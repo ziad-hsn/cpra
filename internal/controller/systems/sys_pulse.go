@@ -3,26 +3,38 @@ package systems
 import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
-	"fmt"
+	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
-	"log"
+	"time"
 )
 
-func FirstPulse(world *controller.CPRaWorld) {
+func FirstPulseSystem(world *controller.CPRaWorld) {
 
-	filter := generic.NewFilter4[components.PulseFirstCheck, components.PulseConfig, components.PulseStatus, components.PulseJob]()
-
+	filter := generic.NewFilter2[components.PulseFirstCheck, components.PulseJob]().Without(generic.T[components.DisabledMonitor]())
 	query := filter.Query(world.Mappers.World)
 
+	exchange := generic.NewExchange(world.Mappers.World).
+		Adds(generic.T[components.PulsePending]()).
+		Removes(
+			generic.T[components.PulseFirstCheck](),
+		)
+	var toExchange []ecs.Entity
+
 	for query.Next() {
+		_, job := query.Get()
 		entity := query.Entity()
-		_, config, status, job := query.Get()
-		job.Job.Execute()
-		err := world.Mappers.MarkAsPending(entity)
-		if err != nil {
-			log.Printf("error: %v\n", err)
-		}
-		fmt.Printf("max failures = %d, last Job ID=%v\n", config.MaxFailures, status.LastJobID)
+
+		go job.Job.Execute()
+
+		toExchange = append(toExchange, entity)
+	}
+	for _, entity := range toExchange {
+		_, status := world.Mappers.Pulse.Get(entity)
+		exchange.Exchange(entity)
+
+		status.LastStatus = "Pending"
+		status.LastCheckTime = time.Now()
+		status.LastError = nil
 	}
 
 }

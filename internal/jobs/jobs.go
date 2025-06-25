@@ -3,14 +3,15 @@ package jobs
 import (
 	"cpra/internal/loader/schema"
 	"fmt"
+	"github.com/mlange-42/arche/ecs"
 	"time"
 )
 
 type Job interface {
-	Execute()
+	Execute() Result
 }
 
-func CreatePulseJob(pulseSchema schema.Pulse, jobID uint32) (Job, error) {
+func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 	// Common parameters from schema.Pulse that are relevant for job execution
 	timeout := pulseSchema.Timeout
 
@@ -44,36 +45,42 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID uint32) (Job, error) {
 }
 
 type PulseHTTPJob struct {
-	ID      uint32
+	ID      ecs.Entity
 	URL     string
 	Method  string
 	Timeout time.Duration
 	Retries int
 }
 
-func (j *PulseHTTPJob) Execute() {
+func (j *PulseHTTPJob) Execute() Result {
 	fmt.Println("executing HTTP Job")
+	res := PulseResults{ID: j.ID, Err: nil}
+	return res
 }
 
 type PulseTCPJob struct {
-	ID      uint32
+	ID      ecs.Entity
 	Host    string
 	Port    int
 	Timeout time.Duration
 	Retries int
 }
 
-func (j *PulseTCPJob) Execute() {
+func (j *PulseTCPJob) Execute() Result {
 	fmt.Println("executing TCP Job")
+	res := PulseResults{ID: j.ID, Err: nil}
+	return res
 }
 
 type PulseICMPJob struct {
-	ID      uint32
+	ID      ecs.Entity
 	Host    string
 	Count   int
 	Timeout time.Duration
 }
 
-func (j *PulseICMPJob) Execute() {
+func (j *PulseICMPJob) Execute() Result {
 	fmt.Println("executing ICMP Job")
+	res := PulseResults{ID: j.ID, Err: fmt.Errorf("ICMP check failed")}
+	return res
 }

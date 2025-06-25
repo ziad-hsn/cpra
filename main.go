@@ -4,10 +4,12 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/systems"
+	"cpra/internal/jobs"
 	"cpra/internal/loader/loader"
 	"fmt"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"time"
 )
 
 func main() {
@@ -27,10 +29,45 @@ func main() {
 		_, n, c, _ := query.Get()
 		fmt.Printf("the following monitor is disabled %v -- %s\n", *n, c.Type)
 	}
-
+	jobChan := make(chan jobs.Job)
+	resultChan := make(chan jobs.Result)
+	s := systems.Scheduler{Systems: make([]systems.System, 0), JobChan: jobChan, ResultChan: resultChan, World: *c, Done: make(chan struct{})}
+	s.AddSystem(&systems.PulseDispatchSystem{
+		JobChan: jobChan,
+	})
+	s.AddSystem(&systems.PulseResultSystem{ResultChan: resultChan})
+	go s.Run(100)
+	timeout := time.After(60 * time.Second)
 	for {
-		systems.FirstPulse(c)
+		select {
+		case job, ok := <-jobChan:
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			resultChan <- res
+		case <-timeout:
+			fmt.Println("timeout")
+			close(s.Done)
+			return
+		}
+
 	}
+
+	//start := time.Now()
+	//timer := time.After(3 * time.Second)
+	//for {
+	//	select {
+	//	case <-timer:
+	//		fmt.Printf("timeout after: %v\n", time.Since(start))
+	//		return
+	//	default:
+	//		fmt.Println(time.Since(start))
+	//		systems.FirstPulseSystem(c)
+	//	}
+	//
+	//}
 	//var client http.Client
 	//worker := systems.SimpleWorker{}
 	//monitorsNum := len(m.Monitors)

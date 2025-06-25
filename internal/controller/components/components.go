@@ -28,6 +28,10 @@ type PulseJob struct {
 	Job jobs.Job
 }
 
+type PulseResults struct {
+	Results jobs.Result
+}
+
 type PulseStatus struct {
 	LastStatus          string
 	LastJobID           uint32

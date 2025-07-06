@@ -54,6 +54,7 @@ var (
 	PulseConfigICMPFields = map[string]FieldType{
 		"host":             {Required: true},
 		"count":            {Required: false},
+		"retries":          {Required: false},
 		"ignore_privilege": {Required: false},
 	}
 
@@ -73,23 +74,23 @@ var (
 		"target":  {Required: true},
 	}
 	InterventionTargetDockerFields = map[string]FieldType{
-		"type":      {Required: true},
+		"type":      {Required: false},
 		"container": {Required: true},
 	}
 	CodeFields = map[string]FieldType{
 		"groups": {Required: false},
-		"blue":   {Required: false},
 		"red":    {Required: false},
 		"yellow": {Required: false},
 		"green":  {Required: false},
 		"cyan":   {Required: false},
-		"black":  {Required: false},
+		"gray":   {Required: false},
 	}
 
 	CodeColorFields = map[string]FieldType{
 		"groups":   {Required: false},
 		"dispatch": {Required: false},
 		"notify":   {Required: true},
+		"config":   {Required: true},
 	}
 )
 
@@ -221,15 +222,18 @@ func (p *YamlParser) ParseMonitor(m yaml.Node, state *parseState) (schema.Monito
 
 	interventionNode := keys["intervention"]
 
-	err = p.ParseIntervention(interventionNode, state)
+	intervention, err := p.ParseIntervention(interventionNode, state)
 	if err != nil {
 		return schema.Monitor{}, err
 	}
+	monitor.Intervention = intervention
+
 	codeNode := keys["codes"]
-	err = p.ParseCode(codeNode, state)
+	codes, err := p.ParseCode(codeNode, state)
 	if err != nil {
 		return schema.Monitor{}, err
 	}
+	monitor.Codes = codes
 
 	return monitor, nil
 }
@@ -275,18 +279,19 @@ func (p *YamlParser) ParsePulse(pNode yaml.Node, state *parseState) (schema.Puls
 		return schema.Pulse{}, &invalidMonitorFieldError{parentKey: "pulse_check", monitor: state.monitorName, field: "type", line: keys["type"].Line, reason: ErrUnknownField}
 	}
 
-	//state.line = pNode.Content[0].Line
-	//_, err = p.ParsePulseConfig(ctx, pConfig, state)
-	//if err != nil {
-	//	return schema.Pulse{}, err
-	//}
+	state.line = pNode.Content[0].Line
+	pConfig := keys["config"]
+	config, err := p.ParsePulseConfig(pConfig, state)
+	if err != nil {
+		return schema.Pulse{}, err
+	}
 
 	var pulse schema.Pulse
 	err = pNode.Decode(&pulse)
 	if err != nil {
 		return schema.Pulse{}, err
 	}
-	//pulse.Config = config
+	pulse.Config = config
 	return pulse, nil
 }
 
@@ -325,16 +330,16 @@ func (p *YamlParser) ParsePulseConfig(pNode yaml.Node, state *parseState) (schem
 	return pulseType, nil
 }
 
-func (p *YamlParser) ParseIntervention(i yaml.Node, state *parseState) error {
+func (p *YamlParser) ParseIntervention(i yaml.Node, state *parseState) (schema.Intervention, error) {
 	var keys map[string]yaml.Node
 	if err := i.Decode(&keys); err != nil {
-		return err
+		return schema.Intervention{}, err
 	}
 
 	key, err := checkMissingRequiredKey("intervention", keys)
 
 	if err != nil || key != "" {
-		return &requiredMonitorFieldError{
+		return schema.Intervention{}, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "intervention",
 			line:      keys[key].Line,
@@ -347,36 +352,43 @@ func (p *YamlParser) ParseIntervention(i yaml.Node, state *parseState) error {
 		if err != nil {
 			line := keys[k].Line
 
-			return &invalidMonitorFieldError{parentKey: "intervention", monitor: state.monitorName, field: k, line: line, reason: err}
+			return schema.Intervention{}, &invalidMonitorFieldError{parentKey: "intervention", monitor: state.monitorName, field: k, line: line, reason: err}
 		}
 	}
 	iTarget := keys["target"]
 
 	var target map[string]yaml.Node
 	if err := iTarget.Decode(&target); err != nil {
-		return err
+		return schema.Intervention{}, err
 	}
 
-	targetType, ok := target["type"]
-	if !ok {
-		return &requiredMonitorFieldError{
-			field:     "type",
-			parentKey: "intervention.target",
-			line:      targetType.Line,
-			reason:    ErrRequiredField,
-		}
-	}
-	switch targetType.Value {
+	//targetType, ok := target["type"]
+	//if !ok {
+	//	return schema.Intervention{}, &requiredMonitorFieldError{
+	//		field:     "type",
+	//		parentKey: "intervention.target",
+	//		line:      targetType.Line,
+	//		reason:    ErrRequiredField,
+	//	}
+	//}
+	action := keys["action"]
+	switch action.Value {
 	case "docker":
 		state.interventionTargetFields = "intervention_docker"
 		err := p.ParseInterventionTarget(iTarget, state)
 		if err != nil {
-			return err
+			return schema.Intervention{}, err
 		}
 	default:
-		return &invalidMonitorFieldError{parentKey: "intervention", monitor: state.monitorName, field: "target", line: keys["target"].Content[0].Line, reason: ErrUnknownField}
+		return schema.Intervention{}, &invalidMonitorFieldError{parentKey: "intervention", monitor: state.monitorName, field: "target", line: keys["target"].Content[0].Line, reason: ErrUnknownField}
 	}
-	return nil
+	var intervention schema.Intervention
+	err = i.Decode(&intervention)
+	if err != nil {
+		return schema.Intervention{}, err
+	}
+	//pulse.Config = config
+	return intervention, nil
 }
 
 func (p *YamlParser) ParseInterventionTarget(i yaml.Node, state *parseState) error {
@@ -408,16 +420,18 @@ func (p *YamlParser) ParseInterventionTarget(i yaml.Node, state *parseState) err
 	return nil
 }
 
-func (p *YamlParser) ParseCode(c yaml.Node, state *parseState) error {
+func (p *YamlParser) ParseCode(c yaml.Node, state *parseState) (schema.Codes, error) {
 	var keys map[string]yaml.Node
 	if err := c.Decode(&keys); err != nil {
-		return err
+		return nil, err
 	}
-
+	var codes schema.Codes
+	if err := c.Decode(&codes); err != nil {
+		return nil, err
+	}
 	key, err := checkMissingRequiredKey("codes", keys)
-
 	if err != nil || key != "" {
-		return &requiredMonitorFieldError{
+		return nil, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "codes",
 			line:      keys[key].Line,
@@ -425,19 +439,16 @@ func (p *YamlParser) ParseCode(c yaml.Node, state *parseState) error {
 		}
 	}
 
-	for k := range keys {
+	//codes := make(schema.Codes)
+	for k, _ := range keys {
 		err := isValidKey(k, "codes")
 		if err != nil {
 			line := keys[k].Line
-			return &invalidMonitorFieldError{parentKey: "codes", monitor: state.monitorName, field: k, line: line, reason: err}
+			return nil, &invalidMonitorFieldError{parentKey: "codes", monitor: state.monitorName, field: k, line: line, reason: err}
 		}
-		state.codeColor = fmt.Sprintf("codes.%v", k)
-		err = p.ParseCodeColor(keys[k], state)
-		if err != nil {
-			return err
-		}
+
 	}
-	return nil
+	return codes, nil
 }
 
 func (p *YamlParser) ParseCodeColor(c yaml.Node, state *parseState) error {

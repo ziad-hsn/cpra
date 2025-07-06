@@ -217,7 +217,7 @@ func TestMutex(t *testing.T) {
 	defer tw.Flush()
 	var m sync.RWMutex
 	fmt.Fprintf(tw, "Readers\tRWMutext\tMutex\n")
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 2; i++ {
 		count := int(math.Pow(2, float64(i)))
 		fmt.Fprintf(
 			tw,

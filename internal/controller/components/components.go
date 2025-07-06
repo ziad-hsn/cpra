@@ -20,6 +20,7 @@ type PulseConfig struct {
 }
 
 type PulseFirstCheck struct{}
+type PulseNeeded struct{}
 type PulsePending struct{}
 type PulseFailed struct{}
 type PulseSuccess struct{}
@@ -34,33 +35,161 @@ type PulseResults struct {
 
 type PulseStatus struct {
 	LastStatus          string
-	LastJobID           uint32
 	ConsecutiveFailures int
 	LastCheckTime       time.Time
 	LastSuccessTime     time.Time
 	LastError           error
 }
 
-// Add Job and Result in an external package, add workerpool and workers in the package on its own, this separate ECS and workers communications without Circular Imports
-
-type InterventionConfig struct {
-	Action   string
-	Cooldown int
-	// ...
+type InterventionNeeded struct{}
+type CodeNeeded struct {
+	Color string
 }
 
+// Add Job and Result in an external package, add workerpool and workers in the package on its own, this separate ECS and workers communications without Circular Imports
+type InterventionConfig struct {
+	Action      string
+	MaxFailures int
+	Target      schema.InterventionTarget
+}
+type InterventionPending struct{}
+type InterventionFailed struct{}
+type InterventionSuccess struct{}
+
+type InterventionJob struct {
+	Job jobs.Job
+}
+
+type InterventionResults struct {
+	Results jobs.Result
+}
+
+type InterventionStatus struct {
+	LastStatus           string
+	ConsecutiveFailures  int
+	LastInterventionTime time.Time
+	LastSuccessTime      time.Time
+	LastError            error
+}
+
+// Add Job and Result in an external package, add workerpool and workers in the package on its own, this separate ECS and workers communications without Circular Imports
 type CodeConfig struct {
-	ID       string
-	Color    string // Or you can use an enum
-	Severity int
-	// ...
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+type CodePending struct {
+	color string
+}
+
+type CodeJob struct {
+	Job jobs.Job
+}
+
+type CodeResults struct {
+	Results jobs.Result
+}
+
+type CodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
 }
 
 // Marker/tag components
-type RedCode struct{}    // use when an entity is a "red code"
-type YellowCode struct{} // etc.
+type RedCode struct{} // use when an entity is a "red code"
 
-// Alternative: use a value type for color/marker
-type CodeColor struct {
-	Color string // "red", "yellow", ...
+type RedCodeJob struct {
+	Job jobs.Job
+}
+type RedCodeConfig struct {
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+type RedCodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
+}
+type GreenCode struct{} // etc.
+
+type GreenCodeJob struct {
+	Job jobs.Job
+}
+type GreenCodeConfig struct {
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+type GreenCodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
+}
+type CyanCode struct{}
+
+type CyanCodeJob struct {
+	Job jobs.Job
+}
+type CyanCodeConfig struct {
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+type CyanCodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
+}
+type YellowCode struct{}
+
+type YellowCodeJob struct {
+	Job jobs.Job
+}
+type YellowCodeConfig struct {
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+type YellowCodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
+}
+
+// GrayCode TODO when API is implemented
+type GrayCode struct{}
+
+type GrayCodeJob struct {
+	Job jobs.Job
+}
+type GrayCodeConfig struct {
+	Dispatch    bool
+	MaxFailures int
+	Notify      string
+	Config      schema.CodeNotification
+}
+
+type GrayCodeStatus struct {
+	LastStatus          string
+	ConsecutiveFailures int
+	LastAlertTime       time.Time
+	LastSuccessTime     time.Time
+	LastError           error
 }

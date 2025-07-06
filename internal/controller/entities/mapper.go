@@ -315,7 +315,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.GreenCodeJob.Assign(entity, &components.GreenCodeJob{Job: j})
+			e.GrayCodeJob.Assign(entity, &components.GrayCodeJob{Job: j})
 		}
 	}
 

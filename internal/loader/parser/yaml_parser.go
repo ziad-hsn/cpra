@@ -457,7 +457,7 @@ func (p *YamlParser) ParseCodeColor(c yaml.Node, state *parseState) error {
 		return err
 	}
 
-	key, err := checkMissingRequiredKey("codes", keys)
+	key, err := checkMissingRequiredKey("codes_color", keys)
 
 	if err != nil || key != "" {
 		return &requiredMonitorFieldError{

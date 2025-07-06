@@ -31,7 +31,7 @@ go.work.sum
 *.zip
 *.bak
 *.sh
-todos.md
+docs/todos.md
 *.dump
 *.yaml
 docs/

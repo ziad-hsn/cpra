@@ -6,9 +6,8 @@ import (
 	"cpra/internal/jobs"
 	"fmt"
 	"github.com/mlange-42/arche/ecs"
-	"github.com/mlange-42/arche/filter"
 	"github.com/mlange-42/arche/generic"
-	"os"
+	"sync"
 	"time"
 )
 
@@ -18,7 +17,7 @@ import (
 //	query := filter.Query(world.Mappers.World)
 //
 //	exchange := generic.NewExchange(world.Mappers.World).
-//		Adds(generic.T[components.PulsePending]()).
+//		Adds(generic.T[components.PulsePulse]()).
 //		Removes(
 //			generic.T[components.PulseFirstCheck](),
 //		)
@@ -43,7 +42,7 @@ import (
 //
 //}
 
-// Create a bridge system to attach either PulseResults or InterventionResults depending on a Pulse type; you can use ID to update entity directly
+// Create a bridge system to attach either PulseResults or PulseResults depending on a Pulse type; you can use ID to update entity directly
 
 //func ResultsBridgeSystem(world *controller.CPRaWorld, results <-chan jobs.PulseResult)
 
@@ -55,6 +54,7 @@ type System interface {
 type Scheduler struct {
 	World      controller.CPRaWorld
 	Systems    []System
+	WG         *sync.WaitGroup
 	JobChan    chan jobs.Job    // channel for jobs
 	ResultChan chan jobs.Result // channel for results
 	Done       chan struct{}
@@ -80,7 +80,9 @@ func (s *Scheduler) Run(tick time.Duration) {
 		case _, ok := <-s.Done:
 			if !ok {
 				close(s.JobChan)
+				close(s.ResultChan)
 				fmt.Printf("scheduler exitied after %v\n", time.Since(start))
+				s.WG.Done()
 				return
 			}
 		}
@@ -89,39 +91,75 @@ func (s *Scheduler) Run(tick time.Duration) {
 
 }
 
+type PulseScheduleSystem struct {
+	PulseFilter generic.Filter2[components.PulseConfig, components.PulseStatus]
+}
+
+func (s *PulseScheduleSystem) Initialize(w controller.CPRaWorld) {
+	s.PulseFilter = *generic.NewFilter2[components.PulseConfig, components.PulseStatus]().Without(generic.T[components.DisabledMonitor]()).Without(generic.T[components.PulsePending]()).Without(generic.T[components.InterventionNeeded]()).Without(generic.T[components.InterventionPending]()).Without(generic.T[components.CodeNeeded]()).Without(generic.T[components.CodePending]())
+	w.Mappers.World.IsLocked()
+}
+
+func (s *PulseScheduleSystem) Update(w controller.CPRaWorld) {
+	toCheck := make([]ecs.Entity, 0)
+	//f := filter.Or(s.FirstCheckFilter.Filter(w.Mappers.World), s.FailedCheckFilter.Filter(w.Mappers.World))
+	query := s.PulseFilter.Query(w.Mappers.World)
+
+	for query.Next() {
+		entity := query.Entity()
+
+		if w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+			//w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
+			//w.Mappers.PulseFirstCheck.Remove(entity)
+			toCheck = append(toCheck, entity)
+			continue
+		}
+		config, status := query.Get()
+		if time.Since(status.LastCheckTime) >= config.Interval {
+			fmt.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
+			//	w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
+			toCheck = append(toCheck, entity)
+		}
+	}
+	for _, entity := range toCheck {
+		w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
+
+	}
+}
+
 // PulseDispatchSystem --- Dispatch System ---
 type PulseDispatchSystem struct {
-	JobChan           chan<- jobs.Job
-	FirstCheckFilter  generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulseFirstCheck]
-	FailedCheckFilter generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulseFailed]
+	JobChan     chan<- jobs.Job
+	PulseNeeded generic.Filter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]
 }
 
 func (s *PulseDispatchSystem) Initialize(w controller.CPRaWorld) {
-	s.FirstCheckFilter = *generic.NewFilter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulseFirstCheck]()
-	s.FailedCheckFilter = *generic.NewFilter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulseFailed]()
+	s.PulseNeeded = *generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
 	w.Mappers.World.IsLocked()
 }
 
 func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
 	toDispatch := make(map[ecs.Entity]jobs.Job)
-	f := filter.Or(s.FirstCheckFilter.Filter(w.Mappers.World), s.FailedCheckFilter.Filter(w.Mappers.World))
-	query := w.Mappers.World.Query(f)
+	//f := filter.Or(s.FirstCheckFilter.Filter(w.Mappers.World), s.FailedCheckFilter.Filter(w.Mappers.World))
+	query := s.PulseNeeded.Query(w.Mappers.World)
 
 	for query.Next() {
-		job := (*components.PulseJob)(query.Get(ecs.ComponentID[components.PulseJob](w.Mappers.World)))
+		job, status, _ := query.Get()
 		// if an interval elapsed and not pending, append to toDispatch
 		// (add your logic)
 		toDispatch[query.Entity()] = job.Job
+		status.LastCheckTime = time.Now()
 	}
 	for entity, job := range toDispatch {
 		select {
 		case s.JobChan <- job:
+
 			fmt.Println("sent job")
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-				w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)})
-			} else {
-				w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseFailed](w.Mappers.World)})
+				w.Mappers.PulseFirstCheck.Remove(entity)
 			}
+			w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
+
 			// mark entity as pending (using Exchange after a query)
 		default:
 			// handle worker pool full, maybe log or retry
@@ -144,38 +182,41 @@ func (s *PulseResultSystem) Update(w controller.CPRaWorld) {
 		select {
 		case res := <-s.ResultChan:
 			entity := res.Entity()
+
+			// 3. Perform structural changes using Exchange for efficiency and pointer validity
+			// This performs the removes and adds in a single archetype transition.
 			w.Mappers.PulsePending.Remove(entity)
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-				w.Mappers.PulseFirstCheck.Remove(entity)
-			}
+
+			// 4. Re-acquire fresh pointers to PulseConfig and PulseStatus AFTER structural changes
+			// The original config and status pointers might be invalid after the Exchange operation.
 			config, status := w.Mappers.Pulse.Get(entity)
 
+			// 5. Update data fields directly on the re-acquired 'status' pointer
 			if res.Error() != nil {
-
 				status.LastStatus = "failed"
 				status.LastError = res.Error()
 				status.ConsecutiveFailures++
-				//w.Mappers.Pulse.Assign(entity, config, status)
 				if config.MaxFailures <= status.ConsecutiveFailures {
+					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
+					name := w.Mappers.Name.Get(entity)
 					if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
-						//	Add intervention markers here
-						name := w.Mappers.Name.Get(entity)
-						fmt.Printf("Monitor %s failed and needs intervention\n", *name)
-						os.Exit(1)
+						fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
+						w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
 					}
 				}
-				w.Mappers.PulseFailed.Add(entity)
-
 			} else {
+				if status.LastStatus == "failed" {
+					if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "green"})
+					}
+				}
 				status.LastStatus = "success"
 				status.LastError = nil
 				status.ConsecutiveFailures = 0
 				status.LastSuccessTime = time.Now()
-				//w.Mappers.Pulse.Assign(entity, config, status)
-				w.Mappers.PulseSuccess.Add(entity)
 			}
-			// update status/markers for res.Entity
-			// (add PulseSuccess/PulseFailed etc. via Exchange)
+			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.
+			// Direct modification of status fields is the correct way to update values.
 		default:
 			return
 		}

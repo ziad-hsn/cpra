@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -29,15 +30,27 @@ func main() {
 		_, n, c, _ := query.Get()
 		fmt.Printf("the following monitor is disabled %v -- %s\n", *n, c.Type)
 	}
-	jobChan := make(chan jobs.Job)
-	resultChan := make(chan jobs.Result)
-	s := systems.Scheduler{Systems: make([]systems.System, 0), JobChan: jobChan, ResultChan: resultChan, World: *c, Done: make(chan struct{})}
+	jobChan := make(chan jobs.Job, len(m.Monitors))
+	resultChan := make(chan jobs.Result, len(m.Monitors))
+	ijobChan := make(chan jobs.Job, len(m.Monitors))
+	iresultChan := make(chan jobs.Result, len(m.Monitors))
+	cjobChan := make(chan jobs.Job, len(m.Monitors))
+	cresultChan := make(chan jobs.Result, len(m.Monitors))
+	schedulerWG := &sync.WaitGroup{}
+	s := systems.Scheduler{Systems: make([]systems.System, 0), WG: schedulerWG, JobChan: jobChan, ResultChan: resultChan, World: *c, Done: make(chan struct{})}
+	s.AddSystem(&systems.PulseScheduleSystem{})
 	s.AddSystem(&systems.PulseDispatchSystem{
 		JobChan: jobChan,
 	})
 	s.AddSystem(&systems.PulseResultSystem{ResultChan: resultChan})
-	go s.Run(100)
-	timeout := time.After(60 * time.Second)
+	s.AddSystem(&systems.InterventionDispatchSystem{JobChan: ijobChan})
+	s.AddSystem(&systems.InterventionResultSystem{ResultChan: iresultChan})
+	s.AddSystem(&systems.CodeDispatchSystem{JobChan: cjobChan})
+	s.AddSystem(&systems.CodeResultSystem{ResultChan: cresultChan})
+	schedulerWG.Add(1)
+	go s.Run(10 * time.Microsecond)
+	timeout := time.After(2 * time.Hour)
+
 	for {
 		select {
 		case job, ok := <-jobChan:
@@ -47,9 +60,25 @@ func main() {
 			}
 			res := job.Execute()
 			resultChan <- res
+		case job, ok := <-ijobChan:
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			iresultChan <- res
+		case job, ok := <-cjobChan:
+			fmt.Println("code code job")
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			cresultChan <- res
 		case <-timeout:
 			fmt.Println("timeout")
 			close(s.Done)
+			schedulerWG.Wait()
 			return
 		}
 

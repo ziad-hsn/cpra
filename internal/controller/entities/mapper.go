@@ -15,27 +15,79 @@ type EntityManager struct {
 	Name            generic.Map1[components.Name]
 	Disabled        generic.Map1[components.DisabledMonitor]
 	Pulse           generic.Map2[components.PulseConfig, components.PulseStatus]
+	PulseNeeded     generic.Map1[components.PulseNeeded]
 	PulsePending    generic.Map1[components.PulsePending]
 	PulseFailed     generic.Map1[components.PulseFailed]
 	PulseSuccess    generic.Map1[components.PulseSuccess]
 	PulseFirstCheck generic.Map1[components.PulseFirstCheck]
 	PulseJob        generic.Map1[components.PulseJob]
 	// ... other mappers
+	Intervention        generic.Map2[components.InterventionConfig, components.InterventionStatus]
+	InterventionPending generic.Map1[components.InterventionPending]
+	InterventionFailed  generic.Map1[components.InterventionFailed]
+	InterventionSuccess generic.Map1[components.InterventionSuccess]
+	InterventionNeeded  generic.Map1[components.InterventionNeeded]
+	InterventionJob     generic.Map1[components.InterventionJob]
+	Code                generic.Map2[components.CodeConfig, components.CodeStatus]
+	CodeNeeded          generic.Map1[components.CodeNeeded]
+	CodePending         generic.Map1[components.CodePending]
+	CodeJob             generic.Map1[components.CodeJob]
+	RedCode             generic.Map1[components.RedCode]
+	RedCodeJob          generic.Map1[components.RedCodeJob]
+	RedCodeConfig       generic.Map2[components.RedCodeConfig, components.RedCodeStatus]
+	CyanCode            generic.Map1[components.CyanCode]
+	CyanCodeJob         generic.Map1[components.CyanCodeJob]
+	CyanCodeConfig      generic.Map2[components.CyanCodeConfig, components.CyanCodeStatus]
+	GreenCode           generic.Map1[components.GreenCode]
+	GreenCodeJob        generic.Map1[components.GreenCodeJob]
+	GreenCodeConfig     generic.Map2[components.GreenCodeConfig, components.GreenCodeStatus]
+	YellowCode          generic.Map1[components.YellowCode]
+	YellowCodeJob       generic.Map1[components.YellowCodeJob]
+	YellowCodeConfig    generic.Map2[components.YellowCodeConfig, components.YellowCodeStatus]
+	GrayCode            generic.Map1[components.GrayCode]
+	GrayCodeJob         generic.Map1[components.GrayCodeJob]
+	GrayCodeConfig      generic.Map2[components.GrayCodeConfig, components.GrayCodeStatus]
 }
 
 // InitializeMappers creates and returns a EntityManager for a given world.
 // It no longer creates the world itself.
 func InitializeMappers(world *ecs.World) EntityManager {
 	return EntityManager{
-		World:           world,
-		Name:            generic.NewMap1[components.Name](world),
-		Disabled:        generic.NewMap1[components.DisabledMonitor](world),
-		Pulse:           generic.NewMap2[components.PulseConfig, components.PulseStatus](world),
-		PulsePending:    generic.NewMap1[components.PulsePending](world),
-		PulseFailed:     generic.NewMap1[components.PulseFailed](world),
-		PulseSuccess:    generic.NewMap1[components.PulseSuccess](world),
-		PulseFirstCheck: generic.NewMap1[components.PulseFirstCheck](world),
-		PulseJob:        generic.NewMap1[components.PulseJob](world),
+		World:               world,
+		Name:                generic.NewMap1[components.Name](world),
+		Disabled:            generic.NewMap1[components.DisabledMonitor](world),
+		Pulse:               generic.NewMap2[components.PulseConfig, components.PulseStatus](world),
+		PulseNeeded:         generic.NewMap1[components.PulseNeeded](world),
+		PulsePending:        generic.NewMap1[components.PulsePending](world),
+		PulseFailed:         generic.NewMap1[components.PulseFailed](world),
+		PulseSuccess:        generic.NewMap1[components.PulseSuccess](world),
+		PulseFirstCheck:     generic.NewMap1[components.PulseFirstCheck](world),
+		PulseJob:            generic.NewMap1[components.PulseJob](world),
+		Intervention:        generic.NewMap2[components.InterventionConfig, components.InterventionStatus](world),
+		InterventionPending: generic.NewMap1[components.InterventionPending](world),
+		InterventionFailed:  generic.NewMap1[components.InterventionFailed](world),
+		InterventionSuccess: generic.NewMap1[components.InterventionSuccess](world),
+		InterventionNeeded:  generic.NewMap1[components.InterventionNeeded](world),
+		InterventionJob:     generic.NewMap1[components.InterventionJob](world),
+		Code:                generic.NewMap2[components.CodeConfig, components.CodeStatus](world),
+		CodeNeeded:          generic.NewMap1[components.CodeNeeded](world),
+		CodePending:         generic.NewMap1[components.CodePending](world),
+		CodeJob:             generic.NewMap1[components.CodeJob](world),
+		RedCode:             generic.NewMap1[components.RedCode](world),
+		RedCodeJob:          generic.NewMap1[components.RedCodeJob](world),
+		RedCodeConfig:       generic.NewMap2[components.RedCodeConfig, components.RedCodeStatus](world),
+		CyanCode:            generic.NewMap1[components.CyanCode](world),
+		CyanCodeJob:         generic.NewMap1[components.CyanCodeJob](world),
+		CyanCodeConfig:      generic.NewMap2[components.CyanCodeConfig, components.CyanCodeStatus](world),
+		GreenCode:           generic.NewMap1[components.GreenCode](world),
+		GreenCodeJob:        generic.NewMap1[components.GreenCodeJob](world),
+		GreenCodeConfig:     generic.NewMap2[components.GreenCodeConfig, components.GreenCodeStatus](world),
+		YellowCode:          generic.NewMap1[components.YellowCode](world),
+		YellowCodeJob:       generic.NewMap1[components.YellowCodeJob](world),
+		YellowCodeConfig:    generic.NewMap2[components.YellowCodeConfig, components.YellowCodeStatus](world),
+		GrayCode:            generic.NewMap1[components.GrayCode](world),
+		GrayCodeJob:         generic.NewMap1[components.GrayCodeJob](world),
+		GrayCodeConfig:      generic.NewMap2[components.GrayCodeConfig, components.GrayCodeStatus](world),
 	}
 }
 
@@ -57,8 +109,8 @@ func (e *EntityManager) MarkAsPending(entity ecs.Entity) error {
 		e.PulseFailed.Remove(entity)
 	}
 
-	// Optionally update PulseStatus component
-	if _, status := e.Pulse.Get(entity); status != nil { // status is *components.PulseStatus
+	// Optionally update InterventionStatus component
+	if _, status := e.Pulse.Get(entity); status != nil { // status is *components.InterventionStatus
 		status.LastStatus = "Pending"
 		status.LastCheckTime = time.Now()
 		status.LastError = nil
@@ -67,7 +119,7 @@ func (e *EntityManager) MarkAsPending(entity ecs.Entity) error {
 }
 
 // MarkAsSuccess records a successful pulse check.
-func (e *EntityManager) MarkAsSuccess(entity ecs.Entity, resultDetails string) error { // resultDetails could be richer, e.g. *jobs.PulseResult
+func (e *EntityManager) MarkAsSuccess(entity ecs.Entity, resultDetails string) error { // resultDetails could be richer, e.g. *jobs.Result
 	if !e.World.Alive(entity) {
 		return fmt.Errorf("Entity is not found in the world: %v.\n", entity)
 	}
@@ -88,7 +140,7 @@ func (e *EntityManager) MarkAsSuccess(entity ecs.Entity, resultDetails string) e
 		status.LastCheckTime = time.Now()
 		status.ConsecutiveFailures = 0
 		status.LastError = nil // Clear last error
-		// You might store parts of resultDetails in PulseStatus
+		// You might store parts of resultDetails in InterventionStatus
 	}
 	return nil
 }
@@ -129,7 +181,7 @@ func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
 	}
 	// Optionally, if enabling a monitor should trigger an immediate check:
 	// c.Mappers.PulseFirstCheck.GetOrAdd(entity) // Or c.Mappers.PulseFirstCheck.Add(entity)
-	// You might also want to reset its PulseStatus here or clear pending/failed/success states.
+	// You might also want to reset its InterventionStatus here or clear pending/failed/success states.
 	// For instance, when re-enabling, it might go into a "Pending" state for its first check.
 	// c.MarkAsPending(entity) // If re-enabling implies it needs an immediate check.
 }
@@ -156,7 +208,7 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 		e.PulseSuccess.Remove(entity)
 	}
 
-	// Or update PulseStatus to indicate it's disabled.
+	// Or update InterventionStatus to indicate it's disabled.
 	if _, status := e.Pulse.Get(entity); status != nil {
 		status.LastStatus = "Disabled"
 	}
@@ -181,15 +233,91 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		Type:        monitor.Pulse.Type,
 		MaxFailures: monitor.Pulse.MaxFailures,
 		Timeout:     monitor.Pulse.Timeout,
+		Interval:    monitor.Pulse.Interval,
 	}
 	pulseStatus := components.PulseStatus{}
 
 	e.Pulse.Assign(entity, &pulseCfg, &pulseStatus)
 
-	j, err := jobs.CreatePulseJob(monitor.Pulse, entity.ID())
+	j, err := jobs.CreatePulseJob(monitor.Pulse, entity)
 	if err != nil {
 		return err
 	}
 	e.PulseJob.Assign(entity, &components.PulseJob{Job: j})
+
+	if monitor.Intervention.Action != "" {
+		interventionCfg := &components.InterventionConfig{
+			Action: monitor.Intervention.Action,
+		}
+		InterventionStatus := &components.InterventionStatus{}
+		e.Intervention.Assign(entity, interventionCfg, InterventionStatus)
+		j, err = jobs.CreateInterventionJob(monitor.Intervention, entity)
+		if err != nil {
+			return err
+		}
+		e.InterventionJob.Assign(entity, &components.InterventionJob{Job: j})
+	}
+
+	for color, config := range monitor.Codes {
+		switch color {
+
+		case "red":
+			e.RedCode.Assign(entity, &components.RedCode{})
+			CodeConfig := &components.RedCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+
+			CodeStatus := &components.RedCodeStatus{}
+			e.RedCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			if err != nil {
+				return err
+			}
+			e.RedCodeJob.Assign(entity, &components.RedCodeJob{Job: j})
+		case "green":
+			e.GreenCode.Assign(entity, &components.GreenCode{})
+			CodeConfig := &components.GreenCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+
+			CodeStatus := &components.GreenCodeStatus{}
+			e.GreenCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			if err != nil {
+				return err
+			}
+			e.GreenCodeJob.Assign(entity, &components.GreenCodeJob{Job: j})
+		case "yellow":
+			e.YellowCode.Assign(entity, &components.YellowCode{})
+			CodeConfig := &components.YellowCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+
+			CodeStatus := &components.YellowCodeStatus{}
+			e.YellowCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			if err != nil {
+				return err
+			}
+			e.YellowCodeJob.Assign(entity, &components.YellowCodeJob{Job: j})
+		case "cyan":
+			e.CyanCode.Assign(entity, &components.CyanCode{})
+			CodeConfig := &components.CyanCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+
+			CodeStatus := &components.CyanCodeStatus{}
+			e.CyanCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			if err != nil {
+				return err
+			}
+			e.CyanCodeJob.Assign(entity, &components.CyanCodeJob{Job: j})
+		case "gray":
+			e.GrayCode.Assign(entity, &components.GrayCode{})
+			CodeConfig := &components.GrayCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+
+			CodeStatus := &components.GrayCodeStatus{}
+			e.GrayCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			if err != nil {
+				return err
+			}
+			e.GreenCodeJob.Assign(entity, &components.GreenCodeJob{Job: j})
+		}
+	}
+
 	return nil
 }

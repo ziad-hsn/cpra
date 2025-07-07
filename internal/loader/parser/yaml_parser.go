@@ -220,13 +220,13 @@ func (p *YamlParser) ParseMonitor(m yaml.Node, state *parseState) (schema.Monito
 
 	monitor.Pulse = pulse
 
-	interventionNode := keys["intervention"]
-
-	intervention, err := p.ParseIntervention(interventionNode, state)
-	if err != nil {
-		return schema.Monitor{}, err
+	if interventionNode, ok := keys["intervention"]; ok {
+		intervention, err := p.ParseIntervention(interventionNode, state)
+		if err != nil {
+			return schema.Monitor{}, err
+		}
+		monitor.Intervention = intervention
 	}
-	monitor.Intervention = intervention
 
 	codeNode := keys["codes"]
 	codes, err := p.ParseCode(codeNode, state)

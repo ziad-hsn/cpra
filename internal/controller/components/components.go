@@ -10,6 +10,13 @@ type Name string
 
 type DisabledMonitor struct{}
 
+type MonitorStatus struct {
+	Status          string
+	LastCheckTime   time.Time
+	LastSuccessTime time.Time
+	LastError       error
+}
+
 type PulseConfig struct {
 	Type        string
 	Timeout     time.Duration
@@ -80,7 +87,7 @@ type CodeConfig struct {
 	Config      schema.CodeNotification
 }
 type CodePending struct {
-	color string
+	Color string
 }
 
 type CodeJob struct {
@@ -97,6 +104,11 @@ type CodeStatus struct {
 	LastAlertTime       time.Time
 	LastSuccessTime     time.Time
 	LastError           error
+}
+
+type CodeStatusAccessor interface {
+	SetSuccess(t time.Time)
+	SetFailure(err error)
 }
 
 // Marker/tag components
@@ -118,6 +130,21 @@ type RedCodeStatus struct {
 	LastSuccessTime     time.Time
 	LastError           error
 }
+
+func (s *RedCodeStatus) SetSuccess(t time.Time) {
+	s.LastStatus = "success"
+	s.LastError = nil
+	s.ConsecutiveFailures = 0
+	s.LastSuccessTime = t
+	s.LastAlertTime = t
+}
+
+func (s *RedCodeStatus) SetFailure(err error) {
+	s.LastStatus = "failed"
+	s.LastError = err
+	s.ConsecutiveFailures++
+}
+
 type GreenCode struct{} // etc.
 
 type GreenCodeJob struct {
@@ -136,6 +163,21 @@ type GreenCodeStatus struct {
 	LastSuccessTime     time.Time
 	LastError           error
 }
+
+func (s *GreenCodeStatus) SetSuccess(t time.Time) {
+	s.LastStatus = "success"
+	s.LastError = nil
+	s.ConsecutiveFailures = 0
+	s.LastSuccessTime = t
+	s.LastAlertTime = t
+}
+
+func (s *GreenCodeStatus) SetFailure(err error) {
+	s.LastStatus = "failed"
+	s.LastError = err
+	s.ConsecutiveFailures++
+}
+
 type CyanCode struct{}
 
 type CyanCodeJob struct {
@@ -154,6 +196,21 @@ type CyanCodeStatus struct {
 	LastSuccessTime     time.Time
 	LastError           error
 }
+
+func (s *CyanCodeStatus) SetSuccess(t time.Time) {
+	s.LastStatus = "success"
+	s.LastError = nil
+	s.ConsecutiveFailures = 0
+	s.LastSuccessTime = t
+	s.LastAlertTime = t
+}
+
+func (s *CyanCodeStatus) SetFailure(err error) {
+	s.LastStatus = "failed"
+	s.LastError = err
+	s.ConsecutiveFailures++
+}
+
 type YellowCode struct{}
 
 type YellowCodeJob struct {
@@ -171,6 +228,20 @@ type YellowCodeStatus struct {
 	LastAlertTime       time.Time
 	LastSuccessTime     time.Time
 	LastError           error
+}
+
+func (s *YellowCodeStatus) SetSuccess(t time.Time) {
+	s.LastStatus = "success"
+	s.LastError = nil
+	s.ConsecutiveFailures = 0
+	s.LastSuccessTime = t
+	s.LastAlertTime = t
+}
+
+func (s *YellowCodeStatus) SetFailure(err error) {
+	s.LastStatus = "failed"
+	s.LastError = err
+	s.ConsecutiveFailures++
 }
 
 // GrayCode TODO when API is implemented
@@ -192,4 +263,18 @@ type GrayCodeStatus struct {
 	LastAlertTime       time.Time
 	LastSuccessTime     time.Time
 	LastError           error
+}
+
+func (s *GrayCodeStatus) SetSuccess(t time.Time) {
+	s.LastStatus = "success"
+	s.LastError = nil
+	s.ConsecutiveFailures = 0
+	s.LastSuccessTime = t
+	s.LastAlertTime = t
+}
+
+func (s *GrayCodeStatus) SetFailure(err error) {
+	s.LastStatus = "failed"
+	s.LastError = err
+	s.ConsecutiveFailures++
 }

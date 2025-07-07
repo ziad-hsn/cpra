@@ -76,12 +76,17 @@ func (s *InterventionResultSystem) Update(w controller.CPRaWorld) {
 					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
 
 					fmt.Printf("Monitor %s intervention failed\n", *name)
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-						fmt.Println("scheduling yellow code")
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{
-							Color: "yellow",
-						})
+					if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+						componentsList := GetEntityComponents(w.Mappers.World, entity)
+						fmt.Printf("DEBUG: Entity %v has components: %v\n", entity, componentsList)
+						fmt.Println("scheduling red code")
+						if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
+							w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{
+								Color: "red",
+							})
+						}
 					}
+					w.Mappers.InterventionPending.Remove(entity)
 
 				} else {
 					w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
@@ -100,4 +105,24 @@ func (s *InterventionResultSystem) Update(w controller.CPRaWorld) {
 			return
 		}
 	}
+}
+
+func GetEntityComponents(w *ecs.World, entity ecs.Entity) []string {
+	// 1. Retrieve Component IDs for the entity.
+	ids := w.Ids(entity)
+
+	var componentNames []string
+
+	// 2. Iterate and access components.
+	for _, id := range ids {
+		// Get the reflect.Type for the component ID.
+		info, _ := ecs.ComponentInfo(w, id)
+		compType := info.Type
+
+		// Get a pointer to the component data.
+		// Note: world.Get() returns an unsafe.Pointer that we don't need to fully cast
+		// just to get the name of the type.
+		componentNames = append(componentNames, compType.Name())
+	}
+	return componentNames
 }

@@ -190,30 +190,41 @@ func (s *PulseResultSystem) Update(w controller.CPRaWorld) {
 			// 4. Re-acquire fresh pointers to PulseConfig and PulseStatus AFTER structural changes
 			// The original config and status pointers might be invalid after the Exchange operation.
 			config, status := w.Mappers.Pulse.Get(entity)
+			monitorStatus := w.Mappers.MonitorStatus.Get(entity)
 
 			// 5. Update data fields directly on the re-acquired 'status' pointer
 			if res.Error() != nil {
 				status.LastStatus = "failed"
 				status.LastError = res.Error()
 				status.ConsecutiveFailures++
+				if status.ConsecutiveFailures == 1 {
+					if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "yellow"})
+					}
+				}
+				name := w.Mappers.Name.Get(entity)
+				//fmt.Printf("%s Job failed: %v\n", *name, res.Error())
 				if config.MaxFailures <= status.ConsecutiveFailures {
 					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
-					name := w.Mappers.Name.Get(entity)
+					monitorStatus.Status = "failed"
 					if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
 						fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
 						w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
 					}
+
 				}
 			} else {
-				if status.LastStatus == "failed" {
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "green"})
-					}
-				}
 				status.LastStatus = "success"
 				status.LastError = nil
 				status.ConsecutiveFailures = 0
 				status.LastSuccessTime = time.Now()
+				monitorStatus.Status = "success"
+
+				if monitorStatus.Status == "failed" {
+					if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "green"})
+					}
+				}
 			}
 			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.
 			// Direct modification of status fields is the correct way to update values.

@@ -37,7 +37,7 @@ func main() {
 	cjobChan := make(chan jobs.Job, len(m.Monitors))
 	cresultChan := make(chan jobs.Result, len(m.Monitors))
 	schedulerWG := &sync.WaitGroup{}
-	s := systems.Scheduler{Systems: make([]systems.System, 0), WG: schedulerWG, JobChan: jobChan, ResultChan: resultChan, World: *c, Done: make(chan struct{})}
+	s := systems.Scheduler{Systems: make([]systems.System, 0), WG: schedulerWG, JobChan: jobChan, ResultChan: resultChan, World: *c, Done: make(chan struct{}), Lock: sync.RWMutex{}}
 	s.AddSystem(&systems.PulseScheduleSystem{})
 	s.AddSystem(&systems.PulseDispatchSystem{
 		JobChan: jobChan,
@@ -54,6 +54,7 @@ func main() {
 	for {
 		select {
 		case job, ok := <-jobChan:
+
 			if !ok {
 				fmt.Println("existing CPRa")
 				return

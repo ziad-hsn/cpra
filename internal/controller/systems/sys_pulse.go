@@ -47,7 +47,7 @@ import (
 //func ResultsBridgeSystem(world *controller.CPRaWorld, results <-chan jobs.PulseResult)
 
 type System interface {
-	Initialize(w controller.CPRaWorld)
+	Initialize(w controller.CPRaWorld, lock sync.Locker)
 	Update(w controller.CPRaWorld)
 }
 
@@ -58,6 +58,7 @@ type Scheduler struct {
 	JobChan    chan jobs.Job    // channel for jobs
 	ResultChan chan jobs.Result // channel for results
 	Done       chan struct{}
+	Lock       sync.RWMutex
 }
 
 func (s *Scheduler) AddSystem(sys System) {
@@ -69,13 +70,15 @@ func (s *Scheduler) Run(tick time.Duration) {
 	fmt.Printf("scheduler started at %v with %v tick\n", start, tick)
 	t := time.Tick(tick)
 	for _, sys := range s.Systems {
-		sys.Initialize(s.World)
+		sys.Initialize(s.World, &s.Lock)
 	}
 	for {
 		select {
 		case <-t:
 			for _, sys := range s.Systems {
+				// s.lock.Lock()
 				sys.Update(s.World)
+				// s.lock.Unlock()
 			}
 		case _, ok := <-s.Done:
 			if !ok {
@@ -93,10 +96,12 @@ func (s *Scheduler) Run(tick time.Duration) {
 
 type PulseScheduleSystem struct {
 	PulseFilter generic.Filter2[components.PulseConfig, components.PulseStatus]
+	lock        sync.Locker
 }
 
-func (s *PulseScheduleSystem) Initialize(w controller.CPRaWorld) {
+func (s *PulseScheduleSystem) Initialize(w controller.CPRaWorld, lock sync.Locker) {
 	s.PulseFilter = *generic.NewFilter2[components.PulseConfig, components.PulseStatus]().Without(generic.T[components.DisabledMonitor]()).Without(generic.T[components.PulsePending]()).Without(generic.T[components.InterventionNeeded]()).Without(generic.T[components.InterventionPending]()).Without(generic.T[components.CodeNeeded]()).Without(generic.T[components.CodePending]())
+	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
 
@@ -121,20 +126,24 @@ func (s *PulseScheduleSystem) Update(w controller.CPRaWorld) {
 			toCheck = append(toCheck, entity)
 		}
 	}
+	// s.lock.Lock()
 	for _, entity := range toCheck {
 		w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
 
 	}
+	// s.lock.Unlock()
 }
 
 // PulseDispatchSystem --- Dispatch System ---
 type PulseDispatchSystem struct {
 	JobChan     chan<- jobs.Job
 	PulseNeeded generic.Filter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]
+	lock        sync.Locker
 }
 
-func (s *PulseDispatchSystem) Initialize(w controller.CPRaWorld) {
+func (s *PulseDispatchSystem) Initialize(w controller.CPRaWorld, lock sync.Locker) {
 	s.PulseNeeded = *generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
+	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
 
@@ -150,6 +159,7 @@ func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
 		toDispatch[query.Entity()] = job.Job
 		status.LastCheckTime = time.Now()
 	}
+	// s.lock.Lock()
 	for entity, job := range toDispatch {
 		select {
 		case s.JobChan <- job:
@@ -165,15 +175,18 @@ func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
 			// handle worker pool full, maybe log or retry
 		}
 	}
+	// s.lock.Unlock()
 }
 
 // PulseResultSystem --- RESULT PROCESS SYSTEM ---
 type PulseResultSystem struct {
 	PendingPulseFilter generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulsePending]
 	ResultChan         <-chan jobs.Result
+	lock               sync.Locker
 }
 
-func (s *PulseResultSystem) Initialize(w controller.CPRaWorld) {
+func (s *PulseResultSystem) Initialize(w controller.CPRaWorld, lock sync.Locker) {
+	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
 
@@ -181,6 +194,7 @@ func (s *PulseResultSystem) Update(w controller.CPRaWorld) {
 	for {
 		select {
 		case res := <-s.ResultChan:
+			// s.lock.Lock()
 			entity := res.Entity()
 
 			// 3. Perform structural changes using Exchange for efficiency and pointer validity
@@ -226,6 +240,7 @@ func (s *PulseResultSystem) Update(w controller.CPRaWorld) {
 					}
 				}
 			}
+			// s.lock.Unlock()
 			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.
 			// Direct modification of status fields is the correct way to update values.
 		default:

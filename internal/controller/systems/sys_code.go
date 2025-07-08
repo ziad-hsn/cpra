@@ -8,6 +8,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -20,12 +21,13 @@ type CodeDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	CodeNeededFilter         generic.Filter1[components.CodeNeeded]
 	FailedInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]
+	lock                     sync.Locker
 }
 
-func (s *CodeDispatchSystem) Initialize(w controller.CPRaWorld) {
+func (s *CodeDispatchSystem) Initialize(w controller.CPRaWorld, lock sync.Locker) {
 	s.CodeNeededFilter = *generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
 	s.FailedInterventionFilter = *generic.NewFilter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]()
-
+	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
 
@@ -59,6 +61,7 @@ func (s *CodeDispatchSystem) Update(w controller.CPRaWorld) {
 		// Store both the job and the color string
 		toDispatch[entity] = dispatchInfo{Job: job, Color: color}
 	}
+	//s.lock.Lock()
 	for entity, job := range toDispatch {
 		select {
 		case s.JobChan <- job.Job:
@@ -72,23 +75,28 @@ func (s *CodeDispatchSystem) Update(w controller.CPRaWorld) {
 			// handle worker pool full, maybe log or retry
 		}
 	}
+	//s.lock.Unlock()
 }
 
 // PulseResultSystem --- RESULT PROCESS SYSTEM ---
 type CodeResultSystem struct {
 	PendingCodeFilter generic.Filter1[components.CodePending]
 	ResultChan        <-chan jobs.Result
+	lock              sync.Locker
 }
 
-func (s *CodeResultSystem) Initialize(w controller.CPRaWorld) {
+func (s *CodeResultSystem) Initialize(w controller.CPRaWorld, lock sync.Locker) {
+	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
 
 func (s *CodeResultSystem) Update(w controller.CPRaWorld) {
 
 	for {
+		//s.lock.Lock()
 		select {
 		case res := <-s.ResultChan:
+
 			entity := res.Entity()
 
 			c := w.Mappers.CodePending.Get(entity)
@@ -107,6 +115,8 @@ func (s *CodeResultSystem) Update(w controller.CPRaWorld) {
 				_, status = w.Mappers.CyanCodeConfig.Get(entity)
 			case "gray":
 				_, status = w.Mappers.GrayCodeConfig.Get(entity)
+			default:
+				log.Fatal(GetEntityComponents(w.Mappers.World, entity))
 			}
 			name := w.Mappers.Name.Get(entity)
 			if res.Error() != nil {
@@ -120,7 +130,9 @@ func (s *CodeResultSystem) Update(w controller.CPRaWorld) {
 				fmt.Printf("Monitor %s %q code sent successfully\n", *name, c.Color)
 			}
 			w.Mappers.CodePending.Remove(entity)
+			//s.lock.Unlock()
 		default:
+			//s.lock.Unlock()
 			return
 		}
 	}

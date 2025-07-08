@@ -185,7 +185,7 @@ func (p *YamlParser) ParseMonitor(m yaml.Node, state *parseState) (schema.Monito
 		return schema.Monitor{}, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "monitor",
-			line:      keys[key].Line,
+			line:      m.Line,
 			reason:    ErrRequiredField,
 		}
 	}
@@ -251,7 +251,7 @@ func (p *YamlParser) ParsePulse(pNode yaml.Node, state *parseState) (schema.Puls
 		return schema.Pulse{}, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "pulse_check",
-			line:      keys[key].Line,
+			line:      pNode.Line,
 			reason:    ErrRequiredField,
 		}
 	}
@@ -342,7 +342,7 @@ func (p *YamlParser) ParseIntervention(i yaml.Node, state *parseState) (schema.I
 		return schema.Intervention{}, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "intervention",
-			line:      keys[key].Line,
+			line:      i.Line,
 			reason:    ErrRequiredField,
 		}
 	}
@@ -404,7 +404,7 @@ func (p *YamlParser) ParseInterventionTarget(i yaml.Node, state *parseState) err
 		return &requiredMonitorFieldError{
 			field:     key,
 			parentKey: fmt.Sprintf("%v intervention", keys["type"].Value),
-			line:      keys[key].Line,
+			line:      i.Line,
 			reason:    ErrRequiredField,
 		}
 	}
@@ -434,12 +434,13 @@ func (p *YamlParser) ParseCode(c yaml.Node, state *parseState) (schema.Codes, er
 		return nil, &requiredMonitorFieldError{
 			field:     key,
 			parentKey: "codes",
-			line:      keys[key].Line,
+			line:      c.Line,
 			reason:    ErrRequiredField,
 		}
 	}
 
 	//codes := make(schema.Codes)
+
 	for k, _ := range keys {
 		err := isValidKey(k, "codes")
 		if err != nil {
@@ -447,6 +448,16 @@ func (p *YamlParser) ParseCode(c yaml.Node, state *parseState) (schema.Codes, er
 			return nil, &invalidMonitorFieldError{parentKey: "codes", monitor: state.monitorName, field: k, line: line, reason: err}
 		}
 
+	}
+	for colorKey, colorNode := range keys {
+		// ... (existing key validation)
+
+		// ADD THIS LOGIC
+		state.codeColor = colorKey // Set the state for the color being parsed
+		err := p.ParseCodeColor(colorNode, state)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return codes, nil
 }
@@ -457,13 +468,13 @@ func (p *YamlParser) ParseCodeColor(c yaml.Node, state *parseState) error {
 		return err
 	}
 
-	key, err := checkMissingRequiredKey("codes_color", keys)
+	key, err := checkMissingRequiredKey("code_color", keys)
 
 	if err != nil || key != "" {
 		return &requiredMonitorFieldError{
 			field:     key,
 			parentKey: state.codeColor,
-			line:      keys[key].Line,
+			line:      c.Line,
 			reason:    ErrRequiredField,
 		}
 	}

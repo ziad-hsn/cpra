@@ -2,7 +2,7 @@ package validator
 
 import (
 	parser2 "cpra/internal/loader/schema"
-	"cpra/loader/parser"
+	//"cpra/loader/parser"
 )
 
 type Validator interface {

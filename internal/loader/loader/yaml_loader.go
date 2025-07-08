@@ -2,11 +2,16 @@ package loader
 
 import (
 	"cpra/internal/loader/parser"
-	"cpra/internal/loader/schema"
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"strings"
+
+	//"cpra/internal/loader/parser"
+	"cpra/internal/loader/schema"
+	//"errors"
+	//"fmt"
+	"gopkg.in/yaml.v3"
+	//"strings"
 
 	//"github.com/ziad-hsn/cpra/loader/validator"
 	"log"
@@ -37,6 +42,13 @@ func (l *YamlLoader) Load() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	//decoder := yaml.NewDecoder(file)
+	//var manifest schema.Manifest
+	//if err := decoder.Decode(&manifest); err != nil {
+	//	// This error will now include line numbers and be very clear
+	//	// because it comes directly from the yaml.v3 library.
+	//	log.Fatal(err)
+	//}
 	yamlParser := parser.NewYamlParser()
 	manifest, err := yamlParser.Parse(file)
 	if err != nil {

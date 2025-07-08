@@ -161,7 +161,7 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 		}
 		i.Target = &t
 	default:
-		return fmt.Errorf("unknown intervention type: %q", i.Target)
+		return fmt.Errorf("unknown intervention type: %q", temp.Action)
 	}
 	return nil
 }
@@ -281,6 +281,63 @@ type Monitor struct {
 	Intervention Intervention `yaml:"intervention,omitempty"`
 	Codes        Codes        `yaml:"codes"`
 }
+
+//func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
+//
+//	var monitors map[string]yaml.Node
+//	if err := value.Decode(&codes); err != nil {
+//		return err
+//	}
+//	colors := make(map[string]CodeConfig)
+//	for color, config := range codes {
+//		var temp struct {
+//			Config   yaml.Node `yaml:"config"`
+//			rawCodes `yaml:",inline"`
+//		}
+//		if err := config.Decode(&temp); err != nil {
+//			return err
+//		}
+//
+//		switch temp.Notify {
+//		case "log":
+//			var t CodeNotificationLog
+//			if err := temp.Config.Decode(&t); err != nil {
+//				return err
+//			}
+//			colors[color] = CodeConfig{
+//				Dispatch: temp.Dispatch,
+//				Notify:   temp.Notify,
+//				Config:   &t,
+//			}
+//		case "slack":
+//			var t CodeNotificationSlack
+//			if err := temp.Config.Decode(&t); err != nil {
+//				return err
+//			}
+//			colors[color] = CodeConfig{
+//				Dispatch: temp.Dispatch,
+//				Notify:   temp.Notify,
+//				Config:   &t,
+//			}
+//		case "pagerduty":
+//			var t CodeNotificationPagerDuty
+//			if err := temp.Config.Decode(&t); err != nil {
+//				return err
+//			}
+//			colors[color] = CodeConfig{
+//				Dispatch: temp.Dispatch,
+//				Notify:   temp.Notify,
+//				Config:   &t,
+//			}
+//		default:
+//			return fmt.Errorf("unknown notificiation type: %q", temp.Notify)
+//
+//		}
+//	}
+//	*c = colors
+//
+//	return nil
+//}
 
 type Manifest struct {
 	Monitors []Monitor `yaml:"monitors"`

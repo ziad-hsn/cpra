@@ -10,7 +10,7 @@ import (
 
 func TestPulseSystem_SchedulesJobs(t *testing.T) {
 	// Arrange
-	l := loader.NewLoader("yaml", "internal/loader/test.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/test.yaml.bak")
 	l.Load()
 	m := l.GetManifest()
 	w, err := controller.NewCPRaWorld(&m)

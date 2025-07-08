@@ -69,12 +69,12 @@ func (s *InterventionResultSystem) Update(w controller.CPRaWorld) {
 
 			name := w.Mappers.Name.Get(entity)
 			if res.Error() != nil {
-				status.LastStatus = "failed"
-				status.LastError = res.Error()
+
 				status.ConsecutiveFailures++
 				if config.MaxFailures <= status.ConsecutiveFailures {
 					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
-
+					status.LastStatus = "failed"
+					status.LastError = res.Error()
 					fmt.Printf("Monitor %s intervention failed\n", *name)
 					if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 						componentsList := GetEntityComponents(w.Mappers.World, entity)
@@ -86,17 +86,22 @@ func (s *InterventionResultSystem) Update(w controller.CPRaWorld) {
 							})
 						}
 					}
-					w.Mappers.InterventionPending.Remove(entity)
 
 				} else {
 					w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
 				}
 			} else {
+				if status.LastStatus == "failed" {
+					if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "cyan"})
+						fmt.Printf("Monitor %s intervention succeded and needs cyan code\n", *name)
+					}
+				}
 				status.LastStatus = "success"
 				status.LastError = nil
 				status.ConsecutiveFailures = 0
 				status.LastSuccessTime = time.Now()
-				fmt.Printf("Monitor %s intervention failed and needs Red code\n", *name)
+
 				w.Mappers.InterventionPending.Remove(entity)
 			}
 			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.

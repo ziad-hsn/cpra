@@ -119,7 +119,9 @@ func (s *PulseScheduleSystem) Update(w controller.CPRaWorld) {
 			toCheck = append(toCheck, entity)
 			continue
 		}
-		config, status := query.Get()
+
+		config := (*components.PulseConfig)(query.Query.Get(ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
+		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
 		if time.Since(status.LastCheckTime) >= config.Interval {
 			fmt.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
 			//	w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
@@ -148,34 +150,49 @@ func (s *PulseDispatchSystem) Initialize(w controller.CPRaWorld, lock sync.Locke
 }
 
 func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
-	toDispatch := make(map[ecs.Entity]jobs.Job)
-	//f := filter.Or(s.FirstCheckFilter.Filter(w.Mappers.World), s.FailedCheckFilter.Filter(w.Mappers.World))
-	query := s.PulseNeeded.Query(w.Mappers.World)
-
-	for query.Next() {
-		job, status, _ := query.Get()
-		// if an interval elapsed and not pending, append to toDispatch
-		// (add your logic)
-		toDispatch[query.Entity()] = job.Job
-		status.LastCheckTime = time.Now()
+	// Collect entities and jobs to dispatch
+	type dispatchEntry struct {
+		entity        ecs.Entity
+		job           jobs.Job
+		hasFirstCheck bool
 	}
-	// s.lock.Lock()
-	for entity, job := range toDispatch {
+	toDispatch := make([]dispatchEntry, 0)
+	query := s.PulseNeeded.Query(w.Mappers.World)
+	for query.Next() {
+		entity := query.Entity()
+		job := (*components.PulseJob)(query.Query.Get(ecs.ComponentID[components.PulseJob](w.Mappers.World)))
+		//status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		hasFirstCheck := w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World))
+		toDispatch = append(toDispatch, dispatchEntry{
+			entity:        entity,
+			job:           job.Job,
+			hasFirstCheck: hasFirstCheck,
+		})
+	}
+
+	// Process collected entities
+	for _, entry := range toDispatch {
+		// Update status before structural changes
+		status := (*components.PulseStatus)(w.Mappers.World.Get(entry.entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		status.LastCheckTime = time.Now()
+
 		select {
-		case s.JobChan <- job:
-
+		case s.JobChan <- entry.job:
 			fmt.Println("sent job")
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-				w.Mappers.PulseFirstCheck.Remove(entity)
+			if entry.hasFirstCheck {
+				w.Mappers.PulseFirstCheck.Remove(entry.entity)
 			}
-			w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
-
-			// mark entity as pending (using Exchange after a query)
+			w.Mappers.World.Exchange(entry.entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
 		default:
-			// handle worker pool full, maybe log or retry
+			// Handle worker pool full, e.g., log or skip
+			fmt.Printf("Job channel full for entity %v\n", entry.entity)
 		}
 	}
-	// s.lock.Unlock()
+}
+
+type resultEntry struct {
+	entity ecs.Entity
+	result jobs.Result
 }
 
 // PulseResultSystem --- RESULT PROCESS SYSTEM ---
@@ -191,60 +208,61 @@ func (s *PulseResultSystem) Initialize(w controller.CPRaWorld, lock sync.Locker)
 }
 
 func (s *PulseResultSystem) Update(w controller.CPRaWorld) {
+	// Collect results to process
+	toProcess := make([]resultEntry, 0)
+loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			// s.lock.Lock()
-			entity := res.Entity()
+			toProcess = append(toProcess, resultEntry{entity: res.Entity(), result: res})
+		default:
+			break loop // Exit loop when no more results
+		}
+	}
 
-			// 3. Perform structural changes using Exchange for efficiency and pointer validity
-			// This performs the removes and adds in a single archetype transition.
-			w.Mappers.PulsePending.Remove(entity)
+	// Process collected results
+	for _, entry := range toProcess {
+		entity := entry.entity
+		res := entry.result
 
-			// 4. Re-acquire fresh pointers to PulseConfig and PulseStatus AFTER structural changes
-			// The original config and status pointers might be invalid after the Exchange operation.
-			config, status := w.Mappers.Pulse.Get(entity)
-			monitorStatus := w.Mappers.MonitorStatus.Get(entity)
+		// Get all component pointers before structural changes
+		config := (*components.PulseConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
+		status := (*components.PulseStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
+		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
 
-			// 5. Update data fields directly on the re-acquired 'status' pointer
-			if res.Error() != nil {
-				status.LastStatus = "failed"
-				status.LastError = res.Error()
-				status.ConsecutiveFailures++
-				if status.ConsecutiveFailures == 1 {
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "yellow"})
-					}
-				}
-				name := w.Mappers.Name.Get(entity)
-				//fmt.Printf("%s Job failed: %v\n", *name, res.Error())
-				if config.MaxFailures <= status.ConsecutiveFailures {
-					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
-					monitorStatus.Status = "failed"
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
-						fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
-						w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
-					}
-
-				}
-			} else {
-				status.LastStatus = "success"
-				status.LastError = nil
-				status.ConsecutiveFailures = 0
-				status.LastSuccessTime = time.Now()
-				monitorStatus.Status = "success"
-
-				if monitorStatus.Status == "failed" {
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "green"})
-					}
+		// Update data
+		if res.Error() != nil {
+			status.LastStatus = "failed"
+			status.LastError = res.Error()
+			status.ConsecutiveFailures++
+			if status.ConsecutiveFailures == 1 {
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+					w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "yellow"})
 				}
 			}
-			// s.lock.Unlock()
-			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.
-			// Direct modification of status fields is the correct way to update values.
-		default:
-			return
+			if config.MaxFailures <= status.ConsecutiveFailures {
+				monitorStatus.Status = "failed"
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
+					fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
+					w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
+				}
+			}
+		} else {
+			status.LastStatus = "success"
+			status.LastError = nil
+			status.ConsecutiveFailures = 0
+			status.LastSuccessTime = time.Now()
+			s := monitorStatus.Status
+			monitorStatus.Status = "success"
+			if s == "failed" {
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+					w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "green"})
+				}
+			}
 		}
+
+		// Perform structural change last
+		w.Mappers.PulsePending.Remove(entity)
 	}
 }

@@ -16,6 +16,8 @@ type EntityManager struct {
 	Disabled        generic.Map1[components.DisabledMonitor]
 	MonitorStatus   generic.Map1[components.MonitorStatus]
 	Pulse           generic.Map2[components.PulseConfig, components.PulseStatus]
+	PulseConfig     generic.Map1[components.PulseConfig]
+	PulseStatus     generic.Map1[components.PulseStatus]
 	PulseNeeded     generic.Map1[components.PulseNeeded]
 	PulsePending    generic.Map1[components.PulsePending]
 	PulseFailed     generic.Map1[components.PulseFailed]
@@ -59,6 +61,8 @@ func InitializeMappers(world *ecs.World) EntityManager {
 		Disabled:            generic.NewMap1[components.DisabledMonitor](world),
 		MonitorStatus:       generic.NewMap1[components.MonitorStatus](world),
 		Pulse:               generic.NewMap2[components.PulseConfig, components.PulseStatus](world),
+		PulseConfig:         generic.NewMap1[components.PulseConfig](world),
+		PulseStatus:         generic.NewMap1[components.PulseStatus](world),
 		PulseNeeded:         generic.NewMap1[components.PulseNeeded](world),
 		PulsePending:        generic.NewMap1[components.PulsePending](world),
 		PulseFailed:         generic.NewMap1[components.PulseFailed](world),

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
+	"log"
 	"sync"
 	"time"
 )
@@ -24,28 +25,31 @@ func (s *InterventionDispatchSystem) Initialize(w controller.CPRaWorld, lock syn
 }
 
 func (s *InterventionDispatchSystem) Update(w controller.CPRaWorld) {
-	toDispatch := make(map[ecs.Entity]jobs.Job)
-	query := s.InterventionNeededFilter.Query(w.Mappers.World)
-
-	for query.Next() {
-
-		job, _ := query.Get()
-		// if an interval elapsed and not pending, append to toDispatch
-		// (add your logic)
-		toDispatch[query.Entity()] = job.Job
+	// Collect entities and jobs to dispatch
+	type dispatchEntry struct {
+		entity ecs.Entity
+		job    jobs.Job
 	}
-	//s.lock.Lock()
-	for entity, job := range toDispatch {
-		select {
-		case s.JobChan <- job:
+	toDispatch := make([]dispatchEntry, 0)
+	query := s.InterventionNeededFilter.Query(w.Mappers.World)
+	for query.Next() {
+		job, _ := query.Get()
+		toDispatch = append(toDispatch, dispatchEntry{
+			entity: query.Entity(),
+			job:    job.Job,
+		})
+	}
 
-			w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
-			// mark entity as pending (using Exchange after a query)
+	// Process collected entities
+	for _, entry := range toDispatch {
+		select {
+		case s.JobChan <- entry.job:
+			w.Mappers.World.Exchange(entry.entity, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
 		default:
-			// handle worker pool full, maybe log or retry
+			// Handle worker pool full
+			fmt.Printf("Job channel full for entity %v\n", entry.entity)
 		}
 	}
-	//s.lock.Unlock()
 }
 
 // PulseResultSystem --- RESULT PROCESS SYSTEM ---
@@ -61,61 +65,70 @@ func (s *InterventionResultSystem) Initialize(w controller.CPRaWorld, lock sync.
 }
 
 func (s *InterventionResultSystem) Update(w controller.CPRaWorld) {
-	for {
-		select {
-		case res := <-s.ResultChan:
-			//s.lock.Lock()
-			entity := res.Entity()
-
-			// 1. Define components to be removed structurally
-			//removes := []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)} // Assumes PulsePulse always exists to be removed
-
-			name := w.Mappers.Name.Get(entity)
-			if res.Error() != nil {
-				config, status := w.Mappers.Intervention.Get(entity)
-				status.ConsecutiveFailures++
-				if config.MaxFailures <= status.ConsecutiveFailures {
-					// Re-acquire Name mapper if it's dynamic or might be affected by prior changes, though unlikely for Name
-					status.LastStatus = "failed"
-					status.LastError = res.Error()
-					fmt.Printf("Monitor %s intervention failed\n", *name)
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-						componentsList := GetEntityComponents(w.Mappers.World, entity)
-						fmt.Printf("DEBUG: Entity %v has components: %v\n", entity, componentsList)
-						fmt.Println("scheduling red code")
-						if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
-							w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{
-								Color: "red",
-							})
-						}
-					}
-
-				} else {
-					w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
-				}
-			} else {
-				_, status := w.Mappers.Intervention.Get(entity)
-				lastStatus := status.LastStatus
-
-				status.LastStatus = "success"
-				status.LastError = nil
-				status.ConsecutiveFailures = 0
-				status.LastSuccessTime = time.Now()
-
-				if lastStatus == "failed" {
-					if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "cyan"})
-						fmt.Printf("Monitor %s intervention succeded and needs cyan code\n", *name)
-					}
-				}
-				w.Mappers.InterventionPending.Remove(entity)
-			}
-			//s.lock.Unlock()
-			// The line w.Mappers.Pulse.Assign(entity, config, status) is not needed here.
-			// Direct modification of status fields is the correct way to update values.
-		default:
+	select {
+	case res := <-s.ResultChan:
+		entity := res.Entity()
+		// Validate entity
+		if !w.Mappers.World.Alive(entity) {
+			log.Printf("Invalid entity %v received from ResultChan", entity)
 			return
 		}
+
+		// Get and validate all component pointers
+		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) ||
+			!w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)) ||
+			!w.Mappers.World.Has(entity, ecs.ComponentID[components.Name](w.Mappers.World)) {
+			log.Printf("Entity %v missing required components: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+			return
+		}
+
+		config := (*components.InterventionConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)))
+		status := (*components.PulseStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
+
+		// Log components for debugging
+		log.Printf("Processing entity %v components: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+
+		// Update data
+		if res.Error() != nil {
+			status.LastStatus = "failed"
+			status.LastError = res.Error()
+			if config.MaxFailures <= status.ConsecutiveFailures {
+				log.Printf("Monitor %s intervention failed", *name)
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+					componentsList := GetEntityComponents(w.Mappers.World, entity)
+					log.Printf("DEBUG: Entity %v has components: %v", entity, componentsList)
+					log.Println("scheduling red code")
+					if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
+						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "red"})
+					}
+				}
+			} else {
+				// Re-schedule intervention
+				log.Printf("Before Exchange entity %v: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+				w.Mappers.World.Exchange(entity, []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
+				log.Printf("After Exchange entity %v: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+			}
+		} else {
+			lastStatus := status.LastStatus
+			status.LastStatus = "success"
+			status.LastError = nil
+			status.ConsecutiveFailures = 0
+			status.LastSuccessTime = time.Now()
+
+			if lastStatus == "failed" {
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+					w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "cyan"})
+					log.Printf("Monitor %s intervention succeeded and needs cyan code", *name)
+				}
+			}
+			// Remove InterventionPending last
+			log.Printf("Before Remove entity %v: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+			w.Mappers.InterventionPending.Remove(entity)
+			log.Printf("After Remove entity %v: %v", entity, GetEntityComponents(w.Mappers.World, entity))
+		}
+	default:
+		return
 	}
 }
 

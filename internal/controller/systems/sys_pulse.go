@@ -76,9 +76,9 @@ func (s *Scheduler) Run(tick time.Duration) {
 		select {
 		case <-t:
 			for _, sys := range s.Systems {
-				// s.lock.Lock()
+				s.Lock.Lock()
 				sys.Update(s.World)
-				// s.lock.Unlock()
+				s.Lock.Unlock()
 			}
 		case _, ok := <-s.Done:
 			if !ok {
@@ -104,39 +104,46 @@ func (s *PulseScheduleSystem) Initialize(w controller.CPRaWorld, lock sync.Locke
 	s.lock = lock
 	w.Mappers.World.IsLocked()
 }
-
-func (s *PulseScheduleSystem) Update(w controller.CPRaWorld) {
+func (s *PulseScheduleSystem) findPulseEntities(w controller.CPRaWorld) []ecs.Entity {
 	toCheck := make([]ecs.Entity, 0)
-	//f := filter.Or(s.FirstCheckFilter.Filter(w.Mappers.World), s.FailedCheckFilter.Filter(w.Mappers.World))
+
 	query := s.PulseFilter.Query(w.Mappers.World)
-
 	for query.Next() {
-		entity := query.Entity()
+		config := (*components.PulseConfig)(query.Query.Get(ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
+		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
 
-		if w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-			//w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
-			//w.Mappers.PulseFirstCheck.Remove(entity)
-			toCheck = append(toCheck, entity)
+		// Check for first-time pulse
+		if w.Mappers.World.Has(query.Entity(), ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+			toCheck = append(toCheck, query.Entity())
 			continue
 		}
 
-		config := (*components.PulseConfig)(query.Query.Get(ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
-		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		// Check for scheduled interval
 		if time.Since(status.LastCheckTime) >= config.Interval {
 			fmt.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
-			//	w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
-			toCheck = append(toCheck, entity)
+			toCheck = append(toCheck, query.Entity())
 		}
 	}
-	// s.lock.Lock()
+	// The 'query' variable is destroyed when this function returns.
+	return toCheck
+}
+
+func (s *PulseScheduleSystem) Update(w controller.CPRaWorld) {
+	// Phase 1: Read from the world. The query is created and destroyed
+	// entirely within this function call.
+	toCheck := s.findPulseEntities(w)
+
+	// Phase 2: Write to the world. This is now safe.
 	for _, entity := range toCheck {
 		w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
-
 	}
-	// s.lock.Unlock()
 }
 
 // PulseDispatchSystem --- Dispatch System ---
+type dispatchablePulse struct {
+	Entity ecs.Entity
+	Job    jobs.Job
+}
 type PulseDispatchSystem struct {
 	JobChan     chan<- jobs.Job
 	PulseNeeded generic.Filter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]
@@ -149,43 +156,38 @@ func (s *PulseDispatchSystem) Initialize(w controller.CPRaWorld, lock sync.Locke
 	w.Mappers.World.IsLocked()
 }
 
-func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
-	// Collect entities and jobs to dispatch
-	type dispatchEntry struct {
-		entity        ecs.Entity
-		job           jobs.Job
-		hasFirstCheck bool
-	}
-	toDispatch := make([]dispatchEntry, 0)
+func (s *PulseDispatchSystem) findDispatchablePulses(w controller.CPRaWorld) []dispatchablePulse {
+	toDispatch := make([]dispatchablePulse, 0)
 	query := s.PulseNeeded.Query(w.Mappers.World)
 	for query.Next() {
-		entity := query.Entity()
 		job := (*components.PulseJob)(query.Query.Get(ecs.ComponentID[components.PulseJob](w.Mappers.World)))
-		//status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
-		hasFirstCheck := w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World))
-		toDispatch = append(toDispatch, dispatchEntry{
-			entity:        entity,
-			job:           job.Job,
-			hasFirstCheck: hasFirstCheck,
+		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+
+		status.LastCheckTime = time.Now() // This is a data-only update, not structural. It's safe.
+
+		toDispatch = append(toDispatch, dispatchablePulse{
+			Entity: query.Entity(),
+			Job:    job.Job,
 		})
 	}
+	return toDispatch
+}
 
-	// Process collected entities
-	for _, entry := range toDispatch {
-		// Update status before structural changes
-		status := (*components.PulseStatus)(w.Mappers.World.Get(entry.entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
-		status.LastCheckTime = time.Now()
+func (s *PulseDispatchSystem) Update(w controller.CPRaWorld) {
+	// Phase 1: Read from the world.
+	dispatchList := s.findDispatchablePulses(w)
 
+	// Phase 2: Write to the world and channels.
+	for _, item := range dispatchList {
 		select {
-		case s.JobChan <- entry.job:
+		case s.JobChan <- item.Job.Copy():
 			fmt.Println("sent job")
-			if entry.hasFirstCheck {
-				w.Mappers.PulseFirstCheck.Remove(entry.entity)
+			if w.Mappers.World.Has(item.Entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+				w.Mappers.PulseFirstCheck.Remove(item.Entity)
 			}
-			w.Mappers.World.Exchange(entry.entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
+			w.Mappers.World.Exchange(item.Entity, []ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
 		default:
-			// Handle worker pool full, e.g., log or skip
-			fmt.Printf("Job channel full for entity %v\n", entry.entity)
+			// handle worker pool full, maybe log or retry
 		}
 	}
 }
@@ -228,7 +230,6 @@ loop:
 		// Get all component pointers before structural changes
 		config := (*components.PulseConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
 		status := (*components.PulseStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
-		monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
 		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
 
 		// Update data
@@ -242,6 +243,7 @@ loop:
 				}
 			}
 			if config.MaxFailures <= status.ConsecutiveFailures {
+				monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
 				monitorStatus.Status = "failed"
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
 					fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
@@ -253,6 +255,7 @@ loop:
 			status.LastError = nil
 			status.ConsecutiveFailures = 0
 			status.LastSuccessTime = time.Now()
+			monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
 			s := monitorStatus.Status
 			monitorStatus.Status = "success"
 			if s == "failed" {

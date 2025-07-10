@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-//type dispatchInfo struct {
-//	Job   jobs.Job
-//	Color string
-//}
-
+type dispatchableCodeJob struct {
+	entity ecs.Entity
+	job    jobs.Job
+	color  string
+}
 type CodeDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	CodeNeededFilter         generic.Filter1[components.CodeNeeded]
@@ -31,14 +31,8 @@ func (s *CodeDispatchSystem) Initialize(w controller.CPRaWorld, lock sync.Locker
 	w.Mappers.World.IsLocked()
 }
 
-func (s *CodeDispatchSystem) Update(w controller.CPRaWorld) {
-	// Collect entities and jobs to dispatch
-	type dispatchEntry struct {
-		entity ecs.Entity
-		job    jobs.Job
-		color  string
-	}
-	toDispatch := make([]dispatchEntry, 0)
+func (s *CodeDispatchSystem) findNeededCodeJobs(w controller.CPRaWorld) []dispatchableCodeJob {
+	toDispatch := make([]dispatchableCodeJob, 0)
 	query := s.CodeNeededFilter.Query(w.Mappers.World)
 	for query.Next() {
 		entity := query.Entity()
@@ -70,14 +64,20 @@ func (s *CodeDispatchSystem) Update(w controller.CPRaWorld) {
 			continue
 		}
 		if job != nil {
-			toDispatch = append(toDispatch, dispatchEntry{entity: entity, job: job, color: codeNeeded.Color})
+			toDispatch = append(toDispatch, dispatchableCodeJob{entity: entity, job: job, color: codeNeeded.Color})
 		}
 	}
+	return toDispatch
+}
 
-	// Process collected entities
-	for _, entry := range toDispatch {
+func (s *CodeDispatchSystem) Update(w controller.CPRaWorld) {
+	// Phase 1: Read from the world.
+	dispatchList := s.findNeededCodeJobs(w)
+
+	// Phase 2: Write to the world and channels.
+	for _, entry := range dispatchList {
 		select {
-		case s.JobChan <- entry.job:
+		case s.JobChan <- entry.job.Copy():
 			log.Printf("Sent %s code job for entity %v", entry.color, entry.entity)
 			w.Mappers.World.Exchange(entry.entity, []ecs.ID{ecs.ComponentID[components.CodePending](w.Mappers.World)}, []ecs.ID{ecs.ComponentID[components.CodeNeeded](w.Mappers.World)})
 		default:

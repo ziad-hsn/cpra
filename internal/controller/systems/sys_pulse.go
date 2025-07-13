@@ -48,7 +48,7 @@ import (
 //func ResultsBridgeSystem(world *controller.CPRaWorld, results <-chan jobs.PulseResult)
 
 type System interface {
-	Initialize(w *controller.CPRaWorld, lock sync.Locker)
+	Initialize(w *controller.CPRaWorld)
 	Update(w *controller.CPRaWorld)
 }
 
@@ -72,16 +72,14 @@ func (s *Scheduler) Run(tick time.Duration) {
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	for _, sys := range s.Systems {
-		sys.Initialize(s.World, &s.Lock)
+		sys.Initialize(s.World)
 	}
 	for {
 		select {
 		case <-t.C:
 			for _, sys := range s.Systems {
-				//s.Lock.Lock()
 				sys.Update(s.World)
-				//time.Sleep(20 * time.Millisecond)
-				//s.Lock.Unlock()
+				time.Sleep(10 * time.Millisecond)
 			}
 		case _, ok := <-s.Done:
 			if !ok {
@@ -103,7 +101,7 @@ type PulseScheduleSystem struct {
 	// lock sync.Locker // REMOVED: External lock is not used by the system directly.
 }
 
-func (s *PulseScheduleSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *PulseScheduleSystem) Initialize(w *controller.CPRaWorld) {
 	s.PulseFilter = *generic.NewFilter2[components.PulseConfig, components.PulseStatus]().
 		Without(generic.T[components.DisabledMonitor]()).
 		Without(generic.T[components.PulsePending]()).
@@ -174,7 +172,7 @@ type PulseDispatchSystem struct {
 	// lock sync.Locker // REMOVED
 }
 
-func (s *PulseDispatchSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *PulseDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.PulseNeeded = *generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
 	// s.lock = lock // REMOVED
 	// w.Mappers.World.IsLocked() // REMOVED
@@ -215,6 +213,7 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []
 				[]ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)},
 				[]ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
 		default:
+			log.Printf("Job channel full, skipping dispatch for entity %v", item.Entity)
 			// handle worker pool full, maybe log or retry
 		}
 	}
@@ -238,7 +237,7 @@ type PulseResultSystem struct {
 	// lock sync.Locker // REMOVED
 }
 
-func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld) {
 	// s.lock = lock // REMOVED
 	// w.Mappers.World.IsLocked() // REMOVED
 }

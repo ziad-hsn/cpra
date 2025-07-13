@@ -7,7 +7,6 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"sync"
 	"time" // Added for time.Now() used in original code
 )
 
@@ -22,7 +21,7 @@ type InterventionDispatchSystem struct {
 	// lock                     sync.Locker // REMOVED: External lock is not needed for arche when used in a single goroutine.
 }
 
-func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.InterventionNeededFilter = *generic.NewFilter2[components.InterventionJob, components.InterventionNeeded]().Without(generic.T[components.InterventionPending]())
 	// s.lock = lock // REMOVED
 	// w.Mappers.World.IsLocked() // REMOVED: Polling IsLocked() is problematic and unnecessary.
@@ -74,7 +73,7 @@ type InterventionResultSystem struct {
 	// lock                      sync.Locker // REMOVED
 }
 
-func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld) {
 	// s.lock = lock // REMOVED
 	// w.Mappers.World.IsLocked() // REMOVED
 }

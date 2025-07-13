@@ -26,6 +26,10 @@ type PulseConfig struct {
 	Config      schema.PulseConfig
 }
 
+type Pulse struct {
+	Config PulseConfig
+	Status PulseStatus
+}
 type PulseFirstCheck struct{}
 type PulseNeeded struct{}
 type PulsePending struct{}

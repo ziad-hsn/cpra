@@ -85,19 +85,20 @@ type PulseHTTPJob struct {
 	Retries int
 }
 
-func (j *PulseHTTPJob) Execute() Result {
+func (p *PulseHTTPJob) Execute() Result {
 	fmt.Println("executing HTTP Job")
-	res := PulseResults{ID: j.ID, Err: fmt.Errorf("HTTP check failed")}
+	time.Sleep(1 * time.Second)
+	res := PulseResults{ID: p.ID, Err: fmt.Errorf("HTTP check failed")}
 	return res
 }
-func (j *PulseHTTPJob) Copy() Job {
+func (p *PulseHTTPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseHTTPJob{
-		ID:      j.ID,
-		URL:     j.URL,
-		Method:  j.Method,
-		Timeout: j.Timeout,
-		Retries: j.Retries,
+		ID:      p.ID,
+		URL:     p.URL,
+		Method:  p.Method,
+		Timeout: p.Timeout,
+		Retries: p.Retries,
 	}
 
 }
@@ -110,20 +111,20 @@ type PulseTCPJob struct {
 	Retries int
 }
 
-func (j *PulseTCPJob) Execute() Result {
+func (p *PulseTCPJob) Execute() Result {
 	fmt.Println("executing TCP Job")
-	res := PulseResults{ID: j.ID, Err: nil}
+	res := PulseResults{ID: p.ID, Err: nil}
 	return res
 }
 
-func (j *PulseTCPJob) Copy() Job {
+func (p *PulseTCPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseTCPJob{
-		ID:      j.ID,
-		Host:    j.Host,
-		Port:    j.Port,
-		Timeout: j.Timeout,
-		Retries: j.Retries,
+		ID:      p.ID,
+		Host:    p.Host,
+		Port:    p.Port,
+		Timeout: p.Timeout,
+		Retries: p.Retries,
 	}
 
 }
@@ -135,19 +136,19 @@ type PulseICMPJob struct {
 	Timeout time.Duration
 }
 
-func (j *PulseICMPJob) Execute() Result {
+func (p *PulseICMPJob) Execute() Result {
 	fmt.Println("executing ICMP Job")
-	res := PulseResults{ID: j.ID, Err: fmt.Errorf("ICMP check failed\n")}
+	res := PulseResults{ID: p.ID, Err: fmt.Errorf("ICMP check failed\n")}
 	return res
 }
 
-func (j *PulseICMPJob) Copy() Job {
+func (p *PulseICMPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseICMPJob{
-		ID:      j.ID,
-		Host:    j.Host,
-		Count:   j.Count,
-		Timeout: j.Timeout,
+		ID:      p.ID,
+		Host:    p.Host,
+		Count:   p.Count,
+		Timeout: p.Timeout,
 	}
 
 }
@@ -159,18 +160,18 @@ type InterventionDockerJob struct {
 	Retries   int
 }
 
-func (j *InterventionDockerJob) Execute() Result {
+func (i *InterventionDockerJob) Execute() Result {
 	fmt.Println("executing docker intervention Job")
-	res := InterventionResults{ID: j.ID, Err: fmt.Errorf("Docker intervention failed\n")}
+	res := InterventionResults{ID: i.ID, Err: fmt.Errorf("Docker intervention failed\n")}
 	return res
 }
-func (j *InterventionDockerJob) Copy() Job {
+func (i *InterventionDockerJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &InterventionDockerJob{
-		ID:        j.ID,
-		Container: j.Container,
-		Timeout:   j.Timeout,
-		Retries:   j.Retries,
+		ID:        i.ID,
+		Container: i.Container,
+		Timeout:   i.Timeout,
+		Retries:   i.Retries,
 	}
 
 }
@@ -190,13 +191,13 @@ func (c *CodeLogJob) Execute() Result {
 	return res
 }
 
-func (j *CodeLogJob) Copy() Job {
+func (c *CodeLogJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodeLogJob{
-		ID:      j.ID,
-		File:    j.File,
-		Timeout: j.Timeout,
-		Retries: j.Retries,
+		ID:      c.ID,
+		File:    c.File,
+		Timeout: c.Timeout,
+		Retries: c.Retries,
 	}
 
 }
@@ -215,13 +216,13 @@ func (c *CodeSlackJob) Execute() Result {
 	res := CodeResults{ID: c.ID, Err: fmt.Errorf("Docker intervention failed\n")}
 	return res
 }
-func (j *CodeSlackJob) Copy() Job {
+func (c *CodeSlackJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodeSlackJob{
-		ID:      j.ID,
-		WebHook: j.WebHook,
-		Timeout: j.Timeout,
-		Retries: j.Retries,
+		ID:      c.ID,
+		WebHook: c.WebHook,
+		Timeout: c.Timeout,
+		Retries: c.Retries,
 	}
 
 }
@@ -241,13 +242,13 @@ func (c *CodePagerDutyJob) Execute() Result {
 	return res
 }
 
-func (j *CodePagerDutyJob) Copy() Job {
+func (c *CodePagerDutyJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodePagerDutyJob{
-		ID:      j.ID,
-		URL:     j.URL,
-		Timeout: j.Timeout,
-		Retries: j.Retries,
+		ID:      c.ID,
+		URL:     c.URL,
+		Timeout: c.Timeout,
+		Retries: c.Retries,
 	}
 
 }

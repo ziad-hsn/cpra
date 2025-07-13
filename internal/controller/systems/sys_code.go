@@ -7,7 +7,6 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"sync" // Still imported because System interface requires sync.Locker, though not used internally by these systems.
 	"time"
 )
 
@@ -24,7 +23,7 @@ type CodeDispatchSystem struct {
 	// lock                     sync.Locker // REMOVED: External lock is not needed for arche when used in a single goroutine.
 }
 
-func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.CodeNeededFilter = *generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
 	s.FailedInterventionFilter = *generic.NewFilter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]()
 	// s.lock = lock // REMOVED
@@ -102,7 +101,7 @@ type CodeResultSystem struct {
 	// lock              sync.Locker // REMOVED
 }
 
-func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld, lock sync.Locker) {
+func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {
 	// s.lock = lock // REMOVED
 	// w.Mappers.World.IsLocked() // REMOVED
 }

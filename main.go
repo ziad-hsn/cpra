@@ -73,8 +73,8 @@ func main() {
 	s.AddSystem(&systems.CodeDispatchSystem{JobChan: cjobChan})
 	s.AddSystem(&systems.CodeResultSystem{ResultChan: cresultChan})
 	schedulerWG.Add(1)
-	go s.Run(100 * time.Millisecond)
-	timeout := time.After(24 * time.Second)
+	go s.Run(1 * time.Microsecond)
+	timeout := time.After(24 * time.Hour)
 
 	for {
 		select {

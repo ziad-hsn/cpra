@@ -40,7 +40,7 @@ func (s *Scheduler) Run(tick time.Duration) {
 		case <-t.C:
 			for _, sys := range s.Systems {
 				sys.Update(s.World)
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 		case _, ok := <-s.Done:
 			if !ok {

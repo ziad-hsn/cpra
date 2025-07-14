@@ -7,7 +7,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"time" // Added for time.Now() used in original code
+	"time"
 )
 
 type dispatchableIntervention struct {
@@ -18,13 +18,10 @@ type dispatchableIntervention struct {
 type InterventionDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	InterventionNeededFilter generic.Filter2[components.InterventionJob, components.InterventionNeeded]
-	// lock                     sync.Locker // REMOVED: External lock is not needed for arche when used in a single goroutine.
 }
 
 func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.InterventionNeededFilter = *generic.NewFilter2[components.InterventionJob, components.InterventionNeeded]().Without(generic.T[components.InterventionPending]())
-	// s.lock = lock // REMOVED
-	// w.Mappers.World.IsLocked() // REMOVED: Polling IsLocked() is problematic and unnecessary.
 }
 
 // collectWork: Phase 1 - Reads from the world to find interventions to dispatch.
@@ -41,41 +38,39 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) []disp
 	return toDispatch
 }
 
-// applyWork: Phase 2 - Dispatches jobs and applies structural changes to the world.
-func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableIntervention) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
+// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
+func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableIntervention) []func() {
+	var deferredOps []func()
 	for _, entry := range dispatchList {
 		select {
 		case s.JobChan <- entry.Job.Copy():
-			// Structural change: Exchange components.
-			// Ensure entity is still alive before making structural changes
-			if w.Mappers.World.Alive(entry.Entity) {
-				w.Mappers.World.Exchange(entry.Entity,
-					[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
-					[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
-			}
+			e := entry.Entity
+			deferredOps = append(deferredOps, func() {
+				if w.Mappers.World.Alive(e) {
+					w.Mappers.World.Exchange(e,
+						[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
+						[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
+				}
+			})
 		default:
 			log.Printf("Job channel full for entity %v\n", entry.Entity)
 		}
 	}
+	return deferredOps
 }
 
-func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld) []func() {
 	dispatchList := s.collectWork(w)
-	s.applyWork(w, dispatchList)
+	return s.applyWork(w, dispatchList)
 }
 
 // InterventionResultSystem --- RESULT PROCESS SYSTEM ---
 type InterventionResultSystem struct {
-	PendingInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionNeeded] // This field is not used in Update, consider removing if truly unused.
+	PendingInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionNeeded]
 	ResultChan                <-chan jobs.Result
-	// lock                      sync.Locker // REMOVED
 }
 
 func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld) {
-	// s.lock = lock // REMOVED
-	// w.Mappers.World.IsLocked() // REMOVED
 }
 
 // collectInterventionResults: Phase 1.1 - Drains the result channel into a slice.
@@ -102,17 +97,15 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		entity := entry.entity
 		res := entry.result
 
-		if entity.IsZero() || !w.Mappers.World.Alive(entity) { // Check if entity is valid/alive
+		if entity.IsZero() {
 			continue
 		}
 
-		// Get components once for this entity
 		config := (*components.InterventionConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)))
 		status := (*components.InterventionStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.InterventionStatus](w.Mappers.World)))
 		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
 
 		if res.Error() != nil {
-			// Data-only changes are safe to do immediately.
 			status.LastStatus = "failed"
 			status.LastError = res.Error()
 			status.ConsecutiveFailures++
@@ -122,7 +115,6 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Println("scheduling red code")
 					if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
-						// This is a structural change. Defer it.
 						deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 							return func() {
 								if w.Mappers.World.Alive(e) {
@@ -133,20 +125,18 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 					}
 				}
 			} else {
-				// This is an Exchange. Defer it.
 				deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 					return func() {
 						if w.Mappers.World.Alive(e) {
-							add := []ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)}
-							remove := []ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)}
-							w.Mappers.World.Exchange(e, add, remove)
+							w.Mappers.World.Exchange(e,
+								[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
+								[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
 						}
 					}
 				}(entity))
 			}
 		} else {
-			// Data-only changes are safe.
-			lastStatus := status.LastStatus // Capture before modification
+			lastStatus := status.LastStatus
 			status.LastStatus = "success"
 			status.LastError = nil
 			status.ConsecutiveFailures = 0
@@ -155,7 +145,6 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			if lastStatus == "failed" {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", *name)
-					// This is a structural change. Defer it.
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
 							if w.Mappers.World.Alive(e) {
@@ -165,7 +154,6 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 					}(entity))
 				}
 			}
-			// This is a Remove. Defer it.
 			deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 				return func() {
 					if w.Mappers.World.Alive(e) {
@@ -178,37 +166,17 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 	return deferredOps
 }
 
-// applyInterventionQueuedStructuralChanges: Phase 2 - Executes all the queued structural changes at once.
-func (s *InterventionResultSystem) applyInterventionQueuedStructuralChanges(deferredOps []func()) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
-	for _, op := range deferredOps {
-		op()
-	}
-}
-
-func (s *InterventionResultSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *InterventionResultSystem) Update(w *controller.CPRaWorld) []func() {
 	results := s.collectInterventionResults()
-	queuedChanges := s.processInterventionResultsAndQueueStructuralChanges(w, results)
-	s.applyInterventionQueuedStructuralChanges(queuedChanges)
+	return s.processInterventionResultsAndQueueStructuralChanges(w, results)
 }
 
-// The commented-out GetEntityComponents function from your original code.
 func GetEntityComponents(w *ecs.World, entity ecs.Entity) []string {
-	// 1. Retrieve Component IDs for the entity.
 	ids := w.Ids(entity)
-
 	var componentNames []string
-
-	// 2. Iterate and access components.
 	for _, id := range ids {
-		// Get the reflect.Type for the component ID.
 		info, _ := ecs.ComponentInfo(w, id)
 		compType := info.Type
-
-		// Get a pointer to the component data.
-		// Note: world.Get() returns an unsafe.Pointer that we don't need to fully cast
-		// just to get the name of the type.
 		componentNames = append(componentNames, compType.Name())
 	}
 	return componentNames

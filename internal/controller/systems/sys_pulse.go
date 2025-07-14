@@ -48,28 +48,27 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 			status.LastCheckTime = time.Now()
 			toCheck = append(toCheck, query.Entity())
 		}
-		// No need to nil out component pointers if they are used within the function scope.
-		// Go's GC handles this.
 	}
 	return toCheck
 }
 
-// applyWork: Phase 2 - Applies structural changes based on collected entities.
-func (s *PulseScheduleSystem) applyWork(w *controller.CPRaWorld, entities []ecs.Entity) {
+// applyWork: Phase 2 - Prepares deferred structural changes.
+func (s *PulseScheduleSystem) applyWork(w *controller.CPRaWorld, entities []ecs.Entity) []func() {
+	var deferredOps []func()
 	for _, entity := range entities {
-		// Check if entity still exists and doesn't already have PulseNeeded.
-		// World.Has is generally safe to call if the entity itself is valid,
-		// but if the entity might have been removed by another system, Alive() check is good.
-		if w.Mappers.World.Alive(entity) && !w.Mappers.World.Has(entity, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
-			w.Mappers.PulseNeeded.Assign(entity, &components.PulseNeeded{})
-		}
+		e := entity
+		deferredOps = append(deferredOps, func() {
+			if w.Mappers.World.Alive(e) && !w.Mappers.World.Has(e, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
+				w.Mappers.PulseNeeded.Assign(e, &components.PulseNeeded{})
+			}
+		})
 	}
+	return deferredOps
 }
 
-func (s *PulseScheduleSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *PulseScheduleSystem) Update(w *controller.CPRaWorld) []func() {
 	entitiesToSchedule := s.collectWork(w)
-	s.applyWork(w, entitiesToSchedule)
+	return s.applyWork(w, entitiesToSchedule)
 }
 
 // PulseDispatchSystem refactored
@@ -101,38 +100,39 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchabl
 			Entity: query.Entity(),
 			Job:    job.Job,
 		})
-		// No need to nil component pointers.
 	}
 	return toDispatch
 }
 
-// applyWork: Phase 2 - Dispatches jobs and applies structural changes.
-func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchablePulse) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
+// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
+func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchablePulse) []func() {
+	var deferredOps []func()
 	for _, item := range dispatchList {
 		select {
 		case s.JobChan <- item.Job.Copy():
 			name := *w.Mappers.Name.Get(item.Entity)
 			log.Printf("sent %s job\n", name)
-			if w.Mappers.World.Has(item.Entity, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-				// Structural change: Remove component.
-				w.Mappers.PulseFirstCheck.Remove(item.Entity)
+			e := item.Entity
+			if w.Mappers.World.Has(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+				deferredOps = append(deferredOps, func() {
+					w.Mappers.PulseFirstCheck.Remove(e)
+				})
 			}
-			// Structural change: Exchange components.
-			w.Mappers.World.Exchange(item.Entity,
-				[]ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)},
-				[]ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
+			deferredOps = append(deferredOps, func() {
+				w.Mappers.World.Exchange(e,
+					[]ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)},
+					[]ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
+			})
 		default:
 			log.Printf("Job channel full, skipping dispatch for entity %v", item.Entity)
-			// handle worker pool full, maybe log or retry
 		}
 	}
+	return deferredOps
 }
 
-func (s *PulseDispatchSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *PulseDispatchSystem) Update(w *controller.CPRaWorld) []func() {
 	dispatchList := s.collectWork(w)
-	s.applyWork(w, dispatchList)
+	return s.applyWork(w, dispatchList)
 }
 
 // PulseResultSystem refactored
@@ -144,12 +144,9 @@ type resultEntry struct {
 type PulseResultSystem struct {
 	PendingPulseFilter generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulsePending]
 	ResultChan         <-chan jobs.Result
-	// lock sync.Locker // REMOVED
 }
 
 func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld) {
-	// s.lock = lock // REMOVED
-	// w.Mappers.World.IsLocked() // REMOVED
 }
 
 // collectResults: Phase 1.1 - Drains the result channel into a slice.
@@ -177,31 +174,23 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 		res := entry.result
 		n := *w.Mappers.Name.Get(entity)
 		fmt.Printf("recived %s results\n", n)
-		// Add safety check before getting components
+
 		if entity.IsZero() {
 			continue
 		}
 
-		// Ensure entity is still alive before getting components
-		if !w.Mappers.World.Alive(entity) {
-			continue
-		}
-
-		// Get components once for this entity
 		config := (*components.PulseConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
 		status := (*components.PulseStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
-		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
+		name := *(*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
 		monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
 
 		if res.Error() != nil {
-			// Data-only changes are safe to do immediately.
 			status.LastStatus = "failed"
 			status.LastError = res.Error()
 			status.ConsecutiveFailures++
 
 			if status.ConsecutiveFailures == 1 {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-					// Structural change: Defer it.
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
 							if w.Mappers.World.Alive(e) {
@@ -212,12 +201,10 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 				}
 			}
 			if config.MaxFailures <= status.ConsecutiveFailures {
-				// Data-only change is safe.
 				monitorStatus.Status = "failed"
 
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
-					fmt.Printf("Monitor %s failed %d times and needs intervention\n", *name, status.ConsecutiveFailures)
-					// Structural change: Defer it.
+					fmt.Printf("Monitor %s failed %d times and needs intervention\n", name, status.ConsecutiveFailures)
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
 							if w.Mappers.World.Alive(e) {
@@ -228,7 +215,6 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 				}
 			}
 		} else {
-			// Data-only changes are safe.
 			status.LastStatus = "success"
 			status.LastError = nil
 			status.ConsecutiveFailures = 0
@@ -238,7 +224,6 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 			if s == "failed" {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-					// Structural change: Defer it.
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
 							if w.Mappers.World.Alive(e) {
@@ -250,34 +235,22 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			}
 		}
 
-		// This is the final structural change for this entity. Defer it.
-		// This ensures PulsePending is removed regardless of success/failure
 		deferredOps = append(deferredOps, func(e ecs.Entity, name components.Name) func() {
 			return func() {
 				if w.Mappers.World.Alive(e) {
 					if w.Mappers.World.Has(e, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
 						w.Mappers.PulsePending.Remove(e)
 					} else {
-						log.Fatalf("name --> %s -- entity --> %v, components --> %v ", name, e, GetEntityComponents(w.Mappers.World, e))
+						log.Fatalf("name --> %s -- entity --> %v, components --> %v, results -> %#v ", name, e, GetEntityComponents(w.Mappers.World, e), results)
 					}
 				}
 			}
-		}(entity, *name))
+		}(entity, name))
 	}
 	return deferredOps
 }
 
-// applyQueuedStructuralChanges: Phase 2 - Executes all the queued structural changes at once.
-func (s *PulseResultSystem) applyQueuedStructuralChanges(deferredOps []func()) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
-	for _, op := range deferredOps {
-		op()
-	}
-}
-
-func (s *PulseResultSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *PulseResultSystem) Update(w *controller.CPRaWorld) []func() {
 	results := s.collectResults()
-	queuedChanges := s.processResultsAndQueueStructuralChanges(w, results)
-	s.applyQueuedStructuralChanges(queuedChanges)
+	return s.processResultsAndQueueStructuralChanges(w, results)
 }

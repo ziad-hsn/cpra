@@ -5,7 +5,9 @@ import (
 	"cpra/internal/controller/systems"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/loader"
+	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -57,34 +59,52 @@ func main() {
 	iresultChan := make(chan jobs.Result, len(m.Monitors))
 	cjobChan := make(chan jobs.Job, len(m.Monitors))
 	cresultChan := make(chan jobs.Result, len(m.Monitors))
+	schedulerWG := &sync.WaitGroup{}
+	s := systems.Scheduler{Systems: make([]systems.System, 0), World: c, Done: make(chan struct{}), WG: schedulerWG}
+	s.AddSystem(&systems.PulseScheduleSystem{})
+	s.AddSystem(&systems.PulseDispatchSystem{
+		JobChan: jobChan,
+	})
+	s.AddSystem(&systems.PulseResultSystem{ResultChan: resultChan})
+	s.AddSystem(&systems.InterventionDispatchSystem{JobChan: ijobChan})
+	s.AddSystem(&systems.InterventionResultSystem{ResultChan: iresultChan})
+	s.AddSystem(&systems.CodeDispatchSystem{JobChan: cjobChan})
+	s.AddSystem(&systems.CodeResultSystem{ResultChan: cresultChan})
+	schedulerWG.Add(1)
+	go s.Run(10 * time.Millisecond)
+	timeout := time.After(24 * time.Second)
 
-	// 2) build your Scheduler
-	sched := systems.Scheduler{
-		World:       c,
-		JobChan:     jobChan,
-		ResultChan:  resultChan,
-		IJobChan:    ijobChan,
-		IResultChan: iresultChan,
-		CJobChan:    cjobChan,
-		CResultChan: cresultChan,
-		Done:        make(chan struct{}),
+	for {
+		select {
+		case job, ok := <-jobChan:
+
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			resultChan <- res
+		case job, ok := <-ijobChan:
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			iresultChan <- res
+		case job, ok := <-cjobChan:
+			fmt.Println("code code job")
+			if !ok {
+				fmt.Println("existing CPRa")
+				return
+			}
+			res := job.Execute()
+			cresultChan <- res
+		case <-timeout:
+			fmt.Println("timeout")
+			close(s.Done)
+			schedulerWG.Wait()
+			return
+		}
+
 	}
-
-	// 3) register all your systems
-	sched.AddSystem(&systems.PulseScheduleSystem{})
-	sched.AddSystem(&systems.PulseDispatchSystem{JobChan: jobChan})
-	sched.AddSystem(&systems.PulseResultSystem{ResultChan: resultChan})
-	sched.AddSystem(&systems.InterventionDispatchSystem{JobChan: ijobChan})
-	sched.AddSystem(&systems.InterventionResultSystem{ResultChan: iresultChan})
-	sched.AddSystem(&systems.CodeDispatchSystem{JobChan: cjobChan})
-	sched.AddSystem(&systems.CodeResultSystem{ResultChan: cresultChan})
-
-	// 4) run — this will internally drain all job/result channels,
-	//    Execute() each job, then call Update() on every system, in one loop.
-	go sched.Run(10 * time.Millisecond)
-
-	// 5) shut down when you like
-	time.Sleep(24 * time.Hour)
-	close(sched.Done)
-
 }

@@ -19,15 +19,12 @@ type dispatchableCodeJob struct {
 type CodeDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	CodeNeededFilter         generic.Filter1[components.CodeNeeded]
-	FailedInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed] // This field is not used in Update, consider removing if truly unused.
-	// lock                     sync.Locker // REMOVED: External lock is not needed for arche when used in a single goroutine.
+	FailedInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]
 }
 
 func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.CodeNeededFilter = *generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
 	s.FailedInterventionFilter = *generic.NewFilter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]()
-	// s.lock = lock // REMOVED
-	// w.Mappers.World.IsLocked() // REMOVED: Polling IsLocked() is problematic and unnecessary.
 }
 
 // collectWork: Phase 1 - Reads from the world to find code jobs to dispatch.
@@ -70,40 +67,39 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 	return toDispatch
 }
 
-// applyWork: Phase 2 - Dispatches jobs and applies structural changes to the world.
-func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableCodeJob) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
+// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
+func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableCodeJob) []func() {
+	var deferredOps []func()
 	for _, entry := range dispatchList {
 		select {
 		case s.JobChan <- entry.job.Copy():
 			log.Printf("Sent %s code job for entity %v", entry.color, entry.entity)
-			// Ensure entity is still alive before making structural changes
-			if w.Mappers.World.Alive(entry.entity) {
-				w.Mappers.CodeNeeded.Remove(entry.entity)
-				w.Mappers.CodePending.Assign(entry.entity, &components.CodePending{Color: entry.color})
-			}
+			e := entry.entity
+			deferredOps = append(deferredOps, func() {
+				if w.Mappers.World.Alive(e) {
+					w.Mappers.CodeNeeded.Remove(e)
+					w.Mappers.CodePending.Assign(e, &components.CodePending{Color: entry.color})
+				}
+			})
 		default:
 			log.Printf("Job channel full for entity %v", entry.entity)
 		}
 	}
+	return deferredOps
 }
 
-func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld) []func() {
 	dispatchList := s.collectWork(w)
-	s.applyWork(w, dispatchList)
+	return s.applyWork(w, dispatchList)
 }
 
 // CodeResultSystem refactored
 type CodeResultSystem struct {
-	PendingCodeFilter generic.Filter1[components.CodePending] // This field is not used in Update, consider removing if truly unused.
+	PendingCodeFilter generic.Filter1[components.CodePending]
 	ResultChan        <-chan jobs.Result
-	// lock              sync.Locker // REMOVED
 }
 
 func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {
-	// s.lock = lock // REMOVED
-	// w.Mappers.World.IsLocked() // REMOVED
 }
 
 // collectCodeResults: Phase 1.1 - Drains the result channel into a slice.
@@ -130,15 +126,13 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		entity := entry.entity
 		res := entry.result
 
-		if entity.IsZero() || !w.Mappers.World.Alive(entity) { // Check if entity is valid/alive
+		if entity.IsZero() {
 			continue
 		}
 
-		// Get CodePending component
 		codePending := w.Mappers.CodePending.Get(entity)
 		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
 
-		// Get appropriate CodeStatusAccessor based on color
 		var status components.CodeStatusAccessor
 		switch codePending.Color {
 		case "red":
@@ -148,7 +142,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		case "yellow":
 			_, status = w.Mappers.YellowCodeConfig.Get(entity)
 		case "cyan":
-			_, status = w.Mappers.CyanCodeConfig.Get(entity)
+			_, status = w.Mappers.GreenCodeConfig.Get(entity)
 		case "gray":
 			_, status = w.Mappers.GrayCodeConfig.Get(entity)
 		default:
@@ -156,7 +150,6 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 			continue
 		}
 
-		// Data-only changes are safe to do immediately.
 		if res.Error() != nil {
 			status.SetFailure(res.Error())
 			log.Printf("Monitor %s Code failed\n", *name)
@@ -165,7 +158,6 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 			log.Printf("Monitor %s %q code sent successfully\n", *name, codePending.Color)
 		}
 
-		// This is a structural change. Defer it.
 		deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 			return func() {
 				if w.Mappers.World.Alive(e) {
@@ -177,17 +169,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 	return deferredOps
 }
 
-// applyCodeQueuedStructuralChanges: Phase 2 - Executes all the queued structural changes at once.
-func (s *CodeResultSystem) applyCodeQueuedStructuralChanges(deferredOps []func()) {
-	// REMOVED: for w.Mappers.World.IsLocked() {}.
-	for _, op := range deferredOps {
-		op()
-	}
-}
-
-func (s *CodeResultSystem) Update(w *controller.CPRaWorld) {
-	// Main update method calls the two phases.
+func (s *CodeResultSystem) Update(w *controller.CPRaWorld) []func() {
 	results := s.collectCodeResults()
-	queuedChanges := s.processCodeResultsAndQueueStructuralChanges(w, results)
-	s.applyCodeQueuedStructuralChanges(queuedChanges)
+	return s.processCodeResultsAndQueueStructuralChanges(w, results)
 }

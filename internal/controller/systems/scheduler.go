@@ -4,24 +4,23 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/jobs"
 	"log"
+	"sync"
 	"time"
 )
 
 type System interface {
 	Initialize(w *controller.CPRaWorld)
-	Update(w *controller.CPRaWorld)
+	Update(w *controller.CPRaWorld) []func()
 }
 
 type Scheduler struct {
-	World       *controller.CPRaWorld
-	Systems     []System
-	JobChan     chan jobs.Job
-	IJobChan    chan jobs.Job
-	CJobChan    chan jobs.Job
-	ResultChan  chan jobs.Result
-	IResultChan chan jobs.Result
-	CResultChan chan jobs.Result
-	Done        chan struct{}
+	World      *controller.CPRaWorld
+	Systems    []System
+	WG         *sync.WaitGroup
+	JobChan    chan jobs.Job    // channel for jobs
+	ResultChan chan jobs.Result // channel for results
+	Done       chan struct{}
+	Lock       sync.RWMutex
 }
 
 func (s *Scheduler) AddSystem(sys System) {
@@ -29,49 +28,33 @@ func (s *Scheduler) AddSystem(sys System) {
 }
 
 func (s *Scheduler) Run(tick time.Duration) {
-	// 1) One‐time init
+	start := time.Now()
+	log.Printf("scheduler started at %v with %v tick\n", start, tick)
+	t := time.NewTicker(tick)
+	defer t.Stop()
 	for _, sys := range s.Systems {
 		sys.Initialize(s.World)
 	}
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
 	for {
 		select {
-		case <-ticker.C:
-			// —— Phase 0: Drain all back‐and‐forth channels in one go ——
-			s.drainJobs()
-
-			// —— Phase 1: Run every ECS system, now that all results are in ——
+		case <-t.C:
+			var allDeferredOps []func()
 			for _, sys := range s.Systems {
-				sys.Update(s.World)
+				ops := sys.Update(s.World)
+				allDeferredOps = append(allDeferredOps, ops...)
 			}
-
-		case <-s.Done:
-			log.Printf("shutting down scheduler")
-			close(s.JobChan)
-			close(s.IJobChan)
-			close(s.CJobChan)
-			close(s.ResultChan)
-			close(s.IResultChan)
-			close(s.CResultChan)
-			return
-		}
-	}
-}
-
-func (s *Scheduler) drainJobs() {
-	for {
-		select {
-		case job := <-s.JobChan:
-			s.ResultChan <- job.Execute()
-		case job := <-s.IJobChan:
-			s.IResultChan <- job.Execute()
-		case job := <-s.CJobChan:
-			s.CResultChan <- job.Execute()
-		default:
-			return
+			// Apply all deferred operations after all systems have been updated
+			for _, op := range allDeferredOps {
+				op()
+			}
+		case _, ok := <-s.Done:
+			if !ok {
+				//close(s.JobChan)
+				//close(s.ResultChan)
+				log.Printf("scheduler exitied after %v\n", time.Since(start))
+				s.WG.Done()
+				return
+			}
 		}
 	}
 }

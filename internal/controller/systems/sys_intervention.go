@@ -194,22 +194,22 @@ func (s *InterventionResultSystem) Update(w *controller.CPRaWorld) {
 }
 
 // The commented-out GetEntityComponents function from your original code.
-//func GetEntityComponents(w *ecs.World, entity ecs.Entity) []string {
-//	// 1. Retrieve Component IDs for the entity.
-//	ids := w.Ids(entity)
-//
-//	var componentNames []string
-//
-//	// 2. Iterate and access components.
-//	for _, id := range ids {
-//		// Get the reflect.Type for the component ID.
-//		info, _ := ecs.ComponentInfo(w, id)
-//		compType := info.Type
-//
-//		// Get a pointer to the component data.
-//		// Note: world.Get() returns an unsafe.Pointer that we don't need to fully cast
-//		// just to get the name of the type.
-//		componentNames = append(componentNames, compType.Name())
-//	}
-//	return componentNames
-//}
+func GetEntityComponents(w *ecs.World, entity ecs.Entity) []string {
+	// 1. Retrieve Component IDs for the entity.
+	ids := w.Ids(entity)
+
+	var componentNames []string
+
+	// 2. Iterate and access components.
+	for _, id := range ids {
+		// Get the reflect.Type for the component ID.
+		info, _ := ecs.ComponentInfo(w, id)
+		compType := info.Type
+
+		// Get a pointer to the component data.
+		// Note: world.Get() returns an unsafe.Pointer that we don't need to fully cast
+		// just to get the name of the type.
+		componentNames = append(componentNames, compType.Name())
+	}
+	return componentNames
+}

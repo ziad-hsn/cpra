@@ -124,58 +124,6 @@ func (e *EntityManager) MarkAsPending(entity ecs.Entity) error {
 	return nil
 }
 
-// MarkAsSuccess records a successful pulse check.
-func (e *EntityManager) MarkAsSuccess(entity ecs.Entity, resultDetails string) error { // resultDetails could be richer, e.g. *jobs.Result
-	if !e.World.Alive(entity) {
-		return fmt.Errorf("Entity is not found in the world: %v.\n", entity)
-	}
-
-	if e.PulseSuccess.Get(entity) == nil {
-		e.PulseSuccess.Add(entity)
-	}
-	if e.PulsePending.Get(entity) != nil {
-		e.PulsePending.Remove(entity)
-	}
-	if e.PulseFailed.Get(entity) != nil {
-		e.PulseFailed.Remove(entity)
-	}
-
-	if _, status := e.Pulse.Get(entity); status != nil {
-		status.LastStatus = "Success"
-		status.LastSuccessTime = time.Now()
-		status.LastCheckTime = time.Now()
-		status.ConsecutiveFailures = 0
-		status.LastError = nil // Clear last error
-		// You might store parts of resultDetails in InterventionStatus
-	}
-	return nil
-}
-
-// MarkAsFailed records a failed pulse check.
-func (e *EntityManager) MarkAsFailed(entity ecs.Entity, errMessage error) error { // errMessage could be richer, e.g. error type
-	if !e.World.Alive(entity) {
-		return fmt.Errorf("Entity is not found in the world: %v.\n", entity)
-	}
-
-	if e.PulseFailed.Get(entity) == nil {
-		e.PulseFailed.Add(entity)
-	}
-	if e.PulsePending.Get(entity) != nil {
-		e.PulsePending.Remove(entity)
-	}
-
-	if e.PulseSuccess.Get(entity) != nil {
-		e.PulseSuccess.Remove(entity)
-	}
-	if _, status := e.Pulse.Get(entity); status != nil {
-		status.LastStatus = "Failed"
-		status.LastCheckTime = time.Now()
-		status.ConsecutiveFailures++
-		status.LastError = errMessage
-	}
-	return nil
-}
-
 // EnableMonitor ensures a monitor is active.
 func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
 

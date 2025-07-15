@@ -13,11 +13,11 @@ import (
 
 // PulseScheduleSystem refactored
 type PulseScheduleSystem struct {
-	PulseFilter generic.Filter2[components.PulseConfig, components.PulseStatus]
+	PulseFilter *generic.Filter2[components.PulseConfig, components.PulseStatus]
 }
 
 func (s *PulseScheduleSystem) Initialize(w *controller.CPRaWorld) {
-	s.PulseFilter = *generic.NewFilter2[components.PulseConfig, components.PulseStatus]().
+	s.PulseFilter = generic.NewFilter2[components.PulseConfig, components.PulseStatus]().
 		Without(generic.T[components.DisabledMonitor]()).
 		Without(generic.T[components.PulsePending]()).
 		Without(generic.T[components.InterventionNeeded]()).
@@ -31,13 +31,14 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 	toCheck := make([]ecs.Entity, 0)
 	query := s.PulseFilter.Query(w.Mappers.World)
 	for query.Next() {
-		config := (*components.PulseConfig)(query.Query.Get(ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
-		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		entity := query.Entity()
+		config := w.Mappers.PulseConfig.Get(entity)
+		status := w.Mappers.PulseStatus.Get(entity)
 
 		// Check for first-time pulse
 		if w.Mappers.World.Has(query.Entity(), ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-			toCheck = append(toCheck, query.Entity())
 			status.LastCheckTime = time.Now()
+			toCheck = append(toCheck, query.Entity())
 			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
 			continue
 		}
@@ -79,11 +80,11 @@ type dispatchablePulse struct {
 
 type PulseDispatchSystem struct {
 	JobChan     chan<- jobs.Job
-	PulseNeeded generic.Filter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]
+	PulseNeeded *generic.Filter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]
 }
 
 func (s *PulseDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.PulseNeeded = *generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
+	s.PulseNeeded = generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
 }
 
 // collectWork: Phase 1 - Reads from the world and returns entities ready for dispatch.
@@ -91,8 +92,9 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchabl
 	toDispatch := make([]dispatchablePulse, 0)
 	query := s.PulseNeeded.Query(w.Mappers.World)
 	for query.Next() {
-		job := (*components.PulseJob)(query.Query.Get(ecs.ComponentID[components.PulseJob](w.Mappers.World)))
-		status := (*components.PulseStatus)(query.Query.Get(ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
+		entity := query.Entity()
+		job := w.Mappers.PulseJob.Get(entity)
+		status := w.Mappers.PulseStatus.Get(entity)
 
 		status.LastCheckTime = time.Now() // Data-only update, safe.
 
@@ -142,7 +144,7 @@ type resultEntry struct {
 }
 
 type PulseResultSystem struct {
-	PendingPulseFilter generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulsePending]
+	PendingPulseFilter *generic.Filter4[components.PulseConfig, components.PulseStatus, components.PulseJob, components.PulsePending]
 	ResultChan         <-chan jobs.Result
 }
 
@@ -172,18 +174,16 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 	for _, entry := range results {
 		entity := entry.entity
 		res := entry.result
-		n := *w.Mappers.Name.Get(entity)
-		fmt.Printf("recived %s results\n", n)
 
 		if entity.IsZero() {
 			continue
 		}
 
-		config := (*components.PulseConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseConfig](w.Mappers.World)))
-		status := (*components.PulseStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.PulseStatus](w.Mappers.World)))
-		name := *(*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
-		monitorStatus := (*components.MonitorStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.MonitorStatus](w.Mappers.World)))
-
+		config := w.Mappers.PulseConfig.Get(entity)
+		status := w.Mappers.PulseStatus.Get(entity)
+		name := *w.Mappers.Name.Get(entity)
+		monitorStatus := w.Mappers.MonitorStatus.Get(entity)
+		fmt.Printf("recived %s results\n", name)
 		if res.Error() != nil {
 			status.LastStatus = "failed"
 			status.LastError = res.Error()

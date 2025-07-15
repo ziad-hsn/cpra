@@ -1,110 +1,69 @@
 package main
 
 import (
-	"cpra/internal/controller"
-	"cpra/internal/controller/systems"
-	"cpra/internal/jobs"
-	"cpra/internal/loader/loader"
 	"fmt"
 	"log"
 	"sync"
 	"time"
+
+	"cpra/internal/controller"
+	"cpra/internal/controller/systems"
+	"cpra/internal/jobs"
+	"cpra/internal/loader/loader"
 )
 
 func main() {
-	//file, err := os.Open("heap.prof")
-	//f, err := os.Create("heap.prof")
-	//if err != nil {
-	//	log.Fatalf("could not create heap profile: %v", err)
-	//}
-	//// Make sure we close it on exit
-	//defer f.Close()
-	//
-	//// Launch a background goroutine to dump the heap every N microseconds
-	//go func() {
-	//	ticker := time.NewTicker(500 * time.Microsecond)
-	//	defer ticker.Stop()
-	//	for range ticker.C {
-	//		// Force a heap GC so the profile is fresh
-	//		runtime.GC()
-	//		if err := pprof.WriteHeapProfile(f); err != nil {
-	//			log.Printf("could not write heap profile: %v", err)
-	//			return
-	//		}
-	//		// Seek back to start so the file doesn't grow unbounded
-	//		if _, err := f.Seek(0, 0); err != nil {
-	//			log.Printf("could not rewind profile: %v", err)
-	//			return
-	//		}
-	//	}
-	//}()
-	l := loader.NewLoader("yaml", "internal/loader/test.yaml")
-	l.Load()
-	m := l.GetManifest()
-	//fmt.Printf("%#v", m)
-	c, err := controller.NewCPRaWorld(&m)
+	loader := loader.NewLoader("yaml", "internal/loader/test.yaml")
+	loader.Load()
+	manifest := loader.GetManifest()
+
+	world, err := controller.NewCPRaWorld(&manifest)
 	if err != nil {
 		log.Fatal(err)
 	}
-	//x := generic.NewFilter4[components.DisabledMonitor, components.Name, components.PulseConfig, components.PulseStatus]()
-	//query := x.Query(c.Mappers.World)
-	//
-	//for query.Next() {
-	//	_, n, c, _ := query.Get()
-	//	fmt.Printf("the following monitor is disabled %v -- %s\n", *n, c.Type)
-	//}
-	jobChan := make(chan jobs.Job, len(m.Monitors))
-	resultChan := make(chan jobs.Result, len(m.Monitors))
-	ijobChan := make(chan jobs.Job, len(m.Monitors))
-	iresultChan := make(chan jobs.Result, len(m.Monitors))
-	cjobChan := make(chan jobs.Job, len(m.Monitors))
-	cresultChan := make(chan jobs.Result, len(m.Monitors))
-	schedulerWG := &sync.WaitGroup{}
-	s := systems.Scheduler{Systems: make([]systems.System, 0), World: c, Done: make(chan struct{}), WG: schedulerWG}
-	s.AddSystem(&systems.PulseScheduleSystem{})
-	s.AddSystem(&systems.PulseDispatchSystem{
-		JobChan: jobChan,
-	})
-	s.AddSystem(&systems.PulseResultSystem{ResultChan: resultChan})
-	s.AddSystem(&systems.InterventionDispatchSystem{JobChan: ijobChan})
-	s.AddSystem(&systems.InterventionResultSystem{ResultChan: iresultChan})
-	s.AddSystem(&systems.CodeDispatchSystem{JobChan: cjobChan})
-	s.AddSystem(&systems.CodeResultSystem{ResultChan: cresultChan})
-	schedulerWG.Add(1)
-	go s.Run(10 * time.Millisecond)
-	timeout := time.After(24 * time.Second)
 
+	// make channels
+	jobCh := make(chan jobs.Job, len(manifest.Monitors))
+	resCh := make(chan jobs.Result, len(manifest.Monitors))
+	ijobCh := make(chan jobs.Job, len(manifest.Monitors))
+	iresCh := make(chan jobs.Result, len(manifest.Monitors))
+	cjobCh := make(chan jobs.Job, len(manifest.Monitors))
+	cresCh := make(chan jobs.Result, len(manifest.Monitors))
+
+	// build scheduler
+	wg := &sync.WaitGroup{}
+	sched := systems.NewScheduler(world, wg, 10*time.Millisecond)
+
+	// Phase 1
+	sched.AddSchedule(&systems.PulseScheduleSystem{})
+
+	// Phase 2
+	sched.AddDispatch(&systems.PulseDispatchSystem{JobChan: jobCh})
+	sched.AddDispatch(&systems.InterventionDispatchSystem{JobChan: ijobCh})
+	sched.AddDispatch(&systems.CodeDispatchSystem{JobChan: cjobCh})
+
+	// Phase 3
+	sched.AddResult(&systems.PulseResultSystem{ResultChan: resCh})
+	sched.AddResult(&systems.InterventionResultSystem{ResultChan: iresCh})
+	sched.AddResult(&systems.CodeResultSystem{ResultChan: cresCh})
+
+	wg.Add(1)
+	go sched.Run()
+	timeout := time.After(24 * time.Second)
+	// worker‐loop
 	for {
 		select {
-		case job, ok := <-jobChan:
-
-			if !ok {
-				fmt.Println("existing CPRa")
-				return
-			}
-			res := job.Execute()
-			resultChan <- res
-		case job, ok := <-ijobChan:
-			if !ok {
-				fmt.Println("existing CPRa")
-				return
-			}
-			res := job.Execute()
-			iresultChan <- res
-		case job, ok := <-cjobChan:
-			fmt.Println("code code job")
-			if !ok {
-				fmt.Println("existing CPRa")
-				return
-			}
-			res := job.Execute()
-			cresultChan <- res
+		case job := <-jobCh:
+			resCh <- job.Execute()
+		case job := <-ijobCh:
+			iresCh <- job.Execute()
+		case job := <-cjobCh:
+			cresCh <- job.Execute()
 		case <-timeout:
 			fmt.Println("timeout")
-			close(s.Done)
-			schedulerWG.Wait()
+			close(sched.Done)
+			wg.Wait()
 			return
 		}
-
 	}
 }

@@ -18,12 +18,12 @@ type dispatchableCodeJob struct {
 
 type CodeDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
-	CodeNeededFilter         generic.Filter1[components.CodeNeeded]
+	CodeNeededFilter         *generic.Filter1[components.CodeNeeded]
 	FailedInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]
 }
 
 func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.CodeNeededFilter = *generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
+	s.CodeNeededFilter = generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
 	s.FailedInterventionFilter = *generic.NewFilter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]()
 }
 
@@ -33,28 +33,34 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 	query := s.CodeNeededFilter.Query(w.Mappers.World)
 	for query.Next() {
 		entity := query.Entity()
-		codeNeeded := (*components.CodeNeeded)(query.Query.Get(ecs.ComponentID[components.CodeNeeded](w.Mappers.World)))
+		codeNeeded := *query.Get()
 		var job jobs.Job
 		switch codeNeeded.Color {
 		case "red":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				job = (*components.RedCodeJob)(w.Mappers.World.Get(entity, ecs.ComponentID[components.RedCodeJob](w.Mappers.World))).Job
+				j := *w.Mappers.RedCodeJob.Get(entity)
+				job = j.Job
 			}
 		case "green":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				job = (*components.GreenCodeJob)(w.Mappers.World.Get(entity, ecs.ComponentID[components.GreenCodeJob](w.Mappers.World))).Job
+				j := *w.Mappers.GreenCodeJob.Get(entity)
+				job = j.Job
 			}
 		case "yellow":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				job = (*components.YellowCodeJob)(w.Mappers.World.Get(entity, ecs.ComponentID[components.YellowCodeJob](w.Mappers.World))).Job
+				j := *w.Mappers.YellowCodeJob.Get(entity)
+				job = j.Job
 			}
 		case "cyan":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				job = (*components.CyanCodeJob)(w.Mappers.World.Get(entity, ecs.ComponentID[components.CyanCodeJob](w.Mappers.World))).Job
+				j := *w.Mappers.CyanCodeJob.Get(entity)
+				job = j.Job
 			}
 		case "gray":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				job = (*components.GrayCodeJob)(w.Mappers.World.Get(entity, ecs.ComponentID[components.GrayCodeJob](w.Mappers.World))).Job
+				j := *w.Mappers.GrayCodeJob.Get(entity)
+				job = j.Job
+
 			}
 		default:
 			log.Printf("Unknown color %q for entity %v", codeNeeded.Color, entity)
@@ -131,7 +137,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		}
 
 		codePending := w.Mappers.CodePending.Get(entity)
-		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
+		name := *w.Mappers.Name.Get(entity)
 
 		var status components.CodeStatusAccessor
 		switch codePending.Color {
@@ -152,10 +158,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 
 		if res.Error() != nil {
 			status.SetFailure(res.Error())
-			log.Printf("Monitor %s Code failed\n", *name)
+			log.Printf("Monitor %s Code failed\n", name)
 		} else {
 			status.SetSuccess(time.Now())
-			log.Printf("Monitor %s %q code sent successfully\n", *name, codePending.Color)
+			log.Printf("Monitor %s %q code sent successfully\n", name, codePending.Color)
 		}
 
 		deferredOps = append(deferredOps, func(e ecs.Entity) func() {

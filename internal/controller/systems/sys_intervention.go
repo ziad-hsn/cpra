@@ -101,9 +101,8 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		config := (*components.InterventionConfig)(w.Mappers.World.Get(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)))
-		status := (*components.InterventionStatus)(w.Mappers.World.Get(entity, ecs.ComponentID[components.InterventionStatus](w.Mappers.World)))
-		name := (*components.Name)(w.Mappers.World.Get(entity, ecs.ComponentID[components.Name](w.Mappers.World)))
+		config, status := w.Mappers.Intervention.Get(entity)
+		name := *w.Mappers.Name.Get(entity)
 
 		if res.Error() != nil {
 			status.LastStatus = "failed"
@@ -111,7 +110,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			status.ConsecutiveFailures++
 
 			if config.MaxFailures <= status.ConsecutiveFailures {
-				log.Printf("Monitor %s intervention failed\n", *name)
+				log.Printf("Monitor %s intervention failed\n", name)
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Println("scheduling red code")
 					if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
@@ -144,7 +143,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 
 			if lastStatus == "failed" {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", *name)
+					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
 							if w.Mappers.World.Alive(e) {

@@ -1,60 +1,79 @@
 package systems
 
 import (
-	"cpra/internal/controller"
-	"cpra/internal/jobs"
 	"log"
 	"sync"
 	"time"
+
+	"cpra/internal/controller"
 )
 
-type System interface {
+type PhaseSystem interface {
 	Initialize(w *controller.CPRaWorld)
+	// Update returns the list of deferred structural-change operations.
 	Update(w *controller.CPRaWorld) []func()
 }
 
 type Scheduler struct {
-	World      *controller.CPRaWorld
-	Systems    []System
-	WG         *sync.WaitGroup
-	JobChan    chan jobs.Job    // channel for jobs
-	ResultChan chan jobs.Result // channel for results
-	Done       chan struct{}
-	Lock       sync.RWMutex
+	World           *controller.CPRaWorld
+	ScheduleSystems []PhaseSystem
+	DispatchSystems []PhaseSystem
+	ResultSystems   []PhaseSystem
+	WG              *sync.WaitGroup
+	Done            chan struct{}
+	Tick            time.Duration
 }
 
-func (s *Scheduler) AddSystem(sys System) {
-	s.Systems = append(s.Systems, sys)
+func NewScheduler(world *controller.CPRaWorld, wg *sync.WaitGroup, tick time.Duration) *Scheduler {
+	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{})}
 }
 
-func (s *Scheduler) Run(tick time.Duration) {
-	start := time.Now()
-	log.Printf("scheduler started at %v with %v tick\n", start, tick)
-	t := time.NewTicker(tick)
-	defer t.Stop()
-	for _, sys := range s.Systems {
+func (s *Scheduler) AddSchedule(sys PhaseSystem) { s.ScheduleSystems = append(s.ScheduleSystems, sys) }
+func (s *Scheduler) AddDispatch(sys PhaseSystem) { s.DispatchSystems = append(s.DispatchSystems, sys) }
+func (s *Scheduler) AddResult(sys PhaseSystem)   { s.ResultSystems = append(s.ResultSystems, sys) }
+
+func (s *Scheduler) Run() {
+	log.Printf("scheduler started with %v tick\n", s.Tick)
+	ticker := time.NewTicker(s.Tick)
+	defer ticker.Stop()
+	// Initialize all systems
+	for _, sys := range s.ScheduleSystems {
 		sys.Initialize(s.World)
 	}
+	for _, sys := range s.DispatchSystems {
+		sys.Initialize(s.World)
+	}
+	for _, sys := range s.ResultSystems {
+		sys.Initialize(s.World)
+	}
+
 	for {
 		select {
-		case <-t.C:
+		case <-ticker.C:
+			// Phase 1: schedule
 			var allDeferredOps []func()
-			for _, sys := range s.Systems {
+			// Collect all deferred operations
+			for _, sys := range s.ScheduleSystems {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
 			}
-			// Apply all deferred operations after all systems have been updated
+			for _, sys := range s.DispatchSystems {
+				ops := sys.Update(s.World)
+				allDeferredOps = append(allDeferredOps, ops...)
+			}
+			for _, sys := range s.ResultSystems {
+				ops := sys.Update(s.World)
+				allDeferredOps = append(allDeferredOps, ops...)
+			}
+			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
 				op()
 			}
-		case _, ok := <-s.Done:
-			if !ok {
-				//close(s.JobChan)
-				//close(s.ResultChan)
-				log.Printf("scheduler exitied after %v\n", time.Since(start))
-				s.WG.Done()
-				return
-			}
+
+		case <-s.Done:
+			log.Printf("scheduler exited\n")
+			s.WG.Done()
+			return
 		}
 	}
 }

@@ -30,9 +30,11 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) []disp
 	query := s.InterventionNeededFilter.Query(w.Mappers.World)
 	for query.Next() {
 		job, _ := query.Get()
+		j := job.Job.Copy()
+		entity := query.Entity()
 		toDispatch = append(toDispatch, dispatchableIntervention{
-			Entity: query.Entity(),
-			Job:    job.Job,
+			Entity: entity,
+			Job:    j,
 		})
 	}
 	return toDispatch
@@ -43,7 +45,7 @@ func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, dispatch
 	var deferredOps []func()
 	for _, entry := range dispatchList {
 		select {
-		case s.JobChan <- entry.Job.Copy():
+		case s.JobChan <- entry.Job:
 			e := entry.Entity
 			deferredOps = append(deferredOps, func() {
 				if w.Mappers.World.Alive(e) {
@@ -80,7 +82,8 @@ loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			toProcess = append(toProcess, resultEntry{entity: res.Entity(), result: res})
+			ent := res.Entity()
+			toProcess = append(toProcess, resultEntry{entity: ent, result: res})
 		default:
 			break loop
 		}

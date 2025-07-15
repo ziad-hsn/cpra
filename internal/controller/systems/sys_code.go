@@ -39,27 +39,27 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 		case "red":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 				j := *w.Mappers.RedCodeJob.Get(entity)
-				job = j.Job
+				job = j.Job.Copy()
 			}
 		case "green":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
 				j := *w.Mappers.GreenCodeJob.Get(entity)
-				job = j.Job
+				job = j.Job.Copy()
 			}
 		case "yellow":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
 				j := *w.Mappers.YellowCodeJob.Get(entity)
-				job = j.Job
+				job = j.Job.Copy()
 			}
 		case "cyan":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 				j := *w.Mappers.CyanCodeJob.Get(entity)
-				job = j.Job
+				job = j.Job.Copy()
 			}
 		case "gray":
 			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
 				j := *w.Mappers.GrayCodeJob.Get(entity)
-				job = j.Job
+				job = j.Job.Copy()
 
 			}
 		default:

@@ -99,7 +99,7 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchabl
 		status.LastCheckTime = time.Now() // Data-only update, safe.
 
 		toDispatch = append(toDispatch, dispatchablePulse{
-			Entity: query.Entity(),
+			Entity: entity,
 			Job:    job.Job,
 		})
 	}
@@ -158,7 +158,8 @@ loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			toProcess = append(toProcess, resultEntry{entity: res.Entity(), result: res})
+			ent := res.Entity()
+			toProcess = append(toProcess, resultEntry{entity: ent, result: res})
 		default:
 			break loop // Exit loop when no more results
 		}

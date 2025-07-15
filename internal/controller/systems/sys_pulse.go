@@ -59,7 +59,7 @@ func (s *PulseScheduleSystem) applyWork(w *controller.CPRaWorld, entities []ecs.
 	for _, entity := range entities {
 		e := entity
 		deferredOps = append(deferredOps, func() {
-			if w.Mappers.World.Alive(e) && !w.Mappers.World.Has(e, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
+			if !e.IsZero() && !w.Mappers.World.Has(e, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
 				w.Mappers.PulseNeeded.Assign(e, &components.PulseNeeded{})
 			}
 		})
@@ -182,7 +182,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 		config := w.Mappers.PulseConfig.Get(entity)
 		status := w.Mappers.PulseStatus.Get(entity)
-		name := *w.Mappers.Name.Get(entity)
+		name := components.Name(string(*w.Mappers.Name.Get(entity)))
 		monitorStatus := w.Mappers.MonitorStatus.Get(entity)
 		fmt.Printf("recived %s results\n", name)
 		if res.Error() != nil {
@@ -194,7 +194,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
-							if w.Mappers.World.Alive(e) {
+							if !e.IsZero() {
 								w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "yellow"})
 							}
 						}
@@ -208,7 +208,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 					fmt.Printf("Monitor %s failed %d times and needs intervention\n", name, status.ConsecutiveFailures)
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
-							if w.Mappers.World.Alive(e) {
+							if !e.IsZero() {
 								w.Mappers.InterventionNeeded.Assign(e, &components.InterventionNeeded{})
 							}
 						}
@@ -220,14 +220,14 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			status.LastError = nil
 			status.ConsecutiveFailures = 0
 			status.LastSuccessTime = time.Now()
-			s := monitorStatus.Status
+			mStatus := monitorStatus.Status
 			monitorStatus.Status = "success"
 
-			if s == "failed" {
+			if mStatus == "failed" {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
-							if w.Mappers.World.Alive(e) {
+							if !e.IsZero() {
 								w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "green"})
 							}
 						}
@@ -238,7 +238,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 		deferredOps = append(deferredOps, func(e ecs.Entity, name components.Name) func() {
 			return func() {
-				if w.Mappers.World.Alive(e) {
+				if !e.IsZero() {
 					if w.Mappers.World.Has(e, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
 						w.Mappers.PulsePending.Remove(e)
 					} else {

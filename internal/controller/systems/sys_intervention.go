@@ -48,7 +48,7 @@ func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, dispatch
 		case s.JobChan <- entry.Job:
 			e := entry.Entity
 			deferredOps = append(deferredOps, func() {
-				if w.Mappers.World.Alive(e) {
+				if !e.IsZero() {
 					w.Mappers.World.Exchange(e,
 						[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
 						[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
@@ -119,7 +119,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 					if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
 						deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 							return func() {
-								if w.Mappers.World.Alive(e) {
+								if !e.IsZero() {
 									w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"})
 								}
 							}
@@ -129,7 +129,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			} else {
 				deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 					return func() {
-						if w.Mappers.World.Alive(e) {
+						if !e.IsZero() {
 							w.Mappers.World.Exchange(e,
 								[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
 								[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
@@ -149,7 +149,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {
-							if w.Mappers.World.Alive(e) {
+							if !e.IsZero() {
 								w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "cyan"})
 							}
 						}
@@ -158,7 +158,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			}
 			deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 				return func() {
-					if w.Mappers.World.Alive(e) {
+					if !e.IsZero() {
 						w.Mappers.InterventionPending.Remove(e)
 					}
 				}

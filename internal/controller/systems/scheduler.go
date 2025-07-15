@@ -53,15 +53,15 @@ func (s *Scheduler) Run() {
 			// Phase 1: schedule
 			var allDeferredOps []func()
 			// Collect all deferred operations
+			for _, sys := range s.ResultSystems {
+				ops := sys.Update(s.World)
+				allDeferredOps = append(allDeferredOps, ops...)
+			}
 			for _, sys := range s.ScheduleSystems {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
 			}
 			for _, sys := range s.DispatchSystems {
-				ops := sys.Update(s.World)
-				allDeferredOps = append(allDeferredOps, ops...)
-			}
-			for _, sys := range s.ResultSystems {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
 			}

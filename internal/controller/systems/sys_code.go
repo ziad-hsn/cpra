@@ -82,7 +82,7 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []d
 			log.Printf("Sent %s code job for entity %v", entry.color, entry.entity)
 			e := entry.entity
 			deferredOps = append(deferredOps, func() {
-				if w.Mappers.World.Alive(e) {
+				if !e.IsZero() {
 					w.Mappers.CodeNeeded.Remove(e)
 					w.Mappers.CodePending.Assign(e, &components.CodePending{Color: entry.color})
 				}
@@ -166,7 +166,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 
 		deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 			return func() {
-				if w.Mappers.World.Alive(e) {
+				if !e.IsZero() {
 					w.Mappers.CodePending.Remove(e)
 				}
 			}

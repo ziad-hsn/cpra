@@ -136,6 +136,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 			continue
 		}
 
+		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+			continue
+		}
+
 		codePending := w.Mappers.CodePending.Get(entity)
 		name := *w.Mappers.Name.Get(entity)
 

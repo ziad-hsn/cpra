@@ -104,6 +104,10 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
+		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
+			continue
+		}
+
 		config, status := w.Mappers.Intervention.Get(entity)
 		name := *w.Mappers.Name.Get(entity)
 

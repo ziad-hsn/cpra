@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mlange-42/arche-model v0.10.0 // indirect
 	github.com/mlange-42/ark v0.4.3 // indirect

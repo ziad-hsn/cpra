@@ -1,6 +1,9 @@
 package jobs
 
-import "github.com/mlange-42/arche/ecs"
+import (
+	"github.com/google/uuid"
+	"github.com/mlange-42/arche/ecs"
+)
 
 type Result interface {
 	Entity() ecs.Entity
@@ -8,36 +11,39 @@ type Result interface {
 }
 
 type PulseResults struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Ent     ecs.Entity
 	latency int // optional delete later if not needed
 	Err     error
 }
 
 func (p PulseResults) Entity() ecs.Entity {
-	return p.ID
+	return p.Ent
 }
 
 func (p PulseResults) Error() error { return p.Err }
 
 type InterventionResults struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Ent     ecs.Entity
 	latency int // optional delete later if not needed
 	Err     error
 }
 
 func (p InterventionResults) Entity() ecs.Entity {
-	return p.ID
+	return p.Ent
 }
 
 func (p InterventionResults) Error() error { return p.Err }
 
 type CodeResults struct {
-	ID  ecs.Entity
+	ID  uuid.UUID
+	Ent ecs.Entity
 	Err error
 }
 
 func (c CodeResults) Entity() ecs.Entity {
-	return c.ID
+	return c.Ent
 }
 
 func (c CodeResults) Error() error { return c.Err }

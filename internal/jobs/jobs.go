@@ -3,6 +3,7 @@ package jobs
 import (
 	"cpra/internal/loader/schema"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mlange-42/arche/ecs"
 	"time"
 )
@@ -19,7 +20,8 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 	switch cfg := pulseSchema.Config.(type) { // cfg is the specific *schema.PulseHTTPConfig, etc.
 	case schema.PulseHTTPConfig:
 		return &PulseHTTPJob{
-			ID:      jobID,
+			ID:      uuid.New(),
+			Entity:  jobID,
 			URL:     cfg.Url,
 			Method:  cfg.Method, // Consider defaulting if empty
 			Timeout: timeout,
@@ -27,7 +29,8 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		}, nil
 	case schema.PulseTCPConfig:
 		return &PulseTCPJob{
-			ID:      jobID,
+			ID:      uuid.New(),
+			Entity:  jobID,
 			Host:    cfg.Host,
 			Port:    cfg.Port,
 			Timeout: timeout,
@@ -35,7 +38,8 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		}, nil
 	case schema.PulseICMPConfig:
 		return &PulseICMPJob{
-			ID:      jobID,
+			ID:      uuid.New(),
+			Entity:  jobID,
 			Host:    cfg.Host,
 			Timeout: timeout,
 			Count:   cfg.Count,
@@ -52,7 +56,8 @@ func CreateInterventionJob(InterventionSchema schema.Intervention, jobID ecs.Ent
 	switch InterventionSchema.Action { // cfg is the specific *schema.PulseHTTPConfig, etc.
 	case "docker":
 		return &InterventionDockerJob{
-			ID:        jobID,
+			ID:        uuid.New(),
+			Entity:    jobID,
 			Container: InterventionSchema.Target.(*schema.InterventionTargetDocker).Container,
 			Retries:   retries,
 		}, nil
@@ -65,11 +70,29 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 	// Common parameters from schema.Pulse that are relevant for job execution
 	switch config.Notify {
 	case "log":
-		return &CodeLogJob{File: config.Config.(*schema.CodeNotificationLog).File, ID: jobID, Monitor: monitor, Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", monitor)}, nil
+		return &CodeLogJob{
+			ID:      uuid.New(),
+			File:    config.Config.(*schema.CodeNotificationLog).File,
+			Entity:  jobID,
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", monitor),
+		}, nil
 	case "pagerduty":
-		return &CodePagerDutyJob{URL: config.Config.(*schema.CodeNotificationPagerDuty).URL, ID: jobID, Monitor: monitor, Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", monitor)}, nil
+		return &CodePagerDutyJob{
+			ID:      uuid.New(),
+			URL:     config.Config.(*schema.CodeNotificationPagerDuty).URL,
+			Entity:  jobID,
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", monitor),
+		}, nil
 	case "slack":
-		return &CodeSlackJob{WebHook: config.Config.(*schema.CodeNotificationSlack).WebHook, ID: jobID, Monitor: monitor, Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", monitor)}, nil
+		return &CodeSlackJob{
+			ID:      uuid.New(),
+			WebHook: config.Config.(*schema.CodeNotificationSlack).WebHook,
+			Entity:  jobID,
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", monitor),
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown code notification type: %T for job creation", config.Notify)
@@ -78,7 +101,8 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 }
 
 type PulseHTTPJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	URL     string
 	Method  string
 	Timeout time.Duration
@@ -88,13 +112,18 @@ type PulseHTTPJob struct {
 func (p *PulseHTTPJob) Execute() Result {
 	fmt.Println("executing HTTP Job")
 	time.Sleep(1 * time.Second)
-	res := PulseResults{ID: p.ID, Err: fmt.Errorf("HTTP check failed")}
+	res := PulseResults{
+		Ent: p.Entity,
+		Err: fmt.Errorf("HTTP check failed"),
+		ID:  p.ID,
+	}
 	return res
 }
 func (p *PulseHTTPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseHTTPJob{
 		ID:      p.ID,
+		Entity:  p.Entity,
 		URL:     p.URL,
 		Method:  p.Method,
 		Timeout: p.Timeout,
@@ -104,7 +133,8 @@ func (p *PulseHTTPJob) Copy() Job {
 }
 
 type PulseTCPJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	Host    string
 	Port    int
 	Timeout time.Duration
@@ -113,7 +143,11 @@ type PulseTCPJob struct {
 
 func (p *PulseTCPJob) Execute() Result {
 	fmt.Println("executing TCP Job")
-	res := PulseResults{ID: p.ID, Err: nil}
+	res := PulseResults{
+		Ent: p.Entity,
+		Err: nil,
+		ID:  p.ID,
+	}
 	return res
 }
 
@@ -121,6 +155,7 @@ func (p *PulseTCPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseTCPJob{
 		ID:      p.ID,
+		Entity:  p.Entity,
 		Host:    p.Host,
 		Port:    p.Port,
 		Timeout: p.Timeout,
@@ -130,7 +165,8 @@ func (p *PulseTCPJob) Copy() Job {
 }
 
 type PulseICMPJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	Host    string
 	Count   int
 	Timeout time.Duration
@@ -138,7 +174,11 @@ type PulseICMPJob struct {
 
 func (p *PulseICMPJob) Execute() Result {
 	fmt.Println("executing ICMP Job")
-	res := PulseResults{ID: p.ID, Err: fmt.Errorf("ICMP check failed\n")}
+	res := PulseResults{
+		Ent: p.Entity,
+		Err: fmt.Errorf("ICMP check failed\n"),
+		ID:  p.ID,
+	}
 	return res
 }
 
@@ -146,6 +186,7 @@ func (p *PulseICMPJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &PulseICMPJob{
 		ID:      p.ID,
+		Entity:  p.Entity,
 		Host:    p.Host,
 		Count:   p.Count,
 		Timeout: p.Timeout,
@@ -154,7 +195,8 @@ func (p *PulseICMPJob) Copy() Job {
 }
 
 type InterventionDockerJob struct {
-	ID        ecs.Entity
+	ID        uuid.UUID
+	Entity    ecs.Entity
 	Container string
 	Timeout   time.Duration
 	Retries   int
@@ -162,13 +204,18 @@ type InterventionDockerJob struct {
 
 func (i *InterventionDockerJob) Execute() Result {
 	fmt.Println("executing docker intervention Job")
-	res := InterventionResults{ID: i.ID, Err: fmt.Errorf("Docker intervention failed\n")}
+	res := InterventionResults{
+		Ent: i.Entity,
+		Err: fmt.Errorf("Docker intervention failed\n"),
+		ID:  i.ID,
+	}
 	return res
 }
 func (i *InterventionDockerJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &InterventionDockerJob{
 		ID:        i.ID,
+		Entity:    i.Entity,
 		Container: i.Container,
 		Timeout:   i.Timeout,
 		Retries:   i.Retries,
@@ -177,7 +224,8 @@ func (i *InterventionDockerJob) Copy() Job {
 }
 
 type CodeLogJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	File    string
 	Message string
 	Monitor string
@@ -187,7 +235,11 @@ type CodeLogJob struct {
 
 func (c *CodeLogJob) Execute() Result {
 	fmt.Println("executing code Log Job")
-	res := CodeResults{ID: c.ID, Err: fmt.Errorf("Docker intervention failed\n")}
+	res := CodeResults{
+		Ent: c.Entity,
+		Err: fmt.Errorf("Docker intervention failed\n"),
+		ID:  c.ID,
+	}
 	return res
 }
 
@@ -195,6 +247,7 @@ func (c *CodeLogJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodeLogJob{
 		ID:      c.ID,
+		Entity:  c.Entity,
 		File:    c.File,
 		Timeout: c.Timeout,
 		Retries: c.Retries,
@@ -203,7 +256,8 @@ func (c *CodeLogJob) Copy() Job {
 }
 
 type CodeSlackJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	WebHook string
 	Message string
 	Monitor string
@@ -213,13 +267,18 @@ type CodeSlackJob struct {
 
 func (c *CodeSlackJob) Execute() Result {
 	fmt.Println("executing code Log Job")
-	res := CodeResults{ID: c.ID, Err: fmt.Errorf("Docker intervention failed\n")}
+	res := CodeResults{
+		Ent: c.Entity,
+		Err: fmt.Errorf("Docker intervention failed\n"),
+		ID:  c.ID,
+	}
 	return res
 }
 func (c *CodeSlackJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodeSlackJob{
 		ID:      c.ID,
+		Entity:  c.Entity,
 		WebHook: c.WebHook,
 		Timeout: c.Timeout,
 		Retries: c.Retries,
@@ -228,7 +287,8 @@ func (c *CodeSlackJob) Copy() Job {
 }
 
 type CodePagerDutyJob struct {
-	ID      ecs.Entity
+	ID      uuid.UUID
+	Entity  ecs.Entity
 	URL     string
 	Message string
 	Monitor string
@@ -238,7 +298,11 @@ type CodePagerDutyJob struct {
 
 func (c *CodePagerDutyJob) Execute() Result {
 	fmt.Println("executing code pagerduty Job")
-	res := CodeResults{ID: c.ID, Err: fmt.Errorf("Docker intervention failed\n")}
+	res := CodeResults{
+		Ent: c.Entity,
+		Err: fmt.Errorf("Docker intervention failed\n"),
+		ID:  c.ID,
+	}
 	return res
 }
 
@@ -246,6 +310,7 @@ func (c *CodePagerDutyJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	return &CodePagerDutyJob{
 		ID:      c.ID,
+		Entity:  c.Entity,
 		URL:     c.URL,
 		Timeout: c.Timeout,
 		Retries: c.Retries,

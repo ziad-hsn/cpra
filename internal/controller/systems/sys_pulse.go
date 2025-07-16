@@ -180,6 +180,10 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			continue
 		}
 
+		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
+			continue
+		}
+
 		config := w.Mappers.PulseConfig.Get(entity)
 		status := w.Mappers.PulseStatus.Get(entity)
 		name := components.Name(string(*w.Mappers.Name.Get(entity)))

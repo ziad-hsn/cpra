@@ -65,6 +65,7 @@ func (s *Scheduler) Run() {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
 			}
+			log.Println(allDeferredOps)
 			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
 				op()

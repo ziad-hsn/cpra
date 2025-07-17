@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cpra/internal/workers/workerspool"
 	"fmt"
 	"log"
 	"sync"
@@ -8,14 +9,13 @@ import (
 
 	"cpra/internal/controller"
 	"cpra/internal/controller/systems"
-	"cpra/internal/jobs"
 	"cpra/internal/loader/loader"
 )
 
 func main() {
-	loader := loader.NewLoader("yaml", "internal/loader/test.yaml")
-	loader.Load()
-	manifest := loader.GetManifest()
+	l := loader.NewLoader("yaml", "internal/loader/test.yaml")
+	l.Load()
+	manifest := l.GetManifest()
 
 	world, err := controller.NewCPRaWorld(&manifest)
 	if err != nil {
@@ -23,13 +23,43 @@ func main() {
 	}
 
 	// make channels
-	jobCh := make(chan jobs.Job, len(manifest.Monitors))
-	resCh := make(chan jobs.Result, len(manifest.Monitors))
-	ijobCh := make(chan jobs.Job, len(manifest.Monitors))
-	iresCh := make(chan jobs.Result, len(manifest.Monitors))
-	cjobCh := make(chan jobs.Job, len(manifest.Monitors))
-	cresCh := make(chan jobs.Result, len(manifest.Monitors))
+	//jobCh := make(chan jobs.Job, len(manifest.Monitors))
+	//resCh := make(chan jobs.Result, len(manifest.Monitors))
+	//ijobCh := make(chan jobs.Job, len(manifest.Monitors))
+	//iresCh := make(chan jobs.Result, len(manifest.Monitors))
+	//cjobCh := make(chan jobs.Job, len(manifest.Monitors))
+	//cresCh := make(chan jobs.Result, len(manifest.Monitors))
 
+	// start workers pools
+	pools := workerspool.NewPoolsManager()
+	pools.NewPool("pulse", 10, 10, 10)
+	pools.NewPool("intervention", 10, 10, 10)
+	pools.NewPool("code", 10, 10, 10)
+	pulseJobChan, err := pools.GetJobChannel("pulse")
+	if err != nil {
+		log.Fatal(err)
+	}
+	interventionJobChan, err := pools.GetJobChannel("intervention")
+	if err != nil {
+		log.Fatal(err)
+	}
+	CodeJobChan, err := pools.GetJobChannel("code")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pulseResultChan, err := pools.GetResultChannel("pulse")
+	if err != nil {
+		log.Fatal(err)
+	}
+	interventionResultChan, err := pools.GetResultChannel("intervention")
+	if err != nil {
+		log.Fatal(err)
+	}
+	codeResultChan, err := pools.GetResultChannel("code")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pools.StartAll()
 	// build scheduler
 	wg := &sync.WaitGroup{}
 	sched := systems.NewScheduler(world, wg, 10*time.Millisecond)
@@ -38,14 +68,14 @@ func main() {
 	sched.AddSchedule(&systems.PulseScheduleSystem{})
 
 	// Phase 2
-	sched.AddDispatch(&systems.PulseDispatchSystem{JobChan: jobCh})
-	sched.AddDispatch(&systems.InterventionDispatchSystem{JobChan: ijobCh})
-	sched.AddDispatch(&systems.CodeDispatchSystem{JobChan: cjobCh})
+	sched.AddDispatch(&systems.PulseDispatchSystem{JobChan: pulseJobChan})
+	sched.AddDispatch(&systems.InterventionDispatchSystem{JobChan: interventionJobChan})
+	sched.AddDispatch(&systems.CodeDispatchSystem{JobChan: CodeJobChan})
 
 	// Phase 3
-	sched.AddResult(&systems.PulseResultSystem{ResultChan: resCh})
-	sched.AddResult(&systems.InterventionResultSystem{ResultChan: iresCh})
-	sched.AddResult(&systems.CodeResultSystem{ResultChan: cresCh})
+	sched.AddResult(&systems.PulseResultSystem{ResultChan: pulseResultChan})
+	sched.AddResult(&systems.InterventionResultSystem{ResultChan: interventionResultChan})
+	sched.AddResult(&systems.CodeResultSystem{ResultChan: codeResultChan})
 
 	wg.Add(1)
 	go sched.Run()
@@ -53,12 +83,12 @@ func main() {
 	// worker‐loop
 	for {
 		select {
-		case job := <-jobCh:
-			resCh <- job.Execute()
-		case job := <-ijobCh:
-			iresCh <- job.Execute()
-		case job := <-cjobCh:
-			cresCh <- job.Execute()
+		//case job := <-pulseJobChan:
+		//	pulseResultChan <- job.Execute()
+		//case job := <-interventionJobChan:
+		//	interventionResultChan <- job.Execute()
+		//case job := <-CodeJobChan:
+		//	codeResultChan <- job.Execute()
 		case <-timeout:
 			fmt.Println("timeout")
 			close(sched.Done)

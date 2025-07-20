@@ -134,16 +134,13 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		entity := entry.entity
 		res := entry.result
 		fmt.Printf("entity is %v for code result.\n", entity)
-		if entity.IsZero() {
-			continue
-		}
 
-		if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		monitor := controller.NewMonitorAdapter(w, entity)
+		if !monitor.IsAlive() || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
 		codePending := w.Mappers.CodePending.GetUnchecked(entity)
-		name := *w.Mappers.Name.GetUnchecked(entity)
 
 		var status components.CodeStatusAccessor
 		switch codePending.Color {
@@ -164,19 +161,18 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 
 		if res.Error() != nil {
 			status.SetFailure(res.Error())
-			log.Printf("Monitor %s Code failed\n", name)
+			log.Printf("Monitor %s Code failed\n", monitor.Name())
 		} else {
 			status.SetSuccess(time.Now())
-			log.Printf("Monitor %s %q code sent successfully\n", name, codePending.Color)
+			log.Printf("Monitor %s %q code sent successfully\n", monitor.Name(), codePending.Color)
 		}
 
-		deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-			return func() {
-				if !e.IsZero() {
-					w.Mappers.CodePending.Remove(e)
-				}
+		deferredOps = append(deferredOps, func() {
+			if !monitor.IsAlive() {
+				monitor.RemovePendingCode()
 			}
-		}(entity))
+		})
+
 	}
 	return deferredOps
 }

@@ -26,7 +26,11 @@ func NewMonitorAdapter(w *CPRaWorld, entity ecs.Entity) MonitorAdapter {
 
 // IsAlive checks if the underlying entity still exists.
 func (m *MonitorAdapter) IsAlive() bool {
+	if m.world.Stats().Entities.Total < int(m.entity.ID()) {
+		return false
+	}
 	return m.world.Alive(m.entity)
+
 }
 
 // Name returns the monitor's name.
@@ -50,9 +54,9 @@ func (m *MonitorAdapter) Status() (components.PulseStatus, bool) {
 	return *status, true
 }
 
-// SetStatusAsFailed updates the monitor's pulse status to failed.
+// SetPulseStatusAsFailed updates the monitor's pulse status to failed.
 // This shows how data modifications are simplified.
-func (m *MonitorAdapter) SetStatusAsFailed(err error) {
+func (m *MonitorAdapter) SetPulseStatusAsFailed(err error) {
 	if status := m.mappers.PulseStatus.Get(m.entity); status != nil {
 		status.LastStatus = "failed"
 		status.LastError = err
@@ -63,9 +67,9 @@ func (m *MonitorAdapter) SetStatusAsFailed(err error) {
 	}
 }
 
-// SetStatusAsSuccess updates the monitor's pulse status to success.
-func (m *MonitorAdapter) SetStatusAsSuccess() {
-	// ... implementation similar to SetStatusAsFailed ...
+// SetPulseStatusAsSuccess updates the monitor's pulse status to success.
+func (m *MonitorAdapter) SetPulseStatusAsSuccess() {
+	// ... implementation similar to SetPulseStatusAsFailed ...
 	if status := m.mappers.PulseStatus.Get(m.entity); status != nil {
 		status.LastStatus = "success"
 		status.LastError = nil
@@ -75,6 +79,34 @@ func (m *MonitorAdapter) SetStatusAsSuccess() {
 	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
 		monitorStatus.Status = "success"
 	}
+}
+
+func (m *MonitorAdapter) SetInterventionStatusAsFailed(err error) {
+	if status := m.mappers.InterventionStatus.Get(m.entity); status != nil {
+		status.LastStatus = "failed"
+		status.LastError = err
+		status.ConsecutiveFailures++
+	}
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+		monitorStatus.Status = "failed"
+	}
+}
+
+// SetPulseStatusAsSuccess updates the monitor's pulse status to success.
+func (m *MonitorAdapter) SetInterventionStatusAsSuccess() string {
+	// ... implementation similar to SetPulseStatusAsFailed ...
+	var lastStatus string
+	if status := m.mappers.InterventionStatus.Get(m.entity); status != nil {
+		lastStatus = status.LastStatus
+		status.LastStatus = "success"
+		status.LastError = nil
+		status.ConsecutiveFailures = 0
+		status.LastSuccessTime = time.Now()
+	}
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+		monitorStatus.Status = "success"
+	}
+	return lastStatus
 }
 
 // ScheduleCode sends a request to trigger a code notification.
@@ -103,5 +135,17 @@ func (m *MonitorAdapter) HasIntervention() bool {
 func (m *MonitorAdapter) RemovePendingPulse() {
 	if m.world.Has(m.entity, ecs.ComponentID[components.PulsePending](m.world)) {
 		m.mappers.PulsePending.Remove(m.entity)
+	}
+}
+
+func (m *MonitorAdapter) RemovePendingIntervention() {
+	if m.world.Has(m.entity, ecs.ComponentID[components.InterventionPending](m.world)) {
+		m.mappers.InterventionPending.Remove(m.entity)
+	}
+}
+
+func (m *MonitorAdapter) RemovePendingCode() {
+	if m.world.Has(m.entity, ecs.ComponentID[components.CodePending](m.world)) {
+		m.mappers.CodePending.Remove(m.entity)
 	}
 }

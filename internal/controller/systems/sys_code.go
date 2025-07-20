@@ -4,6 +4,7 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
+	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
@@ -37,28 +38,28 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 		var job jobs.Job
 		switch codeNeeded.Color {
 		case "red":
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				j := *w.Mappers.RedCodeJob.Get(entity)
+			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+				j := *w.Mappers.RedCodeJob.GetUnchecked(entity)
 				job = j.Job.Copy()
 			}
 		case "green":
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				j := *w.Mappers.GreenCodeJob.Get(entity)
+			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+				j := *w.Mappers.GreenCodeJob.GetUnchecked(entity)
 				job = j.Job.Copy()
 			}
 		case "yellow":
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				j := *w.Mappers.YellowCodeJob.Get(entity)
+			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+				j := *w.Mappers.YellowCodeJob.GetUnchecked(entity)
 				job = j.Job.Copy()
 			}
 		case "cyan":
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				j := *w.Mappers.CyanCodeJob.Get(entity)
+			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+				j := *w.Mappers.CyanCodeJob.GetUnchecked(entity)
 				job = j.Job.Copy()
 			}
 		case "gray":
-			if w.Mappers.World.Has(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				j := *w.Mappers.GrayCodeJob.Get(entity)
+			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
+				j := *w.Mappers.GrayCodeJob.GetUnchecked(entity)
 				job = j.Job.Copy()
 
 			}
@@ -80,13 +81,14 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []d
 		select {
 		case s.JobChan <- entry.job.Copy():
 			log.Printf("Sent %s code job for entity %v", entry.color, entry.entity)
-			e := entry.entity
-			deferredOps = append(deferredOps, func() {
-				if !e.IsZero() {
-					w.Mappers.CodeNeeded.Remove(e)
-					w.Mappers.CodePending.Assign(e, &components.CodePending{Color: entry.color})
+			deferredOps = append(deferredOps, func(e ecs.Entity, c string) func() {
+				return func() {
+					if !e.IsZero() {
+						w.Mappers.CodeNeeded.Remove(e)
+						w.Mappers.CodePending.Assign(e, &components.CodePending{Color: entry.color})
+					}
 				}
-			})
+			}(entry.entity, entry.color))
 		default:
 			log.Printf("Job channel full for entity %v", entry.entity)
 		}
@@ -131,30 +133,30 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 	for _, entry := range results {
 		entity := entry.entity
 		res := entry.result
-
+		fmt.Printf("entity is %v for code result.\n", entity)
 		if entity.IsZero() {
 			continue
 		}
 
-		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
-		codePending := w.Mappers.CodePending.Get(entity)
-		name := *w.Mappers.Name.Get(entity)
+		codePending := w.Mappers.CodePending.GetUnchecked(entity)
+		name := *w.Mappers.Name.GetUnchecked(entity)
 
 		var status components.CodeStatusAccessor
 		switch codePending.Color {
 		case "red":
-			_, status = w.Mappers.RedCodeConfig.Get(entity)
+			_, status = w.Mappers.RedCodeConfig.GetUnchecked(entity)
 		case "green":
-			_, status = w.Mappers.GreenCodeConfig.Get(entity)
+			_, status = w.Mappers.GreenCodeConfig.GetUnchecked(entity)
 		case "yellow":
-			_, status = w.Mappers.YellowCodeConfig.Get(entity)
+			_, status = w.Mappers.YellowCodeConfig.GetUnchecked(entity)
 		case "cyan":
-			_, status = w.Mappers.GreenCodeConfig.Get(entity)
+			_, status = w.Mappers.CyanCodeConfig.GetUnchecked(entity)
 		case "gray":
-			_, status = w.Mappers.GrayCodeConfig.Get(entity)
+			_, status = w.Mappers.GrayCodeConfig.GetUnchecked(entity)
 		default:
 			log.Printf("Unknown color %q for entity %v", codePending.Color, entity)
 			continue

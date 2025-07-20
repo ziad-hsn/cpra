@@ -4,6 +4,7 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
+	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
@@ -100,16 +101,18 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		entity := entry.entity
 		res := entry.result
 
+		fmt.Printf("entity is %v for pulse result.\n", entity)
+
 		if entity.IsZero() {
 			continue
 		}
 
-		if !w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
+		if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
 			continue
 		}
 
-		config, status := w.Mappers.Intervention.Get(entity)
-		name := *w.Mappers.Name.Get(entity)
+		config, status := w.Mappers.Intervention.GetUnchecked(entity)
+		name := *w.Mappers.Name.GetUnchecked(entity)
 
 		if res.Error() != nil {
 			status.LastStatus = "failed"
@@ -118,9 +121,9 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 
 			if config.MaxFailures <= status.ConsecutiveFailures {
 				log.Printf("Monitor %s intervention failed\n", name)
-				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Println("scheduling red code")
-					if !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
+					if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
 						deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 							return func() {
 								if !e.IsZero() {
@@ -149,7 +152,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			status.LastSuccessTime = time.Now()
 
 			if lastStatus == "failed" {
-				if w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 						return func() {

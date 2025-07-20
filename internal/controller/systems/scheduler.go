@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"cpra/internal/loader/schema"
 	"log"
 	"sync"
 	"time"
@@ -24,7 +25,12 @@ type Scheduler struct {
 	Tick            time.Duration
 }
 
-func NewScheduler(world *controller.CPRaWorld, wg *sync.WaitGroup, tick time.Duration) *Scheduler {
+func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Duration) *Scheduler {
+	world, err := controller.NewCPRaWorld(manifest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{})}
 }
 
@@ -69,7 +75,7 @@ func (s *Scheduler) Run() {
 			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
 				op()
-				time.Sleep(1 * time.Millisecond)
+				//time.Sleep(100 * time.Millisecond)
 			}
 
 		case <-s.Done:

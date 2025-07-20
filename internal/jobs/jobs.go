@@ -111,7 +111,7 @@ type PulseHTTPJob struct {
 
 func (p *PulseHTTPJob) Execute() Result {
 	fmt.Println("executing HTTP Job")
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second / 2)
 	res := PulseResults{
 		Ent: p.Entity,
 		Err: fmt.Errorf("HTTP check failed"),

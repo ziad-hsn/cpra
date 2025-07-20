@@ -4,23 +4,19 @@ import (
 	"cpra/internal/workers/workerspool"
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
 	"time"
 
-	"cpra/internal/controller"
 	"cpra/internal/controller/systems"
 	"cpra/internal/loader/loader"
 )
 
 func main() {
-	l := loader.NewLoader("yaml", "internal/loader/test.yaml")
+	//runtime.GOMAXPROCS(24)
+	l := loader.NewLoader("yaml", "internal/loader/test-big.yaml")
 	l.Load()
 	manifest := l.GetManifest()
-
-	world, err := controller.NewCPRaWorld(&manifest)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// make channels
 	//jobCh := make(chan jobs.Job, len(manifest.Monitors))
@@ -30,11 +26,13 @@ func main() {
 	//cjobCh := make(chan jobs.Job, len(manifest.Monitors))
 	//cresCh := make(chan jobs.Result, len(manifest.Monitors))
 
+	numWorkers := runtime.NumCPU() // e.g., 8, 16, or 24
+
 	// start workers pools
 	pools := workerspool.NewPoolsManager()
-	pools.NewPool("pulse", 10, 10, 10)
-	pools.NewPool("intervention", 10, 10, 10)
-	pools.NewPool("code", 10, 10, 10)
+	pools.NewPool("pulse", numWorkers, 1000000, 1000000)
+	pools.NewPool("intervention", numWorkers, 1000000, 1000000)
+	pools.NewPool("code", numWorkers, 1000000, 1000000)
 	pulseJobChan, err := pools.GetJobChannel("pulse")
 	if err != nil {
 		log.Fatal(err)
@@ -62,7 +60,7 @@ func main() {
 	pools.StartAll()
 	// build scheduler
 	wg := &sync.WaitGroup{}
-	sched := systems.NewScheduler(world, wg, 10*time.Millisecond)
+	sched := systems.NewScheduler(&manifest, wg, 10*time.Millisecond)
 
 	// Phase 1
 	sched.AddSchedule(&systems.PulseScheduleSystem{})
@@ -79,7 +77,7 @@ func main() {
 
 	wg.Add(1)
 	go sched.Run()
-	timeout := time.After(24 * time.Second)
+	timeout := time.After(24 * time.Hour)
 	// worker‐loop
 	for {
 		select {

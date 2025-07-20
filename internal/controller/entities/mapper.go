@@ -26,6 +26,8 @@ type EntityManager struct {
 	PulseJob        generic.Map1[components.PulseJob]
 	// ... other mappers
 	Intervention        generic.Map2[components.InterventionConfig, components.InterventionStatus]
+	InterventionConfig  generic.Map1[components.InterventionConfig]
+	InterventionStatus  generic.Map1[components.InterventionStatus]
 	InterventionPending generic.Map1[components.InterventionPending]
 	InterventionFailed  generic.Map1[components.InterventionFailed]
 	InterventionSuccess generic.Map1[components.InterventionSuccess]
@@ -70,6 +72,8 @@ func InitializeMappers(world *ecs.World) EntityManager {
 		PulseFirstCheck:     generic.NewMap1[components.PulseFirstCheck](world),
 		PulseJob:            generic.NewMap1[components.PulseJob](world),
 		Intervention:        generic.NewMap2[components.InterventionConfig, components.InterventionStatus](world),
+		InterventionConfig:  generic.NewMap1[components.InterventionConfig](world),
+		InterventionStatus:  generic.NewMap1[components.InterventionStatus](world),
 		InterventionPending: generic.NewMap1[components.InterventionPending](world),
 		InterventionFailed:  generic.NewMap1[components.InterventionFailed](world),
 		InterventionSuccess: generic.NewMap1[components.InterventionSuccess](world),

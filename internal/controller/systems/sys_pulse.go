@@ -184,7 +184,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 		fmt.Printf("recived %s results\n", monitor.Name())
 		if res.Error() != nil {
-			monitor.SetStatusAsFailed(res.Error())
+			monitor.SetPulseStatusAsFailed(res.Error())
 			status, _ := monitor.Status()
 			config := w.Mappers.PulseConfig.Get(entry.entity)
 
@@ -211,7 +211,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 				}
 			}
 		} else {
-			monitor.SetStatusAsSuccess()
+			monitor.SetPulseStatusAsSuccess()
 
 			//if mStatus == "failed" {
 			//	if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {

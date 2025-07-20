@@ -13,8 +13,17 @@ import (
 )
 
 func main() {
+	//f, err := os.Create("cpu.prof")
+	//if err != nil {
+	//	log.Fatal("could not create CPU profile: ", err)
+	//}
+	//defer f.Close()
+	//if err := pprof.StartCPUProfile(f); err != nil {
+	//	log.Fatal("could not start CPU profile: ", err)
+	//}
+	//defer pprof.StopCPUProfile()
 	//runtime.GOMAXPROCS(24)
-	l := loader.NewLoader("yaml", "internal/loader/test-big.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
 	l.Load()
 	manifest := l.GetManifest()
 
@@ -26,7 +35,7 @@ func main() {
 	//cjobCh := make(chan jobs.Job, len(manifest.Monitors))
 	//cresCh := make(chan jobs.Result, len(manifest.Monitors))
 
-	numWorkers := runtime.NumCPU() // e.g., 8, 16, or 24
+	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)/100) // e.g., 8, 16, or 24
 
 	// start workers pools
 	pools := workerspool.NewPoolsManager()
@@ -60,7 +69,7 @@ func main() {
 	pools.StartAll()
 	// build scheduler
 	wg := &sync.WaitGroup{}
-	sched := systems.NewScheduler(&manifest, wg, 10*time.Millisecond)
+	sched := systems.NewScheduler(&manifest, wg, 100*time.Millisecond)
 
 	// Phase 1
 	sched.AddSchedule(&systems.PulseScheduleSystem{})
@@ -77,7 +86,7 @@ func main() {
 
 	wg.Add(1)
 	go sched.Run()
-	timeout := time.After(24 * time.Hour)
+	timeout := time.After(24 * time.Second)
 	// worker‐loop
 	for {
 		select {

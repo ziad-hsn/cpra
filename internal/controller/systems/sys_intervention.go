@@ -8,7 +8,6 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"time"
 )
 
 type dispatchableIntervention struct {
@@ -103,40 +102,30 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 
 		fmt.Printf("entity is %v for pulse result.\n", entity)
 
-		if entity.IsZero() {
+		monitor := controller.NewMonitorAdapter(w, entity)
+
+		if !monitor.IsAlive() || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
 			continue
 		}
-
-		if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
-			continue
-		}
-
-		config, status := w.Mappers.Intervention.GetUnchecked(entity)
-		name := *w.Mappers.Name.GetUnchecked(entity)
 
 		if res.Error() != nil {
-			status.LastStatus = "failed"
-			status.LastError = res.Error()
-			status.ConsecutiveFailures++
+
+			monitor.SetPulseStatusAsFailed(res.Error())
+
+			config, status := w.Mappers.Intervention.GetUnchecked(entity)
 
 			if config.MaxFailures <= status.ConsecutiveFailures {
-				log.Printf("Monitor %s intervention failed\n", name)
+				log.Printf("Monitor %s intervention failed\n", monitor.Name())
 				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Println("scheduling red code")
-					if !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodeNeeded](w.Mappers.World)) {
-						deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-							return func() {
-								if !e.IsZero() {
-									w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"})
-								}
-							}
-						}(entity))
-					}
+					deferredOps = append(deferredOps, func() {
+						monitor.ScheduleCode("red")
+					})
 				}
 			} else {
 				deferredOps = append(deferredOps, func(e ecs.Entity) func() {
 					return func() {
-						if !e.IsZero() {
+						if monitor.IsAlive() {
 							w.Mappers.World.Exchange(e,
 								[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
 								[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
@@ -145,33 +134,22 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 				}(entity))
 			}
 		} else {
-			lastStatus := status.LastStatus
-			status.LastStatus = "success"
-			status.LastError = nil
-			status.ConsecutiveFailures = 0
-			status.LastSuccessTime = time.Now()
+			lastStatus := monitor.SetInterventionStatusAsSuccess()
 
 			if lastStatus == "failed" {
 				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
-					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-						return func() {
-							if !e.IsZero() {
-								w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "cyan"})
-							}
-						}
-					}(entity))
+					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", monitor.Name())
+					deferredOps = append(deferredOps, func() {
+						monitor.ScheduleCode("cyan")
+					})
 				}
 			}
-			deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-				return func() {
-					if !e.IsZero() {
-						w.Mappers.InterventionPending.Remove(e)
-					}
-				}
-			}(entity))
 		}
+		deferredOps = append(deferredOps, func() {
+			monitor.RemovePendingIntervention()
+		})
 	}
+
 	return deferredOps
 }
 

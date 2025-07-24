@@ -4,7 +4,9 @@ import (
 	"cpra/internal/workers/workerspool"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -23,6 +25,22 @@ func main() {
 	//}
 	//defer pprof.StopCPUProfile()
 	//runtime.GOMAXPROCS(24)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovered in main:", r)
+		}
+	}()
+	debug.SetGCPercent(1)
+	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
+
+	f, err := os.OpenFile("crash.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = debug.SetCrashOutput(f, debug.CrashOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
 	l.Load()
 	manifest := l.GetManifest()
@@ -86,7 +104,10 @@ func main() {
 
 	wg.Add(1)
 	go sched.Run()
-	timeout := time.After(24 * time.Second)
+	timeout := time.After(24 * time.Hour)
+	//runtime.SetFinalizer(runtime.GC, func(x interface{}) {
+	//	log.Println("Recovered in main")
+	//})
 	// worker‐loop
 	for {
 		select {

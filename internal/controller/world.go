@@ -5,14 +5,17 @@ import (
 	"cpra/internal/loader/schema"
 	"fmt"
 	"github.com/mlange-42/arche/ecs"
+	"sync"
 )
 
 type CPRaWorld struct {
 	Mappers entities.EntityManager
+	mu      *sync.Mutex
 }
 
 func NewCPRaWorld(manifest *schema.Manifest) (*CPRaWorld, error) {
-	c := &CPRaWorld{} // Create instance
+	mu := &sync.Mutex{}
+	c := &CPRaWorld{mu: mu} // Create instance
 	w := ecs.NewWorld()
 	c.Mappers = entities.InitializeMappers(&w)
 
@@ -23,4 +26,10 @@ func NewCPRaWorld(manifest *schema.Manifest) (*CPRaWorld, error) {
 		}
 	}
 	return c, nil
+}
+
+func (w *CPRaWorld) SafeAccess(fn func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	fn()
 }

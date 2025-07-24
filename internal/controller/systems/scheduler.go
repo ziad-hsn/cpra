@@ -42,6 +42,11 @@ func (s *Scheduler) Run() {
 	log.Printf("scheduler started with %v tick\n", s.Tick)
 	ticker := time.NewTicker(s.Tick)
 	defer ticker.Stop()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovered in Scheduler:", r)
+		}
+	}()
 	// Initialize all systems
 	for _, sys := range s.ScheduleSystems {
 		sys.Initialize(s.World)
@@ -56,6 +61,9 @@ func (s *Scheduler) Run() {
 	for {
 		select {
 		case <-ticker.C:
+			//x := debug.GCStats{}
+			//debug.ReadGCStats(&x)
+			//fmt.Println(x)
 			// Phase 1: schedule
 			var allDeferredOps []func()
 			// Collect all deferred operations
@@ -74,7 +82,7 @@ func (s *Scheduler) Run() {
 			//log.Println(allDeferredOps)
 			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
-				op()
+				s.World.SafeAccess(op)
 				//time.Sleep(100 * time.Millisecond)
 			}
 

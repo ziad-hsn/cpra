@@ -47,11 +47,11 @@ func (m *MonitorAdapter) Status() (components.PulseStatus, bool) {
 	if !m.IsAlive() {
 		return components.PulseStatus{}, false
 	}
-	status := m.mappers.PulseStatus.Get(m.entity)
-	if status == nil {
+	status := *m.mappers.PulseStatus.Get(m.entity)
+	if status == (components.PulseStatus{}) {
 		return components.PulseStatus{}, false
 	}
-	return *status, true
+	return status, true
 }
 
 // SetPulseStatusAsFailed updates the monitor's pulse status to failed.

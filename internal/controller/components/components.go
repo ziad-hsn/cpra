@@ -135,7 +135,7 @@ type RedCodeStatus struct {
 	LastError           error
 }
 
-func (s *RedCodeStatus) SetSuccess(t time.Time) {
+func (s RedCodeStatus) SetSuccess(t time.Time) {
 	s.LastStatus = "success"
 	s.LastError = nil
 	s.ConsecutiveFailures = 0
@@ -143,7 +143,7 @@ func (s *RedCodeStatus) SetSuccess(t time.Time) {
 	s.LastAlertTime = t
 }
 
-func (s *RedCodeStatus) SetFailure(err error) {
+func (s RedCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
@@ -168,7 +168,7 @@ type GreenCodeStatus struct {
 	LastError           error
 }
 
-func (s *GreenCodeStatus) SetSuccess(t time.Time) {
+func (s GreenCodeStatus) SetSuccess(t time.Time) {
 	s.LastStatus = "success"
 	s.LastError = nil
 	s.ConsecutiveFailures = 0
@@ -176,7 +176,7 @@ func (s *GreenCodeStatus) SetSuccess(t time.Time) {
 	s.LastAlertTime = t
 }
 
-func (s *GreenCodeStatus) SetFailure(err error) {
+func (s GreenCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
@@ -201,7 +201,7 @@ type CyanCodeStatus struct {
 	LastError           error
 }
 
-func (s *CyanCodeStatus) SetSuccess(t time.Time) {
+func (s CyanCodeStatus) SetSuccess(t time.Time) {
 	s.LastStatus = "success"
 	s.LastError = nil
 	s.ConsecutiveFailures = 0
@@ -209,7 +209,7 @@ func (s *CyanCodeStatus) SetSuccess(t time.Time) {
 	s.LastAlertTime = t
 }
 
-func (s *CyanCodeStatus) SetFailure(err error) {
+func (s CyanCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
@@ -234,7 +234,7 @@ type YellowCodeStatus struct {
 	LastError           error
 }
 
-func (s *YellowCodeStatus) SetSuccess(t time.Time) {
+func (s YellowCodeStatus) SetSuccess(t time.Time) {
 	s.LastStatus = "success"
 	s.LastError = nil
 	s.ConsecutiveFailures = 0
@@ -242,7 +242,7 @@ func (s *YellowCodeStatus) SetSuccess(t time.Time) {
 	s.LastAlertTime = t
 }
 
-func (s *YellowCodeStatus) SetFailure(err error) {
+func (s YellowCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
@@ -269,7 +269,7 @@ type GrayCodeStatus struct {
 	LastError           error
 }
 
-func (s *GrayCodeStatus) SetSuccess(t time.Time) {
+func (s GrayCodeStatus) SetSuccess(t time.Time) {
 	s.LastStatus = "success"
 	s.LastError = nil
 	s.ConsecutiveFailures = 0
@@ -277,7 +277,7 @@ func (s *GrayCodeStatus) SetSuccess(t time.Time) {
 	s.LastAlertTime = t
 }
 
-func (s *GrayCodeStatus) SetFailure(err error) {
+func (s GrayCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++

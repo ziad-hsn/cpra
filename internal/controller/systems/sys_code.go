@@ -39,28 +39,24 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 		switch codeNeeded.Color {
 		case "red":
 			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				j := *w.Mappers.RedCodeJob.GetUnchecked(entity)
-				job = j.Job.Copy()
+				job = w.Mappers.RedCodeJob.GetUnchecked(entity).Job.Copy()
+
 			}
 		case "green":
 			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				j := *w.Mappers.GreenCodeJob.GetUnchecked(entity)
-				job = j.Job.Copy()
+				job = w.Mappers.GreenCodeJob.GetUnchecked(entity).Job.Copy()
 			}
 		case "yellow":
 			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				j := *w.Mappers.YellowCodeJob.GetUnchecked(entity)
-				job = j.Job.Copy()
+				job = w.Mappers.YellowCodeJob.GetUnchecked(entity).Job.Copy()
 			}
 		case "cyan":
 			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				j := *w.Mappers.CyanCodeJob.GetUnchecked(entity)
-				job = j.Job.Copy()
+				job = w.Mappers.CyanCodeJob.GetUnchecked(entity).Job.Copy()
 			}
 		case "gray":
 			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				j := *w.Mappers.GrayCodeJob.GetUnchecked(entity)
-				job = j.Job.Copy()
+				job = w.Mappers.GrayCodeJob.GetUnchecked(entity).Job.Copy()
 
 			}
 		default:
@@ -140,20 +136,20 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 			continue
 		}
 
-		codePending := w.Mappers.CodePending.GetUnchecked(entity)
+		codePending := *w.Mappers.CodePending.GetUnchecked(entity)
 
 		var status components.CodeStatusAccessor
 		switch codePending.Color {
 		case "red":
-			_, status = w.Mappers.RedCodeConfig.GetUnchecked(entity)
+			status = *w.Mappers.RedCodeStatus.GetUnchecked(entity)
 		case "green":
-			_, status = w.Mappers.GreenCodeConfig.GetUnchecked(entity)
+			status = *w.Mappers.GreenCodeStatus.GetUnchecked(entity)
 		case "yellow":
-			_, status = w.Mappers.YellowCodeConfig.GetUnchecked(entity)
+			status = *w.Mappers.YellowCodeStatus.GetUnchecked(entity)
 		case "cyan":
-			_, status = w.Mappers.CyanCodeConfig.GetUnchecked(entity)
+			status = *w.Mappers.CyanCodeStatus.GetUnchecked(entity)
 		case "gray":
-			_, status = w.Mappers.GrayCodeConfig.GetUnchecked(entity)
+			status = *w.Mappers.GrayCodeStatus.GetUnchecked(entity)
 		default:
 			log.Printf("Unknown color %q for entity %v", codePending.Color, entity)
 			continue
@@ -165,6 +161,31 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		} else {
 			status.SetSuccess(time.Now())
 			log.Printf("Monitor %s %q code sent successfully\n", monitor.Name(), codePending.Color)
+		}
+		switch codePending.Color {
+		case "red":
+			statusMapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
+			s := status.(components.RedCodeStatus)
+			statusMapper.Set(entity, &s)
+		case "green":
+			statusMapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
+			s := status.(components.GreenCodeStatus)
+			statusMapper.Set(entity, &s)
+		case "yellow":
+			statusMapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
+			s := status.(components.YellowCodeStatus)
+			statusMapper.Set(entity, &s)
+		case "cyan":
+			statusMapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
+			s := status.(components.CyanCodeStatus)
+			statusMapper.Set(entity, &s)
+		case "gray":
+			statusMapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
+			s := status.(components.GrayCodeStatus)
+			statusMapper.Set(entity, &s)
+		default:
+			log.Printf("Unknown color %q for entity %v", codePending.Color, entity)
+			continue
 		}
 
 		deferredOps = append(deferredOps, func() {

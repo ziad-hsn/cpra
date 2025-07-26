@@ -29,9 +29,8 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) []disp
 	toDispatch := make([]dispatchableIntervention, 0)
 	query := s.InterventionNeededFilter.Query(w.Mappers.World)
 	for query.Next() {
-		job, _ := query.Get()
-		j := job.Job.Copy()
 		entity := query.Entity()
+		j := w.Mappers.InterventionJob.GetUnchecked(entity).Job.Copy()
 		toDispatch = append(toDispatch, dispatchableIntervention{
 			Entity: entity,
 			Job:    j,
@@ -111,8 +110,8 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		if res.Error() != nil {
 
 			monitor.SetPulseStatusAsFailed(res.Error())
-
-			config, status := w.Mappers.Intervention.GetUnchecked(entity)
+			config := *w.Mappers.InterventionConfig.GetUnchecked(entity)
+			status := *w.Mappers.InterventionStatus.GetUnchecked(entity)
 
 			if config.MaxFailures <= status.ConsecutiveFailures {
 				log.Printf("Monitor %s intervention failed\n", monitor.Name())

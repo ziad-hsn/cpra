@@ -32,12 +32,11 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 	query := s.PulseFilter.Query(w.Mappers.World)
 	for query.Next() {
 		entity := query.Entity()
-		config := w.Mappers.PulseConfig.GetUnchecked(entity)
-		status := w.Mappers.PulseStatus.GetUnchecked(entity)
+		config := *w.Mappers.PulseConfig.GetUnchecked(entity)
+		status := *w.Mappers.PulseStatus.GetUnchecked(entity)
 
 		// Check for first-time pulse
 		if w.Mappers.World.HasUnchecked(query.Entity(), ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-			//status.LastCheckTime = time.Now()
 			toCheck = append(toCheck, query.Entity())
 			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
 			continue
@@ -46,7 +45,6 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 		// Check for scheduled interval
 		if time.Since(status.LastCheckTime) >= config.Interval {
 			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
-			//status.LastCheckTime = time.Now()
 			toCheck = append(toCheck, query.Entity())
 		}
 	}
@@ -93,14 +91,15 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchabl
 	query := s.PulseNeeded.Query(w.Mappers.World)
 	for query.Next() {
 		entity := query.Entity()
-		job := w.Mappers.PulseJob.GetUnchecked(entity)
-		status := w.Mappers.PulseStatus.GetUnchecked(entity)
+		job := w.Mappers.PulseJob.GetUnchecked(entity).Job.Copy()
+		status := *w.Mappers.PulseStatus.GetUnchecked(entity)
 
 		status.LastCheckTime = time.Now() // Data-only update, safe.
-
+		pulseMap := generic.NewMap[components.PulseStatus](w.Mappers.World)
+		pulseMap.Set(entity, &status)
 		toDispatch = append(toDispatch, dispatchablePulse{
 			Entity: entity,
-			Job:    job.Job,
+			Job:    job,
 		})
 	}
 	return toDispatch
@@ -111,8 +110,8 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []
 	var deferredOps []func()
 	for _, item := range dispatchList {
 		select {
-		case s.JobChan <- item.Job.Copy():
-			name := *w.Mappers.Name.GetUnchecked(item.Entity)
+		case s.JobChan <- item.Job:
+			name := string(*w.Mappers.Name.GetUnchecked(item.Entity))
 			log.Printf("sent %s job\n", name)
 			e := item.Entity
 			if w.Mappers.World.HasUnchecked(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
@@ -186,7 +185,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 		if res.Error() != nil {
 			monitor.SetPulseStatusAsFailed(res.Error())
 			status, _ := monitor.Status()
-			config := w.Mappers.PulseConfig.Get(entry.entity)
+			config := *w.Mappers.PulseConfig.Get(entity)
 
 			if status.ConsecutiveFailures == 1 {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {

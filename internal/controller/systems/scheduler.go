@@ -42,11 +42,11 @@ func (s *Scheduler) Run() {
 	log.Printf("scheduler started with %v tick\n", s.Tick)
 	ticker := time.NewTicker(s.Tick)
 	defer ticker.Stop()
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Recovered in Scheduler:", r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		log.Println("Recovered in Scheduler:", r)
+	//	}
+	//}()
 	// Initialize all systems
 	for _, sys := range s.ScheduleSystems {
 		sys.Initialize(s.World)

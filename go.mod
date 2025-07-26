@@ -3,13 +3,14 @@ module cpra
 go 1.24.2
 
 require (
+	github.com/aws/aws-lambda-go v1.49.0
+	github.com/google/uuid v1.6.0
 	github.com/mlange-42/arche v0.15.3
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mlange-42/arche-model v0.10.0 // indirect
 	github.com/mlange-42/ark v0.4.3 // indirect

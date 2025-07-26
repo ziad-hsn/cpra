@@ -39,19 +39,24 @@ type EntityManager struct {
 	CodeJob             generic.Map1[components.CodeJob]
 	RedCode             generic.Map1[components.RedCode]
 	RedCodeJob          generic.Map1[components.RedCodeJob]
-	RedCodeConfig       generic.Map2[components.RedCodeConfig, components.RedCodeStatus]
+	RedCodeConfig       generic.Map1[components.RedCodeConfig]
+	RedCodeStatus       generic.Map1[components.RedCodeStatus]
 	CyanCode            generic.Map1[components.CyanCode]
 	CyanCodeJob         generic.Map1[components.CyanCodeJob]
-	CyanCodeConfig      generic.Map2[components.CyanCodeConfig, components.CyanCodeStatus]
+	CyanCodeConfig      generic.Map1[components.CyanCodeConfig]
+	CyanCodeStatus      generic.Map1[components.CyanCodeStatus]
 	GreenCode           generic.Map1[components.GreenCode]
 	GreenCodeJob        generic.Map1[components.GreenCodeJob]
-	GreenCodeConfig     generic.Map2[components.GreenCodeConfig, components.GreenCodeStatus]
+	GreenCodeConfig     generic.Map1[components.GreenCodeConfig]
+	GreenCodeStatus     generic.Map1[components.GreenCodeStatus]
 	YellowCode          generic.Map1[components.YellowCode]
 	YellowCodeJob       generic.Map1[components.YellowCodeJob]
-	YellowCodeConfig    generic.Map2[components.YellowCodeConfig, components.YellowCodeStatus]
+	YellowCodeConfig    generic.Map1[components.YellowCodeConfig]
+	YellowCodeStatus    generic.Map1[components.YellowCodeStatus]
 	GrayCode            generic.Map1[components.GrayCode]
 	GrayCodeJob         generic.Map1[components.GrayCodeJob]
-	GrayCodeConfig      generic.Map2[components.GrayCodeConfig, components.GrayCodeStatus]
+	GrayCodeConfig      generic.Map1[components.GrayCodeConfig]
+	GrayCodeStatus      generic.Map1[components.GrayCodeStatus]
 }
 
 // InitializeMappers creates and returns a EntityManager for a given world.
@@ -85,19 +90,24 @@ func InitializeMappers(world *ecs.World) EntityManager {
 		CodeJob:             generic.NewMap1[components.CodeJob](world),
 		RedCode:             generic.NewMap1[components.RedCode](world),
 		RedCodeJob:          generic.NewMap1[components.RedCodeJob](world),
-		RedCodeConfig:       generic.NewMap2[components.RedCodeConfig, components.RedCodeStatus](world),
+		RedCodeConfig:       generic.NewMap1[components.RedCodeConfig](world),
+		RedCodeStatus:       generic.NewMap1[components.RedCodeStatus](world),
 		CyanCode:            generic.NewMap1[components.CyanCode](world),
 		CyanCodeJob:         generic.NewMap1[components.CyanCodeJob](world),
-		CyanCodeConfig:      generic.NewMap2[components.CyanCodeConfig, components.CyanCodeStatus](world),
+		CyanCodeConfig:      generic.NewMap1[components.CyanCodeConfig](world),
+		CyanCodeStatus:      generic.NewMap1[components.CyanCodeStatus](world),
 		GreenCode:           generic.NewMap1[components.GreenCode](world),
 		GreenCodeJob:        generic.NewMap1[components.GreenCodeJob](world),
-		GreenCodeConfig:     generic.NewMap2[components.GreenCodeConfig, components.GreenCodeStatus](world),
+		GreenCodeConfig:     generic.NewMap1[components.GreenCodeConfig](world),
+		GreenCodeStatus:     generic.NewMap1[components.GreenCodeStatus](world),
 		YellowCode:          generic.NewMap1[components.YellowCode](world),
 		YellowCodeJob:       generic.NewMap1[components.YellowCodeJob](world),
-		YellowCodeConfig:    generic.NewMap2[components.YellowCodeConfig, components.YellowCodeStatus](world),
+		YellowCodeConfig:    generic.NewMap1[components.YellowCodeConfig](world),
+		YellowCodeStatus:    generic.NewMap1[components.YellowCodeStatus](world),
 		GrayCode:            generic.NewMap1[components.GrayCode](world),
 		GrayCodeJob:         generic.NewMap1[components.GrayCodeJob](world),
-		GrayCodeConfig:      generic.NewMap2[components.GrayCodeConfig, components.GrayCodeStatus](world),
+		GrayCodeConfig:      generic.NewMap1[components.GrayCodeConfig](world),
+		GrayCodeStatus:      generic.NewMap1[components.GrayCodeStatus](world),
 	}
 }
 
@@ -186,14 +196,18 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	} else {
 		e.DisableMonitor(entity)
 	}
-	e.MonitorStatus.Assign(entity, &components.MonitorStatus{})
+	e.MonitorStatus.Assign(entity, &components.MonitorStatus{
+		LastCheckTime: time.Now(),
+	})
 	pulseCfg := components.PulseConfig{
 		Type:        monitor.Pulse.Type,
 		MaxFailures: monitor.Pulse.MaxFailures,
 		Timeout:     monitor.Pulse.Timeout,
 		Interval:    monitor.Pulse.Interval,
 	}
-	pulseStatus := components.PulseStatus{}
+	pulseStatus := components.PulseStatus{
+		LastCheckTime: time.Now(),
+	}
 
 	e.Pulse.Assign(entity, &pulseCfg, &pulseStatus)
 
@@ -207,7 +221,9 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		interventionCfg := &components.InterventionConfig{
 			Action: monitor.Intervention.Action,
 		}
-		InterventionStatus := &components.InterventionStatus{}
+		InterventionStatus := &components.InterventionStatus{
+			LastInterventionTime: time.Now(),
+		}
 		e.Intervention.Assign(entity, interventionCfg, InterventionStatus)
 		j, err = jobs.CreateInterventionJob(monitor.Intervention, entity)
 		if err != nil {
@@ -223,8 +239,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.RedCode.Assign(entity, &components.RedCode{})
 			CodeConfig := &components.RedCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
 
-			CodeStatus := &components.RedCodeStatus{}
-			e.RedCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			CodeStatus := &components.RedCodeStatus{
+				LastAlertTime: time.Now(),
+			}
+			e.RedCodeConfig.Assign(entity, CodeConfig)
+			e.RedCodeStatus.Assign(entity, CodeStatus)
 			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
 			if err != nil {
 				return err
@@ -234,8 +253,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.GreenCode.Assign(entity, &components.GreenCode{})
 			CodeConfig := &components.GreenCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
 
-			CodeStatus := &components.GreenCodeStatus{}
-			e.GreenCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			CodeStatus := &components.GreenCodeStatus{
+				LastAlertTime: time.Now(),
+			}
+			e.GreenCodeConfig.Assign(entity, CodeConfig)
+			e.GreenCodeStatus.Assign(entity, CodeStatus)
 			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
 			if err != nil {
 				return err
@@ -245,8 +267,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.YellowCode.Assign(entity, &components.YellowCode{})
 			CodeConfig := &components.YellowCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
 
-			CodeStatus := &components.YellowCodeStatus{}
-			e.YellowCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			CodeStatus := &components.YellowCodeStatus{
+				LastAlertTime: time.Now(),
+			}
+			e.YellowCodeConfig.Assign(entity, CodeConfig)
+			e.YellowCodeStatus.Assign(entity, CodeStatus)
 			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
 			if err != nil {
 				return err
@@ -256,8 +281,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.CyanCode.Assign(entity, &components.CyanCode{})
 			CodeConfig := &components.CyanCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
 
-			CodeStatus := &components.CyanCodeStatus{}
-			e.CyanCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			CodeStatus := &components.CyanCodeStatus{
+				LastAlertTime: time.Now(),
+			}
+			e.CyanCodeConfig.Assign(entity, CodeConfig)
+			e.CyanCodeStatus.Assign(entity, CodeStatus)
 			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
 			if err != nil {
 				return err
@@ -267,8 +295,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.GrayCode.Assign(entity, &components.GrayCode{})
 			CodeConfig := &components.GrayCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
 
-			CodeStatus := &components.GrayCodeStatus{}
-			e.GrayCodeConfig.Assign(entity, CodeConfig, CodeStatus)
+			CodeStatus := &components.GrayCodeStatus{
+				LastAlertTime: time.Now(),
+			}
+			e.GrayCodeConfig.Assign(entity, CodeConfig)
+			e.GrayCodeStatus.Assign(entity, CodeStatus)
 			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
 			if err != nil {
 				return err

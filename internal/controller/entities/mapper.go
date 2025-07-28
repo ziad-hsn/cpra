@@ -33,30 +33,30 @@ type EntityManager struct {
 	InterventionSuccess generic.Map1[components.InterventionSuccess]
 	InterventionNeeded  generic.Map1[components.InterventionNeeded]
 	InterventionJob     generic.Map1[components.InterventionJob]
-	Code                generic.Map2[components.CodeConfig, components.CodeStatus]
-	CodeNeeded          generic.Map1[components.CodeNeeded]
-	CodePending         generic.Map1[components.CodePending]
-	CodeJob             generic.Map1[components.CodeJob]
-	RedCode             generic.Map1[components.RedCode]
-	RedCodeJob          generic.Map1[components.RedCodeJob]
-	RedCodeConfig       generic.Map1[components.RedCodeConfig]
-	RedCodeStatus       generic.Map1[components.RedCodeStatus]
-	CyanCode            generic.Map1[components.CyanCode]
-	CyanCodeJob         generic.Map1[components.CyanCodeJob]
-	CyanCodeConfig      generic.Map1[components.CyanCodeConfig]
-	CyanCodeStatus      generic.Map1[components.CyanCodeStatus]
-	GreenCode           generic.Map1[components.GreenCode]
-	GreenCodeJob        generic.Map1[components.GreenCodeJob]
-	GreenCodeConfig     generic.Map1[components.GreenCodeConfig]
-	GreenCodeStatus     generic.Map1[components.GreenCodeStatus]
-	YellowCode          generic.Map1[components.YellowCode]
-	YellowCodeJob       generic.Map1[components.YellowCodeJob]
-	YellowCodeConfig    generic.Map1[components.YellowCodeConfig]
-	YellowCodeStatus    generic.Map1[components.YellowCodeStatus]
-	GrayCode            generic.Map1[components.GrayCode]
-	GrayCodeJob         generic.Map1[components.GrayCodeJob]
-	GrayCodeConfig      generic.Map1[components.GrayCodeConfig]
-	GrayCodeStatus      generic.Map1[components.GrayCodeStatus]
+	//Code                generic.Map2[components.CodeConfig, components.CodeStatus]
+	CodeNeeded       generic.Map1[components.CodeNeeded]
+	CodePending      generic.Map1[components.CodePending]
+	CodeJob          generic.Map1[components.CodeJob]
+	RedCode          generic.Map1[components.RedCode]
+	RedCodeJob       generic.Map1[components.RedCodeJob]
+	RedCodeConfig    generic.Map1[components.RedCodeConfig]
+	RedCodeStatus    generic.Map1[components.RedCodeStatus]
+	CyanCode         generic.Map1[components.CyanCode]
+	CyanCodeJob      generic.Map1[components.CyanCodeJob]
+	CyanCodeConfig   generic.Map1[components.CyanCodeConfig]
+	CyanCodeStatus   generic.Map1[components.CyanCodeStatus]
+	GreenCode        generic.Map1[components.GreenCode]
+	GreenCodeJob     generic.Map1[components.GreenCodeJob]
+	GreenCodeConfig  generic.Map1[components.GreenCodeConfig]
+	GreenCodeStatus  generic.Map1[components.GreenCodeStatus]
+	YellowCode       generic.Map1[components.YellowCode]
+	YellowCodeJob    generic.Map1[components.YellowCodeJob]
+	YellowCodeConfig generic.Map1[components.YellowCodeConfig]
+	YellowCodeStatus generic.Map1[components.YellowCodeStatus]
+	GrayCode         generic.Map1[components.GrayCode]
+	GrayCodeJob      generic.Map1[components.GrayCodeJob]
+	GrayCodeConfig   generic.Map1[components.GrayCodeConfig]
+	GrayCodeStatus   generic.Map1[components.GrayCodeStatus]
 }
 
 // InitializeMappers creates and returns a EntityManager for a given world.
@@ -84,30 +84,30 @@ func InitializeMappers(world *ecs.World) EntityManager {
 		InterventionSuccess: generic.NewMap1[components.InterventionSuccess](world),
 		InterventionNeeded:  generic.NewMap1[components.InterventionNeeded](world),
 		InterventionJob:     generic.NewMap1[components.InterventionJob](world),
-		Code:                generic.NewMap2[components.CodeConfig, components.CodeStatus](world),
-		CodeNeeded:          generic.NewMap1[components.CodeNeeded](world),
-		CodePending:         generic.NewMap1[components.CodePending](world),
-		CodeJob:             generic.NewMap1[components.CodeJob](world),
-		RedCode:             generic.NewMap1[components.RedCode](world),
-		RedCodeJob:          generic.NewMap1[components.RedCodeJob](world),
-		RedCodeConfig:       generic.NewMap1[components.RedCodeConfig](world),
-		RedCodeStatus:       generic.NewMap1[components.RedCodeStatus](world),
-		CyanCode:            generic.NewMap1[components.CyanCode](world),
-		CyanCodeJob:         generic.NewMap1[components.CyanCodeJob](world),
-		CyanCodeConfig:      generic.NewMap1[components.CyanCodeConfig](world),
-		CyanCodeStatus:      generic.NewMap1[components.CyanCodeStatus](world),
-		GreenCode:           generic.NewMap1[components.GreenCode](world),
-		GreenCodeJob:        generic.NewMap1[components.GreenCodeJob](world),
-		GreenCodeConfig:     generic.NewMap1[components.GreenCodeConfig](world),
-		GreenCodeStatus:     generic.NewMap1[components.GreenCodeStatus](world),
-		YellowCode:          generic.NewMap1[components.YellowCode](world),
-		YellowCodeJob:       generic.NewMap1[components.YellowCodeJob](world),
-		YellowCodeConfig:    generic.NewMap1[components.YellowCodeConfig](world),
-		YellowCodeStatus:    generic.NewMap1[components.YellowCodeStatus](world),
-		GrayCode:            generic.NewMap1[components.GrayCode](world),
-		GrayCodeJob:         generic.NewMap1[components.GrayCodeJob](world),
-		GrayCodeConfig:      generic.NewMap1[components.GrayCodeConfig](world),
-		GrayCodeStatus:      generic.NewMap1[components.GrayCodeStatus](world),
+		//Code:                generic.NewMap2[components.CodeConfig, components.CodeStatus](world),
+		CodeNeeded:       generic.NewMap1[components.CodeNeeded](world),
+		CodePending:      generic.NewMap1[components.CodePending](world),
+		CodeJob:          generic.NewMap1[components.CodeJob](world),
+		RedCode:          generic.NewMap1[components.RedCode](world),
+		RedCodeJob:       generic.NewMap1[components.RedCodeJob](world),
+		RedCodeConfig:    generic.NewMap1[components.RedCodeConfig](world),
+		RedCodeStatus:    generic.NewMap1[components.RedCodeStatus](world),
+		CyanCode:         generic.NewMap1[components.CyanCode](world),
+		CyanCodeJob:      generic.NewMap1[components.CyanCodeJob](world),
+		CyanCodeConfig:   generic.NewMap1[components.CyanCodeConfig](world),
+		CyanCodeStatus:   generic.NewMap1[components.CyanCodeStatus](world),
+		GreenCode:        generic.NewMap1[components.GreenCode](world),
+		GreenCodeJob:     generic.NewMap1[components.GreenCodeJob](world),
+		GreenCodeConfig:  generic.NewMap1[components.GreenCodeConfig](world),
+		GreenCodeStatus:  generic.NewMap1[components.GreenCodeStatus](world),
+		YellowCode:       generic.NewMap1[components.YellowCode](world),
+		YellowCodeJob:    generic.NewMap1[components.YellowCodeJob](world),
+		YellowCodeConfig: generic.NewMap1[components.YellowCodeConfig](world),
+		YellowCodeStatus: generic.NewMap1[components.YellowCodeStatus](world),
+		GrayCode:         generic.NewMap1[components.GrayCode](world),
+		GrayCodeJob:      generic.NewMap1[components.GrayCodeJob](world),
+		GrayCodeConfig:   generic.NewMap1[components.GrayCodeConfig](world),
+		GrayCodeStatus:   generic.NewMap1[components.GrayCodeStatus](world),
 	}
 }
 

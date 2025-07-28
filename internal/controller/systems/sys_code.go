@@ -131,66 +131,63 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		res := entry.result
 		fmt.Printf("entity is %v for code result.\n", entity)
 
-		monitor := controller.NewMonitorAdapter(w, entity)
-		if !monitor.IsAlive() || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		//monitor := controller.NewMonitorAdapter(w, entity)
+		if !w.Mappers.World.Alive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
-		codePending := *w.Mappers.CodePending.GetUnchecked(entity)
+		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
+
+		codeColor := string(append([]byte(nil), []byte(w.Mappers.CodePending.GetUnchecked(entity).Color)...))
 
 		var status components.CodeStatusAccessor
-		switch codePending.Color {
+		switch codeColor {
 		case "red":
-			status = *w.Mappers.RedCodeStatus.GetUnchecked(entity)
+			status = w.Mappers.RedCodeStatus.GetUnchecked(entity).Copy()
 		case "green":
-			status = *w.Mappers.GreenCodeStatus.GetUnchecked(entity)
+			status = w.Mappers.GreenCodeStatus.GetUnchecked(entity).Copy()
 		case "yellow":
-			status = *w.Mappers.YellowCodeStatus.GetUnchecked(entity)
+			status = w.Mappers.YellowCodeStatus.GetUnchecked(entity).Copy()
 		case "cyan":
-			status = *w.Mappers.CyanCodeStatus.GetUnchecked(entity)
+			status = w.Mappers.CyanCodeStatus.GetUnchecked(entity).Copy()
 		case "gray":
-			status = *w.Mappers.GrayCodeStatus.GetUnchecked(entity)
+			status = w.Mappers.GrayCodeStatus.GetUnchecked(entity).Copy()
 		default:
-			log.Printf("Unknown color %q for entity %v", codePending.Color, entity)
+			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
 			continue
 		}
 
 		if res.Error() != nil {
 			status.SetFailure(res.Error())
-			log.Printf("Monitor %s Code failed\n", monitor.Name())
+			log.Printf("Monitor %s Code failed\n", name)
 		} else {
 			status.SetSuccess(time.Now())
-			log.Printf("Monitor %s %q code sent successfully\n", monitor.Name(), codePending.Color)
+			log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 		}
-		switch codePending.Color {
+		switch codeColor {
 		case "red":
 			statusMapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
-			s := status.(components.RedCodeStatus)
-			statusMapper.Set(entity, &s)
+			statusMapper.Set(entity, status.(*components.RedCodeStatus))
 		case "green":
 			statusMapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
-			s := status.(components.GreenCodeStatus)
-			statusMapper.Set(entity, &s)
+			statusMapper.Set(entity, status.(*components.GreenCodeStatus))
 		case "yellow":
 			statusMapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
-			s := status.(components.YellowCodeStatus)
-			statusMapper.Set(entity, &s)
+			statusMapper.Set(entity, status.(*components.YellowCodeStatus))
 		case "cyan":
 			statusMapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
-			s := status.(components.CyanCodeStatus)
-			statusMapper.Set(entity, &s)
+			statusMapper.Set(entity, status.(*components.CyanCodeStatus))
 		case "gray":
 			statusMapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
-			s := status.(components.GrayCodeStatus)
-			statusMapper.Set(entity, &s)
+			statusMapper.Set(entity, status.(*components.GrayCodeStatus))
 		default:
-			log.Printf("Unknown color %q for entity %v", codePending.Color, entity)
+			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
 			continue
 		}
 
 		deferredOps = append(deferredOps, func() {
-			if !monitor.IsAlive() {
-				monitor.RemovePendingCode()
+			if !w.Mappers.World.Alive(entity) {
+				w.Mappers.CodePending.Remove(entity)
 			}
 		})
 

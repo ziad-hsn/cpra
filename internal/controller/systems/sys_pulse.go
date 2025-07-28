@@ -32,8 +32,8 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 	query := s.PulseFilter.Query(w.Mappers.World)
 	for query.Next() {
 		entity := query.Entity()
-		config := *w.Mappers.PulseConfig.GetUnchecked(entity)
-		status := *w.Mappers.PulseStatus.GetUnchecked(entity)
+		config := *w.Mappers.PulseConfig.GetUnchecked(entity).Copy()
+		status := *w.Mappers.PulseStatus.GetUnchecked(entity).Copy()
 
 		// Check for first-time pulse
 		if w.Mappers.World.HasUnchecked(query.Entity(), ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
@@ -92,11 +92,11 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchabl
 	for query.Next() {
 		entity := query.Entity()
 		job := w.Mappers.PulseJob.GetUnchecked(entity).Job.Copy()
-		status := *w.Mappers.PulseStatus.GetUnchecked(entity)
+		status := w.Mappers.PulseStatus.GetUnchecked(entity).Copy()
 
 		status.LastCheckTime = time.Now() // Data-only update, safe.
 		pulseMap := generic.NewMap[components.PulseStatus](w.Mappers.World)
-		pulseMap.Set(entity, &status)
+		pulseMap.Set(entity, status)
 		toDispatch = append(toDispatch, dispatchablePulse{
 			Entity: entity,
 			Job:    job,
@@ -111,7 +111,7 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []
 	for _, item := range dispatchList {
 		select {
 		case s.JobChan <- item.Job:
-			name := string(*w.Mappers.Name.GetUnchecked(item.Entity))
+			name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(item.Entity))...))
 			log.Printf("sent %s job\n", name)
 			e := item.Entity
 			if w.Mappers.World.HasUnchecked(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
@@ -174,19 +174,30 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 	for _, entry := range results {
 		entity := entry.entity
 		res := entry.result
-		monitor := controller.NewMonitorAdapter(w, entry.entity)
 
-		fmt.Printf("entity is %v for %s pulse result.\n", entity, monitor.Name())
-		if !monitor.IsAlive() || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
+		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
+
+		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
+		if !w.Mappers.World.Alive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
 			continue
 		}
 
-		fmt.Printf("recived %s results\n", monitor.Name())
+		fmt.Printf("recived %s results\n", name)
 		if res.Error() != nil {
-			monitor.SetPulseStatusAsFailed(res.Error())
-			status, _ := monitor.Status()
-			config := *w.Mappers.PulseConfig.Get(entity)
+			config := *w.Mappers.PulseConfig.Get(entity).Copy()
+			status := w.Mappers.PulseStatus.Get(entity).Copy()
 
+			status.LastStatus = "failed"
+			status.LastError = res.Error()
+			status.ConsecutiveFailures++
+
+			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
+			monitorStatus.Status = "failed"
+
+			pulseStatusMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
+			pulseStatusMapper.Set(entity, status)
+			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+			monitorStatusMapper.Set(entity, monitorStatus)
 			if status.ConsecutiveFailures == 1 {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
 					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
@@ -201,16 +212,29 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			if config.MaxFailures <= status.ConsecutiveFailures {
 				//monitorStatus.Status = "failed"
 
-				if monitor.HasIntervention() {
-					fmt.Printf("Monitor %s failed %d times and needs intervention\n", monitor.Name(), status.ConsecutiveFailures)
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
+					fmt.Printf("Monitor %s failed %d times and needs intervention\n", name, status.ConsecutiveFailures)
 					deferredOps = append(deferredOps, func() {
-						monitor.ScheduleIntervention()
+						w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
 					})
 
 				}
 			}
 		} else {
-			monitor.SetPulseStatusAsSuccess()
+			status := w.Mappers.PulseStatus.Get(entity).Copy()
+
+			status.LastStatus = "success"
+			status.LastError = nil
+			status.ConsecutiveFailures = 0
+			status.LastSuccessTime = time.Now()
+
+			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
+			monitorStatus.Status = "success"
+
+			pulseStatusMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
+			pulseStatusMapper.Set(entity, status)
+			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+			monitorStatusMapper.Set(entity, monitorStatus)
 
 			//if mStatus == "failed" {
 			//	if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
@@ -226,7 +250,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 		}
 
 		deferredOps = append(deferredOps, func() {
-			monitor.RemovePendingPulse()
+			w.Mappers.PulsePending.Remove(entity)
 		})
 	}
 	return deferredOps

@@ -47,7 +47,7 @@ func (m *MonitorAdapter) Status() (components.PulseStatus, bool) {
 	if !m.IsAlive() {
 		return components.PulseStatus{}, false
 	}
-	status := *m.mappers.PulseStatus.Get(m.entity)
+	status := *m.mappers.PulseStatus.Get(m.entity).Copy()
 	if status == (components.PulseStatus{}) {
 		return components.PulseStatus{}, false
 	}
@@ -57,12 +57,12 @@ func (m *MonitorAdapter) Status() (components.PulseStatus, bool) {
 // SetPulseStatusAsFailed updates the monitor's pulse status to failed.
 // This shows how data modifications are simplified.
 func (m *MonitorAdapter) SetPulseStatusAsFailed(err error) {
-	if status := m.mappers.PulseStatus.Get(m.entity); status != nil {
+	if status := m.mappers.PulseStatus.Get(m.entity).Copy(); status != nil {
 		status.LastStatus = "failed"
 		status.LastError = err
 		status.ConsecutiveFailures++
 	}
-	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity).Copy(); monitorStatus != nil {
 		monitorStatus.Status = "failed"
 	}
 }
@@ -70,24 +70,24 @@ func (m *MonitorAdapter) SetPulseStatusAsFailed(err error) {
 // SetPulseStatusAsSuccess updates the monitor's pulse status to success.
 func (m *MonitorAdapter) SetPulseStatusAsSuccess() {
 	// ... implementation similar to SetPulseStatusAsFailed ...
-	if status := m.mappers.PulseStatus.Get(m.entity); status != nil {
+	if status := m.mappers.PulseStatus.Get(m.entity).Copy(); status != nil {
 		status.LastStatus = "success"
 		status.LastError = nil
 		status.ConsecutiveFailures = 0
 		status.LastSuccessTime = time.Now()
 	}
-	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity).Copy(); monitorStatus != nil {
 		monitorStatus.Status = "success"
 	}
 }
 
 func (m *MonitorAdapter) SetInterventionStatusAsFailed(err error) {
-	if status := m.mappers.InterventionStatus.Get(m.entity); status != nil {
+	if status := m.mappers.InterventionStatus.Get(m.entity).Copy(); status != nil {
 		status.LastStatus = "failed"
 		status.LastError = err
 		status.ConsecutiveFailures++
 	}
-	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity).Copy(); monitorStatus != nil {
 		monitorStatus.Status = "failed"
 	}
 }
@@ -96,14 +96,14 @@ func (m *MonitorAdapter) SetInterventionStatusAsFailed(err error) {
 func (m *MonitorAdapter) SetInterventionStatusAsSuccess() string {
 	// ... implementation similar to SetPulseStatusAsFailed ...
 	var lastStatus string
-	if status := m.mappers.InterventionStatus.Get(m.entity); status != nil {
+	if status := m.mappers.InterventionStatus.Get(m.entity).Copy(); status != nil {
 		lastStatus = status.LastStatus
 		status.LastStatus = "success"
 		status.LastError = nil
 		status.ConsecutiveFailures = 0
 		status.LastSuccessTime = time.Now()
 	}
-	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity); monitorStatus != nil {
+	if monitorStatus := m.mappers.MonitorStatus.Get(m.entity).Copy(); monitorStatus != nil {
 		monitorStatus.Status = "success"
 	}
 	return lastStatus

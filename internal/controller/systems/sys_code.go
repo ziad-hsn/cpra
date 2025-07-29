@@ -81,7 +81,7 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []d
 				return func() {
 					if !e.IsZero() {
 						w.Mappers.CodeNeeded.Remove(e)
-						w.Mappers.CodePending.Assign(e, &components.CodePending{Color: entry.color})
+						w.Mappers.CodePending.Assign(e, &components.CodePending{Color: c})
 					}
 				}
 			}(entry.entity, entry.color))
@@ -107,13 +107,14 @@ func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {
 }
 
 // collectCodeResults: Phase 1.1 - Drains the result channel into a slice.
-func (s *CodeResultSystem) collectCodeResults() []resultEntry {
-	toProcess := make([]resultEntry, 0)
+func (s *CodeResultSystem) collectCodeResults() map[ecs.Entity]resultEntry {
+	toProcess := make(map[ecs.Entity]resultEntry)
 loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			toProcess = append(toProcess, resultEntry{entity: res.Entity(), result: res})
+			ent := res.Entity()
+			toProcess[ent] = resultEntry{entity: ent, result: res}
 		default:
 			break loop
 		}
@@ -123,7 +124,7 @@ loop:
 
 // processCodeResultsAndQueueStructuralChanges: Phase 1.2 - Processes results, makes data changes,
 // and returns a slice of functions that will perform structural changes.
-func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results []resultEntry) []func() {
+func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results map[ecs.Entity]resultEntry) []func() {
 	deferredOps := make([]func(), 0, len(results))
 
 	for _, entry := range results {
@@ -132,7 +133,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		fmt.Printf("entity is %v for code result.\n", entity)
 
 		//monitor := controller.NewMonitorAdapter(w, entity)
-		if !w.Mappers.World.Alive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		if !w.IsAlive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
@@ -186,7 +187,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *contro
 		}
 
 		deferredOps = append(deferredOps, func() {
-			if !w.Mappers.World.Alive(entity) {
+			if !w.IsAlive(entity) {
 				w.Mappers.CodePending.Remove(entity)
 			}
 		})

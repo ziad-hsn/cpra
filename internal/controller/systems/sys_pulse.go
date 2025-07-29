@@ -151,14 +151,14 @@ func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld) {
 }
 
 // collectResults: Phase 1.1 - Drains the result channel into a slice.
-func (s *PulseResultSystem) collectResults() []resultEntry {
-	toProcess := make([]resultEntry, 0)
+func (s *PulseResultSystem) collectResults() map[ecs.Entity]resultEntry {
+	toProcess := make(map[ecs.Entity]resultEntry)
 loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
 			ent := res.Entity()
-			toProcess = append(toProcess, resultEntry{entity: ent, result: res})
+			toProcess[ent] = resultEntry{entity: ent, result: res}
 		default:
 			break loop // Exit loop when no more results
 		}
@@ -168,19 +168,20 @@ loop:
 
 // processResultsAndQueueStructuralChanges: Phase 1.2 - Processes results, makes data changes,
 // and returns a slice of functions that will perform structural changes.
-func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results []resultEntry) []func() {
+func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results map[ecs.Entity]resultEntry) []func() {
 	deferredOps := make([]func(), 0, len(results))
 
 	for _, entry := range results {
 		entity := entry.entity
 		res := entry.result
 
+		if !w.IsAlive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
+			continue
+		}
+
 		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
 
 		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
-		if !w.Mappers.World.Alive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
-			continue
-		}
 
 		fmt.Printf("recived %s results\n", name)
 		if res.Error() != nil {

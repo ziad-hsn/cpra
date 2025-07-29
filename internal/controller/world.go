@@ -33,3 +33,11 @@ func (w *CPRaWorld) SafeAccess(fn func()) {
 	defer w.mu.Unlock()
 	fn()
 }
+
+func (w *CPRaWorld) IsAlive(e ecs.Entity) bool {
+	if w.Mappers.World.Stats().Entities.Total < int(e.ID()) {
+		return false
+	}
+	return w.Mappers.World.Alive(e)
+
+}

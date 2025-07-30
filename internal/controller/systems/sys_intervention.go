@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+/* ---------------------------  DISPATCH  --------------------------- */
+
 type dispatchableIntervention struct {
 	Entity ecs.Entity
 	Job    jobs.Job
@@ -22,79 +24,79 @@ type InterventionDispatchSystem struct {
 }
 
 func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.InterventionNeededFilter = *generic.NewFilter2[components.InterventionJob, components.InterventionNeeded]().Without(generic.T[components.InterventionPending]())
+	s.InterventionNeededFilter = *generic.
+		NewFilter2[components.InterventionJob, components.InterventionNeeded]().
+		Without(generic.T[components.InterventionPending]())
 }
 
-// collectWork: Phase 1 - Reads from the world to find interventions to dispatch.
 func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchableIntervention {
-	toDispatch := make([]dispatchableIntervention, 0)
+	out := make([]dispatchableIntervention, 0)
 	query := s.InterventionNeededFilter.Query(w.Mappers.World)
+
 	for query.Next() {
-		entity := query.Entity()
-		j := w.Mappers.InterventionJob.GetUnchecked(entity).Job.Copy()
-		toDispatch = append(toDispatch, dispatchableIntervention{
-			Entity: entity,
-			Job:    j,
-		})
+		ent := query.Entity()
+		job := w.Mappers.InterventionJob.GetUnchecked(ent).Job.Copy()
+		out = append(out, dispatchableIntervention{Entity: ent, Job: job})
 	}
-	return toDispatch
+	return out
 }
 
-// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
-func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableIntervention) []func() {
-	var deferredOps []func()
-	for _, entry := range dispatchList {
+func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, list []dispatchableIntervention) []func() {
+	deferred := make([]func(), 0, len(list))
+
+	for _, item := range list {
 		select {
-		case s.JobChan <- entry.Job:
-			e := entry.Entity
-			deferredOps = append(deferredOps, func() {
+		case s.JobChan <- item.Job:
+			e := item.Entity
+			deferred = append(deferred, func() {
 				if !e.IsZero() {
-					w.Mappers.World.Exchange(e,
+					w.Mappers.World.Exchange(
+						e,
 						[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
-						[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)})
+						[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
+					)
 				}
 			})
 		default:
-			log.Printf("Job channel full for entity %v\n", entry.Entity)
+			log.Printf("Job channel full for entity %v\n", item.Entity)
 		}
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld) []func() {
-	dispatchList := s.collectWork(w)
-	return s.applyWork(w, dispatchList)
+	return s.applyWork(w, s.collectWork(w))
 }
 
-// InterventionResultSystem --- RESULT PROCESS SYSTEM ---
+/* ---------------------------  RESULT  --------------------------- */
+
 type InterventionResultSystem struct {
-	PendingInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionNeeded]
-	ResultChan                <-chan jobs.Result
+	PendingInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus,
+		components.InterventionJob, components.InterventionNeeded]
+	ResultChan <-chan jobs.Result
 }
 
-func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld) {
-}
+func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld) {}
 
-// collectInterventionResults: Phase 1.1 - Drains the result channel into a slice.
 func (s *InterventionResultSystem) collectInterventionResults() map[ecs.Entity]resultEntry {
-	toProcess := make(map[ecs.Entity]resultEntry)
+	out := make(map[ecs.Entity]resultEntry)
 loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			ent := res.Entity()
-			toProcess[ent] = resultEntry{entity: ent, result: res}
+			out[res.Entity()] = resultEntry{entity: res.Entity(), result: res}
 		default:
 			break loop
 		}
 	}
-	return toProcess
+	return out
 }
 
-// processInterventionResultsAndQueueStructuralChanges: Phase 1.2 - Processes results, makes data changes,
-// and returns a slice of functions that will perform structural changes.
-func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results map[ecs.Entity]resultEntry) []func() {
-	deferredOps := make([]func(), 0, len(results))
+func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(
+	w *controller.CPRaWorld, results map[ecs.Entity]resultEntry,
+) []func() {
+
+	deferred := make([]func(), 0, len(results))
 
 	for _, entry := range results {
 		entity := entry.entity
@@ -104,91 +106,100 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
-
+		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
 		fmt.Printf("entity is %v for pulse result.\n", entity)
 
 		if res.Error() != nil {
-
+			// ---- FAILURE ----
 			config := *w.Mappers.InterventionConfig.GetUnchecked(entity).Copy()
-			status := w.Mappers.InterventionStatus.GetUnchecked(entity).Copy()
+			statusCopy := *w.Mappers.InterventionStatus.GetUnchecked(entity).Copy()
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
 
-			status.LastStatus = "failed"
-			status.LastError = res.Error()
-			status.ConsecutiveFailures++
+			statusCopy.LastStatus = "failed"
+			statusCopy.LastError = res.Error()
+			statusCopy.ConsecutiveFailures++
+			monitorCopy.Status = "failed"
 
-			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
-			monitorStatus.Status = "failed"
+			deferred = append(deferred, func(e ecs.Entity, s components.InterventionStatus, m components.MonitorStatus) func() {
+				return func() {
+					interventionMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
+					interventionMapper.Set(e, &s)
+					monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+					monitorMapper.Set(e, &m)
+				}
+			}(entity, statusCopy, monitorCopy))
 
-			interventionStatusMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
-			interventionStatusMapper.Set(entity, status)
-			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-			monitorStatusMapper.Set(entity, monitorStatus)
+			if config.MaxFailures <= statusCopy.ConsecutiveFailures &&
+				w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 
-			if config.MaxFailures <= status.ConsecutiveFailures {
 				log.Printf("Monitor %s intervention failed\n", name)
-				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-					log.Println("scheduling red code")
-					deferredOps = append(deferredOps, func() {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "red"})
-					})
-				}
+
+				e := entity
+				deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"}) })
+
 			} else {
-				deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-					return func() {
-						if w.IsAlive(entity) {
-							w.Mappers.World.Exchange(e,
-								[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
-								[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)})
-						}
+				// schedule retry (needed -> pending)
+				e := entity
+				deferred = append(deferred, func() {
+					if w.IsAlive(e) {
+						w.Mappers.World.Exchange(
+							e,
+							[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
+							[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
+						)
 					}
-				}(entity))
+				})
 			}
+
 		} else {
-			status := w.Mappers.InterventionStatus.Get(entity).Copy()
-			lastStatus := status.LastStatus
-			status.LastStatus = "success"
-			status.LastError = nil
-			status.ConsecutiveFailures = 0
-			status.LastSuccessTime = time.Now()
+			// ---- SUCCESS ----
+			statusCopy := *w.Mappers.InterventionStatus.Get(entity).Copy()
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
+			lastStatus := statusCopy.LastStatus
 
-			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
-			monitorStatus.Status = "success"
+			statusCopy.LastStatus = "success"
+			statusCopy.LastError = nil
+			statusCopy.ConsecutiveFailures = 0
+			statusCopy.LastSuccessTime = time.Now()
+			monitorCopy.Status = "success"
 
-			interventionStatusMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
-			interventionStatusMapper.Set(entity, status)
-			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-			monitorStatusMapper.Set(entity, monitorStatus)
-
-			if lastStatus == "failed" {
-				if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-					log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
-					deferredOps = append(deferredOps, func() {
-						w.Mappers.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: "cyan"})
-					})
+			deferred = append(deferred, func(e ecs.Entity, s components.InterventionStatus, m components.MonitorStatus) func() {
+				return func() {
+					interventionMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
+					interventionMapper.Set(e, &s)
+					monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+					monitorMapper.Set(e, &m)
 				}
+			}(entity, statusCopy, monitorCopy))
+
+			if lastStatus == "failed" &&
+				w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+
+				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
+				e := entity
+				deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "cyan"}) })
 			}
-			deferredOps = append(deferredOps, func() {
-				w.Mappers.InterventionPending.Remove(entity)
-			})
+
+			// remove pending
+			e := entity
+			deferred = append(deferred, func() { w.Mappers.InterventionPending.Remove(e) })
 		}
 	}
-
-	return deferredOps
+	return deferred
 }
 
 func (s *InterventionResultSystem) Update(w *controller.CPRaWorld) []func() {
-	results := s.collectInterventionResults()
-	return s.processInterventionResultsAndQueueStructuralChanges(w, results)
+	return s.processInterventionResultsAndQueueStructuralChanges(w, s.collectInterventionResults())
 }
+
+/* ------------------  Utility: dump component names  ------------------ */
 
 func GetEntityComponents(w *ecs.World, entity ecs.Entity) []string {
 	ids := w.Ids(entity)
-	var componentNames []string
+	out := make([]string, 0, len(ids))
 	for _, id := range ids {
 		info, _ := ecs.ComponentInfo(w, id)
-		compType := info.Type
-		componentNames = append(componentNames, compType.Name())
+		out = append(out, info.Type.Name())
 	}
-	return componentNames
+	return out
 }

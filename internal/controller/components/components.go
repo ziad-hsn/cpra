@@ -24,7 +24,7 @@ func (s *MonitorStatus) Copy() *MonitorStatus {
 		return nil
 	}
 	cpy := &MonitorStatus{
-		Status:          s.Status,
+		Status:          string([]byte(s.Status)),
 		LastCheckTime:   s.LastCheckTime,
 		LastSuccessTime: s.LastSuccessTime,
 	}
@@ -50,7 +50,7 @@ func (c *PulseConfig) Copy() *PulseConfig {
 		return nil
 	}
 	cpy := &PulseConfig{
-		Type:        c.Type,
+		Type:        string([]byte(c.Type)),
 		Timeout:     c.Timeout,
 		Interval:    c.Interval,
 		Retries:     c.Retries,
@@ -130,7 +130,7 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 		return nil
 	}
 	cpy := &InterventionConfig{
-		Action:      c.Action,
+		Action:      string([]byte(c.Action)),
 		MaxFailures: c.MaxFailures,
 	}
 
@@ -173,7 +173,7 @@ func (s *InterventionStatus) Copy() *InterventionStatus {
 		return nil
 	}
 	cpy := &InterventionStatus{
-		LastStatus:           s.LastStatus,
+		LastStatus:           string([]byte(s.LastStatus)),
 		ConsecutiveFailures:  s.ConsecutiveFailures,
 		LastInterventionTime: s.LastInterventionTime,
 		LastSuccessTime:      s.LastSuccessTime,
@@ -199,7 +199,7 @@ func (c *CodeConfig) Copy() *CodeConfig {
 	cpy := &CodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	// Deep copy the interface by copying the underlying concrete struct.
 	if c.Config != nil {
@@ -262,7 +262,7 @@ func (c *RedCodeConfig) Copy() *RedCodeConfig {
 	cpy := &RedCodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	if c.Config != nil {
 		switch v := c.Config.(type) {
@@ -345,7 +345,7 @@ func (c *GreenCodeConfig) Copy() *GreenCodeConfig {
 	cpy := &GreenCodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	if c.Config != nil {
 		switch v := c.Config.(type) {
@@ -428,7 +428,7 @@ func (c *CyanCodeConfig) Copy() *CyanCodeConfig {
 	cpy := &CyanCodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	if c.Config != nil {
 		switch v := c.Config.(type) {
@@ -511,7 +511,7 @@ func (c *YellowCodeConfig) Copy() *YellowCodeConfig {
 	cpy := &YellowCodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	if c.Config != nil {
 		switch v := c.Config.(type) {
@@ -594,7 +594,7 @@ func (c *GrayCodeConfig) Copy() *GrayCodeConfig {
 	cpy := &GrayCodeConfig{
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
-		Notify:      c.Notify,
+		Notify:      string([]byte(c.Notify)),
 	}
 	if c.Config != nil {
 		switch v := c.Config.(type) {

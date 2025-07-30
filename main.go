@@ -33,7 +33,7 @@ func main() {
 	//debug.SetGCPercent(70)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
-	f, err := os.OpenFile("crash-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}

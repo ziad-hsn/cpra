@@ -35,7 +35,7 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 
 	for query.Next() {
 		ent := query.Entity()
-		color := query.Get().Color
+		color := string([]byte(query.Get().Color))
 		var job jobs.Job
 
 		switch color {

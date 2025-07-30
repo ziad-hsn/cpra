@@ -71,8 +71,6 @@ func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld) []func() {
 /* ---------------------------  RESULT  --------------------------- */
 
 type InterventionResultSystem struct {
-	PendingInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus,
-		components.InterventionJob, components.InterventionNeeded]
 	ResultChan <-chan jobs.Result
 }
 
@@ -107,7 +105,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		}
 
 		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
-		fmt.Printf("entity is %v for pulse result.\n", entity)
+		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
 			// ---- FAILURE ----
@@ -129,26 +127,18 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 				}
 			}(entity, statusCopy, monitorCopy))
 
-			if config.MaxFailures <= statusCopy.ConsecutiveFailures &&
-				w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+			if config.MaxFailures <= statusCopy.ConsecutiveFailures {
+				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+					log.Printf("Monitor %s intervention failed\n", name)
 
-				log.Printf("Monitor %s intervention failed\n", name)
-
-				e := entity
-				deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"}) })
-
+					e := entity
+					deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"}) })
+				}
+				// No retry when max failures reached.
 			} else {
-				// schedule retry (needed -> pending)
+				// Schedule retry.
 				e := entity
-				deferred = append(deferred, func() {
-					if w.IsAlive(e) {
-						w.Mappers.World.Exchange(
-							e,
-							[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
-							[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
-						)
-					}
-				})
+				deferred = append(deferred, func() { w.Mappers.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) })
 			}
 
 		} else {
@@ -179,11 +169,11 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 				e := entity
 				deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "cyan"}) })
 			}
-
-			// remove pending
-			e := entity
-			deferred = append(deferred, func() { w.Mappers.InterventionPending.Remove(e) })
 		}
+
+		// Always remove pending after processing.
+		e := entity
+		deferred = append(deferred, func() { w.Mappers.InterventionPending.Remove(e) })
 	}
 	return deferred
 }

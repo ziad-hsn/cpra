@@ -30,7 +30,7 @@ func main() {
 			log.Println("Recovered in main:", r)
 		}
 	}()
-	//debug.SetGCPercent(70)
+	//debug.SetGCPercent(7)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
 	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)

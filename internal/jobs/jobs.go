@@ -124,8 +124,8 @@ func (p *PulseHTTPJob) Copy() Job {
 	return &PulseHTTPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		URL:     p.URL,
-		Method:  p.Method,
+		URL:     string([]byte(p.URL)),
+		Method:  string([]byte(p.Method)),
 		Timeout: p.Timeout,
 		Retries: p.Retries,
 	}
@@ -156,7 +156,7 @@ func (p *PulseTCPJob) Copy() Job {
 	return &PulseTCPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    p.Host,
+		Host:    string([]byte(p.Host)),
 		Port:    p.Port,
 		Timeout: p.Timeout,
 		Retries: p.Retries,
@@ -187,7 +187,7 @@ func (p *PulseICMPJob) Copy() Job {
 	return &PulseICMPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    p.Host,
+		Host:    string([]byte(p.Host)),
 		Count:   p.Count,
 		Timeout: p.Timeout,
 	}
@@ -216,7 +216,7 @@ func (i *InterventionDockerJob) Copy() Job {
 	return &InterventionDockerJob{
 		ID:        i.ID,
 		Entity:    i.Entity,
-		Container: i.Container,
+		Container: string([]byte(i.Container)),
 		Timeout:   i.Timeout,
 		Retries:   i.Retries,
 	}
@@ -248,7 +248,9 @@ func (c *CodeLogJob) Copy() Job {
 	return &CodeLogJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		File:    c.File,
+		File:    string([]byte(c.File)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -279,7 +281,9 @@ func (c *CodeSlackJob) Copy() Job {
 	return &CodeSlackJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		WebHook: c.WebHook,
+		WebHook: string([]byte(c.WebHook)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -311,7 +315,9 @@ func (c *CodePagerDutyJob) Copy() Job {
 	return &CodePagerDutyJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		URL:     c.URL,
+		URL:     string([]byte(c.URL)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}

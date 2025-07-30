@@ -82,7 +82,7 @@ func (s *Scheduler) Run() {
 			//log.Println(allDeferredOps)
 			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
-				s.World.SafeAccess(op)
+				op()
 				//time.Sleep(100 * time.Millisecond)
 			}
 

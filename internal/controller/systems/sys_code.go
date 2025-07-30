@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+/* ---------------------------  DISPATCH  --------------------------- */
+
 type dispatchableCodeJob struct {
 	entity ecs.Entity
 	job    jobs.Job
@@ -18,185 +20,196 @@ type dispatchableCodeJob struct {
 }
 
 type CodeDispatchSystem struct {
-	JobChan                  chan<- jobs.Job
-	CodeNeededFilter         *generic.Filter1[components.CodeNeeded]
-	FailedInterventionFilter generic.Filter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]
+	JobChan          chan<- jobs.Job
+	CodeNeededFilter *generic.Filter1[components.CodeNeeded]
 }
 
 func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.CodeNeededFilter = generic.NewFilter1[components.CodeNeeded]().Without(generic.T[components.CodePending]())
-	s.FailedInterventionFilter = *generic.NewFilter4[components.InterventionConfig, components.InterventionStatus, components.InterventionJob, components.InterventionFailed]()
+	s.CodeNeededFilter = generic.NewFilter1[components.CodeNeeded]().
+		Without(generic.T[components.CodePending]())
 }
 
-// collectWork: Phase 1 - Reads from the world to find code jobs to dispatch.
 func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchableCodeJob {
-	toDispatch := make([]dispatchableCodeJob, 0)
+	out := make([]dispatchableCodeJob, 0)
 	query := s.CodeNeededFilter.Query(w.Mappers.World)
-	for query.Next() {
-		entity := query.Entity()
-		codeNeeded := *query.Get()
-		var job jobs.Job
-		switch codeNeeded.Color {
-		case "red":
-			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				job = w.Mappers.RedCodeJob.GetUnchecked(entity).Job.Copy()
 
+	for query.Next() {
+		ent := query.Entity()
+		color := query.Get().Color
+		var job jobs.Job
+
+		switch color {
+		case "red":
+			if w.Mappers.World.Has(ent, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+				job = w.Mappers.RedCodeJob.Get(ent).Job.Copy()
 			}
 		case "green":
-			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				job = w.Mappers.GreenCodeJob.GetUnchecked(entity).Job.Copy()
+			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+				job = w.Mappers.GreenCodeJob.Get(ent).Job.Copy()
 			}
 		case "yellow":
-			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				job = w.Mappers.YellowCodeJob.GetUnchecked(entity).Job.Copy()
+			if w.Mappers.World.Has(ent, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+				job = w.Mappers.YellowCodeJob.Get(ent).Job.Copy()
 			}
 		case "cyan":
-			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				job = w.Mappers.CyanCodeJob.GetUnchecked(entity).Job.Copy()
+			if w.Mappers.World.Has(ent, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+				job = w.Mappers.CyanCodeJob.Get(ent).Job.Copy()
 			}
 		case "gray":
-			if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				job = w.Mappers.GrayCodeJob.GetUnchecked(entity).Job.Copy()
-
+			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
+				job = w.Mappers.GrayCodeJob.Get(ent).Job.Copy()
 			}
 		default:
-			log.Printf("Unknown color %q for entity %v", codeNeeded.Color, entity)
-			continue
+			log.Printf("Unknown color %q for entity %v", color, ent)
 		}
+
 		if job != nil {
-			toDispatch = append(toDispatch, dispatchableCodeJob{entity: entity, job: job, color: codeNeeded.Color})
+			out = append(out, dispatchableCodeJob{entity: ent, job: job, color: color})
 		}
 	}
-	return toDispatch
+	return out
 }
 
-// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
-func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchableCodeJob) []func() {
-	var deferredOps []func()
-	for _, entry := range dispatchList {
+func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list []dispatchableCodeJob) []func() {
+	deferred := make([]func(), 0, len(list))
+
+	for _, item := range list {
 		select {
-		case s.JobChan <- entry.job.Copy():
-			log.Printf("Sent %s code job for entity %v", entry.color, entry.entity)
-			deferredOps = append(deferredOps, func(e ecs.Entity, c string) func() {
-				return func() {
-					if !e.IsZero() {
-						w.Mappers.CodeNeeded.Remove(e)
-						w.Mappers.CodePending.Assign(e, &components.CodePending{Color: c})
-					}
+		case s.JobChan <- item.job.Copy():
+			e := item.entity
+			c := item.color
+
+			deferred = append(deferred, func() {
+				if w.IsAlive(e) {
+					w.Mappers.CodeNeeded.Remove(e)
+					w.Mappers.CodePending.Assign(e, &components.CodePending{Color: c})
 				}
-			}(entry.entity, entry.color))
+			})
+
+			log.Printf("Sent %s code job for entity %v", c, e)
+
 		default:
-			log.Printf("Job channel full for entity %v", entry.entity)
+			log.Printf("Job channel full for entity %v", item.entity)
 		}
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld) []func() {
-	dispatchList := s.collectWork(w)
-	return s.applyWork(w, dispatchList)
+	return s.applyWork(w, s.collectWork(w))
 }
 
-// CodeResultSystem refactored
+/* ---------------------------  RESULT  --------------------------- */
+
 type CodeResultSystem struct {
-	PendingCodeFilter generic.Filter1[components.CodePending]
-	ResultChan        <-chan jobs.Result
+	ResultChan <-chan jobs.Result
 }
 
-func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {
-}
+func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {}
 
-// collectCodeResults: Phase 1.1 - Drains the result channel into a slice.
 func (s *CodeResultSystem) collectCodeResults() map[ecs.Entity]resultEntry {
-	toProcess := make(map[ecs.Entity]resultEntry)
+	out := make(map[ecs.Entity]resultEntry)
 loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
-			ent := res.Entity()
-			toProcess[ent] = resultEntry{entity: ent, result: res}
+			out[res.Entity()] = resultEntry{entity: res.Entity(), result: res}
 		default:
 			break loop
 		}
 	}
-	return toProcess
+	return out
 }
 
-// processCodeResultsAndQueueStructuralChanges: Phase 1.2 - Processes results, makes data changes,
-// and returns a slice of functions that will perform structural changes.
-func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results map[ecs.Entity]resultEntry) []func() {
-	deferredOps := make([]func(), 0, len(results))
+func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
+	w *controller.CPRaWorld, results map[ecs.Entity]resultEntry,
+) []func() {
+
+	deferred := make([]func(), 0, len(results))
 
 	for _, entry := range results {
 		entity := entry.entity
 		res := entry.result
-		fmt.Printf("entity is %v for code result.\n", entity)
 
-		//monitor := controller.NewMonitorAdapter(w, entity)
-		if !w.IsAlive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
-		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
+		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
+		codeColor := w.Mappers.CodePending.Get(entity).Color
+		fmt.Printf("entity is %v for %s code result.\n", entity, name)
 
-		codeColor := string(append([]byte(nil), []byte(w.Mappers.CodePending.GetUnchecked(entity).Color)...))
-
-		var status components.CodeStatusAccessor
 		switch codeColor {
-		case "red":
-			status = w.Mappers.RedCodeStatus.GetUnchecked(entity).Copy()
-		case "green":
-			status = w.Mappers.GreenCodeStatus.GetUnchecked(entity).Copy()
-		case "yellow":
-			status = w.Mappers.YellowCodeStatus.GetUnchecked(entity).Copy()
-		case "cyan":
-			status = w.Mappers.CyanCodeStatus.GetUnchecked(entity).Copy()
-		case "gray":
-			status = w.Mappers.GrayCodeStatus.GetUnchecked(entity).Copy()
-		default:
-			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
-			continue
-		}
-
-		if res.Error() != nil {
-			status.SetFailure(res.Error())
-			log.Printf("Monitor %s Code failed\n", name)
-		} else {
-			status.SetSuccess(time.Now())
-			log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
-		}
-		switch codeColor {
-		case "red":
-			statusMapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
-			statusMapper.Set(entity, status.(*components.RedCodeStatus))
-		case "green":
-			statusMapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
-			statusMapper.Set(entity, status.(*components.GreenCodeStatus))
-		case "yellow":
-			statusMapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
-			statusMapper.Set(entity, status.(*components.YellowCodeStatus))
-		case "cyan":
-			statusMapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
-			statusMapper.Set(entity, status.(*components.CyanCodeStatus))
-		case "gray":
-			statusMapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
-			statusMapper.Set(entity, status.(*components.GrayCodeStatus))
-		default:
-			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
-			continue
-		}
-
-		deferredOps = append(deferredOps, func() {
-			if !w.IsAlive(entity) {
-				w.Mappers.CodePending.Remove(entity)
+		case "red", "green", "yellow", "cyan", "gray":
+			var statusCopy components.CodeStatusAccessor
+			switch codeColor {
+			case "red":
+				statusCopy = w.Mappers.RedCodeStatus.Get(entity).Copy()
+			case "green":
+				statusCopy = w.Mappers.GreenCodeStatus.Get(entity).Copy()
+			case "yellow":
+				statusCopy = w.Mappers.YellowCodeStatus.Get(entity).Copy()
+			case "cyan":
+				statusCopy = w.Mappers.CyanCodeStatus.Get(entity).Copy()
+			case "gray":
+				statusCopy = w.Mappers.GrayCodeStatus.Get(entity).Copy()
 			}
-		})
 
+			if res.Error() != nil {
+				statusCopy.SetFailure(res.Error())
+				log.Printf("Monitor %s Code failed\n", name)
+			} else {
+				statusCopy.SetSuccess(time.Now())
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+			}
+
+			// capture copies for deferred Set
+			e := entity
+			switch codeColor {
+			case "red":
+				st := *(statusCopy.(*components.RedCodeStatus))
+				deferred = append(deferred, func() {
+					mapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
+					mapper.Set(e, &st)
+					w.Mappers.CodePending.Remove(e)
+				})
+			case "green":
+				st := *(statusCopy.(*components.GreenCodeStatus))
+				deferred = append(deferred, func() {
+					mapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
+					mapper.Set(e, &st)
+					w.Mappers.CodePending.Remove(e)
+				})
+			case "yellow":
+				st := *(statusCopy.(*components.YellowCodeStatus))
+				deferred = append(deferred, func() {
+					mapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
+					mapper.Set(e, &st)
+					w.Mappers.CodePending.Remove(e)
+				})
+			case "cyan":
+				st := *(statusCopy.(*components.CyanCodeStatus))
+				deferred = append(deferred, func() {
+					mapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
+					mapper.Set(e, &st)
+					w.Mappers.CodePending.Remove(e)
+				})
+			case "gray":
+				st := *(statusCopy.(*components.GrayCodeStatus))
+				deferred = append(deferred, func() {
+					mapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
+					mapper.Set(e, &st)
+					w.Mappers.CodePending.Remove(e)
+				})
+			}
+
+		default:
+			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
+		}
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *CodeResultSystem) Update(w *controller.CPRaWorld) []func() {
-	results := s.collectCodeResults()
-	return s.processCodeResultsAndQueueStructuralChanges(w, results)
+	return s.processCodeResultsAndQueueStructuralChanges(w, s.collectCodeResults())
 }

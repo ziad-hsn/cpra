@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-// PulseScheduleSystem refactored
+/* -----------------------------  SCHEDULE  ----------------------------- */
+
 type PulseScheduleSystem struct {
 	PulseFilter *generic.Filter2[components.PulseConfig, components.PulseStatus]
 }
@@ -26,54 +27,54 @@ func (s *PulseScheduleSystem) Initialize(w *controller.CPRaWorld) {
 		Without(generic.T[components.CodePending]())
 }
 
-// collectWork: Phase 1 - Reads from the world and returns entities needing a pulse check.
 func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity {
-	toCheck := make([]ecs.Entity, 0)
+	var toCheck []ecs.Entity
 	query := s.PulseFilter.Query(w.Mappers.World)
-	for query.Next() {
-		entity := query.Entity()
-		config := *w.Mappers.PulseConfig.GetUnchecked(entity).Copy()
-		status := *w.Mappers.PulseStatus.GetUnchecked(entity).Copy()
 
-		// Check for first-time pulse
-		if w.Mappers.World.HasUnchecked(query.Entity(), ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-			toCheck = append(toCheck, query.Entity())
+	for query.Next() {
+		ent := query.Entity()
+		config := *w.Mappers.PulseConfig.GetUnchecked(ent).Copy()
+		status := *w.Mappers.PulseStatus.GetUnchecked(ent).Copy()
+
+		// first‑time check?
+		if w.Mappers.World.HasUnchecked(ent, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+			toCheck = append(toCheck, ent)
 			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
 			continue
 		}
 
-		// Check for scheduled interval
+		// interval check
 		if time.Since(status.LastCheckTime) >= config.Interval {
+			toCheck = append(toCheck, ent)
 			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
-			toCheck = append(toCheck, query.Entity())
 		}
 	}
 	return toCheck
 }
 
-// applyWork: Phase 2 - Prepares deferred structural changes.
 func (s *PulseScheduleSystem) applyWork(w *controller.CPRaWorld, entities []ecs.Entity) []func() {
-	var deferredOps []func()
-	for _, entity := range entities {
-		e := entity
-		deferredOps = append(deferredOps, func() {
+	deferred := make([]func(), 0, len(entities))
+	for _, ent := range entities {
+		e := ent
+		deferred = append(deferred, func() {
 			if !e.IsZero() && !w.Mappers.World.HasUnchecked(e, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
 				w.Mappers.PulseNeeded.Assign(e, &components.PulseNeeded{})
 			}
 		})
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *PulseScheduleSystem) Update(w *controller.CPRaWorld) []func() {
-	entitiesToSchedule := s.collectWork(w)
-	return s.applyWork(w, entitiesToSchedule)
+	return s.applyWork(w, s.collectWork(w))
 }
 
-// PulseDispatchSystem refactored
+/* -----------------------------  DISPATCH  ----------------------------- */
+
 type dispatchablePulse struct {
 	Entity ecs.Entity
 	Job    jobs.Job
+	Status components.PulseStatus // updated LastCheckTime copy
 }
 
 type PulseDispatchSystem struct {
@@ -85,58 +86,69 @@ func (s *PulseDispatchSystem) Initialize(w *controller.CPRaWorld) {
 	s.PulseNeeded = generic.NewFilter3[components.PulseJob, components.PulseStatus, components.PulseNeeded]()
 }
 
-// collectWork: Phase 1 - Reads from the world and returns entities ready for dispatch.
 func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchablePulse {
-	toDispatch := make([]dispatchablePulse, 0)
+	out := make([]dispatchablePulse, 0)
 	query := s.PulseNeeded.Query(w.Mappers.World)
-	for query.Next() {
-		entity := query.Entity()
-		job := w.Mappers.PulseJob.GetUnchecked(entity).Job.Copy()
-		status := w.Mappers.PulseStatus.GetUnchecked(entity).Copy()
 
-		status.LastCheckTime = time.Now() // Data-only update, safe.
-		pulseMap := generic.NewMap[components.PulseStatus](w.Mappers.World)
-		pulseMap.Set(entity, status)
-		toDispatch = append(toDispatch, dispatchablePulse{
-			Entity: entity,
-			Job:    job,
-		})
+	for query.Next() {
+		ent := query.Entity()
+		job := w.Mappers.PulseJob.GetUnchecked(ent).Job.Copy()
+
+		stCopy := *w.Mappers.PulseStatus.GetUnchecked(ent).Copy()
+		stCopy.LastCheckTime = time.Now()
+
+		out = append(out, dispatchablePulse{Entity: ent, Job: job, Status: stCopy})
 	}
-	return toDispatch
+	return out
 }
 
-// applyWork: Phase 2 - Dispatches jobs and prepares deferred structural changes.
-func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, dispatchList []dispatchablePulse) []func() {
-	var deferredOps []func()
-	for _, item := range dispatchList {
+func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, list []dispatchablePulse) []func() {
+	deferred := make([]func(), 0, len(list))
+
+	for _, item := range list {
 		select {
 		case s.JobChan <- item.Job:
-			name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(item.Entity))...))
-			log.Printf("sent %s job\n", name)
 			e := item.Entity
-			if w.Mappers.World.HasUnchecked(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
-				deferredOps = append(deferredOps, func() {
-					w.Mappers.PulseFirstCheck.Remove(e)
-				})
-			}
-			deferredOps = append(deferredOps, func() {
-				w.Mappers.World.Exchange(e,
-					[]ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)},
-					[]ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)})
+			st := item.Status // capture
+
+			deferred = append(deferred, func() {
+				// write updated status
+				mapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
+				mapper.Set(e, &st)
 			})
+
+			// first‑check removal (if present)
+			if w.Mappers.World.HasUnchecked(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+				e1 := e
+				deferred = append(deferred, func() { w.Mappers.PulseFirstCheck.Remove(e1) })
+			}
+
+			// exchange PulseNeeded -> PulsePending
+			e2 := e
+			deferred = append(deferred, func() {
+				w.Mappers.World.Exchange(
+					e2,
+					[]ecs.ID{ecs.ComponentID[components.PulsePending](w.Mappers.World)},
+					[]ecs.ID{ecs.ComponentID[components.PulseNeeded](w.Mappers.World)},
+				)
+			})
+
+			name := string([]byte(*w.Mappers.Name.GetUnchecked(e)))
+			log.Printf("sent %s job\n", name)
+
 		default:
 			log.Printf("Job channel full, skipping dispatch for entity %v", item.Entity)
 		}
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *PulseDispatchSystem) Update(w *controller.CPRaWorld) []func() {
-	dispatchList := s.collectWork(w)
-	return s.applyWork(w, dispatchList)
+	return s.applyWork(w, s.collectWork(w))
 }
 
-// PulseResultSystem refactored
+/* -----------------------------  RESULT  ----------------------------- */
+
 type resultEntry struct {
 	entity ecs.Entity
 	result jobs.Result
@@ -147,29 +159,25 @@ type PulseResultSystem struct {
 	ResultChan         <-chan jobs.Result
 }
 
-func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld) {
-}
+func (s *PulseResultSystem) Initialize(w *controller.CPRaWorld) {}
 
-// collectResults: Phase 1.1 - Drains the result channel into a slice.
 func (s *PulseResultSystem) collectResults() map[ecs.Entity]resultEntry {
-	toProcess := make(map[ecs.Entity]resultEntry)
+	out := make(map[ecs.Entity]resultEntry)
 loop:
 	for {
 		select {
 		case res := <-s.ResultChan:
 			ent := res.Entity()
-			toProcess[ent] = resultEntry{entity: ent, result: res}
+			out[ent] = resultEntry{entity: ent, result: res}
 		default:
-			break loop // Exit loop when no more results
+			break loop
 		}
 	}
-	return toProcess
+	return out
 }
 
-// processResultsAndQueueStructuralChanges: Phase 1.2 - Processes results, makes data changes,
-// and returns a slice of functions that will perform structural changes.
 func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controller.CPRaWorld, results map[ecs.Entity]resultEntry) []func() {
-	deferredOps := make([]func(), 0, len(results))
+	deferred := make([]func(), 0, len(results))
 
 	for _, entry := range results {
 		entity := entry.entity
@@ -179,85 +187,73 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			continue
 		}
 
-		name := string(append([]byte(nil), []byte(*w.Mappers.Name.GetUnchecked(entity))...))
-
+		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
 		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
 
-		fmt.Printf("recived %s results\n", name)
 		if res.Error() != nil {
+			// ---- FAILURE ----
 			config := *w.Mappers.PulseConfig.Get(entity).Copy()
-			status := w.Mappers.PulseStatus.Get(entity).Copy()
+			statusCopy := *w.Mappers.PulseStatus.Get(entity).Copy()
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
 
-			status.LastStatus = "failed"
-			status.LastError = res.Error()
-			status.ConsecutiveFailures++
+			statusCopy.LastStatus = "failed"
+			statusCopy.LastError = res.Error()
+			statusCopy.ConsecutiveFailures++
+			monitorCopy.Status = "failed"
 
-			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
-			monitorStatus.Status = "failed"
-
-			pulseStatusMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
-			pulseStatusMapper.Set(entity, status)
-			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-			monitorStatusMapper.Set(entity, monitorStatus)
-			if status.ConsecutiveFailures == 1 {
-				if w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-					deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-						return func() {
-							if !e.IsZero() {
-								w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "yellow"})
-							}
-						}
-					}(entity))
+			// deferred data writes
+			deferred = append(deferred, func(e ecs.Entity, ps components.PulseStatus, ms components.MonitorStatus) func() {
+				return func() {
+					pulseMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
+					pulseMapper.Set(e, &ps)
+					monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+					monitorMapper.Set(e, &ms)
 				}
-			}
-			if config.MaxFailures <= status.ConsecutiveFailures {
-				//monitorStatus.Status = "failed"
+			}(entity, statusCopy, monitorCopy))
 
-				if w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
-					fmt.Printf("Monitor %s failed %d times and needs intervention\n", name, status.ConsecutiveFailures)
-					deferredOps = append(deferredOps, func() {
-						w.Mappers.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
-					})
-
-				}
+			// yellow code on first failure
+			if statusCopy.ConsecutiveFailures == 1 &&
+				w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+				e := entity
+				deferred = append(deferred, func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "yellow"}) })
 			}
+
+			// interventions
+			if config.MaxFailures <= statusCopy.ConsecutiveFailures &&
+				w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
+				log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
+				e := entity
+				deferred = append(deferred, func() { w.Mappers.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) })
+			}
+
 		} else {
-			status := w.Mappers.PulseStatus.Get(entity).Copy()
+			// ---- SUCCESS ----
+			statusCopy := *w.Mappers.PulseStatus.Get(entity).Copy()
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
 
-			status.LastStatus = "success"
-			status.LastError = nil
-			status.ConsecutiveFailures = 0
-			status.LastSuccessTime = time.Now()
+			statusCopy.LastStatus = "success"
+			statusCopy.LastError = nil
+			statusCopy.ConsecutiveFailures = 0
+			statusCopy.LastSuccessTime = time.Now()
+			monitorCopy.Status = "success"
 
-			monitorStatus := w.Mappers.MonitorStatus.Get(entity).Copy()
-			monitorStatus.Status = "success"
-
-			pulseStatusMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
-			pulseStatusMapper.Set(entity, status)
-			monitorStatusMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-			monitorStatusMapper.Set(entity, monitorStatus)
-
-			//if mStatus == "failed" {
-			//	if w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-			//		deferredOps = append(deferredOps, func(e ecs.Entity) func() {
-			//			return func() {
-			//				if !e.IsZero() {
-			//					w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "green"})
-			//				}
-			//			}
-			//		}(entity))
-			//	}
-			//}
+			deferred = append(deferred, func(e ecs.Entity, ps components.PulseStatus, ms components.MonitorStatus) func() {
+				return func() {
+					pulseMapper := generic.NewMap[components.PulseStatus](w.Mappers.World)
+					pulseMapper.Set(e, &ps)
+					monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
+					monitorMapper.Set(e, &ms)
+				}
+			}(entity, statusCopy, monitorCopy))
 		}
 
-		deferredOps = append(deferredOps, func() {
-			w.Mappers.PulsePending.Remove(entity)
-		})
+		// always remove PulsePending
+		e := entity
+		deferred = append(deferred, func() { w.Mappers.PulsePending.Remove(e) })
 	}
-	return deferredOps
+	return deferred
 }
 
 func (s *PulseResultSystem) Update(w *controller.CPRaWorld) []func() {
-	results := s.collectResults()
-	return s.processResultsAndQueueStructuralChanges(w, results)
+	return s.processResultsAndQueueStructuralChanges(w, s.collectResults())
 }

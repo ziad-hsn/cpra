@@ -33,7 +33,7 @@ func main() {
 	//debug.SetGCPercent(70)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
-	f, err := os.OpenFile("crash.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	f, err := os.OpenFile("crash-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/test-small.yaml")
 	l.Load()
 	manifest := l.GetManifest()
 

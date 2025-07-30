@@ -102,7 +102,7 @@ func (s *PulseStatus) Copy() *PulseStatus {
 		return nil
 	}
 	cpy := &PulseStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastCheckTime:       s.LastCheckTime,
 		LastSuccessTime:     s.LastSuccessTime,
@@ -314,7 +314,7 @@ func (s *RedCodeStatus) Copy() *RedCodeStatus {
 		return nil
 	}
 	cpy := &RedCodeStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastAlertTime:       s.LastAlertTime,
 		LastSuccessTime:     s.LastSuccessTime,
@@ -397,7 +397,7 @@ func (s *GreenCodeStatus) Copy() *GreenCodeStatus {
 		return nil
 	}
 	cpy := &GreenCodeStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastAlertTime:       s.LastAlertTime,
 		LastSuccessTime:     s.LastSuccessTime,
@@ -480,7 +480,7 @@ func (s *CyanCodeStatus) Copy() *CyanCodeStatus {
 		return nil
 	}
 	cpy := &CyanCodeStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastAlertTime:       s.LastAlertTime,
 		LastSuccessTime:     s.LastSuccessTime,
@@ -563,7 +563,7 @@ func (s *YellowCodeStatus) Copy() *YellowCodeStatus {
 		return nil
 	}
 	cpy := &YellowCodeStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastAlertTime:       s.LastAlertTime,
 		LastSuccessTime:     s.LastSuccessTime,
@@ -646,7 +646,7 @@ func (s *GrayCodeStatus) Copy() *GrayCodeStatus {
 		return nil
 	}
 	cpy := &GrayCodeStatus{
-		LastStatus:          s.LastStatus,
+		LastStatus:          string([]byte(s.LastStatus)),
 		ConsecutiveFailures: s.ConsecutiveFailures,
 		LastAlertTime:       s.LastAlertTime,
 		LastSuccessTime:     s.LastSuccessTime,

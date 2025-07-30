@@ -136,7 +136,8 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 		}
 
 		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
-		codeColor := w.Mappers.CodePending.Get(entity).Color
+		codeColor := string([]byte(w.Mappers.CodePending.Get(entity).Color))
+
 		fmt.Printf("entity is %v for %s code result.\n", entity, name)
 
 		switch codeColor {

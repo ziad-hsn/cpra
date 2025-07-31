@@ -54,12 +54,15 @@ type PulseHTTPConfig struct {
 }
 
 func (c PulseHTTPConfig) Copy() PulseConfig {
-	return &PulseHTTPConfig{
+	// This was already correct, but for consistency, we'll return a pointer
+	// to a new struct.
+	newConfig := PulseHTTPConfig{
 		Url:     string([]byte(c.Url)),
-		Method:  c.Method,
+		Method:  string([]byte(c.Method)),
 		Headers: append(StringList(nil), c.Headers...),
 		Retries: c.Retries,
 	}
+	return &newConfig
 }
 
 func (PulseHTTPConfig) isPulseConfigs() {}
@@ -71,7 +74,11 @@ type PulseTCPConfig struct {
 }
 
 func (c PulseTCPConfig) Copy() PulseConfig {
-	return &c
+	return &PulseTCPConfig{
+		Host:    string([]byte(c.Host)),
+		Port:    c.Port,
+		Retries: c.Retries,
+	}
 }
 
 func (PulseTCPConfig) isPulseConfigs() {}
@@ -83,7 +90,11 @@ type PulseICMPConfig struct {
 }
 
 func (c PulseICMPConfig) Copy() PulseConfig {
-	return &c
+	return &PulseICMPConfig{
+		Host:      string([]byte(c.Host)),
+		Privilege: c.Privilege,
+		Count:     c.Count,
+	}
 }
 
 func (PulseICMPConfig) isPulseConfigs() {}
@@ -194,7 +205,10 @@ type InterventionTargetDocker struct {
 }
 
 func (i InterventionTargetDocker) Copy() InterventionTarget {
-	return &i
+	return &InterventionTargetDocker{
+		Type:      i.Type,
+		Container: string([]byte(i.Container)),
+	}
 }
 
 func (i InterventionTargetDocker) GetTargetType() string {
@@ -211,7 +225,9 @@ type CodeNotificationLog struct {
 }
 
 func (c CodeNotificationLog) Copy() CodeNotification {
-	return &c
+	return &CodeNotificationLog{
+		File: string([]byte(c.File)),
+	}
 }
 
 func (c CodeNotificationLog) IsCodeNotification() {
@@ -222,7 +238,9 @@ type CodeNotificationPagerDuty struct {
 }
 
 func (c CodeNotificationPagerDuty) Copy() CodeNotification {
-	return &c
+	return &CodeNotificationPagerDuty{
+		URL: string([]byte(c.URL)),
+	}
 }
 
 func (c CodeNotificationPagerDuty) IsCodeNotification() {
@@ -233,7 +251,9 @@ type CodeNotificationSlack struct {
 }
 
 func (c CodeNotificationSlack) Copy() CodeNotification {
-	return &c
+	return &CodeNotificationSlack{
+		WebHook: string([]byte(c.WebHook)),
+	}
 }
 
 func (c CodeNotificationSlack) IsCodeNotification() {
@@ -316,63 +336,6 @@ type Monitor struct {
 	Intervention Intervention `yaml:"intervention,omitempty"`
 	Codes        Codes        `yaml:"codes"`
 }
-
-//func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
-//
-//  var monitors map[string]yaml.Node
-//  if err := value.Decode(&codes); err != nil {
-//     return err
-//  }
-//  colors := make(map[string]CodeConfig)
-//  for color, config := range codes {
-//     var temp struct {
-//        Config   yaml.Node `yaml:"config"`
-//        rawCodes `yaml:",inline"`
-//     }
-//     if err := config.Decode(&temp); err != nil {
-//        return err
-//     }
-//
-//     switch temp.Notify {
-//     case "log":
-//        var t CodeNotificationLog
-//        if err := temp.Config.Decode(&t); err != nil {
-//           return err
-//        }
-//        colors[color] = CodeConfig{
-//           Dispatch: temp.Dispatch,
-//           Notify:   temp.Notify,
-//           Config:   &t,
-//        }
-//     case "slack":
-//        var t CodeNotificationSlack
-//        if err := temp.Config.Decode(&t); err != nil {
-//           return err
-//        }
-//        colors[color] = CodeConfig{
-//           Dispatch: temp.Dispatch,
-//           Notify:   temp.Notify,
-//           Config:   &t,
-//        }
-//     case "pagerduty":
-//        var t CodeNotificationPagerDuty
-//        if err := temp.Config.Decode(&t); err != nil {
-//           return err
-//        }
-//        colors[color] = CodeConfig{
-//           Dispatch: temp.Dispatch,
-//           Notify:   temp.Notify,
-//           Config:   &t,
-//        }
-//     default:
-//        return fmt.Errorf("unknown notificiation type: %q", temp.Notify)
-//
-//     }
-//  }
-//  *c = colors
-//
-//  return nil
-//}
 
 type Manifest struct {
 	Monitors []Monitor `yaml:"monitors"`

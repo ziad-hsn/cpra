@@ -200,7 +200,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		LastCheckTime: time.Now(),
 	})
 	pulseCfg := components.PulseConfig{
-		Type:        monitor.Pulse.Type,
+		Type:        string([]byte(monitor.Pulse.Type)),
 		MaxFailures: monitor.Pulse.MaxFailures,
 		Timeout:     monitor.Pulse.Timeout,
 		Interval:    monitor.Pulse.Interval,
@@ -215,11 +215,11 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	if err != nil {
 		return err
 	}
-	e.PulseJob.Assign(entity, &components.PulseJob{Job: j})
+	e.PulseJob.Assign(entity, &components.PulseJob{Job: j.Copy()})
 
 	if monitor.Intervention.Action != "" {
 		interventionCfg := &components.InterventionConfig{
-			Action: monitor.Intervention.Action,
+			Action: string([]byte(monitor.Intervention.Action)),
 		}
 		InterventionStatus := &components.InterventionStatus{
 			LastInterventionTime: time.Now(),
@@ -229,7 +229,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		if err != nil {
 			return err
 		}
-		e.InterventionJob.Assign(entity, &components.InterventionJob{Job: j})
+		e.InterventionJob.Assign(entity, &components.InterventionJob{Job: j.Copy()})
 	}
 
 	for color, config := range monitor.Codes {
@@ -237,7 +237,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 		case "red":
 			e.RedCode.Assign(entity, &components.RedCode{})
-			CodeConfig := &components.RedCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+			CodeConfig := &components.RedCodeConfig{Dispatch: config.Dispatch, Notify: string([]byte(config.Notify)), Config: config.Config.Copy()}
 
 			CodeStatus := &components.RedCodeStatus{
 				LastAlertTime: time.Now(),
@@ -248,10 +248,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.RedCodeJob.Assign(entity, &components.RedCodeJob{Job: j})
+			e.RedCodeJob.Assign(entity, &components.RedCodeJob{Job: j.Copy()})
 		case "green":
 			e.GreenCode.Assign(entity, &components.GreenCode{})
-			CodeConfig := &components.GreenCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+			CodeConfig := &components.GreenCodeConfig{Dispatch: config.Dispatch, Notify: string([]byte(config.Notify)), Config: config.Config.Copy()}
 
 			CodeStatus := &components.GreenCodeStatus{
 				LastAlertTime: time.Now(),
@@ -262,10 +262,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.GreenCodeJob.Assign(entity, &components.GreenCodeJob{Job: j})
+			e.GreenCodeJob.Assign(entity, &components.GreenCodeJob{Job: j.Copy()})
 		case "yellow":
 			e.YellowCode.Assign(entity, &components.YellowCode{})
-			CodeConfig := &components.YellowCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+			CodeConfig := &components.YellowCodeConfig{Dispatch: config.Dispatch, Notify: string([]byte(config.Notify)), Config: config.Config.Copy()}
 
 			CodeStatus := &components.YellowCodeStatus{
 				LastAlertTime: time.Now(),
@@ -276,10 +276,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.YellowCodeJob.Assign(entity, &components.YellowCodeJob{Job: j})
+			e.YellowCodeJob.Assign(entity, &components.YellowCodeJob{Job: j.Copy()})
 		case "cyan":
 			e.CyanCode.Assign(entity, &components.CyanCode{})
-			CodeConfig := &components.CyanCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+			CodeConfig := &components.CyanCodeConfig{Dispatch: config.Dispatch, Notify: string([]byte(config.Notify)), Config: config.Config.Copy()}
 
 			CodeStatus := &components.CyanCodeStatus{
 				LastAlertTime: time.Now(),
@@ -290,10 +290,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.CyanCodeJob.Assign(entity, &components.CyanCodeJob{Job: j})
+			e.CyanCodeJob.Assign(entity, &components.CyanCodeJob{Job: j.Copy()})
 		case "gray":
 			e.GrayCode.Assign(entity, &components.GrayCode{})
-			CodeConfig := &components.GrayCodeConfig{Dispatch: config.Dispatch, Notify: config.Notify, Config: config.Config}
+			CodeConfig := &components.GrayCodeConfig{Dispatch: config.Dispatch, Notify: string([]byte(config.Notify)), Config: config.Config.Copy()}
 
 			CodeStatus := &components.GrayCodeStatus{
 				LastAlertTime: time.Now(),
@@ -304,7 +304,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			if err != nil {
 				return err
 			}
-			e.GrayCodeJob.Assign(entity, &components.GrayCodeJob{Job: j})
+			e.GrayCodeJob.Assign(entity, &components.GrayCodeJob{Job: j.Copy()})
 		}
 	}
 

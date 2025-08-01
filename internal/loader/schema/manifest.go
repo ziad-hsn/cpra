@@ -53,7 +53,7 @@ type PulseHTTPConfig struct {
 	Retries int
 }
 
-func (c PulseHTTPConfig) Copy() PulseConfig {
+func (c *PulseHTTPConfig) Copy() PulseConfig {
 	// This was already correct, but for consistency, we'll return a pointer
 	// to a new struct.
 	newConfig := PulseHTTPConfig{
@@ -65,7 +65,7 @@ func (c PulseHTTPConfig) Copy() PulseConfig {
 	return &newConfig
 }
 
-func (PulseHTTPConfig) isPulseConfigs() {}
+func (*PulseHTTPConfig) isPulseConfigs() {}
 
 type PulseTCPConfig struct {
 	Host    string `yaml:"host"`
@@ -73,7 +73,7 @@ type PulseTCPConfig struct {
 	Retries int    `yaml:"retries"`
 }
 
-func (c PulseTCPConfig) Copy() PulseConfig {
+func (c *PulseTCPConfig) Copy() PulseConfig {
 	return &PulseTCPConfig{
 		Host:    string([]byte(c.Host)),
 		Port:    c.Port,
@@ -81,7 +81,7 @@ func (c PulseTCPConfig) Copy() PulseConfig {
 	}
 }
 
-func (PulseTCPConfig) isPulseConfigs() {}
+func (*PulseTCPConfig) isPulseConfigs() {}
 
 type PulseICMPConfig struct {
 	Host      string `yaml:"host"`
@@ -89,7 +89,7 @@ type PulseICMPConfig struct {
 	Count     int    `yaml:"count"`
 }
 
-func (c PulseICMPConfig) Copy() PulseConfig {
+func (c *PulseICMPConfig) Copy() PulseConfig {
 	return &PulseICMPConfig{
 		Host:      string([]byte(c.Host)),
 		Privilege: c.Privilege,
@@ -97,7 +97,7 @@ func (c PulseICMPConfig) Copy() PulseConfig {
 	}
 }
 
-func (PulseICMPConfig) isPulseConfigs() {}
+func (*PulseICMPConfig) isPulseConfigs() {}
 
 type Pulse struct {
 	Type        string        `yaml:"type"`
@@ -204,14 +204,14 @@ type InterventionTargetDocker struct {
 	Container string `yaml:"container"`
 }
 
-func (i InterventionTargetDocker) Copy() InterventionTarget {
+func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
 		Type:      i.Type,
 		Container: string([]byte(i.Container)),
 	}
 }
 
-func (i InterventionTargetDocker) GetTargetType() string {
+func (i *InterventionTargetDocker) GetTargetType() string {
 	return i.Type
 }
 
@@ -224,39 +224,39 @@ type CodeNotificationLog struct {
 	File string `yaml:"file"`
 }
 
-func (c CodeNotificationLog) Copy() CodeNotification {
+func (c *CodeNotificationLog) Copy() CodeNotification {
 	return &CodeNotificationLog{
 		File: string([]byte(c.File)),
 	}
 }
 
-func (c CodeNotificationLog) IsCodeNotification() {
+func (c *CodeNotificationLog) IsCodeNotification() {
 }
 
 type CodeNotificationPagerDuty struct {
 	URL string `yaml:"url"`
 }
 
-func (c CodeNotificationPagerDuty) Copy() CodeNotification {
+func (c *CodeNotificationPagerDuty) Copy() CodeNotification {
 	return &CodeNotificationPagerDuty{
 		URL: string([]byte(c.URL)),
 	}
 }
 
-func (c CodeNotificationPagerDuty) IsCodeNotification() {
+func (c *CodeNotificationPagerDuty) IsCodeNotification() {
 }
 
 type CodeNotificationSlack struct {
 	WebHook string `yaml:"hook"`
 }
 
-func (c CodeNotificationSlack) Copy() CodeNotification {
+func (c *CodeNotificationSlack) Copy() CodeNotification {
 	return &CodeNotificationSlack{
 		WebHook: string([]byte(c.WebHook)),
 	}
 }
 
-func (c CodeNotificationSlack) IsCodeNotification() {
+func (c *CodeNotificationSlack) IsCodeNotification() {
 }
 
 type CodeConfig struct {

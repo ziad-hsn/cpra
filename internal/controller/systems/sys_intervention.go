@@ -35,7 +35,7 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) []disp
 
 	for query.Next() {
 		ent := query.Entity()
-		job := w.Mappers.InterventionJob.GetUnchecked(ent).Job.Copy()
+		job := w.Mappers.InterventionJob.Get(ent).Job.Copy()
 		out = append(out, dispatchableIntervention{Entity: ent, Job: job})
 	}
 	return out
@@ -100,18 +100,18 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		entity := entry.entity
 		res := entry.result
 
-		if !w.IsAlive(entity) || !w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
+		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
 			continue
 		}
 
-		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
+		name := string([]byte(*w.Mappers.Name.Get(entity)))
 		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
 			// ---- FAILURE ----
-			config := *w.Mappers.InterventionConfig.GetUnchecked(entity).Copy()
-			statusCopy := *w.Mappers.InterventionStatus.GetUnchecked(entity).Copy()
-			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
+			config := *(*w.Mappers.InterventionConfig.Get(entity)).Copy()
+			statusCopy := *(*w.Mappers.InterventionStatus.Get(entity)).Copy()
+			monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
 
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
@@ -143,8 +143,8 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 
 		} else {
 			// ---- SUCCESS ----
-			statusCopy := *w.Mappers.InterventionStatus.Get(entity).Copy()
-			monitorCopy := *w.Mappers.MonitorStatus.Get(entity).Copy()
+			statusCopy := *(*w.Mappers.InterventionStatus.Get(entity)).Copy()
+			monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
 			lastStatus := statusCopy.LastStatus
 
 			statusCopy.LastStatus = "success"
@@ -163,7 +163,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			}(entity, statusCopy, monitorCopy))
 
 			if lastStatus == "failed" &&
-				w.Mappers.World.HasUnchecked(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+				w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 
 				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 				e := entity

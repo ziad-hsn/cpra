@@ -41,23 +41,23 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) []dispatchable
 		switch color {
 		case "red":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				job = w.Mappers.RedCodeJob.Get(ent).Job.Copy()
+				job = (*w.Mappers.RedCodeJob.Get(ent)).Job.Copy()
 			}
 		case "green":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				job = w.Mappers.GreenCodeJob.Get(ent).Job.Copy()
+				job = (*w.Mappers.GreenCodeJob.Get(ent)).Job.Copy()
 			}
 		case "yellow":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				job = w.Mappers.YellowCodeJob.Get(ent).Job.Copy()
+				job = (*w.Mappers.YellowCodeJob.Get(ent)).Job.Copy()
 			}
 		case "cyan":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				job = w.Mappers.CyanCodeJob.Get(ent).Job.Copy()
+				job = (*w.Mappers.CyanCodeJob.Get(ent)).Job.Copy()
 			}
 		case "gray":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				job = w.Mappers.GrayCodeJob.Get(ent).Job.Copy()
+				job = (*w.Mappers.GrayCodeJob.Get(ent)).Job.Copy()
 			}
 		default:
 			log.Printf("Unknown color %q for entity %v", color, ent)
@@ -82,7 +82,9 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list []dispatcha
 			deferred = append(deferred, func() {
 				if w.IsAlive(e) {
 					w.Mappers.CodeNeeded.Remove(e)
-					w.Mappers.CodePending.Assign(e, &components.CodePending{Color: c})
+					cp := new(components.CodePending)
+					cp.Color = c
+					w.Mappers.CodePending.Assign(e, cp)
 				}
 			})
 
@@ -135,7 +137,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			continue
 		}
 
-		name := string([]byte(*w.Mappers.Name.GetUnchecked(entity)))
+		name := string([]byte(*w.Mappers.Name.Get(entity)))
 		codeColor := string([]byte(w.Mappers.CodePending.Get(entity).Color))
 
 		fmt.Printf("entity is %v for %s code result.\n", entity, name)
@@ -145,15 +147,15 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			var statusCopy components.CodeStatusAccessor
 			switch codeColor {
 			case "red":
-				statusCopy = w.Mappers.RedCodeStatus.Get(entity).Copy()
+				statusCopy = (*w.Mappers.RedCodeStatus.Get(entity)).Copy()
 			case "green":
-				statusCopy = w.Mappers.GreenCodeStatus.Get(entity).Copy()
+				statusCopy = (*w.Mappers.GreenCodeStatus.Get(entity)).Copy()
 			case "yellow":
-				statusCopy = w.Mappers.YellowCodeStatus.Get(entity).Copy()
+				statusCopy = (*w.Mappers.YellowCodeStatus.Get(entity)).Copy()
 			case "cyan":
-				statusCopy = w.Mappers.CyanCodeStatus.Get(entity).Copy()
+				statusCopy = (*w.Mappers.CyanCodeStatus.Get(entity)).Copy()
 			case "gray":
-				statusCopy = w.Mappers.GrayCodeStatus.Get(entity).Copy()
+				statusCopy = (*w.Mappers.GrayCodeStatus.Get(entity)).Copy()
 			}
 
 			if res.Error() != nil {
@@ -169,37 +171,42 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			switch codeColor {
 			case "red":
 				st := *(statusCopy.(*components.RedCodeStatus))
+				statusToSet := st
 				deferred = append(deferred, func() {
 					mapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
-					mapper.Set(e, &st)
+					mapper.Set(e, &statusToSet)
 					w.Mappers.CodePending.Remove(e)
 				})
 			case "green":
 				st := *(statusCopy.(*components.GreenCodeStatus))
+				statusToSet := st
 				deferred = append(deferred, func() {
 					mapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
-					mapper.Set(e, &st)
+					mapper.Set(e, &statusToSet)
 					w.Mappers.CodePending.Remove(e)
 				})
 			case "yellow":
 				st := *(statusCopy.(*components.YellowCodeStatus))
+				statusToSet := st
 				deferred = append(deferred, func() {
 					mapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
-					mapper.Set(e, &st)
+					mapper.Set(e, &statusToSet)
 					w.Mappers.CodePending.Remove(e)
 				})
 			case "cyan":
 				st := *(statusCopy.(*components.CyanCodeStatus))
+				statusToSet := st
 				deferred = append(deferred, func() {
 					mapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
-					mapper.Set(e, &st)
+					mapper.Set(e, &statusToSet)
 					w.Mappers.CodePending.Remove(e)
 				})
 			case "gray":
 				st := *(statusCopy.(*components.GrayCodeStatus))
+				statusToSet := st
 				deferred = append(deferred, func() {
 					mapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
-					mapper.Set(e, &st)
+					mapper.Set(e, &statusToSet)
 					w.Mappers.CodePending.Remove(e)
 				})
 			}

@@ -112,7 +112,7 @@ type PulseHTTPJob struct {
 func (p *PulseHTTPJob) Execute() Result {
 	fmt.Println("executing HTTP Job")
 	time.Sleep(time.Second / 2)
-	res := PulseResults{
+	res := Result{
 		Ent: p.Entity,
 		Err: fmt.Errorf("HTTP check failed"),
 		ID:  p.ID,
@@ -143,7 +143,7 @@ type PulseTCPJob struct {
 
 func (p *PulseTCPJob) Execute() Result {
 	fmt.Println("executing TCP Job")
-	res := PulseResults{
+	res := Result{
 		Ent: p.Entity,
 		Err: nil,
 		ID:  p.ID,
@@ -174,7 +174,7 @@ type PulseICMPJob struct {
 
 func (p *PulseICMPJob) Execute() Result {
 	fmt.Println("executing ICMP Job")
-	res := PulseResults{
+	res := Result{
 		Ent: p.Entity,
 		Err: fmt.Errorf("ICMP check failed\n"),
 		ID:  p.ID,
@@ -204,7 +204,7 @@ type InterventionDockerJob struct {
 
 func (i *InterventionDockerJob) Execute() Result {
 	fmt.Println("executing docker intervention Job")
-	res := InterventionResults{
+	res := Result{
 		Ent: i.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),
 		ID:  i.ID,
@@ -235,7 +235,7 @@ type CodeLogJob struct {
 
 func (c *CodeLogJob) Execute() Result {
 	fmt.Println("executing code Log Job")
-	res := CodeResults{
+	res := Result{
 		Ent: c.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),
 		ID:  c.ID,
@@ -269,7 +269,7 @@ type CodeSlackJob struct {
 
 func (c *CodeSlackJob) Execute() Result {
 	fmt.Println("executing code Log Job")
-	res := CodeResults{
+	res := Result{
 		Ent: c.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),
 		ID:  c.ID,
@@ -302,7 +302,7 @@ type CodePagerDutyJob struct {
 
 func (c *CodePagerDutyJob) Execute() Result {
 	fmt.Println("executing code pagerduty Job")
-	res := CodeResults{
+	res := Result{
 		Ent: c.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),
 		ID:  c.ID,

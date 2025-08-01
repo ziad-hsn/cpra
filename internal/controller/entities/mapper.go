@@ -130,10 +130,12 @@ func (e *EntityManager) MarkAsPending(entity ecs.Entity) error {
 	}
 
 	// Optionally update InterventionStatus component
-	if _, status := e.Pulse.Get(entity); status != nil { // status is *components.InterventionStatus
-		status.LastStatus = "Pending"
-		status.LastCheckTime = time.Now()
-		status.LastError = nil
+	if _, st := e.Pulse.Get(entity); st != nil {
+		copySt := *st // copy the PulseStatus
+		copySt.LastStatus = "Pending"
+		copySt.LastCheckTime = time.Now()
+		copySt.LastError = nil
+		e.PulseStatus.Assign(entity, &copySt)
 	}
 	return nil
 }
@@ -177,8 +179,10 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 	}
 
 	// Or update InterventionStatus to indicate it's disabled.
-	if _, status := e.Pulse.Get(entity); status != nil {
-		status.LastStatus = "Disabled"
+	if _, st := e.Pulse.Get(entity); st != nil {
+		copySt := *st
+		copySt.LastStatus = "Disabled"
+		e.PulseStatus.Assign(entity, &copySt)
 	}
 }
 

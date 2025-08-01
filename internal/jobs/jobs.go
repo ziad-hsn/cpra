@@ -17,13 +17,13 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 	// Common parameters from schema.Pulse that are relevant for job execution
 	timeout := pulseSchema.Timeout
 
-	switch cfg := pulseSchema.Config.Copy().(type) { // cfg is the specific *schema.PulseHTTPConfig, etc.
+	switch cfg := pulseSchema.Config.(type) { // cfg is the specific *schema.PulseHTTPConfig, etc.
 	case *schema.PulseHTTPConfig:
 		return &PulseHTTPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			URL:     string([]byte(cfg.Url)),
-			Method:  string([]byte(cfg.Method)), // Consider defaulting if empty
+			URL:     cfg.Url,
+			Method:  cfg.Method, // Consider defaulting if empty
 			Timeout: timeout,
 			Retries: cfg.Retries,
 		}, nil
@@ -31,7 +31,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		return &PulseTCPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			Host:    string([]byte(cfg.Host)),
+			Host:    cfg.Host,
 			Port:    cfg.Port,
 			Timeout: timeout,
 			Retries: cfg.Retries,
@@ -40,7 +40,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		return &PulseICMPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			Host:    string([]byte(cfg.Host)),
+			Host:    cfg.Host,
 			Timeout: timeout,
 			Count:   cfg.Count,
 		}, nil
@@ -58,7 +58,7 @@ func CreateInterventionJob(InterventionSchema schema.Intervention, jobID ecs.Ent
 		return &InterventionDockerJob{
 			ID:        uuid.New(),
 			Entity:    jobID,
-			Container: string([]byte(InterventionSchema.Target.Copy().(*schema.InterventionTargetDocker).Container)),
+			Container: InterventionSchema.Target.(*schema.InterventionTargetDocker).Container,
 			Retries:   retries,
 		}, nil
 	default:
@@ -72,26 +72,26 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 	case "log":
 		return &CodeLogJob{
 			ID:      uuid.New(),
-			File:    string([]byte(config.Config.Copy().(*schema.CodeNotificationLog).File)),
+			File:    config.Config.(*schema.CodeNotificationLog).File,
 			Entity:  jobID,
-			Monitor: string([]byte(monitor)),
-			Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", string([]byte(monitor))),
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", monitor),
 		}, nil
 	case "pagerduty":
 		return &CodePagerDutyJob{
 			ID:      uuid.New(),
-			URL:     string([]byte(config.Config.Copy().(*schema.CodeNotificationPagerDuty).URL)),
+			URL:     config.Config.(*schema.CodeNotificationPagerDuty).URL,
 			Entity:  jobID,
-			Monitor: string([]byte(monitor)),
-			Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", string([]byte(monitor))),
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", monitor),
 		}, nil
 	case "slack":
 		return &CodeSlackJob{
 			ID:      uuid.New(),
-			WebHook: string([]byte(config.Config.Copy().(*schema.CodeNotificationSlack).WebHook)),
+			WebHook: config.Config.(*schema.CodeNotificationSlack).WebHook,
 			Entity:  jobID,
-			Monitor: string([]byte(monitor)),
-			Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", string([]byte(monitor))),
+			Monitor: monitor,
+			Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", monitor),
 		}, nil
 
 	default:
@@ -124,8 +124,8 @@ func (p *PulseHTTPJob) Copy() Job {
 	return &PulseHTTPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		URL:     p.URL,
-		Method:  p.Method,
+		URL:     string([]byte(p.URL)),
+		Method:  string([]byte(p.Method)),
 		Timeout: p.Timeout,
 		Retries: p.Retries,
 	}
@@ -156,7 +156,7 @@ func (p *PulseTCPJob) Copy() Job {
 	return &PulseTCPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    p.Host,
+		Host:    string([]byte(p.Host)),
 		Port:    p.Port,
 		Timeout: p.Timeout,
 		Retries: p.Retries,
@@ -187,7 +187,7 @@ func (p *PulseICMPJob) Copy() Job {
 	return &PulseICMPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    p.Host,
+		Host:    string([]byte(p.Host)),
 		Count:   p.Count,
 		Timeout: p.Timeout,
 	}
@@ -216,7 +216,7 @@ func (i *InterventionDockerJob) Copy() Job {
 	return &InterventionDockerJob{
 		ID:        i.ID,
 		Entity:    i.Entity,
-		Container: i.Container,
+		Container: string([]byte(i.Container)),
 		Timeout:   i.Timeout,
 		Retries:   i.Retries,
 	}
@@ -248,9 +248,9 @@ func (c *CodeLogJob) Copy() Job {
 	return &CodeLogJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		File:    c.File,
-		Message: c.Message,
-		Monitor: c.Monitor,
+		File:    string([]byte(c.File)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -281,9 +281,9 @@ func (c *CodeSlackJob) Copy() Job {
 	return &CodeSlackJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		WebHook: c.WebHook,
-		Message: c.Message,
-		Monitor: c.Monitor,
+		WebHook: string([]byte(c.WebHook)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -315,9 +315,9 @@ func (c *CodePagerDutyJob) Copy() Job {
 	return &CodePagerDutyJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		URL:     c.URL,
-		Message: c.Message,
-		Monitor: c.Monitor,
+		URL:     string([]byte(c.URL)),
+		Message: string([]byte(c.Message)),
+		Monitor: string([]byte(c.Monitor)),
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}

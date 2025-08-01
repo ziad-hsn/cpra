@@ -68,7 +68,10 @@ func (s *Scheduler) Run() {
 			// Phase 1: schedule
 			var allDeferredOps []func()
 			// Collect all deferred operations
-
+			for _, sys := range s.ResultSystems {
+				ops := sys.Update(s.World)
+				allDeferredOps = append(allDeferredOps, ops...)
+			}
 			for _, sys := range s.ScheduleSystems {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
@@ -77,14 +80,11 @@ func (s *Scheduler) Run() {
 				ops := sys.Update(s.World)
 				allDeferredOps = append(allDeferredOps, ops...)
 			}
-			for _, sys := range s.ResultSystems {
-				ops := sys.Update(s.World)
-				allDeferredOps = append(allDeferredOps, ops...)
-			}
 			//log.Println(allDeferredOps)
 			// Apply all deferred operations at once
 			for _, op := range allDeferredOps {
 				op()
+				//time.Sleep(100 * time.Millisecond)
 			}
 			runtime.GC()
 

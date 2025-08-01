@@ -5,9 +5,10 @@ import (
 	"github.com/mlange-42/arche/ecs"
 )
 
-type Result interface {
-	Entity() ecs.Entity
-	Error() error
+type Result struct {
+	ID  uuid.UUID
+	Ent ecs.Entity
+	Err error
 }
 
 type PulseResults struct {
@@ -17,11 +18,11 @@ type PulseResults struct {
 	Err     error
 }
 
-func (p PulseResults) Entity() ecs.Entity {
+func (p *Result) Entity() ecs.Entity {
 	return p.Ent
 }
 
-func (p PulseResults) Error() error { return p.Err }
+func (p *Result) Error() error { return p.Err }
 
 type InterventionResults struct {
 	ID      uuid.UUID

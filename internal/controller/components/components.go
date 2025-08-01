@@ -44,7 +44,7 @@ type PulseConfig struct {
 	Config      schema.PulseConfig
 }
 
-// Copy creates a deep copy of the PulseConfig.
+// Copy Fixed Copy methods with deep copy implementations:
 func (c *PulseConfig) Copy() *PulseConfig {
 	if c == nil {
 		return nil
@@ -57,15 +57,34 @@ func (c *PulseConfig) Copy() *PulseConfig {
 		MaxFailures: c.MaxFailures,
 	}
 
-	// Deep copy the interface by copying the underlying concrete struct.
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
-		case schema.PulseHTTPConfig:
-			cpy.Config = v // struct is copied by value
-		case schema.PulseTCPConfig:
-			cpy.Config = v // struct is copied by value
-		case schema.PulseICMPConfig:
-			cpy.Config = v // struct is copied by value
+		case *schema.PulseHTTPConfig:
+			var headers schema.StringList
+			if v.Headers != nil {
+				headers = append(schema.StringList(nil), v.Headers...)
+			} else {
+				headers = make(schema.StringList, 0)
+			}
+			cpy.Config = &schema.PulseHTTPConfig{
+				Url:     v.Url,
+				Method:  v.Method,
+				Headers: headers,
+				Retries: v.Retries,
+			}
+		case *schema.PulseTCPConfig:
+			cpy.Config = &schema.PulseTCPConfig{
+				Host:    v.Host,
+				Port:    v.Port,
+				Retries: v.Retries,
+			}
+		case *schema.PulseICMPConfig:
+			cpy.Config = &schema.PulseICMPConfig{
+				Host:      v.Host,
+				Privilege: v.Privilege,
+				Count:     v.Count,
+			}
 		}
 	}
 	return cpy
@@ -124,7 +143,6 @@ type InterventionConfig struct {
 	Target      schema.InterventionTarget
 }
 
-// Copy creates a deep copy of the InterventionConfig.
 func (c *InterventionConfig) Copy() *InterventionConfig {
 	if c == nil {
 		return nil
@@ -134,13 +152,13 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 		MaxFailures: c.MaxFailures,
 	}
 
-	// Deep copy the interface by copying the underlying concrete struct.
 	if c.Target != nil {
+		// Deep copy based on concrete type
 		switch v := c.Target.(type) {
 		case *schema.InterventionTargetDocker:
-			if v != nil {
-				targetCopy := *v // Dereference pointer to copy the struct
-				cpy.Target = &targetCopy
+			cpy.Target = &schema.InterventionTargetDocker{
+				Type:      v.Type,
+				Container: v.Container,
 			}
 		}
 	}
@@ -191,7 +209,7 @@ type CodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the CodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *CodeConfig) Copy() *CodeConfig {
 	if c == nil {
 		return nil
@@ -201,24 +219,15 @@ func (c *CodeConfig) Copy() *CodeConfig {
 		MaxFailures: c.MaxFailures,
 		Notify:      c.Notify,
 	}
-	// Deep copy the interface by copying the underlying concrete struct.
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy
@@ -254,7 +263,7 @@ type RedCodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the RedCodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *RedCodeConfig) Copy() *RedCodeConfig {
 	if c == nil {
 		return nil
@@ -265,22 +274,14 @@ func (c *RedCodeConfig) Copy() *RedCodeConfig {
 		Notify:      c.Notify,
 	}
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy
@@ -337,7 +338,7 @@ type GreenCodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the GreenCodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *GreenCodeConfig) Copy() *GreenCodeConfig {
 	if c == nil {
 		return nil
@@ -348,22 +349,14 @@ func (c *GreenCodeConfig) Copy() *GreenCodeConfig {
 		Notify:      c.Notify,
 	}
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy
@@ -420,7 +413,7 @@ type CyanCodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the CyanCodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *CyanCodeConfig) Copy() *CyanCodeConfig {
 	if c == nil {
 		return nil
@@ -431,22 +424,14 @@ func (c *CyanCodeConfig) Copy() *CyanCodeConfig {
 		Notify:      c.Notify,
 	}
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy
@@ -503,7 +488,7 @@ type YellowCodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the YellowCodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *YellowCodeConfig) Copy() *YellowCodeConfig {
 	if c == nil {
 		return nil
@@ -514,22 +499,14 @@ func (c *YellowCodeConfig) Copy() *YellowCodeConfig {
 		Notify:      c.Notify,
 	}
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy
@@ -586,7 +563,7 @@ type GrayCodeConfig struct {
 	Config      schema.CodeNotification
 }
 
-// Copy creates a deep copy of the GrayCodeConfig.
+// Copy Apply similar deep copy pattern to all CodeConfig types:
 func (c *GrayCodeConfig) Copy() *GrayCodeConfig {
 	if c == nil {
 		return nil
@@ -597,22 +574,14 @@ func (c *GrayCodeConfig) Copy() *GrayCodeConfig {
 		Notify:      c.Notify,
 	}
 	if c.Config != nil {
+		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationLog{File: v.File}
 		case *schema.CodeNotificationPagerDuty:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
-			if v != nil {
-				configCopy := *v
-				cpy.Config = &configCopy
-			}
+			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
 		}
 	}
 	return cpy

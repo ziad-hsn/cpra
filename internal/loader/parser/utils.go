@@ -33,21 +33,21 @@ func decodePulseConfig(config yaml.Node, pulseType string) (schema.PulseConfig, 
 		if err != nil {
 			return nil, err
 		}
-		return pulseConfig, nil
+		return &pulseConfig, nil
 	case "tcp":
 		var pulseConfig schema.PulseTCPConfig
 		err := config.Decode(&pulseConfig)
 		if err != nil {
 			return nil, err
 		}
-		return pulseConfig, nil
+		return &pulseConfig, nil
 	case "icmp":
 		var pulseConfig schema.PulseICMPConfig
 		err := config.Decode(&pulseConfig)
 		if err != nil {
 			return nil, err
 		}
-		return pulseConfig, nil
+		return &pulseConfig, nil
 	default:
 		return nil, ErrInvalidPulseType
 	}

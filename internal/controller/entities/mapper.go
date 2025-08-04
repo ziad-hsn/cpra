@@ -61,8 +61,8 @@ type EntityManager struct {
 
 // InitializeMappers creates and returns a EntityManager for a given world.
 // It no longer creates the world itself.
-func InitializeMappers(world *ecs.World) EntityManager {
-	return EntityManager{
+func InitializeMappers(world *ecs.World) *EntityManager {
+	return &EntityManager{
 		World:               world,
 		Name:                generic.NewMap1[components.Name](world),
 		Disabled:            generic.NewMap1[components.DisabledMonitor](world),

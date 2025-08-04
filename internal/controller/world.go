@@ -9,7 +9,7 @@ import (
 )
 
 type CPRaWorld struct {
-	Mappers entities.EntityManager
+	Mappers *entities.EntityManager
 	mu      *sync.Mutex
 }
 

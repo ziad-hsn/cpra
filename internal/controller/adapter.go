@@ -20,7 +20,7 @@ func NewMonitorAdapter(w *CPRaWorld, entity ecs.Entity) MonitorAdapter {
 	return MonitorAdapter{
 		entity:  entity,
 		world:   w.Mappers.World,
-		mappers: &w.Mappers,
+		mappers: w.Mappers,
 	}
 }
 

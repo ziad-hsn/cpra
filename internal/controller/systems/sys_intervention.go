@@ -35,33 +35,24 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) map[ec
 	return out
 }
 
-func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map[ecs.Entity]jobs.Job) []func() {
-	deferred := make([]func(), 0, len(jobs))
+func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map[ecs.Entity]jobs.Job, commandBuffer *CommandBufferSystem) {
 
 	for ent, item := range jobs {
 		select {
 		case s.JobChan <- item:
-			deferred = append(deferred, func(e ecs.Entity) func() {
-				return func() {
-					if !e.IsZero() {
-						w.Mappers.World.Exchange(
-							e,
-							[]ecs.ID{ecs.ComponentID[components.InterventionPending](w.Mappers.World)},
-							[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](w.Mappers.World)},
-						)
-					}
-				}
-			}(ent))
+
+			if w.IsAlive(ent) {
+				commandBuffer.markInterventionPending(ent)
+			}
 		default:
 			log.Printf("Job channel full for entity %v\n", ent)
 		}
 	}
-	return deferred
 }
 
-func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld) []func() {
+func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
 	toDispatch := s.collectWork(w)
-	return s.applyWork(w, toDispatch)
+	s.applyWork(w, toDispatch, cb)
 }
 
 /* ---------------------------  RESULT  --------------------------- */
@@ -87,10 +78,8 @@ loop:
 }
 
 func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(
-	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result,
-) []func() {
-
-	deferred := make([]func(), 0, len(results))
+	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result, commandBuffer *CommandBufferSystem,
+) {
 
 	for _, res := range results {
 		entity := res.Entity()
@@ -113,29 +102,18 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			statusCopy.ConsecutiveFailures++
 			//monitorCopy.Status = "failed"
 
-			deferred = append(deferred, func(e ecs.Entity, s components.InterventionStatus) func() {
-				return func() {
-					interventionMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
-					interventionMapper.Set(e, &s)
-					//monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-					//monitorMapper.Set(e, &m)
-				}
-			}(entity, statusCopy))
+			commandBuffer.setInterventionStatus(entity, statusCopy)
 
 			if config.MaxFailures <= statusCopy.ConsecutiveFailures {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Printf("Monitor %s intervention failed\n", name)
 
-					deferred = append(deferred, func(e ecs.Entity) func() {
-						return func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "red"}) }
-					}(entity))
+					commandBuffer.scheduleCode(entity, "red")
 				}
 				// No retry when max failures reached.
 			} else {
 				// Schedule retry.
-				deferred = append(deferred, func(e ecs.Entity) func() {
-					return func() { w.Mappers.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) }
-				}(entity))
+				commandBuffer.scheduleIntervention(entity)
 			}
 
 		} else {
@@ -150,34 +128,24 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			statusCopy.LastSuccessTime = time.Now()
 			//monitorCopy.Status = "success"
 
-			deferred = append(deferred, func(e ecs.Entity, s components.InterventionStatus) func() {
-				return func() {
-					interventionMapper := generic.NewMap[components.InterventionStatus](w.Mappers.World)
-					interventionMapper.Set(e, &s)
-					//monitorMapper := generic.NewMap[components.MonitorStatus](w.Mappers.World)
-					//monitorMapper.Set(e, &m)
-				}
-			}(entity, statusCopy))
+			commandBuffer.setInterventionStatus(entity, statusCopy)
 
 			if lastStatus == "failed" &&
 				w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 
 				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
-				deferred = append(deferred, func(e ecs.Entity) func() {
-					return func() { w.Mappers.CodeNeeded.Assign(e, &components.CodeNeeded{Color: "cyan"}) }
-				}(entity))
+				commandBuffer.scheduleCode(entity, "cyan")
 			}
 		}
 
 		// Always remove pending after processing.
-		deferred = append(deferred, func(e ecs.Entity) func() { return func() { w.Mappers.InterventionPending.Remove(e) } }(entity))
+		commandBuffer.RemoveInterventionPending(entity)
 	}
-	return deferred
 }
 
-func (s *InterventionResultSystem) Update(w *controller.CPRaWorld) []func() {
+func (s *InterventionResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
 	results := s.collectInterventionResults()
-	return s.processInterventionResultsAndQueueStructuralChanges(w, results)
+	s.processInterventionResultsAndQueueStructuralChanges(w, results, cb)
 }
 
 ///* ------------------  Utility: dump component names  ------------------ */

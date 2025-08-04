@@ -41,7 +41,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	l := loader.NewLoader("yaml", "internal/loader/test-small.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
 	l.Load()
 	manifest := l.GetManifest()
 

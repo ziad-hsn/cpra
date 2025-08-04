@@ -3,7 +3,6 @@ package systems
 import (
 	"cpra/internal/loader/schema"
 	"log"
-	"runtime"
 	"sync"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 type PhaseSystem interface {
 	Initialize(w *controller.CPRaWorld)
 	// Update returns the list of deferred structural-change operations.
-	Update(w *controller.CPRaWorld) []func()
+	Update(w *controller.CPRaWorld, cb *CommandBufferSystem)
 }
 
 type Scheduler struct {
@@ -24,6 +23,7 @@ type Scheduler struct {
 	WG              *sync.WaitGroup
 	Done            chan struct{}
 	Tick            time.Duration
+	CommandBuffer   *CommandBufferSystem
 }
 
 func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Duration) *Scheduler {
@@ -32,7 +32,7 @@ func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Durat
 		log.Fatal(err)
 	}
 
-	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{})}
+	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem()}
 }
 
 func (s *Scheduler) AddSchedule(sys PhaseSystem) { s.ScheduleSystems = append(s.ScheduleSystems, sys) }
@@ -62,31 +62,22 @@ func (s *Scheduler) Run() {
 	for {
 		select {
 		case <-ticker.C:
-			//x := debug.GCStats{}
-			//debug.ReadGCStats(&x)
-			//fmt.Println(x)
-			// Phase 1: schedule
-			var allDeferredOps []func()
+			s.CommandBuffer.Init(s.World.Mappers)
 			// Collect all deferred operations
-			for _, sys := range s.ResultSystems {
-				ops := sys.Update(s.World)
-				allDeferredOps = append(allDeferredOps, ops...)
-			}
 			for _, sys := range s.ScheduleSystems {
-				ops := sys.Update(s.World)
-				allDeferredOps = append(allDeferredOps, ops...)
+				sys.Update(s.World, s.CommandBuffer)
 			}
 			for _, sys := range s.DispatchSystems {
-				ops := sys.Update(s.World)
-				allDeferredOps = append(allDeferredOps, ops...)
+				sys.Update(s.World, s.CommandBuffer)
 			}
-			//log.Println(allDeferredOps)
-			// Apply all deferred operations at once
-			for _, op := range allDeferredOps {
-				op()
-				//time.Sleep(100 * time.Millisecond)
+			for _, sys := range s.ResultSystems {
+				sys.Update(s.World, s.CommandBuffer)
 			}
-			runtime.GC()
+			s.CommandBuffer.PlayBack()
+
+			s.CommandBuffer.Clear()
+
+			//runtime.GC()
 
 		case <-s.Done:
 			log.Printf("scheduler exited\n")

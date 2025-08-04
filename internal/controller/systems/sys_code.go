@@ -69,39 +69,27 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity
 	return out
 }
 
-func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Entity]dispatchableCodeJob) []func() {
-	deferred := make([]func(), 0, len(list))
+func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Entity]dispatchableCodeJob, commandBuffer *CommandBufferSystem) {
 
 	for e, item := range list {
 		select {
 		case s.JobChan <- item.job:
-			c := item.color
 
-			deferred = append(deferred, func(entity ecs.Entity, color string) func() {
-				return func() {
+			if w.IsAlive(e) {
+				commandBuffer.MarkCodePending(e, item.color)
+			}
 
-					if w.IsAlive(e) {
-						cp := new(components.CodePending)
-						cp.Color = color
-						w.Mappers.CodePending.Assign(entity, cp)
-						w.Mappers.CodeNeeded.Remove(entity)
-
-					}
-				}
-			}(e, c))
-
-			log.Printf("Sent %s code job for entity %v", c, e)
+			log.Printf("Sent %s code job for entity %v", item.color, e)
 
 		default:
 			log.Printf("Job channel full for entity %v", e)
 		}
 	}
-	return deferred
 }
 
-func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld) []func() {
+func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
 	toDispatch := s.collectWork(w)
-	return s.applyWork(w, toDispatch)
+	s.applyWork(w, toDispatch, cb)
 }
 
 /* ---------------------------  RESULT  --------------------------- */
@@ -127,10 +115,8 @@ loop:
 }
 
 func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
-	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result,
-) []func() {
-
-	deferred := make([]func(), 0, len(results))
+	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result, commandBuffer *CommandBufferSystem,
+) {
 
 	for entity, res := range results {
 
@@ -172,63 +158,38 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 		switch codeColor {
 		case "red":
 			st := *(statusCopy.(*components.RedCodeStatus))
-			deferred = append(deferred, func(e ecs.Entity, statusToSet components.RedCodeStatus) func() {
-				return func() {
 
-					mapper := generic.NewMap[components.RedCodeStatus](w.Mappers.World)
-					mapper.Set(e, &statusToSet)
-					w.Mappers.CodePending.Remove(e)
-				}
-			}(entity, st))
+			commandBuffer.setRedCodeStatus(entity, st)
+
+			commandBuffer.RemoveCodePending(entity)
+
 		case "green":
 			st := *(statusCopy.(*components.GreenCodeStatus))
-			deferred = append(deferred, func(e ecs.Entity, statusToSet components.GreenCodeStatus) func() {
-				return func() {
+			commandBuffer.setGreenCodeStatus(entity, st)
 
-					mapper := generic.NewMap[components.GreenCodeStatus](w.Mappers.World)
-					mapper.Set(e, &statusToSet)
-					w.Mappers.CodePending.Remove(e)
-				}
-			}(entity, st))
+			commandBuffer.RemoveCodePending(entity)
 		case "yellow":
 			st := *(statusCopy.(*components.YellowCodeStatus))
-			deferred = append(deferred, func(e ecs.Entity, statusToSet components.YellowCodeStatus) func() {
-				return func() {
+			commandBuffer.setYellowCodeStatus(entity, st)
 
-					mapper := generic.NewMap[components.YellowCodeStatus](w.Mappers.World)
-					mapper.Set(e, &statusToSet)
-					w.Mappers.CodePending.Remove(e)
-				}
-			}(entity, st))
+			commandBuffer.RemoveCodePending(entity)
 		case "cyan":
 			st := *(statusCopy.(*components.CyanCodeStatus))
-			deferred = append(deferred, func(e ecs.Entity, statusToSet components.CyanCodeStatus) func() {
-				return func() {
+			commandBuffer.setCyanCodeStatus(entity, st)
 
-					mapper := generic.NewMap[components.CyanCodeStatus](w.Mappers.World)
-					mapper.Set(e, &statusToSet)
-					w.Mappers.CodePending.Remove(e)
-				}
-			}(entity, st))
+			commandBuffer.RemoveCodePending(entity)
 		case "gray":
 			st := *(statusCopy.(*components.GrayCodeStatus))
-			deferred = append(deferred, func(e ecs.Entity, statusToSet components.GrayCodeStatus) func() {
-				return func() {
+			commandBuffer.setGrayCodeStatus(entity, st)
 
-					mapper := generic.NewMap[components.GrayCodeStatus](w.Mappers.World)
-					mapper.Set(e, &statusToSet)
-					w.Mappers.CodePending.Remove(e)
-				}
-			}(entity, st))
-
+			commandBuffer.RemoveCodePending(entity)
 		default:
 			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
 		}
 	}
-	return deferred
 }
 
-func (s *CodeResultSystem) Update(w *controller.CPRaWorld) []func() {
+func (s *CodeResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
 	results := s.collectCodeResults()
-	return s.processCodeResultsAndQueueStructuralChanges(w, results)
+	s.processCodeResultsAndQueueStructuralChanges(w, results, cb)
 }

@@ -124,8 +124,8 @@ func (p *PulseHTTPJob) Copy() Job {
 	return &PulseHTTPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		URL:     string([]byte(p.URL)),
-		Method:  string([]byte(p.Method)),
+		URL:     p.URL,
+		Method:  p.Method,
 		Timeout: p.Timeout,
 		Retries: p.Retries,
 	}
@@ -156,7 +156,7 @@ func (p *PulseTCPJob) Copy() Job {
 	return &PulseTCPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    string([]byte(p.Host)),
+		Host:    p.Host,
 		Port:    p.Port,
 		Timeout: p.Timeout,
 		Retries: p.Retries,
@@ -187,7 +187,7 @@ func (p *PulseICMPJob) Copy() Job {
 	return &PulseICMPJob{
 		ID:      p.ID,
 		Entity:  p.Entity,
-		Host:    string([]byte(p.Host)),
+		Host:    p.Host,
 		Count:   p.Count,
 		Timeout: p.Timeout,
 	}
@@ -216,7 +216,7 @@ func (i *InterventionDockerJob) Copy() Job {
 	return &InterventionDockerJob{
 		ID:        i.ID,
 		Entity:    i.Entity,
-		Container: string([]byte(i.Container)),
+		Container: i.Container,
 		Timeout:   i.Timeout,
 		Retries:   i.Retries,
 	}
@@ -248,9 +248,9 @@ func (c *CodeLogJob) Copy() Job {
 	return &CodeLogJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		File:    string([]byte(c.File)),
-		Message: string([]byte(c.Message)),
-		Monitor: string([]byte(c.Monitor)),
+		File:    c.File,
+		Message: c.Message,
+		Monitor: c.Monitor,
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -281,9 +281,9 @@ func (c *CodeSlackJob) Copy() Job {
 	return &CodeSlackJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		WebHook: string([]byte(c.WebHook)),
-		Message: string([]byte(c.Message)),
-		Monitor: string([]byte(c.Monitor)),
+		WebHook: c.WebHook,
+		Message: c.Message,
+		Monitor: c.Monitor,
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}
@@ -315,9 +315,9 @@ func (c *CodePagerDutyJob) Copy() Job {
 	return &CodePagerDutyJob{
 		ID:      c.ID,
 		Entity:  c.Entity,
-		URL:     string([]byte(c.URL)),
-		Message: string([]byte(c.Message)),
-		Monitor: string([]byte(c.Monitor)),
+		URL:     c.URL,
+		Message: c.Message,
+		Monitor: c.Monitor,
 		Timeout: c.Timeout,
 		Retries: c.Retries,
 	}

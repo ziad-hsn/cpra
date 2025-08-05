@@ -15,22 +15,10 @@ import (
 )
 
 func main() {
-	//f, err := os.Create("cpu.prof")
-	//if err != nil {
-	//	log.Fatal("could not create CPU profile: ", err)
-	//}
-	//defer f.Close()
-	//if err := pprof.StartCPUProfile(f); err != nil {
-	//	log.Fatal("could not start CPU profile: ", err)
-	//}
+
 	//defer pprof.StopCPUProfile()
 	//runtime.GOMAXPROCS(24)
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Recovered in main:", r)
-		}
-	}()
-	//debug.SetGCPercent(200)
+	//debug.SetGCPercent(70)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
 	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -41,17 +29,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/sample.yaml")
 	l.Load()
 	manifest := l.GetManifest()
-
-	// make channels
-	//jobCh := make(chan jobs.Job, len(manifest.Monitors))
-	//resCh := make(chan jobs.Result, len(manifest.Monitors))
-	//ijobCh := make(chan jobs.Job, len(manifest.Monitors))
-	//iresCh := make(chan jobs.Result, len(manifest.Monitors))
-	//cjobCh := make(chan jobs.Job, len(manifest.Monitors))
-	//cresCh := make(chan jobs.Result, len(manifest.Monitors))
 
 	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)/100) // e.g., 8, 16, or 24
 
@@ -87,41 +67,29 @@ func main() {
 	pools.StartAll()
 	// build scheduler
 	wg := &sync.WaitGroup{}
-	sched := systems.NewScheduler(&manifest, wg, 100*time.Millisecond)
+	scheduler := systems.NewScheduler(&manifest, wg, 100*time.Millisecond)
 
 	// Phase 1
-	sched.AddSchedule(&systems.PulseScheduleSystem{})
+	scheduler.AddSchedule(&systems.PulseScheduleSystem{})
 
 	// Phase 2
-	sched.AddDispatch(&systems.PulseDispatchSystem{JobChan: pulseJobChan})
-	sched.AddDispatch(&systems.InterventionDispatchSystem{JobChan: interventionJobChan})
-	sched.AddDispatch(&systems.CodeDispatchSystem{JobChan: CodeJobChan})
+	scheduler.AddDispatch(&systems.PulseDispatchSystem{JobChan: pulseJobChan})
+	scheduler.AddDispatch(&systems.InterventionDispatchSystem{JobChan: interventionJobChan})
+	scheduler.AddDispatch(&systems.CodeDispatchSystem{JobChan: CodeJobChan})
 
 	// Phase 3
-	sched.AddResult(&systems.PulseResultSystem{ResultChan: pulseResultChan})
-	sched.AddResult(&systems.InterventionResultSystem{ResultChan: interventionResultChan})
-	sched.AddResult(&systems.CodeResultSystem{ResultChan: codeResultChan})
+	scheduler.AddResult(&systems.PulseResultSystem{ResultChan: pulseResultChan})
+	scheduler.AddResult(&systems.InterventionResultSystem{ResultChan: interventionResultChan})
+	scheduler.AddResult(&systems.CodeResultSystem{ResultChan: codeResultChan})
 
 	wg.Add(1)
-	go sched.Run()
+	go scheduler.Run()
 	timeout := time.After(24 * time.Hour)
-	//runtime.SetFinalizer(runtime.GC, func(x interface{}) {
-	//	log.Println("Recovered in main")
-	//})
-	// worker‐loop
-	for {
-		select {
-		//case job := <-pulseJobChan:
-		//	pulseResultChan <- job.Execute()
-		//case job := <-interventionJobChan:
-		//	interventionResultChan <- job.Execute()
-		//case job := <-CodeJobChan:
-		//	codeResultChan <- job.Execute()
-		case <-timeout:
-			fmt.Println("timeout")
-			close(sched.Done)
-			wg.Wait()
-			return
-		}
-	}
+
+	<-timeout
+	fmt.Println("timeout")
+	close(scheduler.Done)
+	wg.Wait()
+	return
+
 }

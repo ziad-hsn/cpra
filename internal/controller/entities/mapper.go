@@ -240,6 +240,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	for color, config := range monitor.Codes {
 		configCopy := config
+		configCopy.Config = *new(schema.CodeNotification)
 		configCopy.Config = config.Config.Copy() // Copy nested config
 		switch color {
 

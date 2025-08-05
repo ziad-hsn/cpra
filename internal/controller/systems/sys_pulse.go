@@ -208,7 +208,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			commandBuffer.SetPulseStatus(entity, statusCopy)
 			commandBuffer.setMonitorStatus(entity, monitorCopy)
 
-			if lastStatus != statusCopy.LastStatus {
+			if lastStatus != "success" && lastStatus != "" {
 				commandBuffer.scheduleCode(entity, "green")
 			}
 		}

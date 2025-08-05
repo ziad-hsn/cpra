@@ -56,13 +56,10 @@ type PulseHTTPConfig struct {
 func (c *PulseHTTPConfig) Copy() PulseConfig {
 	// This was already correct, but for consistency, we'll return a pointer
 	// to a new struct.
-	newConfig := PulseHTTPConfig{
-		Url:     string([]byte(c.Url)),
-		Method:  string([]byte(c.Method)),
-		Headers: append(StringList(nil), c.Headers...),
-		Retries: c.Retries,
-	}
-	return &newConfig
+
+	newConfig := new(PulseHTTPConfig)
+	*newConfig = *c
+	return newConfig
 }
 
 func (*PulseHTTPConfig) isPulseConfigs() {}
@@ -74,11 +71,9 @@ type PulseTCPConfig struct {
 }
 
 func (c *PulseTCPConfig) Copy() PulseConfig {
-	return &PulseTCPConfig{
-		Host:    string([]byte(c.Host)),
-		Port:    c.Port,
-		Retries: c.Retries,
-	}
+	newConfig := new(PulseTCPConfig)
+	*newConfig = *c
+	return newConfig
 }
 
 func (*PulseTCPConfig) isPulseConfigs() {}
@@ -90,11 +85,9 @@ type PulseICMPConfig struct {
 }
 
 func (c *PulseICMPConfig) Copy() PulseConfig {
-	return &PulseICMPConfig{
-		Host:      string([]byte(c.Host)),
-		Privilege: c.Privilege,
-		Count:     c.Count,
-	}
+	newConfig := new(PulseICMPConfig)
+	*newConfig = *c
+	return newConfig
 }
 
 func (*PulseICMPConfig) isPulseConfigs() {}

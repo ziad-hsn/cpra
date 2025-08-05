@@ -145,7 +145,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 		if statusCopy != nil {
 			if res.Error() != nil {
 				statusCopy.SetFailure(res.Error())
-				log.Printf("Monitor %s Code failed\n", name)
+				log.Printf("Monitor %s Code failed: %v\n", name, res.Error())
 			} else {
 				statusCopy.SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)

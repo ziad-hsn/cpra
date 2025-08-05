@@ -59,33 +59,8 @@ func (c *PulseConfig) Copy() *PulseConfig {
 
 	if c.Config != nil {
 		// Deep copy based on concrete type
-		switch v := c.Config.(type) {
-		case *schema.PulseHTTPConfig:
-			var headers schema.StringList
-			if v.Headers != nil {
-				headers = append(schema.StringList(nil), v.Headers...)
-			} else {
-				headers = make(schema.StringList, 0)
-			}
-			cpy.Config = &schema.PulseHTTPConfig{
-				Url:     v.Url,
-				Method:  v.Method,
-				Headers: headers,
-				Retries: v.Retries,
-			}
-		case *schema.PulseTCPConfig:
-			cpy.Config = &schema.PulseTCPConfig{
-				Host:    v.Host,
-				Port:    v.Port,
-				Retries: v.Retries,
-			}
-		case *schema.PulseICMPConfig:
-			cpy.Config = &schema.PulseICMPConfig{
-				Host:      v.Host,
-				Privilege: v.Privilege,
-				Count:     v.Count,
-			}
-		}
+		cpy.Config = *new(schema.PulseConfig)
+		cpy.Config = c.Config.Copy()
 	}
 	return cpy
 }
@@ -154,13 +129,8 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 
 	if c.Target != nil {
 		// Deep copy based on concrete type
-		switch v := c.Target.(type) {
-		case *schema.InterventionTargetDocker:
-			cpy.Target = &schema.InterventionTargetDocker{
-				Type:      v.Type,
-				Container: v.Container,
-			}
-		}
+		cpy.Target = *new(schema.InterventionTarget)
+		cpy.Target = c.Target.Copy()
 	}
 	return cpy
 }
@@ -221,14 +191,8 @@ func (c *CodeConfig) Copy() *CodeConfig {
 	}
 	if c.Config != nil {
 		// Deep copy based on concrete type
-		switch v := c.Config.(type) {
-		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
-		case *schema.CodeNotificationPagerDuty:
-			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
-		case *schema.CodeNotificationSlack:
-			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
-		}
+		cpy.Config = *new(schema.CodeNotification)
+		cpy.Config = c.Config.Copy()
 	}
 	return cpy
 }
@@ -282,6 +246,7 @@ func (c *RedCodeConfig) Copy() *RedCodeConfig {
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
 			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
+		
 		}
 	}
 	return cpy

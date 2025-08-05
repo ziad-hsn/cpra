@@ -5,6 +5,7 @@ import (
 	"cpra/internal/controller/entities"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
+	"log"
 	"sync"
 )
 
@@ -203,5 +204,9 @@ func (s *CommandBufferSystem) MarkCodePending(entity ecs.Entity, color string) {
 }
 
 func (s *CommandBufferSystem) RemoveCodePending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() { return func() { s.Mapper.CodePending.Remove(e) } }(entity))
+	s.Add(func(e ecs.Entity) func() {
+		return func() {
+			s.Mapper.CodePending.Remove(e)
+		}
+	}(entity))
 }

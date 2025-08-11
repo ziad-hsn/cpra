@@ -4,7 +4,6 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
@@ -40,23 +39,23 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity
 		switch color {
 		case "red":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-				job = (*w.Mappers.RedCodeJob.Get(ent)).Job.Copy()
+				job = w.Mappers.RedCodeJob.Get(ent).Job
 			}
 		case "green":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
-				job = (*w.Mappers.GreenCodeJob.Get(ent)).Job.Copy()
+				job = w.Mappers.GreenCodeJob.Get(ent).Job
 			}
 		case "yellow":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
-				job = (*w.Mappers.YellowCodeJob.Get(ent)).Job.Copy()
+				job = w.Mappers.YellowCodeJob.Get(ent).Job
 			}
 		case "cyan":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
-				job = (*w.Mappers.CyanCodeJob.Get(ent)).Job.Copy()
+				job = w.Mappers.CyanCodeJob.Get(ent).Job
 			}
 		case "gray":
 			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
-				job = (*w.Mappers.GrayCodeJob.Get(ent)).Job.Copy()
+				job = w.Mappers.GrayCodeJob.Get(ent).Job
 			}
 		default:
 			log.Printf("Unknown color %q for entity %v", color, ent)
@@ -117,72 +116,100 @@ loop:
 func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result, commandBuffer *CommandBufferSystem,
 ) {
-
 	for entity, res := range results {
 
 		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
 			continue
 		}
 
-		name := string([]byte(*w.Mappers.Name.Get(entity)))
-		codeColor := string([]byte(w.Mappers.CodePending.Get(entity).Color))
+		namePtr := w.Mappers.Name.Get(entity)
+		if namePtr == nil {
+			continue
+		}
+		name := *namePtr
+		codeColor := w.Mappers.CodePending.Get(entity).Color
 
-		fmt.Printf("entity is %v for %s code result.\n", entity, name)
-
-		var statusCopy components.CodeStatusAccessor
 		switch codeColor {
 		case "red":
-			statusCopy = (*w.Mappers.RedCodeStatus.Get(entity)).Copy()
-		case "green":
-			statusCopy = (*w.Mappers.GreenCodeStatus.Get(entity)).Copy()
-		case "yellow":
-			statusCopy = (*w.Mappers.YellowCodeStatus.Get(entity)).Copy()
-		case "cyan":
-			statusCopy = (*w.Mappers.CyanCodeStatus.Get(entity)).Copy()
-		case "gray":
-			statusCopy = (*w.Mappers.GrayCodeStatus.Get(entity)).Copy()
-		}
-		if statusCopy != nil {
-			if res.Error() != nil {
-				statusCopy.SetFailure(res.Error())
-				log.Printf("Monitor %s Code failed: %v\n", name, res.Error())
+			cur := w.Mappers.RedCodeStatus.Get(entity)
+			var st components.RedCodeStatus
+			if cur != nil {
+				st = *cur // copy by value
+			}
+			if err := res.Error(); err != nil {
+				(&st).SetFailure(err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
-				statusCopy.SetSuccess(time.Now())
+				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-		} else {
-			log.Printf("Monitor %s Code failed with nil status pointer\n", name)
-		}
-
-		// capture copies for deferred Set
-		switch codeColor {
-		case "red":
-			st := *(statusCopy.(*components.RedCodeStatus))
-
 			commandBuffer.setRedCodeStatus(entity, st)
-
 			commandBuffer.RemoveCodePending(entity)
 
 		case "green":
-			st := *(statusCopy.(*components.GreenCodeStatus))
+			cur := w.Mappers.GreenCodeStatus.Get(entity)
+			var st components.GreenCodeStatus
+			if cur != nil {
+				st = *cur
+			}
+			if err := res.Error(); err != nil {
+				(&st).SetFailure(err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
+			} else {
+				(&st).SetSuccess(time.Now())
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+			}
 			commandBuffer.setGreenCodeStatus(entity, st)
-
 			commandBuffer.RemoveCodePending(entity)
+
 		case "yellow":
-			st := *(statusCopy.(*components.YellowCodeStatus))
+			cur := w.Mappers.YellowCodeStatus.Get(entity)
+			var st components.YellowCodeStatus
+			if cur != nil {
+				st = *cur
+			}
+			if err := res.Error(); err != nil {
+				(&st).SetFailure(err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
+			} else {
+				(&st).SetSuccess(time.Now())
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+			}
 			commandBuffer.setYellowCodeStatus(entity, st)
-
 			commandBuffer.RemoveCodePending(entity)
+
 		case "cyan":
-			st := *(statusCopy.(*components.CyanCodeStatus))
+			cur := w.Mappers.CyanCodeStatus.Get(entity)
+			var st components.CyanCodeStatus
+			if cur != nil {
+				st = *cur
+			}
+			if err := res.Error(); err != nil {
+				(&st).SetFailure(err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
+			} else {
+				(&st).SetSuccess(time.Now())
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+			}
 			commandBuffer.setCyanCodeStatus(entity, st)
-
 			commandBuffer.RemoveCodePending(entity)
+
 		case "gray":
-			st := *(statusCopy.(*components.GrayCodeStatus))
+			cur := w.Mappers.GrayCodeStatus.Get(entity)
+			var st components.GrayCodeStatus
+			if cur != nil {
+				st = *cur
+			}
+			if err := res.Error(); err != nil {
+				(&st).SetFailure(err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
+			} else {
+				(&st).SetSuccess(time.Now())
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+			}
 			commandBuffer.setGrayCodeStatus(entity, st)
-
 			commandBuffer.RemoveCodePending(entity)
+
 		default:
 			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
 		}

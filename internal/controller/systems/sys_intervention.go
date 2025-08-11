@@ -30,7 +30,7 @@ func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) map[ec
 
 	for query.Next() {
 		ent := query.Entity()
-		out[ent] = w.Mappers.InterventionJob.Get(ent).Job.Copy()
+		out[ent] = w.Mappers.InterventionJob.Get(ent).Job
 	}
 	return out
 }
@@ -92,9 +92,10 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
+			fmt.Println("booooooooooooooooooooooooooooooooooooo")
 			// ---- FAILURE ----
-			config := *(*w.Mappers.InterventionConfig.Get(entity)).Copy()
-			statusCopy := *(*w.Mappers.InterventionStatus.Get(entity)).Copy()
+			maxFailures := w.Mappers.InterventionConfig.Get(entity).MaxFailures
+			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
 			//monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
 
 			statusCopy.LastStatus = "failed"
@@ -103,8 +104,8 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			//monitorCopy.Status = "failed"
 
 			commandBuffer.setInterventionStatus(entity, statusCopy)
-
-			if config.MaxFailures <= statusCopy.ConsecutiveFailures {
+			fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
+			if maxFailures <= statusCopy.ConsecutiveFailures {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
 					log.Printf("Monitor %s intervention failed\n", name)
 
@@ -117,8 +118,9 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			}
 
 		} else {
+			fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
 			// ---- SUCCESS ----
-			statusCopy := *(*w.Mappers.InterventionStatus.Get(entity)).Copy()
+			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
 			//monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
 			lastStatus := statusCopy.LastStatus
 

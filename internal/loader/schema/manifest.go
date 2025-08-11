@@ -153,9 +153,10 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 //// INTERVENTION TYPES
 
 type Intervention struct {
-	Action  string             `yaml:"action"`
-	Retries int                `yaml:"retries"`
-	Target  InterventionTarget `yaml:"target"`
+	Action      string             `yaml:"action"`
+	Retries     int                `yaml:"retries"`
+	Target      InterventionTarget `yaml:"target"`
+	MaxFailures int                `yaml:"max_failures"`
 }
 type rawIntervention struct {
 	Action  string `yaml:"action"`
@@ -193,14 +194,15 @@ type InterventionTarget interface {
 }
 
 type InterventionTargetDocker struct {
-	Type      string `yaml:"type"`
-	Container string `yaml:"container"`
+	Type      string        `yaml:"type"`
+	Container string        `yaml:"container"`
+	Timeout   time.Duration `yaml:"timeout"`
 }
 
 func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
 		Type:      i.Type,
-		Container: string([]byte(i.Container)),
+		Container: i.Container,
 	}
 }
 
@@ -219,7 +221,7 @@ type CodeNotificationLog struct {
 
 func (c *CodeNotificationLog) Copy() CodeNotification {
 	return &CodeNotificationLog{
-		File: string([]byte(c.File)),
+		File: c.File,
 	}
 }
 
@@ -232,7 +234,7 @@ type CodeNotificationPagerDuty struct {
 
 func (c *CodeNotificationPagerDuty) Copy() CodeNotification {
 	return &CodeNotificationPagerDuty{
-		URL: string([]byte(c.URL)),
+		URL: c.URL,
 	}
 }
 
@@ -245,7 +247,7 @@ type CodeNotificationSlack struct {
 
 func (c *CodeNotificationSlack) Copy() CodeNotification {
 	return &CodeNotificationSlack{
-		WebHook: string([]byte(c.WebHook)),
+		WebHook: c.WebHook,
 	}
 }
 

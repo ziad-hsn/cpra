@@ -8,7 +8,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/mlange-42/arche/ecs"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -67,6 +66,7 @@ func CreateInterventionJob(InterventionSchema schema.Intervention, jobID ecs.Ent
 			Entity:    jobID,
 			Container: InterventionSchema.Target.(*schema.InterventionTargetDocker).Container,
 			Retries:   retries,
+			Timeout:   InterventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown intervention action : %T for job creation", InterventionSchema.Action)
@@ -269,7 +269,8 @@ func (i *InterventionDockerJob) Execute() Result {
 
 		// The "intervention" is to restart the container.
 		// We pass nil for the restart timeout, which makes Docker use the default (10 seconds).
-		restartOptions := container.StopOptions{}
+		timeout := int(i.Timeout)
+		restartOptions := container.StopOptions{Timeout: &timeout}
 		err := cli.ContainerRestart(ctx, i.Container, restartOptions)
 		if err == nil {
 			// Success! The container was restarted.
@@ -310,65 +311,49 @@ type CodeLogJob struct {
 	Retries int
 }
 
-// Execute writes a formatted log message to a file.
-// It handles retries and enforces a timeout on each write attempt.
+// Execute writes a formatted log message to a file synchronously.
+// It handles retries but no longer enforces a timeout.
 func (c *CodeLogJob) Execute() Result {
 	var lastErr error
 
 	// Total attempts = 1 initial try + c.Retries
 	attempts := c.Retries + 1
 	for attempt := 0; attempt < attempts; attempt++ {
-		// A channel to receive the outcome (error or nil) from the write operation.
-		done := make(chan error, 1)
+		// Open the file for appending. Create it if it doesn't exist.
+		// We use defer to ensure f.Close() is called before the function exits this iteration.
+		f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to open file: %w", err)
+			continue // Move to the next retry attempt
+		}
 
-		// We run the file I/O in a separate goroutine. This allows the main
-		// goroutine to use a `select` statement to enforce a timeout.
-		go func() {
-			// Open the file for appending. Create it with standard permissions if it doesn't exist.
-			f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				done <- err // Send error to the channel
-				return
-			}
-			defer f.Close()
+		// Format a structured log line.
+		logLine := fmt.Sprintf(
+			"%s [%s] %s\n",
+			time.Now().UTC().Format(time.RFC3339),
+			c.Monitor,
+			c.Message,
+		)
 
-			// Format a structured log line including a timestamp, the monitor name, and the message.
-			logLine := fmt.Sprintf(
-				"%s [%s] %s\n",
-				time.Now().UTC().Format(time.RFC3339), // ISO 8601 / RFC3339 timestamp
-				c.Monitor,
-				c.Message,
-			)
+		// Write the formatted string to the file.
+		_, writeErr := f.WriteString(logLine)
+		closeErr := f.Close() // Close the file handle
 
-			// Write the final string to the file.
-			if _, err := f.WriteString(logLine); err != nil {
-				done <- err // Send error to the channel
-				return
-			}
-			log.Printf("logged code to %s for monitor %s\n", c.File, c.Monitor)
+		if writeErr != nil {
+			lastErr = fmt.Errorf("failed to write to file: %w", writeErr)
+			continue // Move to the next retry attempt
+		}
+		if closeErr != nil {
+			// It's good practice to check for an error on close as well.
+			lastErr = fmt.Errorf("failed to close file: %w", closeErr)
+			continue // Move to the next retry attempt
+		}
 
-			// Signal success by sending a nil error.
-			done <- nil
-		}()
-
-		// The select statement will wait for one of two events to occur first.
-		select {
-		case err := <-done:
-			// The write operation finished.
-			if err == nil {
-				// Success! The log was written.
-				return Result{
-					ID:  c.ID,
-					Ent: c.Entity,
-					Err: nil,
-				}
-			}
-			// The write operation failed.
-			lastErr = err
-
-		case <-time.After(c.Timeout):
-			// The timeout duration passed before the write operation completed.
-			lastErr = fmt.Errorf("write operation timed out after %v", c.Timeout)
+		// If we reached here, the write and close operations were successful.
+		return Result{
+			ID:  c.ID,
+			Ent: c.Entity,
+			Err: nil, // A nil error signifies success
 		}
 	}
 

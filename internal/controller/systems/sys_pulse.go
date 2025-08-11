@@ -115,7 +115,7 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.En
 
 			// exchange PulseNeeded -> PulsePending
 
-			name := string([]byte(*w.Mappers.Name.Get(e)))
+			name := *w.Mappers.Name.Get(e)
 			log.Printf("sent %s job\n", name)
 
 		default:
@@ -161,7 +161,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			continue
 		}
 
-		name := string([]byte(*w.Mappers.Name.Get(entity)))
+		name := *w.Mappers.Name.Get(entity)
 		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
 
 		if res.Error() != nil {

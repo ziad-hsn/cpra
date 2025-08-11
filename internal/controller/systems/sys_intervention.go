@@ -88,7 +88,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		name := string([]byte(*w.Mappers.Name.Get(entity)))
+		name := *w.Mappers.Name.Get(entity)
 		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {

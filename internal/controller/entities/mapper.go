@@ -223,9 +223,16 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	e.PulseJob.Assign(entity, &components.PulseJob{Job: j.Copy()})
 
 	if monitor.Intervention.Action != "" {
+		var max_failures int
+		if monitor.Intervention.MaxFailures > 0 {
+			max_failures = monitor.Intervention.MaxFailures
+		} else {
+			max_failures = 1
+		}
 		interventionCfg := &components.InterventionConfig{
-			Action: string([]byte(monitor.Intervention.Action)),
-			Target: monitor.Intervention.Target.Copy(), // Use Copy method
+			Action:      string([]byte(monitor.Intervention.Action)),
+			Target:      monitor.Intervention.Target.Copy(), // Use Copy method
+			MaxFailures: max_failures,
 		}
 		InterventionStatus := &components.InterventionStatus{
 			LastInterventionTime: time.Now(),

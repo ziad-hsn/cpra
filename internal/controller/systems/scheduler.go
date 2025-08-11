@@ -31,8 +31,7 @@ func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Durat
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem()}
+	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem(world.Mappers.World)}
 }
 
 func (s *Scheduler) AddSchedule(sys PhaseSystem) { s.ScheduleSystems = append(s.ScheduleSystems, sys) }
@@ -59,10 +58,11 @@ func (s *Scheduler) Run() {
 		sys.Initialize(s.World)
 	}
 
+	s.CommandBuffer.Init()
+	
 	for {
 		select {
 		case <-ticker.C:
-			s.CommandBuffer.Init(s.World.Mappers)
 			// Collect all deferred operations
 			for _, sys := range s.ScheduleSystems {
 				sys.Update(s.World, s.CommandBuffer)

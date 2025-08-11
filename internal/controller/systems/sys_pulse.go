@@ -33,20 +33,20 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 
 	for query.Next() {
 		ent := query.Entity()
-		config := *(*w.Mappers.PulseConfig.Get(ent)).Copy()
-		status := *(*w.Mappers.PulseStatus.Get(ent)).Copy()
+		interval := w.Mappers.PulseConfig.Get(ent).Interval
+		lastCheckTime := w.Mappers.PulseStatus.Get(ent).LastCheckTime
 
 		// first‑time check?
 		if w.Mappers.World.Has(ent, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
+			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
 			continue
 		}
 
 		// interval check
-		if time.Since(status.LastCheckTime) >= config.Interval {
+		if time.Since(lastCheckTime) >= interval {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(status.LastCheckTime), config.Interval)
+			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
 		}
 	}
 	return toCheck
@@ -88,9 +88,9 @@ func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entit
 
 	for query.Next() {
 		ent := query.Entity()
-		job := w.Mappers.PulseJob.Get(ent).Job.Copy()
+		job := w.Mappers.PulseJob.Get(ent).Job
 
-		stCopy := *(*w.Mappers.PulseStatus.Get(ent)).Copy()
+		stCopy := *w.Mappers.PulseStatus.Get(ent)
 		stCopy.LastCheckTime = time.Now()
 
 		out[ent] = dispatchablePulse{Job: job, Status: stCopy}
@@ -166,9 +166,9 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 		if res.Error() != nil {
 			// ---- FAILURE ----
-			config := *(*w.Mappers.PulseConfig.Get(entity)).Copy()
-			statusCopy := *(*w.Mappers.PulseStatus.Get(entity)).Copy()
-			monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
+			maxFailures := w.Mappers.PulseConfig.Get(entity).MaxFailures
+			statusCopy := *w.Mappers.PulseStatus.Get(entity)
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity)
 
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
@@ -181,7 +181,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			}
 
 			// interventions
-			if config.MaxFailures <= statusCopy.ConsecutiveFailures &&
+			if statusCopy.ConsecutiveFailures%maxFailures == 0 &&
 				w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
 				log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
 				commandBuffer.scheduleIntervention(entity)
@@ -194,8 +194,8 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 		} else {
 			// ---- SUCCESS ----
-			statusCopy := *(*w.Mappers.PulseStatus.Get(entity)).Copy()
-			monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
+			statusCopy := *w.Mappers.PulseStatus.Get(entity)
+			monitorCopy := *w.Mappers.MonitorStatus.Get(entity)
 
 			lastStatus := statusCopy.LastStatus
 

@@ -5,7 +5,6 @@ import (
 	"cpra/internal/jobs"
 	"fmt"
 	"github.com/google/uuid"
-	"log"
 	"sync"
 	"time"
 )
@@ -29,11 +28,6 @@ func (p *Pool) Start() {
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					log.Println("Recovered in workers:", r)
-				}
-			}()
 			for {
 				select {
 				case <-p.ctx.Done():

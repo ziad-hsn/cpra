@@ -18,7 +18,7 @@ func main() {
 
 	//defer pprof.StopCPUProfile()
 	//runtime.GOMAXPROCS(24)
-	//debug.SetGCPercent(70)
+	//debug.SetGCPercent(20)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
 	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	l := loader.NewLoader("yaml", "internal/loader/sample.yaml")
+	l := loader.NewLoader("yaml", "internal/loader/replicated_test.yaml")
 	l.Load()
 	manifest := l.GetManifest()
 

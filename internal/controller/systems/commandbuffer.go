@@ -2,44 +2,56 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
-	"log"
 	"sync"
 )
 
 type CommandBufferSystem struct {
-	Commands           []func()
-	Mux                *sync.RWMutex
-	Mapper             *entities.EntityManager
-	MonitorStatus      generic.Map[components.MonitorStatus]
-	PulseStatus        generic.Map[components.PulseStatus]
-	InterventionStatus generic.Map[components.InterventionStatus]
-	RedCodeStatus      generic.Map[components.RedCodeStatus]
-	GreenCodeStatus    generic.Map[components.GreenCodeStatus]
-	YellowCodeStatus   generic.Map[components.YellowCodeStatus]
-	CyanCodeStatus     generic.Map[components.CyanCodeStatus]
-	GrayCodeStatus     generic.Map[components.GrayCodeStatus]
+	Commands            []func()
+	Mux                 *sync.RWMutex
+	World               *ecs.World
+	MonitorStatus       generic.Map[components.MonitorStatus]
+	PulseStatus         generic.Map[components.PulseStatus]
+	InterventionStatus  generic.Map[components.InterventionStatus]
+	RedCodeStatus       generic.Map[components.RedCodeStatus]
+	GreenCodeStatus     generic.Map[components.GreenCodeStatus]
+	YellowCodeStatus    generic.Map[components.YellowCodeStatus]
+	CyanCodeStatus      generic.Map[components.CyanCodeStatus]
+	GrayCodeStatus      generic.Map[components.GrayCodeStatus]
+	PulseNeeded         generic.Map1[components.PulseNeeded]
+	PulseFirstCheck     generic.Map1[components.PulseFirstCheck]
+	PulsePending        generic.Map1[components.PulsePending]
+	InterventionNeeded  generic.Map1[components.InterventionNeeded]
+	InterventionPending generic.Map1[components.InterventionPending]
+	CodeNeeded          generic.Map1[components.CodeNeeded]
+	CodePending         generic.Map[components.CodePending]
 }
 
-func NewCommandBufferSystem() *CommandBufferSystem {
+func NewCommandBufferSystem(w *ecs.World) *CommandBufferSystem {
 	return &CommandBufferSystem{
 		Commands: make([]func(), 0),
 		Mux:      &sync.RWMutex{},
+		World:    w,
 	}
 }
 
-func (s *CommandBufferSystem) Init(m *entities.EntityManager) {
-	s.Mapper = m
-	s.MonitorStatus = generic.NewMap[components.MonitorStatus](m.World)
-	s.PulseStatus = generic.NewMap[components.PulseStatus](m.World)
-	s.InterventionStatus = generic.NewMap[components.InterventionStatus](m.World)
-	s.RedCodeStatus = generic.NewMap[components.RedCodeStatus](m.World)
-	s.GreenCodeStatus = generic.NewMap[components.GreenCodeStatus](m.World)
-	s.YellowCodeStatus = generic.NewMap[components.YellowCodeStatus](m.World)
-	s.CyanCodeStatus = generic.NewMap[components.CyanCodeStatus](m.World)
-	s.GrayCodeStatus = generic.NewMap[components.GrayCodeStatus](m.World)
+func (s *CommandBufferSystem) Init() {
+	s.MonitorStatus = generic.NewMap[components.MonitorStatus](s.World)
+	s.PulseStatus = generic.NewMap[components.PulseStatus](s.World)
+	s.InterventionStatus = generic.NewMap[components.InterventionStatus](s.World)
+	s.RedCodeStatus = generic.NewMap[components.RedCodeStatus](s.World)
+	s.GreenCodeStatus = generic.NewMap[components.GreenCodeStatus](s.World)
+	s.YellowCodeStatus = generic.NewMap[components.YellowCodeStatus](s.World)
+	s.CyanCodeStatus = generic.NewMap[components.CyanCodeStatus](s.World)
+	s.GrayCodeStatus = generic.NewMap[components.GrayCodeStatus](s.World)
+	s.PulseFirstCheck = generic.NewMap1[components.PulseFirstCheck](s.World)
+	s.PulseNeeded = generic.NewMap1[components.PulseNeeded](s.World)
+	s.PulsePending = generic.NewMap1[components.PulsePending](s.World)
+	s.InterventionNeeded = generic.NewMap1[components.InterventionNeeded](s.World)
+	s.InterventionPending = generic.NewMap1[components.InterventionPending](s.World)
+	s.CodeNeeded = generic.NewMap1[components.CodeNeeded](s.World)
+	s.CodePending = generic.NewMap[components.CodePending](s.World)
 }
 func (s *CommandBufferSystem) Add(command func()) {
 
@@ -130,7 +142,7 @@ func (s *CommandBufferSystem) setCyanCodeStatus(entity ecs.Entity, status compon
 func (s *CommandBufferSystem) schedulePulse(entity ecs.Entity) {
 	s.Add(func(e ecs.Entity) func() {
 		return func() {
-			s.Mapper.PulseNeeded.Assign(e, &components.PulseNeeded{})
+			s.PulseNeeded.Assign(e, &components.PulseNeeded{})
 		}
 	}(entity))
 
@@ -138,7 +150,7 @@ func (s *CommandBufferSystem) schedulePulse(entity ecs.Entity) {
 
 func (s *CommandBufferSystem) removeFirstCheck(entity ecs.Entity) {
 	s.Add(func(e ecs.Entity) func() {
-		return func() { s.Mapper.PulseFirstCheck.Remove(e) }
+		return func() { s.PulseFirstCheck.Remove(e) }
 	}(entity))
 
 }
@@ -147,10 +159,10 @@ func (s *CommandBufferSystem) MarkPulsePending(entity ecs.Entity) {
 
 	s.Add(func(e ecs.Entity) func() {
 		return func() {
-			s.Mapper.World.Exchange(
+			s.World.Exchange(
 				e,
-				[]ecs.ID{ecs.ComponentID[components.PulsePending](s.Mapper.World)},
-				[]ecs.ID{ecs.ComponentID[components.PulseNeeded](s.Mapper.World)},
+				[]ecs.ID{ecs.ComponentID[components.PulsePending](s.World)},
+				[]ecs.ID{ecs.ComponentID[components.PulseNeeded](s.World)},
 			)
 		}
 	}(entity))
@@ -158,12 +170,12 @@ func (s *CommandBufferSystem) MarkPulsePending(entity ecs.Entity) {
 }
 
 func (s *CommandBufferSystem) RemovePulsePending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() { return func() { s.Mapper.PulsePending.Remove(e) } }(entity))
+	s.Add(func(e ecs.Entity) func() { return func() { s.PulsePending.Remove(e) } }(entity))
 }
 
 func (s *CommandBufferSystem) scheduleIntervention(entity ecs.Entity) {
 	s.Add(func(e ecs.Entity) func() {
-		return func() { s.Mapper.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) }
+		return func() { s.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) }
 	}(entity))
 
 }
@@ -171,10 +183,10 @@ func (s *CommandBufferSystem) scheduleIntervention(entity ecs.Entity) {
 func (s *CommandBufferSystem) markInterventionPending(entity ecs.Entity) {
 	s.Add(func(e ecs.Entity) func() {
 		return func() {
-			s.Mapper.World.Exchange(
+			s.World.Exchange(
 				e,
-				[]ecs.ID{ecs.ComponentID[components.InterventionPending](s.Mapper.World)},
-				[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](s.Mapper.World)},
+				[]ecs.ID{ecs.ComponentID[components.InterventionPending](s.World)},
+				[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](s.World)},
 			)
 
 		}
@@ -182,12 +194,12 @@ func (s *CommandBufferSystem) markInterventionPending(entity ecs.Entity) {
 }
 
 func (s *CommandBufferSystem) RemoveInterventionPending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() { return func() { s.Mapper.InterventionPending.Remove(e) } }(entity))
+	s.Add(func(e ecs.Entity) func() { return func() { s.InterventionPending.Remove(e) } }(entity))
 }
 
 func (s *CommandBufferSystem) scheduleCode(entity ecs.Entity, color string) {
 	s.Add(func(e ecs.Entity, c string) func() {
-		return func() { s.Mapper.CodeNeeded.Assign(e, &components.CodeNeeded{Color: c}) }
+		return func() { s.CodeNeeded.Assign(e, &components.CodeNeeded{Color: c}) }
 	}(entity, color))
 }
 
@@ -195,8 +207,8 @@ func (s *CommandBufferSystem) MarkCodePending(entity ecs.Entity, color string) {
 	s.Add(func(e ecs.Entity, c string) func() {
 		return func() {
 
-			s.Mapper.World.ExchangeFn(e, []ecs.ID{ecs.ComponentID[components.CodePending](s.Mapper.World)}, []ecs.ID{ecs.ComponentID[components.CodeNeeded](s.Mapper.World)}, func(entity ecs.Entity) {
-				s.Mapper.CodePending.Get(entity).Color = c
+			s.World.ExchangeFn(e, []ecs.ID{ecs.ComponentID[components.CodePending](s.World)}, []ecs.ID{ecs.ComponentID[components.CodeNeeded](s.World)}, func(entity ecs.Entity) {
+				s.CodePending.Set(entity, &components.CodePending{Color: c})
 			})
 
 		}
@@ -206,7 +218,7 @@ func (s *CommandBufferSystem) MarkCodePending(entity ecs.Entity, color string) {
 func (s *CommandBufferSystem) RemoveCodePending(entity ecs.Entity) {
 	s.Add(func(e ecs.Entity) func() {
 		return func() {
-			s.Mapper.CodePending.Remove(e)
+			s.World.Remove(entity, ecs.ComponentID[components.CodePending](s.World))
 		}
 	}(entity))
 }

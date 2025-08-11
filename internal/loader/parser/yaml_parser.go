@@ -69,13 +69,15 @@ var (
 	//PulseConfigDNSFields = map[string]FieldType{}
 
 	InterventionFields = map[string]FieldType{
-		"action":  {Required: true},
-		"retries": {Required: false},
-		"target":  {Required: true},
+		"action":       {Required: true},
+		"retries":      {Required: false},
+		"target":       {Required: true},
+		"max_failures": {Required: false},
 	}
 	InterventionTargetDockerFields = map[string]FieldType{
 		"type":      {Required: false},
 		"container": {Required: true},
+		"timeout":   {Required: false},
 	}
 	CodeFields = map[string]FieldType{
 		"groups": {Required: false},

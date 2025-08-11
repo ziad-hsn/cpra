@@ -214,7 +214,7 @@ type CodeStatusAccessor interface {
 	SetFailure(err error)
 }
 
-// Marker/tag components
+// RedCode Marker/tag components
 type RedCode struct{}
 
 type RedCodeJob struct {
@@ -246,7 +246,7 @@ func (c *RedCodeConfig) Copy() *RedCodeConfig {
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
 			cpy.Config = &schema.CodeNotificationSlack{WebHook: v.WebHook}
-		
+
 		}
 	}
 	return cpy
@@ -272,23 +272,6 @@ func (s *RedCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
-}
-
-// Copy creates a deep copy of the RedCodeStatus.
-func (s *RedCodeStatus) Copy() *RedCodeStatus {
-	if s == nil {
-		return nil
-	}
-	cpy := &RedCodeStatus{
-		LastStatus:          s.LastStatus,
-		ConsecutiveFailures: s.ConsecutiveFailures,
-		LastAlertTime:       s.LastAlertTime,
-		LastSuccessTime:     s.LastSuccessTime,
-	}
-	if s.LastError != nil {
-		cpy.LastError = errors.New(s.LastError.Error())
-	}
-	return cpy
 }
 
 type GreenCode struct{}
@@ -349,23 +332,6 @@ func (s *GreenCodeStatus) SetFailure(err error) {
 	s.ConsecutiveFailures++
 }
 
-// Copy creates a deep copy of the GreenCodeStatus.
-func (s *GreenCodeStatus) Copy() *GreenCodeStatus {
-	if s == nil {
-		return nil
-	}
-	cpy := &GreenCodeStatus{
-		LastStatus:          s.LastStatus,
-		ConsecutiveFailures: s.ConsecutiveFailures,
-		LastAlertTime:       s.LastAlertTime,
-		LastSuccessTime:     s.LastSuccessTime,
-	}
-	if s.LastError != nil {
-		cpy.LastError = errors.New(s.LastError.Error())
-	}
-	return cpy
-}
-
 type CyanCode struct{}
 
 type CyanCodeJob struct {
@@ -422,23 +388,6 @@ func (s *CyanCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
-}
-
-// Copy creates a deep copy of the CyanCodeStatus.
-func (s *CyanCodeStatus) Copy() *CyanCodeStatus {
-	if s == nil {
-		return nil
-	}
-	cpy := &CyanCodeStatus{
-		LastStatus:          s.LastStatus,
-		ConsecutiveFailures: s.ConsecutiveFailures,
-		LastAlertTime:       s.LastAlertTime,
-		LastSuccessTime:     s.LastSuccessTime,
-	}
-	if s.LastError != nil {
-		cpy.LastError = errors.New(s.LastError.Error())
-	}
-	return cpy
 }
 
 type YellowCode struct{}
@@ -499,23 +448,6 @@ func (s *YellowCodeStatus) SetFailure(err error) {
 	s.ConsecutiveFailures++
 }
 
-// Copy creates a deep copy of the YellowCodeStatus.
-func (s *YellowCodeStatus) Copy() *YellowCodeStatus {
-	if s == nil {
-		return nil
-	}
-	cpy := &YellowCodeStatus{
-		LastStatus:          s.LastStatus,
-		ConsecutiveFailures: s.ConsecutiveFailures,
-		LastAlertTime:       s.LastAlertTime,
-		LastSuccessTime:     s.LastSuccessTime,
-	}
-	if s.LastError != nil {
-		cpy.LastError = errors.New(s.LastError.Error())
-	}
-	return cpy
-}
-
 type GrayCode struct{}
 
 type GrayCodeJob struct {
@@ -572,21 +504,4 @@ func (s *GrayCodeStatus) SetFailure(err error) {
 	s.LastStatus = "failed"
 	s.LastError = err
 	s.ConsecutiveFailures++
-}
-
-// Copy creates a deep copy of the GrayCodeStatus.
-func (s *GrayCodeStatus) Copy() *GrayCodeStatus {
-	if s == nil {
-		return nil
-	}
-	cpy := &GrayCodeStatus{
-		LastStatus:          s.LastStatus,
-		ConsecutiveFailures: s.ConsecutiveFailures,
-		LastAlertTime:       s.LastAlertTime,
-		LastSuccessTime:     s.LastSuccessTime,
-	}
-	if s.LastError != nil {
-		cpy.LastError = errors.New(s.LastError.Error())
-	}
-	return cpy
 }

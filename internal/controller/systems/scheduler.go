@@ -59,7 +59,7 @@ func (s *Scheduler) Run() {
 	}
 
 	s.CommandBuffer.Init()
-	
+
 	for {
 		select {
 		case <-ticker.C:

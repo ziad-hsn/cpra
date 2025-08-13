@@ -7,6 +7,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -122,12 +123,8 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			continue
 		}
 
-		namePtr := w.Mappers.Name.Get(entity)
-		if namePtr == nil {
-			continue
-		}
-		name := *namePtr
-		codeColor := w.Mappers.CodePending.Get(entity).Color
+		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		codeColor := strings.Clone(w.Mappers.CodePending.Get(entity).Color)
 
 		switch codeColor {
 		case "red":

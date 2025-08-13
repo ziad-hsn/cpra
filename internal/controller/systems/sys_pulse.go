@@ -8,6 +8,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -115,7 +116,7 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.En
 
 			// exchange PulseNeeded -> PulsePending
 
-			name := *w.Mappers.Name.Get(e)
+			name := strings.Clone(string(*w.Mappers.Name.Get(e)))
 			log.Printf("sent %s job\n", name)
 
 		default:
@@ -161,7 +162,8 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			continue
 		}
 
-		name := *w.Mappers.Name.Get(entity)
+		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+
 		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
 
 		if res.Error() != nil {

@@ -33,7 +33,7 @@ func main() {
 	l.Load()
 	manifest := l.GetManifest()
 
-	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)/100) // e.g., 8, 16, or 24
+	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)) // e.g., 8, 16, or 24
 
 	// start workers pools
 	pools := workerspool.NewPoolsManager()

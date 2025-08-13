@@ -4,9 +4,9 @@ import (
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
-	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
+	"strings"
 	"time"
 )
 
@@ -111,35 +111,6 @@ func InitializeMappers(world *ecs.World) *EntityManager {
 	}
 }
 
-// MarkAsPending sets the entity to a 'pending' state for a pulse check.
-// It ensures other conflicting status components are removed.
-func (e *EntityManager) MarkAsPending(entity ecs.Entity) error {
-	if !e.World.Alive(entity) {
-		return fmt.Errorf("Entity is not found in the world: %v.\n", entity)
-	}
-
-	if e.PulsePending.Get(entity) == nil {
-		e.PulsePending.Add(entity)
-	}
-
-	if e.PulseSuccess.Get(entity) != nil { // Check if component exists by trying to Get it
-		e.PulseSuccess.Remove(entity)
-	}
-	if e.PulseFailed.Get(entity) != nil {
-		e.PulseFailed.Remove(entity)
-	}
-
-	// Optionally update InterventionStatus component
-	if _, st := e.Pulse.Get(entity); st != nil {
-		copySt := *st // copy the PulseStatus
-		copySt.LastStatus = "Pending"
-		copySt.LastCheckTime = time.Now()
-		copySt.LastError = nil
-		e.PulseStatus.Assign(entity, &copySt)
-	}
-	return nil
-}
-
 // EnableMonitor ensures a monitor is active.
 func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
 
@@ -149,11 +120,6 @@ func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
 	if e.PulseFirstCheck.Get(entity) == nil {
 		e.PulseFirstCheck.Add(entity)
 	}
-	// Optionally, if enabling a monitor should trigger an immediate check:
-	// c.Mappers.PulseFirstCheck.GetOrAdd(entity) // Or c.Mappers.PulseFirstCheck.Add(entity)
-	// You might also want to reset its InterventionStatus here or clear pending/failed/success states.
-	// For instance, when re-enabling, it might go into a "Pending" state for its first check.
-	// c.MarkAsPending(entity) // If re-enabling implies it needs an immediate check.
 }
 
 // DisableMonitor deactivates a monitor.
@@ -161,28 +127,10 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 	if e.Disabled.Get(entity) == nil {
 		e.Disabled.Add(entity)
 	}
-	if e.Disabled.Get(entity) == nil {
-		e.Disabled.Add(entity)
-	}
 	// When disabling, you might want to clear any transient pulse states:
 
-	if e.PulsePending.Get(entity) != nil {
+	if e.World.Has(entity, ecs.ComponentID[components.PulsePending](e.World)) {
 		e.PulsePending.Remove(entity)
-	}
-
-	if e.PulseFailed.Get(entity) != nil {
-		e.PulseFailed.Remove(entity)
-	}
-
-	if e.PulseSuccess.Get(entity) != nil {
-		e.PulseSuccess.Remove(entity)
-	}
-
-	// Or update InterventionStatus to indicate it's disabled.
-	if _, st := e.Pulse.Get(entity); st != nil {
-		copySt := *st
-		copySt.LastStatus = "Disabled"
-		e.PulseStatus.Assign(entity, &copySt)
 	}
 }
 
@@ -192,7 +140,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 ) error {
 	entity := e.World.NewEntity()
 	// ... (entity creation logic as before) ...
-	nameComponent := components.Name(monitor.Name)
+	nameComponent := components.Name(strings.Clone(monitor.Name))
 	e.Name.Assign(entity, &nameComponent)
 
 	if monitor.Enabled {
@@ -204,7 +152,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		LastCheckTime: time.Now(),
 	})
 	pulseCfg := components.PulseConfig{
-		Type:        string([]byte(monitor.Pulse.Type)),
+		Type:        strings.Clone(monitor.Pulse.Type),
 		MaxFailures: monitor.Pulse.MaxFailures,
 		Timeout:     monitor.Pulse.Timeout,
 		Interval:    monitor.Pulse.Interval,
@@ -223,16 +171,15 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	e.PulseJob.Assign(entity, &components.PulseJob{Job: j.Copy()})
 
 	if monitor.Intervention.Action != "" {
-		var max_failures int
+		var maxFailures int = 1
 		if monitor.Intervention.MaxFailures > 0 {
-			max_failures = monitor.Intervention.MaxFailures
-		} else {
-			max_failures = 1
+			maxFailures = monitor.Intervention.MaxFailures
 		}
+
 		interventionCfg := &components.InterventionConfig{
-			Action:      string([]byte(monitor.Intervention.Action)),
+			Action:      strings.Clone(monitor.Intervention.Action),
 			Target:      monitor.Intervention.Target.Copy(), // Use Copy method
-			MaxFailures: max_failures,
+			MaxFailures: maxFailures,
 		}
 		InterventionStatus := &components.InterventionStatus{
 			LastInterventionTime: time.Now(),
@@ -255,7 +202,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.RedCode.Assign(entity, &components.RedCode{})
 			CodeConfig := &components.RedCodeConfig{
 				Dispatch: configCopy.Dispatch,
-				Notify:   string([]byte(configCopy.Notify)),
+				Notify:   strings.Clone(configCopy.Notify),
 				Config:   configCopy.Config, // Use copied config
 			}
 
@@ -264,7 +211,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.RedCodeConfig.Assign(entity, CodeConfig)
 			e.RedCodeStatus.Assign(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
 			if err != nil {
 				return err
 			}
@@ -273,7 +220,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.GreenCode.Assign(entity, &components.GreenCode{})
 			CodeConfig := &components.GreenCodeConfig{
 				Dispatch: configCopy.Dispatch,
-				Notify:   string([]byte(configCopy.Notify)),
+				Notify:   strings.Clone(configCopy.Notify),
 				Config:   configCopy.Config, // Use copied config
 			}
 			CodeStatus := &components.GreenCodeStatus{
@@ -281,7 +228,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.GreenCodeConfig.Assign(entity, CodeConfig)
 			e.GreenCodeStatus.Assign(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
 			if err != nil {
 				return err
 			}
@@ -290,7 +237,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.YellowCode.Assign(entity, &components.YellowCode{})
 			CodeConfig := &components.YellowCodeConfig{
 				Dispatch: configCopy.Dispatch,
-				Notify:   string([]byte(configCopy.Notify)),
+				Notify:   strings.Clone(configCopy.Notify),
 				Config:   configCopy.Config, // Use copied config
 			}
 			CodeStatus := &components.YellowCodeStatus{
@@ -298,7 +245,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.YellowCodeConfig.Assign(entity, CodeConfig)
 			e.YellowCodeStatus.Assign(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
 			if err != nil {
 				return err
 			}
@@ -307,7 +254,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.CyanCode.Assign(entity, &components.CyanCode{})
 			CodeConfig := &components.CyanCodeConfig{
 				Dispatch: configCopy.Dispatch,
-				Notify:   string([]byte(configCopy.Notify)),
+				Notify:   strings.Clone(configCopy.Notify),
 				Config:   configCopy.Config, // Use copied config
 			}
 			CodeStatus := &components.CyanCodeStatus{
@@ -315,7 +262,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.CyanCodeConfig.Assign(entity, CodeConfig)
 			e.CyanCodeStatus.Assign(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
 			if err != nil {
 				return err
 			}
@@ -324,7 +271,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			e.GrayCode.Assign(entity, &components.GrayCode{})
 			CodeConfig := &components.GrayCodeConfig{
 				Dispatch: configCopy.Dispatch,
-				Notify:   string([]byte(configCopy.Notify)),
+				Notify:   strings.Clone(configCopy.Notify),
 				Config:   configCopy.Config, // Use copied config
 			}
 			CodeStatus := &components.GrayCodeStatus{
@@ -332,7 +279,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.GrayCodeConfig.Assign(entity, CodeConfig)
 			e.GrayCodeStatus.Assign(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(monitor.Name, config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
 			if err != nil {
 				return err
 			}

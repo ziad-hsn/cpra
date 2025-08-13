@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"strings"
 	"time"
 )
 
@@ -201,8 +202,8 @@ type InterventionTargetDocker struct {
 
 func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
-		Type:      i.Type,
-		Container: i.Container,
+		Type:      strings.Clone(i.Type),
+		Container: strings.Clone(i.Container),
 	}
 }
 
@@ -221,7 +222,7 @@ type CodeNotificationLog struct {
 
 func (c *CodeNotificationLog) Copy() CodeNotification {
 	return &CodeNotificationLog{
-		File: c.File,
+		File: strings.Clone(c.File),
 	}
 }
 
@@ -234,7 +235,7 @@ type CodeNotificationPagerDuty struct {
 
 func (c *CodeNotificationPagerDuty) Copy() CodeNotification {
 	return &CodeNotificationPagerDuty{
-		URL: c.URL,
+		URL: strings.Clone(c.URL),
 	}
 }
 
@@ -247,7 +248,7 @@ type CodeNotificationSlack struct {
 
 func (c *CodeNotificationSlack) Copy() CodeNotification {
 	return &CodeNotificationSlack{
-		WebHook: c.WebHook,
+		WebHook: strings.Clone(c.WebHook),
 	}
 }
 

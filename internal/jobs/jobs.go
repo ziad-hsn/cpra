@@ -10,6 +10,7 @@ import (
 	"github.com/moby/moby/client"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		return &PulseHTTPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			URL:     cfg.Url,
+			URL:     strings.Clone(cfg.Url),
 			Method:  cfg.Method, // Consider defaulting if empty
 			Timeout: timeout,
 			Retries: cfg.Retries,
@@ -37,7 +38,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		return &PulseTCPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			Host:    cfg.Host,
+			Host:    strings.Clone(cfg.Host),
 			Port:    cfg.Port,
 			Timeout: timeout,
 			Retries: cfg.Retries,
@@ -46,7 +47,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		return &PulseICMPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
-			Host:    cfg.Host,
+			Host:    strings.Clone(cfg.Host),
 			Timeout: timeout,
 			Count:   cfg.Count,
 		}, nil
@@ -64,7 +65,7 @@ func CreateInterventionJob(InterventionSchema schema.Intervention, jobID ecs.Ent
 		return &InterventionDockerJob{
 			ID:        uuid.New(),
 			Entity:    jobID,
-			Container: InterventionSchema.Target.(*schema.InterventionTargetDocker).Container,
+			Container: strings.Clone(InterventionSchema.Target.(*schema.InterventionTargetDocker).Container),
 			Retries:   retries,
 			Timeout:   InterventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
 		}, nil
@@ -79,25 +80,25 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 	case "log":
 		return &CodeLogJob{
 			ID:      uuid.New(),
-			File:    config.Config.(*schema.CodeNotificationLog).File,
+			File:    strings.Clone(config.Config.(*schema.CodeNotificationLog).File),
 			Entity:  jobID,
-			Monitor: monitor,
+			Monitor: strings.Clone(monitor),
 			Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", monitor),
 		}, nil
 	case "pagerduty":
 		return &CodePagerDutyJob{
 			ID:      uuid.New(),
-			URL:     config.Config.(*schema.CodeNotificationPagerDuty).URL,
+			URL:     strings.Clone(config.Config.(*schema.CodeNotificationPagerDuty).URL),
 			Entity:  jobID,
-			Monitor: monitor,
+			Monitor: strings.Clone(monitor),
 			Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", monitor),
 		}, nil
 	case "slack":
 		return &CodeSlackJob{
 			ID:      uuid.New(),
-			WebHook: config.Config.(*schema.CodeNotificationSlack).WebHook,
+			WebHook: strings.Clone(config.Config.(*schema.CodeNotificationSlack).WebHook),
 			Entity:  jobID,
-			Monitor: monitor,
+			Monitor: strings.Clone(monitor),
 			Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", monitor),
 		}, nil
 
@@ -126,7 +127,13 @@ func (p *PulseHTTPJob) Execute() Result {
 	attempts := p.Retries + 1
 	for i := 0; i < attempts; i++ {
 		// Create a new request for each attempt.
-		req, err := http.NewRequest(p.Method, p.URL, nil)
+		var method string
+		if p.Method != "" {
+			method = p.Method
+		} else {
+			method = "GET"
+		}
+		req, err := http.NewRequest(method, p.URL, nil)
 		if err != nil {
 			// This is a fatal error in creating the request itself; retrying won't help.
 			return Result{

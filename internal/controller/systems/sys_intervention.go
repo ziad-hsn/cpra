@@ -8,6 +8,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -88,7 +89,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		name := *w.Mappers.Name.Get(entity)
+		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
 		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {

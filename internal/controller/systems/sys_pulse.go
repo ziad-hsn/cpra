@@ -4,11 +4,9 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -40,14 +38,14 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 		// first‑time check?
 		if w.Mappers.World.Has(ent, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
+			//log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
 			continue
 		}
 
 		// interval check
 		if time.Since(lastCheckTime) >= interval {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
+			//log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
 		}
 	}
 	return toCheck
@@ -116,8 +114,8 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.En
 
 			// exchange PulseNeeded -> PulsePending
 
-			name := strings.Clone(string(*w.Mappers.Name.Get(e)))
-			log.Printf("sent %s job\n", name)
+			//name := strings.Clone(string(*w.Mappers.Name.Get(e)))
+			//log.Printf("sent %s job\n", name)
 
 		default:
 			log.Printf("Job channel full, skipping dispatch for entity %v", e)
@@ -162,9 +160,9 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			continue
 		}
 
-		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		//name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
 
-		fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
+		//fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
 
 		if res.Error() != nil {
 			// ---- FAILURE ----
@@ -185,7 +183,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 			// interventions
 			if statusCopy.ConsecutiveFailures%maxFailures == 0 &&
 				w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
-				log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
+				//log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
 				commandBuffer.scheduleIntervention(entity)
 				monitorCopy.Status = "failed"
 			}

@@ -4,11 +4,9 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"fmt"
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -46,7 +44,7 @@ func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map
 				commandBuffer.markInterventionPending(ent)
 			}
 		default:
-			log.Printf("Job channel full for entity %v\n", ent)
+			log.Printf("Intervention Job channel full for entity %v\n", ent)
 		}
 	}
 }
@@ -89,11 +87,11 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
-		fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
+		//name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		//fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
-			fmt.Println("booooooooooooooooooooooooooooooooooooo")
+			//fmt.Println("booooooooooooooooooooooooooooooooooooo")
 			// ---- FAILURE ----
 			maxFailures := w.Mappers.InterventionConfig.Get(entity).MaxFailures
 			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
@@ -105,10 +103,10 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			//monitorCopy.Status = "failed"
 
 			commandBuffer.setInterventionStatus(entity, statusCopy)
-			fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
+			//fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
 			if maxFailures <= statusCopy.ConsecutiveFailures {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-					log.Printf("Monitor %s intervention failed\n", name)
+					//log.Printf("Monitor %s intervention failed\n", name)
 
 					commandBuffer.scheduleCode(entity, "red")
 				}
@@ -119,7 +117,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			}
 
 		} else {
-			fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
+			//fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
 			// ---- SUCCESS ----
 			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
 			//monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
@@ -136,7 +134,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			if lastStatus == "failed" &&
 				w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 
-				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
+				//log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 				commandBuffer.scheduleCode(entity, "cyan")
 			}
 		}

@@ -18,7 +18,7 @@ func main() {
 
 	//defer pprof.StopCPUProfile()
 	//runtime.GOMAXPROCS(24)
-	//debug.SetGCPercent(20)
+	debug.SetGCPercent(20)
 	//debug.SetMemoryLimit(1024 * 1024 * 1024 * 1024)
 
 	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -37,9 +37,9 @@ func main() {
 
 	// start workers pools
 	pools := workerspool.NewPoolsManager()
-	pools.NewPool("pulse", numWorkers, 1000000, 1000000)
-	pools.NewPool("intervention", numWorkers, 1000000, 1000000)
-	pools.NewPool("code", numWorkers, 1000000, 1000000)
+	pools.NewPool("pulse", numWorkers, 10000, 10000)
+	pools.NewPool("intervention", numWorkers, 10000, 10000)
+	pools.NewPool("code", numWorkers, 10000, 10000)
 	pulseJobChan, err := pools.GetJobChannel("pulse")
 	if err != nil {
 		log.Fatal(err)

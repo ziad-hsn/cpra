@@ -30,7 +30,7 @@ type CommandBufferSystem struct {
 
 func NewCommandBufferSystem(w *ecs.World) *CommandBufferSystem {
 	return &CommandBufferSystem{
-		Commands: make([]func(), 0),
+		Commands: make([]func(), 0, 100), // Start with reasonable capacity
 		Mux:      &sync.RWMutex{},
 		World:    w,
 	}
@@ -53,172 +53,163 @@ func (s *CommandBufferSystem) Init() {
 	s.CodeNeeded = generic.NewMap1[components.CodeNeeded](s.World)
 	s.CodePending = generic.NewMap[components.CodePending](s.World)
 }
-func (s *CommandBufferSystem) Add(command func()) {
 
+func (s *CommandBufferSystem) Add(command func()) {
 	s.Commands = append(s.Commands, command)
 }
 
 func (s *CommandBufferSystem) Clear() {
+	// Reuse the underlying array to avoid allocations
+	s.Commands = s.Commands[:0]
 
-	s.Commands = make([]func(), 0)
+	// Only reallocate if it grew too large
+	if cap(s.Commands) > 10000 {
+		s.Commands = make([]func(), 0, 100)
+	}
 }
 
 func (s *CommandBufferSystem) PlayBack() {
-
 	for _, op := range s.Commands {
 		op()
 	}
 }
 
+// SetPulseStatus Fixed: Properly allocate on heap without taking address of parameter
 func (s *CommandBufferSystem) SetPulseStatus(entity ecs.Entity, status components.PulseStatus) {
-	s.Add(func(e ecs.Entity, st components.PulseStatus) func() {
-		// write updated status
-		return func() {
-			s.PulseStatus.Set(e, &st)
-		}
-	}(entity, status))
+	s.Add(func() {
+		statusCopy := new(components.PulseStatus)
+		*statusCopy = status
+		s.PulseStatus.Set(entity, statusCopy)
+	})
 }
 
 func (s *CommandBufferSystem) setMonitorStatus(entity ecs.Entity, status components.MonitorStatus) {
-	s.Add(func(e ecs.Entity, st components.MonitorStatus) func() {
-		// write updated status
-		return func() {
-			s.MonitorStatus.Set(e, &st)
-		}
-	}(entity, status))
-
+	s.Add(func() {
+		statusCopy := new(components.MonitorStatus)
+		*statusCopy = status
+		s.MonitorStatus.Set(entity, statusCopy)
+	})
 }
 
 func (s *CommandBufferSystem) setInterventionStatus(entity ecs.Entity, status components.InterventionStatus) {
-	s.Add(func(e ecs.Entity, st components.InterventionStatus) func() {
-		return func() {
-			s.InterventionStatus.Set(e, &st)
-		}
-	}(entity, status))
-
+	s.Add(func() {
+		statusCopy := new(components.InterventionStatus)
+		*statusCopy = status
+		s.InterventionStatus.Set(entity, statusCopy)
+	})
 }
 
 func (s *CommandBufferSystem) setRedCodeStatus(entity ecs.Entity, status components.RedCodeStatus) {
-	s.Add(func(e ecs.Entity, st components.RedCodeStatus) func() {
-		return func() {
-			s.RedCodeStatus.Set(e, &st)
-		}
-	}(entity, status))
+	s.Add(func() {
+		statusCopy := new(components.RedCodeStatus)
+		*statusCopy = status
+		s.RedCodeStatus.Set(entity, statusCopy)
+	})
 }
 
 func (s *CommandBufferSystem) setGrayCodeStatus(entity ecs.Entity, status components.GrayCodeStatus) {
-
-	s.Add(func(e ecs.Entity, st components.GrayCodeStatus) func() {
-		return func() {
-			s.GrayCodeStatus.Set(e, &st)
-		}
-	}(entity, status))
+	s.Add(func() {
+		statusCopy := new(components.GrayCodeStatus)
+		*statusCopy = status
+		s.GrayCodeStatus.Set(entity, statusCopy)
+	})
 }
+
 func (s *CommandBufferSystem) setGreenCodeStatus(entity ecs.Entity, status components.GreenCodeStatus) {
-
-	s.Add(func(e ecs.Entity, st components.GreenCodeStatus) func() {
-		return func() {
-			s.GreenCodeStatus.Set(e, &st)
-		}
-	}(entity, status))
+	s.Add(func() {
+		statusCopy := new(components.GreenCodeStatus)
+		*statusCopy = status
+		s.GreenCodeStatus.Set(entity, statusCopy)
+	})
 }
+
 func (s *CommandBufferSystem) setYellowCodeStatus(entity ecs.Entity, status components.YellowCodeStatus) {
-
-	s.Add(func(e ecs.Entity, st components.YellowCodeStatus) func() {
-		return func() {
-			s.YellowCodeStatus.Set(e, &st)
-		}
-	}(entity, status))
+	s.Add(func() {
+		statusCopy := new(components.YellowCodeStatus)
+		*statusCopy = status
+		s.YellowCodeStatus.Set(entity, statusCopy)
+	})
 }
-func (s *CommandBufferSystem) setCyanCodeStatus(entity ecs.Entity, status components.CyanCodeStatus) {
 
-	s.Add(func(e ecs.Entity, st components.CyanCodeStatus) func() {
-		return func() {
-			s.CyanCodeStatus.Set(e, &st)
-		}
-	}(entity, status))
+func (s *CommandBufferSystem) setCyanCodeStatus(entity ecs.Entity, status components.CyanCodeStatus) {
+	s.Add(func() {
+		statusCopy := new(components.CyanCodeStatus)
+		*statusCopy = status
+		s.CyanCodeStatus.Set(entity, statusCopy)
+	})
 }
 
 func (s *CommandBufferSystem) schedulePulse(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() {
-		return func() {
-			s.PulseNeeded.Assign(e, &components.PulseNeeded{})
-		}
-	}(entity))
-
+	s.Add(func() {
+		s.PulseNeeded.Assign(entity, &components.PulseNeeded{})
+	})
 }
 
 func (s *CommandBufferSystem) removeFirstCheck(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() {
-		return func() { s.PulseFirstCheck.Remove(e) }
-	}(entity))
-
+	s.Add(func() {
+		s.PulseFirstCheck.Remove(entity)
+	})
 }
 
 func (s *CommandBufferSystem) MarkPulsePending(entity ecs.Entity) {
-
-	s.Add(func(e ecs.Entity) func() {
-		return func() {
-			s.World.Exchange(
-				e,
-				[]ecs.ID{ecs.ComponentID[components.PulsePending](s.World)},
-				[]ecs.ID{ecs.ComponentID[components.PulseNeeded](s.World)},
-			)
-		}
-	}(entity))
-
+	s.Add(func() {
+		s.World.Exchange(
+			entity,
+			[]ecs.ID{ecs.ComponentID[components.PulsePending](s.World)},
+			[]ecs.ID{ecs.ComponentID[components.PulseNeeded](s.World)},
+		)
+	})
 }
 
 func (s *CommandBufferSystem) RemovePulsePending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() { return func() { s.PulsePending.Remove(e) } }(entity))
+	s.Add(func() {
+		s.PulsePending.Remove(entity)
+	})
 }
 
 func (s *CommandBufferSystem) scheduleIntervention(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() {
-		return func() { s.InterventionNeeded.Assign(e, &components.InterventionNeeded{}) }
-	}(entity))
-
+	s.Add(func() {
+		s.InterventionNeeded.Assign(entity, &components.InterventionNeeded{})
+	})
 }
 
 func (s *CommandBufferSystem) markInterventionPending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() {
-		return func() {
-			s.World.Exchange(
-				e,
-				[]ecs.ID{ecs.ComponentID[components.InterventionPending](s.World)},
-				[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](s.World)},
-			)
-
-		}
-	}(entity))
+	s.Add(func() {
+		s.World.Exchange(
+			entity,
+			[]ecs.ID{ecs.ComponentID[components.InterventionPending](s.World)},
+			[]ecs.ID{ecs.ComponentID[components.InterventionNeeded](s.World)},
+		)
+	})
 }
 
 func (s *CommandBufferSystem) RemoveInterventionPending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() { return func() { s.InterventionPending.Remove(e) } }(entity))
+	s.Add(func() {
+		s.InterventionPending.Remove(entity)
+	})
 }
 
 func (s *CommandBufferSystem) scheduleCode(entity ecs.Entity, color string) {
-	s.Add(func(e ecs.Entity, c string) func() {
-		return func() { s.CodeNeeded.Assign(e, &components.CodeNeeded{Color: c}) }
-	}(entity, color))
+	// Capture color by value in the closure
+	s.Add(func() {
+		s.CodeNeeded.Assign(entity, &components.CodeNeeded{Color: color})
+	})
 }
 
 func (s *CommandBufferSystem) MarkCodePending(entity ecs.Entity, color string) {
-	s.Add(func(e ecs.Entity, c string) func() {
-		return func() {
-
-			s.World.ExchangeFn(e, []ecs.ID{ecs.ComponentID[components.CodePending](s.World)}, []ecs.ID{ecs.ComponentID[components.CodeNeeded](s.World)}, func(entity ecs.Entity) {
-				s.CodePending.Set(entity, &components.CodePending{Color: c})
+	// Capture both entity and color by value
+	s.Add(func() {
+		s.World.ExchangeFn(entity,
+			[]ecs.ID{ecs.ComponentID[components.CodePending](s.World)},
+			[]ecs.ID{ecs.ComponentID[components.CodeNeeded](s.World)},
+			func(e ecs.Entity) {
+				s.CodePending.Set(e, &components.CodePending{Color: color})
 			})
-
-		}
-	}(entity, color))
+	})
 }
 
 func (s *CommandBufferSystem) RemoveCodePending(entity ecs.Entity) {
-	s.Add(func(e ecs.Entity) func() {
-		return func() {
-			s.World.Remove(entity, ecs.ComponentID[components.CodePending](s.World))
-		}
-	}(entity))
+	s.Add(func() {
+		s.World.Remove(entity, ecs.ComponentID[components.CodePending](s.World))
+	})
 }

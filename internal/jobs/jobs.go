@@ -29,7 +29,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			ID:      uuid.New(),
 			Entity:  jobID,
 			URL:     strings.Clone(cfg.Url),
-			Method:  cfg.Method, // Consider defaulting if empty
+			Method:  strings.Clone(cfg.Method), // Consider defaulting if empty
 			Timeout: timeout,
 			Retries: cfg.Retries,
 			Client:  http.Client{Timeout: timeout},
@@ -199,7 +199,7 @@ type PulseTCPJob struct {
 }
 
 func (p *PulseTCPJob) Execute() Result {
-	fmt.Println("executing TCP Job")
+	//fmt.Println("executing TCP Job")
 	res := Result{
 		Ent: p.Entity,
 		Err: nil,
@@ -225,7 +225,7 @@ type PulseICMPJob struct {
 }
 
 func (p *PulseICMPJob) Execute() Result {
-	fmt.Println("executing ICMP Job")
+	//fmt.Println("executing ICMP Job")
 	res := Result{
 		Ent: p.Entity,
 		Err: fmt.Errorf("ICMP check failed\n"),
@@ -376,6 +376,7 @@ func (c *CodeLogJob) Copy() Job {
 	// Create a new struct and copy all the values.
 	job := new(CodeLogJob)
 	*job = *c
+	job.File = strings.Clone(c.File)
 	return job
 
 }
@@ -391,7 +392,7 @@ type CodeSlackJob struct {
 }
 
 func (c *CodeSlackJob) Execute() Result {
-	fmt.Println("executing code Log Job")
+	//fmt.Println("executing code Log Job")
 	res := Result{
 		Ent: c.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),
@@ -418,7 +419,7 @@ type CodePagerDutyJob struct {
 }
 
 func (c *CodePagerDutyJob) Execute() Result {
-	fmt.Println("executing code pagerduty Job")
+	//fmt.Println("executing code pagerduty Job")
 	res := Result{
 		Ent: c.Entity,
 		Err: fmt.Errorf("Docker intervention failed\n"),

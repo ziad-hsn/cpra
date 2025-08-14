@@ -4,6 +4,7 @@ import (
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -241,7 +242,10 @@ func (c *RedCodeConfig) Copy() *RedCodeConfig {
 		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
+			if v.File == "" {
+				v.File = "default-cpra.log"
+			}
+			cpy.Config = &schema.CodeNotificationLog{File: strings.Clone(v.File)}
 		case *schema.CodeNotificationPagerDuty:
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
@@ -300,7 +304,10 @@ func (c *GreenCodeConfig) Copy() *GreenCodeConfig {
 		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
+			if v.File == "" {
+				v.File = "default-cpra.log"
+			}
+			cpy.Config = &schema.CodeNotificationLog{File: strings.Clone(v.File)}
 		case *schema.CodeNotificationPagerDuty:
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
@@ -358,7 +365,10 @@ func (c *CyanCodeConfig) Copy() *CyanCodeConfig {
 		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
+			if v.File == "" {
+				v.File = "default-cpra.log"
+			}
+			cpy.Config = &schema.CodeNotificationLog{File: strings.Clone(v.File)}
 		case *schema.CodeNotificationPagerDuty:
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
@@ -416,7 +426,10 @@ func (c *YellowCodeConfig) Copy() *YellowCodeConfig {
 		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
+			if v.File == "" {
+				v.File = "default-cpra.log"
+			}
+			cpy.Config = &schema.CodeNotificationLog{File: strings.Clone(v.File)}
 		case *schema.CodeNotificationPagerDuty:
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:
@@ -474,7 +487,10 @@ func (c *GrayCodeConfig) Copy() *GrayCodeConfig {
 		// Deep copy based on concrete type
 		switch v := c.Config.(type) {
 		case *schema.CodeNotificationLog:
-			cpy.Config = &schema.CodeNotificationLog{File: v.File}
+			if v.File == "" {
+				v.File = "default-cpra.log"
+			}
+			cpy.Config = &schema.CodeNotificationLog{File: strings.Clone(v.File)}
 		case *schema.CodeNotificationPagerDuty:
 			cpy.Config = &schema.CodeNotificationPagerDuty{URL: v.URL}
 		case *schema.CodeNotificationSlack:

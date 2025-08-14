@@ -33,13 +33,14 @@ func main() {
 	l.Load()
 	manifest := l.GetManifest()
 
-	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)) // e.g., 8, 16, or 24
+	numWorkers := max(runtime.NumCPU()*2, len(manifest.Monitors)/1000) // e.g., 8, 16, or 24
 
 	// start workers pools
 	pools := workerspool.NewPoolsManager()
-	pools.NewPool("pulse", numWorkers, 10000, 10000)
-	pools.NewPool("intervention", numWorkers, 10000, 10000)
-	pools.NewPool("code", numWorkers, 10000, 10000)
+	pools.NewPool("pulse", numWorkers, 65536, 65536)
+	pools.NewPool("intervention", numWorkers, 4096, 4096)
+	pools.NewPool("code", numWorkers, 4096, 4096)
+
 	pulseJobChan, err := pools.GetJobChannel("pulse")
 	if err != nil {
 		log.Fatal(err)

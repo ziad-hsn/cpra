@@ -7,6 +7,7 @@ import (
 	"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/arche/generic"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -87,7 +88,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		//name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
 		//fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
@@ -106,7 +107,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			//fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
 			if maxFailures <= statusCopy.ConsecutiveFailures {
 				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
-					//log.Printf("Monitor %s intervention failed\n", name)
+					log.Printf("Monitor %s intervention failed\n", name)
 
 					commandBuffer.scheduleCode(entity, "red")
 				}
@@ -134,7 +135,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			if lastStatus == "failed" &&
 				w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
 
-				//log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
+				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 				commandBuffer.scheduleCode(entity, "cyan")
 			}
 		}

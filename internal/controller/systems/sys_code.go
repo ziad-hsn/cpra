@@ -79,7 +79,7 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Ent
 				commandBuffer.MarkCodePending(e, item.color)
 			}
 
-			//log.Printf("Sent %s code job for entity %v", item.color, e)
+			log.Printf("Sent %s code job for entity %v", item.color, e)
 
 		default:
 			log.Printf("Job channel full for entity %v", e)
@@ -123,7 +123,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			continue
 		}
 
-		//name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
 		codeColor := strings.Clone(w.Mappers.CodePending.Get(entity).Color)
 
 		switch codeColor {
@@ -135,10 +135,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			}
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				//log.Printf("Monitor %s Code failed: %v\n", name, err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				//log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
 			commandBuffer.setRedCodeStatus(entity, st)
 			commandBuffer.RemoveCodePending(entity)
@@ -151,10 +151,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			}
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				//log.Printf("Monitor %s Code failed: %v\n", name, err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				//log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
 			commandBuffer.setGreenCodeStatus(entity, st)
 			commandBuffer.RemoveCodePending(entity)
@@ -167,10 +167,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			}
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				//log.Printf("Monitor %s Code failed: %v\n", name, err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				//log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
 			commandBuffer.setYellowCodeStatus(entity, st)
 			commandBuffer.RemoveCodePending(entity)
@@ -183,10 +183,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			}
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				//log.Printf("Monitor %s Code failed: %v\n", name, err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				//log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
 			commandBuffer.setCyanCodeStatus(entity, st)
 			commandBuffer.RemoveCodePending(entity)
@@ -199,10 +199,10 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 			}
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				//log.Printf("Monitor %s Code failed: %v\n", name, err)
+				log.Printf("Monitor %s Code failed: %v\n", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				//log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
 			commandBuffer.setGrayCodeStatus(entity, st)
 			commandBuffer.RemoveCodePending(entity)

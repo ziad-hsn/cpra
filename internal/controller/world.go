@@ -5,6 +5,8 @@ import (
 	"cpra/internal/loader/schema"
 	"fmt"
 	"github.com/mlange-42/ark/ecs"
+	//"log"
+	//"os"
 	"sync"
 )
 
@@ -15,17 +17,19 @@ type CPRaWorld struct {
 }
 
 func NewCPRaWorld(manifest *schema.Manifest, world *ecs.World) (*CPRaWorld, error) {
-	mu := &sync.Mutex{}
-	c := &CPRaWorld{mu: mu, World: ecs.NewWorld()} // Create instance
-	c.Mappers = entities.InitializeMappers(world)
+	//mu := &sync.Mutex{}
+	//c := &CPRaWorld{mu: mu, World: *world} // Create instance
+	mapper := entities.InitializeMappers(world)
 
 	for _, m := range manifest.Monitors {
-		err := c.Mappers.CreateEntityFromMonitor(m)
+		err := mapper.CreateEntityFromMonitor(m)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create entity for monitor %s: %w", m.Name, err)
 		}
 	}
-	return c, nil
+	//log.Println(world.Stats())
+	//os.Exit(0)
+	return nil, nil
 }
 
 func (w *CPRaWorld) SafeAccess(fn func()) {

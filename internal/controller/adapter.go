@@ -14,8 +14,8 @@ package controller
 //func NewMonitorAdapter(w *CPRaWorld, entity ecs.Entity) MonitorAdapter {
 //	return MonitorAdapter{
 //		entity:  entity,
-//		world:   w.Mappers.World,
-//		mappers: w.Mappers,
+//		world:   w.Mapper.World,
+//		mappers: w.Mapper,
 //	}
 //}
 //

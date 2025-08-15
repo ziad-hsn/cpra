@@ -95,7 +95,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			// ---- FAILURE ----
 			maxFailures := w.Mappers.InterventionConfig.Get(entity).MaxFailures
 			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
-			//monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
+			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
 
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
@@ -120,7 +120,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			//fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
 			// ---- SUCCESS ----
 			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
-			//monitorCopy := *(*w.Mappers.MonitorStatus.Get(entity)).Copy()
+			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
 			lastStatus := statusCopy.LastStatus
 
 			statusCopy.LastStatus = "success"
@@ -150,7 +150,6 @@ func (s *InterventionResultSystem) Update(w *controller.CPRaWorld, cb *CommandBu
 }
 
 func (s *InterventionResultSystem) Finalize(w *controller.CPRaWorld) {}
-
 
 ///* ------------------  Utility: dump component names  ------------------ */
 //

@@ -5,9 +5,10 @@ import (
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"fmt"
-	"github.com/mlange-42/ark/ecs"
 	"strings"
 	"time"
+
+	"github.com/mlange-42/ark/ecs"
 )
 
 type EntityManager struct {
@@ -34,29 +35,32 @@ type EntityManager struct {
 	InterventionNeeded  *ecs.Map1[components.InterventionNeeded]
 	InterventionJob     *ecs.Map1[components.InterventionJob]
 	//Code                ecs.Map2[components.CodeConfig, components.CodeStatus]
-	CodeNeeded       *ecs.Map1[components.CodeNeeded]
-	CodePending      *ecs.Map1[components.CodePending]
-	CodeJob          *ecs.Map1[components.CodeJob]
-	RedCode          *ecs.Map1[components.RedCode]
-	RedCodeJob       *ecs.Map1[components.RedCodeJob]
-	RedCodeConfig    *ecs.Map1[components.RedCodeConfig]
-	RedCodeStatus    *ecs.Map1[components.RedCodeStatus]
-	CyanCode         *ecs.Map1[components.CyanCode]
-	CyanCodeJob      *ecs.Map1[components.CyanCodeJob]
-	CyanCodeConfig   *ecs.Map1[components.CyanCodeConfig]
-	CyanCodeStatus   *ecs.Map1[components.CyanCodeStatus]
-	GreenCode        *ecs.Map1[components.GreenCode]
-	GreenCodeJob     *ecs.Map1[components.GreenCodeJob]
-	GreenCodeConfig  *ecs.Map1[components.GreenCodeConfig]
-	GreenCodeStatus  *ecs.Map1[components.GreenCodeStatus]
-	YellowCode       *ecs.Map1[components.YellowCode]
-	YellowCodeJob    *ecs.Map1[components.YellowCodeJob]
-	YellowCodeConfig *ecs.Map1[components.YellowCodeConfig]
-	YellowCodeStatus *ecs.Map1[components.YellowCodeStatus]
-	GrayCode         *ecs.Map1[components.GrayCode]
-	GrayCodeJob      *ecs.Map1[components.GrayCodeJob]
-	GrayCodeConfig   *ecs.Map1[components.GrayCodeConfig]
-	GrayCodeStatus   *ecs.Map1[components.GrayCodeStatus]
+	CodeNeeded                  *ecs.Map1[components.CodeNeeded]
+	CodePending                 *ecs.Map1[components.CodePending]
+	CodeJob                     *ecs.Map1[components.CodeJob]
+	RedCode                     *ecs.Map1[components.RedCode]
+	RedCodeJob                  *ecs.Map1[components.RedCodeJob]
+	RedCodeConfig               *ecs.Map1[components.RedCodeConfig]
+	RedCodeStatus               *ecs.Map1[components.RedCodeStatus]
+	CyanCode                    *ecs.Map1[components.CyanCode]
+	CyanCodeJob                 *ecs.Map1[components.CyanCodeJob]
+	CyanCodeConfig              *ecs.Map1[components.CyanCodeConfig]
+	CyanCodeStatus              *ecs.Map1[components.CyanCodeStatus]
+	GreenCode                   *ecs.Map1[components.GreenCode]
+	GreenCodeJob                *ecs.Map1[components.GreenCodeJob]
+	GreenCodeConfig             *ecs.Map1[components.GreenCodeConfig]
+	GreenCodeStatus             *ecs.Map1[components.GreenCodeStatus]
+	YellowCode                  *ecs.Map1[components.YellowCode]
+	YellowCodeJob               *ecs.Map1[components.YellowCodeJob]
+	YellowCodeConfig            *ecs.Map1[components.YellowCodeConfig]
+	YellowCodeStatus            *ecs.Map1[components.YellowCodeStatus]
+	GrayCode                    *ecs.Map1[components.GrayCode]
+	GrayCodeJob                 *ecs.Map1[components.GrayCodeJob]
+	GrayCodeConfig              *ecs.Map1[components.GrayCodeConfig]
+	GrayCodeStatus              *ecs.Map1[components.GrayCodeStatus]
+	PulsePendingExchange        *ecs.Exchange2[components.PulsePending, components.PulseNeeded]
+	InterventionPendingExchange *ecs.Exchange2[components.InterventionPending, components.InterventionNeeded]
+	CodePendingExchange         *ecs.Exchange2[components.CodePending, components.CodeNeeded]
 }
 
 // InitializeMappers creates and returns a EntityManager for a given world.
@@ -85,29 +89,32 @@ func InitializeMappers(world *ecs.World) *EntityManager {
 		InterventionNeeded:  ecs.NewMap1[components.InterventionNeeded](world),
 		InterventionJob:     ecs.NewMap1[components.InterventionJob](world),
 		//Code:                ecs.NewMap2[components.CodeConfig, components.CodeStatus](world),
-		CodeNeeded:       ecs.NewMap1[components.CodeNeeded](world),
-		CodePending:      ecs.NewMap1[components.CodePending](world),
-		CodeJob:          ecs.NewMap1[components.CodeJob](world),
-		RedCode:          ecs.NewMap1[components.RedCode](world),
-		RedCodeJob:       ecs.NewMap1[components.RedCodeJob](world),
-		RedCodeConfig:    ecs.NewMap1[components.RedCodeConfig](world),
-		RedCodeStatus:    ecs.NewMap1[components.RedCodeStatus](world),
-		CyanCode:         ecs.NewMap1[components.CyanCode](world),
-		CyanCodeJob:      ecs.NewMap1[components.CyanCodeJob](world),
-		CyanCodeConfig:   ecs.NewMap1[components.CyanCodeConfig](world),
-		CyanCodeStatus:   ecs.NewMap1[components.CyanCodeStatus](world),
-		GreenCode:        ecs.NewMap1[components.GreenCode](world),
-		GreenCodeJob:     ecs.NewMap1[components.GreenCodeJob](world),
-		GreenCodeConfig:  ecs.NewMap1[components.GreenCodeConfig](world),
-		GreenCodeStatus:  ecs.NewMap1[components.GreenCodeStatus](world),
-		YellowCode:       ecs.NewMap1[components.YellowCode](world),
-		YellowCodeJob:    ecs.NewMap1[components.YellowCodeJob](world),
-		YellowCodeConfig: ecs.NewMap1[components.YellowCodeConfig](world),
-		YellowCodeStatus: ecs.NewMap1[components.YellowCodeStatus](world),
-		GrayCode:         ecs.NewMap1[components.GrayCode](world),
-		GrayCodeJob:      ecs.NewMap1[components.GrayCodeJob](world),
-		GrayCodeConfig:   ecs.NewMap1[components.GrayCodeConfig](world),
-		GrayCodeStatus:   ecs.NewMap1[components.GrayCodeStatus](world),
+		CodeNeeded:                  ecs.NewMap1[components.CodeNeeded](world),
+		CodePending:                 ecs.NewMap1[components.CodePending](world),
+		CodeJob:                     ecs.NewMap1[components.CodeJob](world),
+		RedCode:                     ecs.NewMap1[components.RedCode](world),
+		RedCodeJob:                  ecs.NewMap1[components.RedCodeJob](world),
+		RedCodeConfig:               ecs.NewMap1[components.RedCodeConfig](world),
+		RedCodeStatus:               ecs.NewMap1[components.RedCodeStatus](world),
+		CyanCode:                    ecs.NewMap1[components.CyanCode](world),
+		CyanCodeJob:                 ecs.NewMap1[components.CyanCodeJob](world),
+		CyanCodeConfig:              ecs.NewMap1[components.CyanCodeConfig](world),
+		CyanCodeStatus:              ecs.NewMap1[components.CyanCodeStatus](world),
+		GreenCode:                   ecs.NewMap1[components.GreenCode](world),
+		GreenCodeJob:                ecs.NewMap1[components.GreenCodeJob](world),
+		GreenCodeConfig:             ecs.NewMap1[components.GreenCodeConfig](world),
+		GreenCodeStatus:             ecs.NewMap1[components.GreenCodeStatus](world),
+		YellowCode:                  ecs.NewMap1[components.YellowCode](world),
+		YellowCodeJob:               ecs.NewMap1[components.YellowCodeJob](world),
+		YellowCodeConfig:            ecs.NewMap1[components.YellowCodeConfig](world),
+		YellowCodeStatus:            ecs.NewMap1[components.YellowCodeStatus](world),
+		GrayCode:                    ecs.NewMap1[components.GrayCode](world),
+		GrayCodeJob:                 ecs.NewMap1[components.GrayCodeJob](world),
+		GrayCodeConfig:              ecs.NewMap1[components.GrayCodeConfig](world),
+		GrayCodeStatus:              ecs.NewMap1[components.GrayCodeStatus](world),
+		PulsePendingExchange:        ecs.NewExchange2[components.PulsePending, components.PulseNeeded](world),
+		InterventionPendingExchange: ecs.NewExchange2[components.InterventionPending, components.InterventionNeeded](world),
+		CodePendingExchange:         ecs.NewExchange2[components.CodePending, components.CodeNeeded](world),
 	}
 }
 

@@ -4,23 +4,23 @@ import (
 	"cpra/internal/controller/entities"
 	"cpra/internal/loader/schema"
 	"fmt"
-	"github.com/mlange-42/arche/ecs"
+	"github.com/mlange-42/ark/ecs"
 	"sync"
 )
 
 type CPRaWorld struct {
 	Mappers *entities.EntityManager
 	mu      *sync.Mutex
+	World   ecs.World
 }
 
-func NewCPRaWorld(manifest *schema.Manifest) (*CPRaWorld, error) {
+func NewCPRaWorld(manifest *schema.Manifest, world *ecs.World) (*CPRaWorld, error) {
 	mu := &sync.Mutex{}
-	c := &CPRaWorld{mu: mu} // Create instance
-	w := ecs.NewWorld()
-	c.Mappers = entities.InitializeMappers(&w)
+	c := &CPRaWorld{mu: mu, World: ecs.NewWorld()} // Create instance
+	c.Mappers = entities.InitializeMappers(world)
 
 	for _, m := range manifest.Monitors {
-		err := c.Mappers.CreateEntityFromMonitor(&m)
+		err := c.Mappers.CreateEntityFromMonitor(m)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create entity for monitor %s: %w", m.Name, err)
 		}

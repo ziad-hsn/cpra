@@ -3,8 +3,7 @@ package systems
 import (
 	"cpra/internal/controller/components"
 
-	"github.com/mlange-42/arche/ecs"
-	"github.com/mlange-42/arche/generic"
+	"github.com/mlange-42/ark/ecs"
 )
 
 /*
@@ -61,23 +60,25 @@ type cbOp struct {
 type CommandBufferSystem struct {
 	ops []cbOp
 
-	World               *ecs.World
-	MonitorStatus       generic.Map[components.MonitorStatus]
-	PulseStatus         generic.Map[components.PulseStatus]
-	InterventionStatus  generic.Map[components.InterventionStatus]
-	RedCodeStatus       generic.Map[components.RedCodeStatus]
-	GreenCodeStatus     generic.Map[components.GreenCodeStatus]
-	YellowCodeStatus    generic.Map[components.YellowCodeStatus]
-	CyanCodeStatus      generic.Map[components.CyanCodeStatus]
-	GrayCodeStatus      generic.Map[components.GrayCodeStatus]
-	PulseNeeded         generic.Map1[components.PulseNeeded]
-	PulseFirstCheck     generic.Map1[components.PulseFirstCheck]
-	PulsePending        generic.Map1[components.PulsePending]
-	InterventionNeeded  generic.Map1[components.InterventionNeeded]
-	InterventionPending generic.Map1[components.InterventionPending]
-	CodeNeeded          generic.Map1[components.CodeNeeded]
-	CodePending         generic.Map[components.CodePending]
-
+	World                       *ecs.World
+	MonitorStatus               *ecs.Map[components.MonitorStatus]
+	PulseStatus                 *ecs.Map[components.PulseStatus]
+	InterventionStatus          *ecs.Map[components.InterventionStatus]
+	RedCodeStatus               *ecs.Map[components.RedCodeStatus]
+	GreenCodeStatus             *ecs.Map[components.GreenCodeStatus]
+	YellowCodeStatus            *ecs.Map[components.YellowCodeStatus]
+	CyanCodeStatus              *ecs.Map[components.CyanCodeStatus]
+	GrayCodeStatus              *ecs.Map[components.GrayCodeStatus]
+	PulseNeeded                 *ecs.Map1[components.PulseNeeded]
+	PulseFirstCheck             *ecs.Map1[components.PulseFirstCheck]
+	PulsePending                *ecs.Map1[components.PulsePending]
+	InterventionNeeded          *ecs.Map1[components.InterventionNeeded]
+	InterventionPending         *ecs.Map1[components.InterventionPending]
+	CodeNeeded                  *ecs.Map1[components.CodeNeeded]
+	CodePending                 *ecs.Map[components.CodePending]
+	PulsePendingExchange        *ecs.Exchange2[components.PulsePending, components.PulseNeeded]
+	InterventionPendingExchange *ecs.Exchange2[components.InterventionPending, components.InterventionNeeded]
+	CodePendingExchange         *ecs.Exchange2[components.CodePending, components.CodeNeeded]
 	// cached component IDs (filled in Init)
 	pulseStatusID        ecs.ID
 	monitorStatusID      ecs.ID
@@ -107,45 +108,35 @@ func NewCommandBufferSystem(w *ecs.World) *CommandBufferSystem {
 
 func (s *CommandBufferSystem) Init() {
 	// mappers
-	s.MonitorStatus = generic.NewMap[components.MonitorStatus](s.World)
-	s.PulseStatus = generic.NewMap[components.PulseStatus](s.World)
-	s.InterventionStatus = generic.NewMap[components.InterventionStatus](s.World)
-	s.RedCodeStatus = generic.NewMap[components.RedCodeStatus](s.World)
-	s.GreenCodeStatus = generic.NewMap[components.GreenCodeStatus](s.World)
-	s.YellowCodeStatus = generic.NewMap[components.YellowCodeStatus](s.World)
-	s.CyanCodeStatus = generic.NewMap[components.CyanCodeStatus](s.World)
-	s.GrayCodeStatus = generic.NewMap[components.GrayCodeStatus](s.World)
+	s.MonitorStatus = ecs.NewMap[components.MonitorStatus](s.World)
 
-	s.PulseFirstCheck = generic.NewMap1[components.PulseFirstCheck](s.World)
-	s.PulseNeeded = generic.NewMap1[components.PulseNeeded](s.World)
-	s.PulsePending = generic.NewMap1[components.PulsePending](s.World)
+	s.PulseStatus = ecs.NewMap[components.PulseStatus](s.World)
 
-	s.InterventionNeeded = generic.NewMap1[components.InterventionNeeded](s.World)
-	s.InterventionPending = generic.NewMap1[components.InterventionPending](s.World)
+	s.InterventionStatus = ecs.NewMap[components.InterventionStatus](s.World)
 
-	s.CodeNeeded = generic.NewMap1[components.CodeNeeded](s.World)
-	s.CodePending = generic.NewMap[components.CodePending](s.World)
+	s.RedCodeStatus = ecs.NewMap[components.RedCodeStatus](s.World)
 
-	// component IDs (cached)
-	s.pulseStatusID = ecs.ComponentID[components.PulseStatus](s.World)
-	s.monitorStatusID = ecs.ComponentID[components.MonitorStatus](s.World)
-	s.interventionStatusID = ecs.ComponentID[components.InterventionStatus](s.World)
+	s.GreenCodeStatus = ecs.NewMap[components.GreenCodeStatus](s.World)
 
-	s.redCodeStatusID = ecs.ComponentID[components.RedCodeStatus](s.World)
-	s.greenCodeStatusID = ecs.ComponentID[components.GreenCodeStatus](s.World)
-	s.yellowCodeStatusID = ecs.ComponentID[components.YellowCodeStatus](s.World)
-	s.cyanCodeStatusID = ecs.ComponentID[components.CyanCodeStatus](s.World)
-	s.grayCodeStatusID = ecs.ComponentID[components.GrayCodeStatus](s.World)
+	s.YellowCodeStatus = ecs.NewMap[components.YellowCodeStatus](s.World)
 
-	s.pulseNeededID = ecs.ComponentID[components.PulseNeeded](s.World)
-	s.pulseFirstCheckID = ecs.ComponentID[components.PulseFirstCheck](s.World)
-	s.pulsePendingID = ecs.ComponentID[components.PulsePending](s.World)
+	s.CyanCodeStatus = ecs.NewMap[components.CyanCodeStatus](s.World)
 
-	s.interventionNeededID = ecs.ComponentID[components.InterventionNeeded](s.World)
-	s.interventionPendingID = ecs.ComponentID[components.InterventionPending](s.World)
+	s.GrayCodeStatus = ecs.NewMap[components.GrayCodeStatus](s.World)
 
-	s.codeNeededID = ecs.ComponentID[components.CodeNeeded](s.World)
-	s.codePendingID = ecs.ComponentID[components.CodePending](s.World)
+	s.PulseFirstCheck = ecs.NewMap1[components.PulseFirstCheck](s.World)
+	s.PulseNeeded = ecs.NewMap1[components.PulseNeeded](s.World)
+	s.PulsePending = ecs.NewMap1[components.PulsePending](s.World)
+
+	s.InterventionNeeded = ecs.NewMap1[components.InterventionNeeded](s.World)
+	s.InterventionPending = ecs.NewMap1[components.InterventionPending](s.World)
+
+	s.CodeNeeded = ecs.NewMap1[components.CodeNeeded](s.World)
+	s.CodePending = ecs.NewMap[components.CodePending](s.World)
+
+	s.PulsePendingExchange = ecs.NewExchange2[components.PulsePending, components.PulseNeeded](s.World)
+	s.InterventionPendingExchange = ecs.NewExchange2[components.InterventionPending, components.InterventionNeeded](s.World)
+	s.CodePendingExchange = ecs.NewExchange2[components.CodePending, components.CodeNeeded](s.World)
 }
 
 func (s *CommandBufferSystem) Add(op cbOp) { s.ops = append(s.ops, op) }
@@ -156,98 +147,98 @@ func (s *CommandBufferSystem) Clear() { s.ops = s.ops[:0] }
 // in-flight has() cache updated as we mutate the world.
 func (s *CommandBufferSystem) PlayBack() {
 	// per-playback caches
-	aliveCache := make(map[ecs.Entity]bool, 64)
-	type hasKey struct {
-		e  ecs.Entity
-		id ecs.ID
-	}
-	hasCache := make(map[hasKey]bool, 128)
+	//aliveCache := make(map[ecs.Entity]bool, 64)
+	//type hasKey struct {
+	//	e  ecs.Entity
+	//	id ecs.ID
+	//}
+	//hasCache := make(map[hasKey]bool, 128)
 
-	alive := func(e ecs.Entity) bool {
-		if v, ok := aliveCache[e]; ok {
-			return v
-		}
-		v := s.World.Alive(e)
-		aliveCache[e] = v
-		return v
-	}
-	has := func(e ecs.Entity, id ecs.ID) bool {
-		k := hasKey{e, id}
-		if v, ok := hasCache[k]; ok {
-			return v
-		}
-		v := s.World.Has(e, id)
-		hasCache[k] = v
-		return v
-	}
-	setHas := func(e ecs.Entity, id ecs.ID, v bool) {
-		hasCache[hasKey{e, id}] = v
-	}
+	//alive := func(e ecs.Entity) bool {
+	//	if v, ok := aliveCache[e]; ok {
+	//		return v
+	//	}
+	//	v := s.World.Alive(e)
+	//	aliveCache[e] = v
+	//	return v
+	//}
+	//has := func(e ecs.Entity, id ecs.ID) bool {
+	//	k := hasKey{e, id}
+	//	if v, ok := hasCache[k]; ok {
+	//		return v
+	//	}
+	//	v := s.PulsePending.h
+	//	hasCache[k] = v
+	//	return v
+	//}
+	//setHas := func(e ecs.Entity, id ecs.ID, v bool) {
+	//	hasCache[hasKey{e, id}] = v
+	//}
 
 	for i := range s.ops {
 		op := &s.ops[i]
 		e := op.e
 
-		if !alive(e) {
-			// zero slot and skip
-			s.ops[i] = cbOp{}
-			continue
-		}
+		//if !alive(e) {
+		//	// zero slot and skip
+		//	s.ops[i] = cbOp{}
+		//	continue
+		//}
 
 		switch op.k {
 
 		// ----- status writes (require component present) -----
 		case opSetPulseStatus:
-			if has(e, s.pulseStatusID) {
+			if s.PulseStatus.Has(e) {
 				v := new(components.PulseStatus)
 				*v = op.pulseStatus // heap copy to be conservative
 				s.PulseStatus.Set(e, v)
 			}
 
 		case opSetMonitorStatus:
-			if has(e, s.monitorStatusID) {
+			if s.MonitorStatus.Has(e) {
 				v := new(components.MonitorStatus)
 				*v = op.monitorStatus
 				s.MonitorStatus.Set(e, v)
 			}
 
 		case opSetInterventionStatus:
-			if has(e, s.interventionStatusID) {
+			if s.InterventionStatus.Has(e) {
 				v := new(components.InterventionStatus)
 				*v = op.interventionStatus
 				s.InterventionStatus.Set(e, v)
 			}
 
 		case opSetRedCodeStatus:
-			if has(e, s.redCodeStatusID) {
+			if s.RedCodeStatus.Has(e) {
 				v := new(components.RedCodeStatus)
 				*v = op.red
 				s.RedCodeStatus.Set(e, v)
 			}
 
 		case opSetGreenCodeStatus:
-			if has(e, s.greenCodeStatusID) {
+			if s.GreenCodeStatus.Has(e) {
 				v := new(components.GreenCodeStatus)
 				*v = op.green
 				s.GreenCodeStatus.Set(e, v)
 			}
 
 		case opSetYellowCodeStatus:
-			if has(e, s.yellowCodeStatusID) {
+			if s.YellowCodeStatus.Has(e) {
 				v := new(components.YellowCodeStatus)
 				*v = op.yellow
 				s.YellowCodeStatus.Set(e, v)
 			}
 
 		case opSetCyanCodeStatus:
-			if has(e, s.cyanCodeStatusID) {
+			if s.CyanCodeStatus.Has(e) {
 				v := new(components.CyanCodeStatus)
 				*v = op.cyan
 				s.CyanCodeStatus.Set(e, v)
 			}
 
 		case opSetGrayCodeStatus:
-			if has(e, s.grayCodeStatusID) {
+			if s.GrayCodeStatus.Has(e) {
 				v := new(components.GrayCodeStatus)
 				*v = op.gray
 				s.GrayCodeStatus.Set(e, v)
@@ -256,79 +247,66 @@ func (s *CommandBufferSystem) PlayBack() {
 		// ----- pulse -----
 		case opAssignPulseNeeded:
 			// only if not already Needed/Pending
-			if !has(e, s.pulseNeededID) && !has(e, s.pulsePendingID) {
-				s.PulseNeeded.Assign(e, &components.PulseNeeded{})
-				setHas(e, s.pulseNeededID, true)
+			if !s.PulseNeeded.HasAll(e) && !s.PulsePending.HasAll(e) {
+				s.PulseNeeded.Set(e, &components.PulseNeeded{})
 			}
 
 		case opRemoveFirstCheck:
-			if has(e, s.pulseFirstCheckID) {
+			if s.PulseFirstCheck.HasAll(e) {
 				s.PulseFirstCheck.Remove(e)
-				setHas(e, s.pulseFirstCheckID, false)
 			}
 
 		case opExchangePulsePending:
 			// Needed -> Pending; only if currently Needed and not already Pending
-			if has(e, s.pulseNeededID) && !has(e, s.pulsePendingID) {
-				s.World.Exchange(
+			if s.PulseNeeded.HasAll(e) && !s.PulsePending.HasAll(e) {
+				s.PulsePendingExchange.Exchange(
 					e,
-					[]ecs.ID{s.pulsePendingID},
-					[]ecs.ID{s.pulseNeededID},
+					&components.PulsePending{},
+					&components.PulseNeeded{},
 				)
-				setHas(e, s.pulseNeededID, false)
-				setHas(e, s.pulsePendingID, true)
 			}
 
 		// ----- intervention -----
 		case opAssignInterventionNeeded:
-			if !has(e, s.interventionNeededID) && !has(e, s.interventionPendingID) {
-				s.InterventionNeeded.Assign(e, &components.InterventionNeeded{})
-				setHas(e, s.interventionNeededID, true)
+			if !s.InterventionNeeded.HasAll(e) && !s.InterventionPending.HasAll(e) {
+				s.InterventionNeeded.Set(e, &components.InterventionNeeded{})
 			}
 
 		case opExchangeInterventionPending:
-			if has(e, s.interventionNeededID) && !has(e, s.interventionPendingID) {
-				s.World.Exchange(
+			if s.InterventionNeeded.HasAll(e) && !s.InterventionPending.HasAll(e) {
+				s.InterventionPendingExchange.Exchange(
 					e,
-					[]ecs.ID{s.interventionPendingID},
-					[]ecs.ID{s.interventionNeededID},
+					&components.InterventionPending{},
+					&components.InterventionNeeded{},
 				)
-				setHas(e, s.interventionNeededID, false)
-				setHas(e, s.interventionPendingID, true)
+
 			}
 
 		case opRemoveInterventionPending:
-			if has(e, s.interventionPendingID) {
+			if s.InterventionPending.HasAll(e) {
 				s.InterventionPending.Remove(e)
-				setHas(e, s.interventionPendingID, false)
 			}
 
 		// ----- codes -----
 		case opAssignCodeNeeded:
-			if !has(e, s.codeNeededID) && !has(e, s.codePendingID) {
-				s.CodeNeeded.Assign(e, &components.CodeNeeded{Color: op.codeColor})
-				setHas(e, s.codeNeededID, true)
+			if !s.CodeNeeded.HasAll(e) && !s.CodePending.Has(e) {
+				s.CodeNeeded.Set(e, &components.CodeNeeded{Color: op.codeColor})
 			}
 
 		case opExchangeCodePending:
-			if has(e, s.codeNeededID) && !has(e, s.codePendingID) {
-				s.World.ExchangeFn(
+			if s.CodeNeeded.HasAll(e) && !s.CodePending.Has(e) {
+				s.CodePendingExchange.ExchangeFn(
 					e,
-					[]ecs.ID{s.codePendingID},
-					[]ecs.ID{s.codeNeededID},
-					func(ent ecs.Entity) {
-						val := components.CodePending{Color: op.codeColor}
-						s.CodePending.Set(ent, &val)
+					func(A *components.CodePending,
+						B *components.CodeNeeded) {
+						A.Color = op.codeColor
 					},
 				)
-				setHas(e, s.codeNeededID, false)
-				setHas(e, s.codePendingID, true)
 			}
 
 		case opRemoveCodePending:
-			if has(e, s.codePendingID) {
-				s.World.Remove(e, s.codePendingID)
-				setHas(e, s.codePendingID, false)
+			if s.CodePending.Has(e) {
+				s.CodePending.Remove(e)
 			}
 		}
 

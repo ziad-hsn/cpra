@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"github.com/google/uuid"
-	"github.com/mlange-42/arche/ecs"
+	"github.com/mlange-42/ark/ecs"
 )
 
 type Result struct {

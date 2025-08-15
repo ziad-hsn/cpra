@@ -1,6 +1,9 @@
 package main
 
 import (
+	"cpra/internal/controller"
+	"cpra/internal/controller/systems"
+	"cpra/internal/loader/loader"
 	"cpra/internal/workers/workerspool"
 	"fmt"
 	"log"
@@ -10,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"cpra/internal/controller/systems"
-	"cpra/internal/loader/loader"
+	"github.com/mlange-42/ark-tools/app"
+	ss "github.com/mlange-42/ark-tools/system"
 )
 
 func main() {
@@ -68,10 +71,24 @@ func main() {
 	pools.StartAll()
 	// build scheduler
 	wg := &sync.WaitGroup{}
-	scheduler := systems.NewScheduler(&manifest, wg, 100*time.Millisecond)
+	// Create a new, seeded tool.
+	tool := app.New(1024).Seed(123)
+	// Limit simulation speed.
+	tool.TPS = 30
+
+	c, err := controller.NewCPRaWorld(&manifest, &tool.World)
+	tool.AddSystem(&systems.PulseScheduleSystem{
+		Mappers: c.Mappers,
+	})
+	tool.AddSystem(&ss.PerfTimer{
+		UpdateInterval: int(10 * time.Microsecond),
+	})
+	// Add a termination system that ends the simulation.
+
+	scheduler := systems.NewScheduler(&manifest, wg, 100*time.Millisecond, &tool.World)
 
 	// Phase 1
-	scheduler.AddSchedule(&systems.PulseScheduleSystem{})
+	//scheduler.AddSchedule(&systems.PulseScheduleSystem{})
 
 	// Phase 2
 	scheduler.AddDispatch(&systems.PulseDispatchSystem{JobChan: pulseJobChan})
@@ -84,7 +101,7 @@ func main() {
 	scheduler.AddResult(&systems.CodeResultSystem{ResultChan: codeResultChan})
 
 	wg.Add(1)
-	go scheduler.Run()
+	go tool.Run()
 	timeout := time.After(24 * time.Hour)
 
 	<-timeout

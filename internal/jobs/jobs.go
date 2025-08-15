@@ -5,7 +5,7 @@ import (
 	"cpra/internal/loader/schema"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/mlange-42/arche/ecs"
+	"github.com/mlange-42/ark/ecs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"net/http"

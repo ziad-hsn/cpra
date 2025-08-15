@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"cpra/internal/controller"
+
+	"github.com/mlange-42/ark/ecs"
 )
 
 type PhaseSystem interface {
@@ -26,12 +28,12 @@ type Scheduler struct {
 	CommandBuffer   *CommandBufferSystem
 }
 
-func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Duration) *Scheduler {
-	world, err := controller.NewCPRaWorld(manifest)
+func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Duration, world *ecs.World) *Scheduler {
+	w, err := controller.NewCPRaWorld(manifest, world)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &Scheduler{World: world, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem(world.Mappers.World)}
+	return &Scheduler{World: w, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem(w.Mappers.World)}
 }
 
 func (s *Scheduler) AddSchedule(sys PhaseSystem) { s.ScheduleSystems = append(s.ScheduleSystems, sys) }

@@ -18,7 +18,7 @@ package systems
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	entity := w.Mappers.CreateEntityFromMonitor(m)
+//	entity := w.Mapper.CreateEntityFromMonitor(m)
 //	w.AddComponent(entity, components.PulseConfig{ /* ... */ })
 //	w.AddComponent(entity, components.Status{ /* ... */ })
 //	// ... setup as needed

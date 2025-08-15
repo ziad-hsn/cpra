@@ -2,9 +2,10 @@ package schema
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 //// UTILITY TYPES
@@ -128,23 +129,23 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	}
 	switch temp.Type {
 	case "http":
-		var c PulseHTTPConfig
-		if err := temp.Config.Decode(&c); err != nil {
+		var c = &PulseHTTPConfig{} // FIX: Allocate on the heap
+		if err := temp.Config.Decode(c); err != nil {
 			return err
 		}
-		p.Config = &c
+		p.Config = c
 	case "tcp":
-		var c PulseTCPConfig
-		if err := temp.Config.Decode(&c); err != nil {
+		var c = &PulseTCPConfig{} // FIX: Allocate on the heap
+		if err := temp.Config.Decode(c); err != nil {
 			return err
 		}
-		p.Config = &c
+		p.Config = c
 	case "icmp":
-		var c PulseICMPConfig
-		if err := temp.Config.Decode(&c); err != nil {
+		var c = &PulseICMPConfig{} // FIX: Allocate on the heap
+		if err := temp.Config.Decode(c); err != nil {
 			return err
 		}
-		p.Config = &c
+		p.Config = c
 	default:
 		return fmt.Errorf("unknown pulse type: %q", temp.Type)
 	}
@@ -178,11 +179,11 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 	}
 	switch temp.Action {
 	case "docker":
-		var t InterventionTargetDocker
-		if err := temp.Target.Decode(&t); err != nil {
+		var t = &InterventionTargetDocker{} // FIX: Allocate on the heap
+		if err := temp.Target.Decode(t); err != nil {
 			return err
 		}
-		i.Target = &t
+		i.Target = t
 	default:
 		return fmt.Errorf("unknown intervention type: %q", temp.Action)
 	}
@@ -269,7 +270,6 @@ type rawCodes struct {
 }
 
 func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
-
 	var codes map[string]yaml.Node
 	if err := value.Decode(&codes); err != nil {
 		return err
@@ -283,45 +283,42 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 		if err := config.Decode(&temp); err != nil {
 			return err
 		}
-
 		switch temp.Notify {
 		case "log":
-			var t CodeNotificationLog
-			if err := temp.Config.Decode(&t); err != nil {
+			var t = &CodeNotificationLog{} // FIX: Allocate on the heap
+			if err := temp.Config.Decode(t); err != nil {
 				return err
 			}
 			colors[color] = CodeConfig{
 				Dispatch: temp.Dispatch,
 				Notify:   temp.Notify,
-				Config:   &t,
+				Config:   t,
 			}
 		case "slack":
-			var t CodeNotificationSlack
-			if err := temp.Config.Decode(&t); err != nil {
+			var t = &CodeNotificationSlack{} // FIX: Allocate on the heap
+			if err := temp.Config.Decode(t); err != nil {
 				return err
 			}
 			colors[color] = CodeConfig{
 				Dispatch: temp.Dispatch,
 				Notify:   temp.Notify,
-				Config:   &t,
+				Config:   t,
 			}
 		case "pagerduty":
-			var t CodeNotificationPagerDuty
-			if err := temp.Config.Decode(&t); err != nil {
+			var t = &CodeNotificationPagerDuty{} // FIX: Allocate on the heap
+			if err := temp.Config.Decode(t); err != nil {
 				return err
 			}
 			colors[color] = CodeConfig{
 				Dispatch: temp.Dispatch,
 				Notify:   temp.Notify,
-				Config:   &t,
+				Config:   t,
 			}
 		default:
 			return fmt.Errorf("unknown notificiation type: %q", temp.Notify)
-
 		}
 	}
 	*c = colors
-
 	return nil
 }
 

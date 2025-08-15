@@ -4,8 +4,8 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"github.com/mlange-42/arche/ecs"
-	"github.com/mlange-42/arche/generic"
+	//"github.com/mlange-42/arche/ecs"
+	"github.com/mlange-42/ark/ecs"
 	"log"
 	"strings"
 	"time"
@@ -20,17 +20,17 @@ type dispatchableCodeJob struct {
 
 type CodeDispatchSystem struct {
 	JobChan          chan<- jobs.Job
-	CodeNeededFilter *generic.Filter1[components.CodeNeeded]
+	CodeNeededFilter *ecs.Filter1[components.CodeNeeded]
 }
 
 func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.CodeNeededFilter = generic.NewFilter1[components.CodeNeeded]().
-		Without(generic.T[components.CodePending]())
+	s.CodeNeededFilter = ecs.NewFilter1[components.CodeNeeded](w.Mappers.World).
+		Without(ecs.C[components.CodePending]())
 }
 
 func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity]dispatchableCodeJob {
 	out := make(map[ecs.Entity]dispatchableCodeJob)
-	query := s.CodeNeededFilter.Query(w.Mappers.World)
+	query := s.CodeNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
@@ -39,23 +39,23 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity
 
 		switch color {
 		case "red":
-			if w.Mappers.World.Has(ent, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+			if w.Mappers.RedCode.HasAll(ent) {
 				job = w.Mappers.RedCodeJob.Get(ent).Job
 			}
 		case "green":
-			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GreenCode](w.Mappers.World)) {
+			if w.Mappers.GreenCode.HasAll(ent) {
 				job = w.Mappers.GreenCodeJob.Get(ent).Job
 			}
 		case "yellow":
-			if w.Mappers.World.Has(ent, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+			if w.Mappers.YellowCode.HasAll(ent) {
 				job = w.Mappers.YellowCodeJob.Get(ent).Job
 			}
 		case "cyan":
-			if w.Mappers.World.Has(ent, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+			if w.Mappers.CyanCode.HasAll(ent) {
 				job = w.Mappers.CyanCodeJob.Get(ent).Job
 			}
 		case "gray":
-			if w.Mappers.World.Has(ent, ecs.ComponentID[components.GrayCode](w.Mappers.World)) {
+			if w.Mappers.GrayCode.HasAll(ent) {
 				job = w.Mappers.GrayCodeJob.Get(ent).Job
 			}
 		default:
@@ -75,7 +75,7 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Ent
 		select {
 		case s.JobChan <- item.job:
 
-			if w.IsAlive(e) {
+			if w.Mappers.World.Alive(e) {
 				commandBuffer.MarkCodePending(e, item.color)
 			}
 
@@ -119,7 +119,7 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 ) {
 	for entity, res := range results {
 
-		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.CodePending](w.Mappers.World)) {
+		if !w.Mappers.World.Alive(entity) || !w.Mappers.CodePending.HasAll(entity) {
 			continue
 		}
 
@@ -217,3 +217,6 @@ func (s *CodeResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSyst
 	results := s.collectCodeResults()
 	s.processCodeResultsAndQueueStructuralChanges(w, results, cb)
 }
+
+func (s *CodeResultSystem) Finalize(w *controller.CPRaWorld) {}
+

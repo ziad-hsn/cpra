@@ -3,9 +3,10 @@ package systems
 import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
+	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	"github.com/mlange-42/arche/ecs"
-	"github.com/mlange-42/arche/generic"
+	"fmt"
+	"github.com/mlange-42/ark/ecs"
 	"log"
 	"strings"
 	"time"
@@ -14,30 +15,33 @@ import (
 /* -----------------------------  SCHEDULE  ----------------------------- */
 
 type PulseScheduleSystem struct {
-	PulseFilter *generic.Filter2[components.PulseConfig, components.PulseStatus]
+	PulseFilter *ecs.Filter2[components.PulseConfig, components.PulseStatus]
+	Mappers     *entities.EntityManager
 }
 
-func (s *PulseScheduleSystem) Initialize(w *controller.CPRaWorld) {
-	s.PulseFilter = generic.NewFilter2[components.PulseConfig, components.PulseStatus]().
-		Without(generic.T[components.DisabledMonitor]()).
-		Without(generic.T[components.PulsePending]()).
-		Without(generic.T[components.InterventionNeeded]()).
-		Without(generic.T[components.InterventionPending]()).
-		Without(generic.T[components.CodeNeeded]()).
-		Without(generic.T[components.CodePending]())
+func (s *PulseScheduleSystem) Initialize(w *ecs.World) {
+	s.PulseFilter = (*ecs.Filter2[components.PulseConfig, components.PulseStatus])(ecs.NewFilter2[components.PulseConfig, components.PulseNeeded](w)).Without(ecs.C[components.DisabledMonitor]()).
+		Without(ecs.C[components.PulsePending]()).
+		Without(ecs.C[components.InterventionNeeded]()).
+		Without(ecs.C[components.InterventionPending]()).
+		Without(ecs.C[components.CodeNeeded]()).
+		Without(ecs.C[components.CodePending]())
+	//s.Mappers = entities.InitializeMappers(w)
 }
 
-func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity {
+func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
+	fmt.Println("started")
+	fmt.Println(w.Stats())
 	var toCheck []ecs.Entity
-	query := s.PulseFilter.Query(w.Mappers.World)
+	query := s.PulseFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
-		interval := w.Mappers.PulseConfig.Get(ent).Interval
-		lastCheckTime := w.Mappers.PulseStatus.Get(ent).LastCheckTime
+		interval := s.Mappers.PulseConfig.Get(ent).Interval
+		lastCheckTime := s.Mappers.PulseStatus.Get(ent).LastCheckTime
 
 		// first‑time check?
-		if w.Mappers.World.Has(ent, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+		if s.Mappers.PulseFirstCheck.HasAll(ent) {
 			toCheck = append(toCheck, ent)
 			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
 			continue
@@ -52,19 +56,21 @@ func (s *PulseScheduleSystem) collectWork(w *controller.CPRaWorld) []ecs.Entity 
 	return toCheck
 }
 
-func (s *PulseScheduleSystem) applyWork(w *controller.CPRaWorld, entities []ecs.Entity, commandBuffer *CommandBufferSystem) {
+func (s *PulseScheduleSystem) applyWork(w *ecs.World, entities []ecs.Entity) {
 	for _, ent := range entities {
 
-		if w.IsAlive(ent) && !w.Mappers.World.Has(ent, ecs.ComponentID[components.PulseNeeded](w.Mappers.World)) {
-			commandBuffer.schedulePulse(ent)
+		if s.Mappers.World.Alive(ent) && !s.Mappers.PulseNeeded.HasAll(ent) {
+			s.Mappers.PulseNeeded.Set(ent, &components.PulseNeeded{})
 		}
 	}
 }
 
-func (s *PulseScheduleSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
+func (s *PulseScheduleSystem) Update(w *ecs.World) {
 	toCheck := s.collectWork(w)
-	s.applyWork(w, toCheck, cb)
+	s.applyWork(w, toCheck)
 }
+
+func (s *PulseScheduleSystem) Finalize(w *ecs.World) {}
 
 /* -----------------------------  DISPATCH  ----------------------------- */
 
@@ -75,16 +81,16 @@ type dispatchablePulse struct {
 
 type PulseDispatchSystem struct {
 	JobChan     chan<- jobs.Job
-	PulseNeeded *generic.Filter1[components.PulseNeeded]
+	PulseNeeded *ecs.Filter1[components.PulseNeeded]
 }
 
 func (s *PulseDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.PulseNeeded = generic.NewFilter1[components.PulseNeeded]()
+	s.PulseNeeded = ecs.NewFilter1[components.PulseNeeded](w.Mappers.World)
 }
 
 func (s *PulseDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity]dispatchablePulse {
 	out := make(map[ecs.Entity]dispatchablePulse)
-	query := s.PulseNeeded.Query(w.Mappers.World)
+	query := s.PulseNeeded.Query()
 
 	for query.Next() {
 		ent := query.Entity()
@@ -107,7 +113,7 @@ func (s *PulseDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.En
 			commandBuffer.SetPulseStatus(e, item.Status)
 
 			// first‑check removal (if present)
-			if w.Mappers.World.Has(e, ecs.ComponentID[components.PulseFirstCheck](w.Mappers.World)) {
+			if w.Mappers.PulseFirstCheck.HasAll(e) {
 				commandBuffer.removeFirstCheck(e)
 			}
 
@@ -128,6 +134,8 @@ func (s *PulseDispatchSystem) Update(w *controller.CPRaWorld, cb *CommandBufferS
 	toDispatch := s.collectWork(w)
 	s.applyWork(w, toDispatch, cb)
 }
+
+func (s *PulseDispatchSystem) Finalize(w *controller.CPRaWorld) {}
 
 /* -----------------------------  RESULT  ----------------------------- */
 
@@ -157,7 +165,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 	for _, res := range results {
 		entity := res.Entity()
 
-		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.PulsePending](w.Mappers.World)) {
+		if !w.Mappers.World.Alive(entity) || !w.Mappers.PulsePending.HasAll(entity) {
 			continue
 		}
 
@@ -177,13 +185,13 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *controlle
 
 			// yellow code on first failure
 			if statusCopy.ConsecutiveFailures == 1 &&
-				w.Mappers.World.Has(entity, ecs.ComponentID[components.YellowCode](w.Mappers.World)) {
+				w.Mappers.YellowCode.HasAll(entity) {
 				commandBuffer.scheduleCode(entity, "yellow")
 			}
 
 			// interventions
 			if statusCopy.ConsecutiveFailures%maxFailures == 0 &&
-				w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionConfig](w.Mappers.World)) {
+				w.Mappers.InterventionConfig.HasAll(entity) {
 				log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
 				commandBuffer.scheduleIntervention(entity)
 				monitorCopy.Status = "failed"
@@ -223,3 +231,5 @@ func (s *PulseResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSys
 	results := s.collectResults()
 	s.processResultsAndQueueStructuralChanges(w, results, cb)
 }
+
+func (s *PulseResultSystem) Finalize(w *controller.CPRaWorld) {}

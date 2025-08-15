@@ -4,8 +4,7 @@ import (
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"github.com/mlange-42/arche/ecs"
-	"github.com/mlange-42/arche/generic"
+	"github.com/mlange-42/ark/ecs"
 	"log"
 	"strings"
 	"time"
@@ -15,18 +14,18 @@ import (
 
 type InterventionDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
-	InterventionNeededFilter generic.Filter1[components.InterventionNeeded]
+	InterventionNeededFilter ecs.Filter1[components.InterventionNeeded]
 }
 
 func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.InterventionNeededFilter = *generic.
-		NewFilter1[components.InterventionNeeded]().
-		Without(generic.T[components.InterventionPending]())
+	s.InterventionNeededFilter = *ecs.
+		NewFilter1[components.InterventionNeeded](w.Mappers.World).
+		Without(ecs.C[components.InterventionPending]())
 }
 
 func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity]jobs.Job {
 	out := make(map[ecs.Entity]jobs.Job)
-	query := s.InterventionNeededFilter.Query(w.Mappers.World)
+	query := s.InterventionNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
@@ -41,7 +40,7 @@ func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map
 		select {
 		case s.JobChan <- item:
 
-			if w.IsAlive(ent) {
+			if w.Mappers.World.Alive(ent) {
 				commandBuffer.markInterventionPending(ent)
 			}
 		default:
@@ -84,7 +83,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 	for _, res := range results {
 		entity := res.Entity()
 
-		if !w.IsAlive(entity) || !w.Mappers.World.Has(entity, ecs.ComponentID[components.InterventionPending](w.Mappers.World)) {
+		if !w.Mappers.World.Alive(entity) || !w.Mappers.InterventionPending.HasAll(entity) {
 			continue
 		}
 
@@ -106,7 +105,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			commandBuffer.setInterventionStatus(entity, statusCopy)
 			//fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
 			if maxFailures <= statusCopy.ConsecutiveFailures {
-				if w.Mappers.World.Has(entity, ecs.ComponentID[components.RedCode](w.Mappers.World)) {
+				if w.Mappers.RedCode.HasAll(entity) {
 					log.Printf("Monitor %s intervention failed\n", name)
 
 					commandBuffer.scheduleCode(entity, "red")
@@ -133,7 +132,7 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			commandBuffer.setInterventionStatus(entity, statusCopy)
 
 			if lastStatus == "failed" &&
-				w.Mappers.World.Has(entity, ecs.ComponentID[components.CyanCode](w.Mappers.World)) {
+				w.Mappers.CyanCode.HasAll(entity) {
 
 				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
 				commandBuffer.scheduleCode(entity, "cyan")
@@ -149,6 +148,9 @@ func (s *InterventionResultSystem) Update(w *controller.CPRaWorld, cb *CommandBu
 	results := s.collectInterventionResults()
 	s.processInterventionResultsAndQueueStructuralChanges(w, results, cb)
 }
+
+func (s *InterventionResultSystem) Finalize(w *controller.CPRaWorld) {}
+
 
 ///* ------------------  Utility: dump component names  ------------------ */
 //

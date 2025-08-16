@@ -12,7 +12,6 @@ import (
 )
 
 type EntityManager struct {
-	World           *ecs.World
 	Name            *ecs.Map1[components.Name]
 	Disabled        *ecs.Map1[components.DisabledMonitor]
 	MonitorStatus   *ecs.Map1[components.MonitorStatus]
@@ -67,7 +66,6 @@ type EntityManager struct {
 // It no longer creates the world itself.
 func InitializeMappers(world *ecs.World) *EntityManager {
 	return &EntityManager{
-		World:               world,
 		Name:                ecs.NewMap1[components.Name](world),
 		Disabled:            ecs.NewMap1[components.DisabledMonitor](world),
 		MonitorStatus:       ecs.NewMap1[components.MonitorStatus](world),
@@ -144,8 +142,8 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 // CreateEntityFromMonitor remains the same
 func (e *EntityManager) CreateEntityFromMonitor(
 	monitor schema.Monitor,
-) error {
-	entity := e.World.NewEntity()
+	world *ecs.World) error {
+	entity := world.NewEntity()
 	// ... (entity creation logic as before) ...
 	nameComponent := components.Name(strings.Clone(monitor.Name))
 	if &nameComponent == nil {

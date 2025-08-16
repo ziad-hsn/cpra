@@ -2,6 +2,7 @@ package main
 
 import (
 	"cpra/internal/controller"
+	"cpra/internal/controller/entities"
 	"cpra/internal/controller/systems"
 	"cpra/internal/loader/loader"
 	"cpra/internal/workers/workerspool"
@@ -10,11 +11,9 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"sync"
 	"time"
 
 	"github.com/mlange-42/ark-tools/app"
-	ss "github.com/mlange-42/ark-tools/system"
 )
 
 func main() {
@@ -48,64 +47,70 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//interventionJobChan, err := pools.GetJobChannel("intervention")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//CodeJobChan, err := pools.GetJobChannel("code")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	interventionJobChan, err := pools.GetJobChannel("intervention")
+	if err != nil {
+		log.Fatal(err)
+	}
+	CodeJobChan, err := pools.GetJobChannel("code")
+	if err != nil {
+		log.Fatal(err)
+	}
 	pulseResultChan, err := pools.GetResultChannel("pulse")
 	if err != nil {
 		log.Fatal(err)
 	}
-	//interventionResultChan, err := pools.GetResultChannel("intervention")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//codeResultChan, err := pools.GetResultChannel("code")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	interventionResultChan, err := pools.GetResultChannel("intervention")
+	if err != nil {
+		log.Fatal(err)
+	}
+	codeResultChan, err := pools.GetResultChannel("code")
+	if err != nil {
+		log.Fatal(err)
+	}
 	pools.StartAll()
-	// build scheduler
-	wg := &sync.WaitGroup{}
+
 	// Create a new, seeded tool.
 	tool := app.New(1024).Seed(123)
 	// Limit simulation speed.
 	tool.TPS = 30
 
 	_, err = controller.NewCPRaWorld(&manifest, &tool.World)
-	//_ := entities.InitializeMappers(&tool.World)
-	tool.AddSystem(&systems.PulseResultSystem{
-		ResultChan: pulseResultChan,
+	mapper := entities.InitializeMappers(&tool.World)
+
+	tool.AddSystem(&systems.PulseScheduleSystem{
+		Mapper: mapper,
 	})
-	tool.AddSystem(&systems.PulseScheduleSystem{})
 	tool.AddSystem(&systems.PulseDispatchSystem{
 		JobChan: pulseJobChan,
+		Mapper:  mapper,
 	})
-	tool.AddSystem(&ss.PerfTimer{
-		UpdateInterval: int(10 * time.Microsecond),
+
+	tool.AddSystem(&systems.PulseResultSystem{
+		ResultChan: pulseResultChan,
+		Mapper:     mapper,
 	})
-	// Add a termination system that ends the simulation.
 
-	//scheduler := systems.NewScheduler(&manifest, wg, 100*time.Millisecond, &tool.World)
-	//
-	//// Phase 1
-	////scheduler.AddSchedule(&systems.PulseScheduleSystem{})
-	//
-	//// Phase 2
-	//scheduler.AddDispatch(&systems.PulseDispatchSystem{JobChan: pulseJobChan})
-	//scheduler.AddDispatch(&systems.InterventionDispatchSystem{JobChan: interventionJobChan})
-	//scheduler.AddDispatch(&systems.CodeDispatchSystem{JobChan: CodeJobChan})
-	//
-	//// Phase 3
-	//scheduler.AddResult(&systems.PulseResultSystem{ResultChan: pulseResultChan})
-	//scheduler.AddResult(&systems.InterventionResultSystem{ResultChan: interventionResultChan})
-	//scheduler.AddResult(&systems.CodeResultSystem{ResultChan: codeResultChan})
+	tool.AddSystem(&systems.InterventionDispatchSystem{
+		JobChan: interventionJobChan,
+		Mapper:  mapper,
+	})
+	tool.AddSystem(&systems.InterventionResultSystem{
+		ResultChan: interventionResultChan,
+		Mapper:     mapper,
+	})
+	tool.AddSystem(&systems.CodeDispatchSystem{
+		JobChan: CodeJobChan,
+		Mapper:  mapper,
+	})
 
-	wg.Add(1)
+	tool.AddSystem(&systems.CodeResultSystem{
+		ResultChan: codeResultChan,
+		Mapper:     mapper,
+	})
+	//tool.AddSystem(&ss.PerfTimer{
+	//	UpdateInterval: 10,
+	//})
+
 	go tool.Run()
 	timeout := time.After(24 * time.Hour)
 
@@ -113,7 +118,6 @@ func main() {
 	fmt.Println("timeout")
 	//close(scheduler.Done)
 	tool.Finalize()
-	wg.Wait()
 	return
 
 }

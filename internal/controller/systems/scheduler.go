@@ -33,7 +33,7 @@ func NewScheduler(manifest *schema.Manifest, wg *sync.WaitGroup, tick time.Durat
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &Scheduler{World: w, WG: wg, Tick: tick, Done: make(chan struct{}), CommandBuffer: NewCommandBufferSystem(w.Mappers.World)}
+	return &Scheduler{World: w, WG: wg, Tick: tick, Done: make(chan struct{})}
 }
 
 func (s *Scheduler) AddSchedule(sys PhaseSystem) { s.ScheduleSystems = append(s.ScheduleSystems, sys) }

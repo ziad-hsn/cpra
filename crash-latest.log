@@ -236,3 +236,101 @@ github.com/mlange-42/ark-tools/app.(*App).Run(...)
 	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
 created by main.main in goroutine 1
 	/home/ziad/work/cpra/cpra-ark/cpra/main.go:109 +0x527
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x118 pc=0x6f31f6]
+
+goroutine 20 [running]:
+cpra/internal/controller/systems.(*CodeDispatchSystem).collectWork(0xc0067820c0, 0xc0000050e0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:49 +0x496
+cpra/internal/controller/systems.(*CodeDispatchSystem).Update(0xc0067820c0, 0xc0000050e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:90 +0x1d
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:121 +0x7c5
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x118 pc=0x6f320b]
+
+goroutine 104 [running]:
+cpra/internal/controller/systems.(*CodeDispatchSystem).collectWork(0xc000010030, 0xc0000048e0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:49 +0x4ab
+cpra/internal/controller/systems.(*CodeDispatchSystem).Update(0xc000010030, 0xc0000048e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:90 +0x1d
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:121 +0x7c5
+panic: entity already has component with ID 18, or it was added twice
+
+goroutine 92 [running]:
+github.com/mlange-42/ark/ecs.(*graph).Find(0xc0000051d0, 0xf01a9ea0?, {0xc001d14ea8, 0x2, 0x758938286108?}, {0x0, 0x0, 0x47689f?}, 0xc00261dc50)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/graph.go:62 +0x429
+github.com/mlange-42/ark/ecs.(*storage).findOrCreateTable(0xc0000051a0, 0xc0004fc868, {0xc001d14ea8?, 0xc003c26640?, 0x7c5960?}, {0x0?, 0x81d400?, 0xc00019ad28?}, {0x0, 0x0, ...}, ...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/storage.go:62 +0x6a
+github.com/mlange-42/ark/ecs.(*World).exchange(0xc0000050e0, {0x4?, 0x0?}, {0xc001d14ea8?, 0x4115f4?, 0xc001d14ea8?}, {0x0?, 0xc00261def0?, 0xc00261dd48?}, {0x0, ...})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/world_internal.go:44 +0x17c
+github.com/mlange-42/ark/ecs.(*Exchange2[...]).ExchangeFn(0x8d7ee0, {0x261dd60, 0xc0?}, 0xc00261dd68?, {0x0, 0xc00261dd88?, 0x41299a?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/exchange_gen.go:283 +0xd7
+github.com/mlange-42/ark/ecs.(*Exchange2[...]).Exchange(0x0?, {0x261de90?, 0xc0?}, 0x0?, 0x0?, {0x0?, 0x0?, 0x1336?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/exchange_gen.go:266 +0x48
+cpra/internal/controller/systems.(*CodeDispatchSystem).applyWork(0xc0022d0168, 0xc0000050e0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:79 +0x177
+cpra/internal/controller/systems.(*CodeDispatchSystem).Update(0xc0022d0168, 0xc0000050e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:92 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:121 +0x7c5
+panic: entity already has component with ID 18, or it was added twice
+
+goroutine 98 [running]:
+github.com/mlange-42/ark/ecs.(*graph).Find(0xc0000051d0, 0x1?, {0xc001c923b3, 0x1, 0x4879dd?}, {0x0, 0x0, 0xc002da9890?}, 0xc002da9948)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/graph.go:62 +0x429
+github.com/mlange-42/ark/ecs.(*storage).findOrCreateTable(0xc0000051a0, 0xc003292dc0, {0xc001c923b3?, 0x0?, 0x0?}, {0x0?, 0xc002da9950?, 0x4760f9?}, {0x0, 0x0, ...}, ...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/storage.go:62 +0x6a
+github.com/mlange-42/ark/ecs.(*World).exchange(0xc0000050e0, {0x1f062b8?, 0xc0?}, {0xc001c923b3?, 0xb68540?, 0xc001c923b3?}, {0x0?, 0x644780?, 0xc001f062b8?}, {0x0, ...})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/world_internal.go:44 +0x17c
+github.com/mlange-42/ark/ecs.(*Map1[...]).AddFn(0x10, {0x7998a0?, 0x0?}, 0xc002da9a60?, {0x0, 0xc002da9a78?, 0x475d26?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/maps_gen.go:177 +0xcf
+github.com/mlange-42/ark/ecs.(*Map1[...]).Add(0x0?, {0x2?, 0x0?}, 0xc002da9c28?, {0x0?, 0x199?, 0xc002da9ae0?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/maps_gen.go:163 +0x3a
+cpra/internal/controller/systems.(*InterventionResultSystem).processInterventionResultsAndQueueStructuralChanges(0xc0039b20b0, 0xc0000050e0, 0x24c7?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:120 +0x467
+cpra/internal/controller/systems.(*InterventionResultSystem).Update(0xc0039b20b0, 0xc0000050e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:158 +0x185
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:114 +0x827

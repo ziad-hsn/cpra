@@ -22,7 +22,7 @@ func NewCPRaWorld(manifest *schema.Manifest, world *ecs.World) (*CPRaWorld, erro
 	mapper := entities.InitializeMappers(world)
 
 	for _, m := range manifest.Monitors {
-		err := mapper.CreateEntityFromMonitor(m)
+		err := mapper.CreateEntityFromMonitor(m, world)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create entity for monitor %s: %w", m.Name, err)
 		}
@@ -39,9 +39,9 @@ func (w *CPRaWorld) SafeAccess(fn func()) {
 }
 
 func (w *CPRaWorld) IsAlive(e ecs.Entity) bool {
-	if w.Mappers.World.Stats().Entities.Total < int(e.ID()) {
+	if w.World.Stats().Entities.Total < int(e.ID()) {
 		return false
 	}
-	return w.Mappers.World.Alive(e)
+	return w.World.Alive(e)
 
 }

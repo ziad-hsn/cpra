@@ -1,12 +1,11 @@
 package systems
 
 import (
-	"cpra/internal/controller"
 	"cpra/internal/controller/components"
+	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -15,33 +14,37 @@ import (
 type InterventionDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	InterventionNeededFilter ecs.Filter1[components.InterventionNeeded]
+	Mapper                   *entities.EntityManager
 }
 
-func (s *InterventionDispatchSystem) Initialize(w *controller.CPRaWorld) {
+func (s *InterventionDispatchSystem) Initialize(w *ecs.World) {
 	s.InterventionNeededFilter = *ecs.
-		NewFilter1[components.InterventionNeeded](w.Mappers.World).
+		NewFilter1[components.InterventionNeeded](w).
 		Without(ecs.C[components.InterventionPending]())
+	//s.Mapper = entities.InitializeMappers(w)
 }
 
-func (s *InterventionDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity]jobs.Job {
+func (s *InterventionDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
 	out := make(map[ecs.Entity]jobs.Job)
 	query := s.InterventionNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
-		out[ent] = w.Mappers.InterventionJob.Get(ent).Job
+		out[ent] = s.Mapper.InterventionJob.Get(ent).Job
 	}
 	return out
 }
 
-func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map[ecs.Entity]jobs.Job, commandBuffer *CommandBufferSystem) {
+func (s *InterventionDispatchSystem) applyWork(w *ecs.World, jobs map[ecs.Entity]jobs.Job) {
 
 	for ent, item := range jobs {
 		select {
 		case s.JobChan <- item:
 
-			if w.Mappers.World.Alive(ent) {
-				commandBuffer.markInterventionPending(ent)
+			if w.Alive(ent) {
+				s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
+				s.Mapper.InterventionNeeded.Remove(ent)
+				//s.Mapper.InterventionPendingExchange.Exchange(ent, &components.InterventionPending{}, &components.InterventionNeeded{})
 			}
 		default:
 			log.Printf("Intervention Job channel full for entity %v\n", ent)
@@ -49,18 +52,24 @@ func (s *InterventionDispatchSystem) applyWork(w *controller.CPRaWorld, jobs map
 	}
 }
 
-func (s *InterventionDispatchSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
+func (s *InterventionDispatchSystem) Update(w *ecs.World) {
 	toDispatch := s.collectWork(w)
-	s.applyWork(w, toDispatch, cb)
+	s.applyWork(w, toDispatch)
+}
+
+func (s *InterventionDispatchSystem) Finalize(w *ecs.World) {
 }
 
 /* ---------------------------  RESULT  --------------------------- */
 
 type InterventionResultSystem struct {
 	ResultChan <-chan jobs.Result
+	Mapper     *entities.EntityManager
 }
 
-func (s *InterventionResultSystem) Initialize(w *controller.CPRaWorld) {}
+func (s *InterventionResultSystem) Initialize(w *ecs.World) {
+	//s.Mapper = entities.InitializeMappers(w)
+}
 
 func (s *InterventionResultSystem) collectInterventionResults() map[ecs.Entity]jobs.Result {
 	out := make(map[ecs.Entity]jobs.Result)
@@ -77,24 +86,24 @@ loop:
 }
 
 func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(
-	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result, commandBuffer *CommandBufferSystem,
+	w *ecs.World, results map[ecs.Entity]jobs.Result,
 ) {
 
 	for _, res := range results {
 		entity := res.Entity()
 
-		if !w.Mappers.World.Alive(entity) || !w.Mappers.InterventionPending.HasAll(entity) {
+		if !w.Alive(entity) || !s.Mapper.InterventionPending.HasAll(entity) {
 			continue
 		}
 
-		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
+		name := *s.Mapper.Name.Get(entity)
 		//fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
 
 		if res.Error() != nil {
 			//fmt.Println("booooooooooooooooooooooooooooooooooooo")
 			// ---- FAILURE ----
-			maxFailures := w.Mappers.InterventionConfig.Get(entity).MaxFailures
-			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
+			maxFailures := s.Mapper.InterventionConfig.Get(entity).MaxFailures
+			statusCopy := *s.Mapper.InterventionStatus.Get(entity)
 			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
 
 			statusCopy.LastStatus = "failed"
@@ -102,24 +111,24 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			statusCopy.ConsecutiveFailures++
 			//monitorCopy.Status = "failed"
 
-			commandBuffer.setInterventionStatus(entity, statusCopy)
+			s.Mapper.InterventionStatus.Set(entity, &statusCopy)
+
 			//fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
 			if maxFailures <= statusCopy.ConsecutiveFailures {
-				if w.Mappers.RedCode.HasAll(entity) {
+				if s.Mapper.RedCode.HasAll(entity) {
 					log.Printf("Monitor %s intervention failed\n", name)
-
-					commandBuffer.scheduleCode(entity, "red")
+					s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "red"})
 				}
 				// No retry when max failures reached.
 			} else {
 				// Schedule retry.
-				commandBuffer.scheduleIntervention(entity)
+				s.Mapper.InterventionNeeded.Add(entity, &components.InterventionNeeded{})
 			}
 
 		} else {
 			//fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
 			// ---- SUCCESS ----
-			statusCopy := *w.Mappers.InterventionStatus.Get(entity)
+			statusCopy := *s.Mapper.InterventionStatus.Get(entity)
 			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
 			lastStatus := statusCopy.LastStatus
 
@@ -129,27 +138,27 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			statusCopy.LastSuccessTime = time.Now()
 			//monitorCopy.Status = "success"
 
-			commandBuffer.setInterventionStatus(entity, statusCopy)
+			s.Mapper.InterventionStatus.Set(entity, &statusCopy)
 
 			if lastStatus == "failed" &&
-				w.Mappers.CyanCode.HasAll(entity) {
+				s.Mapper.CyanCode.HasAll(entity) {
 
 				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
-				commandBuffer.scheduleCode(entity, "cyan")
+				s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "cyan"})
 			}
 		}
 
 		// Always remove pending after processing.
-		commandBuffer.RemoveInterventionPending(entity)
+		s.Mapper.InterventionPending.Remove(entity)
 	}
 }
 
-func (s *InterventionResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
+func (s *InterventionResultSystem) Update(w *ecs.World) {
 	results := s.collectInterventionResults()
-	s.processInterventionResultsAndQueueStructuralChanges(w, results, cb)
+	s.processInterventionResultsAndQueueStructuralChanges(w, results)
 }
 
-func (s *InterventionResultSystem) Finalize(w *controller.CPRaWorld) {}
+func (s *InterventionResultSystem) Finalize(w *ecs.World) {}
 
 ///* ------------------  Utility: dump component names  ------------------ */
 //

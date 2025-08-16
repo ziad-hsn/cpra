@@ -1,13 +1,11 @@
 package systems
 
 import (
-	"cpra/internal/controller"
 	"cpra/internal/controller/components"
+	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	//"github.com/mlange-42/arche/ecs"
 	"github.com/mlange-42/ark/ecs"
 	"log"
-	"strings"
 	"time"
 )
 
@@ -21,42 +19,44 @@ type dispatchableCodeJob struct {
 type CodeDispatchSystem struct {
 	JobChan          chan<- jobs.Job
 	CodeNeededFilter *ecs.Filter1[components.CodeNeeded]
+	Mapper           *entities.EntityManager
 }
 
-func (s *CodeDispatchSystem) Initialize(w *controller.CPRaWorld) {
-	s.CodeNeededFilter = ecs.NewFilter1[components.CodeNeeded](w.Mappers.World).
+func (s *CodeDispatchSystem) Initialize(w *ecs.World) {
+	s.CodeNeededFilter = ecs.NewFilter1[components.CodeNeeded](w).
 		Without(ecs.C[components.CodePending]())
+	//s.Mapper = entities.InitializeMappers(w)
 }
 
-func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity]dispatchableCodeJob {
+func (s *CodeDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchableCodeJob {
 	out := make(map[ecs.Entity]dispatchableCodeJob)
 	query := s.CodeNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
-		color := string([]byte(query.Get().Color))
+		color := query.Get().Color
 		var job jobs.Job
 
 		switch color {
 		case "red":
-			if w.Mappers.RedCode.HasAll(ent) {
-				job = w.Mappers.RedCodeJob.Get(ent).Job
+			if s.Mapper.RedCode.HasAll(ent) {
+				job = s.Mapper.RedCodeJob.Get(ent).Job
 			}
 		case "green":
-			if w.Mappers.GreenCode.HasAll(ent) {
-				job = w.Mappers.GreenCodeJob.Get(ent).Job
+			if s.Mapper.GreenCode.HasAll(ent) {
+				job = s.Mapper.GreenCodeJob.Get(ent).Job
 			}
 		case "yellow":
-			if w.Mappers.YellowCode.HasAll(ent) {
-				job = w.Mappers.YellowCodeJob.Get(ent).Job
+			if s.Mapper.YellowCode.HasAll(ent) {
+				job = s.Mapper.YellowCodeJob.Get(ent).Job
 			}
 		case "cyan":
-			if w.Mappers.CyanCode.HasAll(ent) {
-				job = w.Mappers.CyanCodeJob.Get(ent).Job
+			if s.Mapper.CyanCode.HasAll(ent) {
+				job = s.Mapper.CyanCodeJob.Get(ent).Job
 			}
 		case "gray":
-			if w.Mappers.GrayCode.HasAll(ent) {
-				job = w.Mappers.GrayCodeJob.Get(ent).Job
+			if s.Mapper.GrayCode.HasAll(ent) {
+				job = s.Mapper.GrayCodeJob.Get(ent).Job
 			}
 		default:
 			log.Printf("Unknown color %q for entity %v", color, ent)
@@ -69,14 +69,16 @@ func (s *CodeDispatchSystem) collectWork(w *controller.CPRaWorld) map[ecs.Entity
 	return out
 }
 
-func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Entity]dispatchableCodeJob, commandBuffer *CommandBufferSystem) {
+func (s *CodeDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispatchableCodeJob) {
 
 	for e, item := range list {
 		select {
 		case s.JobChan <- item.job:
 
-			if w.Mappers.World.Alive(e) {
-				commandBuffer.MarkCodePending(e, item.color)
+			if w.Alive(e) {
+				s.Mapper.CodePending.Add(e, &components.CodePending{Color: item.color})
+				s.Mapper.CodeNeeded.Remove(e)
+				//s.Mapper.CodePendingExchange.Exchange(e, &components.CodePending{Color: item.color}, &components.CodeNeeded{Color: item.color})
 			}
 
 			log.Printf("Sent %s code job for entity %v", item.color, e)
@@ -87,18 +89,24 @@ func (s *CodeDispatchSystem) applyWork(w *controller.CPRaWorld, list map[ecs.Ent
 	}
 }
 
-func (s *CodeDispatchSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
+func (s *CodeDispatchSystem) Update(w *ecs.World) {
 	toDispatch := s.collectWork(w)
-	s.applyWork(w, toDispatch, cb)
+	s.applyWork(w, toDispatch)
+}
+
+func (s *CodeDispatchSystem) Finalize(w *ecs.World) {
 }
 
 /* ---------------------------  RESULT  --------------------------- */
 
 type CodeResultSystem struct {
 	ResultChan <-chan jobs.Result
+	Mapper     *entities.EntityManager
 }
 
-func (s *CodeResultSystem) Initialize(w *controller.CPRaWorld) {}
+func (s *CodeResultSystem) Initialize(w *ecs.World) {
+	//s.Mapper = entities.InitializeMappers(w)
+}
 
 func (s *CodeResultSystem) collectCodeResults() map[ecs.Entity]jobs.Result {
 	out := make(map[ecs.Entity]jobs.Result)
@@ -115,24 +123,21 @@ loop:
 }
 
 func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
-	w *controller.CPRaWorld, results map[ecs.Entity]jobs.Result, commandBuffer *CommandBufferSystem,
+	w *ecs.World, results map[ecs.Entity]jobs.Result,
 ) {
 	for entity, res := range results {
 
-		if !w.Mappers.World.Alive(entity) || !w.Mappers.CodePending.HasAll(entity) {
+		if !w.Alive(entity) || !s.Mapper.CodePending.HasAll(entity) {
 			continue
 		}
 
-		name := strings.Clone(string(*w.Mappers.Name.Get(entity)))
-		codeColor := strings.Clone(w.Mappers.CodePending.Get(entity).Color)
+		name := *s.Mapper.Name.Get(entity)
+		codeColor := s.Mapper.CodePending.Get(entity).Color
 
 		switch codeColor {
 		case "red":
-			cur := w.Mappers.RedCodeStatus.Get(entity)
-			var st components.RedCodeStatus
-			if cur != nil {
-				st = *cur // copy by value
-			}
+			st := *s.Mapper.RedCodeStatus.Get(entity)
+
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
 				log.Printf("Monitor %s Code failed: %v\n", name, err)
@@ -140,15 +145,12 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-			commandBuffer.setRedCodeStatus(entity, st)
-			commandBuffer.RemoveCodePending(entity)
+			s.Mapper.RedCodeStatus.Set(entity, &st)
+			s.Mapper.CodePending.Remove(entity)
 
 		case "green":
-			cur := w.Mappers.GreenCodeStatus.Get(entity)
-			var st components.GreenCodeStatus
-			if cur != nil {
-				st = *cur
-			}
+			st := *s.Mapper.GreenCodeStatus.Get(entity)
+
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
 				log.Printf("Monitor %s Code failed: %v\n", name, err)
@@ -156,15 +158,12 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-			commandBuffer.setGreenCodeStatus(entity, st)
-			commandBuffer.RemoveCodePending(entity)
+			s.Mapper.GreenCodeStatus.Set(entity, &st)
+			s.Mapper.CodePending.Remove(entity)
 
 		case "yellow":
-			cur := w.Mappers.YellowCodeStatus.Get(entity)
-			var st components.YellowCodeStatus
-			if cur != nil {
-				st = *cur
-			}
+			st := *s.Mapper.YellowCodeStatus.Get(entity)
+
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
 				log.Printf("Monitor %s Code failed: %v\n", name, err)
@@ -172,15 +171,12 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-			commandBuffer.setYellowCodeStatus(entity, st)
-			commandBuffer.RemoveCodePending(entity)
+			s.Mapper.YellowCodeStatus.Set(entity, &st)
+			s.Mapper.CodePending.Remove(entity)
 
 		case "cyan":
-			cur := w.Mappers.CyanCodeStatus.Get(entity)
-			var st components.CyanCodeStatus
-			if cur != nil {
-				st = *cur
-			}
+			st := *s.Mapper.CyanCodeStatus.Get(entity)
+
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
 				log.Printf("Monitor %s Code failed: %v\n", name, err)
@@ -188,15 +184,12 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-			commandBuffer.setCyanCodeStatus(entity, st)
-			commandBuffer.RemoveCodePending(entity)
+			s.Mapper.CyanCodeStatus.Set(entity, &st)
+			s.Mapper.CodePending.Remove(entity)
 
 		case "gray":
-			cur := w.Mappers.GrayCodeStatus.Get(entity)
-			var st components.GrayCodeStatus
-			if cur != nil {
-				st = *cur
-			}
+			st := *s.Mapper.GrayCodeStatus.Get(entity)
+
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
 				log.Printf("Monitor %s Code failed: %v\n", name, err)
@@ -204,8 +197,8 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 				(&st).SetSuccess(time.Now())
 				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
 			}
-			commandBuffer.setGrayCodeStatus(entity, st)
-			commandBuffer.RemoveCodePending(entity)
+			s.Mapper.GrayCodeStatus.Set(entity, &st)
+			s.Mapper.CodePending.Remove(entity)
 
 		default:
 			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
@@ -213,10 +206,9 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 	}
 }
 
-func (s *CodeResultSystem) Update(w *controller.CPRaWorld, cb *CommandBufferSystem) {
+func (s *CodeResultSystem) Update(w *ecs.World) {
 	results := s.collectCodeResults()
-	s.processCodeResultsAndQueueStructuralChanges(w, results, cb)
+	s.processCodeResultsAndQueueStructuralChanges(w, results)
 }
 
-func (s *CodeResultSystem) Finalize(w *controller.CPRaWorld) {}
-
+func (s *CodeResultSystem) Finalize(w *ecs.World) {}

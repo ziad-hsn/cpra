@@ -26,7 +26,7 @@ func (s *PulseScheduleSystem) Initialize(w *ecs.World) {
 		Without(ecs.C[components.InterventionPending]()).
 		Without(ecs.C[components.CodeNeeded]()).
 		Without(ecs.C[components.CodePending]())
-	s.Mapper = entities.InitializeMappers(w)
+	//s.Mapper = entities.InitializeMappers(w)
 }
 
 func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
@@ -85,7 +85,7 @@ type PulseDispatchSystem struct {
 
 func (s *PulseDispatchSystem) Initialize(w *ecs.World) {
 	s.PulseNeeded = ecs.NewFilter1[components.PulseNeeded](w)
-	s.Mapper = entities.InitializeMappers(w)
+	//s.Mapper = entities.InitializeMappers(w)
 }
 
 func (s *PulseDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchablePulse {
@@ -96,10 +96,7 @@ func (s *PulseDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatcha
 		ent := query.Entity()
 		job := s.Mapper.PulseJob.Get(ent).Job
 
-		stCopy := *s.Mapper.PulseStatus.Get(ent)
-		stCopy.LastCheckTime = time.Now()
-
-		out[ent] = dispatchablePulse{Job: job, Status: stCopy}
+		out[ent] = dispatchablePulse{Job: job}
 	}
 	return out
 }
@@ -110,7 +107,9 @@ func (s *PulseDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispat
 		select {
 		case s.JobChan <- item.Job:
 
-			s.Mapper.PulseStatus.Set(e, &item.Status)
+			pulseStatusPtr := s.Mapper.PulseStatus.Get(e)
+
+			pulseStatusPtr.LastCheckTime = time.Now()
 
 			// first‑check removal (if present)
 			if s.Mapper.PulseFirstCheck.HasAll(e) {
@@ -150,7 +149,7 @@ type PulseResultSystem struct {
 }
 
 func (s *PulseResultSystem) Initialize(w *ecs.World) {
-	s.Mapper = entities.InitializeMappers(w)
+	//s.Mapper = entities.InitializeMappers(w)
 }
 
 func (s *PulseResultSystem) collectResults() map[ecs.Entity]jobs.Result {
@@ -184,8 +183,8 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 		if res.Error() != nil {
 			// ---- FAILURE ----
 			maxFailures := s.Mapper.PulseConfig.Get(entity).MaxFailures
-			statusCopy := *s.Mapper.PulseStatus.Get(entity)
-			monitorCopy := *s.Mapper.MonitorStatus.Get(entity)
+			statusCopy := s.Mapper.PulseStatus.Get(entity)
+			monitorCopy := s.Mapper.MonitorStatus.Get(entity)
 
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
@@ -207,13 +206,13 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			}
 
 			// deferred data writes
-			s.Mapper.PulseStatus.Set(entity, &statusCopy)
-			s.Mapper.MonitorStatus.Set(entity, &monitorCopy)
+			//s.Mapper.PulseStatus.Set(entity, &statusCopy)
+			//s.Mapper.MonitorStatus.Set(entity, &monitorCopy)
 
 		} else {
 			// ---- SUCCESS ----
-			statusCopy := *s.Mapper.PulseStatus.Get(entity)
-			monitorCopy := *s.Mapper.MonitorStatus.Get(entity)
+			statusCopy := s.Mapper.PulseStatus.Get(entity)
+			monitorCopy := s.Mapper.MonitorStatus.Get(entity)
 
 			lastStatus := statusCopy.LastStatus
 
@@ -223,8 +222,8 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			statusCopy.LastSuccessTime = time.Now()
 			monitorCopy.Status = "success"
 
-			s.Mapper.PulseStatus.Set(entity, &statusCopy)
-			s.Mapper.MonitorStatus.Set(entity, &monitorCopy)
+			//s.Mapper.PulseStatus.Set(entity, &statusCopy)
+			//s.Mapper.MonitorStatus.Set(entity, &monitorCopy)
 
 			if lastStatus != "success" && lastStatus != "" {
 				s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "green"})

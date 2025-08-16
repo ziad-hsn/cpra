@@ -26,7 +26,7 @@ type Pool struct {
 func (p *Pool) Start() {
 	for i := 0; i < p.workers; i++ {
 		p.wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer p.wg.Done()
 			for {
 				select {
@@ -36,17 +36,36 @@ func (p *Pool) Start() {
 					if !ok {
 						return
 					}
+
+					// Execute job and handle result non-blocking
 					result := job.Execute()
-					p.resultChan <- result
+
+					// Safely send result to channel
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								// channel closed, ignore
+							}
+						}()
+						select {
+						case p.resultChan <- result:
+							// Success - log in debug mode only
+						default:
+							// Result channel full - log and continue
+							// This prevents workers from blocking on result delivery
+							fmt.Printf("Warning: Pool %s result channel full, dropping result for worker %d\n",
+								p.alias, workerID)
+						}
+					}()
 				}
 			}
-		}()
+		}(i)
 	}
 }
 
 func (p *Pool) Stop() {
 	p.cancel()
-	close(p.jobChan)
+
 	p.wg.Wait()
 	close(p.resultChan)
 }
@@ -61,6 +80,7 @@ type PoolsManager struct {
 	heartbeat      *time.Timer
 	ctx            context.Context
 	wg             *sync.WaitGroup
+	Monitor        *PerformanceMonitor
 }
 
 func (m *PoolsManager) Init(wg *sync.WaitGroup, cancel chan struct{}, heartbeat *time.Timer) {
@@ -94,13 +114,17 @@ func (m *PoolsManager) AddPool(alias string, pool *Pool) {
 }
 
 func (m *PoolsManager) StartAll() {
+	// Initialize performance monitor
+	m.Monitor = NewPerformanceMonitor(m.Pools)
+
 	for _, pool := range m.Pools {
 		pool.Start()
 	}
 }
 
 func (m *PoolsManager) StopAll() {
-	for _, pool := range m.Pools {
+	for alias, pool := range m.Pools {
+		fmt.Printf("Stopping pool: %s\n", alias)
 		pool.Stop()
 	}
 }

@@ -5,7 +5,7 @@ import (
 )
 
 type Loader interface {
-	Load()
+	Load() error
 	GetManifest() schema.Manifest
 }
 

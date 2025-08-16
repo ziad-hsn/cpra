@@ -13,8 +13,6 @@ import (
 	"gopkg.in/yaml.v3"
 	//"strings"
 
-	//"github.com/ziad-hsn/cpra/loader/validator"
-	"log"
 	"os"
 )
 
@@ -30,17 +28,12 @@ func NewYamlLoader(fileName string) *YamlLoader {
 	}
 }
 
-func (l *YamlLoader) Load() {
+func (l *YamlLoader) Load() error {
 	file, err := os.Open(l.File)
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(file)
+	defer file.Close()
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	//decoder := yaml.NewDecoder(file)
 	//var manifest schema.Manifest
@@ -56,11 +49,11 @@ func (l *YamlLoader) Load() {
 		if errors.As(err, &typeErr) {
 			for _, msg := range typeErr.Errors {
 				if strings.HasPrefix(msg, "line") {
-					fatalManifestError(fmt.Errorf("invalid manifest: %s", msg))
+					return fmt.Errorf("invalid manifest: %s", msg)
 				}
 			}
 		}
-		fatalManifestError(fmt.Errorf("invalid manifest: %w", err))
+		return fmt.Errorf("invalid manifest: %w", err)
 	}
 	//yamlValidator := validator.NewYamlValidator()
 	//err = yamlValidator.ValidateManifest(&manifest)
@@ -68,6 +61,7 @@ func (l *YamlLoader) Load() {
 	//	log.Fatal(err)
 	//}
 	l.Manifest = manifest
+	return nil
 }
 
 func (l *YamlLoader) GetManifest() schema.Manifest {

@@ -334,3 +334,326 @@ github.com/mlange-42/ark-tools/app.(*App).Run(...)
 	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
 created by main.main in goroutine 1
 	/home/ziad/Desktop/work/ark-migration/cpra/main.go:114 +0x827
+panic: entity already has component with ID 18, or it was added twice
+
+goroutine 20 [running]:
+github.com/mlange-42/ark/ecs.(*graph).Find(0xc0000051d0, 0x1?, {0xc000d09b53, 0x1, 0x4879dd?}, {0x0, 0x0, 0xc001b25880?}, 0xc001b25938)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/graph.go:62 +0x429
+github.com/mlange-42/ark/ecs.(*storage).findOrCreateTable(0xc0000051a0, 0xc00264edc0, {0xc000d09b53?, 0x0?, 0x0?}, {0x0?, 0xc000095008?, 0xc001ef23f0?}, {0x0, 0x0, ...}, ...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/storage.go:62 +0x6a
+github.com/mlange-42/ark/ecs.(*World).exchange(0xc0000050e0, {0x15bc120?, 0xc0?}, {0xc000d09b53?, 0xb685c0?, 0xc000d09b53?}, {0x0?, 0x644780?, 0xc0015bc120?}, {0x0, ...})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/world_internal.go:44 +0x17c
+github.com/mlange-42/ark/ecs.(*Map1[...]).AddFn(0x10, {0x7998a0?, 0x0?}, 0xc001b25a50?, {0x0, 0xc001b25a68?, 0x475d26?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/maps_gen.go:177 +0xcf
+github.com/mlange-42/ark/ecs.(*Map1[...]).Add(0x0?, {0x2?, 0x0?}, 0xc001b25c50?, {0x0?, 0xc00036b408?, 0x12?})
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark@v0.4.3/ecs/maps_gen.go:163 +0x3a
+cpra/internal/controller/systems.(*InterventionResultSystem).processInterventionResultsAndQueueStructuralChanges(0xc003e46b90, 0xc0000050e0, 0x154f?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:120 +0x547
+cpra/internal/controller/systems.(*InterventionResultSystem).Update(0xc003e46b90, 0xc0000050e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:158 +0x185
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000005008)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:114 +0x827
+panic: send on closed channel
+
+goroutine 5 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000010018, 0x1?, 0xb6c820?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:108 +0x105
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000010018, 0xc0001224e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:139 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000122408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000122408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000122408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:122 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:120 +0x886
+panic: send on closed channel
+
+goroutine 164 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000010120, 0x1?, 0xb71820?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:118 +0x105
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000010120, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:147 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:142 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:140 +0xab8
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc00084a000, 0x2?, 0xb74820?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:118 +0x105
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc00084a000, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:147 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:194 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:192 +0xc78
+panic: send on closed channel
+
+goroutine 2338 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000a46000, 0x1?, 0xb74820?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:118 +0x105
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000a46000, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:147 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:194 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:192 +0xc58
+panic: send on closed channel
+
+goroutine 5 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000010090, 0x395?, 0xb74820?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:118 +0x105
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000010090, 0xc0000048e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:147 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:194 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:192 +0xc58
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000aca000, 0x2?, 0xb77860?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:127 +0x10b
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000aca000, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:163 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc0008fe000, 0xb?, 0xb76860?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:127 +0x10b
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc0008fe000, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:163 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2326 [running]:
+cpra/internal/controller/systems.(*PulseDispatchSystem).applyWork(0xc000cfa000, 0x17?, 0xb77860?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:127 +0x10b
+cpra/internal/controller/systems.(*PulseDispatchSystem).Update(0xc000cfa000, 0xc0000048e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_pulse.go:163 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*InterventionDispatchSystem).applyWork(0xc0000b8370, 0xc000004ce0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:56 +0xce
+cpra/internal/controller/systems.(*InterventionDispatchSystem).Update(0xc0000b8370, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:94 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*InterventionDispatchSystem).applyWork(0xc0000b8370, 0xc000004ce0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:56 +0xce
+cpra/internal/controller/systems.(*InterventionDispatchSystem).Update(0xc0000b8370, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:94 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*InterventionDispatchSystem).applyWork(0xc0066a8160, 0xc000004ce0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:56 +0xce
+cpra/internal/controller/systems.(*InterventionDispatchSystem).Update(0xc0066a8160, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:94 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2326 [running]:
+cpra/internal/controller/systems.(*CodeDispatchSystem).applyWork(0xc0008ce018, 0xc00012a4e0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:77 +0xe5
+cpra/internal/controller/systems.(*CodeDispatchSystem).Update(0xc0008ce018, 0xc00012a4e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_code.go:113 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc00012a408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc00012a408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc00012a408)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2326 [running]:
+cpra/internal/controller/systems.(*InterventionDispatchSystem).applyWork(0xc000144370, 0xc0000048e0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:58 +0xe5
+cpra/internal/controller/systems.(*InterventionDispatchSystem).Update(0xc000144370, 0xc0000048e0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:97 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004808)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98
+panic: send on closed channel
+
+goroutine 2324 [running]:
+cpra/internal/controller/systems.(*InterventionDispatchSystem).applyWork(0xc006620160, 0xc000004ce0, 0x0?)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:58 +0xe5
+cpra/internal/controller/systems.(*InterventionDispatchSystem).Update(0xc006620160, 0xc000004ce0)
+	/home/ziad/Desktop/work/ark-migration/cpra/internal/controller/systems/sys_intervention.go:97 +0x2f
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsSimple(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:284
+github.com/mlange-42/ark-tools/app.(*Systems).updateSystemsTimed(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:307 +0x1b4
+github.com/mlange-42/ark-tools/app.(*Systems).update(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:215 +0x25
+github.com/mlange-42/ark-tools/app.(*Systems).run(0xc000004c08)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/systems.go:360 +0x36
+github.com/mlange-42/ark-tools/app.(*App).Run(...)
+	/home/ziad/go/pkg/mod/github.com/mlange-42/ark-tools@v0.1.5/app/app.go:80
+main.main.func1()
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:214 +0x4a
+created by main.main in goroutine 1
+	/home/ziad/Desktop/work/ark-migration/cpra/main.go:212 +0xd98

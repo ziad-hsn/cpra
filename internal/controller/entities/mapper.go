@@ -143,12 +143,28 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 func (e *EntityManager) CreateEntityFromMonitor(
 	monitor schema.Monitor,
 	world *ecs.World) error {
-	entity := world.NewEntity()
-	// ... (entity creation logic as before) ...
-	nameComponent := components.Name(strings.Clone(monitor.Name))
-	if &nameComponent == nil {
-		return fmt.Errorf("Monitor has no name\n")
+	// Validate inputs first
+	if world == nil {
+		return fmt.Errorf("world cannot be nil")
 	}
+	if e == nil {
+		return fmt.Errorf("EntityManager cannot be nil")
+	}
+	if monitor.Name == "" {
+		return fmt.Errorf("monitor name cannot be empty")
+	}
+
+	// Validate entity manager components are initialized
+	if e.Name == nil || e.MonitorStatus == nil || e.Pulse == nil || e.PulseJob == nil {
+		return fmt.Errorf("EntityManager components not properly initialized")
+	}
+
+	entity := world.NewEntity()
+	if !world.Alive(entity) {
+		return fmt.Errorf("failed to create valid entity")
+	}
+
+	nameComponent := components.Name(strings.Clone(monitor.Name))
 	e.Name.Add(entity, &nameComponent)
 
 	if monitor.Enabled {

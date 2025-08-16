@@ -1,11 +1,11 @@
 package systems
 
 import (
+	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
-	"log"
 	"time"
 )
 
@@ -25,29 +25,69 @@ func (s *InterventionDispatchSystem) Initialize(w *ecs.World) {
 }
 
 func (s *InterventionDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
+	start := time.Now()
 	out := make(map[ecs.Entity]jobs.Job)
 	query := s.InterventionNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
-		out[ent] = s.Mapper.InterventionJob.Get(ent).Job
+		job := s.Mapper.InterventionJob.Get(ent).Job
+		if job != nil {
+			out[ent] = job
+
+			namePtr := s.Mapper.Name.Get(ent)
+			if namePtr != nil {
+				controller.DispatchLogger.Debug("Entity[%d] (%s) intervention job collected", ent.ID(), *namePtr)
+			}
+		} else {
+			controller.DispatchLogger.Warn("Entity[%d] has no intervention job", ent.ID())
+		}
 	}
+
+	controller.DispatchLogger.LogSystemPerformance("InterventionDispatch", time.Since(start), len(out))
 	return out
 }
 
 func (s *InterventionDispatchSystem) applyWork(w *ecs.World, jobs map[ecs.Entity]jobs.Job) {
-
 	for ent, item := range jobs {
-		select {
-		case s.JobChan <- item:
+		// Safely send job to channel
+		closed := false
+		if s.JobChan != nil {
+			select {
+
+			case s.JobChan <- item:
+				// job sent successfully
+			default:
+				controller.DispatchLogger.Warn("Job channel full or closed, skipping dispatch for entity: %d", ent.ID())
+				closed = true
+			}
+
+			if closed {
+				continue
+			}
 
 			if w.Alive(ent) {
-				s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
-				s.Mapper.InterventionNeeded.Remove(ent)
-				//s.Mapper.InterventionPendingExchange.Exchange(ent, &components.InterventionPending{}, &components.InterventionNeeded{})
+				// Prevent component duplication
+				if s.Mapper.InterventionPending.HasAll(ent) {
+					namePtr := s.Mapper.Name.Get(ent)
+					if namePtr != nil {
+						controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
+					}
+					continue
+				}
+
+				// Safe component transition
+				if s.Mapper.InterventionNeeded.HasAll(ent) {
+					s.Mapper.InterventionNeeded.Remove(ent)
+					s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
+
+					namePtr := s.Mapper.Name.Get(ent)
+					if namePtr != nil {
+						controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
+					}
+					controller.DispatchLogger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
+				}
 			}
-		default:
-			log.Printf("Intervention Job channel full for entity %v\n", ent)
 		}
 	}
 }
@@ -58,6 +98,7 @@ func (s *InterventionDispatchSystem) Update(w *ecs.World) {
 }
 
 func (s *InterventionDispatchSystem) Finalize(w *ecs.World) {
+	close(s.JobChan)
 }
 
 /* ---------------------------  RESULT  --------------------------- */
@@ -76,7 +117,10 @@ func (s *InterventionResultSystem) collectInterventionResults() map[ecs.Entity]j
 loop:
 	for {
 		select {
-		case res := <-s.ResultChan:
+		case res, ok := <-s.ResultChan:
+			if !ok {
+				break loop
+			}
 			out[res.Entity()] = res
 		default:
 			break loop
@@ -88,7 +132,6 @@ loop:
 func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(
 	w *ecs.World, results map[ecs.Entity]jobs.Result,
 ) {
-
 	for _, res := range results {
 		entity := res.Entity()
 
@@ -96,60 +139,62 @@ func (s *InterventionResultSystem) processInterventionResultsAndQueueStructuralC
 			continue
 		}
 
-		name := *s.Mapper.Name.Get(entity)
-		//fmt.Printf("entity is %v for %s intervention result.\n", entity, name)
+		namePtr := s.Mapper.Name.Get(entity)
+		if namePtr == nil {
+			controller.ResultLogger.Warn("Entity %d has nil name component", entity.ID())
+			continue
+		}
+		name := *namePtr
 
 		if res.Error() != nil {
-			//fmt.Println("booooooooooooooooooooooooooooooooooooo")
 			// ---- FAILURE ----
 			maxFailures := s.Mapper.InterventionConfig.Get(entity).MaxFailures
-			statusCopy := *s.Mapper.InterventionStatus.Get(entity)
-			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
+			statusCopy := s.Mapper.InterventionStatus.Get(entity)
 
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
 			statusCopy.ConsecutiveFailures++
-			//monitorCopy.Status = "failed"
 
-			s.Mapper.InterventionStatus.Set(entity, &statusCopy)
+			controller.ResultLogger.Debug("Monitor %s failed (attempt %d/%d): %v",
+				name, statusCopy.ConsecutiveFailures, maxFailures, res.Error())
 
-			//fmt.Println(statusCopy.LastStatus, maxFailures, statusCopy.ConsecutiveFailures, statusCopy.LastError)
 			if maxFailures <= statusCopy.ConsecutiveFailures {
 				if s.Mapper.RedCode.HasAll(entity) {
-					log.Printf("Monitor %s intervention failed\n", name)
-					s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "red"})
+					controller.ResultLogger.Info("Monitor %s intervention failed", name)
+					if !s.Mapper.CodeNeeded.HasAll(entity) {
+						s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "red"})
+						controller.ResultLogger.LogComponentState(entity.ID(), "CodeNeeded", "red added")
+					}
 				}
-				// No retry when max failures reached.
 			} else {
-				// Schedule retry.
 				s.Mapper.InterventionNeeded.Add(entity, &components.InterventionNeeded{})
+				controller.ResultLogger.LogComponentState(entity.ID(), "InterventionNeeded", "added")
 			}
 
 		} else {
-			//fmt.Println("horaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay")
 			// ---- SUCCESS ----
-			statusCopy := *s.Mapper.InterventionStatus.Get(entity)
-			//monitorCopy := *(*w.Mapper.MonitorStatus.Get(entity)).Copy()
+			statusCopy := s.Mapper.InterventionStatus.Get(entity)
 			lastStatus := statusCopy.LastStatus
 
 			statusCopy.LastStatus = "success"
 			statusCopy.LastError = nil
 			statusCopy.ConsecutiveFailures = 0
 			statusCopy.LastSuccessTime = time.Now()
-			//monitorCopy.Status = "success"
 
-			s.Mapper.InterventionStatus.Set(entity, &statusCopy)
+			controller.ResultLogger.Debug("Monitor %s intervention successful", name)
 
-			if lastStatus == "failed" &&
-				s.Mapper.CyanCode.HasAll(entity) {
-
-				log.Printf("Monitor %s intervention succeeded and needs cyan code\n", name)
-				s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "cyan"})
+			if lastStatus == "failed" && s.Mapper.CyanCode.HasAll(entity) {
+				controller.ResultLogger.Info("Monitor %s intervention succeeded and needs cyan code", name)
+				if !s.Mapper.CodeNeeded.HasAll(entity) {
+					s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "cyan"})
+					controller.ResultLogger.LogComponentState(entity.ID(), "CodeNeeded", "cyan added")
+				}
 			}
 		}
 
 		// Always remove pending after processing.
 		s.Mapper.InterventionPending.Remove(entity)
+		controller.ResultLogger.LogComponentState(entity.ID(), "InterventionPending", "removed")
 	}
 }
 

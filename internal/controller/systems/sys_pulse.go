@@ -1,12 +1,12 @@
 package systems
 
 import (
+	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
 
 	"github.com/mlange-42/ark/ecs"
-	"log"
 	"time"
 )
 
@@ -30,6 +30,7 @@ func (s *PulseScheduleSystem) Initialize(w *ecs.World) {
 }
 
 func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
+	start := time.Now()
 	var toCheck []ecs.Entity
 	query := s.PulseFilter.Query()
 
@@ -37,28 +38,46 @@ func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
 		ent := query.Entity()
 		interval := s.Mapper.PulseConfig.Get(ent).Interval
 		lastCheckTime := s.Mapper.PulseStatus.Get(ent).LastCheckTime
+		timeSinceLast := time.Since(lastCheckTime)
 
 		// first‑time check?
 		if s.Mapper.PulseFirstCheck.HasAll(ent) {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
+			controller.SchedulerLogger.Debug("Entity[%d] first check scheduled (age: %v, interval: %v)",
+				ent.ID(), timeSinceLast, interval)
 			continue
 		}
 
 		// interval check
-		if time.Since(lastCheckTime) >= interval {
+		if timeSinceLast >= interval {
 			toCheck = append(toCheck, ent)
-			log.Printf("%v --> %v\n", time.Since(lastCheckTime), interval)
+			controller.SchedulerLogger.Debug("Entity[%d] interval check scheduled (age: %v, interval: %v)",
+				ent.ID(), timeSinceLast, interval)
 		}
 	}
+
+	controller.SchedulerLogger.LogSystemPerformance("PulseScheduler", time.Since(start), len(toCheck))
 	return toCheck
 }
 
 func (s *PulseScheduleSystem) applyWork(w *ecs.World, entities []ecs.Entity) {
 	for _, ent := range entities {
-
 		if w.Alive(ent) && !s.Mapper.PulseNeeded.HasAll(ent) {
+			// Update lastCheckTime immediately when scheduling to prevent race conditions
+			pulseStatusPtr := s.Mapper.PulseStatus.Get(ent)
+			if pulseStatusPtr != nil {
+				pulseStatusPtr.LastCheckTime = time.Now()
+				controller.SchedulerLogger.LogComponentState(ent.ID(), "PulseStatus", "LastCheckTime updated")
+			}
+
+			// Remove first-check flag if present
+			if s.Mapper.PulseFirstCheck.HasAll(ent) {
+				s.Mapper.PulseFirstCheck.Remove(ent)
+				controller.SchedulerLogger.LogComponentState(ent.ID(), "PulseFirstCheck", "removed")
+			}
+
 			s.Mapper.PulseNeeded.Add(ent, &components.PulseNeeded{})
+			controller.SchedulerLogger.LogComponentState(ent.ID(), "PulseNeeded", "added")
 		}
 	}
 }
@@ -104,32 +123,39 @@ func (s *PulseDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatcha
 func (s *PulseDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispatchablePulse) {
 
 	for e, item := range list {
-		select {
-		case s.JobChan <- item.Job:
+		if s.JobChan != nil {
+			select {
+			case s.JobChan <- item.Job:
+				// Prevent component duplication
+				if s.Mapper.PulsePending.HasAll(e) {
+					namePtr := s.Mapper.Name.Get(e)
+					if namePtr != nil {
+						controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, e.ID())
+					}
+					continue
+				}
 
-			pulseStatusPtr := s.Mapper.PulseStatus.Get(e)
+				// Safe component transition (lastCheckTime already updated in schedule system)
+				if s.Mapper.PulseNeeded.HasAll(e) {
+					s.Mapper.PulseNeeded.Remove(e)
+					s.Mapper.PulsePending.Add(e, &components.PulsePending{})
 
-			pulseStatusPtr.LastCheckTime = time.Now()
+					namePtr := s.Mapper.Name.Get(e)
+					if namePtr != nil {
+						controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, e.ID())
+					}
 
-			// first‑check removal (if present)
-			if s.Mapper.PulseFirstCheck.HasAll(e) {
-				s.Mapper.PulseFirstCheck.Remove(e)
+					controller.DispatchLogger.LogComponentState(e.ID(), "PulseNeeded->PulsePending", "transitioned")
+				}
+
+			default:
+				namePtr := s.Mapper.Name.Get(e)
+				monitorName := "unknown"
+				if namePtr != nil {
+					monitorName = string(*namePtr)
+				}
+				controller.DispatchLogger.Warn("Job channel full, skipping dispatch for %s (entity: %d)", monitorName, e.ID())
 			}
-
-			if s.Mapper.PulsePending.HasAll(e) {
-				name := *s.Mapper.Name.Get(e)
-				log.Fatalf("Monitor %v have pending component before dispatching entity: %v\n", name, e)
-			}
-			//s.Mapper.PulsePendingExchange.Exchange(e, &components.PulsePending{}, &components.PulseNeeded{})
-			s.Mapper.PulsePending.Add(e, &components.PulsePending{})
-			s.Mapper.PulseNeeded.Remove(e)
-			// exchange PulseNeeded -> PulsePending
-
-			name := *s.Mapper.Name.Get(e)
-			log.Printf("sent %s job\n", name)
-
-		default:
-			log.Printf("Job channel full, skipping dispatch for entity %v", e)
 		}
 	}
 }
@@ -139,7 +165,9 @@ func (s *PulseDispatchSystem) Update(w *ecs.World) {
 	s.applyWork(w, toDispatch)
 }
 
-func (s *PulseDispatchSystem) Finalize(w *ecs.World) {}
+func (s *PulseDispatchSystem) Finalize(w *ecs.World) {
+	close(s.JobChan)
+}
 
 /* -----------------------------  RESULT  ----------------------------- */
 
@@ -176,7 +204,21 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			continue
 		}
 
-		name := *s.Mapper.Name.Get(entity)
+		// Safe component access with nil checks
+		namePtr := s.Mapper.Name.Get(entity)
+		if namePtr == nil {
+			controller.ResultLogger.Warn("Entity %d has nil name component", entity.ID())
+			continue
+		}
+		name := *namePtr
+
+		// Validate required components exist
+		if s.Mapper.PulseConfig.Get(entity) == nil ||
+			s.Mapper.PulseStatus.Get(entity) == nil ||
+			s.Mapper.MonitorStatus.Get(entity) == nil {
+			controller.ResultLogger.Warn("Entity %d (%s) missing required components", entity.ID(), name)
+			continue
+		}
 
 		//fmt.Printf("entity is %v for %s pulse result.\n", entity, name)
 
@@ -190,19 +232,26 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			statusCopy.LastError = res.Error()
 			statusCopy.ConsecutiveFailures++
 
+			controller.ResultLogger.Debug("Monitor %s failed (attempt %d/%d): %v",
+				name, statusCopy.ConsecutiveFailures, maxFailures, res.Error())
+
 			// yellow code on first failure
 			if statusCopy.ConsecutiveFailures == 1 &&
 				s.Mapper.YellowCode.HasAll(entity) {
-				log.Println("Pulse failed and need Yellow Code")
-				s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "yellow"})
+				controller.ResultLogger.Info("Monitor %s triggering yellow code on first failure", name)
+				if !s.Mapper.CodeNeeded.HasAll(entity) {
+					s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "yellow"})
+					controller.ResultLogger.LogComponentState(entity.ID(), "CodeNeeded", "yellow added")
+				}
 			}
 
 			// interventions
 			if statusCopy.ConsecutiveFailures%maxFailures == 0 &&
 				s.Mapper.InterventionConfig.HasAll(entity) {
-				log.Printf("Monitor %s failed %d times and needs intervention\n", name, statusCopy.ConsecutiveFailures)
+				controller.ResultLogger.Warn("Monitor %s failed %d times, triggering intervention", name, statusCopy.ConsecutiveFailures)
 				s.Mapper.InterventionNeeded.Add(entity, &components.InterventionNeeded{})
 				monitorCopy.Status = "failed"
+				controller.ResultLogger.LogComponentState(entity.ID(), "InterventionNeeded", "added")
 			}
 
 			// deferred data writes
@@ -215,6 +264,7 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			monitorCopy := s.Mapper.MonitorStatus.Get(entity)
 
 			lastStatus := statusCopy.LastStatus
+			wasFailure := statusCopy.ConsecutiveFailures > 0
 
 			statusCopy.LastStatus = "success"
 			statusCopy.LastError = nil
@@ -222,16 +272,25 @@ func (s *PulseResultSystem) processResultsAndQueueStructuralChanges(w *ecs.World
 			statusCopy.LastSuccessTime = time.Now()
 			monitorCopy.Status = "success"
 
-			//s.Mapper.PulseStatus.Set(entity, &statusCopy)
-			//s.Mapper.MonitorStatus.Set(entity, &monitorCopy)
+			if wasFailure {
+				controller.ResultLogger.Info("Monitor %s recovered after failure", name)
+			} else {
+				controller.ResultLogger.Debug("Monitor %s pulse successful", name)
+			}
 
+			// Trigger green code for recovery
 			if lastStatus != "success" && lastStatus != "" {
-				s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "green"})
+				if !s.Mapper.CodeNeeded.HasAll(entity) {
+					s.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "green"})
+					controller.ResultLogger.Info("Monitor %s triggering green code for recovery", name)
+					controller.ResultLogger.LogComponentState(entity.ID(), "CodeNeeded", "green added")
+				}
 			}
 		}
 
 		// always remove PulsePending
 		s.Mapper.PulsePending.Remove(entity)
+		controller.ResultLogger.LogComponentState(entity.ID(), "PulsePending", "removed")
 	}
 }
 
@@ -240,4 +299,6 @@ func (s *PulseResultSystem) Update(w *ecs.World) {
 	s.processResultsAndQueueStructuralChanges(w, results)
 }
 
-func (s *PulseResultSystem) Finalize(w *ecs.World) {}
+func (s *PulseResultSystem) Finalize(w *ecs.World) {
+
+}

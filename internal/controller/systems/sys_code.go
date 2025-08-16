@@ -1,11 +1,11 @@
 package systems
 
 import (
+	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
-	"log"
 	"time"
 )
 
@@ -29,6 +29,7 @@ func (s *CodeDispatchSystem) Initialize(w *ecs.World) {
 }
 
 func (s *CodeDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchableCodeJob {
+	start := time.Now()
 	out := make(map[ecs.Entity]dispatchableCodeJob)
 	query := s.CodeNeededFilter.Query()
 
@@ -59,32 +60,52 @@ func (s *CodeDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchab
 				job = s.Mapper.GrayCodeJob.Get(ent).Job
 			}
 		default:
-			log.Printf("Unknown color %q for entity %v", color, ent)
+			controller.DispatchLogger.Warn("Unknown color %q for entity %v", color, ent)
 		}
 
 		if job != nil {
 			out[ent] = dispatchableCodeJob{job: job, color: color}
 		}
 	}
+	controller.DispatchLogger.LogSystemPerformance("CodeDispatch", time.Since(start), len(out))
 	return out
 }
 
 func (s *CodeDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispatchableCodeJob) {
-
 	for e, item := range list {
-		select {
-		case s.JobChan <- item.job:
+		if s.JobChan != nil {
+			select {
+			case s.JobChan <- item.job:
+				if w.Alive(e) {
+					// Prevent component duplication
+					if s.Mapper.CodePending.HasAll(e) {
+						namePtr := s.Mapper.Name.Get(e)
+						if namePtr != nil {
+							controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, e.ID())
+						}
+						continue
+					}
 
-			if w.Alive(e) {
-				s.Mapper.CodePending.Add(e, &components.CodePending{Color: item.color})
-				s.Mapper.CodeNeeded.Remove(e)
-				//s.Mapper.CodePendingExchange.Exchange(e, &components.CodePending{Color: item.color}, &components.CodeNeeded{Color: item.color})
+					// Safe component transition
+					if s.Mapper.CodeNeeded.HasAll(e) {
+						s.Mapper.CodeNeeded.Remove(e)
+						s.Mapper.CodePending.Add(e, &components.CodePending{Color: item.color})
+
+						namePtr := s.Mapper.Name.Get(e)
+						if namePtr != nil {
+							controller.DispatchLogger.Debug("Dispatched %s code job for entity: %d", item.color, e.ID())
+						}
+						controller.DispatchLogger.LogComponentState(e.ID(), "CodeNeeded->CodePending", "transitioned")
+					}
+				}
+			default:
+				namePtr := s.Mapper.Name.Get(e)
+				monitorName := "unknown"
+				if namePtr != nil {
+					monitorName = string(*namePtr)
+				}
+				controller.DispatchLogger.Warn("Job channel full, skipping dispatch for %s (entity: %d)", monitorName, e.ID())
 			}
-
-			log.Printf("Sent %s code job for entity %v", item.color, e)
-
-		default:
-			log.Printf("Job channel full for entity %v", e)
 		}
 	}
 }
@@ -95,6 +116,7 @@ func (s *CodeDispatchSystem) Update(w *ecs.World) {
 }
 
 func (s *CodeDispatchSystem) Finalize(w *ecs.World) {
+	close(s.JobChan)
 }
 
 /* ---------------------------  RESULT  --------------------------- */
@@ -113,7 +135,10 @@ func (s *CodeResultSystem) collectCodeResults() map[ecs.Entity]jobs.Result {
 loop:
 	for {
 		select {
-		case res := <-s.ResultChan:
+		case res, ok := <-s.ResultChan:
+			if !ok {
+				break loop
+			}
 			out[res.Entity()] = res
 		default:
 			break loop
@@ -140,68 +165,73 @@ func (s *CodeResultSystem) processCodeResultsAndQueueStructuralChanges(
 
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				log.Printf("Monitor %s Code failed: %v\n", name, err)
+				controller.ResultLogger.Error("Monitor %s Code failed: %v", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				controller.ResultLogger.Info("Monitor %s %q code sent successfully", name, codeColor)
 			}
 			s.Mapper.RedCodeStatus.Set(entity, &st)
 			s.Mapper.CodePending.Remove(entity)
+			controller.ResultLogger.LogComponentState(entity.ID(), "CodePending", "removed")
 
 		case "green":
 			st := *s.Mapper.GreenCodeStatus.Get(entity)
 
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				log.Printf("Monitor %s Code failed: %v\n", name, err)
+				controller.ResultLogger.Error("Monitor %s Code failed: %v", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				controller.ResultLogger.Info("Monitor %s %q code sent successfully", name, codeColor)
 			}
 			s.Mapper.GreenCodeStatus.Set(entity, &st)
 			s.Mapper.CodePending.Remove(entity)
+			controller.ResultLogger.LogComponentState(entity.ID(), "CodePending", "removed")
 
 		case "yellow":
 			st := *s.Mapper.YellowCodeStatus.Get(entity)
 
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				log.Printf("Monitor %s Code failed: %v\n", name, err)
+				controller.ResultLogger.Error("Monitor %s Code failed: %v", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				controller.ResultLogger.Info("Monitor %s %q code sent successfully", name, codeColor)
 			}
 			s.Mapper.YellowCodeStatus.Set(entity, &st)
 			s.Mapper.CodePending.Remove(entity)
+			controller.ResultLogger.LogComponentState(entity.ID(), "CodePending", "removed")
 
 		case "cyan":
 			st := *s.Mapper.CyanCodeStatus.Get(entity)
 
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				log.Printf("Monitor %s Code failed: %v\n", name, err)
+				controller.ResultLogger.Error("Monitor %s Code failed: %v", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				controller.ResultLogger.Info("Monitor %s %q code sent successfully", name, codeColor)
 			}
 			s.Mapper.CyanCodeStatus.Set(entity, &st)
 			s.Mapper.CodePending.Remove(entity)
+			controller.ResultLogger.LogComponentState(entity.ID(), "CodePending", "removed")
 
 		case "gray":
 			st := *s.Mapper.GrayCodeStatus.Get(entity)
 
 			if err := res.Error(); err != nil {
 				(&st).SetFailure(err)
-				log.Printf("Monitor %s Code failed: %v\n", name, err)
+				controller.ResultLogger.Error("Monitor %s Code failed: %v", name, err)
 			} else {
 				(&st).SetSuccess(time.Now())
-				log.Printf("Monitor %s %q code sent successfully\n", name, codeColor)
+				controller.ResultLogger.Info("Monitor %s %q code sent successfully", name, codeColor)
 			}
 			s.Mapper.GrayCodeStatus.Set(entity, &st)
 			s.Mapper.CodePending.Remove(entity)
+			controller.ResultLogger.LogComponentState(entity.ID(), "CodePending", "removed")
 
 		default:
-			log.Printf("Unknown codeColor %q for entity %v", codeColor, entity)
+			controller.ResultLogger.Warn("Unknown codeColor %q for entity %v", codeColor, entity)
 		}
 	}
 }

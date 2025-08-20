@@ -5,6 +5,7 @@ import (
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"cpra/internal/queue"
 	"github.com/mlange-42/ark/ecs"
 	"time"
 )
@@ -20,6 +21,7 @@ type CodeDispatchSystem struct {
 	JobChan          chan<- jobs.Job
 	CodeNeededFilter *ecs.Filter1[components.CodeNeeded]
 	Mapper           *entities.EntityManager
+	QueueManager     *queue.QueueManager
 }
 
 func (s *CodeDispatchSystem) Initialize(w *ecs.World) {
@@ -73,40 +75,36 @@ func (s *CodeDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchab
 
 func (s *CodeDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispatchableCodeJob) {
 	for e, item := range list {
-		if s.JobChan != nil {
-			select {
-			case s.JobChan <- item.job:
-				if w.Alive(e) {
-					// Prevent component duplication
-					if s.Mapper.CodePending.HasAll(e) {
-						namePtr := s.Mapper.Name.Get(e)
-						if namePtr != nil {
-							controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, e.ID())
-						}
-						continue
-					}
-
-					// Safe component transition
-					if s.Mapper.CodeNeeded.HasAll(e) {
-						s.Mapper.CodeNeeded.Remove(e)
-						s.Mapper.CodePending.Add(e, &components.CodePending{Color: item.color})
-
-						namePtr := s.Mapper.Name.Get(e)
-						if namePtr != nil {
-							controller.DispatchLogger.Debug("Dispatched %s code job for entity: %d", item.color, e.ID())
-						}
-						controller.DispatchLogger.LogComponentState(e.ID(), "CodeNeeded->CodePending", "transitioned")
-					}
-				}
-			default:
+		if w.Alive(e) {
+			// Prevent component duplication
+			if s.Mapper.CodePending.HasAll(e) {
 				namePtr := s.Mapper.Name.Get(e)
-				monitorName := "unknown"
 				if namePtr != nil {
-					monitorName = string(*namePtr)
+					controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %v", *namePtr, e)
 				}
-				controller.DispatchLogger.Warn("Job channel full, skipping dispatch for %s (entity: %d)", monitorName, e.ID())
+				continue
+			}
+
+			// Enqueue with deduplication
+			err := s.QueueManager.EnqueueCode(e, item.job)
+			if err != nil {
+				controller.DispatchLogger.Warn("Failed to enqueue code for entity %d: %v", e, err)
+				continue
+			}
+
+			// Safe component transition
+			if s.Mapper.CodeNeeded.HasAll(e) {
+				s.Mapper.CodeNeeded.Remove(e)
+				s.Mapper.CodePending.Add(e, &components.CodePending{Color: item.color})
+
+				namePtr := s.Mapper.Name.Get(e)
+				if namePtr != nil {
+					controller.DispatchLogger.Debug("Dispatched %s code job for entity: %d", item.color, e.ID())
+				}
+				controller.DispatchLogger.LogComponentState(e.ID(), "CodeNeeded->CodePending", "transitioned")
 			}
 		}
+
 	}
 }
 

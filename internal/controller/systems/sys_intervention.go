@@ -5,6 +5,7 @@ import (
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"cpra/internal/queue"
 	"github.com/mlange-42/ark/ecs"
 	"time"
 )
@@ -15,6 +16,7 @@ type InterventionDispatchSystem struct {
 	JobChan                  chan<- jobs.Job
 	InterventionNeededFilter ecs.Filter1[components.InterventionNeeded]
 	Mapper                   *entities.EntityManager
+	QueueManager             *queue.QueueManager
 }
 
 func (s *InterventionDispatchSystem) Initialize(w *ecs.World) {
@@ -49,45 +51,37 @@ func (s *InterventionDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]jo
 }
 
 func (s *InterventionDispatchSystem) applyWork(w *ecs.World, jobs map[ecs.Entity]jobs.Job) {
-	for ent, item := range jobs {
+	for ent, job := range jobs {
 		// Safely send job to channel
-		closed := false
-		if s.JobChan != nil {
-			select {
 
-			case s.JobChan <- item:
-				// job sent successfully
-			default:
-				controller.DispatchLogger.Warn("Job channel full or closed, skipping dispatch for entity: %d", ent.ID())
-				closed = true
-			}
-
-			if closed {
+		if w.Alive(ent) {
+			// Prevent component duplication
+			if s.Mapper.InterventionPending.HasAll(ent) {
+				namePtr := s.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
+				}
 				continue
 			}
 
-			if w.Alive(ent) {
-				// Prevent component duplication
-				if s.Mapper.InterventionPending.HasAll(ent) {
-					namePtr := s.Mapper.Name.Get(ent)
-					if namePtr != nil {
-						controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
-					}
-					continue
-				}
-
-				// Safe component transition
-				if s.Mapper.InterventionNeeded.HasAll(ent) {
-					s.Mapper.InterventionNeeded.Remove(ent)
-					s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
-
-					namePtr := s.Mapper.Name.Get(ent)
-					if namePtr != nil {
-						controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
-					}
-					controller.DispatchLogger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
-				}
+			err := s.QueueManager.EnqueueIntervention(ent, job)
+			if err != nil {
+				controller.DispatchLogger.Warn("Failed to enqueue intervention for entity %d: %v", ent.ID(), err)
+				continue
 			}
+
+			// Safe component transition
+			if s.Mapper.InterventionNeeded.HasAll(ent) {
+				s.Mapper.InterventionNeeded.Remove(ent)
+				s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
+
+				namePtr := s.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
+				}
+				controller.DispatchLogger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
+			}
+
 		}
 	}
 }

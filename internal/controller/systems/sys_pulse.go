@@ -5,6 +5,7 @@ import (
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"cpra/internal/queue"
 
 	"github.com/mlange-42/ark/ecs"
 	"time"
@@ -97,9 +98,10 @@ type dispatchablePulse struct {
 }
 
 type PulseDispatchSystem struct {
-	JobChan     chan<- jobs.Job
-	PulseNeeded *ecs.Filter1[components.PulseNeeded]
-	Mapper      *entities.EntityManager
+	JobChan      chan<- jobs.Job
+	PulseNeeded  *ecs.Filter1[components.PulseNeeded]
+	Mapper       *entities.EntityManager
+	QueueManager *queue.QueueManager
 }
 
 func (s *PulseDispatchSystem) Initialize(w *ecs.World) {
@@ -123,40 +125,35 @@ func (s *PulseDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatcha
 func (s *PulseDispatchSystem) applyWork(w *ecs.World, list map[ecs.Entity]dispatchablePulse) {
 
 	for e, item := range list {
-		if s.JobChan != nil {
-			select {
-			case s.JobChan <- item.Job:
-				// Prevent component duplication
-				if s.Mapper.PulsePending.HasAll(e) {
-					namePtr := s.Mapper.Name.Get(e)
-					if namePtr != nil {
-						controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, e.ID())
-					}
-					continue
-				}
-
-				// Safe component transition (lastCheckTime already updated in schedule system)
-				if s.Mapper.PulseNeeded.HasAll(e) {
-					s.Mapper.PulseNeeded.Remove(e)
-					s.Mapper.PulsePending.Add(e, &components.PulsePending{})
-
-					namePtr := s.Mapper.Name.Get(e)
-					if namePtr != nil {
-						controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, e.ID())
-					}
-
-					controller.DispatchLogger.LogComponentState(e.ID(), "PulseNeeded->PulsePending", "transitioned")
-				}
-
-			default:
-				namePtr := s.Mapper.Name.Get(e)
-				monitorName := "unknown"
-				if namePtr != nil {
-					monitorName = string(*namePtr)
-				}
-				controller.DispatchLogger.Warn("Job channel full, skipping dispatch for %s (entity: %d)", monitorName, e.ID())
+		// Prevent component duplication
+		if s.Mapper.PulsePending.HasAll(e) {
+			namePtr := s.Mapper.Name.Get(e)
+			if namePtr != nil {
+				controller.DispatchLogger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, e.ID())
 			}
+			continue
 		}
+
+		err := s.QueueManager.EnqueuePulse(e, item.Job)
+
+		if err != nil {
+			controller.DispatchLogger.Warn("Failed to enqueue pulse for entity %d: %v", e.ID(), err)
+			continue
+		}
+
+		// Safe component transition (lastCheckTime already updated in schedule system)
+		if s.Mapper.PulseNeeded.HasAll(e) {
+			s.Mapper.PulseNeeded.Remove(e)
+			s.Mapper.PulsePending.Add(e, &components.PulsePending{})
+
+			namePtr := s.Mapper.Name.Get(e)
+			if namePtr != nil {
+				controller.DispatchLogger.Debug("Dispatched %s job for entity: %d", *namePtr, e.ID())
+			}
+
+			controller.DispatchLogger.LogComponentState(e.ID(), "PulseNeeded->PulsePending", "transitioned")
+		}
+
 	}
 }
 

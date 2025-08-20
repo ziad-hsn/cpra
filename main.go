@@ -5,9 +5,8 @@ import (
 	"cpra/internal/controller/entities"
 	"cpra/internal/controller/systems"
 	"cpra/internal/loader/loader"
-	"cpra/internal/workers/workerspool"
+	"cpra/internal/queue"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -18,187 +17,99 @@ import (
 	"github.com/mlange-42/ark-tools/app"
 )
 
-// calculateOptimalWorkers determines worker count based on monitor scale and workload type
-func calculateOptimalWorkers(monitorCount, cpuCount int) int {
-	// For I/O-bound HTTP monitoring workloads, we can scale far beyond CPU count
-	// Each worker spends most time waiting for network I/O, not CPU processing
-
-	if monitorCount <= 100 {
-		// Small scale: Conservative approach
-		return cpuCount * 4
-	} else if monitorCount <= 1000 {
-		// Medium scale: Moderate scaling
-		return cpuCount * 16
-	} else if monitorCount <= 10000 {
-		// High scale: Aggressive scaling for I/O bound workload
-		// Use either 64x CPU count or 1 worker per 10 monitors, whichever is smaller
-		return min(cpuCount*64, monitorCount/10)
-	} else {
-		// Very high scale: Maximum practical limit
-		// Cap at 1000 workers to prevent resource exhaustion
-		return min(1000, monitorCount/20)
-	}
-}
-
-// calculateBufferSize determines optimal channel buffer sizes to prevent blocking
-func calculateBufferSize(monitorCount int, poolType string) int {
-	baseSize := monitorCount * 2 // Allow 2x monitor count for burst capacity
-
-	switch poolType {
-	case "pulse":
-		// Pulse jobs are most frequent - need largest buffers
-		if monitorCount <= 1000 {
-			return max(baseSize, 50000)
-		} else {
-			return max(baseSize, 500000) // 500K buffer for 10K+ monitors
-		}
-	case "intervention":
-		// Interventions are less frequent but critical
-		return max(baseSize/4, 10000)
-	case "code":
-		// Code notifications can burst during outages
-		return max(baseSize/2, 25000)
-	default:
-		return max(baseSize, 10000)
-	}
-}
-
 func main() {
-	// Check for debug mode from environment or command line
+	// Check for debug mode
 	debugMode := os.Getenv("CPRA_DEBUG") == "true" ||
 		(len(os.Args) > 1 && (os.Args[1] == "--debug" || os.Args[1] == "-d"))
 
-	// Initialize logging system
+	// Initialize logging
 	controller.InitializeLoggers(debugMode)
 	defer controller.CloseLoggers()
 
-	controller.SystemLogger.Info("Starting CPRa Monitoring System")
-	if debugMode {
-		controller.SystemLogger.Debug("Debug mode enabled - verbose logging active")
-	}
+	controller.SystemLogger.Info("Starting CPRa Monitoring System with Optimized Queue")
 
-	// Production-ready settings with enhanced error handling
-	debug.SetGCPercent(20)
-	debug.SetMemoryLimit(1 << 30) // 1GB memory limit for stability
+	// Set optimal GC and memory settings for high throughput
+	debug.SetGCPercent(50)               // More aggressive GC for queue-heavy workload
+	runtime.GOMAXPROCS(runtime.NumCPU()) // Use all available cores
 
-	// Initialize memory manager
-	memManager := controller.NewMemoryManager(1, 30) // 1GB limit, GC every 30s
+	// Memory manager with 2GB limit for 10k+ monitors
+	memManager := controller.NewMemoryManager(2, 30)
 	memManager.SetMemoryLimit()
-	controller.SystemLogger.Info("Memory manager initialized with 1GB limit")
 
-	// Setup crash logging with rotation
-	f, err := os.OpenFile("crash-latest.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	err = debug.SetCrashOutput(f, debug.CrashOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Load configuration with validation
-	configFile := "internal/loader/sample.yaml"
-	if debugMode {
-		controller.SystemLogger.Debug("Loading configuration from: %s", configFile)
-	}
-
+	// Load configuration
+	configFile := "internal/loader/replicated_test.yaml"
 	l := loader.NewLoader("yaml", configFile)
 	if err := l.Load(); err != nil {
 		controller.SystemLogger.Fatal("Failed to load configuration: %v", err)
 	}
 	manifest := l.GetManifest()
 
-	if len(manifest.Monitors) == 0 {
+	monitorCount := len(manifest.Monitors)
+	if monitorCount == 0 {
 		controller.SystemLogger.Fatal("No monitors configured")
 	}
 
-	controller.SystemLogger.Info("Configuration loaded successfully: %d monitors", len(manifest.Monitors))
+	controller.SystemLogger.Info("Initializing optimized queue for %d monitors", monitorCount)
 
-	// Calculate optimal worker count for high-scale performance
-	cpuCount := runtime.NumCPU()
-	numWorkers := calculateOptimalWorkers(len(manifest.Monitors), cpuCount)
-
-	controller.SystemLogger.Info("Worker scaling: %d workers for %d monitors (CPU: %d, ratio: %.1fx)",
-		numWorkers, len(manifest.Monitors), cpuCount, float64(numWorkers)/float64(cpuCount))
-
-	// Calculate optimal buffer sizes based on scale
-	pulseBufferSize := calculateBufferSize(len(manifest.Monitors), "pulse")
-	interventionBufferSize := calculateBufferSize(len(manifest.Monitors), "intervention")
-	codeBufferSize := calculateBufferSize(len(manifest.Monitors), "code")
-
-	controller.SystemLogger.Info("Channel buffers - Pulse: %d, Intervention: %d, Code: %d",
-		pulseBufferSize, interventionBufferSize, codeBufferSize)
-
-	// start workers pools with optimized buffers
-	pools := workerspool.NewPoolsManager()
-	pools.NewPool("pulse", numWorkers, pulseBufferSize, pulseBufferSize)
-	pools.NewPool("intervention", numWorkers, interventionBufferSize, interventionBufferSize)
-	pools.NewPool("code", numWorkers, codeBufferSize, codeBufferSize)
-
-	pulseJobChan, err := pools.GetJobChannel("pulse")
+	// Create the optimized queue manager
+	queueManager, err := queue.NewQueueManager(monitorCount)
 	if err != nil {
-		log.Fatal(err)
+		controller.SystemLogger.Fatal("Failed to create queue manager: %v", err)
 	}
-	interventionJobChan, err := pools.GetJobChannel("intervention")
-	if err != nil {
-		log.Fatal(err)
-	}
-	CodeJobChan, err := pools.GetJobChannel("code")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pulseResultChan, err := pools.GetResultChannel("pulse")
-	if err != nil {
-		log.Fatal(err)
-	}
-	interventionResultChan, err := pools.GetResultChannel("intervention")
-	if err != nil {
-		log.Fatal(err)
-	}
-	codeResultChan, err := pools.GetResultChannel("code")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pools.StartAll()
+	defer queueManager.Shutdown()
 
-	// Create a new, seeded tool.
+	// Get result channels from queue manager
+	pulseResults, interventionResults, codeResults := queueManager.GetChannels()
+
+	// Log queue configuration
+	metrics := queueManager.GetMetrics()
+	controller.SystemLogger.Info("Queue initialized with metrics: %+v", metrics)
+
+	// Create ECS world and systems
 	tool := app.New(1024).Seed(123)
-	// Limit simulation speed.
-	tool.TPS = 3000
+	tool.TPS = 10000 // High TPS for 10k monitors with 1s intervals
 
 	_, err = controller.NewCPRaWorld(&manifest, &tool.World)
+	if err != nil {
+		controller.SystemLogger.Fatal("Failed to create world: %v", err)
+	}
+
 	mapper := entities.InitializeMappers(&tool.World)
 
+	// Add scheduling system (unchanged)
 	tool.AddSystem(&systems.PulseScheduleSystem{
 		Mapper: mapper,
 	})
-	tool.AddSystem(&systems.PulseDispatchSystem{
-		JobChan: pulseJobChan,
-		Mapper:  mapper,
-	})
 
-	tool.AddSystem(&systems.PulseResultSystem{
-		ResultChan: pulseResultChan,
-		Mapper:     mapper,
+	// Add dispatch systems with queue manager
+	tool.AddSystem(&systems.PulseDispatchSystem{
+		QueueManager: queueManager,
+		Mapper:       mapper,
 	})
 
 	tool.AddSystem(&systems.InterventionDispatchSystem{
-		JobChan: interventionJobChan,
-		Mapper:  mapper,
+		QueueManager: queueManager,
+		Mapper:       mapper,
 	})
-	tool.AddSystem(&systems.InterventionResultSystem{
-		ResultChan: interventionResultChan,
+
+	tool.AddSystem(&systems.CodeDispatchSystem{
+		QueueManager: queueManager,
+		Mapper:       mapper,
+	})
+
+	// Add result systems (unchanged, they still use channels)
+	tool.AddSystem(&systems.PulseResultSystem{
+		ResultChan: pulseResults,
 		Mapper:     mapper,
 	})
-	tool.AddSystem(&systems.CodeDispatchSystem{
-		JobChan: CodeJobChan,
-		Mapper:  mapper,
+
+	tool.AddSystem(&systems.InterventionResultSystem{
+		ResultChan: interventionResults,
+		Mapper:     mapper,
 	})
 
 	tool.AddSystem(&systems.CodeResultSystem{
-		ResultChan: codeResultChan,
+		ResultChan: codeResults,
 		Mapper:     mapper,
 	})
 
@@ -209,47 +120,67 @@ func main() {
 	// Initialize the world
 	tool.Initialize()
 
-	// Main application loop
-	mainLoop(tool, memManager, pools, sigChan)
+	// Start monitoring loop
+	go monitoringLoop(queueManager, memManager)
 
-	// Graceful shutdown sequence
+	// Main application loop
+	mainLoop(tool, sigChan)
+
+	// Graceful shutdown
 	fmt.Println("Starting graceful shutdown...")
 
-	// Stop worker pools first
-	pools.StopAll()
+	// Log final metrics
+	finalMetrics := queueManager.GetMetrics()
+	controller.SystemLogger.Info("Final queue metrics: %+v", finalMetrics)
 
-	// Finalize simulation
 	tool.Finalize()
-
-	// Log final memory stats
 	memManager.LogMemoryStats()
 
 	fmt.Println("Shutdown complete")
 }
 
-func mainLoop(tool *app.App, memManager *controller.MemoryManager, pools *workerspool.PoolsManager, sigChan chan os.Signal) {
-	memoryTicker := time.NewTicker(10 * time.Second)
-	defer memoryTicker.Stop()
-
-	poolStatsTicker := time.NewTicker(30 * time.Second)
-	defer poolStatsTicker.Stop()
-
+func mainLoop(tool *app.App, sigChan chan os.Signal) {
 	ticker := time.NewTicker(time.Second / time.Duration(tool.TPS))
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-sigChan:
-			fmt.Println("Shutdown signal received, exiting main loop.")
+			fmt.Println("Shutdown signal received")
 			return
 		case <-ticker.C:
 			tool.Update()
-		case <-memoryTicker.C:
-			memManager.MonitorMemory()
-		case <-poolStatsTicker.C:
-			if pools.Monitor != nil {
-				pools.Monitor.PrintStats()
+		}
+	}
+}
+
+func monitoringLoop(qm *queue.QueueManager, mm *controller.MemoryManager) {
+	memTicker := time.NewTicker(10 * time.Second)
+	metricsTicker := time.NewTicker(30 * time.Second)
+	defer memTicker.Stop()
+	defer metricsTicker.Stop()
+
+	for {
+		select {
+		case <-memTicker.C:
+			mm.MonitorMemory()
+		case <-metricsTicker.C:
+			metrics := qm.GetMetrics()
+
+			// Calculate throughput
+			processed := metrics["pulsesProcessed"].(int64)
+			queued := metrics["pulsesQueued"].(int64)
+			dropped := metrics["droppedJobs"].(int64)
+
+			var efficiency float64
+			if queued > 0 {
+				efficiency = float64(processed) / float64(queued) * 100
 			}
+
+			controller.SystemLogger.Info(
+				"Queue Performance: Processed=%d, Queued=%d, Dropped=%d, Efficiency=%.1f%%, QueueDepth=%d",
+				processed, queued, dropped, efficiency, metrics["pulseQueueDepth"],
+			)
 		}
 	}
 }

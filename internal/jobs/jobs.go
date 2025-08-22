@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpra/internal/loader/schema"
 	"fmt"
+	"log"
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/moby/moby/api/types/container"
@@ -334,10 +335,16 @@ func (c *CodeLogJob) Execute() Result {
 			continue // Move to the next retry attempt
 		}
 
-		// Format a structured log line.
+		// Get timezone for logging (check environment or use local)
+		timezone := getLoggingTimezone()
+		
+		// Format a structured log line with enhanced timestamp including timezone
+		now := time.Now().In(timezone)
+		timestamp := now.Format("2006-01-02T15:04:05.000Z07:00") // RFC3339 with milliseconds and timezone
+		
 		logLine := fmt.Sprintf(
 			"%s [%s] %s\n",
-			time.Now().UTC().Format(time.RFC3339),
+			timestamp,
 			c.Monitor,
 			c.Message,
 		)
@@ -395,7 +402,7 @@ func (c *CodeSlackJob) Execute() Result {
 	//fmt.Println("executing code Log Job")
 	res := Result{
 		Ent: c.Entity,
-		Err: fmt.Errorf("Docker intervention failed\n"),
+		Err: fmt.Errorf("slack notification failed\n"),
 		ID:  c.ID,
 	}
 	return res
@@ -422,7 +429,7 @@ func (c *CodePagerDutyJob) Execute() Result {
 	//fmt.Println("executing code pagerduty Job")
 	res := Result{
 		Ent: c.Entity,
-		Err: fmt.Errorf("Docker intervention failed\n"),
+		Err: fmt.Errorf("pagerduty notification failed\n"),
 		ID:  c.ID,
 	}
 	return res
@@ -434,4 +441,18 @@ func (c *CodePagerDutyJob) Copy() Job {
 	*job = *c
 	return job
 
+}
+
+// getLoggingTimezone returns the timezone to use for job logging
+func getLoggingTimezone() *time.Location {
+	// Check environment variable first
+	if tz := os.Getenv("CPRA_TIMEZONE"); tz != "" {
+		if loc, err := time.LoadLocation(tz); err == nil {
+			return loc
+		}
+		log.Printf("Warning: Invalid timezone '%s' in CPRA_TIMEZONE, using local timezone", tz)
+	}
+	
+	// Use local timezone as default
+	return time.Local
 }

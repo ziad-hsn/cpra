@@ -114,7 +114,7 @@ func (s *CodeDispatchSystem) Update(w *ecs.World) {
 }
 
 func (s *CodeDispatchSystem) Finalize(w *ecs.World) {
-	close(s.JobChan)
+	//close(s.JobChan)
 }
 
 /* ---------------------------  RESULT  --------------------------- */

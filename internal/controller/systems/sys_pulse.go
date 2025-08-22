@@ -163,7 +163,7 @@ func (s *PulseDispatchSystem) Update(w *ecs.World) {
 }
 
 func (s *PulseDispatchSystem) Finalize(w *ecs.World) {
-	close(s.JobChan)
+	//close(s.JobChan)
 }
 
 /* -----------------------------  RESULT  ----------------------------- */

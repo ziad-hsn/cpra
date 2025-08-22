@@ -18,9 +18,9 @@ import (
 // QueueManager combines K8s workqueue (deduplication) with ants pool (execution)
 type QueueManager struct {
 	// Workqueues for deduplication and rate limiting
-	pulseQueue        workqueue.RateLimitingInterface
-	interventionQueue workqueue.RateLimitingInterface
-	codeQueue         workqueue.RateLimitingInterface
+	pulseQueue        workqueue.TypedRateLimitingInterface[string]
+	interventionQueue workqueue.TypedRateLimitingInterface[string]
+	codeQueue         workqueue.TypedRateLimitingInterface[string]
 
 	// Ants pools for efficient execution
 	pulsePool        *ants.Pool
@@ -66,13 +66,13 @@ type customRateLimiter struct {
 	limiter *rate.Limiter
 }
 
-func (r *customRateLimiter) When(item interface{}) time.Duration {
+func (r *customRateLimiter) When(item string) time.Duration {
 	return r.limiter.Reserve().Delay()
 }
 
-func (r *customRateLimiter) Forget(item interface{}) {}
+func (r *customRateLimiter) Forget(item string) {}
 
-func (r *customRateLimiter) NumRequeues(item interface{}) int {
+func (r *customRateLimiter) NumRequeues(item string) int {
 	return 0
 }
 
@@ -106,20 +106,26 @@ func NewQueueManager(monitorCount int) (*QueueManager, error) {
 		limiter: rate.NewLimiter(rate.Limit(monitorCount/5), monitorCount/2),
 	}
 
-	// Create workqueues with custom rate limiters
-	pulseQueue := workqueue.NewNamedRateLimitingQueue(
+	// Create workqueues with custom rate limiters using the recommended approach
+	pulseQueue := workqueue.NewTypedRateLimitingQueueWithConfig(
 		pulseLimiter,
-		"pulse-queue",
+		workqueue.TypedRateLimitingQueueConfig[string]{
+			Name: "pulse-queue",
+		},
 	)
 
-	interventionQueue := workqueue.NewNamedRateLimitingQueue(
+	interventionQueue := workqueue.NewTypedRateLimitingQueueWithConfig(
 		interventionLimiter,
-		"intervention-queue",
+		workqueue.TypedRateLimitingQueueConfig[string]{
+			Name: "intervention-queue",
+		},
 	)
 
-	codeQueue := workqueue.NewNamedRateLimitingQueue(
+	codeQueue := workqueue.NewTypedRateLimitingQueueWithConfig(
 		codeLimiter,
-		"code-queue",
+		workqueue.TypedRateLimitingQueueConfig[string]{
+			Name: "code-queue",
+		},
 	)
 
 	// Create ants pools with pre-allocated workers and non-blocking mode
@@ -243,7 +249,7 @@ func (qm *QueueManager) startProcessors() {
 
 // processQueue pulls from workqueue and submits to ants pool
 func (qm *QueueManager) processQueue(
-	queue workqueue.RateLimitingInterface,
+	queue workqueue.TypedRateLimitingInterface[string],
 	pool *ants.Pool,
 	results chan jobs.Result,
 	queueType string,
@@ -268,8 +274,8 @@ func (qm *QueueManager) processQueue(
 }
 
 func (qm *QueueManager) processItem(
-	key interface{},
-	queue workqueue.RateLimitingInterface,
+	key string,
+	queue workqueue.TypedRateLimitingInterface[string],
 	pool *ants.Pool,
 	results chan jobs.Result,
 	queueType string,
@@ -278,7 +284,7 @@ func (qm *QueueManager) processItem(
 	defer queue.Done(key)
 
 	// Retrieve job from store
-	jobInterface, ok := qm.jobStore.Load(key.(string))
+	jobInterface, ok := qm.jobStore.Load(key)
 	if !ok {
 		// Job not found, forget it
 		queue.Forget(key)
@@ -304,7 +310,7 @@ func (qm *QueueManager) processItem(
 		}
 
 		// Clean up job from store
-		qm.jobStore.Delete(key.(string))
+		qm.jobStore.Delete(key)
 	})
 
 	if err != nil {

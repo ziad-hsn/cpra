@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -45,6 +46,8 @@ type Logger struct {
 	debugMode   bool
 	prodMode    bool
 	file        *os.File
+	timezone    *time.Location
+	tracer      *Tracer
 }
 
 // NewLogger creates a new logger instance
@@ -63,12 +66,19 @@ func NewLogger(component string, debugMode bool) *Logger {
 	// Enable colors for terminal output (disable in production)
 	enableColor := !prodMode && isTerminal()
 
+	// Get timezone from environment or use local timezone
+	timezone := getTimezone()
+
+	// Enable tracing in debug mode or if explicitly enabled
+	enableTracing := debugMode || strings.ToLower(os.Getenv("CPRA_TRACING")) == "true"
+
 	logger := &Logger{
 		level:       level,
 		component:   component,
 		enableColor: enableColor,
 		debugMode:   debugMode,
 		prodMode:    prodMode,
+		timezone:    timezone,
 	}
 
 	// Setup file logging for production
@@ -76,7 +86,26 @@ func NewLogger(component string, debugMode bool) *Logger {
 		logger.setupFileLogging()
 	}
 
+	// Setup tracing if enabled
+	if enableTracing {
+		logger.tracer = NewTracer(component, true)
+	}
+
 	return logger
+}
+
+// getTimezone returns the timezone to use for logging
+func getTimezone() *time.Location {
+	// Check environment variable first
+	if tz := os.Getenv("CPRA_TIMEZONE"); tz != "" {
+		if loc, err := time.LoadLocation(tz); err == nil {
+			return loc
+		}
+		log.Printf("Warning: Invalid timezone '%s', using local timezone", tz)
+	}
+	
+	// Use local timezone as default
+	return time.Local
 }
 
 // isTerminal checks if we're running in a terminal
@@ -87,7 +116,7 @@ func isTerminal() bool {
 
 // setupFileLogging configures file output for production
 func (l *Logger) setupFileLogging() {
-	logFile := fmt.Sprintf("cpra-%s.log", time.Now().Format("2006-01-02"))
+	logFile := fmt.Sprintf("cpra-%s.log", time.Now().In(l.timezone).Format("2006-01-02"))
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		log.Printf("Failed to open log file: %v", err)
@@ -105,7 +134,9 @@ func (l *Logger) Close() {
 
 // formatMessage formats a log message with timestamp, level, and component
 func (l *Logger) formatMessage(level LogLevel, msg string, args ...interface{}) string {
-	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
+	// Use enhanced timestamp with timezone information
+	now := time.Now().In(l.timezone)
+	timestamp := now.Format("2006-01-02T15:04:05.000Z07:00") // RFC3339 with milliseconds
 	levelName := logLevelNames[level]
 
 	formattedMsg := fmt.Sprintf(msg, args...)
@@ -177,7 +208,53 @@ func (l *Logger) WithContext(context string) *Logger {
 		debugMode:   l.debugMode,
 		prodMode:    l.prodMode,
 		file:        l.file,
+		timezone:    l.timezone,
+		tracer:      l.tracer,
 	}
+}
+
+// StartTrace begins a new trace span with the logger's tracer
+func (l *Logger) StartTrace(ctx context.Context, operation string) (context.Context, *TraceSpan) {
+	if l.tracer != nil {
+		return l.tracer.StartSpan(ctx, operation)
+	}
+	return ctx, nil
+}
+
+// FinishTrace completes a trace span
+func (l *Logger) FinishTrace(span *TraceSpan, err error) {
+	if l.tracer != nil {
+		l.tracer.FinishSpan(span, err)
+	}
+}
+
+// AddTraceTag adds a tag to a trace span
+func (l *Logger) AddTraceTag(span *TraceSpan, key, value string) {
+	if l.tracer != nil {
+		l.tracer.AddSpanTag(span, key, value)
+	}
+}
+
+// AddTraceMetadata adds metadata to a trace span
+func (l *Logger) AddTraceMetadata(span *TraceSpan, key string, value interface{}) {
+	if l.tracer != nil {
+		l.tracer.AddSpanMetadata(span, key, value)
+	}
+}
+
+// SetTraceEntity sets the entity ID for a trace span
+func (l *Logger) SetTraceEntity(span *TraceSpan, entityID uint64) {
+	if l.tracer != nil {
+		l.tracer.SetSpanEntity(span, entityID)
+	}
+}
+
+// GetTracingStats returns tracing statistics
+func (l *Logger) GetTracingStats() map[string]interface{} {
+	if l.tracer != nil {
+		return l.tracer.GetStats()
+	}
+	return map[string]interface{}{"enabled": false}
 }
 
 // LogSystemPerformance logs system performance metrics

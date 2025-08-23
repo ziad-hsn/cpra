@@ -22,9 +22,18 @@ func main() {
 	debugMode := os.Getenv("CPRA_DEBUG") == "true" ||
 		(len(os.Args) > 1 && (os.Args[1] == "--debug" || os.Args[1] == "-d"))
 
-	// Initialize logging
+	// Check for tracing mode
+	tracingEnabled := debugMode || (os.Getenv("CPRA_TRACING") == "true")
+
+	// Initialize logging and tracing
 	controller.InitializeLoggers(debugMode)
+	controller.InitializeTracers(tracingEnabled)
 	defer controller.CloseLoggers()
+	
+	// Start periodic trace cleanup if tracing is enabled
+	if tracingEnabled {
+		controller.StartPeriodicCleanup(5*time.Minute, 30*time.Minute)
+	}
 
 	controller.SystemLogger.Info("Starting CPRa Monitoring System with Optimized Queue")
 

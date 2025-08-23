@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"context"
 	"cpra/internal/controller"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
@@ -32,6 +33,14 @@ func (s *PulseScheduleSystem) Initialize(w *ecs.World) {
 
 func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
 	start := time.Now()
+	
+	// Start tracing for this operation
+	ctx := context.Background()
+	ctx, span := controller.SchedulerLogger.StartTrace(ctx, "pulse_schedule_collect")
+	defer func() {
+		controller.SchedulerLogger.FinishTrace(span, nil)
+	}()
+	
 	var toCheck []ecs.Entity
 	query := s.PulseFilter.Query()
 
@@ -44,6 +53,8 @@ func (s *PulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
 		// first‑time check?
 		if s.Mapper.PulseFirstCheck.HasAll(ent) {
 			toCheck = append(toCheck, ent)
+			controller.SchedulerLogger.SetTraceEntity(span, uint64(ent.ID()))
+			controller.SchedulerLogger.AddTraceTag(span, "check_type", "first_check")
 			controller.SchedulerLogger.Debug("Entity[%d] first check scheduled (age: %v, interval: %v)",
 				ent.ID(), timeSinceLast, interval)
 			continue
@@ -110,12 +121,23 @@ func (s *PulseDispatchSystem) Initialize(w *ecs.World) {
 }
 
 func (s *PulseDispatchSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchablePulse {
+	// Start tracing for dispatch collection
+	ctx := context.Background()
+	ctx, span := controller.DispatchLogger.StartTrace(ctx, "pulse_dispatch_collect")
+	defer func() {
+		controller.DispatchLogger.FinishTrace(span, nil)
+	}()
+	
 	out := make(map[ecs.Entity]dispatchablePulse)
 	query := s.PulseNeeded.Query()
 
 	for query.Next() {
 		ent := query.Entity()
 		job := s.Mapper.PulseJob.Get(ent).Job
+		
+		// Add entity to trace
+		controller.DispatchLogger.SetTraceEntity(span, uint64(ent.ID()))
+		controller.DispatchLogger.AddTraceTag(span, "job_type", "pulse")
 
 		out[ent] = dispatchablePulse{Job: job}
 	}

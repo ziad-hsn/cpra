@@ -45,12 +45,23 @@ type Tracer struct {
 
 // NewTracer creates a new tracer instance
 func NewTracer(component string, enabled bool) *Tracer {
+	// Create a simple logger without tracing to avoid circular dependency
+	simpleLogger := &Logger{
+		level:       LogLevelDebug,
+		component:   fmt.Sprintf("TRACE:%s", component),
+		enableColor: false,
+		debugMode:   true,
+		prodMode:    false,
+		timezone:    time.Local,
+		tracer:      nil, // No tracer to avoid recursion
+	}
+	
 	return &Tracer{
 		spans:     make(map[string]*TraceSpan),
 		traces:    make(map[string][]*TraceSpan),
 		enabled:   enabled,
 		component: component,
-		logger:    NewLogger(fmt.Sprintf("TRACE:%s", component), true),
+		logger:    simpleLogger,
 	}
 }
 

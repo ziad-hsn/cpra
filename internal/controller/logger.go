@@ -134,21 +134,31 @@ func (l *Logger) Close() {
 
 // formatMessage formats a log message with timestamp, level, and component
 func (l *Logger) formatMessage(level LogLevel, msg string, args ...interface{}) string {
-	// Use enhanced timestamp with timezone information
+	// Use enhanced timestamp with timezone information - 12 hour format with AM/PM
 	now := time.Now().In(l.timezone)
-	timestamp := now.Format("2006-01-02T15:04:05.000Z07:00") // RFC3339 with milliseconds
+	timestamp := now.Format("2006-01-02 03:04:05.000 PM Z07:00") // 12-hour format with space and AM/PM
+	timezoneName := l.timezone.String()
 	levelName := logLevelNames[level]
 
 	formattedMsg := fmt.Sprintf(msg, args...)
 
-	if l.enableColor {
-		color := logLevelColors[level]
-		return fmt.Sprintf("%s [%s%s%s] [%s] %s",
-			timestamp, color, levelName, colorReset, l.component, formattedMsg)
+	// Add tracing info if available
+	traceInfo := ""
+	if l.tracer != nil && l.tracer.enabled {
+		stats := l.tracer.GetStats()
+		if totalSpans, ok := stats["total_spans"].(int); ok && totalSpans > 0 {
+			traceInfo = fmt.Sprintf(" [TRACE:spans=%d]", totalSpans)
+		}
 	}
 
-	return fmt.Sprintf("%s [%s] [%s] %s",
-		timestamp, levelName, l.component, formattedMsg)
+	if l.enableColor {
+		color := logLevelColors[level]
+		return fmt.Sprintf("%s %s [%s%s%s] [%s]%s %s",
+			timestamp, timezoneName, color, levelName, colorReset, l.component, traceInfo, formattedMsg)
+	}
+
+	return fmt.Sprintf("%s %s [%s] [%s]%s %s",
+		timestamp, timezoneName, levelName, l.component, traceInfo, formattedMsg)
 }
 
 // log writes a message at the specified level

@@ -338,14 +338,23 @@ func (c *CodeLogJob) Execute() Result {
 		// Get timezone for logging (check environment or use local)
 		timezone := getLoggingTimezone()
 		
-		// Format a structured log line with enhanced timestamp including timezone
+		// Format a structured log line with enhanced timestamp including timezone name
 		now := time.Now().In(timezone)
 		timestamp := now.Format("2006-01-02T15:04:05.000Z07:00") // RFC3339 with milliseconds and timezone
+		timezoneName := timezone.String()
+		
+		// Add tracing ID if tracing is enabled
+		traceInfo := ""
+		if strings.ToLower(os.Getenv("CPRA_TRACING")) == "true" {
+			traceInfo = fmt.Sprintf(" [TRACE:%s]", c.ID.String()[:8])
+		}
 		
 		logLine := fmt.Sprintf(
-			"%s [%s] %s\n",
+			"%s %s [%s]%s %s\n",
 			timestamp,
+			timezoneName,
 			c.Monitor,
+			traceInfo,
 			c.Message,
 		)
 

@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"cpra/internal/controller"
 	"cpra/internal/jobs"
 	"fmt"
 	"runtime"
@@ -295,8 +296,23 @@ func (qm *QueueManager) processItem(
 
 	// Submit to ants pool (non-blocking)
 	err := pool.Submit(func() {
+		// Start tracing for job execution
+		ctx := context.Background()
+		ctx, span := controller.WorkerPoolLogger.StartTrace(ctx, fmt.Sprintf("job_execute_%s", queueType))
+		controller.WorkerPoolLogger.AddTraceTag(span, "queue_type", queueType)
+		controller.WorkerPoolLogger.AddTraceTag(span, "job_key", key)
+		
 		// Execute job
+		start := time.Now()
 		result := job.Execute()
+		duration := time.Since(start)
+		
+		// Add execution metrics to trace
+		controller.WorkerPoolLogger.AddTraceMetadata(span, "execution_duration", duration)
+		controller.WorkerPoolLogger.AddTraceMetadata(span, "success", result.Err == nil)
+		
+		// Finish trace
+		controller.WorkerPoolLogger.FinishTrace(span, result.Err)
 
 		// Send result (non-blocking)
 		select {

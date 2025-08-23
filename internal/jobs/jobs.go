@@ -338,9 +338,9 @@ func (c *CodeLogJob) Execute() Result {
 		// Get timezone for logging (check environment or use local)
 		timezone := getLoggingTimezone()
 		
-		// Format a structured log line with enhanced timestamp including timezone name
+		// Format a structured log line with enhanced timestamp including timezone name - 12 hour format
 		now := time.Now().In(timezone)
-		timestamp := now.Format("2006-01-02T15:04:05.000Z07:00") // RFC3339 with milliseconds and timezone
+		timestamp := now.Format("2006-01-02 03:04:05.000 PM Z07:00") // 12-hour format with space and AM/PM
 		timezoneName := timezone.String()
 		
 		// Add tracing ID if tracing is enabled

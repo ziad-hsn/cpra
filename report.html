@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The State of Observability 2025: An Interactive Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is designed as a single-page dashboard with a clear, thematic flow, moving from high-level trends to specific competitive and talent analysis, and concluding with actionable strategy. This structure was chosen over a linear report format to empower users to explore content non-linearly based on their interests. Key interactions include: 1) A tab-based system for exploring the five dominant trends, preventing information overload. 2) An interactive vendor comparison table where clicking a vendor updates a detailed profile card and a dynamic radar chart for at-a-glance comparison. 3) An interactive role-based feature planner that connects key talent profiles to actionable product features and hiring strategies for a new project. This user-centric, interactive design makes the dense report content more digestible, engaging, and easier to synthesize. -->
+    <!-- Visualization & Content Choices: 1) Dominant Trends: Report Info -> 5 core market trends. Goal -> Inform & Organize. Viz -> Interactive tabbed cards. Interaction -> Click to reveal detailed text. Justification -> Breaks down dense paragraphs into manageable, user-selectable topics. Method -> HTML/CSS/JS. 2) Competitive Analysis: Report Info -> Vendor comparison data. Goal -> Compare. Viz -> HTML table + Radar Chart. Interaction -> Click row to update detail card & chart. Justification -> Allows direct, multi-faceted comparison of competitors. Library -> Chart.js (Canvas). 3) Talent & Feature Roadmap: Report Info -> Key job roles and their needs. Goal -> Inform & Strategize. Viz -> Interactive role-selector cards. Interaction -> Click a role to display its core focus, required product features, and strategic value. Justification -> Directly translates talent trends into an actionable product and hiring roadmap, moving beyond academic analysis. Method -> HTML/CSS/JS. 4) Strategic Recommendations: Report Info -> Actionable advice for Project CPRa. Goal -> Inform. Viz -> Structured list with icons. Interaction -> Static display. Justification -> Clear, concise presentation of key takeaways. Method -> HTML/CSS. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #3D3D3D;
+        }
+        .active-tab, .active-role {
+            border-color: #A5947E;
+            background-color: #EFEAE4;
+            color: #3D3D3D;
+        }
+        .inactive-tab, .inactive-role {
+            border-color: transparent;
+            background-color: #F7F4F0;
+            color: #7A7A7A;
+        }
+        .vendor-row:hover, .role-card:hover {
+            background-color: #F7F4F0;
+            cursor: pointer;
+        }
+        .selected-vendor-row {
+            background-color: #EFEAE4;
+            border-left: 4px solid #A5947E;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-gray-800">Observability 2025</h1>
+                </div>
+                <nav class="hidden md:flex md:space-x-8">
+                    <a href="#trends" class="text-gray-600 hover:text-gray-900 font-medium">Trends</a>
+                    <a href="#competition" class="text-gray-600 hover:text-gray-900 font-medium">Competition</a>
+                    <a href="#talent" class="text-gray-600 hover:text-gray-900 font-medium">Talent</a>
+                    <a href="#strategy" class="text-gray-600 hover:text-gray-900 font-medium">Strategy</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        
+        <section class="text-center mb-16">
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-4">The State of Observability 2025</h1>
+            <p class="max-w-3xl mx-auto text-lg text-gray-600">An interactive analysis of the market's transformation, driven by AI, open standards, and the new competitive frontier.</p>
+        </section>
+
+        <section id="trends" class="mb-16 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Dominant Market Trends</h2>
+            <p class="text-gray-600 mb-8">The observability landscape is being reshaped by powerful, interconnected forces. This section provides an interactive overview of the key trends driving the market forward. Click on each trend to explore the detailed analysis and understand the philosophies that govern how modern digital systems are managed.</p>
+            
+            <div>
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="-mb-px flex space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs" id="trend-tabs">
+                    </nav>
+                </div>
+                <div id="trend-content" class="bg-white p-6 rounded-lg shadow-sm min-h-[300px]">
+                </div>
+            </div>
+        </section>
+
+        <section id="competition" class="mb-16 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Competitive Landscape</h2>
+            <p class="text-gray-600 mb-8">The market is dominated by a handful of major players, each with a distinct strategy. This section offers a dynamic comparison of the leading vendors. Select a vendor from the table to view their detailed profile, key differentiators, and strategic positioning in the radar chart below.</p>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Vendor Comparison</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Core Value Proposition</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target Audience</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendor-table" class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="vendor-details" class="bg-white p-6 rounded-lg shadow-sm">
+                </div>
+            </div>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow-sm">
+                 <h3 class="text-xl font-semibold mb-4 text-center text-gray-800">Vendor Strategic Positioning</h3>
+                 <div class="chart-container h-96 md:h-[450px] max-h-[500px]">
+                    <canvas id="vendorRadarChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="talent" class="mb-16 scroll-mt-20">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Building Your Team: Key Roles & Features for CPRa</h2>
+            <p class="text-gray-600 mb-8">Success in the modern observability market depends on attracting the right talent. This requires building a product that empowers them. This section moves beyond simple job titles to provide an actionable roadmap. Select a key professional role to see which features CPRa must build to win them over and why they are a strategic hire.</p>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Select a Role Profile</h3>
+                    <div id="talent-roles" class="space-y-3">
+                    </div>
+                </div>
+                <div id="talent-details" class="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm">
+                </div>
+            </div>
+        </section>
+
+        <section id="strategy" class="scroll-mt-20">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Strategic Recommendations for Project CPRa</h2>
+            <p class="text-gray-600 mb-8">Synthesizing market trends, competitive dynamics, and the talent ecosystem, this final section provides a framework for navigating the complexities of the current observability market. These recommendations are designed to position a new project for success in this dynamic environment.</p>
+            <div id="strategy-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-white mt-16 border-t border-gray-200">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
+            <p>Interactive Report generated from "The State of Observability 2025".</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const trendData = {
+                "The AI Imperative": {
+                    icon: '🧠',
+                    summary: "AI is reshaping observability, both by enhancing operational efficiency (AIOps) and by creating new challenges in monitoring AI systems themselves (LLM Observability).",
+                    content: `
+                        <h4 class="font-bold text-lg mb-2">From AIOps to Generative AI</h4>
+                        <p class="text-gray-600 mb-4">The integration of artificial intelligence is the single most significant trend, bifurcating into two distinct but complementary domains: leveraging AI to enhance observability processes and developing new observability practices to manage AI systems themselves. The primary driver is the shift from reactive monitoring to proactive, preventive, and predictive operations. AIOps automates root cause analysis, predicts failures, and reduces alert noise. Simultaneously, the rise of LLMs creates an urgent need for 'Observability for AI' to monitor for unique failure modes like hallucinations, data poisoning, and PII leakage. Generative AI is also becoming the new user interface for platforms, democratizing data access through natural language queries.</p>
+                    `
+                },
+                "The Economics of Observability": {
+                    icon: '💰',
+                    summary: "The explosion of telemetry data has made cost management a primary feature, deeply embedding FinOps principles into observability platforms.",
+                    content: `
+                        <h4 class="font-bold text-lg mb-2">The Rise of FinOps and Cost Optimization</h4>
+                        <p class="text-gray-600 mb-4">The sheer volume of telemetry data has created a significant financial burden, elevating cost management to a core strategic concern. In response, vendors are competing on their ability to help customers control spending. Key features include observability pipelines to filter and route data before ingestion, reducing costs by up to 80%. Vendor-specific tools like Datadog's CCM and Grafana's Adaptive Metrics provide granular cost control. This trend links observability data directly to FinOps, providing the insights needed to make informed decisions about cloud spend and resource allocation. Flexible, usage-based pricing models are becoming the norm, replacing rigid legacy contracts.</p>
+                    `
+                },
+                "Shifting Left": {
+                    icon: '🚀',
+                    summary: "Traditional silos are collapsing as observability converges with security (DevSecOps) and becomes a foundational component of platform engineering.",
+                    content: `
+                        <h4 class="font-bold text-lg mb-2">Convergence with Security & Platform Engineering</h4>
+                        <p class="text-gray-600 mb-4">The wall between IT operations and security is crumbling, as both disciplines rely on the same underlying telemetry data. Leading vendors are integrating SIEM capabilities directly into their platforms, creating a single source of truth for threat detection and operational monitoring. Simultaneously, observability is becoming a core principle of Platform Engineering. By embedding standardized observability into Internal Developer Platforms (IDPs), organizations 'shift left' the responsibility for reliability, empowering developers with self-service tools and immediate feedback on their code's performance, reducing cognitive load and accelerating software delivery.</p>
+                    `
+                },
+                "The Future is Open": {
+                    icon: '🌐',
+                    summary: "OpenTelemetry (OTel) has become the de facto standard for data collection, commoditizing the agent layer and shifting competition to the analytics platform.",
+                    content: `
+                        <h4 class="font-bold text-lg mb-2">OpenTelemetry's Journey to De Facto Standard</h4>
+                        <p class="text-gray-600 mb-4">OpenTelemetry, the second most active CNCF project after Kubernetes, has fundamentally altered the market by eliminating vendor lock-in. Organizations can now instrument their code once with OTel and send the standardized data to any compatible backend. This has commoditized the data collection layer, which was once a vendor's competitive moat. The competitive battleground has now moved up the stack. Market leadership is no longer determined by *how* data is collected, but by what a platform *does* with that data—providing the most intelligent, automated, and actionable insights from the standardized OTel feed.</p>
+                    `
+                },
+                "Business & User-Centricity": {
+                    icon: '📈',
+                    summary: "The focus is expanding beyond system health to connect technical performance directly with business KPIs and the end-user's digital experience.",
+                    content: `
+                        <h4 class="font-bold text-lg mb-2">Beyond MELT</h4>
+                        <p class="text-gray-600 mb-4">A key maturation of the market is the rise of 'business observability,' which correlates system telemetry (Metrics, Events, Logs, Traces) with high-level business KPIs like conversion rates and revenue. This translates technical performance into a language business leaders can understand. Furthermore, there is a growing focus on the end-user experience through technologies like Real User Monitoring (RUM) and Digital Experience Monitoring (DEM). This user-centric perspective is critical for understanding the real-world impact of performance issues. The ultimate goal is the democratization of observability data across the entire organization, making it a universal platform for data-driven decision-making.</p>
+                    `
+                }
+            };
+
+            const vendorData = [
+                { name: "Datadog", proposition: "The Unified Platform for Monitoring, Security, and Business", audience: "DevOps, Security, and Business Teams", ai: "Watchdog & Agentic AI Triage", otel: "Unified via DDOT Collector", scores: { platform: 5, ai: 4, otel: 3, community: 3 } },
+                { name: "Dynatrace", proposition: "AI-Powered Observability and Automation", audience: "Large Enterprise Operations and Platform Teams", ai: "Davis Causal AI Engine", otel: "Enrichment via PurePath & Smartscape", scores: { platform: 4, ai: 5, otel: 4, community: 2 } },
+                { name: "New Relic", proposition: "Intelligent Observability / A System of Intelligence", audience: "Engineering Teams (All Sizes)", ai: "Agentic AI & MCP Observability", otel: "Complementary Data Source", scores: { platform: 3, ai: 4, otel: 4, community: 3 } },
+                { name: "Splunk", proposition: "Enterprise Resilience (Security + Observability)", audience: "Security Operations (SOC) and IT Operations", ai: "AI Assistant for SPL", otel: "Splunk OTel Collector for Data Ingestion", scores: { platform: 4, ai: 3, otel: 3, community: 2 } },
+                { name: "Grafana", proposition: "The Open and Composable Observability Platform", audience: "Developers & the Open Source Community", ai: "Grafana Assistant (LLM Agent)", otel: "Alloy & OTel Native / Community-driven", scores: { platform: 3, ai: 3, otel: 5, community: 5 } }
+            ];
+
+            const talentData = {
+                "Observability Engineer": {
+                    icon: '🛠️',
+                    focus: "Data pipelines, dashboards, and platform reliability.",
+                    features: [
+                        "<strong>OTel-Native Ingestion:</strong> Standardized, vendor-agnostic data collection.",
+                        "<strong>Cost Management Dashboards:</strong> Granular control and visibility over telemetry spend.",
+                        "<strong>Intuitive Query Builder:</strong> Fast, flexible data exploration without a steep learning curve.",
+                        "<strong>Automated SLO Tracking:</strong> Proactive reliability management and error budget monitoring."
+                    ],
+                    justification: "This is your foundational hire. To attract them, CPRa must provide robust, efficient, and cost-effective tools to manage the core data platform. Their buy-in is critical for platform stability and adoption."
+                },
+                "AI/AIOps Specialist": {
+                    icon: '🤖',
+                    focus: "Anomaly detection, predictive analytics, and workflow automation.",
+                    features: [
+                        "<strong>Agentic AI for Root Cause Analysis:</strong> Move beyond simple alerts to automated triage and diagnosis.",
+                        "<strong>LLM Observability Hooks:</strong> Provide specialized tools to monitor AI/ML models in production.",
+                        "<strong>Predictive Failure Alerts:</strong> Use historical data to forecast potential issues before they impact users.",
+                        "<strong>Natural Language Querying:</strong> Allow users to ask complex questions of their data in plain English."
+                    ],
+                    justification: "This role represents the competitive frontier. To be a market leader, CPRa must have a compelling AI/ML story that goes beyond a chatbot wrapper and delivers genuine operational automation."
+                },
+                "Platform Engineer / Developer": {
+                    icon: '🧑‍💻',
+                    focus: "Developer experience, self-service tooling, and 'shifting left'.",
+                    features: [
+                        "<strong>Seamless IDP Integration:</strong> Plug directly into developer platforms like Backstage.",
+                        "<strong>Code-Level Tracing & Profiling:</strong> Give developers instant feedback on performance within their IDE or CI/CD pipeline.",
+                        "<strong>Pre-configured 'Golden Paths':</strong> Offer standardized, easy-to-deploy observability for common services.",
+                        "<strong>Security Signal Correlation:</strong> Combine observability and security data in one view to support DevSecOps."
+                    ],
+                    justification: "This persona is your key to widespread adoption. If developers find CPRa easy to use and valuable, it will succeed. Winning the platform engineer means winning the enterprise."
+                }
+            };
+
+            const strategyData = [
+                { icon: '🎯', title: 'Positioning in an AI-Driven Market', content: 'Embrace the AI dichotomy (AI for O11y & O11y for AI). Move beyond chatbots to truly agentic AI that automates complex workflows.' },
+                { icon: '🗺️', title: 'Competitive Feature Roadmap', content: 'Build on an OpenTelemetry foundation. Make cost management a core pillar. Plan for unified security and observability from the outset.' },
+                { icon: '📢', title: 'Branding & Go-to-Market', content: 'Craft a sharp, differentiated narrative. Target a specific niche (e.g., AI startups, mid-market) and expand from there. Leverage open source to build community.' },
+                { icon: '👥', title: 'Talent Acquisition', content: 'Define the required engineering profile with precision. Invest in a hybrid "build vs. buy" talent strategy. Foster a culture of observability.' }
+            ];
+
+            function setupTrends() {
+                const tabsContainer = document.getElementById('trend-tabs');
+                const contentContainer = document.getElementById('trend-content');
+                const trendNames = Object.keys(trendData);
+
+                trendNames.forEach((name, index) => {
+                    const button = document.createElement('button');
+                    button.innerHTML = `<span class="mr-2">${trendData[name].icon}</span>${name}`;
+                    button.className = `flex-shrink-0 px-3 py-2 font-medium text-sm rounded-t-md border-b-2 transition-colors duration-200 ${index === 0 ? 'active-tab' : 'inactive-tab'}`;
+                    button.dataset.trend = name;
+                    tabsContainer.appendChild(button);
+                });
+
+                function updateTrendContent(trendName) {
+                    const trend = trendData[trendName];
+                    contentContainer.innerHTML = `
+                        <div class="flex items-start">
+                            <div class="text-4xl mr-4">${trend.icon}</div>
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-800 mb-2">${trendName}</h3>
+                                <p class="text-gray-700">${trend.content}</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    Array.from(tabsContainer.children).forEach(btn => {
+                        if (btn.dataset.trend === trendName) {
+                            btn.classList.remove('inactive-tab');
+                            btn.classList.add('active-tab');
+                        } else {
+                            btn.classList.remove('active-tab');
+                            btn.classList.add('inactive-tab');
+                        }
+                    });
+                }
+
+                tabsContainer.addEventListener('click', (e) => {
+                    const button = e.target.closest('button');
+                    if (button && button.dataset.trend) {
+                        updateTrendContent(button.dataset.trend);
+                    }
+                });
+
+                updateTrendContent(trendNames[0]);
+            }
+
+            let vendorRadarChart;
+            function setupCompetition() {
+                const tableBody = document.getElementById('vendor-table');
+                const detailsContainer = document.getElementById('vendor-details');
+                
+                vendorData.forEach((vendor, index) => {
+                    const row = document.createElement('tr');
+                    row.className = 'vendor-row';
+                    row.dataset.vendorIndex = index;
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${vendor.name}</div></td>
+                        <td class="px-6 py-4 whitespace-normal text-sm text-gray-600">${vendor.proposition}</td>
+                        <td class="px-6 py-4 whitespace-normal text-sm text-gray-600">${vendor.audience}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                function updateVendorDetails(index) {
+                    const vendor = vendorData[index];
+                    detailsContainer.innerHTML = `
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">${vendor.name}</h3>
+                        <div class="space-y-3 text-sm">
+                            <p><strong class="font-medium text-gray-700">AI Differentiation:</strong><br>${vendor.ai}</p>
+                            <p><strong class="font-medium text-gray-700">OpenTelemetry Strategy:</strong><br>${vendor.otel}</p>
+                        </div>
+                    `;
+                    
+                    Array.from(tableBody.children).forEach((row, i) => {
+                        if (i == index) {
+                            row.classList.add('selected-vendor-row');
+                        } else {
+                            row.classList.remove('selected-vendor-row');
+                        }
+                    });
+
+                    updateRadarChart(index);
+                }
+                
+                tableBody.addEventListener('click', (e) => {
+                    const row = e.target.closest('tr');
+                    if (row && row.dataset.vendorIndex) {
+                        updateVendorDetails(row.dataset.vendorIndex);
+                    }
+                });
+
+                const ctx = document.getElementById('vendorRadarChart').getContext('2d');
+                const chartData = {
+                    labels: ['Unified Platform', 'AI/AIOps Leadership', 'OpenTelemetry Native', 'Open Source Community'],
+                    datasets: []
+                };
+                vendorRadarChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { display: true },
+                                suggestedMin: 0,
+                                suggestedMax: 5,
+                                pointLabels: {
+                                    font: { size: 12 }
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                        }
+                    }
+                });
+
+                function updateRadarChart(index) {
+                    const vendor = vendorData[index];
+                    vendorRadarChart.data.datasets = [{
+                        label: vendor.name,
+                        data: [vendor.scores.platform, vendor.scores.ai, vendor.scores.otel, vendor.scores.community],
+                        backgroundColor: 'rgba(165, 148, 126, 0.2)',
+                        borderColor: '#A5947E',
+                        pointBackgroundColor: '#A5947E',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#A5947E'
+                    }];
+                    vendorRadarChart.update();
+                }
+
+                updateVendorDetails(0);
+            }
+
+            function setupTalent() {
+                const rolesContainer = document.getElementById('talent-roles');
+                const detailsContainer = document.getElementById('talent-details');
+                const roleNames = Object.keys(talentData);
+
+                roleNames.forEach((roleName, index) => {
+                    const role = talentData[roleName];
+                    const button = document.createElement('button');
+                    button.className = `role-card w-full text-left p-4 rounded-lg border-2 transition-colors duration-200 ${index === 0 ? 'active-role' : 'inactive-role'}`;
+                    button.dataset.role = roleName;
+                    button.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${role.icon}</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">${roleName}</h4>
+                                <p class="text-sm text-gray-600">${role.focus}</p>
+                            </div>
+                        </div>
+                    `;
+                    rolesContainer.appendChild(button);
+                });
+
+                function updateTalentDetails(roleName) {
+                    const role = talentData[roleName];
+                    const featuresHtml = role.features.map(f => `<li class="flex items-start"><span class="mr-2 text-green-600">✓</span><span>${f}</span></li>`).join('');
+
+                    detailsContainer.innerHTML = `
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Empowering the ${roleName}</h3>
+                        <p class="text-sm text-gray-600 mb-4">To attract this talent, CPRa must deliver these core features:</p>
+                        <ul class="space-y-2 mb-6 text-sm text-gray-700">
+                            ${featuresHtml}
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mb-2">Strategic Value for CPRa</h4>
+                        <p class="text-sm text-gray-600">${role.justification}</p>
+                    `;
+
+                    Array.from(rolesContainer.children).forEach(btn => {
+                        if (btn.dataset.role === roleName) {
+                            btn.classList.remove('inactive-role');
+                            btn.classList.add('active-role');
+                        } else {
+                            btn.classList.remove('active-role');
+                            btn.classList.add('inactive-role');
+                        }
+                    });
+                }
+
+                rolesContainer.addEventListener('click', (e) => {
+                    const button = e.target.closest('button');
+                    if (button && button.dataset.role) {
+                        updateTalentDetails(button.dataset.role);
+                    }
+                });
+
+                updateTalentDetails(roleNames[0]);
+            }
+
+            function setupStrategy() {
+                const container = document.getElementById('strategy-content');
+                strategyData.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-6 rounded-lg shadow-sm flex flex-col items-center text-center';
+                    card.innerHTML = `
+                        <div class="text-4xl mb-4">${item.icon}</div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-2">${item.title}</h4>
+                        <p class="text-gray-600 text-sm">${item.content}</p>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            setupTrends();
+            setupCompetition();
+            setupTalent();
+            setupStrategy();
+
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

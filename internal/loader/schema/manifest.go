@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -49,10 +50,10 @@ type PulseConfig interface {
 }
 
 type PulseHTTPConfig struct {
-	Url     string
-	Method  string
-	Headers StringList
-	Retries int
+	Url     string     `yaml:"url" json:"url"`
+	Method  string     `yaml:"method" json:"method"`
+	Headers StringList `yaml:"headers" json:"headers"`
+	Retries int        `yaml:"retries" json:"retries"`
 }
 
 func (c *PulseHTTPConfig) Copy() PulseConfig {
@@ -95,12 +96,12 @@ func (c *PulseICMPConfig) Copy() PulseConfig {
 func (*PulseICMPConfig) isPulseConfigs() {}
 
 type Pulse struct {
-	Type        string        `yaml:"type"`
-	Interval    time.Duration `yaml:"interval"`
-	Timeout     time.Duration `yaml:"timeout"`
-	MaxFailures int           `yaml:"max_failures"`
-	Groups      StringList    `yaml:"groups"`
-	Config      PulseConfig
+	Type        string        `yaml:"type" json:"type"`
+	Interval    time.Duration `yaml:"interval" json:"interval"`
+	Timeout     time.Duration `yaml:"timeout" json:"timeout"`
+	MaxFailures int           `yaml:"max_failures" json:"max_failures"`
+	Groups      StringList    `yaml:"groups" json:"groups"`
+	Config      PulseConfig   `json:"config"`
 }
 
 type rawPulse struct {
@@ -152,6 +153,63 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// UnmarshalJSON handles JSON unmarshaling for Pulse (needed for JSON parser)  
+func (p *Pulse) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Type        string          `json:"type"`
+		Interval    string          `json:"interval"`    // Parse as string first
+		Timeout     string          `json:"timeout"`     // Parse as string first
+		MaxFailures int             `json:"max_failures"`
+		Config      json.RawMessage `json:"config"`
+	}
+	
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	
+	// Parse duration strings
+	interval, err := time.ParseDuration(temp.Interval)
+	if err != nil {
+		return fmt.Errorf("invalid interval duration %q: %w", temp.Interval, err)
+	}
+	
+	timeout, err := time.ParseDuration(temp.Timeout)
+	if err != nil {
+		return fmt.Errorf("invalid timeout duration %q: %w", temp.Timeout, err)
+	}
+	
+	*p = Pulse{
+		Type:        temp.Type,
+		Interval:    interval,
+		Timeout:     timeout,
+		MaxFailures: temp.MaxFailures,
+	}
+	
+	switch temp.Type {
+	case "http":
+		var c = &PulseHTTPConfig{}
+		if err := json.Unmarshal(temp.Config, c); err != nil {
+			return err
+		}
+		p.Config = c
+	case "tcp":
+		var c = &PulseTCPConfig{}
+		if err := json.Unmarshal(temp.Config, c); err != nil {
+			return err
+		}
+		p.Config = c
+	case "icmp":
+		var c = &PulseICMPConfig{}
+		if err := json.Unmarshal(temp.Config, c); err != nil {
+			return err
+		}
+		p.Config = c
+	default:
+		return fmt.Errorf("unknown pulse type: %q", temp.Type)
+	}
+	return nil
+}
+
 //// INTERVENTION TYPES
 
 type Intervention struct {
@@ -190,15 +248,45 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// UnmarshalJSON handles JSON unmarshaling for Intervention (needed for JSON parser)
+func (i *Intervention) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Action  string          `json:"action"`
+		Retries int             `json:"retries"`
+		Target  json.RawMessage `json:"target"`
+	}
+	
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	
+	*i = Intervention{
+		Action:  temp.Action,
+		Retries: temp.Retries,
+	}
+	
+	switch temp.Action {
+	case "docker":
+		var t = &InterventionTargetDocker{}
+		if err := json.Unmarshal(temp.Target, t); err != nil {
+			return err
+		}
+		i.Target = t
+	default:
+		return fmt.Errorf("unknown intervention type: %q", temp.Action)
+	}
+	return nil
+}
+
 type InterventionTarget interface {
 	GetTargetType() string
 	Copy() InterventionTarget
 }
 
 type InterventionTargetDocker struct {
-	Type      string        `yaml:"type"`
-	Container string        `yaml:"container"`
-	Timeout   time.Duration `yaml:"timeout"`
+	Type      string        `yaml:"type" json:"type"`
+	Container string        `yaml:"container" json:"container"`
+	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
 }
 
 func (i *InterventionTargetDocker) Copy() InterventionTarget {
@@ -218,7 +306,7 @@ type CodeNotification interface {
 }
 
 type CodeNotificationLog struct {
-	File string `yaml:"file"`
+	File string `yaml:"file" json:"file"`
 }
 
 func (c *CodeNotificationLog) Copy() CodeNotification {
@@ -231,7 +319,7 @@ func (c *CodeNotificationLog) IsCodeNotification() {
 }
 
 type CodeNotificationPagerDuty struct {
-	URL string `yaml:"url"`
+	URL string `yaml:"url" json:"url"`
 }
 
 func (c *CodeNotificationPagerDuty) Copy() CodeNotification {
@@ -244,7 +332,7 @@ func (c *CodeNotificationPagerDuty) IsCodeNotification() {
 }
 
 type CodeNotificationSlack struct {
-	WebHook string `yaml:"hook"`
+	WebHook string `yaml:"hook" json:"hook"`
 }
 
 func (c *CodeNotificationSlack) Copy() CodeNotification {
@@ -322,14 +410,67 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// UnmarshalJSON handles JSON unmarshaling for Codes (needed for JSON parser)
+func (c *Codes) UnmarshalJSON(data []byte) error {
+	var codes map[string]struct {
+		Dispatch bool            `json:"dispatch"`
+		Notify   string          `json:"notify"`
+		Config   json.RawMessage `json:"config"`
+	}
+	
+	if err := json.Unmarshal(data, &codes); err != nil {
+		return err
+	}
+	
+	colors := make(map[string]CodeConfig)
+	for color, config := range codes {
+		switch config.Notify {
+		case "log":
+			var t = &CodeNotificationLog{}
+			if err := json.Unmarshal(config.Config, t); err != nil {
+				return err
+			}
+			colors[color] = CodeConfig{
+				Dispatch: config.Dispatch,
+				Notify:   config.Notify,
+				Config:   t,
+			}
+		case "slack":
+			var t = &CodeNotificationSlack{}
+			if err := json.Unmarshal(config.Config, t); err != nil {
+				return err
+			}
+			colors[color] = CodeConfig{
+				Dispatch: config.Dispatch,
+				Notify:   config.Notify,
+				Config:   t,
+			}
+		case "pagerduty":
+			var t = &CodeNotificationPagerDuty{}
+			if err := json.Unmarshal(config.Config, t); err != nil {
+				return err
+			}
+			colors[color] = CodeConfig{
+				Dispatch: config.Dispatch,
+				Notify:   config.Notify,
+				Config:   t,
+			}
+		default:
+			return fmt.Errorf("unknown notification type: %q", config.Notify)
+		}
+	}
+	*c = colors
+	return nil
+}
+
 type Monitor struct {
-	Name         string       `yaml:"name"`
-	Enabled      bool         `yaml:"enabled"`
-	Pulse        Pulse        `yaml:"pulse_check"`
-	Intervention Intervention `yaml:"intervention,omitempty"`
-	Codes        Codes        `yaml:"codes"`
+	Name         string       `yaml:"name" json:"name"`
+	Enabled      bool         `yaml:"enabled" json:"enabled"`
+	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
+	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
+	Codes        Codes        `yaml:"codes" json:"codes"`
 }
 
 type Manifest struct {
-	Monitors []Monitor `yaml:"monitors"`
+	Monitors []Monitor `yaml:"monitors" json:"monitors"`
 }

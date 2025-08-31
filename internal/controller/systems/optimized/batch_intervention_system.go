@@ -3,151 +3,170 @@ package optimized
 import (
 	"context"
 	"time"
-
+	
 	"github.com/mlange-42/ark/ecs"
 	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities" 
+	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	"cpra/internal/queue/optimized"
+	optimizedQueue "cpra/internal/queue/optimized"
 )
 
+// BatchInterventionSystem processes intervention dispatch exactly like sys_intervention.go but in batches
 type BatchInterventionSystem struct {
-	world          *ecs.World
-	batchCollector *optimized.BatchCollector
-	config         SystemConfig
+	world                    *ecs.World
+	InterventionNeededFilter *ecs.Filter1[components.InterventionNeeded]
+	Mapper                   *entities.EntityManager
+	queue                    *optimizedQueue.BoundedQueue
+	logger                   Logger
 	
-	// Use entity manager like original systems
-	Mapper *entities.EntityManager
-	
-	// Component filter like original
-	InterventionNeededFilter ecs.Filter1[components.InterventionNeeded]
-	
-	// Batching
-	batchSize int
-	
-	// Logger interface
-	logger Logger
+	// Batching optimization
+	batchSize          int
+	entitiesProcessed  int64
+	batchesCreated     int64
 }
 
-func NewBatchInterventionSystem(world *ecs.World, batchCollector *optimized.BatchCollector, config SystemConfig, logger Logger) *BatchInterventionSystem {
+// NewBatchInterventionSystem creates a new batch intervention system using the original queue approach
+func NewBatchInterventionSystem(world *ecs.World, mapper *entities.EntityManager, queue *optimizedQueue.BoundedQueue, batchSize int, logger Logger) *BatchInterventionSystem {
 	system := &BatchInterventionSystem{
 		world:          world,
-		batchCollector: batchCollector,
-		config:         config,
-		batchSize:      config.BatchSize,
-		Mapper:         entities.InitializeMappers(world),
+		Mapper:         mapper,
+		queue:          queue,
+		batchSize:      batchSize,
 		logger:         logger,
 	}
 	
-	system.Initialize(world)
+	system.initializeComponents()
 	return system
 }
 
-func (s *BatchInterventionSystem) Initialize(w *ecs.World) {
-	s.InterventionNeededFilter = *ecs.
-		NewFilter1[components.InterventionNeeded](w).
+// Initialize initializes ECS filters exactly like sys_intervention.go
+func (bis *BatchInterventionSystem) Initialize(w *ecs.World) {
+	bis.initializeComponents()
+}
+
+// initializeComponents initializes ECS filters exactly like the original system
+func (bis *BatchInterventionSystem) initializeComponents() {
+	// Exactly like sys_intervention.go - entities with InterventionNeeded but not InterventionPending
+	bis.InterventionNeededFilter = ecs.NewFilter1[components.InterventionNeeded](bis.world).
 		Without(ecs.C[components.InterventionPending]())
 }
 
-// collectWork - exactly like original
-func (s *BatchInterventionSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
+// collectWork collects entities and jobs exactly like sys_intervention.go
+func (bis *BatchInterventionSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
 	start := time.Now()
 	out := make(map[ecs.Entity]jobs.Job)
-	query := s.InterventionNeededFilter.Query()
+	query := bis.InterventionNeededFilter.Query()
 
 	for query.Next() {
 		ent := query.Entity()
-		job := s.Mapper.InterventionJob.Get(ent).Job
+		interventionJobComp := bis.Mapper.InterventionJob.Get(ent)
+		if interventionJobComp == nil {
+			bis.logger.Warn("Entity[%d] has no intervention job component", ent.ID())
+			continue
+		}
+		job := interventionJobComp.Job
 		if job != nil {
 			out[ent] = job
 
-			namePtr := s.Mapper.Name.Get(ent)
+			namePtr := bis.Mapper.Name.Get(ent)
 			if namePtr != nil {
-				s.logger.Debug("Entity[%d] (%s) intervention job collected", ent.ID(), *namePtr)
+				bis.logger.Debug("Entity[%d] (%s) intervention job collected", ent.ID(), *namePtr)
 			}
 		} else {
-			s.logger.Warn("Entity[%d] has no intervention job", ent.ID())
+			bis.logger.Warn("Entity[%d] has no intervention job", ent.ID())
 		}
 	}
 
-	s.logger.LogSystemPerformance("BatchInterventionDispatch", time.Since(start), len(out))
+	bis.logger.LogSystemPerformance("BatchInterventionDispatch", time.Since(start), len(out))
 	return out
 }
 
-// applyWork - batch version of original
-func (s *BatchInterventionSystem) applyWork(w *ecs.World, jobsMap map[ecs.Entity]jobs.Job) {
-	// Convert to slice for batching
-	entities := make([]ecs.Entity, 0, len(jobsMap))
-	jobList := make([]jobs.Job, 0, len(jobsMap))
+// applyWork applies work exactly like sys_intervention.go but in batches
+func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
+	for i, ent := range entities {
+		_ = jobs[i] // Job already submitted to queue
+		
+		if w.Alive(ent) {
+			// Prevent component duplication exactly like original
+			if bis.Mapper.InterventionPending.HasAll(ent) {
+				namePtr := bis.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					bis.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
+				}
+				continue
+			}
+
+			// Job will be submitted with batch
+
+			// Safe component transition exactly like original
+			if bis.Mapper.InterventionNeeded.HasAll(ent) {
+				bis.Mapper.InterventionNeeded.Remove(ent)
+				bis.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
+
+				namePtr := bis.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					bis.logger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
+				}
+				bis.logger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
+			}
+		}
+	}
+	return nil
+}
+
+// Update processes entities using the exact same flow as sys_intervention.go but in batches
+func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
+	// Collect work exactly like original system
+	toDispatch := bis.collectWork(bis.world)
 	
-	for ent, job := range jobsMap {
-		entities = append(entities, ent)
-		jobList = append(jobList, job)
+	bis.logger.Debug("Intervention system found %d entities to dispatch", len(toDispatch))
+	
+	if len(toDispatch) == 0 {
+		return nil
 	}
 	
-	// Process in batches
-	for i := 0; i < len(entities); i += s.batchSize {
-		end := i + s.batchSize
+	bis.logger.Info("Batch Intervention System: Processing %d entities", len(toDispatch))
+	
+	// Convert map to slices for batch processing
+	entities := make([]ecs.Entity, 0, len(toDispatch))
+	jobs := make([]jobs.Job, 0, len(toDispatch))
+	
+	for ent, job := range toDispatch {
+		entities = append(entities, ent)
+		jobs = append(jobs, job)
+	}
+	
+	// Process in batches - collect jobs and submit as batch
+	batchCount := 0
+	for i := 0; i < len(entities); i += bis.batchSize {
+		end := i + bis.batchSize
 		if end > len(entities) {
 			end = len(entities)
 		}
 		
-		// Process batch
-		for j := i; j < end; j++ {
-			ent := entities[j]
-			job := jobList[j]
-			
-			if w.Alive(ent) {
-				// Prevent component duplication - exactly like original
-				if s.Mapper.InterventionPending.HasAll(ent) {
-					namePtr := s.Mapper.Name.Get(ent)
-					if namePtr != nil {
-						s.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
-					}
-					continue
-				}
-
-				// Submit job to batch collector instead of queue manager
-				err := s.batchCollector.Add(job)
-				if err != nil {
-					s.logger.Warn("Failed to enqueue intervention for entity %d: %v", ent.ID(), err)
-					continue
-				}
-
-				// Safe component transition - exactly like original
-				if s.Mapper.InterventionNeeded.HasAll(ent) {
-					s.Mapper.InterventionNeeded.Remove(ent)
-					s.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
-
-					namePtr := s.Mapper.Name.Get(ent)
-					if namePtr != nil {
-						s.logger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
-					}
-					s.logger.LogComponentState(uint32(ent.ID()), "InterventionNeeded->InterventionPending", "transitioned")
-				}
-			}
+		batchEntities := entities[i:end]
+		batchJobs := jobs[i:end]
+		
+		// Submit batch of jobs to queue
+		if err := bis.queue.EnqueueBatch(batchJobs); err != nil {
+			bis.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
 		}
+		
+		// Apply component transitions
+		if err := bis.applyWork(bis.world, batchEntities, batchJobs); err != nil {
+			return err
+		}
+		
+		batchCount++
 	}
-}
-
-func (s *BatchInterventionSystem) Update(ctx context.Context) error {
-	toDispatch := s.collectWork(s.world)
-	s.applyWork(s.world, toDispatch)
+	
+	bis.entitiesProcessed += int64(len(toDispatch))
+	bis.batchesCreated += int64(batchCount)
+	
 	return nil
 }
 
-// GetStats returns dummy stats to satisfy interface - batch systems track stats differently
-func (s *BatchInterventionSystem) GetStats() InterventionStats {
-	return InterventionStats{
-		EntitiesProcessed: 0,
-		BatchesCreated:    0,
-		JobsDispatched:    0,
-	}
-}
-
-// InterventionStats tracks intervention system performance  
-type InterventionStats struct {
-	EntitiesProcessed int64
-	BatchesCreated    int64
-	JobsDispatched    int64
+// Finalize cleans up like the original system
+func (bis *BatchInterventionSystem) Finalize(w *ecs.World) {
+	// Nothing to clean up - queue manager handles its own cleanup
 }

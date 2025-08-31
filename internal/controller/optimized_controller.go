@@ -4,129 +4,177 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
-	"github.com/mlange-42/ark-tools/app"
+
+	optimizedSystems "cpra/internal/controller/systems/optimized"
+	"cpra/internal/controller/entities"
+	"cpra/internal/jobs"
 	"cpra/internal/loader/streaming"
 	"cpra/internal/queue/optimized"
-	optimizedSystems "cpra/internal/controller/systems/optimized"
+
+	"github.com/mlange-42/ark-tools/app"
+	"github.com/mlange-42/ark/ecs"
 )
 
-// OptimizedController manages the entire optimized monitoring system
+// LoggerAdapter adapts the controller loggers to the optimized systems interface
+type LoggerAdapter struct {
+	logger interface {
+		Info(format string, args ...interface{})
+		Debug(format string, args ...interface{})
+		Warn(format string, args ...interface{})
+		Error(format string, args ...interface{})
+		LogSystemPerformance(name string, duration time.Duration, count int)
+		LogComponentState(entityID uint32, component string, action string)
+	}
+}
+
+func (l *LoggerAdapter) Info(format string, args ...interface{}) {
+	l.logger.Info(format, args...)
+}
+
+func (l *LoggerAdapter) Debug(format string, args ...interface{}) {
+	l.logger.Debug(format, args...)
+}
+
+func (l *LoggerAdapter) Warn(format string, args ...interface{}) {
+	l.logger.Warn(format, args...)
+}
+
+func (l *LoggerAdapter) Error(format string, args ...interface{}) {
+	l.logger.Error(format, args...)
+}
+
+func (l *LoggerAdapter) LogSystemPerformance(name string, duration time.Duration, count int) {
+	l.logger.LogSystemPerformance(name, duration, count)
+}
+
+func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, action string) {
+	l.logger.LogComponentState(entityID, component, action)
+}
+
+// OptimizedController manages the optimized monitoring system using original queue approach
 type OptimizedController struct {
 	// Core components
-	world          *ecs.World
-	
-	// Queue components
-	queue          *optimized.BoundedQueue
-	batchCollector *optimized.BatchCollector
-	connPool       *optimized.ConnectionPool
-	workerPool     *optimized.DynamicWorkerPool
-	batchProcessor *optimized.BatchProcessor
-	
-	// ECS systems
-	pulseSystem        *optimizedSystems.BatchPulseSystem
-	interventionSystem *optimizedSystems.BatchInterventionSystem
-	codeSystem         *optimizedSystems.BatchCodeSystem
-	memorySystem       *optimizedSystems.MemoryEfficientSystem
-	
+	world  *ecs.World
+	mapper *entities.EntityManager
+
+	// Queue system - use optimized components (NEVER blocks)
+	queue                    *optimized.BoundedQueue
+	batchProcessor           *optimized.BatchProcessor
+	connPool                 *optimized.ConnectionPool
+	workerPool               *optimized.DynamicWorkerPool
+
+	// ECS systems - same as original but with batching
+	pulseScheduleSystem    *optimizedSystems.BatchPulseScheduleSystem
+	pulseSystem            *optimizedSystems.BatchPulseSystem
+	interventionSystem     *optimizedSystems.BatchInterventionSystem
+	codeSystem             *optimizedSystems.BatchCodeSystem
+
+	// Result processing systems - read from original channels
+	pulseResultSystem        *optimizedSystems.BatchPulseResultSystem
+	interventionResultSystem *optimizedSystems.BatchInterventionResultSystem
+	codeResultSystem         *optimizedSystems.BatchCodeResultSystem
+
 	// Configuration
-	config         OptimizedConfig
-	
+	config OptimizedConfig
+
 	// State
-	running        bool
+	running bool
 }
 
 // OptimizedConfig holds all configuration for the optimized controller
 type OptimizedConfig struct {
 	// Streaming loader config
 	StreamingConfig streaming.StreamingConfig
-	
-	// Queue config
-	QueueConfig     optimized.QueueConfig
-	PoolConfig      optimized.PoolConfig
-	WorkerConfig    optimized.WorkerPoolConfig
-	ProcessorConfig optimized.ProcessorConfig
-	
-	// System config
-	SystemConfig    optimizedSystems.SystemConfig
-	MemoryConfig    optimizedSystems.MemoryConfig
-	
+
+	// Queue config - use original QueueManager
+	MonitorCount int // For calculating worker counts
+
+	// System config - batching optimization
+	BatchSize int
+
 	// Performance config
-	UpdateInterval  time.Duration
-	StatsInterval   time.Duration
+	UpdateInterval time.Duration
+	StatsInterval  time.Duration
 }
 
 // DefaultOptimizedConfig returns optimized default configuration for 1M monitors
 func DefaultOptimizedConfig() OptimizedConfig {
 	return OptimizedConfig{
 		StreamingConfig: streaming.DefaultStreamingConfig(),
-		
-		QueueConfig: optimized.QueueConfig{
-			MaxSize:      50000,  // 50k batches max for 1M monitors
-			MaxBatch:     500,    // 500 jobs per batch for higher throughput
-			BatchTimeout: 50 * time.Millisecond, // Faster batching
-		},
-		
-		PoolConfig: optimized.DefaultPoolConfig(),
-		WorkerConfig: optimized.DefaultWorkerPoolConfig(),
-		
-		ProcessorConfig: optimized.ProcessorConfig{
-			BatchSize:     500,  // Match batch size
-			MaxConcurrent: 200,  // 200 concurrent batches for 1M monitors
-			Timeout:       30 * time.Second,
-			RetryAttempts: 3,
-			RetryDelay:    500 * time.Millisecond, // Faster retries
-		},
-		
-		SystemConfig: optimizedSystems.SystemConfig{
-			BatchSize:       5000, // Process 5K entities per batch for speed
-			BufferSize:      100000, // Buffer for 100K entities
-			ProcessInterval: 500 * time.Millisecond, // Faster processing
-		},
-		
-		MemoryConfig: optimizedSystems.MemoryConfig{
-			GCInterval:      10 * time.Second,
-			MemoryThreshold: 1024 * 1024 * 1024, // 1GB
-			EnableProfiling: true,
-		},
-		
+
+		// Use original queue manager that never blocks
+		MonitorCount: 1000000,
+
+		// Batch processing optimization - process more entities per system update
+		BatchSize: 5000, // Process 5K entities per batch for speed
+
 		UpdateInterval: 1 * time.Second,
 		StatsInterval:  10 * time.Second,
 	}
 }
 
-// NewOptimizedController creates a new optimized controller
+// NewOptimizedController creates a new optimized controller using the original queue approach
 func NewOptimizedController(config OptimizedConfig) *OptimizedController {
 	// Create ECS world using app tool like in main.go
 	tool := app.New(1024).Seed(123)
 	tool.TPS = 10000 // High TPS for 1M monitors
+
+	// Initialize entity manager exactly like original systems
+	mapper := entities.InitializeMappers(&tool.World)
+
+	// Create optimized queue components - THESE NEVER BLOCK!
+	queueConfig := optimized.QueueConfig{
+		MaxSize:      50000,
+		MaxBatch:     500,
+		BatchTimeout: 50 * time.Millisecond,
+	}
+	boundedQueue := optimized.NewBoundedQueue(queueConfig)
 	
-	// Create queue components
-	queue := optimized.NewBoundedQueue(config.QueueConfig)
-	batchCollector := optimized.NewBatchCollector(queue, config.QueueConfig.MaxBatch, config.QueueConfig.BatchTimeout)
-	connPool := optimized.NewConnectionPool(config.PoolConfig)
-	workerPool := optimized.NewDynamicWorkerPool(config.WorkerConfig, WorkerPoolLogger)
-	batchProcessor := optimized.NewBatchProcessor(queue, connPool, config.ProcessorConfig, WorkerPoolLogger)
+	connPool := optimized.NewConnectionPool(optimized.DefaultPoolConfig())
+	workerPool := optimized.NewDynamicWorkerPool(optimized.DefaultWorkerPoolConfig(), WorkerPoolLogger)
 	
-	// Create ECS systems with proper logging
-	pulseSystem := optimizedSystems.NewBatchPulseSystem(&tool.World, batchCollector, config.SystemConfig)
-	interventionSystem := optimizedSystems.NewBatchInterventionSystem(&tool.World, batchCollector, config.SystemConfig, DispatchLogger)
-	codeSystem := optimizedSystems.NewBatchCodeSystem(&tool.World, batchCollector, config.SystemConfig, DispatchLogger)
-	memorySystem := optimizedSystems.NewMemoryEfficientSystem(&tool.World, config.MemoryConfig)
+	// Create result channels
+	pulseResults := make(chan jobs.Result, 10000)
+	interventionResults := make(chan jobs.Result, 5000)
+	codeResults := make(chan jobs.Result, 5000)
 	
+	batchProcessor := optimized.NewBatchProcessor(boundedQueue, connPool, optimized.ProcessorConfig{
+		BatchSize:     500,
+		MaxConcurrent: 200,
+		Timeout:       30 * time.Second,
+		RetryAttempts: 3,
+		RetryDelay:    500 * time.Millisecond,
+	}, WorkerPoolLogger, pulseResults, interventionResults, codeResults)
+
+	// Create ECS systems using optimized components
+	dispatchLogger := &LoggerAdapter{logger: DispatchLogger}
+	schedulerLogger := &LoggerAdapter{logger: SchedulerLogger}
+	pulseScheduleSystem := optimizedSystems.NewBatchPulseScheduleSystem(&tool.World, mapper, config.BatchSize, schedulerLogger)
+	pulseSystem := optimizedSystems.NewBatchPulseSystem(&tool.World, mapper, boundedQueue, config.BatchSize, dispatchLogger)
+	interventionSystem := optimizedSystems.NewBatchInterventionSystem(&tool.World, mapper, boundedQueue, config.BatchSize, dispatchLogger)
+	codeSystem := optimizedSystems.NewBatchCodeSystem(&tool.World, mapper, boundedQueue, config.BatchSize, dispatchLogger)
+
+	// Create result processing systems using result channels
+	resultLogger := &LoggerAdapter{logger: ResultLogger}
+	pulseResultSystem := optimizedSystems.NewBatchPulseResultSystem(pulseResults, mapper, resultLogger)
+	interventionResultSystem := optimizedSystems.NewBatchInterventionResultSystem(interventionResults, mapper, resultLogger)
+	codeResultSystem := optimizedSystems.NewBatchCodeResultSystem(codeResults, mapper, resultLogger)
+
 	return &OptimizedController{
-		world:              &tool.World,
-		queue:              queue,
-		batchCollector:     batchCollector,
-		connPool:           connPool,
-		workerPool:         workerPool,
-		batchProcessor:     batchProcessor,
-		pulseSystem:        pulseSystem,
-		interventionSystem: interventionSystem,
-		codeSystem:         codeSystem,
-		memorySystem:       memorySystem,
-		config:             config,
+		world:                    &tool.World,
+		mapper:                   mapper,
+		queue:                    boundedQueue,
+		batchProcessor:           batchProcessor,
+		connPool:                 connPool,
+		workerPool:               workerPool,
+		pulseScheduleSystem:      pulseScheduleSystem,
+		pulseSystem:              pulseSystem,
+		interventionSystem:       interventionSystem,
+		codeSystem:               codeSystem,
+		pulseResultSystem:        pulseResultSystem,
+		interventionResultSystem: interventionResultSystem,
+		codeResultSystem:         codeResultSystem,
+		config:                   config,
 	}
 }
 
@@ -136,19 +184,19 @@ func (oc *OptimizedController) LoadMonitors(ctx context.Context, filename string
 	if SystemLogger == nil {
 		InitializeLoggers(true) // Enable debug for optimized loading
 	}
-	
+
 	SystemLogger.Info("Loading monitors from %s using streaming loader", filename)
-	
+
 	loader := streaming.NewStreamingLoader(filename, oc.world, oc.config.StreamingConfig)
 	stats, err := loader.Load(ctx)
 	if err != nil {
 		SystemLogger.Error("Failed to load monitors: %v", err)
 		return fmt.Errorf("failed to load monitors: %w", err)
 	}
-	
+
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
-	
+
 	return nil
 }
 
@@ -157,10 +205,10 @@ func (oc *OptimizedController) Start(ctx context.Context) error {
 	if oc.running {
 		return fmt.Errorf("controller already running")
 	}
-	
+
 	SystemLogger.Info("Starting optimized controller")
-	
-	// Start queue components
+
+	// Start optimized components - these never block
 	if err := oc.workerPool.Start(ctx); err != nil {
 		SystemLogger.Error("Failed to start worker pool: %v", err)
 		return fmt.Errorf("failed to start worker pool: %w", err)
@@ -172,14 +220,14 @@ func (oc *OptimizedController) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start batch processor: %w", err)
 	}
 	SystemLogger.Debug("Batch processor started successfully")
-	
+
 	// Start main loop
 	go oc.mainLoop(ctx)
 	go oc.statsLoop(ctx)
-	
+
 	oc.running = true
 	SystemLogger.Info("Optimized controller started successfully")
-	
+
 	return nil
 }
 
@@ -188,65 +236,73 @@ func (oc *OptimizedController) Stop() {
 	if !oc.running {
 		return
 	}
-	
+
 	fmt.Println("Stopping optimized controller...")
-	
+
 	oc.running = false
 	oc.batchProcessor.Stop()
 	oc.workerPool.Stop()
-	oc.batchCollector.Close()
 	oc.queue.Close()
 	oc.connPool.Close()
-	
+
 	fmt.Println("Optimized controller stopped")
 }
 
 // mainLoop is the main processing loop
 func (oc *OptimizedController) mainLoop(ctx context.Context) {
-	ticker := time.NewTicker(oc.config.UpdateInterval)
-	defer ticker.Stop()
-	
+	Ticker := time.NewTicker(oc.config.UpdateInterval)
+	defer Ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-Ticker.C:
 			if !oc.running {
 				return
 			}
-			
+
 			// Update ECS systems (single-threaded for Ark compatibility)
+			// CRITICAL: Schedule FIRST to mark entities as needed!
+			if err := oc.pulseScheduleSystem.Update(ctx); err != nil {
+				SystemLogger.Error("Error updating pulse schedule system: %v", err)
+			}
+			
+			// Then dispatch the scheduled entities
 			if err := oc.pulseSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating pulse system: %v", err)
 			}
-			
+
 			if err := oc.interventionSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating intervention system: %v", err)
 			}
-			
+
 			if err := oc.codeSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating code system: %v", err)
 			}
-			
-			oc.memorySystem.Update()
+
+			// Update result processing systems using the original ECS world interface
+			oc.pulseResultSystem.Update(oc.world)
+			oc.interventionResultSystem.Update(oc.world)
+			oc.codeResultSystem.Update(oc.world)
 		}
 	}
 }
 
 // statsLoop prints performance statistics
 func (oc *OptimizedController) statsLoop(ctx context.Context) {
-	ticker := time.NewTicker(oc.config.StatsInterval)
-	defer ticker.Stop()
-	
+	Ticker := time.NewTicker(oc.config.StatsInterval)
+	defer Ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-Ticker.C:
 			if !oc.running {
 				return
 			}
-			
+
 			oc.printStats()
 		}
 	}
@@ -254,45 +310,22 @@ func (oc *OptimizedController) statsLoop(ctx context.Context) {
 
 // printStats prints current performance statistics
 func (oc *OptimizedController) printStats() {
-	// Queue stats
+	// Get stats from optimized components
 	queueStats := oc.queue.Stats()
-	
-	// Processor stats
 	processorStats := oc.batchProcessor.Stats()
-	
-	// Worker pool stats
 	workerStats := oc.workerPool.Stats()
-	
-	// System stats
-	pulseStats := oc.pulseSystem.GetStats()
-	interventionStats := oc.interventionSystem.GetStats()
-	codeStats := oc.codeSystem.GetStats()
-	
-	// Memory stats
-	memoryStats := oc.memorySystem.GetMemoryStats()
-	
+
 	SystemLogger.Info("=== PERFORMANCE STATISTICS ===")
-	SystemLogger.Info("Queue: %d enqueued, %d processed, %d dropped, depth: %d",
-		queueStats.Enqueued, queueStats.Dequeued, queueStats.Dropped, queueStats.QueueDepth)
-	
-	SystemLogger.Info("Processor: %d processed, %d failed, %.0f jobs/sec",
-		processorStats.Processed, processorStats.Failed, processorStats.Throughput)
-	
-	SystemLogger.Info("Workers: %d current, %d target, %d tasks processed",
+	SystemLogger.Info("Queue: depth=%d, enqueued=%d, dequeued=%d, dropped=%d",
+		queueStats.QueueDepth, queueStats.Enqueued, queueStats.Dequeued, queueStats.Dropped)
+
+	SystemLogger.Info("Batch Processor: processed=%d, failed=%d, avg_time=%.2fms, throughput=%.1f/sec",
+		processorStats.Processed, processorStats.Failed, 
+		processorStats.AverageTime.Seconds()*1000, processorStats.Throughput)
+
+	SystemLogger.Info("Worker Pool: current=%d, target=%d, tasks_processed=%d",
 		workerStats.CurrentWorkers, workerStats.TargetWorkers, workerStats.TasksProcessed)
-	
-	SystemLogger.Info("Pulse ECS: %d entities processed, %d batches created",
-		pulseStats.EntitiesProcessed, pulseStats.BatchesCreated)
-	
-	SystemLogger.Info("Intervention ECS: %d entities processed, %d batches created, %d jobs dispatched",
-		interventionStats.EntitiesProcessed, interventionStats.BatchesCreated, interventionStats.JobsDispatched)
-	
-	SystemLogger.Info("Code ECS: %d entities processed, %d batches created, %d jobs dispatched",
-		codeStats.EntitiesProcessed, codeStats.BatchesCreated, codeStats.JobsDispatched)
-	
-	SystemLogger.Info("Memory: %d MB allocated, %d GCs",
-		memoryStats.Alloc/1024/1024, memoryStats.GCCount)
-	
+
 	SystemLogger.Info("===============================")
 }
 

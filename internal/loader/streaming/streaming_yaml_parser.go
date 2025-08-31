@@ -100,12 +100,34 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	reader := bufio.NewReaderSize(file, p.bufferSize)
 	decoder := yaml.NewDecoder(reader)
 	
-	// Parse the entire manifest first  
+	// Parse the entire manifest first with timeout
 	fmt.Printf("DEBUG: Starting to parse YAML file...\n")
+	
+	type result struct {
+		manifest schema.Manifest
+		err      error
+	}
+	
+	resultChan := make(chan result, 1)
+	go func() {
+		var manifest schema.Manifest
+		err := decoder.Decode(&manifest)
+		resultChan <- result{manifest: manifest, err: err}
+	}()
+	
+	// Wait for decode with timeout
 	var manifest schema.Manifest
-	err = decoder.Decode(&manifest)
-	if err != nil {
-		return fmt.Errorf("failed to decode manifest: %w", err)
+	select {
+	case res := <-resultChan:
+		if res.err != nil {
+			fmt.Printf("DEBUG: YAML decode error: %v\n", res.err)
+			return fmt.Errorf("failed to decode manifest: %w", res.err)
+		}
+		manifest = res.manifest
+		fmt.Printf("DEBUG: Successfully decoded YAML\n")
+	case <-time.After(10 * time.Second):
+		fmt.Printf("DEBUG: YAML decode timeout - file might be too large for full decode\n")
+		return fmt.Errorf("YAML decode timeout - try using smaller file or different approach")
 	}
 	
 	fmt.Printf("DEBUG: Loaded manifest with %d monitors\n", len(manifest.Monitors))

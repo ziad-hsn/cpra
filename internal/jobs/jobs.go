@@ -75,8 +75,67 @@ func CreateInterventionJob(InterventionSchema schema.Intervention, jobID ecs.Ent
 	}
 }
 
-func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (Job, error) {
-	// Common parameters from schema.Pulse that are relevant for job execution
+func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, color string) (Job, error) {
+	// Generate professional, descriptive message based on color
+	var message string
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
+	
+	switch color {
+	case "yellow":
+		message = fmt.Sprintf("🟡 ALERT NOTIFICATION\n"+
+			"Monitor: %s\n"+
+			"Status: DEGRADED - Service experiencing failures\n"+
+			"Timestamp: %s\n"+
+			"Action Required: Investigation needed - monitor has failed health checks\n"+
+			"Severity: Warning\n"+
+			"Next Steps: Review monitor configuration and target service status", 
+			monitor, currentTime)
+	case "red":
+		message = fmt.Sprintf("🔴 CRITICAL ALERT\n"+
+			"Monitor: %s\n"+
+			"Status: FAILED - Service is down and intervention attempts have failed\n"+
+			"Timestamp: %s\n"+
+			"Action Required: IMMEDIATE attention required - service outage detected\n"+
+			"Severity: Critical\n"+
+			"Next Steps: Manual intervention required, check service logs and infrastructure", 
+			monitor, currentTime)
+	case "green":
+		message = fmt.Sprintf("🟢 RECOVERY NOTIFICATION\n"+
+			"Monitor: %s\n"+
+			"Status: RECOVERED - Service has returned to healthy state\n"+
+			"Timestamp: %s\n"+
+			"Action Required: None - service is now operational\n"+
+			"Severity: Informational\n"+
+			"Next Steps: Monitor for stability, review incident timeline if needed", 
+			monitor, currentTime)
+	case "cyan":
+		message = fmt.Sprintf("🔵 INTERVENTION SUCCESS\n"+
+			"Monitor: %s\n"+
+			"Status: RESTORED - Automated intervention completed successfully\n"+
+			"Timestamp: %s\n"+
+			"Action Required: Monitor for continued stability\n"+
+			"Severity: Informational\n"+
+			"Next Steps: Verify service functionality, document successful intervention", 
+			monitor, currentTime)
+	case "gray":
+		message = fmt.Sprintf("⚫ MAINTENANCE MODE\n"+
+			"Monitor: %s\n"+
+			"Status: MAINTENANCE - Service monitoring temporarily disabled\n"+
+			"Timestamp: %s\n"+
+			"Action Required: None during maintenance window\n"+
+			"Severity: Informational\n"+
+			"Next Steps: Resume monitoring after maintenance completion", 
+			monitor, currentTime)
+	default:
+		message = fmt.Sprintf("ℹ️ STATUS UPDATE\n"+
+			"Monitor: %s\n"+
+			"Status: UNKNOWN - Monitor status has changed\n"+
+			"Timestamp: %s\n"+
+			"Action Required: Review monitor configuration\n"+
+			"Severity: Unknown", 
+			monitor, currentTime)
+	}
+	
 	switch config.Notify {
 	case "log":
 		return &CodeLogJob{
@@ -84,7 +143,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 			File:    strings.Clone(config.Config.(*schema.CodeNotificationLog).File),
 			Entity:  jobID,
 			Monitor: strings.Clone(monitor),
-			Message: fmt.Sprintf("%s monitor is down color and will send log alert.\n", monitor),
+			Message: message,
 		}, nil
 	case "pagerduty":
 		return &CodePagerDutyJob{
@@ -92,7 +151,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 			URL:     strings.Clone(config.Config.(*schema.CodeNotificationPagerDuty).URL),
 			Entity:  jobID,
 			Monitor: strings.Clone(monitor),
-			Message: fmt.Sprintf("%s monitor is down color and will pagerduty slack alert.\n", monitor),
+			Message: message,
 		}, nil
 	case "slack":
 		return &CodeSlackJob{
@@ -100,7 +159,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity) (
 			WebHook: strings.Clone(config.Config.(*schema.CodeNotificationSlack).WebHook),
 			Entity:  jobID,
 			Monitor: strings.Clone(monitor),
-			Message: fmt.Sprintf("%s monitor is down color and will send slack alert.\n", monitor),
+			Message: message,
 		}, nil
 
 	default:

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cpra/internal/controller"
+	"cpra/internal/controller/systems/optimized"
 )
 
 func main() {
@@ -22,13 +23,19 @@ func main() {
 	flag.Parse()
 
 	// Initialize loggers first
-	controller.InitializeLoggers(true)
+	controller.InitializeLoggers(false)
 	
 	controller.SystemLogger.Info("Starting CPRA Optimized Controller for 1M Monitors")
 	controller.SystemLogger.Info("Input file: %s", *yamlFile)
 
+	// Create mock result channels for testing
+	mockChannels := optimized.NewMockResultChannels()
+	defer mockChannels.Close()
+
 	// Create optimized configuration
 	config := controller.DefaultOptimizedConfig()
+	
+	// Result channels are created internally by optimized controller
 
 	// Override configuration if file provided
 	if *configFile != "" {

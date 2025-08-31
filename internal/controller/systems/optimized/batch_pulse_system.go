@@ -7,240 +7,176 @@ import (
 	
 	"github.com/mlange-42/ark/ecs"
 	"cpra/internal/controller/components"
+	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"cpra/internal/queue/optimized"
+	optimizedQueue "cpra/internal/queue/optimized"
 )
 
-// BatchPulseSystem processes pulse monitoring in batches for better performance
-// NOTE: All ECS operations are single-threaded due to Ark constraints
+// BatchPulseSystem processes pulse monitoring exactly like sys_pulse.go but in batches
 type BatchPulseSystem struct {
-	// ECS components
-	world       *ecs.World
-	pulseFilter *ecs.Filter2[components.PulseConfig, components.PulseStatus]
+	world              *ecs.World
+	PulseNeededFilter  *ecs.Filter1[components.PulseNeeded]
+	Mapper             *entities.EntityManager
+	queue              *optimizedQueue.BoundedQueue
+	logger             Logger
 	
-	// Component mappers (cached for performance)
-	pulseConfigMapper *ecs.Map1[components.PulseConfig]
-	pulseStatusMapper *ecs.Map1[components.PulseStatus]
-	nameMapper        *ecs.Map1[components.Name]
-	
-	// Queue integration
-	batchCollector *optimized.BatchCollector
-	
-	// Performance optimization
-	batchSize      int
-	entityBuffer   []ecs.Entity
-	jobBuffer      []jobs.Job
-	
-	// Statistics
-	entitiesProcessed int64
-	batchesCreated    int64
-	lastProcessTime   time.Time
+	// Batching optimization
+	batchSize          int
+	entitiesProcessed  int64
+	batchesCreated     int64
+	lastProcessTime    time.Time
 }
 
-// SystemConfig holds system configuration
-type SystemConfig struct {
-	BatchSize       int           // Entities per batch
-	BufferSize      int           // Buffer size for entities
-	ProcessInterval time.Duration // How often to process
-}
-
-// NewBatchPulseSystem creates a new batch pulse system
-func NewBatchPulseSystem(world *ecs.World, batchCollector *optimized.BatchCollector, config SystemConfig) *BatchPulseSystem {
+// NewBatchPulseSystem creates a new batch pulse system using the original queue approach
+func NewBatchPulseSystem(world *ecs.World, mapper *entities.EntityManager, queue *optimizedQueue.BoundedQueue, batchSize int, logger Logger) *BatchPulseSystem {
 	system := &BatchPulseSystem{
 		world:          world,
-		batchCollector: batchCollector,
-		batchSize:      config.BatchSize,
-		entityBuffer:   make([]ecs.Entity, 0, config.BufferSize),
-		jobBuffer:      make([]jobs.Job, 0, config.BatchSize),
+		Mapper:         mapper,
+		queue:          queue,
+		batchSize:      batchSize,
+		logger:         logger,
 		lastProcessTime: time.Now(),
 	}
 	
-	// Initialize ECS components
+	// Initialize ECS filter exactly like the original system
 	system.initializeComponents()
 	
 	return system
 }
 
-// initializeComponents initializes ECS filters and mappers
-func (bps *BatchPulseSystem) initializeComponents() {
-	// Create filter for entities with pulse components that need first check
-	bps.pulseFilter = ecs.NewFilter2[components.PulseConfig, components.PulseStatus](bps.world).
-		With(ecs.C[components.PulseFirstCheck]())
-	
-	// Create component mappers for efficient access
-	bps.pulseConfigMapper = ecs.NewMap1[components.PulseConfig](bps.world)
-	bps.pulseStatusMapper = ecs.NewMap1[components.PulseStatus](bps.world)
-	bps.nameMapper = ecs.NewMap1[components.Name](bps.world)
+// Initialize initializes ECS filters exactly like sys_pulse.go
+func (bps *BatchPulseSystem) Initialize(w *ecs.World) {
+	bps.initializeComponents()
 }
 
-// Update processes entities in batches (single-threaded for Ark compatibility)
+// initializeComponents initializes ECS filters exactly like the original system  
+func (bps *BatchPulseSystem) initializeComponents() {
+	// Exactly like sys_pulse.go - entities with PulseNeeded but not PulsePending
+	bps.PulseNeededFilter = ecs.NewFilter1[components.PulseNeeded](bps.world).
+		Without(ecs.C[components.PulsePending]())
+}
+
+// collectWork collects entities and jobs exactly like sys_pulse.go
+func (bps *BatchPulseSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
+	start := time.Now()
+	out := make(map[ecs.Entity]jobs.Job)
+	query := bps.PulseNeededFilter.Query()
+
+	for query.Next() {
+		ent := query.Entity()
+		pulseJobComp := bps.Mapper.PulseJob.Get(ent)
+		if pulseJobComp == nil {
+			bps.logger.Warn("Entity[%d] has no pulse job component", ent.ID())
+			continue
+		}
+		job := pulseJobComp.Job
+		if job != nil {
+			out[ent] = job
+
+			namePtr := bps.Mapper.Name.Get(ent)
+			if namePtr != nil {
+				bps.logger.Debug("Entity[%d] (%s) pulse job collected", ent.ID(), *namePtr)
+			}
+		} else {
+			bps.logger.Warn("Entity[%d] has no pulse job", ent.ID())
+		}
+	}
+
+	bps.logger.LogSystemPerformance("BatchPulseDispatch", time.Since(start), len(out))
+	return out
+}
+
+// applyWork applies work exactly like sys_pulse.go but in batches
+func (bps *BatchPulseSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
+	for i, ent := range entities {
+		_ = jobs[i] // Job already submitted to queue
+		
+		if w.Alive(ent) {
+			// Prevent component duplication exactly like original
+			if bps.Mapper.PulsePending.HasAll(ent) {
+				namePtr := bps.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					bps.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
+				}
+				continue
+			}
+
+			// Job will be submitted with batch - just continue with component transition
+
+			// Safe component transition exactly like original
+			if bps.Mapper.PulseNeeded.HasAll(ent) {
+				bps.Mapper.PulseNeeded.Remove(ent)
+				bps.Mapper.PulsePending.Add(ent, &components.PulsePending{})
+
+				namePtr := bps.Mapper.Name.Get(ent)
+				if namePtr != nil {
+					bps.logger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
+				}
+				bps.logger.LogComponentState(ent.ID(), "PulseNeeded->PulsePending", "transitioned")
+			}
+		}
+	}
+	return nil
+}
+
+// Update processes entities using the exact same flow as sys_pulse.go but in batches
 func (bps *BatchPulseSystem) Update(ctx context.Context) error {
 	startTime := time.Now()
 	
-	// Collect entities that need processing
-	entitiesToProcess := bps.collectEntitiesForProcessing()
+	// Collect work exactly like original system
+	toDispatch := bps.collectWork(bps.world)
 	
-	if len(entitiesToProcess) == 0 {
+	if len(toDispatch) == 0 {
 		return nil
 	}
 	
-	// Process entities in batches
+	// Convert map to slices for batch processing
+	entities := make([]ecs.Entity, 0, len(toDispatch))
+	jobs := make([]jobs.Job, 0, len(toDispatch))
+	
+	for ent, job := range toDispatch {
+		entities = append(entities, ent)
+		jobs = append(jobs, job)
+	}
+	
+	// Process in batches - collect jobs and submit as batch
 	batchCount := 0
-	for i := 0; i < len(entitiesToProcess); i += bps.batchSize {
+	for i := 0; i < len(entities); i += bps.batchSize {
 		end := i + bps.batchSize
-		if end > len(entitiesToProcess) {
-			end = len(entitiesToProcess)
+		if end > len(entities) {
+			end = len(entities)
 		}
 		
-		batch := entitiesToProcess[i:end]
-		if err := bps.processBatch(ctx, batch); err != nil {
+		batchEntities := entities[i:end]
+		batchJobs := jobs[i:end]
+		
+		// Submit batch of jobs to queue
+		if err := bps.queue.EnqueueBatch(batchJobs); err != nil {
+			// If queue full, apply component transitions anyway
+			bps.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
+		}
+		
+		// Apply component transitions
+		if err := bps.applyWork(bps.world, batchEntities, batchJobs); err != nil {
 			return fmt.Errorf("failed to process batch %d: %w", batchCount, err)
 		}
 		
 		batchCount++
 	}
 	
-	// Update statistics
-	bps.entitiesProcessed += int64(len(entitiesToProcess))
+	bps.entitiesProcessed += int64(len(toDispatch))
 	bps.batchesCreated += int64(batchCount)
-	bps.lastProcessTime = time.Now()
 	
-	if len(entitiesToProcess) > 0 {
+	if len(toDispatch) > 0 {
 		processingTime := time.Since(startTime)
 		fmt.Printf("Batch Pulse System: Processed %d entities in %d batches (took %v)\n", 
-			len(entitiesToProcess), batchCount, processingTime.Truncate(time.Millisecond))
+			len(toDispatch), batchCount, processingTime.Truncate(time.Millisecond))
 	}
 	
 	return nil
 }
 
-// collectEntitiesForProcessing identifies entities that need pulse checking
-func (bps *BatchPulseSystem) collectEntitiesForProcessing() []ecs.Entity {
-	// Reset buffer
-	bps.entityBuffer = bps.entityBuffer[:0]
-	
-	now := time.Now()
-	
-	// Query entities with pulse components
-	query := bps.pulseFilter.Query()
-	for query.Next() {
-		entity := query.Entity()
-		
-		// Get components (Filter2 provides direct access)
-		config, status := query.Get()
-		
-		// Check if entity needs processing
-		if bps.shouldProcessEntity(config, status, now) {
-			bps.entityBuffer = append(bps.entityBuffer, entity)
-		}
-	}
-	
-	return bps.entityBuffer
-}
-
-// shouldProcessEntity determines if an entity needs processing
-func (bps *BatchPulseSystem) shouldProcessEntity(config *components.PulseConfig, status *components.PulseStatus, now time.Time) bool {
-	// First-time check
-	if status.LastCheckTime.IsZero() {
-		return true
-	}
-	
-	// Interval-based check
-	return now.Sub(status.LastCheckTime) >= config.Interval
-}
-
-// processBatch processes a batch of entities
-func (bps *BatchPulseSystem) processBatch(ctx context.Context, entities []ecs.Entity) error {
-	// Reset job buffer
-	bps.jobBuffer = bps.jobBuffer[:0]
-	
-	// Create jobs for entities in this batch
-	for _, entity := range entities {
-		job := bps.createPulseJob(entity)
-		if job != nil {
-			bps.jobBuffer = append(bps.jobBuffer, job)
-		}
-	}
-	
-	// Submit jobs to queue if any were created
-	if len(bps.jobBuffer) > 0 {
-		// Add jobs to batch collector
-		for _, job := range bps.jobBuffer {
-			if err := bps.batchCollector.Add(job); err != nil {
-				return fmt.Errorf("failed to add job to collector: %w", err)
-			}
-		}
-	}
-	
-	// Update entity status to mark as scheduled and remove first check marker
-	bps.updateEntityStatus(entities)
-	
-	return nil
-}
-
-// createPulseJob creates a pulse job for an entity
-func (bps *BatchPulseSystem) createPulseJob(entity ecs.Entity) jobs.Job {
-	config := bps.pulseConfigMapper.Get(entity)
-	if config == nil {
-		return nil
-	}
-	
-	// Create job based on pulse type
-	job, err := jobs.CreatePulseJob(
-		schema.Pulse{
-			Type:        config.Type,
-			Timeout:     config.Timeout,
-			Config:      config.Config,
-		},
-		entity,
-	)
-	if err != nil {
-		fmt.Printf("Failed to create pulse job for entity %d: %v\n", entity.ID(), err)
-		return nil
-	}
-	
-	return job
-}
-
-// updateEntityStatus updates the status of processed entities
-func (bps *BatchPulseSystem) updateEntityStatus(entities []ecs.Entity) {
-	now := time.Now()
-	
-	for _, entity := range entities {
-		status := bps.pulseStatusMapper.Get(entity)
-		if status != nil {
-			// Update last check time to prevent immediate re-processing
-			status.LastCheckTime = now
-			status.LastStatus = "scheduled"
-			
-			// The actual result will be updated when the job completes
-			// Note: We would need to use the correct mapper method here
-			// but for now we'll skip the update since we can't use Set
-		}
-		
-		// Note: Removing and adding components requires proper mappers
-		// which are not readily available in this simplified implementation
-		// In a real implementation, we would use the entity manager pattern
-	}
-}
-
-// GetStats returns system statistics
-func (bps *BatchPulseSystem) GetStats() SystemStats {
-	return SystemStats{
-		EntitiesProcessed: bps.entitiesProcessed,
-		BatchesCreated:    bps.batchesCreated,
-		LastProcessTime:   bps.lastProcessTime,
-		BufferCapacity:    int64(cap(bps.entityBuffer)),
-		CurrentBuffer:     int64(len(bps.entityBuffer)),
-	}
-}
-
-// SystemStats holds system statistics
-type SystemStats struct {
-	EntitiesProcessed int64
-	BatchesCreated    int64
-	LastProcessTime   time.Time
-	BufferCapacity    int64
-	CurrentBuffer     int64
+// Finalize cleans up like the original system
+func (bps *BatchPulseSystem) Finalize(w *ecs.World) {
+	// Nothing to clean up - queue manager handles its own cleanup
 }

@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"cpra/internal/controller"
 	"cpra/internal/jobs"
 	"fmt"
 	"runtime"
@@ -434,4 +433,44 @@ func calculateResultBuffer(monitorCount int) int {
 
 func panicHandler(err interface{}) {
 	fmt.Printf("Worker panic recovered: %v\n", err)
+}
+
+// GetPulseResults returns the pulse results channel
+func (qm *QueueManager) GetPulseResults() <-chan jobs.Result {
+	return qm.pulseResults
+}
+
+// GetInterventionResults returns the intervention results channel
+func (qm *QueueManager) GetInterventionResults() <-chan jobs.Result {
+	return qm.interventionResults
+}
+
+// GetCodeResults returns the code results channel
+func (qm *QueueManager) GetCodeResults() <-chan jobs.Result {
+	return qm.codeResults
+}
+
+// GetMetrics returns the queue metrics
+func (qm *QueueManager) GetMetrics() *QueueMetrics {
+	return qm.metrics
+}
+
+// GetPulsesQueued returns pulses queued count
+func (qm *QueueMetrics) GetPulsesQueued() int64 {
+	return qm.pulsesQueued.Load()
+}
+
+// GetPulsesProcessed returns pulses processed count
+func (qm *QueueMetrics) GetPulsesProcessed() int64 {
+	return qm.pulsesProcessed.Load()
+}
+
+// GetInterventionsQueued returns interventions queued count
+func (qm *QueueMetrics) GetInterventionsQueued() int64 {
+	return qm.interventionsQueued.Load()
+}
+
+// GetCodesSent returns codes sent count
+func (qm *QueueMetrics) GetCodesSent() int64 {
+	return qm.codesSent.Load()
 }

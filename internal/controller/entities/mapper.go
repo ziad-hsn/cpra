@@ -235,7 +235,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.RedCodeConfig.Add(entity, CodeConfig)
 			e.RedCodeStatus.Add(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity, "red")
 			if err != nil {
 				return err
 			}
@@ -252,7 +252,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.GreenCodeConfig.Add(entity, CodeConfig)
 			e.GreenCodeStatus.Add(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity, "green")
 			if err != nil {
 				return err
 			}
@@ -269,7 +269,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.YellowCodeConfig.Add(entity, CodeConfig)
 			e.YellowCodeStatus.Add(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity, "yellow")
 			if err != nil {
 				return err
 			}
@@ -286,7 +286,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.CyanCodeConfig.Add(entity, CodeConfig)
 			e.CyanCodeStatus.Add(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity, "cyan")
 			if err != nil {
 				return err
 			}
@@ -303,7 +303,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			}
 			e.GrayCodeConfig.Add(entity, CodeConfig)
 			e.GrayCodeStatus.Add(entity, CodeStatus)
-			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity)
+			j, err = jobs.CreateCodeJob(strings.Clone(monitor.Name), config, entity, "gray")
 			if err != nil {
 				return err
 			}

@@ -1,4 +1,4 @@
-package optimized
+package queue
 
 import (
 	"context"
@@ -22,25 +22,25 @@ type DynamicWorkerPool struct {
 	minWorkers    int32
 	maxWorkers    int32
 	scaleInterval time.Duration
-	
+
 	// State
 	currentWorkers int32
 	targetWorkers  int32
-	
+
 	// Work distribution
 	workChan    chan func()
 	workerChans []chan func()
-	
+
 	// Statistics
 	tasksProcessed   int64
 	tasksQueued      int64
 	workersCreated   int64
 	workersDestroyed int64
-	
+
 	// Control
 	running int32
 	mu      sync.RWMutex
-	
+
 	// Logging
 	logger WorkerPoolLogger
 }
@@ -64,7 +64,7 @@ type WorkerPoolStats struct {
 	QueueDepth       int
 }
 
-// DefaultWorkerPoolConfig returns optimized default configuration
+// DefaultWorkerPoolConfig returns default configuration
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	numCPU := runtime.NumCPU()
 	return WorkerPoolConfig{
@@ -86,7 +86,7 @@ func NewDynamicWorkerPool(config WorkerPoolConfig, logger WorkerPoolLogger) *Dyn
 		targetWorkers: int32(config.MinWorkers),
 		logger:        logger,
 	}
-	
+
 	return pool
 }
 
@@ -95,16 +95,16 @@ func (dwp *DynamicWorkerPool) Start(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&dwp.running, 0, 1) {
 		return fmt.Errorf("worker pool already running")
 	}
-	
+
 	// Start initial workers
 	dwp.scaleWorkers(int(dwp.minWorkers))
-	
+
 	// Start scaling goroutine
 	go dwp.scalingLoop(ctx)
-	
+
 	// Start work distribution
 	go dwp.distributeWork(ctx)
-	
+
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (dwp *DynamicWorkerPool) Submit(work func()) error {
 	if atomic.LoadInt32(&dwp.running) == 0 {
 		return fmt.Errorf("worker pool not running")
 	}
-	
+
 	select {
 	case dwp.workChan <- work:
 		atomic.AddInt64(&dwp.tasksQueued, 1)
@@ -133,7 +133,7 @@ func (dwp *DynamicWorkerPool) Submit(work func()) error {
 func (dwp *DynamicWorkerPool) scalingLoop(ctx context.Context) {
 	ticker := time.NewTicker(dwp.scaleInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -151,9 +151,9 @@ func (dwp *DynamicWorkerPool) scalingLoop(ctx context.Context) {
 func (dwp *DynamicWorkerPool) adjustWorkerCount() {
 	queueDepth := len(dwp.workChan)
 	currentWorkers := atomic.LoadInt32(&dwp.currentWorkers)
-	
+
 	var targetWorkers int32
-	
+
 	// Scale up if queue is getting full
 	if queueDepth > int(currentWorkers)*2 {
 		targetWorkers = currentWorkers + int32(runtime.NumCPU())
@@ -169,10 +169,10 @@ func (dwp *DynamicWorkerPool) adjustWorkerCount() {
 	} else {
 		targetWorkers = currentWorkers
 	}
-	
+
 	if targetWorkers != currentWorkers {
 		atomic.StoreInt32(&dwp.targetWorkers, targetWorkers)
-		
+
 		if targetWorkers > currentWorkers {
 			dwp.scaleUp(int(targetWorkers - currentWorkers))
 		} else if targetWorkers < currentWorkers {
@@ -185,16 +185,16 @@ func (dwp *DynamicWorkerPool) adjustWorkerCount() {
 func (dwp *DynamicWorkerPool) scaleUp(count int) {
 	dwp.mu.Lock()
 	defer dwp.mu.Unlock()
-	
+
 	for i := 0; i < count; i++ {
 		workerChan := make(chan func(), 1)
 		dwp.workerChans = append(dwp.workerChans, workerChan)
-		
+
 		go dwp.worker(workerChan)
 		atomic.AddInt32(&dwp.currentWorkers, 1)
 		atomic.AddInt64(&dwp.workersCreated, 1)
 	}
-	
+
 	dwp.logger.Info("Worker pool scaled up: %d workers (total: %d)", count, atomic.LoadInt32(&dwp.currentWorkers))
 }
 
@@ -202,11 +202,11 @@ func (dwp *DynamicWorkerPool) scaleUp(count int) {
 func (dwp *DynamicWorkerPool) scaleDown(count int) {
 	dwp.mu.Lock()
 	defer dwp.mu.Unlock()
-	
+
 	if count > len(dwp.workerChans) {
 		count = len(dwp.workerChans)
 	}
-	
+
 	// Close worker channels to signal shutdown
 	for i := 0; i < count; i++ {
 		if len(dwp.workerChans) > 0 {
@@ -216,7 +216,7 @@ func (dwp *DynamicWorkerPool) scaleDown(count int) {
 			atomic.AddInt64(&dwp.workersDestroyed, 1)
 		}
 	}
-	
+
 	dwp.logger.Info("Worker pool scaled down: %d workers (total: %d)", count, atomic.LoadInt32(&dwp.currentWorkers))
 }
 
@@ -224,11 +224,11 @@ func (dwp *DynamicWorkerPool) scaleDown(count int) {
 func (dwp *DynamicWorkerPool) scaleWorkers(count int) {
 	dwp.mu.Lock()
 	defer dwp.mu.Unlock()
-	
+
 	for i := 0; i < count; i++ {
 		workerChan := make(chan func(), 1)
 		dwp.workerChans = append(dwp.workerChans, workerChan)
-		
+
 		go dwp.worker(workerChan)
 		atomic.AddInt32(&dwp.currentWorkers, 1)
 		atomic.AddInt64(&dwp.workersCreated, 1)
@@ -245,19 +245,19 @@ func (dwp *DynamicWorkerPool) distributeWork(ctx context.Context) {
 			if !ok {
 				return
 			}
-			
+
 			// Find available worker
 			dwp.mu.RLock()
 			if len(dwp.workerChans) == 0 {
 				dwp.mu.RUnlock()
 				continue
 			}
-			
+
 			// Round-robin distribution
 			workerIndex := int(atomic.LoadInt64(&dwp.tasksProcessed)) % len(dwp.workerChans)
 			workerChan := dwp.workerChans[workerIndex]
 			dwp.mu.RUnlock()
-			
+
 			// Send work to worker
 			select {
 			case workerChan <- work:
@@ -285,7 +285,7 @@ func (dwp *DynamicWorkerPool) worker(workChan <-chan func()) {
 func (dwp *DynamicWorkerPool) Stats() WorkerPoolStats {
 	dwp.mu.RLock()
 	defer dwp.mu.RUnlock()
-	
+
 	return WorkerPoolStats{
 		CurrentWorkers:   atomic.LoadInt32(&dwp.currentWorkers),
 		TargetWorkers:    atomic.LoadInt32(&dwp.targetWorkers),

@@ -1,4 +1,4 @@
-package optimized
+package queue
 
 import (
 	"context"
@@ -6,33 +6,33 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	
+
 	"cpra/internal/jobs"
 )
 
 var (
-	ErrQueueFull    = errors.New("queue is full")
-	ErrQueueClosed  = errors.New("queue is closed")
+	ErrQueueFull   = errors.New("queue is full")
+	ErrQueueClosed = errors.New("queue is closed")
 )
 
 // BoundedQueue implements a high-performance bounded queue with batching
 type BoundedQueue struct {
 	// Queue storage
-	batches    chan []jobs.Job
-	maxSize    int32
-	maxBatch   int32
-	
+	batches  chan []jobs.Job
+	maxSize  int32
+	maxBatch int32
+
 	// State management
-	closed     int32
-	
+	closed int32
+
 	// Statistics
-	enqueued   int64
-	dequeued   int64
-	dropped    int64
-	
+	enqueued int64
+	dequeued int64
+	dropped  int64
+
 	// Configuration
 	batchTimeout time.Duration
-	
+
 	mu sync.RWMutex
 }
 
@@ -45,11 +45,11 @@ type QueueConfig struct {
 
 // QueueStats holds queue statistics
 type QueueStats struct {
-	Enqueued    int64
-	Dequeued    int64
-	Dropped     int64
-	QueueDepth  int32
-	BatchCount  int32
+	Enqueued   int64
+	Dequeued   int64
+	Dropped    int64
+	QueueDepth int32
+	BatchCount int32
 }
 
 // NewBoundedQueue creates a new bounded queue
@@ -67,16 +67,16 @@ func (q *BoundedQueue) EnqueueBatch(batch []jobs.Job) error {
 	if atomic.LoadInt32(&q.closed) == 1 {
 		return ErrQueueClosed
 	}
-	
+
 	if len(batch) == 0 {
 		return nil
 	}
-	
+
 	// Limit batch size
 	if len(batch) > int(q.maxBatch) {
 		batch = batch[:q.maxBatch]
 	}
-	
+
 	select {
 	case q.batches <- batch:
 		atomic.AddInt64(&q.enqueued, int64(len(batch)))
@@ -93,7 +93,7 @@ func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 	if atomic.LoadInt32(&q.closed) == 1 {
 		return nil, ErrQueueClosed
 	}
-	
+
 	select {
 	case batch := <-q.batches:
 		atomic.AddInt64(&q.dequeued, int64(len(batch)))
@@ -127,10 +127,10 @@ type BatchCollector struct {
 	currentBatch []jobs.Job
 	batchSize    int
 	timeout      time.Duration
-	
-	mu           sync.Mutex
-	lastFlush    time.Time
-	closed       int32
+
+	mu        sync.Mutex
+	lastFlush time.Time
+	closed    int32
 }
 
 // NewBatchCollector creates a new batch collector
@@ -142,10 +142,10 @@ func NewBatchCollector(queue *BoundedQueue, batchSize int, timeout time.Duration
 		timeout:      timeout,
 		lastFlush:    time.Now(),
 	}
-	
+
 	// Start flush timer
 	go collector.flushTimer()
-	
+
 	return collector
 }
 
@@ -154,17 +154,17 @@ func (bc *BatchCollector) Add(job jobs.Job) error {
 	if atomic.LoadInt32(&bc.closed) == 1 {
 		return ErrQueueClosed
 	}
-	
+
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
-	
+
 	bc.currentBatch = append(bc.currentBatch, job)
-	
+
 	// Flush if batch is full
 	if len(bc.currentBatch) >= bc.batchSize {
 		return bc.flushLocked()
 	}
-	
+
 	return nil
 }
 
@@ -172,12 +172,12 @@ func (bc *BatchCollector) Add(job jobs.Job) error {
 func (bc *BatchCollector) flushTimer() {
 	ticker := time.NewTicker(bc.timeout)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		if atomic.LoadInt32(&bc.closed) == 1 {
 			return
 		}
-		
+
 		bc.mu.Lock()
 		if time.Since(bc.lastFlush) >= bc.timeout && len(bc.currentBatch) > 0 {
 			bc.flushLocked()
@@ -191,15 +191,15 @@ func (bc *BatchCollector) flushLocked() error {
 	if len(bc.currentBatch) == 0 {
 		return nil
 	}
-	
+
 	// Create a copy of the batch
 	batch := make([]jobs.Job, len(bc.currentBatch))
 	copy(batch, bc.currentBatch)
-	
+
 	// Reset current batch
 	bc.currentBatch = bc.currentBatch[:0]
 	bc.lastFlush = time.Now()
-	
+
 	// Enqueue the batch
 	return bc.queue.EnqueueBatch(batch)
 }

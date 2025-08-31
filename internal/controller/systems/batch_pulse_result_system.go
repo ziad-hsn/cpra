@@ -1,12 +1,12 @@
-package optimized
+package systems
 
 import (
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
+
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // BatchPulseResultSystem processes pulse results exactly like sys_pulse.go
@@ -70,7 +70,7 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 			// ---- FAILURE - exact same logic as sys_pulse.go ----
 			maxFailures := bprs.Mapper.PulseConfig.Get(entity).MaxFailures
 			statusCopy := bprs.Mapper.PulseStatus.Get(entity)
-			
+
 			// DEBUG: Check maxFailures value
 			bprs.logger.Debug("DEBUG: maxFailures=%d, current ConsecutiveFailures=%d", maxFailures, statusCopy.ConsecutiveFailures)
 			monitorCopy := bprs.Mapper.MonitorStatus.Get(entity)
@@ -78,7 +78,7 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
 			statusCopy.ConsecutiveFailures++
-			
+
 			// Store the updated value for correct logging
 			currentFailures := statusCopy.ConsecutiveFailures
 
@@ -104,7 +104,6 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 				bprs.logger.LogComponentState(entity.ID(), "InterventionNeeded", "added")
 			}
 
-			
 			// Always retry on failure - original logic
 			if currentFailures < maxFailures {
 				bprs.logger.Info("Monitor %s pulse failed - will retry (%d/%d)", name, currentFailures, maxFailures)
@@ -131,7 +130,6 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 				bprs.logger.Info("Monitor %s pulse succeeded", name)
 			}
 
-			
 			if lastStatus == "failed" && bprs.Mapper.GreenCode.HasAll(entity) {
 				bprs.logger.Info("Monitor %s pulse recovered - triggering green recovery code", name)
 				if !bprs.Mapper.CodeNeeded.HasAll(entity) {

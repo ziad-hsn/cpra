@@ -1,11 +1,11 @@
-package optimized
+package systems
 
 import (
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
+
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // BatchCodeResultSystem processes code results exactly like sys_code.go

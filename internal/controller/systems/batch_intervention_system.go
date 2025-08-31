@@ -1,14 +1,14 @@
-package optimized
+package systems
 
 import (
 	"context"
+	"cpra/internal/queue"
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
+
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	optimizedQueue "cpra/internal/queue/optimized"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // BatchInterventionSystem processes intervention dispatch exactly like sys_intervention.go but in batches
@@ -16,25 +16,25 @@ type BatchInterventionSystem struct {
 	world                    *ecs.World
 	InterventionNeededFilter *ecs.Filter1[components.InterventionNeeded]
 	Mapper                   *entities.EntityManager
-	queue                    *optimizedQueue.BoundedQueue
+	queue                    *queue.BoundedQueue
 	logger                   Logger
-	
+
 	// Batching optimization
-	batchSize          int
-	entitiesProcessed  int64
-	batchesCreated     int64
+	batchSize         int
+	entitiesProcessed int64
+	batchesCreated    int64
 }
 
 // NewBatchInterventionSystem creates a new batch intervention system using the original queue approach
-func NewBatchInterventionSystem(world *ecs.World, mapper *entities.EntityManager, queue *optimizedQueue.BoundedQueue, batchSize int, logger Logger) *BatchInterventionSystem {
+func NewBatchInterventionSystem(world *ecs.World, mapper *entities.EntityManager, boundedQueue *queue.BoundedQueue, batchSize int, logger Logger) *BatchInterventionSystem {
 	system := &BatchInterventionSystem{
-		world:          world,
-		Mapper:         mapper,
-		queue:          queue,
-		batchSize:      batchSize,
-		logger:         logger,
+		world:     world,
+		Mapper:    mapper,
+		queue:     boundedQueue,
+		batchSize: batchSize,
+		logger:    logger,
 	}
-	
+
 	system.initializeComponents()
 	return system
 }
@@ -85,7 +85,7 @@ func (bis *BatchInterventionSystem) collectWork(w *ecs.World) map[ecs.Entity]job
 func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
 	for i, ent := range entities {
 		_ = jobs[i] // Job already submitted to queue
-		
+
 		if w.Alive(ent) {
 			// Prevent component duplication exactly like original
 			if bis.Mapper.InterventionPending.HasAll(ent) {
@@ -118,24 +118,24 @@ func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entit
 func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
 	// Collect work exactly like original system
 	toDispatch := bis.collectWork(bis.world)
-	
+
 	bis.logger.Debug("Intervention system found %d entities to dispatch", len(toDispatch))
-	
+
 	if len(toDispatch) == 0 {
 		return nil
 	}
-	
+
 	bis.logger.Info("Batch Intervention System: Processing %d entities", len(toDispatch))
-	
+
 	// Convert map to slices for batch processing
 	entities := make([]ecs.Entity, 0, len(toDispatch))
 	jobs := make([]jobs.Job, 0, len(toDispatch))
-	
+
 	for ent, job := range toDispatch {
 		entities = append(entities, ent)
 		jobs = append(jobs, job)
 	}
-	
+
 	// Process in batches - collect jobs and submit as batch
 	batchCount := 0
 	for i := 0; i < len(entities); i += bis.batchSize {
@@ -143,26 +143,26 @@ func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
 		if end > len(entities) {
 			end = len(entities)
 		}
-		
+
 		batchEntities := entities[i:end]
 		batchJobs := jobs[i:end]
-		
+
 		// Submit batch of jobs to queue
 		if err := bis.queue.EnqueueBatch(batchJobs); err != nil {
 			bis.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
 		}
-		
+
 		// Apply component transitions
 		if err := bis.applyWork(bis.world, batchEntities, batchJobs); err != nil {
 			return err
 		}
-		
+
 		batchCount++
 	}
-	
+
 	bis.entitiesProcessed += int64(len(toDispatch))
 	bis.batchesCreated += int64(batchCount)
-	
+
 	return nil
 }
 

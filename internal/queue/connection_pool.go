@@ -1,4 +1,4 @@
-package optimized
+package queue
 
 import (
 	"context"
@@ -11,19 +11,19 @@ import (
 
 // ConnectionPool manages HTTP connections for efficient reuse
 type ConnectionPool struct {
-	client     *http.Client
-	transport  *http.Transport
-	
+	client    *http.Client
+	transport *http.Transport
+
 	// Pool configuration
 	maxIdleConns        int
 	maxIdleConnsPerHost int
 	maxConnsPerHost     int
 	idleConnTimeout     time.Duration
-	
+
 	// Statistics
 	activeConns   int64
 	totalRequests int64
-	
+
 	mu sync.RWMutex
 }
 
@@ -46,7 +46,7 @@ type PoolStats struct {
 	MaxConnsPerHost     int64
 }
 
-// DefaultPoolConfig returns optimized default configuration
+// DefaultPoolConfig returns default configuration
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
 		MaxIdleConns:          100,
@@ -66,32 +66,32 @@ func NewConnectionPool(config PoolConfig) *ConnectionPool {
 		MaxIdleConnsPerHost: config.MaxIdleConnsPerHost,
 		MaxConnsPerHost:     config.MaxConnsPerHost,
 		IdleConnTimeout:     config.IdleConnTimeout,
-		
+
 		DialContext: (&net.Dialer{
 			Timeout:   config.DialTimeout,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		
+
 		TLSHandshakeTimeout:   config.TLSHandshakeTimeout,
 		ResponseHeaderTimeout: config.ResponseHeaderTimeout,
-		
+
 		// Optimize for performance
 		DisableCompression: false,
 		DisableKeepAlives:  false,
 		ForceAttemptHTTP2:  true,
-		
+
 		// TLS configuration
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
 			MinVersion:         tls.VersionTLS12,
 		},
 	}
-	
+
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   30 * time.Second,
 	}
-	
+
 	return &ConnectionPool{
 		client:              client,
 		transport:           transport,
@@ -112,7 +112,7 @@ func (cp *ConnectionPool) Do(req *http.Request) (*http.Response, error) {
 	cp.mu.Lock()
 	cp.totalRequests++
 	cp.mu.Unlock()
-	
+
 	return cp.client.Do(req)
 }
 
@@ -126,7 +126,7 @@ func (cp *ConnectionPool) DoWithContext(ctx context.Context, req *http.Request) 
 func (cp *ConnectionPool) Stats() PoolStats {
 	cp.mu.RLock()
 	defer cp.mu.RUnlock()
-	
+
 	return PoolStats{
 		TotalRequests:       cp.totalRequests,
 		MaxIdleConns:        int64(cp.maxIdleConns),

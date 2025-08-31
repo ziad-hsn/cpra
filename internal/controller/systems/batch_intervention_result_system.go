@@ -1,12 +1,12 @@
-package optimized
+package systems
 
 import (
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
+
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // BatchInterventionResultSystem processes intervention results exactly like sys_intervention.go

@@ -1,23 +1,23 @@
-package optimized
+package systems
 
 import (
 	"context"
 	"time"
 
-	"github.com/mlange-42/ark/ecs"
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // BatchPulseScheduleSystem schedules pulse checks based on intervals - THE MISSING PIECE!
 type BatchPulseScheduleSystem struct {
-	world          *ecs.World
-	Mapper         *entities.EntityManager
-	logger         Logger
-	
+	world  *ecs.World
+	Mapper *entities.EntityManager
+	logger Logger
+
 	// Component filter - entities ready for scheduling
 	PulseFilter *ecs.Filter2[components.PulseConfig, components.PulseStatus]
-	
+
 	// Batching
 	batchSize int
 }
@@ -30,7 +30,7 @@ func NewBatchPulseScheduleSystem(world *ecs.World, mapper *entities.EntityManage
 		batchSize: batchSize,
 		logger:    logger,
 	}
-	
+
 	system.Initialize(world)
 	return system
 }
@@ -50,23 +50,23 @@ func (s *BatchPulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
 	start := time.Now()
 	var toCheck []ecs.Entity
 	query := s.PulseFilter.Query()
-	
+
 	now := time.Now()
-	
+
 	for query.Next() {
 		ent := query.Entity()
 		config, status := query.Get()
-		
+
 		// Check if it needs scheduling based on interval (exactly like original logic)
 		interval := config.Interval
 		timeSinceLast := now.Sub(status.LastCheckTime)
-		
+
 		// If it has FirstCheck or enough time has passed, schedule it
 		if s.Mapper.PulseFirstCheck.HasAll(ent) || timeSinceLast >= interval {
 			toCheck = append(toCheck, ent)
 		}
 	}
-	
+
 	s.logger.LogSystemPerformance("BatchPulseScheduler", time.Since(start), len(toCheck))
 	return toCheck
 }
@@ -79,7 +79,7 @@ func (s *BatchPulseScheduleSystem) applyWork(w *ecs.World, entities []ecs.Entity
 			if !s.Mapper.PulseNeeded.HasAll(ent) {
 				s.Mapper.PulseNeeded.Add(ent, &components.PulseNeeded{})
 			}
-			
+
 			// Remove FirstCheck if it exists
 			if s.Mapper.PulseFirstCheck.HasAll(ent) {
 				s.Mapper.PulseFirstCheck.Remove(ent)
@@ -92,22 +92,22 @@ func (s *BatchPulseScheduleSystem) applyWork(w *ecs.World, entities []ecs.Entity
 func (s *BatchPulseScheduleSystem) Update(ctx context.Context) error {
 	// Collect entities that need scheduling
 	toSchedule := s.collectWork(s.world)
-	
+
 	if len(toSchedule) == 0 {
 		return nil
 	}
-	
+
 	// Process in batches
 	for i := 0; i < len(toSchedule); i += s.batchSize {
 		end := i + s.batchSize
 		if end > len(toSchedule) {
 			end = len(toSchedule)
 		}
-		
+
 		batch := toSchedule[i:end]
 		s.applyWork(s.world, batch)
 	}
-	
+
 	return nil
 }
 

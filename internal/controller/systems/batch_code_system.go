@@ -1,14 +1,14 @@
-package optimized
+package systems
 
 import (
 	"context"
+	"cpra/internal/queue"
 	"time"
-	
-	"github.com/mlange-42/ark/ecs"
+
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	optimizedQueue "cpra/internal/queue/optimized"
+	"github.com/mlange-42/ark/ecs"
 )
 
 // dispatchableCodeJob holds job and color info exactly like sys_code.go
@@ -22,25 +22,25 @@ type BatchCodeSystem struct {
 	world            *ecs.World
 	CodeNeededFilter *ecs.Filter1[components.CodeNeeded]
 	Mapper           *entities.EntityManager
-	queue            *optimizedQueue.BoundedQueue
+	queue            *queue.BoundedQueue
 	logger           Logger
-	
+
 	// Batching optimization
-	batchSize          int
-	entitiesProcessed  int64
-	batchesCreated     int64
+	batchSize         int
+	entitiesProcessed int64
+	batchesCreated    int64
 }
 
 // NewBatchCodeSystem creates a new batch code system using the original queue approach
-func NewBatchCodeSystem(world *ecs.World, mapper *entities.EntityManager, queue *optimizedQueue.BoundedQueue, batchSize int, logger Logger) *BatchCodeSystem {
+func NewBatchCodeSystem(world *ecs.World, mapper *entities.EntityManager, boundedQueue *queue.BoundedQueue, batchSize int, logger Logger) *BatchCodeSystem {
 	system := &BatchCodeSystem{
-		world:          world,
-		Mapper:         mapper,
-		queue:          queue,
-		batchSize:      batchSize,
-		logger:         logger,
+		world:     world,
+		Mapper:    mapper,
+		queue:     boundedQueue,
+		batchSize: batchSize,
+		logger:    logger,
 	}
-		
+
 	system.initializeComponents()
 	return system
 }
@@ -108,7 +108,7 @@ func (bcs *BatchCodeSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchabl
 			out[ent] = dispatchableCodeJob{job: job, color: color}
 		}
 	}
-	
+
 	bcs.logger.LogSystemPerformance("BatchCodeDispatch", time.Since(start), len(out))
 	return out
 }
@@ -117,7 +117,7 @@ func (bcs *BatchCodeSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchabl
 func (bcs *BatchCodeSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []dispatchableCodeJob) error {
 	for i, ent := range entities {
 		item := jobs[i]
-		
+
 		if w.Alive(ent) {
 			// Prevent component duplication exactly like original
 			if bcs.Mapper.CodePending.HasAll(ent) {
@@ -150,20 +150,20 @@ func (bcs *BatchCodeSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs 
 func (bcs *BatchCodeSystem) Update(ctx context.Context) error {
 	// Collect work exactly like original system
 	toDispatch := bcs.collectWork(bcs.world)
-	
+
 	if len(toDispatch) == 0 {
 		return nil
 	}
-	
+
 	// Convert map to slices for batch processing
 	entities := make([]ecs.Entity, 0, len(toDispatch))
 	dispatchableJobs := make([]dispatchableCodeJob, 0, len(toDispatch))
-	
+
 	for ent, job := range toDispatch {
 		entities = append(entities, ent)
 		dispatchableJobs = append(dispatchableJobs, job)
 	}
-	
+
 	// Process in batches - collect jobs and submit as batch
 	batchCount := 0
 	for i := 0; i < len(entities); i += bcs.batchSize {
@@ -171,10 +171,10 @@ func (bcs *BatchCodeSystem) Update(ctx context.Context) error {
 		if end > len(entities) {
 			end = len(entities)
 		}
-		
+
 		batchEntities := entities[i:end]
 		batchJobs := dispatchableJobs[i:end]
-		
+
 		// Submit batch of jobs to queue
 		jobsToSubmit := make([]jobs.Job, 0, len(batchJobs))
 		for _, item := range batchJobs {
@@ -183,18 +183,18 @@ func (bcs *BatchCodeSystem) Update(ctx context.Context) error {
 		if err := bcs.queue.EnqueueBatch(jobsToSubmit); err != nil {
 			bcs.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
 		}
-		
+
 		// Apply component transitions
 		if err := bcs.applyWork(bcs.world, batchEntities, batchJobs); err != nil {
 			return err
 		}
-		
+
 		batchCount++
 	}
-	
+
 	bcs.entitiesProcessed += int64(len(toDispatch))
 	bcs.batchesCreated += int64(batchCount)
-	
+
 	return nil
 }
 

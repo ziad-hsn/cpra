@@ -122,7 +122,7 @@ func NewController(config Config) *Controller {
 	mapper := entities.InitializeMappers(&tool.World)
 
 	// Create  queue components - THESE NEVER BLOCK!
-	queueConfig := queue.QueueConfig{
+	queueConfig := queue.BoundedQueueConfig{
 		MaxSize:      50000,
 		MaxBatch:     500,
 		BatchTimeout: 50 * time.Millisecond,

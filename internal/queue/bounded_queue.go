@@ -36,15 +36,15 @@ type BoundedQueue struct {
 	mu sync.RWMutex
 }
 
-// QueueConfig holds queue configuration
-type QueueConfig struct {
+// BoundedQueueConfig holds queue configuration
+type BoundedQueueConfig struct {
 	MaxSize      int           // Maximum number of batches
 	MaxBatch     int           // Maximum jobs per batch
 	BatchTimeout time.Duration // Maximum time to wait for batch to fill
 }
 
-// QueueStats holds queue statistics
-type QueueStats struct {
+// Stats holds queue statistics
+type Stats struct {
 	Enqueued   int64
 	Dequeued   int64
 	Dropped    int64
@@ -53,7 +53,7 @@ type QueueStats struct {
 }
 
 // NewBoundedQueue creates a new bounded queue
-func NewBoundedQueue(config QueueConfig) *BoundedQueue {
+func NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue {
 	return &BoundedQueue{
 		batches:      make(chan []jobs.Job, config.MaxSize),
 		maxSize:      int32(config.MaxSize),
@@ -111,8 +111,8 @@ func (q *BoundedQueue) Close() {
 }
 
 // Stats returns current queue statistics
-func (q *BoundedQueue) Stats() QueueStats {
-	return QueueStats{
+func (q *BoundedQueue) Stats() Stats {
+	return Stats{
 		Enqueued:   atomic.LoadInt64(&q.enqueued),
 		Dequeued:   atomic.LoadInt64(&q.dequeued),
 		Dropped:    atomic.LoadInt64(&q.dropped),
@@ -133,41 +133,6 @@ type BatchCollector struct {
 	closed    int32
 }
 
-// NewBatchCollector creates a new batch collector
-func NewBatchCollector(queue *BoundedQueue, batchSize int, timeout time.Duration) *BatchCollector {
-	collector := &BatchCollector{
-		queue:        queue,
-		currentBatch: make([]jobs.Job, 0, batchSize),
-		batchSize:    batchSize,
-		timeout:      timeout,
-		lastFlush:    time.Now(),
-	}
-
-	// Start flush timer
-	go collector.flushTimer()
-
-	return collector
-}
-
-// Add adds a job to the current batch
-func (bc *BatchCollector) Add(job jobs.Job) error {
-	if atomic.LoadInt32(&bc.closed) == 1 {
-		return ErrQueueClosed
-	}
-
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
-
-	bc.currentBatch = append(bc.currentBatch, job)
-
-	// Flush if batch is full
-	if len(bc.currentBatch) >= bc.batchSize {
-		return bc.flushLocked()
-	}
-
-	return nil
-}
-
 // flushTimer periodically flushes incomplete batches
 func (bc *BatchCollector) flushTimer() {
 	ticker := time.NewTicker(bc.timeout)
@@ -180,7 +145,10 @@ func (bc *BatchCollector) flushTimer() {
 
 		bc.mu.Lock()
 		if time.Since(bc.lastFlush) >= bc.timeout && len(bc.currentBatch) > 0 {
-			bc.flushLocked()
+			err := bc.flushLocked()
+			if err != nil {
+				return
+			}
 		}
 		bc.mu.Unlock()
 	}

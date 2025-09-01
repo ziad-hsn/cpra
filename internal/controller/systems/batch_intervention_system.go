@@ -119,35 +119,35 @@ func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
 	// Collect work exactly like original system
 	toDispatch := bis.collectWork(bis.world)
 
-	bis.logger.Debug("Intervention system found %d entities to dispatch", len(toDispatch))
+	bis.logger.Debug("Intervention system found %d e to dispatch", len(toDispatch))
 
 	if len(toDispatch) == 0 {
 		return nil
 	}
 
-	bis.logger.Info("Batch Intervention System: Processing %d entities", len(toDispatch))
+	bis.logger.Info("Batch Intervention System: Processing %d e", len(toDispatch))
 
 	// Convert map to slices for batch processing
-	entities := make([]ecs.Entity, 0, len(toDispatch))
-	jobs := make([]jobs.Job, 0, len(toDispatch))
+	e := make([]ecs.Entity, 0, len(toDispatch))
+	j := make([]jobs.Job, 0, len(toDispatch))
 
 	for ent, job := range toDispatch {
-		entities = append(entities, ent)
-		jobs = append(jobs, job)
+		e = append(e, ent)
+		j = append(j, job)
 	}
 
-	// Process in batches - collect jobs and submit as batch
+	// Process in batches - collect j and submit as batch
 	batchCount := 0
-	for i := 0; i < len(entities); i += bis.batchSize {
+	for i := 0; i < len(e); i += bis.batchSize {
 		end := i + bis.batchSize
-		if end > len(entities) {
-			end = len(entities)
+		if end > len(e) {
+			end = len(e)
 		}
 
-		batchEntities := entities[i:end]
-		batchJobs := jobs[i:end]
+		batchEntities := e[i:end]
+		batchJobs := j[i:end]
 
-		// Submit batch of jobs to queue
+		// Submit batch of j to queue
 		if err := bis.queue.EnqueueBatch(batchJobs); err != nil {
 			bis.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
 		}

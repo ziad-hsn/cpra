@@ -4,11 +4,11 @@ import (
 	"context"
 	"cpra/internal/loader/schema"
 	"fmt"
-	"log"
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -79,7 +79,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 	// Generate professional, descriptive message based on color
 	var message string
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
-	
+
 	switch color {
 	case "yellow":
 		message = fmt.Sprintf("🟡 ALERT NOTIFICATION\n"+
@@ -88,7 +88,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Timestamp: %s\n"+
 			"Action Required: Investigation needed - monitor has failed health checks\n"+
 			"Severity: Warning\n"+
-			"Next Steps: Review monitor configuration and target service status", 
+			"Next Steps: Review monitor configuration and target service status",
 			monitor, currentTime)
 	case "red":
 		message = fmt.Sprintf("🔴 CRITICAL ALERT\n"+
@@ -97,7 +97,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Timestamp: %s\n"+
 			"Action Required: IMMEDIATE attention required - service outage detected\n"+
 			"Severity: Critical\n"+
-			"Next Steps: Manual intervention required, check service logs and infrastructure", 
+			"Next Steps: Manual intervention required, check service logs and infrastructure",
 			monitor, currentTime)
 	case "green":
 		message = fmt.Sprintf("🟢 RECOVERY NOTIFICATION\n"+
@@ -106,7 +106,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Timestamp: %s\n"+
 			"Action Required: None - service is now operational\n"+
 			"Severity: Informational\n"+
-			"Next Steps: Monitor for stability, review incident timeline if needed", 
+			"Next Steps: Monitor for stability, review incident timeline if needed",
 			monitor, currentTime)
 	case "cyan":
 		message = fmt.Sprintf("🔵 INTERVENTION SUCCESS\n"+
@@ -115,7 +115,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Timestamp: %s\n"+
 			"Action Required: Monitor for continued stability\n"+
 			"Severity: Informational\n"+
-			"Next Steps: Verify service functionality, document successful intervention", 
+			"Next Steps: Verify service functionality, document successful intervention",
 			monitor, currentTime)
 	case "gray":
 		message = fmt.Sprintf("⚫ MAINTENANCE MODE\n"+
@@ -124,7 +124,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Timestamp: %s\n"+
 			"Action Required: None during maintenance window\n"+
 			"Severity: Informational\n"+
-			"Next Steps: Resume monitoring after maintenance completion", 
+			"Next Steps: Resume monitoring after maintenance completion",
 			monitor, currentTime)
 	default:
 		message = fmt.Sprintf("ℹ️ STATUS UPDATE\n"+
@@ -132,10 +132,10 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			"Status: UNKNOWN - Monitor status has changed\n"+
 			"Timestamp: %s\n"+
 			"Action Required: Review monitor configuration\n"+
-			"Severity: Unknown", 
+			"Severity: Unknown",
 			monitor, currentTime)
 	}
-	
+
 	switch config.Notify {
 	case "log":
 		return &CodeLogJob{
@@ -396,18 +396,18 @@ func (c *CodeLogJob) Execute() Result {
 
 		// Get timezone for logging (check environment or use local)
 		timezone := getLoggingTimezone()
-		
-		// Format a structured log line with enhanced timestamp including timezone name - 12 hour format
+
+		// Format a structured log line with enhanced timestamp including timezone name - 12-hour format
 		now := time.Now().In(timezone)
 		timestamp := now.Format("2006-01-02 03:04:05.000 PM Z07:00") // 12-hour format with space and AM/PM
 		timezoneName := timezone.String()
-		
+
 		// Add tracing ID if tracing is enabled
 		traceInfo := ""
 		if strings.ToLower(os.Getenv("CPRA_TRACING")) == "true" {
 			traceInfo = fmt.Sprintf(" [TRACE:%s]", c.ID.String()[:8])
 		}
-		
+
 		logLine := fmt.Sprintf(
 			"%s %s [%s]%s %s\n",
 			timestamp,
@@ -520,7 +520,7 @@ func getLoggingTimezone() *time.Location {
 		}
 		log.Printf("Warning: Invalid timezone '%s' in CPRA_TIMEZONE, using local timezone", tz)
 	}
-	
+
 	// Use local timezone as default
 	return time.Local
 }

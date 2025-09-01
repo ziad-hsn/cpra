@@ -103,7 +103,7 @@ func getTimezone() *time.Location {
 		}
 		log.Printf("Warning: Invalid timezone '%s', using local timezone", tz)
 	}
-	
+
 	// Use local timezone as default
 	return time.Local
 }
@@ -134,7 +134,7 @@ func (l *Logger) Close() {
 
 // formatMessage formats a log message with timestamp, level, and component
 func (l *Logger) formatMessage(level LogLevel, msg string, args ...interface{}) string {
-	// Use enhanced timestamp with timezone information - 12 hour format with AM/PM
+	// Use enhanced timestamp with timezone information - 12-hour format with AM/PM
 	now := time.Now().In(l.timezone)
 	timestamp := now.Format("2006-01-02 03:04:05.000 PM Z07:00") // 12-hour format with space and AM/PM
 	timezoneName := l.timezone.String()

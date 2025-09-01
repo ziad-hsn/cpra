@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -114,7 +115,7 @@ func (bp *BatchProcessor) processingLoop(ctx context.Context, workerID int) {
 		// Get a batch from the queue
 		batch, err := bp.queue.DequeueBatch(ctx)
 		if err != nil {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				return
 			}
 			time.Sleep(100 * time.Millisecond)

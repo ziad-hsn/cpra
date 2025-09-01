@@ -59,6 +59,7 @@ func main() {
 		<-sigChan
 		fmt.Println("\nShutdown signal received...")
 		cancel()
+		controller.CloseLoggers()
 	}()
 
 	// Load monitors if YAML file exists

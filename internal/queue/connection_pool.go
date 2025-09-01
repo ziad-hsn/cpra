@@ -15,13 +15,13 @@ type ConnectionPool struct {
 	transport *http.Transport
 
 	// Pool configuration
-	maxIdleConns        int
-	maxIdleConnsPerHost int
-	maxConnsPerHost     int
-	idleConnTimeout     time.Duration
+	maxIdleCons        int
+	maxIdleConsPerHost int
+	maxConsPerHost     int
+	idleConTimeout     time.Duration
 
 	// Statistics
-	activeConns   int64
+	activeCons    int64
 	totalRequests int64
 
 	mu sync.RWMutex
@@ -29,10 +29,10 @@ type ConnectionPool struct {
 
 // PoolConfig holds connection pool configuration
 type PoolConfig struct {
-	MaxIdleConns          int           // Maximum idle connections
-	MaxIdleConnsPerHost   int           // Maximum idle connections per host
-	MaxConnsPerHost       int           // Maximum connections per host
-	IdleConnTimeout       time.Duration // Idle connection timeout
+	MaxIdleCons           int           // Maximum idle connections
+	MaxIdleConsPerHost    int           // Maximum idle connections per host
+	MaxConsPerHost        int           // Maximum connections per host
+	IdleConTimeout        time.Duration // Idle connection timeout
 	DialTimeout           time.Duration // Connection dial timeout
 	TLSHandshakeTimeout   time.Duration // TLS handshake timeout
 	ResponseHeaderTimeout time.Duration // Response header timeout
@@ -40,19 +40,19 @@ type PoolConfig struct {
 
 // PoolStats holds connection pool statistics
 type PoolStats struct {
-	TotalRequests       int64
-	MaxIdleConns        int64
-	MaxIdleConnsPerHost int64
-	MaxConnsPerHost     int64
+	TotalRequests      int64
+	MaxIdleCons        int64
+	MaxIdleConsPerHost int64
+	MaxConsPerHost     int64
 }
 
 // DefaultPoolConfig returns default configuration
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		MaxConnsPerHost:       50,
-		IdleConnTimeout:       90 * time.Second,
+		MaxIdleCons:           100,
+		MaxIdleConsPerHost:    10,
+		MaxConsPerHost:        50,
+		IdleConTimeout:        90 * time.Second,
 		DialTimeout:           10 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 10 * time.Second,
@@ -62,10 +62,10 @@ func DefaultPoolConfig() PoolConfig {
 // NewConnectionPool creates a new connection pool
 func NewConnectionPool(config PoolConfig) *ConnectionPool {
 	transport := &http.Transport{
-		MaxIdleConns:        config.MaxIdleConns,
-		MaxIdleConnsPerHost: config.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     config.MaxConnsPerHost,
-		IdleConnTimeout:     config.IdleConnTimeout,
+		MaxIdleConns:        config.MaxIdleCons,
+		MaxIdleConnsPerHost: config.MaxIdleConsPerHost,
+		MaxConnsPerHost:     config.MaxConsPerHost,
+		IdleConnTimeout:     config.IdleConTimeout,
 
 		DialContext: (&net.Dialer{
 			Timeout:   config.DialTimeout,
@@ -93,12 +93,12 @@ func NewConnectionPool(config PoolConfig) *ConnectionPool {
 	}
 
 	return &ConnectionPool{
-		client:              client,
-		transport:           transport,
-		maxIdleConns:        config.MaxIdleConns,
-		maxIdleConnsPerHost: config.MaxIdleConnsPerHost,
-		maxConnsPerHost:     config.MaxConnsPerHost,
-		idleConnTimeout:     config.IdleConnTimeout,
+		client:             client,
+		transport:          transport,
+		maxIdleCons:        config.MaxIdleCons,
+		maxIdleConsPerHost: config.MaxIdleConsPerHost,
+		maxConsPerHost:     config.MaxConsPerHost,
+		idleConTimeout:     config.IdleConTimeout,
 	}
 }
 
@@ -107,7 +107,7 @@ func (cp *ConnectionPool) GetClient() *http.Client {
 	return cp.client
 }
 
-// Do performs an HTTP request using the pooled client
+// Do perform an HTTP request using the pooled client
 func (cp *ConnectionPool) Do(req *http.Request) (*http.Response, error) {
 	cp.mu.Lock()
 	cp.totalRequests++
@@ -128,10 +128,10 @@ func (cp *ConnectionPool) Stats() PoolStats {
 	defer cp.mu.RUnlock()
 
 	return PoolStats{
-		TotalRequests:       cp.totalRequests,
-		MaxIdleConns:        int64(cp.maxIdleConns),
-		MaxIdleConnsPerHost: int64(cp.maxIdleConnsPerHost),
-		MaxConnsPerHost:     int64(cp.maxConnsPerHost),
+		TotalRequests:      cp.totalRequests,
+		MaxIdleCons:        int64(cp.maxIdleCons),
+		MaxIdleConsPerHost: int64(cp.maxIdleConsPerHost),
+		MaxConsPerHost:     int64(cp.maxConsPerHost),
 	}
 }
 

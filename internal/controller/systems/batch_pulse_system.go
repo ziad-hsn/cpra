@@ -131,26 +131,26 @@ func (bps *BatchPulseSystem) Update(ctx context.Context) error {
 	}
 
 	// Convert map to slices for batch processing
-	entities := make([]ecs.Entity, 0, len(toDispatch))
-	jobs := make([]jobs.Job, 0, len(toDispatch))
+	e := make([]ecs.Entity, 0, len(toDispatch))
+	j := make([]jobs.Job, 0, len(toDispatch))
 
 	for ent, job := range toDispatch {
-		entities = append(entities, ent)
-		jobs = append(jobs, job)
+		e = append(e, ent)
+		j = append(j, job)
 	}
 
-	// Process in batches - collect jobs and submit as batch
+	// Process in batches - collect j and submit as batch
 	batchCount := 0
-	for i := 0; i < len(entities); i += bps.batchSize {
+	for i := 0; i < len(e); i += bps.batchSize {
 		end := i + bps.batchSize
-		if end > len(entities) {
-			end = len(entities)
+		if end > len(e) {
+			end = len(e)
 		}
 
-		batchEntities := entities[i:end]
-		batchJobs := jobs[i:end]
+		batchEntities := e[i:end]
+		batchJobs := j[i:end]
 
-		// Submit batch of jobs to queue
+		// Submit batch of j to queue
 		if err := bps.queue.EnqueueBatch(batchJobs); err != nil {
 			// If queue full, apply component transitions anyway
 			bps.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
@@ -169,7 +169,7 @@ func (bps *BatchPulseSystem) Update(ctx context.Context) error {
 
 	if len(toDispatch) > 0 {
 		processingTime := time.Since(startTime)
-		fmt.Printf("Batch Pulse System: Processed %d entities in %d batches (took %v)\n",
+		fmt.Printf("Batch Pulse System: Processed %d e in %d batches (took %v)\n",
 			len(toDispatch), batchCount, processingTime.Truncate(time.Millisecond))
 	}
 

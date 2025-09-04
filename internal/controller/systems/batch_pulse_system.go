@@ -169,7 +169,7 @@ func (bps *BatchPulseSystem) Update(ctx context.Context) error {
 
 	if len(toDispatch) > 0 {
 		processingTime := time.Since(startTime)
-		fmt.Printf("Batch Pulse System: Processed %d e in %d batches (took %v)\n",
+		bps.logger.Debug("Batch Pulse System: Processed %d entities in %d batches (took %v)",
 			len(toDispatch), batchCount, processingTime.Truncate(time.Millisecond))
 	}
 
@@ -179,4 +179,9 @@ func (bps *BatchPulseSystem) Update(ctx context.Context) error {
 // Finalize cleans up like the original system
 func (bps *BatchPulseSystem) Finalize(w *ecs.World) {
 	// Nothing to clean up - queue manager handles its own cleanup
+}
+
+// GetMetrics returns current system metrics
+func (bps *BatchPulseSystem) GetMetrics() (int64, int64) {
+	return bps.entitiesProcessed, bps.batchesCreated
 }

@@ -78,6 +78,7 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 			statusCopy.LastStatus = "failed"
 			statusCopy.LastError = res.Error()
 			statusCopy.ConsecutiveFailures++
+			statusCopy.LastCheckTime = time.Now()
 
 			// Store the updated value for correct logging
 			currentFailures := statusCopy.ConsecutiveFailures
@@ -122,6 +123,7 @@ func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges
 			statusCopy.LastError = nil
 			statusCopy.ConsecutiveFailures = 0
 			statusCopy.LastSuccessTime = time.Now()
+			statusCopy.LastCheckTime = time.Now()
 			monitorCopy.Status = "success"
 
 			if wasFailure {

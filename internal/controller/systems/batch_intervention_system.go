@@ -170,3 +170,8 @@ func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
 func (bis *BatchInterventionSystem) Finalize(w *ecs.World) {
 	// Nothing to clean up - queue manager handles its own cleanup
 }
+
+// GetMetrics returns current system metrics
+func (bis *BatchInterventionSystem) GetMetrics() (int64, int64) {
+	return bis.entitiesProcessed, bis.batchesCreated
+}

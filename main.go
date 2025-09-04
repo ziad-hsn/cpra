@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -59,7 +60,6 @@ func main() {
 		<-sigChan
 		fmt.Println("\nShutdown signal received...")
 		cancel()
-		controller.CloseLoggers()
 	}()
 
 	// Load monitors if YAML file exists
@@ -87,8 +87,33 @@ func main() {
 	<-ctx.Done()
 	fmt.Println("Shutting down...")
 
+	// Print comprehensive shutdown metrics before stopping
+	oc.PrintShutdownMetrics()
+
+	// Print memory Usage
+	PrintMemUsage()
+
 	// Stop the controller
 	oc.Stop()
+	
+	// Close loggers after everything is done
+	controller.CloseLoggers()
 
 	fmt.Println("CPRA Optimized Controller stopped")
+}
+
+// bToMb converts bytes to megabytes
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+
+// PrintMemUsage outputs the current, total, and system memory usage
+func PrintMemUsage() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Printf("\nMemory usage on exit:\n")
+	fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	fmt.Printf("\tNumGC = %v\n", m.NumGC)
 }

@@ -29,11 +29,16 @@ type BoundedQueue struct {
 	enqueued int64
 	dequeued int64
 	dropped  int64
+	
+	// Latency tracking
+	maxQueueTime    int64 // nanoseconds
+	totalQueueTime  int64 // nanoseconds for average calculation
+	maxJobLatency   int64 // nanoseconds
+	totalJobLatency int64 // nanoseconds for average calculation
+	mu              sync.RWMutex
 
 	// Configuration
 	batchTimeout time.Duration
-
-	mu sync.RWMutex
 }
 
 // BoundedQueueConfig holds queue configuration
@@ -45,11 +50,15 @@ type BoundedQueueConfig struct {
 
 // Stats holds queue statistics
 type Stats struct {
-	Enqueued   int64
-	Dequeued   int64
-	Dropped    int64
-	QueueDepth int32
-	BatchCount int32
+	Enqueued        int64
+	Dequeued        int64
+	Dropped         int64
+	QueueDepth      int32
+	BatchCount      int32
+	MaxQueueTime    time.Duration
+	AvgQueueTime    time.Duration
+	MaxJobLatency   time.Duration
+	AvgJobLatency   time.Duration
 }
 
 // NewBoundedQueue creates a new bounded queue
@@ -70,6 +79,12 @@ func (q *BoundedQueue) EnqueueBatch(batch []jobs.Job) error {
 
 	if len(batch) == 0 {
 		return nil
+	}
+
+	// Set enqueue time for all jobs in batch
+	enqueueTime := time.Now()
+	for _, job := range batch {
+		job.SetEnqueueTime(enqueueTime)
 	}
 
 	// Limit batch size
@@ -96,6 +111,15 @@ func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 
 	select {
 	case batch := <-q.batches:
+		// Calculate queue time for latency tracking
+		dequeueTime := time.Now()
+		for _, job := range batch {
+			if !job.GetEnqueueTime().IsZero() {
+				queueTime := dequeueTime.Sub(job.GetEnqueueTime())
+				q.updateQueueTime(queueTime)
+			}
+		}
+		
 		atomic.AddInt64(&q.dequeued, int64(len(batch)))
 		return batch, nil
 	case <-ctx.Done():
@@ -110,14 +134,66 @@ func (q *BoundedQueue) Close() {
 	}
 }
 
+// updateQueueTime updates queue time statistics
+func (q *BoundedQueue) updateQueueTime(queueTime time.Duration) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	
+	queueTimeNs := queueTime.Nanoseconds()
+	
+	// Update max queue time
+	if queueTimeNs > q.maxQueueTime {
+		q.maxQueueTime = queueTimeNs
+	}
+	
+	// Update total for average calculation
+	q.totalQueueTime += queueTimeNs
+}
+
+// UpdateJobLatency updates job execution latency statistics
+func (q *BoundedQueue) UpdateJobLatency(jobLatency time.Duration) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	
+	latencyNs := jobLatency.Nanoseconds()
+	
+	// Update max job latency
+	if latencyNs > q.maxJobLatency {
+		q.maxJobLatency = latencyNs
+	}
+	
+	// Update total for average calculation
+	q.totalJobLatency += latencyNs
+}
+
 // Stats returns current queue statistics
 func (q *BoundedQueue) Stats() Stats {
+	q.mu.RLock()
+	maxQueueTime := q.maxQueueTime
+	totalQueueTime := q.totalQueueTime
+	maxJobLatency := q.maxJobLatency
+	totalJobLatency := q.totalJobLatency
+	q.mu.RUnlock()
+	
+	dequeued := atomic.LoadInt64(&q.dequeued)
+	
+	// Calculate averages
+	var avgQueueTime, avgJobLatency time.Duration
+	if dequeued > 0 {
+		avgQueueTime = time.Duration(totalQueueTime / dequeued)
+		avgJobLatency = time.Duration(totalJobLatency / dequeued)
+	}
+	
 	return Stats{
-		Enqueued:   atomic.LoadInt64(&q.enqueued),
-		Dequeued:   atomic.LoadInt64(&q.dequeued),
-		Dropped:    atomic.LoadInt64(&q.dropped),
-		QueueDepth: int32(len(q.batches)),
-		BatchCount: int32(cap(q.batches)),
+		Enqueued:      atomic.LoadInt64(&q.enqueued),
+		Dequeued:      dequeued,
+		Dropped:       atomic.LoadInt64(&q.dropped),
+		QueueDepth:    int32(len(q.batches)),
+		BatchCount:    int32(cap(q.batches)),
+		MaxQueueTime:  time.Duration(maxQueueTime),
+		AvgQueueTime:  avgQueueTime,
+		MaxJobLatency: time.Duration(maxJobLatency),
+		AvgJobLatency: avgJobLatency,
 	}
 }
 
@@ -128,7 +204,6 @@ type BatchCollector struct {
 	batchSize    int
 	timeout      time.Duration
 
-	mu        sync.Mutex
 	lastFlush time.Time
 	closed    int32
 }
@@ -143,14 +218,12 @@ func (bc *BatchCollector) flushTimer() {
 			return
 		}
 
-		bc.mu.Lock()
 		if time.Since(bc.lastFlush) >= bc.timeout && len(bc.currentBatch) > 0 {
 			err := bc.flushLocked()
 			if err != nil {
 				return
 			}
 		}
-		bc.mu.Unlock()
 	}
 }
 
@@ -174,8 +247,6 @@ func (bc *BatchCollector) flushLocked() error {
 
 // Flush manually flushes the current batch
 func (bc *BatchCollector) Flush() error {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
 	return bc.flushLocked()
 }
 

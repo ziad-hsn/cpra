@@ -202,3 +202,8 @@ func (bcs *BatchCodeSystem) Update(ctx context.Context) error {
 func (bcs *BatchCodeSystem) Finalize(w *ecs.World) {
 	// Nothing to clean up - queue manager handles its own cleanup
 }
+
+// GetMetrics returns current system metrics
+func (bcs *BatchCodeSystem) GetMetrics() (int64, int64) {
+	return bcs.entitiesProcessed, bcs.batchesCreated
+}

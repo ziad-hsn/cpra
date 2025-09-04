@@ -41,8 +41,6 @@ type BatchProcessor struct {
 	// Logging
 	logger BatchProcessorLogger
 
-	mu sync.RWMutex
-
 	// Result channels
 	pulseResults        chan jobs.Result
 	interventionResults chan jobs.Result
@@ -141,7 +139,7 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, batch []jobs.Job, wo
 
 	// Process jobs in parallel within the batch
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10) // Limit concurrent jobs per batch
+	semaphore := make(chan struct{}, 1000) // Limit concurrent jobs per batch
 
 	successCount := int64(0)
 	failureCount := int64(0)
@@ -160,11 +158,19 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, batch []jobs.Job, wo
 				return
 			}
 
-			// Execute the job
+			// Execute the job with timing
+			startTime := time.Now()
+			j.SetStartTime(startTime)
 			result := j.Execute()
+			endTime := time.Now()
+			
+			// Calculate job latency and update queue statistics
+			jobLatency := endTime.Sub(startTime)
+			bp.queue.UpdateJobLatency(jobLatency)
+			
 			if result.Err != nil {
 				atomic.AddInt64(&failureCount, 1)
-				bp.logger.Warn("Worker %d: Job %d failed: %v", workerID, jobIndex, result.Err)
+				bp.logger.Warn("Worker %d: Job %d failed after %v: %v", workerID, jobIndex, jobLatency, result.Err)
 			} else {
 				atomic.AddInt64(&successCount, 1)
 			}
@@ -211,8 +217,6 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, batch []jobs.Job, wo
 
 // Stats returns current processing statistics
 func (bp *BatchProcessor) Stats() ProcessorStats {
-	bp.mu.RLock()
-	defer bp.mu.RUnlock()
 
 	processed := atomic.LoadInt64(&bp.processed)
 	failed := atomic.LoadInt64(&bp.failed)

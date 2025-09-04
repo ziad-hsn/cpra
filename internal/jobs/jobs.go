@@ -18,6 +18,10 @@ import (
 type Job interface {
 	Execute() Result
 	Copy() Job
+	GetEnqueueTime() time.Time
+	SetEnqueueTime(time.Time)
+	GetStartTime() time.Time
+	SetStartTime(time.Time)
 }
 
 func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
@@ -169,13 +173,15 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 }
 
 type PulseHTTPJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	URL     string
-	Method  string
-	Timeout time.Duration
-	Client  http.Client
-	Retries int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	URL         string
+	Method      string
+	Timeout     time.Duration
+	Client      http.Client
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 // Execute performs the HTTP request for the job, with retries.
@@ -249,13 +255,20 @@ func (p *PulseHTTPJob) Copy() Job {
 	return job
 }
 
+func (p *PulseHTTPJob) GetEnqueueTime() time.Time { return p.EnqueueTime }
+func (p *PulseHTTPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
+func (p *PulseHTTPJob) GetStartTime() time.Time { return p.StartTime }
+func (p *PulseHTTPJob) SetStartTime(t time.Time) { p.StartTime = t }
+
 type PulseTCPJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	Host    string
-	Port    int
-	Timeout time.Duration
-	Retries int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	Host        string
+	Port        int
+	Timeout     time.Duration
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 func (p *PulseTCPJob) Execute() Result {
@@ -273,15 +286,21 @@ func (p *PulseTCPJob) Copy() Job {
 	job := new(PulseTCPJob)
 	*job = *p
 	return job
-
 }
 
+func (p *PulseTCPJob) GetEnqueueTime() time.Time { return p.EnqueueTime }
+func (p *PulseTCPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
+func (p *PulseTCPJob) GetStartTime() time.Time { return p.StartTime }
+func (p *PulseTCPJob) SetStartTime(t time.Time) { p.StartTime = t }
+
 type PulseICMPJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	Host    string
-	Count   int
-	Timeout time.Duration
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	Host        string
+	Count       int
+	Timeout     time.Duration
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 func (p *PulseICMPJob) Execute() Result {
@@ -299,15 +318,21 @@ func (p *PulseICMPJob) Copy() Job {
 	job := new(PulseICMPJob)
 	*job = *p
 	return job
-
 }
 
+func (p *PulseICMPJob) GetEnqueueTime() time.Time { return p.EnqueueTime }
+func (p *PulseICMPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
+func (p *PulseICMPJob) GetStartTime() time.Time { return p.StartTime }
+func (p *PulseICMPJob) SetStartTime(t time.Time) { p.StartTime = t }
+
 type InterventionDockerJob struct {
-	ID        uuid.UUID
-	Entity    ecs.Entity
-	Container string
-	Timeout   time.Duration
-	Retries   int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	Container   string
+	Timeout     time.Duration
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 // Execute performs the Docker intervention by restarting the specified container.
@@ -365,17 +390,23 @@ func (i *InterventionDockerJob) Copy() Job {
 	job := new(InterventionDockerJob)
 	*job = *i
 	return job
-
 }
 
+func (i *InterventionDockerJob) GetEnqueueTime() time.Time { return i.EnqueueTime }
+func (i *InterventionDockerJob) SetEnqueueTime(t time.Time) { i.EnqueueTime = t }
+func (i *InterventionDockerJob) GetStartTime() time.Time { return i.StartTime }
+func (i *InterventionDockerJob) SetStartTime(t time.Time) { i.StartTime = t }
+
 type CodeLogJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	File    string
-	Message string
-	Monitor string
-	Timeout time.Duration
-	Retries int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	File        string
+	Message     string
+	Monitor     string
+	Timeout     time.Duration
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 // Execute writes a formatted log message to a file synchronously.
@@ -453,17 +484,23 @@ func (c *CodeLogJob) Copy() Job {
 	*job = *c
 	job.File = strings.Clone(c.File)
 	return job
-
 }
 
+func (c *CodeLogJob) GetEnqueueTime() time.Time { return c.EnqueueTime }
+func (c *CodeLogJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
+func (c *CodeLogJob) GetStartTime() time.Time { return c.StartTime }
+func (c *CodeLogJob) SetStartTime(t time.Time) { c.StartTime = t }
+
 type CodeSlackJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	WebHook string
-	Message string
-	Monitor string
-	Timeout time.Duration
-	Retries int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	WebHook     string
+	Message     string
+	Monitor     string
+	Timeout     time.Duration
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 func (c *CodeSlackJob) Execute() Result {
@@ -480,17 +517,23 @@ func (c *CodeSlackJob) Copy() Job {
 	job := new(CodeSlackJob)
 	*job = *c
 	return job
-
 }
 
+func (c *CodeSlackJob) GetEnqueueTime() time.Time { return c.EnqueueTime }
+func (c *CodeSlackJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
+func (c *CodeSlackJob) GetStartTime() time.Time { return c.StartTime }
+func (c *CodeSlackJob) SetStartTime(t time.Time) { c.StartTime = t }
+
 type CodePagerDutyJob struct {
-	ID      uuid.UUID
-	Entity  ecs.Entity
-	URL     string
-	Message string
-	Monitor string
-	Timeout time.Duration
-	Retries int
+	ID          uuid.UUID
+	Entity      ecs.Entity
+	URL         string
+	Message     string
+	Monitor     string
+	Timeout     time.Duration
+	Retries     int
+	EnqueueTime time.Time
+	StartTime   time.Time
 }
 
 func (c *CodePagerDutyJob) Execute() Result {
@@ -508,8 +551,12 @@ func (c *CodePagerDutyJob) Copy() Job {
 	job := new(CodePagerDutyJob)
 	*job = *c
 	return job
-
 }
+
+func (c *CodePagerDutyJob) GetEnqueueTime() time.Time { return c.EnqueueTime }
+func (c *CodePagerDutyJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
+func (c *CodePagerDutyJob) GetStartTime() time.Time { return c.StartTime }
+func (c *CodePagerDutyJob) SetStartTime(t time.Time) { c.StartTime = t }
 
 // getLoggingTimezone returns the timezone to use for job logging
 func getLoggingTimezone() *time.Location {

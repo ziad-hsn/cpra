@@ -76,6 +76,9 @@ type Controller struct {
 	// Configuration
 	config Config
 
+	// Metrics collection
+	metricsAggregator *MetricsAggregator
+
 	// State
 	running bool
 }
@@ -122,15 +125,37 @@ func NewController(config Config) *Controller {
 	mapper := entities.InitializeMappers(&tool.World)
 
 	// Create  queue components - THESE NEVER BLOCK!
+
+	ws := queue.WorldSummary{
+		NumMonitors:                config.MonitorCount,
+		AvgInterval:                10 * time.Second,
+		MeanServicePulse:           120 * time.Millisecond,
+		PulseFailProb:              0.02,
+		MeanServiceIntervention:    300 * time.Millisecond,
+		InterventionEscalationProb: 0.10,
+		MeanServiceCode:            80 * time.Millisecond,
+	}
+	desiredWorkers, suggestedCap := queue.ComputeInitialSizingFromWorld(
+		ws,
+		0.75,
+		1*time.Second,
+		1, // minWorkers
+		queue.DefaultWorkerPoolConfig().MaxWorkers,
+		10_000,  // minQueue; avoid too small
+		500_000, // maxQueue; cap to something sane
+	)
 	queueConfig := queue.BoundedQueueConfig{
-		MaxSize:      50000,
-		MaxBatch:     500,
+		MaxSize:      suggestedCap,
+		MaxBatch:     suggestedCap,
 		BatchTimeout: 50 * time.Millisecond,
 	}
 	boundedQueue := queue.NewBoundedQueue(queueConfig)
 
 	connPool := queue.NewConnectionPool(queue.DefaultPoolConfig())
-	workerPool := queue.NewDynamicWorkerPool(queue.DefaultWorkerPoolConfig(), WorkerPoolLogger)
+	wpCfg := queue.DefaultWorkerPoolConfig()
+	wpCfg.MinWorkers = desiredWorkers
+
+	workerPool := queue.NewDynamicWorkerPool(wpCfg, WorkerPoolLogger)
 
 	// Create result channels
 	pulseResults := make(chan jobs.Result, 10000)
@@ -138,8 +163,8 @@ func NewController(config Config) *Controller {
 	codeResults := make(chan jobs.Result, 5000)
 
 	batchProcessor := queue.NewBatchProcessor(boundedQueue, connPool, queue.ProcessorConfig{
-		BatchSize:     500,
-		MaxConcurrent: 200,
+		BatchSize:     suggestedCap,
+		MaxConcurrent: 1000,
 		Timeout:       30 * time.Second,
 		RetryAttempts: 3,
 		RetryDelay:    500 * time.Millisecond,
@@ -159,6 +184,16 @@ func NewController(config Config) *Controller {
 	interventionResultSystem := systems.NewBatchInterventionResultSystem(interventionResults, mapper, resultLogger)
 	codeResultSystem := systems.NewBatchCodeResultSystem(codeResults, mapper, resultLogger)
 
+	// Initialize metrics aggregator
+	metricsAggregator := NewMetricsAggregator()
+	metricsAggregator.RegisterSystem("BatchPulseScheduleSystem")
+	metricsAggregator.RegisterSystem("BatchPulseSystem")
+	metricsAggregator.RegisterSystem("BatchInterventionSystem")
+	metricsAggregator.RegisterSystem("BatchCodeSystem")
+	metricsAggregator.RegisterSystem("BatchPulseResultSystem")
+	metricsAggregator.RegisterSystem("BatchInterventionResultSystem")
+	metricsAggregator.RegisterSystem("BatchCodeResultSystem")
+
 	return &Controller{
 		world:                    &tool.World,
 		mapper:                   mapper,
@@ -174,6 +209,7 @@ func NewController(config Config) *Controller {
 		interventionResultSystem: interventionResultSystem,
 		codeResultSystem:         codeResultSystem,
 		config:                   config,
+		metricsAggregator:        metricsAggregator,
 	}
 }
 
@@ -263,27 +299,46 @@ func (oc *Controller) mainLoop(ctx context.Context) {
 
 			// Update ECS systems (single-threaded for Ark compatibility)
 			// CRITICAL: Schedule FIRST to mark entities as needed!
+			start := time.Now()
 			if err := oc.pulseScheduleSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating pulse schedule system: %v", err)
 			}
+			oc.metricsAggregator.RecordSystemUpdate("BatchPulseScheduleSystem", time.Since(start), 0, 0)
 
 			// Then dispatch the scheduled entities
+			start = time.Now()
 			if err := oc.pulseSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating pulse system: %v", err)
 			}
+			entities, batches := oc.pulseSystem.GetMetrics()
+			oc.metricsAggregator.RecordSystemUpdate("BatchPulseSystem", time.Since(start), entities, batches)
 
+			start = time.Now()
 			if err := oc.interventionSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating intervention system: %v", err)
 			}
+			entities, batches = oc.interventionSystem.GetMetrics()
+			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), entities, batches)
 
+			start = time.Now()
 			if err := oc.codeSystem.Update(ctx); err != nil {
 				SystemLogger.Error("Error updating code system: %v", err)
 			}
+			entities, batches = oc.codeSystem.GetMetrics()
+			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), entities, batches)
 
 			// Update result processing systems using the original ECS world interface
+			start = time.Now()
 			oc.pulseResultSystem.Update(oc.world)
+			oc.metricsAggregator.RecordSystemUpdate("BatchPulseResultSystem", time.Since(start), 0, 0)
+
+			start = time.Now()
 			oc.interventionResultSystem.Update(oc.world)
+			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionResultSystem", time.Since(start), 0, 0)
+
+			start = time.Now()
 			oc.codeResultSystem.Update(oc.world)
+			oc.metricsAggregator.RecordSystemUpdate("BatchCodeResultSystem", time.Since(start), 0, 0)
 		}
 	}
 }
@@ -326,6 +381,77 @@ func (oc *Controller) printStats() {
 		workerStats.CurrentWorkers, workerStats.TargetWorkers, workerStats.TasksProcessed)
 
 	SystemLogger.Info("===============================")
+}
+
+// PrintShutdownMetrics prints comprehensive shutdown metrics
+func (oc *Controller) PrintShutdownMetrics() {
+	SystemLogger.Info("=== SHUTDOWN METRICS REPORT ===")
+
+	// Queue statistics with latency data
+	queueStats := oc.queue.Stats()
+	SystemLogger.Info("=== QUEUE PERFORMANCE ===")
+	SystemLogger.Info("Total Jobs: enqueued=%d, dequeued=%d, dropped=%d",
+		queueStats.Enqueued, queueStats.Dequeued, queueStats.Dropped)
+	SystemLogger.Info("Queue Latency: max=%v, avg=%v",
+		queueStats.MaxQueueTime, queueStats.AvgQueueTime)
+	SystemLogger.Info("Job Execution: max_latency=%v, avg_latency=%v",
+		queueStats.MaxJobLatency, queueStats.AvgJobLatency)
+
+	// Batch processor statistics
+	processorStats := oc.batchProcessor.Stats()
+	SystemLogger.Info("=== BATCH PROCESSOR ===")
+	SystemLogger.Info("Jobs: processed=%d, failed=%d, success_rate=%.2f%%",
+		processorStats.Processed, processorStats.Failed,
+		float64(processorStats.Processed-processorStats.Failed)/float64(processorStats.Processed)*100)
+	SystemLogger.Info("Performance: avg_time=%.2fms, throughput=%.1f/sec",
+		processorStats.AverageTime.Seconds()*1000, processorStats.Throughput)
+
+	// Worker pool statistics
+	workerStats := oc.workerPool.Stats()
+	SystemLogger.Info("=== WORKER POOL ===")
+	SystemLogger.Info("Workers: current=%d, target=%d, created=%d, destroyed=%d",
+		workerStats.CurrentWorkers, workerStats.TargetWorkers,
+		workerStats.WorkersCreated, workerStats.WorkersDestroyed)
+	SystemLogger.Info("Tasks: processed=%d, queued=%d, queue_depth=%d",
+		workerStats.TasksProcessed, workerStats.TasksQueued, workerStats.QueueDepth)
+
+	// System performance metrics
+	SystemLogger.Info("=== SYSTEM PERFORMANCE ===")
+	aggregateMetrics := oc.metricsAggregator.GetAggregateMetrics()
+	SystemLogger.Info("Runtime: %v", time.Since(aggregateMetrics.StartTime))
+	SystemLogger.Info("Systems: %d active systems", aggregateMetrics.SystemCount)
+	SystemLogger.Info("Updates: total=%d, rate=%.1f/sec",
+		aggregateMetrics.TotalUpdates, aggregateMetrics.UpdatesPerSecond)
+	SystemLogger.Info("Entities: processed=%d, rate=%.1f/sec, avg_per_update=%.1f",
+		aggregateMetrics.TotalEntitiesProcessed, aggregateMetrics.EntitiesPerSecond, aggregateMetrics.AvgEntitiesPerUpdate)
+	SystemLogger.Info("Batches: created=%d, avg_per_update=%.1f",
+		aggregateMetrics.TotalBatchesCreated, aggregateMetrics.AvgBatchesPerUpdate)
+	SystemLogger.Info("Update Duration: max=%v, min=%v, avg=%v",
+		aggregateMetrics.MaxUpdateDuration, aggregateMetrics.MinUpdateDuration, aggregateMetrics.AvgUpdateDuration)
+
+	// Per-system breakdown
+	SystemLogger.Info("=== INDIVIDUAL SYSTEM METRICS ===")
+	allSystemMetrics := oc.metricsAggregator.GetAllMetrics()
+	for systemName, metrics := range allSystemMetrics {
+		if metrics.TotalUpdates > 0 {
+			avgDuration := metrics.TotalDuration / time.Duration(metrics.TotalUpdates)
+			avgEntitiesPerUpdate := float64(metrics.TotalEntitiesProcessed) / float64(metrics.TotalUpdates)
+
+			SystemLogger.Info("%s: updates=%d, entities=%d (%.1f/update), batches=%d, avg_duration=%v",
+				systemName, metrics.TotalUpdates, metrics.TotalEntitiesProcessed,
+				avgEntitiesPerUpdate, metrics.TotalBatchesCreated, avgDuration)
+		}
+	}
+
+	// Memory and resource summary
+	SystemLogger.Info("=== RESOURCE SUMMARY ===")
+	runtime := time.Since(aggregateMetrics.StartTime)
+	if runtime > 0 {
+		totalThroughput := float64(aggregateMetrics.TotalEntitiesProcessed) / runtime.Seconds()
+		SystemLogger.Info("Overall Throughput: %.1f entities/sec over %v", totalThroughput, runtime)
+	}
+
+	SystemLogger.Info("==== END SHUTDOWN METRICS ====")
 }
 
 // GetWorld returns the ECS world for external access

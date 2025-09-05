@@ -81,13 +81,19 @@ func (bis *BatchInterventionSystem) collectWork(w *ecs.World) map[ecs.Entity]job
 	return out
 }
 
-// applyWork applies work exactly like sys_intervention.go but in batches
+// applyWork applies work using Ark's batch operations for optimal performance
 func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// Filter entities to only include those that need transitions and don't already have InterventionPending
+	validEntities := make([]ecs.Entity, 0, len(entities))
 	for i, ent := range entities {
 		_ = jobs[i] // Job already submitted to queue
 
 		if w.Alive(ent) {
-			// Prevent component duplication exactly like original
+			// Skip entities that already have InterventionPending
 			if bis.Mapper.InterventionPending.HasAll(ent) {
 				namePtr := bis.Mapper.Name.Get(ent)
 				if namePtr != nil {
@@ -96,21 +102,39 @@ func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entit
 				continue
 			}
 
-			// Job will be submitted with batch
-
-			// Safe component transition exactly like original
+			// Only include entities that have InterventionNeeded
 			if bis.Mapper.InterventionNeeded.HasAll(ent) {
-				bis.Mapper.InterventionNeeded.Remove(ent)
-				bis.Mapper.InterventionPending.Add(ent, &components.InterventionPending{})
-
-				namePtr := bis.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bis.logger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
-				}
-				bis.logger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
+				validEntities = append(validEntities, ent)
 			}
 		}
 	}
+
+	if len(validEntities) == 0 {
+		return nil
+	}
+
+	// Use Ark's batch operations for component transitions
+	// Create a filter for entities that have InterventionNeeded but not InterventionPending
+	interventionNeededFilter := ecs.NewFilter1[components.InterventionNeeded](w).
+		Without(ecs.C[components.InterventionPending]())
+	
+	// Get batch of matching entities
+	batch := interventionNeededFilter.Batch()
+	
+	// Use batch operations: Remove InterventionNeeded and Add InterventionPending in batches
+	bis.Mapper.InterventionNeeded.RemoveBatch(batch, nil)
+	bis.Mapper.InterventionPending.AddBatch(batch, &components.InterventionPending{})
+
+	// Log component transitions
+	for _, ent := range validEntities {
+		namePtr := bis.Mapper.Name.Get(ent)
+		if namePtr != nil {
+			bis.logger.Info("INTERVENTION DISPATCHED: %s", *namePtr)
+		}
+		bis.logger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
+	}
+
+	bis.logger.Debug("Batch intervention system: Applied component transitions to %d entities using batch operations", len(validEntities))
 	return nil
 }
 

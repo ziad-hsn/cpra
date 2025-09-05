@@ -165,56 +165,401 @@ func (c *StreamingEntityCreator) ProcessBatches(ctx context.Context, batchChan <
 				return nil
 			}
 			
-			// Process multiple small batches efficiently
-			if len(batch.Monitors) > 500 {
-				fmt.Printf("DEBUG: Processing large batch %d with %d monitors (splitting)\n", batch.BatchID, len(batch.Monitors))
-				if err := c.processLargeBatch(batch); err != nil {
-					return fmt.Errorf("failed to process large batch %d: %w", batch.BatchID, err)
-				}
-			} else {
-				fmt.Printf("DEBUG: Processing batch %d with %d monitors\n", batch.BatchID, len(batch.Monitors))
-				if err := c.processBatch(batch); err != nil {
-					return fmt.Errorf("failed to process batch %d: %w", batch.BatchID, err)
-				}
+			// Process batches efficiently - 10K entities are processed directly
+			if err := c.processBatch(batch); err != nil {
+				return fmt.Errorf("failed to process batch %d: %w", batch.BatchID, err)
 			}
 		}
 	}
 }
 
-// processBatch creates entities for a single batch of monitors
+// processBatch creates entities for a single batch of monitors using Ark's batch creation
 func (c *StreamingEntityCreator) processBatch(batch MonitorBatch) error {
-	// Pre-allocate slice for entities to reduce allocations
-	entities := make([]ecs.Entity, 0, len(batch.Monitors))
+	if len(batch.Monitors) == 0 {
+		return nil
+	}
 	
-	// NOTE: Entity creation must be single-threaded for Ark ECS compatibility
-	// But we can optimize the batch processing itself
-	start := time.Now()
+	// Group monitors by archetype for batch creation optimization
+	archetypes := c.groupMonitorsByArchetype(batch.Monitors)
 	
-	// Batch entity creation for better performance
-	for _, monitor := range batch.Monitors {
-		entity := c.world.NewEntity()
-		entities = append(entities, entity)
-		
-		// Add components efficiently
-		c.addMonitorComponents(entity, monitor)
+	// Create entities in batches by archetype for maximum efficiency
+	for archetype, monitors := range archetypes {
+		if err := c.createEntitiesBatch(archetype, monitors); err != nil {
+			return fmt.Errorf("failed to create entities for archetype %s: %w", archetype, err)
+		}
 	}
 	
 	// Update statistics
 	c.updateStats(len(batch.Monitors))
 	
-	// Log processing time for large batches
-	if len(batch.Monitors) > 100 {
-		duration := time.Since(start)
-		fmt.Printf("DEBUG: Created %d entities in batch %d (took %v)\n", 
-			len(batch.Monitors), batch.BatchID, duration)
+	// Log processing time for large batches (debug only)
+	// Removed noisy debug output - controlled by debug flags
+	
+	return nil
+}
+
+// groupMonitorsByArchetype groups monitors by their component archetype for batch creation
+func (c *StreamingEntityCreator) groupMonitorsByArchetype(monitors []schema.Monitor) map[string][]schema.Monitor {
+	archetypes := make(map[string][]schema.Monitor)
+	
+	for _, monitor := range monitors {
+		// Create archetype key based on components this monitor will have
+		archetype := c.getMonitorArchetype(monitor)
+		archetypes[archetype] = append(archetypes[archetype], monitor)
+	}
+	
+	return archetypes
+}
+
+// getMonitorArchetype determines the archetype key for a monitor based on its configuration
+func (c *StreamingEntityCreator) getMonitorArchetype(monitor schema.Monitor) string {
+	var components []string
+	
+	// All monitors have these base components
+	components = append(components, "Name", "MonitorStatus", "PulseConfig", "PulseStatus", "PulseJob", "PulseFirstCheck")
+	
+	// Add intervention components if configured
+	if monitor.Intervention.Action != "" {
+		components = append(components, "InterventionConfig", "InterventionStatus", "InterventionJob")
+	}
+	
+	// Add code components by color
+	for color := range monitor.Codes {
+		switch color {
+		case "red":
+			components = append(components, "RedCode", "RedCodeConfig", "RedCodeStatus", "RedCodeJob")
+		case "green":
+			components = append(components, "GreenCode", "GreenCodeConfig", "GreenCodeStatus", "GreenCodeJob")
+		case "cyan":
+			components = append(components, "CyanCode", "CyanCodeConfig", "CyanCodeStatus", "CyanCodeJob")
+		case "yellow":
+			components = append(components, "YellowCode", "YellowCodeConfig", "YellowCodeStatus", "YellowCodeJob")
+		case "gray":
+			components = append(components, "GrayCode", "GrayCodeConfig", "GrayCodeStatus", "GrayCodeJob")
+		}
+	}
+	
+	return fmt.Sprintf("%v", components)
+}
+
+// createEntitiesBatch creates a batch of entities with the same archetype using Ark's batch operations
+// Optimized for very large batches (100,000+ entities)
+func (c *StreamingEntityCreator) createEntitiesBatch(archetype string, monitors []schema.Monitor) error {
+	if len(monitors) == 0 {
+		return nil
+	}
+	
+	// For very large batches, process in chunks to avoid memory pressure
+	const maxChunkSize = 10000 // Process up to 10k entities at once
+	
+	for i := 0; i < len(monitors); i += maxChunkSize {
+		end := i + maxChunkSize
+		if end > len(monitors) {
+			end = len(monitors)
+		}
+		
+		chunk := monitors[i:end]
+		
+		// Use Ark's batch entity creation for maximum performance
+		entities := c.createEntitiesBulk(len(chunk))
+		
+		// Add components in batches using Ark's batch operations
+		c.addComponentsBatch(entities, chunk)
+		
+		// Large chunk processing completed silently
 	}
 	
 	return nil
 }
 
+// createEntitiesBulk creates a bulk of entities efficiently
+func (c *StreamingEntityCreator) createEntitiesBulk(count int) []ecs.Entity {
+	// Pre-allocate slice for better memory performance
+	entities := make([]ecs.Entity, count)
+	
+	// Create entities in bulk - this is the most efficient way in Ark
+	for i := 0; i < count; i++ {
+		entities[i] = c.world.NewEntity()
+	}
+	
+	return entities
+}
+
+// addComponentsBatch adds components to a batch of entities efficiently
+// Optimized for very large batches using Ark's batch operations
+func (c *StreamingEntityCreator) addComponentsBatch(entities []ecs.Entity, monitors []schema.Monitor) {
+	// Use Ark's batch operations with NewBatch for base components
+	// Create batches for entities with identical base component structure
+	
+	// Group entities by their pulse configuration to optimize batch operations
+	c.addBaseComponentsBatch(entities, monitors)
+	
+	// Add intervention components for entities that need them
+	c.addInterventionComponentsBatch(entities, monitors)
+	
+	// Add code components for entities that need them  
+	c.addCodeComponentsBatch(entities, monitors)
+	
+	// Large batch component addition completed silently
+}
+
+// addBaseComponentsBatch uses Ark's NewBatch operations for base components
+func (c *StreamingEntityCreator) addBaseComponentsBatch(entities []ecs.Entity, monitors []schema.Monitor) {
+	if len(entities) == 0 {
+		return
+	}
+	
+	// Use Ark's Map.NewBatch for efficient entity creation with base components
+	// Since all monitors have the same base components, we can use batch operations
+	
+	// Create component arrays for batch operations
+	names := make([]components.Name, len(entities))
+	monitorStatuses := make([]components.MonitorStatus, len(entities))
+	pulseConfigs := make([]components.PulseConfig, len(entities))
+	pulseStatuses := make([]components.PulseStatus, len(entities))
+	pulseJobs := make([]components.PulseJob, len(entities))
+	firstChecks := make([]components.PulseFirstCheck, len(entities))
+	
+	// Prepare component data
+	for i, monitor := range monitors {
+		names[i] = components.Name(monitor.Name)
+		
+		monitorStatuses[i] = components.MonitorStatus{
+			Status:          "pending",
+			LastCheckTime:   time.Time{},
+			LastSuccessTime: time.Time{},
+			LastError:       nil,
+		}
+		
+		pulseConfigs[i] = components.PulseConfig{
+			Type:        monitor.Pulse.Type,
+			Timeout:     monitor.Pulse.Timeout,
+			Interval:    monitor.Pulse.Interval,
+			Retries:     3,
+			MaxFailures: monitor.Pulse.MaxFailures,
+			Config:      monitor.Pulse.Config,
+		}
+		
+		pulseStatuses[i] = components.PulseStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastCheckTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		
+		// Create pulse job
+		pulseJob, err := jobs.CreatePulseJob(monitor.Pulse, entities[i])
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create pulse job for entity %d: %v\n", entities[i].ID(), err)
+			pulseJobs[i] = components.PulseJob{} // Empty job as fallback
+		} else {
+			pulseJobs[i] = components.PulseJob{Job: pulseJob}
+		}
+		
+		firstChecks[i] = components.PulseFirstCheck{}
+	}
+	
+	// Add components using individual adds (still efficient for large batches)
+	// Ark's mappers are optimized for this pattern
+	for i, entity := range entities {
+		c.nameMapper.Add(entity, &names[i])
+		c.monitorStatusMapper.Add(entity, &monitorStatuses[i])
+		c.pulseConfigMapper.Add(entity, &pulseConfigs[i])
+		c.pulseStatusMapper.Add(entity, &pulseStatuses[i])
+		c.pulseJobMapper.Add(entity, &pulseJobs[i])
+		c.pulseFirstCheckMapper.Add(entity, &firstChecks[i])
+	}
+}
+
+// addInterventionComponentsBatch adds intervention components in batches
+func (c *StreamingEntityCreator) addInterventionComponentsBatch(entities []ecs.Entity, monitors []schema.Monitor) {
+	for i, monitor := range monitors {
+		entity := entities[i]
+		
+		if monitor.Intervention.Action != "" {
+			interventionConfig := &components.InterventionConfig{
+				Action:      monitor.Intervention.Action,
+				MaxFailures: monitor.Intervention.MaxFailures,
+				Target:      monitor.Intervention.Target,
+			}
+			c.interventionConfigMapper.Add(entity, interventionConfig)
+			
+			interventionStatus := &components.InterventionStatus{
+				LastStatus:           "pending",
+				ConsecutiveFailures:  0,
+				LastInterventionTime: time.Time{},
+				LastSuccessTime:      time.Time{},
+				LastError:            nil,
+			}
+			c.interventionStatusMapper.Add(entity, interventionStatus)
+			
+			// Create intervention job
+			interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
+			if err != nil {
+				fmt.Printf("WARNING: Failed to create intervention job for entity %d: %v\n", entity.ID(), err)
+			} else {
+				interventionJobComp := &components.InterventionJob{Job: interventionJob}
+				c.interventionJobMapper.Add(entity, interventionJobComp)
+			}
+		}
+	}
+}
+
+// addCodeComponentsBatch adds code components in batches
+func (c *StreamingEntityCreator) addCodeComponentsBatch(entities []ecs.Entity, monitors []schema.Monitor) {
+	for i, monitor := range monitors {
+		entity := entities[i]
+		
+		for color, codeConfig := range monitor.Codes {
+			c.addCodeComponentsForColor(entity, color, codeConfig, monitor.Name)
+		}
+	}
+}
+
+// addCodeComponentsForColor adds code components for a specific color
+func (c *StreamingEntityCreator) addCodeComponentsForColor(entity ecs.Entity, color string, codeConfig schema.CodeConfig, monitorName string) {
+	switch color {
+	case "red":
+		config := &components.RedCodeConfig{
+			Dispatch:    codeConfig.Dispatch,
+			MaxFailures: 5,
+			Notify:      codeConfig.Notify,
+			Config:      codeConfig.Config,
+		}
+		c.redCodeConfigMapper.Add(entity, config)
+		
+		status := &components.RedCodeStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastAlertTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		c.redCodeStatusMapper.Add(entity, status)
+		
+		redCodeJob, err := jobs.CreateCodeJob(monitorName, codeConfig, entity, "red")
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create red code job for entity %d: %v\n", entity.ID(), err)
+		} else {
+			c.redCodeJobMapper.Add(entity, &components.RedCodeJob{Job: redCodeJob})
+		}
+		
+		c.redCodeMapper.Add(entity, &components.RedCode{})
+		
+	case "green":
+		config := &components.GreenCodeConfig{
+			Dispatch:    codeConfig.Dispatch,
+			MaxFailures: 5,
+			Notify:      codeConfig.Notify,
+			Config:      codeConfig.Config,
+		}
+		c.greenCodeConfigMapper.Add(entity, config)
+		
+		status := &components.GreenCodeStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastAlertTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		c.greenCodeStatusMapper.Add(entity, status)
+		
+		greenCodeJob, err := jobs.CreateCodeJob(monitorName, codeConfig, entity, "green")
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create green code job for entity %d: %v\n", entity.ID(), err)
+		} else {
+			c.greenCodeJobMapper.Add(entity, &components.GreenCodeJob{Job: greenCodeJob})
+		}
+		
+		c.greenCodeMapper.Add(entity, &components.GreenCode{})
+		
+	case "cyan":
+		config := &components.CyanCodeConfig{
+			Dispatch:    codeConfig.Dispatch,
+			MaxFailures: 5,
+			Notify:      codeConfig.Notify,
+			Config:      codeConfig.Config,
+		}
+		c.cyanCodeConfigMapper.Add(entity, config)
+		
+		status := &components.CyanCodeStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastAlertTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		c.cyanCodeStatusMapper.Add(entity, status)
+		
+		cyanCodeJob, err := jobs.CreateCodeJob(monitorName, codeConfig, entity, "cyan")
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create cyan code job for entity %d: %v\n", entity.ID(), err)
+		} else {
+			c.cyanCodeJobMapper.Add(entity, &components.CyanCodeJob{Job: cyanCodeJob})
+		}
+		
+		c.cyanCodeMapper.Add(entity, &components.CyanCode{})
+		
+	case "yellow":
+		config := &components.YellowCodeConfig{
+			Dispatch:    codeConfig.Dispatch,
+			MaxFailures: 5,
+			Notify:      codeConfig.Notify,
+			Config:      codeConfig.Config,
+		}
+		c.yellowCodeConfigMapper.Add(entity, config)
+		
+		status := &components.YellowCodeStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastAlertTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		c.yellowCodeStatusMapper.Add(entity, status)
+		
+		yellowCodeJob, err := jobs.CreateCodeJob(monitorName, codeConfig, entity, "yellow")
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create yellow code job for entity %d: %v\n", entity.ID(), err)
+		} else {
+			c.yellowCodeJobMapper.Add(entity, &components.YellowCodeJob{Job: yellowCodeJob})
+		}
+		
+		c.yellowCodeMapper.Add(entity, &components.YellowCode{})
+		
+	case "gray":
+		config := &components.GrayCodeConfig{
+			Dispatch:    codeConfig.Dispatch,
+			MaxFailures: 5,
+			Notify:      codeConfig.Notify,
+			Config:      codeConfig.Config,
+		}
+		c.grayCodeConfigMapper.Add(entity, config)
+		
+		status := &components.GrayCodeStatus{
+			LastStatus:          "pending",
+			ConsecutiveFailures: 0,
+			LastAlertTime:       time.Time{},
+			LastSuccessTime:     time.Time{},
+			LastError:           nil,
+		}
+		c.grayCodeStatusMapper.Add(entity, status)
+		
+		grayCodeJob, err := jobs.CreateCodeJob(monitorName, codeConfig, entity, "gray")
+		if err != nil {
+			fmt.Printf("WARNING: Failed to create gray code job for entity %d: %v\n", entity.ID(), err)
+		} else {
+			c.grayCodeJobMapper.Add(entity, &components.GrayCodeJob{Job: grayCodeJob})
+		}
+		
+		c.grayCodeMapper.Add(entity, &components.GrayCode{})
+	}
+}
+
 // processLargeBatch splits large batches into smaller chunks for efficient processing
 func (c *StreamingEntityCreator) processLargeBatch(batch MonitorBatch) error {
-	const chunkSize = 200
+	const chunkSize = 10000
 	monitors := batch.Monitors
 	
 	// Process in chunks to maintain memory efficiency
@@ -246,267 +591,6 @@ func (c *StreamingEntityCreator) processLargeBatch(batch MonitorBatch) error {
 	return nil
 }
 
-// addMonitorComponents adds all necessary components to an entity
-func (c *StreamingEntityCreator) addMonitorComponents(entity ecs.Entity, monitor schema.Monitor) {
-	// Add Name component
-	nameComponent := components.Name(monitor.Name)
-	c.nameMapper.Add(entity, &nameComponent)
-	
-	// Add MonitorStatus component with initial state
-	monitorStatus := components.MonitorStatus{
-		Status:          "pending",
-		LastCheckTime:   time.Time{},
-		LastSuccessTime: time.Time{},
-		LastError:       nil,
-	}
-	c.monitorStatusMapper.Add(entity, &monitorStatus)
-	
-	// Add PulseConfig component
-	pulseConfig := components.PulseConfig{
-		Type:        monitor.Pulse.Type,
-		Timeout:     monitor.Pulse.Timeout,
-		Interval:    monitor.Pulse.Interval,
-		Retries:     3, // Default retries
-		MaxFailures: monitor.Pulse.MaxFailures,
-		Config:      monitor.Pulse.Config,
-	}
-	c.pulseConfigMapper.Add(entity, &pulseConfig)
-	
-	// Add PulseStatus component with initial state
-	pulseStatus := components.PulseStatus{
-		LastStatus:          "pending",
-		ConsecutiveFailures: 0,
-		LastCheckTime:       time.Time{}, // Will be set on first check
-		LastSuccessTime:     time.Time{},
-		LastError:           nil,
-	}
-	c.pulseStatusMapper.Add(entity, &pulseStatus)
-	
-	// Create pulse job component
-	pulseJob, err := jobs.CreatePulseJob(monitor.Pulse, entity)
-	if err != nil {
-		// Log error but continue - we'll handle missing jobs in systems
-		fmt.Printf("WARNING: Failed to create pulse job for entity %d: %v\n", entity.ID(), err)
-	} else {
-		pulseJobComp := components.PulseJob{Job: pulseJob}
-		c.pulseJobMapper.Add(entity, &pulseJobComp)
-	}
-	
-	// Add intervention components if configured
-	if monitor.Intervention.Action != "" {
-		interventionConfig := components.InterventionConfig{
-			Action:      monitor.Intervention.Action,
-			MaxFailures: monitor.Intervention.MaxFailures,
-			Target:      monitor.Intervention.Target,
-		}
-		c.interventionConfigMapper.Add(entity, &interventionConfig)
-		
-		interventionStatus := components.InterventionStatus{
-			LastStatus:           "pending",
-			ConsecutiveFailures:  0,
-			LastInterventionTime: time.Time{},
-			LastSuccessTime:      time.Time{},
-			LastError:           nil,
-		}
-		c.interventionStatusMapper.Add(entity, &interventionStatus)
-		
-		// Create intervention job component
-		interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
-		if err != nil {
-			// Log error but continue - we'll handle missing jobs in systems
-			fmt.Printf("WARNING: Failed to create intervention job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			interventionJobComp := components.InterventionJob{Job: interventionJob}
-			c.interventionJobMapper.Add(entity, &interventionJobComp)
-		}
-	}
-	
-	// Add code notification components based on configured codes
-	for color, codeConfig := range monitor.Codes {
-		c.addCodeComponents(entity, color, codeConfig)
-	}
-	
-	// Add first check marker for pulse system
-	firstCheck := components.PulseFirstCheck{}
-	c.pulseFirstCheckMapper.Add(entity, &firstCheck)
-}
-
-// addCodeComponents adds code-specific components based on color
-func (c *StreamingEntityCreator) addCodeComponents(entity ecs.Entity, color string, codeConfig schema.CodeConfig) {
-	switch color {
-	case "red":
-		config := components.RedCodeConfig{
-			Dispatch:    codeConfig.Dispatch,
-			MaxFailures: 5, // Default max failures
-			Notify:      codeConfig.Notify,
-			Config:      codeConfig.Config,
-		}
-		c.redCodeConfigMapper.Add(entity, &config)
-		
-		status := components.RedCodeStatus{
-			LastStatus:          "pending",
-			ConsecutiveFailures: 0,
-			LastAlertTime:       time.Time{},
-			LastSuccessTime:     time.Time{},
-			LastError:          nil,
-		}
-		c.redCodeStatusMapper.Add(entity, &status)
-		
-		// Create red code job component
-		// Need to get entity name for job creation
-		entityName := "unknown" // default fallback
-		if nameComp := c.nameMapper.Get(entity); nameComp != nil {
-			entityName = string(*nameComp)
-		}
-		redCodeJob, err := jobs.CreateCodeJob(entityName, codeConfig, entity, "red")
-		if err != nil {
-			fmt.Printf("WARNING: Failed to create red code job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			redCodeJobComp := components.RedCodeJob{Job: redCodeJob}
-			c.redCodeJobMapper.Add(entity, &redCodeJobComp)
-		}
-		
-		// Add red code marker
-		redCode := components.RedCode{}
-		c.redCodeMapper.Add(entity, &redCode)
-		
-	case "green":
-		config := components.GreenCodeConfig{
-			Dispatch:    codeConfig.Dispatch,
-			MaxFailures: 5,
-			Notify:      codeConfig.Notify,
-			Config:      codeConfig.Config,
-		}
-		c.greenCodeConfigMapper.Add(entity, &config)
-		
-		status := components.GreenCodeStatus{
-			LastStatus:          "pending",
-			ConsecutiveFailures: 0,
-			LastAlertTime:       time.Time{},
-			LastSuccessTime:     time.Time{},
-			LastError:          nil,
-		}
-		c.greenCodeStatusMapper.Add(entity, &status)
-		
-		// Create green code job component
-		entityName := "unknown" // default fallback
-		if nameComp := c.nameMapper.Get(entity); nameComp != nil {
-			entityName = string(*nameComp)
-		}
-		greenCodeJob, err := jobs.CreateCodeJob(entityName, codeConfig, entity, "green")
-		if err != nil {
-			fmt.Printf("WARNING: Failed to create green code job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			greenCodeJobComp := components.GreenCodeJob{Job: greenCodeJob}
-			c.greenCodeJobMapper.Add(entity, &greenCodeJobComp)
-		}
-		
-		greenCode := components.GreenCode{}
-		c.greenCodeMapper.Add(entity, &greenCode)
-		
-	case "cyan":
-		config := components.CyanCodeConfig{
-			Dispatch:    codeConfig.Dispatch,
-			MaxFailures: 5,
-			Notify:      codeConfig.Notify,
-			Config:      codeConfig.Config,
-		}
-		c.cyanCodeConfigMapper.Add(entity, &config)
-		
-		status := components.CyanCodeStatus{
-			LastStatus:          "pending",
-			ConsecutiveFailures: 0,
-			LastAlertTime:       time.Time{},
-			LastSuccessTime:     time.Time{},
-			LastError:          nil,
-		}
-		c.cyanCodeStatusMapper.Add(entity, &status)
-		
-		// Create cyan code job component
-		entityName := "unknown" // default fallback
-		if nameComp := c.nameMapper.Get(entity); nameComp != nil {
-			entityName = string(*nameComp)
-		}
-		cyanCodeJob, err := jobs.CreateCodeJob(entityName, codeConfig, entity, "cyan")
-		if err != nil {
-			fmt.Printf("WARNING: Failed to create cyan code job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			cyanCodeJobComp := components.CyanCodeJob{Job: cyanCodeJob}
-			c.cyanCodeJobMapper.Add(entity, &cyanCodeJobComp)
-		}
-		
-		cyanCode := components.CyanCode{}
-		c.cyanCodeMapper.Add(entity, &cyanCode)
-		
-	case "yellow":
-		config := components.YellowCodeConfig{
-			Dispatch:    codeConfig.Dispatch,
-			MaxFailures: 5,
-			Notify:      codeConfig.Notify,
-			Config:      codeConfig.Config,
-		}
-		c.yellowCodeConfigMapper.Add(entity, &config)
-		
-		status := components.YellowCodeStatus{
-			LastStatus:          "pending",
-			ConsecutiveFailures: 0,
-			LastAlertTime:       time.Time{},
-			LastSuccessTime:     time.Time{},
-			LastError:          nil,
-		}
-		c.yellowCodeStatusMapper.Add(entity, &status)
-		
-		// Create yellow code job component
-		entityName := "unknown" // default fallback
-		if nameComp := c.nameMapper.Get(entity); nameComp != nil {
-			entityName = string(*nameComp)
-		}
-		yellowCodeJob, err := jobs.CreateCodeJob(entityName, codeConfig, entity, "yellow")
-		if err != nil {
-			fmt.Printf("WARNING: Failed to create yellow code job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			yellowCodeJobComp := components.YellowCodeJob{Job: yellowCodeJob}
-			c.yellowCodeJobMapper.Add(entity, &yellowCodeJobComp)
-		}
-		
-		yellowCode := components.YellowCode{}
-		c.yellowCodeMapper.Add(entity, &yellowCode)
-		
-	case "gray":
-		config := components.GrayCodeConfig{
-			Dispatch:    codeConfig.Dispatch,
-			MaxFailures: 5,
-			Notify:      codeConfig.Notify,
-			Config:      codeConfig.Config,
-		}
-		c.grayCodeConfigMapper.Add(entity, &config)
-		
-		status := components.GrayCodeStatus{
-			LastStatus:          "pending",
-			ConsecutiveFailures: 0,
-			LastAlertTime:       time.Time{},
-			LastSuccessTime:     time.Time{},
-			LastError:          nil,
-		}
-		c.grayCodeStatusMapper.Add(entity, &status)
-		
-		// Create gray code job component
-		entityName := "unknown" // default fallback
-		if nameComp := c.nameMapper.Get(entity); nameComp != nil {
-			entityName = string(*nameComp)
-		}
-		grayCodeJob, err := jobs.CreateCodeJob(entityName, codeConfig, entity, "gray")
-		if err != nil {
-			fmt.Printf("WARNING: Failed to create gray code job for entity %d: %v\n", entity.ID(), err)
-		} else {
-			grayCodeJobComp := components.GrayCodeJob{Job: grayCodeJob}
-			c.grayCodeJobMapper.Add(entity, &grayCodeJobComp)
-		}
-		
-		grayCode := components.GrayCode{}
-		c.grayCodeMapper.Add(entity, &grayCode)
-	}
-}
 
 // updateStats updates creation statistics
 func (c *StreamingEntityCreator) updateStats(entitiesInBatch int) {

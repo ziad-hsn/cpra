@@ -86,13 +86,19 @@ func (bps *BatchPulseSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
 	return out
 }
 
-// applyWork applies work exactly like sys_pulse.go but in batches
+// applyWork applies work using Ark's batch operations for optimal performance
 func (bps *BatchPulseSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// Filter entities to only include those that need transitions and don't already have PulsePending
+	validEntities := make([]ecs.Entity, 0, len(entities))
 	for i, ent := range entities {
 		_ = jobs[i] // Job already submitted to queue
 
 		if w.Alive(ent) {
-			// Prevent component duplication exactly like original
+			// Skip entities that already have PulsePending
 			if bps.Mapper.PulsePending.HasAll(ent) {
 				namePtr := bps.Mapper.Name.Get(ent)
 				if namePtr != nil {
@@ -101,21 +107,66 @@ func (bps *BatchPulseSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs
 				continue
 			}
 
-			// Job will be submitted with batch - just continue with component transition
-
-			// Safe component transition exactly like original
+			// Only include entities that have PulseNeeded
 			if bps.Mapper.PulseNeeded.HasAll(ent) {
-				bps.Mapper.PulseNeeded.Remove(ent)
-				bps.Mapper.PulsePending.Add(ent, &components.PulsePending{})
-
-				namePtr := bps.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bps.logger.Debug("Dispatched %s job for entity: %d", *namePtr, ent.ID())
-				}
-				bps.logger.LogComponentState(ent.ID(), "PulseNeeded->PulsePending", "transitioned")
+				validEntities = append(validEntities, ent)
 			}
 		}
 	}
+
+	if len(validEntities) == 0 {
+		return nil
+	}
+
+	// Use Ark's batch operations for component transitions
+	// Create a filter for entities that have PulseNeeded but not PulsePending
+	pulseNeededFilter := ecs.NewFilter1[components.PulseNeeded](w).
+		Without(ecs.C[components.PulsePending]())
+	
+	// Get batch of matching entities
+	batch := pulseNeededFilter.Batch()
+	
+	// Use batch operations: Remove PulseNeeded and Add PulsePending in batches
+	bps.Mapper.PulseNeeded.RemoveBatch(batch, nil)
+	bps.Mapper.PulsePending.AddBatch(batch, &components.PulsePending{})
+
+	// Log component transitions with timing information
+	for _, ent := range validEntities {
+		namePtr := bps.Mapper.Name.Get(ent)
+		if namePtr != nil {
+			// Get pulse configuration to show interval and calculate delay
+			pulseConfig := bps.Mapper.PulseConfig.Get(ent)
+			pulseStatus := bps.Mapper.PulseStatus.Get(ent)
+			
+			if pulseConfig != nil && pulseStatus != nil {
+				interval := pulseConfig.Interval
+				
+				// Check if this is the first check (LastCheckTime is zero or entity has PulseFirstCheck)
+				isFirstCheck := pulseStatus.LastCheckTime.IsZero() || bps.Mapper.PulseFirstCheck.HasAll(ent)
+				
+				if isFirstCheck {
+					bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, FIRST CHECK)", 
+						*namePtr, interval)
+				} else {
+					timeSinceLastCheck := time.Since(pulseStatus.LastCheckTime)
+					delay := timeSinceLastCheck - interval
+					
+					if delay > 0 {
+						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, last check: %v ago, delay: %v)", 
+							*namePtr, interval, timeSinceLastCheck.Truncate(time.Second), delay.Truncate(time.Second))
+					} else {
+						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, last check: %v ago)", 
+							*namePtr, interval, timeSinceLastCheck.Truncate(time.Second))
+					}
+				}
+			} else {
+				bps.logger.Info("PULSE DISPATCHED: %s", *namePtr)
+			}
+		}
+		bps.logger.LogComponentState(ent.ID(), "PulseNeeded->PulsePending", "transitioned")
+	}
+
+	bps.logger.Debug("Batch pulse system: Applied component transitions to %d entities using batch operations", len(validEntities))
 	return nil
 }
 

@@ -113,13 +113,21 @@ func (bcs *BatchCodeSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchabl
 	return out
 }
 
-// applyWork applies work exactly like sys_code.go but in batches
+// applyWork applies work using Ark's batch operations for optimal performance
 func (bcs *BatchCodeSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []dispatchableCodeJob) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// Filter entities to only include those that need transitions and don't already have CodePending
+	validEntities := make([]ecs.Entity, 0, len(entities))
+	validJobs := make([]dispatchableCodeJob, 0, len(jobs))
+	
 	for i, ent := range entities {
 		item := jobs[i]
 
 		if w.Alive(ent) {
-			// Prevent component duplication exactly like original
+			// Skip entities that already have CodePending
 			if bcs.Mapper.CodePending.HasAll(ent) {
 				namePtr := bcs.Mapper.Name.Get(ent)
 				if namePtr != nil {
@@ -128,21 +136,53 @@ func (bcs *BatchCodeSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs 
 				continue
 			}
 
-			// Job will be submitted with batch
-
-			// Safe component transition exactly like original
+			// Only include entities that have CodeNeeded
 			if bcs.Mapper.CodeNeeded.HasAll(ent) {
-				bcs.Mapper.CodeNeeded.Remove(ent)
-				bcs.Mapper.CodePending.Add(ent, &components.CodePending{Color: item.color})
-
-				namePtr := bcs.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bcs.logger.Debug("Dispatched %s code job for entity: %d", item.color, ent.ID())
-				}
-				bcs.logger.LogComponentState(ent.ID(), "CodeNeeded->CodePending", "transitioned")
+				validEntities = append(validEntities, ent)
+				validJobs = append(validJobs, item)
 			}
 		}
 	}
+
+	if len(validEntities) == 0 {
+		return nil
+	}
+
+	// Use Ark's batch operations for component transitions
+	// Create a filter for entities that have CodeNeeded but not CodePending
+	codeNeededFilter := ecs.NewFilter1[components.CodeNeeded](w).
+		Without(ecs.C[components.CodePending]())
+	
+	// Get batch of matching entities
+	batch := codeNeededFilter.Batch()
+	
+	// Remove CodeNeeded in batch
+	bcs.Mapper.CodeNeeded.RemoveBatch(batch, nil)
+	
+	// Add CodePending components using AddBatchFn for custom per-entity initialization
+	bcs.Mapper.CodePending.AddBatchFn(batch, func(entity ecs.Entity, comp *components.CodePending) {
+		// Find the corresponding job for this entity to get the color
+		for i, ent := range validEntities {
+			if ent.ID() == entity.ID() {
+				comp.Color = validJobs[i].color
+				return
+			}
+		}
+		// Fallback - should not happen
+		comp.Color = "unknown"
+	})
+
+	// Log component transitions
+	for i, ent := range validEntities {
+		item := validJobs[i]
+		namePtr := bcs.Mapper.Name.Get(ent)
+		if namePtr != nil {
+			bcs.logger.Info("CODE DISPATCHED: %s (%s)", *namePtr, item.color)
+		}
+		bcs.logger.LogComponentState(ent.ID(), "CodeNeeded->CodePending", "transitioned")
+	}
+
+	bcs.logger.Debug("Batch code system: Applied component transitions to %d entities using batch operations", len(validEntities))
 	return nil
 }
 

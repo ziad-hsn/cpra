@@ -58,18 +58,18 @@ type LoadingStats struct {
 // DefaultStreamingConfig returns optimized default configuration for large files
 func DefaultStreamingConfig() StreamingConfig {
 	return StreamingConfig{
-		ParseBatchSize:   2000, // Larger batches for better throughput
+		ParseBatchSize:   10000, // Parse 10K monitors per batch to match entity creation
 		ParseBufferSize:  4 * 1024 * 1024, // 4MB buffer for large files
 		MaxParseMemory:   1 * 1024 * 1024 * 1024, // 1GB for parsing
 		
-		EntityBatchSize:  2000, // Match parse batch size
+		EntityBatchSize:  10000, // Create 10K entities per batch for maximum performance
 		PreAllocateCount: 500000, // Pre-allocate for 500K entities
 		
 		MaxWorkers:       runtime.NumCPU() * 2, // More workers for concurrent operations
 		ProgressInterval: 1 * time.Second, // More frequent progress updates
 		
 		GCInterval:       5 * time.Second, // More frequent GC for large loads
-		MemoryLimit:      4 * 1024 * 1024 * 1024, // 4GB memory limit
+		MemoryLimit:      2 * 1024 * 1024 * 1024, // 2GB memory limit
 	}
 }
 

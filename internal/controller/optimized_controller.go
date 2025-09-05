@@ -110,7 +110,7 @@ func DefaultConfig() Config {
 		// Batch processing optimization - process more entities per system update
 		BatchSize: 5000, // Process 5K entities per batch for speed
 
-		UpdateInterval: 10 * time.Microsecond,
+		UpdateInterval: 100 * time.Millisecond,
 		StatsInterval:  10 * time.Second,
 	}
 }
@@ -158,9 +158,9 @@ func NewController(config Config) *Controller {
 	workerPool := queue.NewDynamicWorkerPool(wpCfg, WorkerPoolLogger)
 
 	// Create result channels
-	pulseResults := make(chan jobs.Result, 10000)
-	interventionResults := make(chan jobs.Result, 5000)
-	codeResults := make(chan jobs.Result, 5000)
+	pulseResults := make(chan jobs.Result, suggestedCap)
+	interventionResults := make(chan jobs.Result, suggestedCap)
+	codeResults := make(chan jobs.Result, suggestedCap)
 
 	batchProcessor := queue.NewBatchProcessor(boundedQueue, connPool, queue.ProcessorConfig{
 		BatchSize:     suggestedCap,

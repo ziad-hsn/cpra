@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,11 +20,12 @@ func main() {
 		configFile = flag.String("config", "", "Configuration file path")
 		yamlFile   = flag.String("yaml", "internal/loader/replicated_test.yaml", "YAML file with monitors")
 		profile    = flag.Bool("profile", false, "Enable CPU profiling")
+		debug      = flag.Bool("debug", false, "Enable debug logging")
 	)
 	flag.Parse()
 
 	// Initialize loggers first
-	controller.InitializeLoggers(false)
+	controller.InitializeLoggers(*debug)
 
 	controller.SystemLogger.Info("Starting CPRA Optimized Controller for 1M Monitors")
 	controller.SystemLogger.Info("Input file: %s", *yamlFile)
@@ -56,10 +58,19 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Track if shutdown was initiated
+	var shutdownInitiated bool
+	var shutdownMutex sync.Mutex
+
 	go func() {
-		<-sigChan
-		fmt.Println("\nShutdown signal received...")
-		cancel()
+		sig := <-sigChan
+		shutdownMutex.Lock()
+		if !shutdownInitiated {
+			shutdownInitiated = true
+			fmt.Printf("\nShutdown signal received (%v)...\n", sig)
+			cancel()
+		}
+		shutdownMutex.Unlock()
 	}()
 
 	// Load monitors if YAML file exists

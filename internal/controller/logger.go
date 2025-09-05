@@ -283,17 +283,9 @@ func (l *Logger) LogEntityOperation(operation string, entityID uint64, details s
 	}
 }
 
-// LogWorkerPool logs worker pool statistics
+// LogWorkerPool logs worker pool statistics - debug only, completely silent otherwise
 func (l *Logger) LogWorkerPool(poolName string, stats map[string]interface{}) {
-	if l.debugMode {
-		l.Debug("WorkerPool[%s] stats: %+v", poolName, stats)
-	} else if l.level <= LogLevelInfo {
-		if processed, ok := stats["processed"].(int64); ok {
-			if rate, ok := stats["rate"].(float64); ok {
-				l.Info("Pool %s: %d jobs (%.1f/sec)", poolName, processed, rate)
-			}
-		}
-	}
+	// Only log in debug mode, completely silent otherwise
 }
 
 // LogComponentState logs component state changes

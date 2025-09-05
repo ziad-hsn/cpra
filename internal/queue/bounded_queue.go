@@ -109,6 +109,16 @@ func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 		return nil, ErrQueueClosed
 	}
 
+	// Create timeout context if batch timeout is configured
+	var timeoutCtx context.Context
+	var cancel context.CancelFunc
+	if q.batchTimeout > 0 {
+		timeoutCtx, cancel = context.WithTimeout(ctx, q.batchTimeout)
+		defer cancel()
+	} else {
+		timeoutCtx = ctx
+	}
+
 	select {
 	case batch := <-q.batches:
 		// Calculate queue time for latency tracking
@@ -122,7 +132,11 @@ func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 		
 		atomic.AddInt64(&q.dequeued, int64(len(batch)))
 		return batch, nil
-	case <-ctx.Done():
+	case <-timeoutCtx.Done():
+		if timeoutCtx != ctx {
+			// Batch timeout occurred, return timeout error
+			return nil, context.DeadlineExceeded
+		}
 		return nil, ctx.Err()
 	}
 }

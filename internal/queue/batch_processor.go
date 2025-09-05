@@ -170,7 +170,7 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, batch []jobs.Job, wo
 			
 			if result.Err != nil {
 				atomic.AddInt64(&failureCount, 1)
-				bp.logger.Warn("Worker %d: Job %d failed after %v: %v", workerID, jobIndex, jobLatency, result.Err)
+				bp.logger.Debug("Worker %d: Job %d failed after %v: %v", workerID, jobIndex, jobLatency, result.Err)
 			} else {
 				atomic.AddInt64(&successCount, 1)
 			}

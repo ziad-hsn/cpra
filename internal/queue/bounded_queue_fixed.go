@@ -15,8 +15,9 @@ var (
 	ErrQueueClosed = errors.New("queue is closed")
 )
 
-// BoundedQueue implements a high-performance bounded queue with batching
-type BoundedQueue struct {
+// FixedBoundedQueue implements a thread-safe bounded queue with batching
+// Fixes race conditions in the original implementation
+type FixedBoundedQueue struct {
 	// Queue storage
 	batches  chan []jobs.Job
 	maxSize  int32
@@ -25,17 +26,17 @@ type BoundedQueue struct {
 	// State management
 	closed int32
 
-	// Statistics
+	// Statistics (all atomic for thread safety)
 	enqueued int64
 	dequeued int64
 	dropped  int64
 	
-	// Latency tracking
+	// Latency tracking (protected by mutex)
 	maxQueueTime    int64 // nanoseconds
 	totalQueueTime  int64 // nanoseconds for average calculation
 	maxJobLatency   int64 // nanoseconds
 	totalJobLatency int64 // nanoseconds for average calculation
-	mu              sync.RWMutex
+	statsMu         sync.RWMutex // Separate mutex for stats to reduce contention
 
 	// Configuration
 	batchTimeout time.Duration
@@ -61,9 +62,9 @@ type Stats struct {
 	AvgJobLatency   time.Duration
 }
 
-// NewBoundedQueue creates a new bounded queue
-func NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue {
-	return &BoundedQueue{
+// NewFixedBoundedQueue creates a new thread-safe bounded queue
+func NewFixedBoundedQueue(config BoundedQueueConfig) *FixedBoundedQueue {
+	return &FixedBoundedQueue{
 		batches:      make(chan []jobs.Job, config.MaxSize),
 		maxSize:      int32(config.MaxSize),
 		maxBatch:     int32(config.MaxBatch),
@@ -73,7 +74,7 @@ func NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue {
 
 // EnqueueBatch adds a batch of jobs to the queue
 // Fixed: Proper handling of job copying to avoid shared data races
-func (q *BoundedQueue) EnqueueBatch(batch []jobs.Job) error {
+func (q *FixedBoundedQueue) EnqueueBatch(batch []jobs.Job) error {
 	if atomic.LoadInt32(&q.closed) == 1 {
 		return ErrQueueClosed
 	}
@@ -109,7 +110,7 @@ func (q *BoundedQueue) EnqueueBatch(batch []jobs.Job) error {
 }
 
 // DequeueBatch removes a batch of jobs from the queue
-func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
+func (q *FixedBoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 	if atomic.LoadInt32(&q.closed) == 1 {
 		return nil, ErrQueueClosed
 	}
@@ -147,16 +148,16 @@ func (q *BoundedQueue) DequeueBatch(ctx context.Context) ([]jobs.Job, error) {
 }
 
 // Close closes the queue
-func (q *BoundedQueue) Close() {
+func (q *FixedBoundedQueue) Close() {
 	if atomic.CompareAndSwapInt32(&q.closed, 0, 1) {
 		close(q.batches)
 	}
 }
 
-// updateQueueTime updates queue time statistics
-func (q *BoundedQueue) updateQueueTime(queueTime time.Duration) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+// updateQueueTime updates queue time statistics thread-safely
+func (q *FixedBoundedQueue) updateQueueTime(queueTime time.Duration) {
+	q.statsMu.Lock()
+	defer q.statsMu.Unlock()
 	
 	queueTimeNs := queueTime.Nanoseconds()
 	
@@ -169,10 +170,10 @@ func (q *BoundedQueue) updateQueueTime(queueTime time.Duration) {
 	q.totalQueueTime += queueTimeNs
 }
 
-// UpdateJobLatency updates job execution latency statistics
-func (q *BoundedQueue) UpdateJobLatency(jobLatency time.Duration) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
+// UpdateJobLatency updates job execution latency statistics thread-safely
+func (q *FixedBoundedQueue) UpdateJobLatency(jobLatency time.Duration) {
+	q.statsMu.Lock()
+	defer q.statsMu.Unlock()
 	
 	latencyNs := jobLatency.Nanoseconds()
 	
@@ -186,13 +187,13 @@ func (q *BoundedQueue) UpdateJobLatency(jobLatency time.Duration) {
 }
 
 // Stats returns current queue statistics
-func (q *BoundedQueue) Stats() Stats {
-	q.mu.RLock()
+func (q *FixedBoundedQueue) Stats() Stats {
+	q.statsMu.RLock()
 	maxQueueTime := q.maxQueueTime
 	totalQueueTime := q.totalQueueTime
 	maxJobLatency := q.maxJobLatency
 	totalJobLatency := q.totalJobLatency
-	q.mu.RUnlock()
+	q.statsMu.RUnlock()
 	
 	dequeued := atomic.LoadInt64(&q.dequeued)
 	
@@ -216,10 +217,9 @@ func (q *BoundedQueue) Stats() Stats {
 	}
 }
 
-// BatchCollector collects individual jobs into batches
-// Fixed: Added proper synchronization to prevent race conditions
-type BatchCollector struct {
-	queue        *BoundedQueue
+// FixedBatchCollector collects individual jobs into batches with proper synchronization
+type FixedBatchCollector struct {
+	queue        *FixedBoundedQueue
 	currentBatch []jobs.Job
 	batchSize    int
 	timeout      time.Duration
@@ -233,27 +233,65 @@ type BatchCollector struct {
 	wg         sync.WaitGroup
 }
 
+// NewFixedBatchCollector creates a new thread-safe batch collector
+func NewFixedBatchCollector(queue *FixedBoundedQueue, batchSize int, timeout time.Duration) *FixedBatchCollector {
+	bc := &FixedBatchCollector{
+		queue:      queue,
+		batchSize:  batchSize,
+		timeout:    timeout,
+		lastFlush:  time.Now(),
+		shutdownCh: make(chan struct{}),
+	}
+	
+	// Start the flush timer goroutine
+	bc.wg.Add(1)
+	go bc.flushTimer()
+	
+	return bc
+}
+
+// Add adds a job to the current batch
+func (bc *FixedBatchCollector) Add(job jobs.Job) error {
+	if atomic.LoadInt32(&bc.closed) == 1 {
+		return ErrQueueClosed
+	}
+
+	bc.mu.Lock()
+	defer bc.mu.Unlock()
+
+	bc.currentBatch = append(bc.currentBatch, job)
+
+	// Flush if batch is full
+	if len(bc.currentBatch) >= bc.batchSize {
+		return bc.flushLocked()
+	}
+
+	return nil
+}
+
 // flushTimer periodically flushes incomplete batches
-func (bc *BatchCollector) flushTimer() {
+func (bc *FixedBatchCollector) flushTimer() {
+	defer bc.wg.Done()
+	
 	ticker := time.NewTicker(bc.timeout)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if atomic.LoadInt32(&bc.closed) == 1 {
+	for {
+		select {
+		case <-bc.shutdownCh:
 			return
-		}
-
-		if time.Since(bc.lastFlush) >= bc.timeout && len(bc.currentBatch) > 0 {
-			err := bc.flushLocked()
-			if err != nil {
-				return
+		case <-ticker.C:
+			bc.mu.Lock()
+			if time.Since(bc.lastFlush) >= bc.timeout && len(bc.currentBatch) > 0 {
+				bc.flushLocked() // Ignore error during periodic flush
 			}
+			bc.mu.Unlock()
 		}
 	}
 }
 
 // flushLocked flushes the current batch (must hold mutex)
-func (bc *BatchCollector) flushLocked() error {
+func (bc *FixedBatchCollector) flushLocked() error {
 	if len(bc.currentBatch) == 0 {
 		return nil
 	}
@@ -266,20 +304,45 @@ func (bc *BatchCollector) flushLocked() error {
 	bc.currentBatch = bc.currentBatch[:0]
 	bc.lastFlush = time.Now()
 
-	// Enqueue the batch
-	return bc.queue.EnqueueBatch(batch)
+	// Enqueue the batch (release mutex during I/O)
+	bc.mu.Unlock()
+	err := bc.queue.EnqueueBatch(batch)
+	bc.mu.Lock()
+	
+	return err
 }
 
 // Flush manually flushes the current batch
-func (bc *BatchCollector) Flush() error {
+func (bc *FixedBatchCollector) Flush() error {
+	bc.mu.Lock()
+	defer bc.mu.Unlock()
 	return bc.flushLocked()
 }
 
 // Close closes the batch collector
-func (bc *BatchCollector) Close() error {
+func (bc *FixedBatchCollector) Close() error {
 	if atomic.CompareAndSwapInt32(&bc.closed, 0, 1) {
+		// Signal shutdown to flush timer
+		close(bc.shutdownCh)
+		
+		// Wait for flush timer to stop
+		bc.wg.Wait()
+		
 		// Flush any remaining items
 		return bc.Flush()
 	}
 	return nil
 }
+
+// Interface compatibility - ensure we can replace the original
+type QueueInterface interface {
+	EnqueueBatch(batch []jobs.Job) error
+	DequeueBatch(ctx context.Context) ([]jobs.Job, error)
+	Close()
+	Stats() Stats
+}
+
+// Ensure both implementations satisfy the interface
+var _ QueueInterface = (*BoundedQueue)(nil)
+var _ QueueInterface = (*FixedBoundedQueue)(nil)
+

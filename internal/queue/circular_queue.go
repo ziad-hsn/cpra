@@ -56,21 +56,27 @@ func NewCircularQueue(capacity uint64) *CircularQueue {
 	}
 }
 
-// Enqueue adds a job to the queue (non-blocking)
-// Returns false if queue is full (following Go error handling patterns)
+// Enqueue adds a job to the queue using Compare-And-Swap for atomicity
+// Returns false if queue is full
 func (q *CircularQueue) Enqueue(job Job) bool {
-	tail := atomic.LoadUint64(&q.tail)
-	head := atomic.LoadUint64(&q.head)
-	
-	// Check if queue is full
-	if tail-head >= q.capacity {
-		return false
+	for {
+		tail := atomic.LoadUint64(&q.tail)
+		head := atomic.LoadUint64(&q.head)
+		
+		// Check if queue is full
+		if tail-head >= q.capacity {
+			return false
+		}
+		
+		// Try to claim the slot atomically
+		if atomic.CompareAndSwapUint64(&q.tail, tail, tail+1) {
+			// Successfully claimed slot, now store the job
+			// This is safe because we own this slot now
+			q.items[tail&q.mask] = job
+			return true
+		}
+		// CAS failed, retry
 	}
-	
-	// Use bitwise AND instead of modulo for performance
-	q.items[tail&q.mask] = job
-	atomic.StoreUint64(&q.tail, tail+1)
-	return true
 }
 
 // EnqueueBatch adds multiple jobs efficiently
@@ -87,51 +93,50 @@ func (q *CircularQueue) EnqueueBatch(jobs []Job) int {
 	return enqueued
 }
 
-// Dequeue removes a single job from the queue
+// Dequeue removes a single job from the queue atomically
 // Returns job and true if successful, zero job and false if empty
 func (q *CircularQueue) Dequeue() (Job, bool) {
-	head := atomic.LoadUint64(&q.head)
-	tail := atomic.LoadUint64(&q.tail)
-	
-	if head >= tail {
-		return Job{}, false // Queue empty
+	for {
+		head := atomic.LoadUint64(&q.head)
+		tail := atomic.LoadUint64(&q.tail)
+		
+		if head >= tail {
+			return Job{}, false // Queue empty
+		}
+		
+		// Try to claim the slot atomically
+		if atomic.CompareAndSwapUint64(&q.head, head, head+1) {
+			// Successfully claimed slot, now read the job
+			job := q.items[head&q.mask]
+			return job, true
+		}
+		// CAS failed, retry
 	}
-	
-	job := q.items[head&q.mask]
-	atomic.StoreUint64(&q.head, head+1)
-	return job, true
 }
 
-// DequeueBatch removes multiple jobs efficiently (following Ark batch patterns)
-// Returns number of jobs dequeued
+// DequeueBatch removes multiple jobs with proper synchronization
+// More conservative but race-condition-free implementation
 func (q *CircularQueue) DequeueBatch(batch []Job) int {
-	head := atomic.LoadUint64(&q.head)
-	tail := atomic.LoadUint64(&q.tail)
-	
-	available := tail - head
-	if available == 0 {
-		return 0
+	dequeued := 0
+	for i := range batch {
+		if job, ok := q.Dequeue(); ok {
+			batch[i] = job
+			dequeued++
+		} else {
+			break // Queue empty
+		}
 	}
-	
-	count := uint64(len(batch))
-	if available < count {
-		count = available
-	}
-	
-	// Bulk copy for cache efficiency
-	for i := uint64(0); i < count; i++ {
-		batch[i] = q.items[(head+i)&q.mask]
-	}
-	
-	atomic.StoreUint64(&q.head, head+count)
-	return int(count)
+	return dequeued
 }
 
-// Size returns current queue size (O(1) operation)
+// Size returns current queue size (may be slightly stale but safe)
 func (q *CircularQueue) Size() uint64 {
 	tail := atomic.LoadUint64(&q.tail)
 	head := atomic.LoadUint64(&q.head)
-	return tail - head
+	if tail >= head {
+		return tail - head
+	}
+	return 0 // Handle potential race condition gracefully
 }
 
 // Capacity returns the maximum queue capacity

@@ -304,19 +304,19 @@ func (oc *Controller) mainLoop(ctx context.Context) {
 			start = time.Now()
 			oc.pulseSystem.Update(oc.world)
 			stats := oc.pulseSystem.GetStats()
-			oc.metricsAggregator.RecordSystemUpdate("BatchPulseSystem", time.Since(start), int(stats.EntitiesProcessed), int(stats.BatchesCreated))
+			oc.metricsAggregator.RecordSystemUpdate("BatchPulseSystem", time.Since(start), int64(stats.EntitiesProcessed), int64(stats.BatchesCreated))
 
 			// 3. Intervention System - handles failed monitors
 			start = time.Now()
 			oc.interventionSystem.Update(oc.world)
 			interventionStats := oc.interventionSystem.GetStats()
-			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), int(interventionStats.EntitiesProcessed), int(interventionStats.BatchesCreated))
+			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), int64(interventionStats.EntitiesProcessed), int64(interventionStats.BatchesCreated))
 
 			// 4. Code System - handles alert notifications
 			start = time.Now()
 			oc.codeSystem.Update(oc.world)
 			codeStats := oc.codeSystem.GetStats()
-			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), int(codeStats.EntitiesProcessed), int(codeStats.BatchesCreated))
+			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), int64(codeStats.EntitiesProcessed), int64(codeStats.BatchesCreated))
 
 			// 5. Result processing systems using proper Ark world interface
 			start = time.Now()

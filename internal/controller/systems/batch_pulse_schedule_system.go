@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
@@ -18,7 +17,7 @@ type BatchPulseScheduleSystem struct {
 	logger Logger
 
 	// Cached filter for optimal Ark performance
-	scheduleFilter *generic.Filter2[components.PulseConfig, components.PulseStatus]
+	scheduleFilter *ecs.Filter2[components.PulseConfig, components.PulseStatus]
 
 	// Performance tracking
 	entitiesScheduled int64
@@ -40,14 +39,13 @@ func NewBatchPulseScheduleSystem(world *ecs.World, mapper *entities.EntityManage
 
 // Initialize creates and registers cached filters for optimal performance
 func (s *BatchPulseScheduleSystem) Initialize(w *ecs.World) {
-	// Create cached filter and register it (Ark best practice)
-	s.scheduleFilter = generic.NewFilter2[components.PulseConfig, components.PulseStatus](w).
-		Without(generic.T[components.DisabledMonitor]()).
-		Without(generic.T[components.PulseNeeded]()).
-		Without(generic.T[components.PulsePending]()).
-		Without(generic.T[components.InterventionNeeded]()).
-		Without(generic.T[components.InterventionPending]()).
-		Register()
+	// Create cached filter using correct Ark patterns
+	s.scheduleFilter = ecs.NewFilter2[components.PulseConfig, components.PulseStatus](w).
+		Without(ecs.C[components.DisabledMonitor]()).
+		Without(ecs.C[components.PulseNeeded]()).
+		Without(ecs.C[components.PulsePending]()).
+		Without(ecs.C[components.InterventionNeeded]()).
+		Without(ecs.C[components.InterventionPending]())
 }
 
 // Update schedules pulse checks using Ark's efficient batch operations
@@ -76,8 +74,15 @@ func (s *BatchPulseScheduleSystem) collectWork(w *ecs.World) []ecs.Entity {
 	now := time.Now()
 	var entitiesToSchedule []ecs.Entity
 	
-	// Use cached filter for optimal performance
-	query := s.scheduleFilter.Query()
+	// Create fresh filter each time to avoid query lifecycle issues
+	filter := ecs.NewFilter2[components.PulseConfig, components.PulseStatus](w).
+		Without(ecs.C[components.DisabledMonitor]()).
+		Without(ecs.C[components.PulseNeeded]()).
+		Without(ecs.C[components.PulsePending]()).
+		Without(ecs.C[components.InterventionNeeded]()).
+		Without(ecs.C[components.InterventionPending]())
+	
+	query := filter.Query()
 	defer query.Close()
 
 	for query.Next() {
@@ -124,22 +129,14 @@ func (s *BatchPulseScheduleSystem) applyScheduling(entities []ecs.Entity) {
 		return
 	}
 	
-	// Use Ark's efficient batch operation to add PulseNeeded components
-	pulseNeededComponent := &components.PulseNeeded{
-		ScheduledTime: time.Now(),
-	}
-	s.Mapper.PulseNeeded.AddBatch(validEntities, pulseNeededComponent)
-	
-	// Remove PulseFirstCheck if present (using batch operation)
-	firstCheckEntities := make([]ecs.Entity, 0, len(validEntities))
+	// Use individual operations for now - batch operations need specific entity sets
 	for _, entity := range validEntities {
+		s.Mapper.PulseNeeded.Add(entity, &components.PulseNeeded{})
+		
+		// Remove PulseFirstCheck if present
 		if s.Mapper.PulseFirstCheck.HasAll(entity) {
-			firstCheckEntities = append(firstCheckEntities, entity)
+			s.Mapper.PulseFirstCheck.Remove(entity)
 		}
-	}
-	
-	if len(firstCheckEntities) > 0 {
-		s.Mapper.PulseFirstCheck.RemoveBatch(firstCheckEntities, nil)
 	}
 	
 	// Log scheduling for monitoring

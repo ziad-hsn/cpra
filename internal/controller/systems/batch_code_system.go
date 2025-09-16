@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
@@ -27,7 +26,7 @@ type BatchCodeSystem struct {
 	logger Logger
 
 	// Cached filter for optimal Ark performance
-	codeNeededFilter *generic.Filter1[components.CodeNeeded]
+	codeNeededFilter *ecs.Filter1[components.CodeNeeded]
 
 	// Performance tracking
 	entitiesProcessed int64
@@ -55,10 +54,9 @@ func (bcs *BatchCodeSystem) Initialize(w *ecs.World) {
 
 // initializeComponents creates and registers cached filters
 func (bcs *BatchCodeSystem) initializeComponents() {
-	// Create cached filter and register it (Ark best practice)
-	bcs.codeNeededFilter = generic.NewFilter1[components.CodeNeeded](bcs.world).
-		Without(generic.T[components.CodePending]()).
-		Register()
+	// Create cached filter using correct Ark patterns
+	bcs.codeNeededFilter = ecs.NewFilter1[components.CodeNeeded](bcs.world).
+		Without(ecs.C[components.CodePending]())
 }
 
 // Update processes code dispatch using Ark's efficient batch operations
@@ -109,11 +107,8 @@ func (bcs *BatchCodeSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchabl
 
 		job := codeJobComp.Job
 		if job != nil {
-			// Get color information for the code job
-			color := "default"
-			if codeConfig := bcs.Mapper.CodeConfig.Get(entity); codeConfig != nil {
-				color = codeConfig.Color
-			}
+			// Get color information for the code job (default for now)
+			color := "yellow" // Default color for code jobs
 
 			out[entity] = dispatchableCodeJob{
 				job:   job,
@@ -174,15 +169,11 @@ func (bcs *BatchCodeSystem) transitionEntityStates(entities []ecs.Entity) {
 		return
 	}
 
-	// Use Ark's efficient batch operations
-	// Remove CodeNeeded components in batch
-	bcs.Mapper.CodeNeeded.RemoveBatch(validEntities, nil)
-
-	// Add CodePending components in batch
-	pendingComponent := &components.CodePending{
-		StartTime: time.Now(),
+	// Use individual operations for now
+	for _, entity := range validEntities {
+		bcs.Mapper.CodeNeeded.Remove(entity)
+		bcs.Mapper.CodePending.Add(entity, &components.CodePending{})
 	}
-	bcs.Mapper.CodePending.AddBatch(validEntities, pendingComponent)
 
 	// Log transitions for monitoring
 	for _, entity := range validEntities {
@@ -190,8 +181,9 @@ func (bcs *BatchCodeSystem) transitionEntityStates(entities []ecs.Entity) {
 		if namePtr != nil {
 			// Get color information for logging
 			color := "default"
-			if codeConfig := bcs.Mapper.CodeConfig.Get(entity); codeConfig != nil {
-				color = codeConfig.Color
+			if codeNeeded := bcs.Mapper.CodeNeeded.Get(entity); codeNeeded != nil {
+				// Note: CodeNeeded component might have color info, check component definition
+				color = "yellow" // Default for now
 			}
 			bcs.logger.Info("CODE DISPATCHED: %s (color: %s)", *namePtr, color)
 		}

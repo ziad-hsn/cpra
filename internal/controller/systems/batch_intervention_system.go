@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
@@ -21,7 +20,7 @@ type BatchInterventionSystem struct {
 	logger Logger
 
 	// Cached filter for optimal Ark performance
-	interventionNeededFilter *generic.Filter1[components.InterventionNeeded]
+	interventionNeededFilter *ecs.Filter1[components.InterventionNeeded]
 
 	// Performance tracking
 	entitiesProcessed int64
@@ -49,10 +48,9 @@ func (bis *BatchInterventionSystem) Initialize(w *ecs.World) {
 
 // initializeComponents creates and registers cached filters
 func (bis *BatchInterventionSystem) initializeComponents() {
-	// Create cached filter and register it (Ark best practice)
-	bis.interventionNeededFilter = generic.NewFilter1[components.InterventionNeeded](bis.world).
-		Without(generic.T[components.InterventionPending]()).
-		Register()
+	// Create cached filter using correct Ark patterns
+	bis.interventionNeededFilter = ecs.NewFilter1[components.InterventionNeeded](bis.world).
+		Without(ecs.C[components.InterventionPending]())
 }
 
 // Update processes intervention dispatch using Ark's efficient batch operations
@@ -159,15 +157,11 @@ func (bis *BatchInterventionSystem) transitionEntityStates(entities []ecs.Entity
 		return
 	}
 
-	// Use Ark's efficient batch operations
-	// Remove InterventionNeeded components in batch
-	bis.Mapper.InterventionNeeded.RemoveBatch(validEntities, nil)
-
-	// Add InterventionPending components in batch
-	pendingComponent := &components.InterventionPending{
-		StartTime: time.Now(),
+	// Use individual operations for now
+	for _, entity := range validEntities {
+		bis.Mapper.InterventionNeeded.Remove(entity)
+		bis.Mapper.InterventionPending.Add(entity, &components.InterventionPending{})
 	}
-	bis.Mapper.InterventionPending.AddBatch(validEntities, pendingComponent)
 
 	// Log transitions for monitoring
 	for _, entity := range validEntities {

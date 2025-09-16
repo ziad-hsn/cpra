@@ -1,13 +1,10 @@
 package systems
 
 import (
-	"context"
-	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
@@ -23,8 +20,8 @@ type BatchPulseSystem struct {
 	queue  *queue.BoundedQueue
 	logger Logger
 
-	// Cached filters for optimal Ark performance
-	pulseNeededFilter *generic.Filter1[components.PulseNeeded]
+		// Cached filter for optimal Ark performance
+	pulseNeededFilter *ecs.Filter1[components.PulseNeeded]
 	
 	// Performance tracking
 	entitiesProcessed int64
@@ -55,10 +52,9 @@ func (bps *BatchPulseSystem) Initialize(w *ecs.World) {
 
 // initializeComponents creates and registers cached filters
 func (bps *BatchPulseSystem) initializeComponents() {
-	// Create cached filter and register it for optimal performance
-	bps.pulseNeededFilter = generic.NewFilter1[components.PulseNeeded](bps.world).
-		Without(generic.T[components.PulsePending]()).
-		Register()
+	// Create cached filter using correct Ark patterns
+	bps.pulseNeededFilter = ecs.NewFilter1[components.PulseNeeded](bps.world).
+		Without(ecs.C[components.PulsePending]())
 }
 
 // Update processes pulse checks using Ark's efficient batch operations
@@ -152,54 +148,43 @@ func (bps *BatchPulseSystem) transitionEntityStates(entities []ecs.Entity) {
 		return
 	}
 	
-	// Filter out entities that are no longer valid or already have PulsePending
-	validEntities := make([]ecs.Entity, 0, len(entities))
-	for _, entity := range entities {
-		if bps.world.Alive(entity) && 
-		   bps.Mapper.PulseNeeded.HasAll(entity) && 
-		   !bps.Mapper.PulsePending.HasAll(entity) {
-			validEntities = append(validEntities, entity)
-		}
-	}
+	// Use Ark's proper batch operations - create fresh filter for batch operations
+	pulseNeededFilter := ecs.NewFilter1[components.PulseNeeded](bps.world).
+		Without(ecs.C[components.PulsePending]())
 	
-	if len(validEntities) == 0 {
-		return
-	}
+	// Get batch of matching entities
+	batch := pulseNeededFilter.Batch()
 	
-	// Use Ark's efficient batch operations
-	// Remove PulseNeeded components in batch
-	bps.Mapper.PulseNeeded.RemoveBatch(validEntities, nil)
-	
-	// Add PulsePending components in batch
-	pendingComponent := &components.PulsePending{
-		StartTime: time.Now(),
-	}
-	bps.Mapper.PulsePending.AddBatch(validEntities, pendingComponent)
+	// Use Ark's efficient batch operations - the correct way!
+	bps.Mapper.PulseNeeded.RemoveBatch(batch, nil)
+	bps.Mapper.PulsePending.AddBatch(batch, &components.PulsePending{})
 	
 	// Log transitions for monitoring
-	for _, entity := range validEntities {
-		namePtr := bps.Mapper.Name.Get(entity)
-		if namePtr != nil {
-			pulseConfig := bps.Mapper.PulseConfig.Get(entity)
-			pulseStatus := bps.Mapper.PulseStatus.Get(entity)
-			
-			if pulseConfig != nil && pulseStatus != nil {
-				interval := pulseConfig.Interval
-				isFirstCheck := pulseStatus.LastCheckTime.IsZero() || bps.Mapper.PulseFirstCheck.HasAll(entity)
+	for _, entity := range entities {
+		if bps.world.Alive(entity) {
+			namePtr := bps.Mapper.Name.Get(entity)
+			if namePtr != nil {
+				pulseConfig := bps.Mapper.PulseConfig.Get(entity)
+				pulseStatus := bps.Mapper.PulseStatus.Get(entity)
 				
-				if isFirstCheck {
-					bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, FIRST CHECK)", 
-						*namePtr, interval)
-				} else {
-					timeSinceLastCheck := time.Since(pulseStatus.LastCheckTime)
-					delay := timeSinceLastCheck - interval
+				if pulseConfig != nil && pulseStatus != nil {
+					interval := pulseConfig.Interval
+					isFirstCheck := pulseStatus.LastCheckTime.IsZero() || bps.Mapper.PulseFirstCheck.HasAll(entity)
 					
-					if delay > 0 {
-						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, delay: %v)", 
-							*namePtr, interval, delay)
-					} else {
-						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, on time)", 
+					if isFirstCheck {
+						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, FIRST CHECK)", 
 							*namePtr, interval)
+					} else {
+						timeSinceLastCheck := time.Since(pulseStatus.LastCheckTime)
+						delay := timeSinceLastCheck - interval
+						
+						if delay > 0 {
+							bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, delay: %v)", 
+								*namePtr, interval, delay)
+						} else {
+							bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, on time)", 
+								*namePtr, interval)
+						}
 					}
 				}
 			}

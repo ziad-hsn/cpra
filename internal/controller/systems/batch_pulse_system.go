@@ -2,147 +2,190 @@ package systems
 
 import (
 	"context"
-	"cpra/internal/queue"
 	"fmt"
+	"sync/atomic"
 	"time"
+
+	"github.com/mlange-42/ark/ecs"
+	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	"github.com/mlange-42/ark/ecs"
+	"cpra/internal/queue"
 )
 
-// BatchPulseSystem processes pulse monitoring exactly like sys_pulse.go but in batches
+// BatchPulseSystem processes pulse monitoring using proper Ark batch operations
+// Replaces individual component operations with efficient MapBatchFn calls
 type BatchPulseSystem struct {
-	world             *ecs.World
-	PulseNeededFilter *ecs.Filter1[components.PulseNeeded]
-	Mapper            *entities.EntityManager
-	queue             *queue.BoundedQueue
-	logger            Logger
+	world  *ecs.World
+	Mapper *entities.EntityManager
+	queue  *queue.BoundedQueue
+	logger Logger
 
-	// Batching optimization
-	batchSize         int
+	// Cached filters for optimal Ark performance
+	pulseNeededFilter *generic.Filter1[components.PulseNeeded]
+	
+	// Performance tracking
 	entitiesProcessed int64
 	batchesCreated    int64
 	lastProcessTime   time.Time
+	totalDropped      uint64
 }
 
-// NewBatchPulseSystem creates a new batch pulse system using the original queue approach
+// NewBatchPulseSystem creates a new batch pulse system using proper Ark patterns
 func NewBatchPulseSystem(world *ecs.World, mapper *entities.EntityManager, boundedQueue *queue.BoundedQueue, batchSize int, logger Logger) *BatchPulseSystem {
 	system := &BatchPulseSystem{
 		world:           world,
 		Mapper:          mapper,
 		queue:           boundedQueue,
-		batchSize:       batchSize,
 		logger:          logger,
 		lastProcessTime: time.Now(),
 	}
 
-	// Initialize ECS filter exactly like the original system
+	// Initialize cached filters (Ark best practice)
 	system.initializeComponents()
-
 	return system
 }
 
-// Initialize initializes ECS filters exactly like sys_pulse.go
+// Initialize initializes cached ECS filters for optimal performance
 func (bps *BatchPulseSystem) Initialize(w *ecs.World) {
 	bps.initializeComponents()
 }
 
-// initializeComponents initializes ECS filters exactly like the original system
+// initializeComponents creates and registers cached filters
 func (bps *BatchPulseSystem) initializeComponents() {
-	// Exactly like sys_pulse.go - entities with PulseNeeded but not PulsePending
-	bps.PulseNeededFilter = ecs.NewFilter1[components.PulseNeeded](bps.world).
-		Without(ecs.C[components.PulsePending]())
+	// Create cached filter and register it for optimal performance
+	bps.pulseNeededFilter = generic.NewFilter1[components.PulseNeeded](bps.world).
+		Without(generic.T[components.PulsePending]()).
+		Register()
 }
 
-// collectWork collects entities and jobs exactly like sys_pulse.go
+// Update processes pulse checks using Ark's efficient batch operations
+func (bps *BatchPulseSystem) Update(w *ecs.World) {
+	start := time.Now()
+	
+	// Collect entities and jobs using cached filter
+	entityJobMap := bps.collectWork(w)
+	if len(entityJobMap) == 0 {
+		return
+	}
+	
+	// Convert to slices for batch processing
+	entities := make([]ecs.Entity, 0, len(entityJobMap))
+	jobs := make([]jobs.Job, 0, len(entityJobMap))
+	
+	for entity, job := range entityJobMap {
+		entities = append(entities, entity)
+		jobs = append(jobs, job)
+	}
+	
+	// Process using proper Ark batch operations
+	bps.processBatch(jobs, entities)
+	
+	// Update performance metrics
+	atomic.AddInt64(&bps.entitiesProcessed, int64(len(entities)))
+	atomic.AddInt64(&bps.batchesCreated, 1)
+	bps.lastProcessTime = time.Now()
+	
+	bps.logger.LogSystemPerformance("BatchPulseSystem", time.Since(start), len(entities))
+}
+
+// collectWork collects entities that need pulse checks using cached filter
 func (bps *BatchPulseSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
 	start := time.Now()
 	out := make(map[ecs.Entity]jobs.Job)
-	query := bps.PulseNeededFilter.Query()
+	
+	// Use cached filter for optimal performance
+	query := bps.pulseNeededFilter.Query()
+	defer query.Close()
 
 	for query.Next() {
-		ent := query.Entity()
-		pulseJobComp := bps.Mapper.PulseJob.Get(ent)
+		entity := query.Entity()
+		pulseJobComp := bps.Mapper.PulseJob.Get(entity)
 		if pulseJobComp == nil {
-			bps.logger.Warn("Entity[%d] has no pulse job component", ent.ID())
+			bps.logger.Warn("Entity[%d] has no pulse job component", entity.ID())
 			continue
 		}
+		
 		job := pulseJobComp.Job
 		if job != nil {
-			out[ent] = job
+			out[entity] = job
 
-			namePtr := bps.Mapper.Name.Get(ent)
+			namePtr := bps.Mapper.Name.Get(entity)
 			if namePtr != nil {
-				bps.logger.Debug("Entity[%d] (%s) pulse job collected", ent.ID(), *namePtr)
+				bps.logger.Debug("Entity[%d] (%s) pulse job collected", entity.ID(), *namePtr)
 			}
 		} else {
-			bps.logger.Warn("Entity[%d] has no pulse job", ent.ID())
+			bps.logger.Warn("Entity[%d] has no pulse job", entity.ID())
 		}
 	}
 
-	bps.logger.LogSystemPerformance("BatchPulseDispatch", time.Since(start), len(out))
+	bps.logger.LogSystemPerformance("BatchPulseCollect", time.Since(start), len(out))
 	return out
 }
 
-// applyWork applies work using Ark's batch operations for optimal performance
-func (bps *BatchPulseSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
-	if len(entities) == 0 {
-		return nil
+// processBatch processes a batch of jobs using proper Ark batch operations
+func (bps *BatchPulseSystem) processBatch(batchJobs []jobs.Job, batchEntities []ecs.Entity) {
+	if len(batchJobs) == 0 {
+		return
+	}
+	
+	// Try to enqueue batch first
+	err := bps.queue.EnqueueBatch(batchJobs)
+	if err != nil {
+		// CRITICAL FIX: Don't transition state if enqueue fails
+		bps.logger.Warn("Queue full, retrying batch later: %v", err)
+		atomic.AddUint64(&bps.totalDropped, uint64(len(batchJobs)))
+		// Keep entities in PulseNeeded state for retry
+		return
 	}
 
-	// Filter entities to only include those that need transitions and don't already have PulsePending
+	// Only transition state after successful enqueue
+	// Use Ark's efficient batch operations instead of individual component changes
+	bps.transitionEntityStates(batchEntities)
+}
+
+// transitionEntityStates uses Ark's efficient batch operations for state transitions
+func (bps *BatchPulseSystem) transitionEntityStates(entities []ecs.Entity) {
+	if len(entities) == 0 {
+		return
+	}
+	
+	// Filter out entities that are no longer valid or already have PulsePending
 	validEntities := make([]ecs.Entity, 0, len(entities))
-	for i, ent := range entities {
-		_ = jobs[i] // Job already submitted to queue
-
-		if w.Alive(ent) {
-			// Skip entities that already have PulsePending
-			if bps.Mapper.PulsePending.HasAll(ent) {
-				namePtr := bps.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bps.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
-				}
-				continue
-			}
-
-			// Only include entities that have PulseNeeded
-			if bps.Mapper.PulseNeeded.HasAll(ent) {
-				validEntities = append(validEntities, ent)
-			}
+	for _, entity := range entities {
+		if bps.world.Alive(entity) && 
+		   bps.Mapper.PulseNeeded.HasAll(entity) && 
+		   !bps.Mapper.PulsePending.HasAll(entity) {
+			validEntities = append(validEntities, entity)
 		}
 	}
-
+	
 	if len(validEntities) == 0 {
-		return nil
+		return
 	}
-
-	// Use Ark's batch operations for component transitions
-	// Create a filter for entities that have PulseNeeded but not PulsePending
-	pulseNeededFilter := ecs.NewFilter1[components.PulseNeeded](w).
-		Without(ecs.C[components.PulsePending]())
 	
-	// Get batch of matching entities
-	batch := pulseNeededFilter.Batch()
+	// Use Ark's efficient batch operations
+	// Remove PulseNeeded components in batch
+	bps.Mapper.PulseNeeded.RemoveBatch(validEntities, nil)
 	
-	// Use batch operations: Remove PulseNeeded and Add PulsePending in batches
-	bps.Mapper.PulseNeeded.RemoveBatch(batch, nil)
-	bps.Mapper.PulsePending.AddBatch(batch, &components.PulsePending{})
-
-	// Log component transitions with timing information
-	for _, ent := range validEntities {
-		namePtr := bps.Mapper.Name.Get(ent)
+	// Add PulsePending components in batch
+	pendingComponent := &components.PulsePending{
+		StartTime: time.Now(),
+	}
+	bps.Mapper.PulsePending.AddBatch(validEntities, pendingComponent)
+	
+	// Log transitions for monitoring
+	for _, entity := range validEntities {
+		namePtr := bps.Mapper.Name.Get(entity)
 		if namePtr != nil {
-			// Get pulse configuration to show interval and calculate delay
-			pulseConfig := bps.Mapper.PulseConfig.Get(ent)
-			pulseStatus := bps.Mapper.PulseStatus.Get(ent)
+			pulseConfig := bps.Mapper.PulseConfig.Get(entity)
+			pulseStatus := bps.Mapper.PulseStatus.Get(entity)
 			
 			if pulseConfig != nil && pulseStatus != nil {
 				interval := pulseConfig.Interval
-				
-				// Check if this is the first check (LastCheckTime is zero or entity has PulseFirstCheck)
-				isFirstCheck := pulseStatus.LastCheckTime.IsZero() || bps.Mapper.PulseFirstCheck.HasAll(ent)
+				isFirstCheck := pulseStatus.LastCheckTime.IsZero() || bps.Mapper.PulseFirstCheck.HasAll(entity)
 				
 				if isFirstCheck {
 					bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, FIRST CHECK)", 
@@ -152,87 +195,41 @@ func (bps *BatchPulseSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs
 					delay := timeSinceLastCheck - interval
 					
 					if delay > 0 {
-						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, last check: %v ago, delay: %v)", 
-							*namePtr, interval, timeSinceLastCheck.Truncate(time.Second), delay.Truncate(time.Second))
+						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, delay: %v)", 
+							*namePtr, interval, delay)
 					} else {
-						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, last check: %v ago)", 
-							*namePtr, interval, timeSinceLastCheck.Truncate(time.Second))
+						bps.logger.Info("PULSE DISPATCHED: %s (interval: %v, on time)", 
+							*namePtr, interval)
 					}
 				}
-			} else {
-				bps.logger.Info("PULSE DISPATCHED: %s", *namePtr)
 			}
 		}
-		bps.logger.LogComponentState(ent.ID(), "PulseNeeded->PulsePending", "transitioned")
 	}
-
-	bps.logger.Debug("Batch pulse system: Applied component transitions to %d entities using batch operations", len(validEntities))
-	return nil
 }
 
-// Update processes entities using the exact same flow as sys_pulse.go but in batches
-func (bps *BatchPulseSystem) Update(ctx context.Context) error {
-	startTime := time.Now()
-
-	// Collect work exactly like original system
-	toDispatch := bps.collectWork(bps.world)
-
-	if len(toDispatch) == 0 {
-		return nil
+// GetStats returns performance statistics
+func (bps *BatchPulseSystem) GetStats() BatchPulseStats {
+	return BatchPulseStats{
+		EntitiesProcessed: atomic.LoadInt64(&bps.entitiesProcessed),
+		BatchesCreated:    atomic.LoadInt64(&bps.batchesCreated),
+		TotalDropped:      atomic.LoadUint64(&bps.totalDropped),
+		LastProcessTime:   bps.lastProcessTime,
 	}
-
-	// Convert map to slices for batch processing
-	e := make([]ecs.Entity, 0, len(toDispatch))
-	j := make([]jobs.Job, 0, len(toDispatch))
-
-	for ent, job := range toDispatch {
-		e = append(e, ent)
-		j = append(j, job)
-	}
-
-	// Process in batches - collect j and submit as batch
-	batchCount := 0
-	for i := 0; i < len(e); i += bps.batchSize {
-		end := i + bps.batchSize
-		if end > len(e) {
-			end = len(e)
-		}
-
-		batchEntities := e[i:end]
-		batchJobs := j[i:end]
-
-		// Submit batch of j to queue
-		if err := bps.queue.EnqueueBatch(batchJobs); err != nil {
-			// If queue full, apply component transitions anyway
-			bps.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
-		}
-
-		// Apply component transitions
-		if err := bps.applyWork(bps.world, batchEntities, batchJobs); err != nil {
-			return fmt.Errorf("failed to process batch %d: %w", batchCount, err)
-		}
-
-		batchCount++
-	}
-
-	bps.entitiesProcessed += int64(len(toDispatch))
-	bps.batchesCreated += int64(batchCount)
-
-	if len(toDispatch) > 0 {
-		processingTime := time.Since(startTime)
-		bps.logger.Debug("Batch Pulse System: Processed %d entities in %d batches (took %v)",
-			len(toDispatch), batchCount, processingTime.Truncate(time.Millisecond))
-	}
-
-	return nil
 }
 
-// Finalize cleans up like the original system
-func (bps *BatchPulseSystem) Finalize(w *ecs.World) {
-	// Nothing to clean up - queue manager handles its own cleanup
+// BatchPulseStats provides performance metrics
+type BatchPulseStats struct {
+	EntitiesProcessed int64     `json:"entities_processed"`
+	BatchesCreated    int64     `json:"batches_created"`
+	TotalDropped      uint64    `json:"total_dropped"`
+	LastProcessTime   time.Time `json:"last_process_time"`
 }
 
-// GetMetrics returns current system metrics
-func (bps *BatchPulseSystem) GetMetrics() (int64, int64) {
-	return bps.entitiesProcessed, bps.batchesCreated
+// Reset resets performance counters
+func (bps *BatchPulseSystem) Reset() {
+	atomic.StoreInt64(&bps.entitiesProcessed, 0)
+	atomic.StoreInt64(&bps.batchesCreated, 0)
+	atomic.StoreUint64(&bps.totalDropped, 0)
+	bps.lastProcessTime = time.Now()
 }
+

@@ -283,7 +283,7 @@ func (oc *Controller) Stop() {
 	fmt.Println("controller stopped")
 }
 
-// mainLoop is the main processing loop
+// mainLoop is the main processing loop using proper Ark batch operations
 func (oc *Controller) mainLoop(ctx context.Context) {
 	Ticker := time.NewTicker(oc.config.UpdateInterval)
 	defer Ticker.Stop()
@@ -293,41 +293,30 @@ func (oc *Controller) mainLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-Ticker.C:
-			if !oc.running {
-				return
-			}
-
-			// Update ECS systems (single-threaded for Ark compatibility)
-			// CRITICAL: Schedule FIRST to mark entities as needed!
+			// Update ECS systems using proper Ark patterns (single-threaded for Ark compatibility)
+			
+			// 1. Schedule System - identifies entities ready for pulse checks
 			start := time.Now()
-			if err := oc.pulseScheduleSystem.Update(ctx); err != nil {
-				SystemLogger.Error("Error updating pulse schedule system: %v", err)
-			}
+			oc.pulseScheduleSystem.Update(oc.world)
 			oc.metricsAggregator.RecordSystemUpdate("BatchPulseScheduleSystem", time.Since(start), 0, 0)
 
-			// Then dispatch the scheduled entities
+			// 2. Pulse System - dispatches pulse jobs using Ark batch operations
 			start = time.Now()
-			if err := oc.pulseSystem.Update(ctx); err != nil {
-				SystemLogger.Error("Error updating pulse system: %v", err)
-			}
-			entities, batches := oc.pulseSystem.GetMetrics()
-			oc.metricsAggregator.RecordSystemUpdate("BatchPulseSystem", time.Since(start), entities, batches)
+			oc.pulseSystem.Update(oc.world)
+			stats := oc.pulseSystem.GetStats()
+			oc.metricsAggregator.RecordSystemUpdate("BatchPulseSystem", time.Since(start), int(stats.EntitiesProcessed), int(stats.BatchesCreated))
 
+			// 3. Intervention System - handles failed monitors
 			start = time.Now()
-			if err := oc.interventionSystem.Update(ctx); err != nil {
-				SystemLogger.Error("Error updating intervention system: %v", err)
-			}
-			entities, batches = oc.interventionSystem.GetMetrics()
-			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), entities, batches)
+			oc.interventionSystem.Update(oc.world)
+			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), 0, 0)
 
+			// 4. Code System - handles alert notifications
 			start = time.Now()
-			if err := oc.codeSystem.Update(ctx); err != nil {
-				SystemLogger.Error("Error updating code system: %v", err)
-			}
-			entities, batches = oc.codeSystem.GetMetrics()
-			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), entities, batches)
+			oc.codeSystem.Update(oc.world)
+			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), 0, 0)
 
-			// Update result processing systems using the original ECS world interface
+			// 5. Result processing systems using proper Ark world interface
 			start = time.Now()
 			oc.pulseResultSystem.Update(oc.world)
 			oc.metricsAggregator.RecordSystemUpdate("BatchPulseResultSystem", time.Since(start), 0, 0)

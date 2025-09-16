@@ -1,201 +1,209 @@
 package systems
 
 import (
-	"context"
-	"cpra/internal/queue"
+	"sync/atomic"
 	"time"
+
+	"github.com/mlange-42/ark/ecs"
+	"github.com/mlange-42/ark/generic"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
 	"cpra/internal/jobs"
-	"github.com/mlange-42/ark/ecs"
+	"cpra/internal/queue"
 )
 
-// BatchInterventionSystem processes intervention dispatch exactly like sys_intervention.go but in batches
+// BatchInterventionSystem processes intervention dispatch using proper Ark batch operations
 type BatchInterventionSystem struct {
-	world                    *ecs.World
-	InterventionNeededFilter *ecs.Filter1[components.InterventionNeeded]
-	Mapper                   *entities.EntityManager
-	queue                    *queue.BoundedQueue
-	logger                   Logger
+	world  *ecs.World
+	Mapper *entities.EntityManager
+	queue  *queue.BoundedQueue
+	logger Logger
 
-	// Batching optimization
-	batchSize         int
+	// Cached filter for optimal Ark performance
+	interventionNeededFilter *generic.Filter1[components.InterventionNeeded]
+
+	// Performance tracking
 	entitiesProcessed int64
 	batchesCreated    int64
+	totalDropped      uint64
 }
 
-// NewBatchInterventionSystem creates a new batch intervention system using the original queue approach
+// NewBatchInterventionSystem creates a new batch intervention system using Ark best practices
 func NewBatchInterventionSystem(world *ecs.World, mapper *entities.EntityManager, boundedQueue *queue.BoundedQueue, batchSize int, logger Logger) *BatchInterventionSystem {
 	system := &BatchInterventionSystem{
-		world:     world,
-		Mapper:    mapper,
-		queue:     boundedQueue,
-		batchSize: batchSize,
-		logger:    logger,
+		world:  world,
+		Mapper: mapper,
+		queue:  boundedQueue,
+		logger: logger,
 	}
 
 	system.initializeComponents()
 	return system
 }
 
-// Initialize initializes ECS filters exactly like sys_intervention.go
+// Initialize initializes cached ECS filters for optimal performance
 func (bis *BatchInterventionSystem) Initialize(w *ecs.World) {
 	bis.initializeComponents()
 }
 
-// initializeComponents initializes ECS filters exactly like the original system
+// initializeComponents creates and registers cached filters
 func (bis *BatchInterventionSystem) initializeComponents() {
-	// Exactly like sys_intervention.go - entities with InterventionNeeded but not InterventionPending
-	bis.InterventionNeededFilter = ecs.NewFilter1[components.InterventionNeeded](bis.world).
-		Without(ecs.C[components.InterventionPending]())
+	// Create cached filter and register it (Ark best practice)
+	bis.interventionNeededFilter = generic.NewFilter1[components.InterventionNeeded](bis.world).
+		Without(generic.T[components.InterventionPending]()).
+		Register()
 }
 
-// collectWork collects entities and jobs exactly like sys_intervention.go
+// Update processes intervention dispatch using Ark's efficient batch operations
+func (bis *BatchInterventionSystem) Update(w *ecs.World) {
+	start := time.Now()
+
+	// Collect entities and jobs using cached filter
+	entityJobMap := bis.collectWork(w)
+	if len(entityJobMap) == 0 {
+		return
+	}
+
+	// Convert to slices for batch processing
+	entities := make([]ecs.Entity, 0, len(entityJobMap))
+	jobs := make([]jobs.Job, 0, len(entityJobMap))
+
+	for entity, job := range entityJobMap {
+		entities = append(entities, entity)
+		jobs = append(jobs, job)
+	}
+
+	// Process using proper Ark batch operations
+	bis.processBatch(jobs, entities)
+
+	// Update performance metrics
+	atomic.AddInt64(&bis.entitiesProcessed, int64(len(entities)))
+	atomic.AddInt64(&bis.batchesCreated, 1)
+
+	bis.logger.LogSystemPerformance("BatchInterventionSystem", time.Since(start), len(entities))
+}
+
+// collectWork collects entities that need intervention using cached filter
 func (bis *BatchInterventionSystem) collectWork(w *ecs.World) map[ecs.Entity]jobs.Job {
 	start := time.Now()
 	out := make(map[ecs.Entity]jobs.Job)
-	query := bis.InterventionNeededFilter.Query()
+
+	// Use cached filter for optimal performance
+	query := bis.interventionNeededFilter.Query()
+	defer query.Close()
 
 	for query.Next() {
-		ent := query.Entity()
-		interventionJobComp := bis.Mapper.InterventionJob.Get(ent)
+		entity := query.Entity()
+		interventionJobComp := bis.Mapper.InterventionJob.Get(entity)
 		if interventionJobComp == nil {
-			bis.logger.Warn("Entity[%d] has no intervention job component", ent.ID())
+			bis.logger.Warn("Entity[%d] has no intervention job component", entity.ID())
 			continue
 		}
+
 		job := interventionJobComp.Job
 		if job != nil {
-			out[ent] = job
+			out[entity] = job
 
-			namePtr := bis.Mapper.Name.Get(ent)
+			namePtr := bis.Mapper.Name.Get(entity)
 			if namePtr != nil {
-				bis.logger.Debug("Entity[%d] (%s) intervention job collected", ent.ID(), *namePtr)
+				bis.logger.Debug("Entity[%d] (%s) intervention job collected", entity.ID(), *namePtr)
 			}
 		} else {
-			bis.logger.Warn("Entity[%d] has no intervention job", ent.ID())
+			bis.logger.Warn("Entity[%d] has no intervention job", entity.ID())
 		}
 	}
 
-	bis.logger.LogSystemPerformance("BatchInterventionDispatch", time.Since(start), len(out))
+	bis.logger.LogSystemPerformance("BatchInterventionCollect", time.Since(start), len(out))
 	return out
 }
 
-// applyWork applies work using Ark's batch operations for optimal performance
-func (bis *BatchInterventionSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []jobs.Job) error {
-	if len(entities) == 0 {
-		return nil
+// processBatch processes a batch of intervention jobs using proper Ark batch operations
+func (bis *BatchInterventionSystem) processBatch(batchJobs []jobs.Job, batchEntities []ecs.Entity) {
+	if len(batchJobs) == 0 {
+		return
 	}
 
-	// Filter entities to only include those that need transitions and don't already have InterventionPending
+	// Try to enqueue batch first
+	err := bis.queue.EnqueueBatch(batchJobs)
+	if err != nil {
+		// CRITICAL FIX: Don't transition state if enqueue fails
+		bis.logger.Warn("Queue full, retrying intervention batch later: %v", err)
+		atomic.AddUint64(&bis.totalDropped, uint64(len(batchJobs)))
+		// Keep entities in InterventionNeeded state for retry
+		return
+	}
+
+	// Only transition state after successful enqueue
+	// Use Ark's efficient batch operations instead of individual component changes
+	bis.transitionEntityStates(batchEntities)
+}
+
+// transitionEntityStates uses Ark's efficient batch operations for state transitions
+func (bis *BatchInterventionSystem) transitionEntityStates(entities []ecs.Entity) {
+	if len(entities) == 0 {
+		return
+	}
+
+	// Filter out entities that are no longer valid or already have InterventionPending
 	validEntities := make([]ecs.Entity, 0, len(entities))
-	for i, ent := range entities {
-		_ = jobs[i] // Job already submitted to queue
-
-		if w.Alive(ent) {
-			// Skip entities that already have InterventionPending
-			if bis.Mapper.InterventionPending.HasAll(ent) {
-				namePtr := bis.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bis.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %d", *namePtr, ent.ID())
-				}
-				continue
-			}
-
-			// Only include entities that have InterventionNeeded
-			if bis.Mapper.InterventionNeeded.HasAll(ent) {
-				validEntities = append(validEntities, ent)
-			}
+	for _, entity := range entities {
+		if bis.world.Alive(entity) &&
+			bis.Mapper.InterventionNeeded.HasAll(entity) &&
+			!bis.Mapper.InterventionPending.HasAll(entity) {
+			validEntities = append(validEntities, entity)
 		}
 	}
 
 	if len(validEntities) == 0 {
-		return nil
+		return
 	}
 
-	// Use Ark's batch operations for component transitions
-	// Create a filter for entities that have InterventionNeeded but not InterventionPending
-	interventionNeededFilter := ecs.NewFilter1[components.InterventionNeeded](w).
-		Without(ecs.C[components.InterventionPending]())
-	
-	// Get batch of matching entities
-	batch := interventionNeededFilter.Batch()
-	
-	// Use batch operations: Remove InterventionNeeded and Add InterventionPending in batches
-	bis.Mapper.InterventionNeeded.RemoveBatch(batch, nil)
-	bis.Mapper.InterventionPending.AddBatch(batch, &components.InterventionPending{})
+	// Use Ark's efficient batch operations
+	// Remove InterventionNeeded components in batch
+	bis.Mapper.InterventionNeeded.RemoveBatch(validEntities, nil)
 
-	// Log component transitions
-	for _, ent := range validEntities {
-		namePtr := bis.Mapper.Name.Get(ent)
+	// Add InterventionPending components in batch
+	pendingComponent := &components.InterventionPending{
+		StartTime: time.Now(),
+	}
+	bis.Mapper.InterventionPending.AddBatch(validEntities, pendingComponent)
+
+	// Log transitions for monitoring
+	for _, entity := range validEntities {
+		namePtr := bis.Mapper.Name.Get(entity)
 		if namePtr != nil {
 			bis.logger.Info("INTERVENTION DISPATCHED: %s", *namePtr)
 		}
-		bis.logger.LogComponentState(ent.ID(), "InterventionNeeded->InterventionPending", "transitioned")
 	}
-
-	bis.logger.Debug("Batch intervention system: Applied component transitions to %d entities using batch operations", len(validEntities))
-	return nil
 }
 
-// Update processes entities using the exact same flow as sys_intervention.go but in batches
-func (bis *BatchInterventionSystem) Update(ctx context.Context) error {
-	// Collect work exactly like original system
-	toDispatch := bis.collectWork(bis.world)
-
-	bis.logger.Debug("Intervention system found %d e to dispatch", len(toDispatch))
-
-	if len(toDispatch) == 0 {
-		return nil
+// GetStats returns performance statistics
+func (bis *BatchInterventionSystem) GetStats() BatchInterventionStats {
+	return BatchInterventionStats{
+		EntitiesProcessed: atomic.LoadInt64(&bis.entitiesProcessed),
+		BatchesCreated:    atomic.LoadInt64(&bis.batchesCreated),
+		TotalDropped:      atomic.LoadUint64(&bis.totalDropped),
 	}
-
-	bis.logger.Info("Batch Intervention System: Processing %d e", len(toDispatch))
-
-	// Convert map to slices for batch processing
-	e := make([]ecs.Entity, 0, len(toDispatch))
-	j := make([]jobs.Job, 0, len(toDispatch))
-
-	for ent, job := range toDispatch {
-		e = append(e, ent)
-		j = append(j, job)
-	}
-
-	// Process in batches - collect j and submit as batch
-	batchCount := 0
-	for i := 0; i < len(e); i += bis.batchSize {
-		end := i + bis.batchSize
-		if end > len(e) {
-			end = len(e)
-		}
-
-		batchEntities := e[i:end]
-		batchJobs := j[i:end]
-
-		// Submit batch of j to queue
-		if err := bis.queue.EnqueueBatch(batchJobs); err != nil {
-			bis.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
-		}
-
-		// Apply component transitions
-		if err := bis.applyWork(bis.world, batchEntities, batchJobs); err != nil {
-			return err
-		}
-
-		batchCount++
-	}
-
-	bis.entitiesProcessed += int64(len(toDispatch))
-	bis.batchesCreated += int64(batchCount)
-
-	return nil
 }
 
-// Finalize cleans up like the original system
-func (bis *BatchInterventionSystem) Finalize(w *ecs.World) {
-	// Nothing to clean up - queue manager handles its own cleanup
+// GetLastUpdateStats returns stats for the controller (compatibility)
+func (bis *BatchInterventionSystem) GetLastUpdateStats() (int, int) {
+	stats := bis.GetStats()
+	return int(stats.EntitiesProcessed), int(stats.BatchesCreated)
 }
 
-// GetMetrics returns current system metrics
-func (bis *BatchInterventionSystem) GetMetrics() (int64, int64) {
-	return bis.entitiesProcessed, bis.batchesCreated
+// BatchInterventionStats provides performance metrics
+type BatchInterventionStats struct {
+	EntitiesProcessed int64  `json:"entities_processed"`
+	BatchesCreated    int64  `json:"batches_created"`
+	TotalDropped      uint64 `json:"total_dropped"`
 }
+
+// Reset resets performance counters
+func (bis *BatchInterventionSystem) Reset() {
+	atomic.StoreInt64(&bis.entitiesProcessed, 0)
+	atomic.StoreInt64(&bis.batchesCreated, 0)
+	atomic.StoreUint64(&bis.totalDropped, 0)
+}
+

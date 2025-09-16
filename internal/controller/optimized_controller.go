@@ -309,12 +309,14 @@ func (oc *Controller) mainLoop(ctx context.Context) {
 			// 3. Intervention System - handles failed monitors
 			start = time.Now()
 			oc.interventionSystem.Update(oc.world)
-			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), 0, 0)
+			interventionStats := oc.interventionSystem.GetStats()
+			oc.metricsAggregator.RecordSystemUpdate("BatchInterventionSystem", time.Since(start), int(interventionStats.EntitiesProcessed), int(interventionStats.BatchesCreated))
 
 			// 4. Code System - handles alert notifications
 			start = time.Now()
 			oc.codeSystem.Update(oc.world)
-			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), 0, 0)
+			codeStats := oc.codeSystem.GetStats()
+			oc.metricsAggregator.RecordSystemUpdate("BatchCodeSystem", time.Since(start), int(codeStats.EntitiesProcessed), int(codeStats.BatchesCreated))
 
 			// 5. Result processing systems using proper Ark world interface
 			start = time.Now()

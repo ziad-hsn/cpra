@@ -1,249 +1,136 @@
 package systems
 
 import (
-	"context"
+	"cpra/internal/controller/components"
 	"cpra/internal/queue"
+	"sync/atomic"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
 )
 
-// dispatchableCodeJob holds job and color info exactly like sys_code.go
-type dispatchableCodeJob struct {
-	job   jobs.Job
-	color string
+// jobInfo is a helper struct to associate a job with its entity and color for batch processing.
+type jobInfo struct {
+	Entity ecs.Entity
+	Job    interface{}
+	Color  string
 }
 
-// BatchCodeSystem processes code dispatch exactly like sys_code.go but in batches
+// BatchCodeSystem processes entities that need a code alert dispatched.
+// It determines the correct color based on the entity's state and enqueues the job.
 type BatchCodeSystem struct {
-	world            *ecs.World
-	CodeNeededFilter *ecs.Filter1[components.CodeNeeded]
-	Mapper           *entities.EntityManager
-	queue            *queue.BoundedQueue
-	logger           Logger
+	world     *ecs.World
+	queue     queue.Queue // Using a generic queue interface
+	logger    Logger
+	batchSize int
 
-	// Batching optimization
-	batchSize         int
-	entitiesProcessed int64
-	batchesCreated    int64
+	// Filter for entities that require a code alert.
+	filter *ecs.Filter3[components.MonitorState, components.CodeConfig, components.JobStorage]
 }
 
-// NewBatchCodeSystem creates a new batch code system using the original queue approach
-func NewBatchCodeSystem(world *ecs.World, mapper *entities.EntityManager, boundedQueue *queue.BoundedQueue, batchSize int, logger Logger) *BatchCodeSystem {
-	system := &BatchCodeSystem{
+// NewBatchCodeSystem creates a new BatchCodeSystem.
+func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchCodeSystem {
+	return &BatchCodeSystem{
 		world:     world,
-		Mapper:    mapper,
-		queue:     boundedQueue,
-		batchSize: batchSize,
+		queue:     q,
 		logger:    logger,
+		batchSize: batchSize,
+		filter:    ecs.NewFilter3[components.MonitorState, components.CodeConfig, components.JobStorage](world),
 	}
+}
+func (s *BatchCodeSystem) Initialize(w *ecs.World) {
 
-	system.initializeComponents()
-	return system
 }
 
-// Initialize initializes ECS filters exactly like sys_code.go
-func (bcs *BatchCodeSystem) Initialize(w *ecs.World) {
-	bcs.initializeComponents()
-}
+// Update finds and processes all monitors that need a code alert.
+func (s *BatchCodeSystem) Update(w *ecs.World) {
+	startTime := time.Now()
+	query := s.filter.Query()
 
-// initializeComponents initializes ECS filters exactly like the original system
-func (bcs *BatchCodeSystem) initializeComponents() {
-	// Exactly like sys_code.go - entities with CodeNeeded but not CodePending
-	bcs.CodeNeededFilter = ecs.NewFilter1[components.CodeNeeded](bcs.world).
-		Without(ecs.C[components.CodePending]())
-}
-
-// collectWork collects entities and jobs exactly like sys_code.go
-func (bcs *BatchCodeSystem) collectWork(w *ecs.World) map[ecs.Entity]dispatchableCodeJob {
-	start := time.Now()
-	out := make(map[ecs.Entity]dispatchableCodeJob)
-	query := bcs.CodeNeededFilter.Query()
+	jobsToProcess := make([]jobInfo, 0, s.batchSize)
+	processedCount := 0
 
 	for query.Next() {
 		ent := query.Entity()
-		color := query.Get().Color
-		var job jobs.Job
+		state, _, jobStorage := query.Get()
 
-		// Exact same color logic as sys_code.go with nil checks
-		switch color {
-		case "red":
-			if bcs.Mapper.RedCode.HasAll(ent) {
-				if jobComp := bcs.Mapper.RedCodeJob.Get(ent); jobComp != nil {
-					job = jobComp.Job
-				}
-			}
-		case "green":
-			if bcs.Mapper.GreenCode.HasAll(ent) {
-				if jobComp := bcs.Mapper.GreenCodeJob.Get(ent); jobComp != nil {
-					job = jobComp.Job
-				}
-			}
-		case "yellow":
-			if bcs.Mapper.YellowCode.HasAll(ent) {
-				if jobComp := bcs.Mapper.YellowCodeJob.Get(ent); jobComp != nil {
-					job = jobComp.Job
-				}
-			}
-		case "cyan":
-			if bcs.Mapper.CyanCode.HasAll(ent) {
-				if jobComp := bcs.Mapper.CyanCodeJob.Get(ent); jobComp != nil {
-					job = jobComp.Job
-				}
-			}
-		case "gray":
-			if bcs.Mapper.GrayCode.HasAll(ent) {
-				if jobComp := bcs.Mapper.GrayCodeJob.Get(ent); jobComp != nil {
-					job = jobComp.Job
-				}
-			}
-		default:
-			bcs.logger.Warn("Unknown color %q for entity %v", color, ent)
+		// Process only entities that need a code alert.
+		if (atomic.LoadUint32(&state.Flags) & components.StateCodeNeeded) == 0 {
+			continue
 		}
 
-		if job != nil {
-			out[ent] = dispatchableCodeJob{job: job, color: color}
+		color := state.PendingCode
+		if color == "" {
+			// This should not happen if StateCodeNeeded is set, but as a safeguard:
+			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+			continue
+		}
+
+		job, ok := jobStorage.CodeJobs[color]
+		if !ok || job == nil {
+			s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
+			// Clear the flag if no job is found to prevent spinning.
+			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+			continue
+		}
+
+		jobsToProcess = append(jobsToProcess, jobInfo{Entity: ent, Job: job, Color: color})
+
+		// Process in batches
+		if len(jobsToProcess) >= s.batchSize {
+			s.processBatch(&jobsToProcess)
+			processedCount += len(jobsToProcess)
+			jobsToProcess = make([]jobInfo, 0, s.batchSize)
 		}
 	}
 
-	bcs.logger.LogSystemPerformance("BatchCodeDispatch", time.Since(start), len(out))
-	return out
+	// Process any remaining entities
+	if len(jobsToProcess) > 0 {
+		s.processBatch(&jobsToProcess)
+		processedCount += len(jobsToProcess)
+	}
+
+	if processedCount > 0 {
+		s.logger.LogSystemPerformance("BatchCodeSystem", time.Since(startTime), processedCount)
+	}
+
 }
 
-// applyWork applies work using Ark's batch operations for optimal performance
-func (bcs *BatchCodeSystem) applyWork(w *ecs.World, entities []ecs.Entity, jobs []dispatchableCodeJob) error {
-	if len(entities) == 0 {
-		return nil
+
+
+// processBatch attempts to enqueue a batch of jobs and updates entity states on success.
+func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
+	jobs := make([]interface{}, len(*jobsInfo))
+	for i, info := range *jobsInfo {
+		jobs[i] = info.Job
 	}
 
-	// Filter entities to only include those that need transitions and don't already have CodePending
-	validEntities := make([]ecs.Entity, 0, len(entities))
-	validJobs := make([]dispatchableCodeJob, 0, len(jobs))
-	
-	for i, ent := range entities {
-		item := jobs[i]
+	err := s.queue.EnqueueBatch(jobs)
+	if err != nil {
+		s.logger.Warn("Failed to enqueue code job batch, queue may be full: %v", err)
+		return
+	}
 
-		if w.Alive(ent) {
-			// Skip entities that already have CodePending
-			if bcs.Mapper.CodePending.HasAll(ent) {
-				namePtr := bcs.Mapper.Name.Get(ent)
-				if namePtr != nil {
-					bcs.logger.Warn("Monitor %s already has pending component, skipping dispatch for entity: %v", *namePtr, ent)
-				}
-				continue
-			}
-
-			// Only include entities that have CodeNeeded
-			if bcs.Mapper.CodeNeeded.HasAll(ent) {
-				validEntities = append(validEntities, ent)
-				validJobs = append(validJobs, item)
-			}
+	for _, info := range *jobsInfo {
+		if !s.world.Alive(info.Entity) {
+			continue
 		}
-	}
-
-	if len(validEntities) == 0 {
-		return nil
-	}
-
-	// Use Ark's batch operations for component transitions
-	// Create a filter for entities that have CodeNeeded but not CodePending
-	codeNeededFilter := ecs.NewFilter1[components.CodeNeeded](w).
-		Without(ecs.C[components.CodePending]())
-	
-	// Get batch of matching entities
-	batch := codeNeededFilter.Batch()
-	
-	// Remove CodeNeeded in batch
-	bcs.Mapper.CodeNeeded.RemoveBatch(batch, nil)
-	
-	// Add CodePending components using AddBatchFn for custom per-entity initialization
-	bcs.Mapper.CodePending.AddBatchFn(batch, func(entity ecs.Entity, comp *components.CodePending) {
-		// Find the corresponding job for this entity to get the color
-		for i, ent := range validEntities {
-			if ent.ID() == entity.ID() {
-				comp.Color = validJobs[i].color
-				return
-			}
+		stateMapper := ecs.NewMap1[components.MonitorState](s.world)
+		state := stateMapper.Get(info.Entity)
+		if state == nil {
+			continue
 		}
-		// Fallback - should not happen
-		comp.Color = "unknown"
-	})
 
-	// Log component transitions
-	for i, ent := range validEntities {
-		item := validJobs[i]
-		namePtr := bcs.Mapper.Name.Get(ent)
-		if namePtr != nil {
-			bcs.logger.Info("CODE DISPATCHED: %s (%s)", *namePtr, item.color)
-		}
-		bcs.logger.LogComponentState(ent.ID(), "CodeNeeded->CodePending", "transitioned")
+		state.PendingCode = ""
+
+		// Atomically update flags: remove CodeNeeded, add CodePending.
+		flags := atomic.LoadUint32(&state.Flags)
+		newFlags := (flags & ^uint32(components.StateCodeNeeded)) | uint32(components.StateCodePending)
+		atomic.StoreUint32(&state.Flags, newFlags)
+
+		s.logger.Info("CODE DISPATCHED: %s (%s)", state.Name, info.Color)
 	}
-
-	bcs.logger.Debug("Batch code system: Applied component transitions to %d entities using batch operations", len(validEntities))
-	return nil
 }
 
-// Update processes entities using the exact same flow as sys_code.go but in batches
-func (bcs *BatchCodeSystem) Update(ctx context.Context) error {
-	// Collect work exactly like original system
-	toDispatch := bcs.collectWork(bcs.world)
-
-	if len(toDispatch) == 0 {
-		return nil
-	}
-
-	// Convert map to slices for batch processing
-	entities := make([]ecs.Entity, 0, len(toDispatch))
-	dispatchableJobs := make([]dispatchableCodeJob, 0, len(toDispatch))
-
-	for ent, job := range toDispatch {
-		entities = append(entities, ent)
-		dispatchableJobs = append(dispatchableJobs, job)
-	}
-
-	// Process in batches - collect jobs and submit as batch
-	batchCount := 0
-	for i := 0; i < len(entities); i += bcs.batchSize {
-		end := i + bcs.batchSize
-		if end > len(entities) {
-			end = len(entities)
-		}
-
-		batchEntities := entities[i:end]
-		batchJobs := dispatchableJobs[i:end]
-
-		// Submit batch of jobs to queue
-		jobsToSubmit := make([]jobs.Job, 0, len(batchJobs))
-		for _, item := range batchJobs {
-			jobsToSubmit = append(jobsToSubmit, item.job)
-		}
-		if err := bcs.queue.EnqueueBatch(jobsToSubmit); err != nil {
-			bcs.logger.Warn("Failed to enqueue batch %d, queue full: %v", batchCount, err)
-		}
-
-		// Apply component transitions
-		if err := bcs.applyWork(bcs.world, batchEntities, batchJobs); err != nil {
-			return err
-		}
-
-		batchCount++
-	}
-
-	bcs.entitiesProcessed += int64(len(toDispatch))
-	bcs.batchesCreated += int64(batchCount)
-
-	return nil
-}
-
-// Finalize cleans up like the original system
-func (bcs *BatchCodeSystem) Finalize(w *ecs.World) {
-	// Nothing to clean up - queue manager handles its own cleanup
-}
-
-// GetMetrics returns current system metrics
-func (bcs *BatchCodeSystem) GetMetrics() (int64, int64) {
-	return bcs.entitiesProcessed, bcs.batchesCreated
-}
+// Finalize is a no-op for this system.
+func (s *BatchCodeSystem) Finalize(w *ecs.World) {}

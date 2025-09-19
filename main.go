@@ -33,8 +33,6 @@ func main() {
 	// Create optimized configuration
 	config := controller.DefaultConfig()
 
-	// Result channels are created internally by optimized controller
-
 	// Override configuration if file provided
 	if *configFile != "" {
 		fmt.Printf("Loading configuration from: %s\n", *configFile)
@@ -47,8 +45,8 @@ func main() {
 		// CPU profiling would be initialized here
 	}
 
-	// Create optimized controller
-	oc := controller.NewController(config)
+	// Create the new optimized controller
+	oc := controller.NewOptimizedController(config)
 
 	// Setup context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,7 +56,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Track if shutdown was initiated
 	var shutdownInitiated bool
 	var shutdownMutex sync.Mutex
 
@@ -98,15 +95,14 @@ func main() {
 	<-ctx.Done()
 	fmt.Println("Shutting down...")
 
-	// Print comprehensive shutdown metrics before stopping
-	oc.PrintShutdownMetrics()
+	// oc.PrintShutdownMetrics() // This method was part of the old controller and has been removed.
 
 	// Print memory Usage
 	PrintMemUsage()
 
 	// Stop the controller
 	oc.Stop()
-	
+
 	// Close loggers after everything is done
 	controller.CloseLoggers()
 

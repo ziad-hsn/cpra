@@ -11,11 +11,11 @@ import (
 
 // RecoverySystem provides system-level error recovery and health monitoring
 type RecoverySystem struct {
-	ErrorCount   int
-	LastError    time.Time
-	MaxErrors    int
-	ResetWindow  time.Duration
-	Mapper       *entities.EntityManager
+	ErrorCount  int
+	LastError   time.Time
+	MaxErrors   int
+	ResetWindow time.Duration
+	Mapper      *entities.EntityManager
 }
 
 func NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem {
@@ -31,13 +31,13 @@ func (r *RecoverySystem) SafeSystemUpdate(systemName string, updateFunc func() e
 		if recovered := recover(); recovered != nil {
 			r.ErrorCount++
 			r.LastError = time.Now()
-			
+
 			log.Printf("PANIC in system %s: %v", systemName, recovered)
 			log.Printf("Stack trace: %s", debug.Stack())
-			
+
 			// Circuit breaker logic
 			if r.ErrorCount >= r.MaxErrors {
-				log.Printf("System %s exceeded max errors (%d), entering degraded mode", 
+				log.Printf("System %s exceeded max errors (%d), entering degraded mode",
 					systemName, r.MaxErrors)
 			}
 		}
@@ -64,7 +64,7 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 
 	// Check for required components
 	if r.Mapper != nil {
-		if r.Mapper.Name.Get(entity) == nil {
+		if r.Mapper.GetMonitorState(entity).Name == "" {
 			log.Printf("Entity %v missing Name component", entity)
 			return false
 		}

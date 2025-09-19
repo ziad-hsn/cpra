@@ -1,79 +1,33 @@
 package streaming
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"sync"
-	"time"
 
 	"cpra/internal/loader/schema"
 	"gopkg.in/yaml.v3"
 )
 
-// StreamingYamlParser handles streaming YAML parsing with batching
+// StreamingYamlParser handles true streaming parsing of a YAML file.
+// It reads the file document by document, creating batches without loading the entire file into memory.
 type StreamingYamlParser struct {
-	filename   string
-	batchSize  int
-	bufferSize int
-
-	// Progress tracking
-	totalBytes     int64
-	processedBytes int64
-
-	// Statistics
-	startTime    time.Time
-	entitiesRead int64
-
-	mu sync.RWMutex // Protects statistics only
+	filename string
+	config   ParseConfig
 }
 
-// MonitorBatch represents a batch of monitors
-type MonitorBatch struct {
-	Monitors []schema.Monitor
-	BatchID  int
-	Offset   int64
-}
-
-// ParseConfig holds parsing configuration
-type ParseConfig struct {
-	BatchSize    int             // Number of monitors per batch
-	BufferSize   int             // Read buffer size in bytes
-	MaxMemory    int64           // Maximum memory usage
-	ProgressChan chan<- Progress // Progress reporting channel
-}
-
-// Progress represents parsing progress
-type Progress struct {
-	EntitiesProcessed  int64
-	TotalBytes         int64
-	ProcessedBytes     int64
-	Percentage         float64
-	Rate               float64 // entities per second
-	EstimatedRemaining time.Duration
-}
-
-// NewStreamingYamlParser creates a new streaming parser
+// NewStreamingYamlParser creates a new streaming YAML parser.
 func NewStreamingYamlParser(filename string, config ParseConfig) (*StreamingYamlParser, error) {
-	// Get file size for progress tracking
-	fileInfo, err := os.Stat(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to stat file: %w", err)
-	}
-
 	return &StreamingYamlParser{
-		filename:   filename,
-		batchSize:  config.BatchSize,
-		bufferSize: config.BufferSize,
-		totalBytes: fileInfo.Size(),
-		startTime:  time.Now(),
+		filename: filename,
+		config:   config,
 	}, nil
 }
 
-// ParseBatches streams YAML file and returns batches of monitors
+// ParseBatches streams the YAML file and sends batches of monitors over a channel.
 func (p *StreamingYamlParser) ParseBatches(ctx context.Context, progressChan chan<- Progress) (<-chan MonitorBatch, <-chan error) {
-	batchChan := make(chan MonitorBatch, 10) // Buffer for batches
+	batchChan := make(chan MonitorBatch, 100)
 	errorChan := make(chan error, 1)
 
 	go func() {
@@ -88,7 +42,8 @@ func (p *StreamingYamlParser) ParseBatches(ctx context.Context, progressChan cha
 	return batchChan, errorChan
 }
 
-// parseFile performs the actual file parsing
+// parseFile performs the actual streaming YAML parsing.
+// It decodes the main `monitors` list and then streams each monitor entry.
 func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- MonitorBatch, progressChan chan<- Progress) error {
 	file, err := os.Open(p.filename)
 	if err != nil {
@@ -96,165 +51,67 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	}
 	defer file.Close()
 
-	// Create buffered reader for efficient I/O
-	reader := bufio.NewReaderSize(file, p.bufferSize)
-	decoder := yaml.NewDecoder(reader)
+	decoder := yaml.NewDecoder(file)
 
-	// Parse the entire manifest first with timeout
-	fmt.Printf("DEBUG: Starting to parse YAML file...\n")
+	// The YAML file is expected to have a root structure like:
+	// monitors:
+	//   - name: ...
+	//   - name: ...
+	// We need to find the 'monitors' sequence node.
 
-	type result struct {
-		manifest schema.Manifest
-		err      error
+	// 1. Decode the top-level structure.
+	var topLevel struct {
+		Monitors yaml.Node `yaml:"monitors"`
 	}
-
-	resultChan := make(chan result, 1)
-	go func() {
-		var manifest schema.Manifest
-		err := decoder.Decode(&manifest)
-		resultChan <- result{manifest: manifest, err: err}
-	}()
-
-	// Wait for decode with timeout
-	var manifest schema.Manifest
-	select {
-	case res := <-resultChan:
-		if res.err != nil {
-			fmt.Printf("DEBUG: YAML decode error: %v\n", res.err)
-			return fmt.Errorf("failed to decode manifest: %w", res.err)
+	if err := decoder.Decode(&topLevel); err != nil {
+		if err == io.EOF {
+			return nil // Empty file is not an error
 		}
-		manifest = res.manifest
-		fmt.Printf("DEBUG: Successfully decoded YAML\n")
-	case <-time.After(120 * time.Second):
-		fmt.Printf("DEBUG: YAML decode timeout - file might be too large for full decode\n")
-		return fmt.Errorf("YAML decode timeout - try using smaller file or different approach")
+		return fmt.Errorf("failed to decode top-level 'monitors' field: %w", err)
 	}
 
-	fmt.Printf("DEBUG: Loaded manifest with %d monitors\n", len(manifest.Monitors))
+	// 2. Check if 'monitors' is a sequence.
+	if topLevel.Monitors.Kind != yaml.SequenceNode {
+		return fmt.Errorf("'monitors' field must be a YAML sequence")
+	}
 
-	// Now process monitors in batches with concurrent sending
-	totalMonitors := len(manifest.Monitors)
+	// 3. Iterate through the sequence and decode each monitor.
+	batchID := 0
+	batch := make([]schema.Monitor, 0, p.config.BatchSize)
 
-	// Progress reporting ticker
-	progressTicker := time.NewTicker(1 * time.Second)
-	defer progressTicker.Stop()
-
-	// Process monitors in large chunks with maximum concurrency
-	const maxGoroutines = 100 // 100 concurrent goroutines
-	const chunkSize = 10000   // 10k monitors per routine
-	sem := make(chan struct{}, maxGoroutines)
-
-	for i := 0; i < totalMonitors; i += chunkSize {
+	for _, monitorNode := range topLevel.Monitors.Content {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-progressTicker.C:
-			p.reportProgress(progressChan)
 		default:
-		}
-
-		// Calculate end index for this chunk
-		end := i + chunkSize
-		if end > totalMonitors {
-			end = totalMonitors
-		}
-
-		// Process large chunk concurrently, splitting into smaller batches
-		sem <- struct{}{} // Acquire semaphore
-		go func(chunkStart, chunkEnd int) {
-			defer func() { <-sem }() // Release semaphore
-
-			// Process this chunk in smaller batches
-			for j := chunkStart; j < chunkEnd; j += p.batchSize {
-				batchEnd := j + p.batchSize
-				if batchEnd > chunkEnd {
-					batchEnd = chunkEnd
-				}
-
-				// Create batch efficiently
-				batchMonitors := make([]schema.Monitor, batchEnd-j)
-				copy(batchMonitors, manifest.Monitors[j:batchEnd])
-
-				// Send batch (non-blocking)
-				select {
-				case batchChan <- MonitorBatch{
-					Monitors: batchMonitors,
-					BatchID:  j / p.batchSize, // Calculate batch ID
-					Offset:   int64(j),
-				}:
-					// Update stats for this batch
-					for range batchMonitors {
-						p.incrementStats()
-					}
-				case <-ctx.Done():
-					return
-				}
+			var monitor schema.Monitor
+			if err := monitorNode.Decode(&monitor); err != nil {
+				// Provide context for the decoding error.
+				return fmt.Errorf("failed to decode monitor at line %d: %w", monitorNode.Line, err)
 			}
-		}(i, end)
 
-		// Small yield every 10 chunks to prevent overwhelming
-		if (i/chunkSize)%10 == 0 && i > 0 {
-			time.Sleep(10 * time.Microsecond)
+			// Basic validation to catch empty monitors from malformed YAML (e.g., "- ").
+			if monitor.Name == "" && monitor.Pulse.Type == "" {
+				// This is likely an empty or malformed monitor entry, so we skip it.
+				continue
+			}
+
+			batch = append(batch, monitor)
+
+			if len(batch) >= p.config.BatchSize {
+				// Send the full batch.
+				batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
+				// Reset batch.
+				batch = make([]schema.Monitor, 0, p.config.BatchSize)
+				batchID++
+			}
 		}
 	}
 
-	// Wait for all goroutines to complete
-	for i := 0; i < maxGoroutines; i++ {
-		sem <- struct{}{}
+	// 4. Send any remaining monitors in the last batch.
+	if len(batch) > 0 {
+		batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
 	}
 
-	// Final progress report
-	p.reportProgress(progressChan)
 	return nil
-}
-
-// incrementStats safely increments parsing statistics
-func (p *StreamingYamlParser) incrementStats() {
-	p.mu.Lock()
-	p.entitiesRead++
-	p.mu.Unlock()
-}
-
-// reportProgress sends progress update
-func (p *StreamingYamlParser) reportProgress(progressChan chan<- Progress) {
-	if progressChan == nil {
-		return
-	}
-
-	p.mu.RLock()
-	entitiesRead := p.entitiesRead
-	p.mu.RUnlock()
-
-	elapsed := time.Since(p.startTime)
-	rate := float64(entitiesRead) / elapsed.Seconds()
-
-	// For progress, we'll use the entities read vs a reasonable estimate
-	// This is simplified since we don't have accurate byte tracking during parsing
-	var percentage float64
-	var estimatedRemaining time.Duration
-	if entitiesRead > 0 {
-		percentage = 50.0 // Rough progress estimate
-	}
-
-	select {
-	case progressChan <- Progress{
-		EntitiesProcessed:  entitiesRead,
-		TotalBytes:         p.totalBytes,
-		ProcessedBytes:     int64(float64(p.totalBytes) * percentage / 100),
-		Percentage:         percentage,
-		Rate:               rate,
-		EstimatedRemaining: estimatedRemaining,
-	}:
-	default:
-		// Don't block if channel is full
-	}
-}
-
-// GetStats returns current parsing statistics
-func (p *StreamingYamlParser) GetStats() (entitiesRead int64, rate float64) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	elapsed := time.Since(p.startTime)
-	return p.entitiesRead, float64(p.entitiesRead) / elapsed.Seconds()
 }

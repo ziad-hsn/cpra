@@ -2,302 +2,253 @@ package queue
 
 import (
 	"context"
-	"fmt"
-	"runtime"
+	"cpra/internal/jobs"
+	"log"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/panjf2000/ants/v2"
 )
 
-// WorkerPoolLogger interface for structured logging
-type WorkerPoolLogger interface {
-	Info(format string, args ...interface{})
-	Debug(format string, args ...interface{})
-	Warn(format string, args ...interface{})
+// ResultRouter handles routing of job results to type-specific channels.
+// This enables decoupling result processing from the main worker pool.
+type ResultRouter struct {
+	PulseResultChan        chan []jobs.Result
+	InterventionResultChan chan []jobs.Result
+	CodeResultChan         chan []jobs.Result
+
+	config WorkerPoolConfig
+	logger *log.Logger
 }
 
-// DynamicWorkerPool manages a pool of workers that can scale up and down
+// NewResultRouter creates a new result router with buffered channels.
+func NewResultRouter(config WorkerPoolConfig, logger *log.Logger) *ResultRouter {
+	bufferSize := config.MaxWorkers // Buffer size based on max workers
+	return &ResultRouter{
+		PulseResultChan:        make(chan []jobs.Result, bufferSize),
+		InterventionResultChan: make(chan []jobs.Result, bufferSize),
+		CodeResultChan:         make(chan []jobs.Result, bufferSize),
+		config:                 config,
+		logger:                 logger,
+	}
+}
+
+// RouteResults takes a batch of mixed results and routes them to appropriate channels.
+func (r *ResultRouter) RouteResults(results []jobs.Result) {
+	if len(results) == 0 {
+		return
+	}
+
+	// Group results by type
+	pulseResults := make([]jobs.Result, 0, len(results))
+	interventionResults := make([]jobs.Result, 0, len(results))
+	codeResults := make([]jobs.Result, 0, len(results))
+
+	for _, result := range results {
+		switch result.Payload["type"] {
+		case "pulse":
+			pulseResults = append(pulseResults, result)
+		case "intervention":
+			interventionResults = append(interventionResults, result)
+		case "code":
+			codeResults = append(codeResults, result)
+		default:
+			r.logger.Printf("Unknown job type in result: %v", result.Payload["type"])
+		}
+	}
+
+	// Send to appropriate channels (non-blocking)
+	if len(pulseResults) > 0 {
+		select {
+		case r.PulseResultChan <- pulseResults:
+		default:
+			r.logger.Printf("Warning: PulseResultChan full, dropping %d results", len(pulseResults))
+		}
+	}
+	if len(interventionResults) > 0 {
+		select {
+		case r.InterventionResultChan <- interventionResults:
+		default:
+			r.logger.Printf("Warning: InterventionResultChan full, dropping %d results", len(interventionResults))
+		}
+	}
+	if len(codeResults) > 0 {
+		select {
+		case r.CodeResultChan <- codeResults:
+		default:
+			r.logger.Printf("Warning: CodeResultChan full, dropping %d results", len(codeResults))
+		}
+	}
+}
+
+// Close closes all result channels.
+func (r *ResultRouter) Close() {
+	close(r.PulseResultChan)
+	close(r.InterventionResultChan)
+	close(r.CodeResultChan)
+}
+
+// DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
+// It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
-	// Configuration
-	minWorkers    int32
-	maxWorkers    int32
-	scaleInterval time.Duration
+	queue      Queue
+	antsPool   *ants.PoolWithFunc
+	logger     *log.Logger
+	config     WorkerPoolConfig
+	resultChan chan jobs.Result
+	router     *ResultRouter
 
-	// State
-	currentWorkers int32
-	targetWorkers  int32
-
-	// Work distribution
-	workChan    chan func()
-	workerChans []chan func()
-
-	// Statistics
-	tasksProcessed   int64
-	tasksQueued      int64
-	workersCreated   int64
-	workersDestroyed int64
-
-	// Control
-	running int32
-	mu      sync.RWMutex
-
-	// Logging
-	logger WorkerPoolLogger
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
-// WorkerPoolConfig holds worker pool configuration
+// WorkerPoolConfig holds configuration for the DynamicWorkerPool.
 type WorkerPoolConfig struct {
-	MinWorkers    int           // Minimum number of workers
-	MaxWorkers    int           // Maximum number of workers
-	ScaleInterval time.Duration // How often to check scaling
-	QueueSize     int           // Work queue size
+	MinWorkers         int
+	MaxWorkers         int
+	AdjustmentInterval time.Duration
+	ResultBatchSize    int
+	ResultBatchTimeout time.Duration
 }
 
-// WorkerPoolStats holds worker pool statistics
-type WorkerPoolStats struct {
-	CurrentWorkers   int32
-	TargetWorkers    int32
-	TasksProcessed   int64
-	TasksQueued      int64
-	WorkersCreated   int64
-	WorkersDestroyed int64
-	QueueDepth       int
-}
-
-// DefaultWorkerPoolConfig returns default configuration
+// DefaultWorkerPoolConfig returns a default configuration for the worker pool.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
-	numCPU := runtime.NumCPU()
 	return WorkerPoolConfig{
-		MinWorkers:    numCPU,
-		MaxWorkers:    numCPU * 10, // 10x CPU cores
-		ScaleInterval: 5 * time.Second,
-		QueueSize:     1000,
+		MinWorkers:         10,
+		MaxWorkers:         1000,
+		AdjustmentInterval: 5 * time.Second,
+		ResultBatchSize:    100,
+		ResultBatchTimeout: 10 * time.Millisecond,
 	}
 }
 
-// NewDynamicWorkerPool creates a new dynamic worker pool
-func NewDynamicWorkerPool(config WorkerPoolConfig, logger WorkerPoolLogger) *DynamicWorkerPool {
+// NewDynamicWorkerPool creates a new dynamic worker pool.
+func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) (*DynamicWorkerPool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	pool := &DynamicWorkerPool{
-		minWorkers:    int32(config.MinWorkers),
-		maxWorkers:    int32(config.MaxWorkers),
-		scaleInterval: config.ScaleInterval,
-		workChan:      make(chan func(), config.QueueSize),
-		workerChans:   make([]chan func(), 0, config.MaxWorkers),
-		targetWorkers: int32(config.MinWorkers),
-		logger:        logger,
+		queue:      q,
+		logger:     logger,
+		config:     config,
+		resultChan: make(chan jobs.Result, config.MaxWorkers),
+		router:     NewResultRouter(config, logger),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 
-	return pool
-}
-
-// Start starts the worker pool
-func (dwp *DynamicWorkerPool) Start(ctx context.Context) error {
-	if !atomic.CompareAndSwapInt32(&dwp.running, 0, 1) {
-		return fmt.Errorf("worker pool already running")
+	workerFunc := func(job interface{}) {
+		j, ok := job.(jobs.Job)
+		if !ok {
+			pool.logger.Printf("Error: Invalid job type in worker pool: %T", job)
+			return
+		}
+		result := j.Execute()
+		pool.resultChan <- result
 	}
 
-	// Start initial workers
-	dwp.scaleWorkers(int(dwp.minWorkers))
-
-	// Start scaling goroutine
-	go dwp.scalingLoop(ctx)
-
-	// Start work distribution
-	go dwp.distributeWork(ctx)
-
-	return nil
-}
-
-// Stop stops the worker pool
-func (dwp *DynamicWorkerPool) Stop() {
-	atomic.StoreInt32(&dwp.running, 0)
-	close(dwp.workChan)
-}
-
-// Submit submits work to the pool
-func (dwp *DynamicWorkerPool) Submit(work func()) error {
-	if atomic.LoadInt32(&dwp.running) == 0 {
-		return fmt.Errorf("worker pool not running")
+	antsPool, err := ants.NewPoolWithFunc(config.MinWorkers, workerFunc, ants.WithPanicHandler(func(err interface{}) {
+		pool.logger.Printf("Worker panic: %v", err)
+	}))
+	if err != nil {
+		return nil, err
 	}
+	pool.antsPool = antsPool
 
-	select {
-	case dwp.workChan <- work:
-		atomic.AddInt64(&dwp.tasksQueued, 1)
-		return nil
-	default:
-		return fmt.Errorf("work queue full")
+	return pool, nil
+}
+
+// Start begins the worker pool's operations.
+func (p *DynamicWorkerPool) Start() {
+	p.wg.Add(2)
+	go p.dispatcher()
+	go p.resultProcessor()
+	p.logger.Println("DynamicWorkerPool started")
+}
+
+// GetRouter returns the result router for accessing type-specific result channels.
+func (p *DynamicWorkerPool) GetRouter() *ResultRouter {
+	return p.router
+}
+
+// Stop gracefully shuts down the worker pool.
+func (p *DynamicWorkerPool) Stop() {
+	p.logger.Println("Stopping DynamicWorkerPool...")
+	p.cancel()
+	p.wg.Wait()
+	p.antsPool.Release()
+	close(p.resultChan)
+	p.router.Close()
+	p.logger.Println("DynamicWorkerPool stopped")
+}
+
+// dispatcher fetches batches of jobs from the queue and submits them to the ants pool.
+func (p *DynamicWorkerPool) dispatcher() {
+	defer p.wg.Done()
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		default:
+			// Dequeue a batch of jobs. The maxSize can be tuned.
+			jobs, err := p.queue.DequeueBatch(p.config.MaxWorkers) // Using MaxWorkers as batch size for now
+			if err != nil {
+				if err != ErrQueueClosed {
+					p.logger.Printf("Error dequeuing job batch: %v", err)
+				}
+				time.Sleep(100 * time.Millisecond) // Wait a bit if there's an error
+				continue
+			}
+			if len(jobs) == 0 {
+				time.Sleep(10 * time.Millisecond) // Wait if the queue is empty
+				continue
+			}
+
+			for _, job := range jobs {
+				if err := p.antsPool.Invoke(job); err != nil {
+					p.logger.Printf("Error invoking job: %v", err)
+				}
+			}
+		}
 	}
 }
 
-// scalingLoop monitors and adjusts worker count
-func (dwp *DynamicWorkerPool) scalingLoop(ctx context.Context) {
-	ticker := time.NewTicker(dwp.scaleInterval)
+// resultProcessor collects individual results and routes them through the router in batches.
+func (p *DynamicWorkerPool) resultProcessor() {
+	defer p.wg.Done()
+
+	batch := make([]jobs.Result, 0, p.config.ResultBatchSize)
+	ticker := time.NewTicker(p.config.ResultBatchTimeout)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-p.ctx.Done():
+			// Route any remaining results before shutting down
+			if len(batch) > 0 {
+				p.router.RouteResults(batch)
+			}
 			return
+		case result, ok := <-p.resultChan:
+			if !ok { // resultChan was closed
+				if len(batch) > 0 {
+					p.router.RouteResults(batch)
+				}
+				return
+			}
+			batch = append(batch, result)
+			if len(batch) >= p.config.ResultBatchSize {
+				p.router.RouteResults(batch)
+				batch = make([]jobs.Result, 0, p.config.ResultBatchSize)
+				// Reset the ticker to prevent immediate firing
+				ticker.Reset(p.config.ResultBatchTimeout)
+			}
 		case <-ticker.C:
-			if atomic.LoadInt32(&dwp.running) == 0 {
-				return
-			}
-			dwp.adjustWorkerCount()
-		}
-	}
-}
-
-// adjustWorkerCount adjusts the number of workers based on load
-func (dwp *DynamicWorkerPool) adjustWorkerCount() {
-	queueDepth := len(dwp.workChan)
-	currentWorkers := atomic.LoadInt32(&dwp.currentWorkers)
-
-	var targetWorkers int32
-
-	// Scale up if queue is getting full
-	if queueDepth > int(currentWorkers)*2 {
-		targetWorkers = currentWorkers + int32(runtime.NumCPU())
-		if targetWorkers > dwp.maxWorkers {
-			targetWorkers = dwp.maxWorkers
-		}
-	} else if queueDepth < int(currentWorkers)/2 && currentWorkers > dwp.minWorkers {
-		// Scale down if queue is mostly empty
-		targetWorkers = currentWorkers - int32(runtime.NumCPU()/2)
-		if targetWorkers < dwp.minWorkers {
-			targetWorkers = dwp.minWorkers
-		}
-	} else {
-		targetWorkers = currentWorkers
-	}
-
-	if targetWorkers != currentWorkers {
-		atomic.StoreInt32(&dwp.targetWorkers, targetWorkers)
-
-		if targetWorkers > currentWorkers {
-			dwp.scaleUp(int(targetWorkers - currentWorkers))
-		} else if targetWorkers < currentWorkers {
-			dwp.scaleDown(int(currentWorkers - targetWorkers))
-		}
-	}
-}
-
-// scaleUp adds more workers
-func (dwp *DynamicWorkerPool) scaleUp(count int) {
-	dwp.mu.Lock()
-	defer dwp.mu.Unlock()
-
-	for i := 0; i < count; i++ {
-		workerChan := make(chan func(), 1)
-		dwp.workerChans = append(dwp.workerChans, workerChan)
-
-		go dwp.worker(workerChan)
-		atomic.AddInt32(&dwp.currentWorkers, 1)
-		atomic.AddInt64(&dwp.workersCreated, 1)
-	}
-
-	dwp.logger.Info("Worker pool scaled up: %d workers (total: %d)", count, atomic.LoadInt32(&dwp.currentWorkers))
-}
-
-// scaleDown removes workers
-func (dwp *DynamicWorkerPool) scaleDown(count int) {
-	dwp.mu.Lock()
-	defer dwp.mu.Unlock()
-
-	if count > len(dwp.workerChans) {
-		count = len(dwp.workerChans)
-	}
-
-	// Close worker channels to signal shutdown
-	for i := 0; i < count; i++ {
-		if len(dwp.workerChans) > 0 {
-			close(dwp.workerChans[len(dwp.workerChans)-1])
-			dwp.workerChans = dwp.workerChans[:len(dwp.workerChans)-1]
-			atomic.AddInt32(&dwp.currentWorkers, -1)
-			atomic.AddInt64(&dwp.workersDestroyed, 1)
-		}
-	}
-
-	dwp.logger.Info("Worker pool scaled down: %d workers (total: %d)", count, atomic.LoadInt32(&dwp.currentWorkers))
-}
-
-// scaleWorkers sets the initial number of workers
-func (dwp *DynamicWorkerPool) scaleWorkers(count int) {
-	dwp.mu.Lock()
-	defer dwp.mu.Unlock()
-
-	for i := 0; i < count; i++ {
-		workerChan := make(chan func(), 1)
-		dwp.workerChans = append(dwp.workerChans, workerChan)
-
-		go dwp.worker(workerChan)
-		atomic.AddInt32(&dwp.currentWorkers, 1)
-		atomic.AddInt64(&dwp.workersCreated, 1)
-	}
-}
-
-// distributeWork distributes work to available workers
-func (dwp *DynamicWorkerPool) distributeWork(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case work, ok := <-dwp.workChan:
-			if !ok {
-				return
-			}
-
-			// Find available worker
-			dwp.mu.RLock()
-			if len(dwp.workerChans) == 0 {
-				dwp.mu.RUnlock()
-				continue
-			}
-
-			// Round-robin distribution
-			workerIndex := int(atomic.LoadInt64(&dwp.tasksProcessed)) % len(dwp.workerChans)
-			workerChan := dwp.workerChans[workerIndex]
-			dwp.mu.RUnlock()
-
-			// Send work to worker
-			select {
-			case workerChan <- work:
-				// Work assigned successfully
-			default:
-				// Worker busy, try to execute directly
-				go func() {
-					work()
-					atomic.AddInt64(&dwp.tasksProcessed, 1)
-				}()
+			// Route partial batches on timeout
+			if len(batch) > 0 {
+				p.router.RouteResults(batch)
+				batch = make([]jobs.Result, 0, p.config.ResultBatchSize)
 			}
 		}
 	}
-}
-
-// worker is the main worker loop
-func (dwp *DynamicWorkerPool) worker(workChan <-chan func()) {
-	for work := range workChan {
-		work()
-		atomic.AddInt64(&dwp.tasksProcessed, 1)
-	}
-}
-
-// Stats returns current worker pool statistics
-func (dwp *DynamicWorkerPool) Stats() WorkerPoolStats {
-	dwp.mu.RLock()
-	defer dwp.mu.RUnlock()
-
-	return WorkerPoolStats{
-		CurrentWorkers:   atomic.LoadInt32(&dwp.currentWorkers),
-		TargetWorkers:    atomic.LoadInt32(&dwp.targetWorkers),
-		TasksProcessed:   atomic.LoadInt64(&dwp.tasksProcessed),
-		TasksQueued:      atomic.LoadInt64(&dwp.tasksQueued),
-		WorkersCreated:   atomic.LoadInt64(&dwp.workersCreated),
-		WorkersDestroyed: atomic.LoadInt64(&dwp.workersDestroyed),
-		QueueDepth:       len(dwp.workChan),
-	}
-}
-
-// IsRunning returns true if the worker pool is currently running
-func (dwp *DynamicWorkerPool) IsRunning() bool {
-	return atomic.LoadInt32(&dwp.running) == 1
 }

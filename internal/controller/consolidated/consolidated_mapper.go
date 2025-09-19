@@ -1,7 +1,6 @@
-package entities
+package consolidated
 
 import (
-	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"fmt"
@@ -11,33 +10,33 @@ import (
 	"github.com/mlange-42/ark/ecs"
 )
 
-// EntityManager uses the new consolidated component design.
-// This dramatically reduces the number of archetypes and improves performance.
+// EntityManager uses the new consolidated component design
+// This dramatically reduces the number of archetypes and improves performance
 type EntityManager struct {
-	// Core consolidated components - only a few archetypes instead of dozens.
-	MonitorState       *ecs.Map1[components.MonitorState]
-	PulseConfig        *ecs.Map1[components.PulseConfig]
-	InterventionConfig *ecs.Map1[components.InterventionConfig]
-	CodeConfig         *ecs.Map1[components.CodeConfig]
-	CodeStatus         *ecs.Map1[components.CodeStatus]
-	JobStorage         *ecs.Map1[components.JobStorage]
+	// Core consolidated components - only 4 archetypes instead of 50+
+	MonitorState       *ecs.Map1[MonitorState]
+	PulseConfig        *ecs.Map1[PulseConfig]
+	InterventionConfig *ecs.Map1[InterventionConfig]
+	CodeConfig         *ecs.Map1[CodeConfig]
+	CodeStatus         *ecs.Map1[CodeStatus]
+	JobStorage         *ecs.Map1[JobStorage]
 }
 
-// NewEntityManager creates a new consolidated entity manager.
-func NewEntityManager(world *ecs.World) *EntityManager {
+// NewConsolidatedEntityManager creates a new consolidated entity manager
+func NewConsolidatedEntityManager(world *ecs.World) *EntityManager {
 	return &EntityManager{
-		MonitorState:       ecs.NewMap1[components.MonitorState](world),
-		PulseConfig:        ecs.NewMap1[components.PulseConfig](world),
-		InterventionConfig: ecs.NewMap1[components.InterventionConfig](world),
-		CodeConfig:         ecs.NewMap1[components.CodeConfig](world),
-		CodeStatus:         ecs.NewMap1[components.CodeStatus](world),
-		JobStorage:         ecs.NewMap1[components.JobStorage](world),
+		MonitorState:       ecs.NewMap1[MonitorState](world),
+		PulseConfig:        ecs.NewMap1[PulseConfig](world),
+		InterventionConfig: ecs.NewMap1[InterventionConfig](world),
+		CodeConfig:         ecs.NewMap1[CodeConfig](world),
+		CodeStatus:         ecs.NewMap1[CodeStatus](world),
+		JobStorage:         ecs.NewMap1[JobStorage](world),
 	}
 }
 
-// CreateEntityFromMonitor creates an entity using the consolidated design.
+// CreateEntityFromMonitor creates entity using consolidated design
 func (e *EntityManager) CreateEntityFromMonitor(
-	monitor *schema.Monitor,
+	monitor schema.Monitor,
 	world *ecs.World) error {
 
 	// Validation
@@ -45,10 +44,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		return fmt.Errorf("world cannot be nil")
 	}
 	if e == nil {
-		return fmt.Errorf("EntityManager cannot be nil")
+		return fmt.Errorf("ConsolidatedEntityManager cannot be nil")
 	}
 	if monitor.Name == "" {
-		fmt.Println(monitor, "name cannot be empty")
+		fmt.Println(monitor, "ziaaaaaaaaaaaaaaaaad")
 		return fmt.Errorf("monitor name cannot be empty")
 	}
 
@@ -58,7 +57,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Create consolidated MonitorState component
-	monitorState := &components.MonitorState{
+	monitorState := &MonitorState{
 		Name:            strings.Clone(monitor.Name),
 		LastCheckTime:   time.Now(),
 		LastSuccessTime: time.Now(),
@@ -75,7 +74,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	e.MonitorState.Add(entity, monitorState)
 
 	// Add pulse configuration
-	pulseConfig := &components.PulseConfig{
+	pulseConfig := &PulseConfig{
 		Type:        strings.Clone(monitor.Pulse.Type),
 		MaxFailures: monitor.Pulse.MaxFailures,
 		Timeout:     monitor.Pulse.Timeout,
@@ -85,7 +84,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	e.PulseConfig.Add(entity, pulseConfig)
 
 	// Create consolidated job storage
-	jobStorage := &components.JobStorage{
+	jobStorage := &JobStorage{
 		CodeJobs: make(map[string]jobs.Job),
 	}
 
@@ -103,7 +102,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			maxFailures = monitor.Intervention.MaxFailures
 		}
 
-		interventionConfig := &components.InterventionConfig{
+		interventionConfig := &InterventionConfig{
 			Action:      strings.Clone(monitor.Intervention.Action),
 			Target:      monitor.Intervention.Target.Copy(),
 			MaxFailures: maxFailures,
@@ -120,22 +119,22 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	// Add consolidated code configuration instead of separate color components
 	if len(monitor.Codes) > 0 {
-		codeConfig := &components.CodeConfig{
-			Configs: make(map[string]*components.ColorCodeConfig),
+		codeConfig := &CodeConfig{
+			Configs: make(map[string]*ColorCodeConfig),
 		}
-		codeStatus := &components.CodeStatus{
-			Status: make(map[string]*components.ColorCodeStatus),
+		codeStatus := &CodeStatus{
+			Status: make(map[string]*ColorCodeStatus),
 		}
 
 		for color, config := range monitor.Codes {
 			// Single consolidated entry instead of separate components
-			codeConfig.Configs[color] = &components.ColorCodeConfig{
+			codeConfig.Configs[color] = &ColorCodeConfig{
 				Dispatch: config.Dispatch,
 				Notify:   strings.Clone(config.Notify),
 				Config:   config.Config.Copy(),
 			}
 
-			codeStatus.Status[color] = &components.ColorCodeStatus{
+			codeStatus.Status[color] = &ColorCodeStatus{
 				LastAlertTime: time.Now(),
 			}
 
@@ -175,6 +174,33 @@ func (e *EntityManager) DisableMonitor(entity ecs.Entity) {
 }
 
 // GetMonitorState provides easy access to consolidated state
-func (e *EntityManager) GetMonitorState(entity ecs.Entity) *components.MonitorState {
+func (e *EntityManager) GetMonitorState(entity ecs.Entity) *MonitorState {
 	return e.MonitorState.Get(entity)
+}
+
+// HasPulseNeeded Legacy compatibility methods for gradual migration
+func (e *EntityManager) HasPulseNeeded(entity ecs.Entity) bool {
+	if state := e.MonitorState.Get(entity); state != nil {
+		return state.IsPulseNeeded()
+	}
+	return false
+}
+
+func (e *EntityManager) SetPulseNeeded(entity ecs.Entity, needed bool) {
+	if state := e.MonitorState.Get(entity); state != nil {
+		state.SetPulseNeeded(needed)
+	}
+}
+
+func (e *EntityManager) HasPulsePending(entity ecs.Entity) bool {
+	if state := e.MonitorState.Get(entity); state != nil {
+		return state.IsPulsePending()
+	}
+	return false
+}
+
+func (e *EntityManager) SetPulsePending(entity ecs.Entity, pending bool) {
+	if state := e.MonitorState.Get(entity); state != nil {
+		state.SetPulsePending(pending)
+	}
 }

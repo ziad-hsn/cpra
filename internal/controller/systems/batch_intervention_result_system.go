@@ -1,132 +1,116 @@
 package systems
 
 import (
+	"cpra/internal/controller/components"
+	"cpra/internal/jobs"
+	"sync/atomic"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
 )
 
-// BatchInterventionResultSystem processes intervention results exactly like sys_intervention.go
+// BatchInterventionResultSystem processes completed intervention jobs.
+// It processes batches of results passed directly from the result router.
 type BatchInterventionResultSystem struct {
-	ResultChan <-chan jobs.Result
-	Mapper     *entities.EntityManager
-	logger     Logger
+	world  *ecs.World
+	logger Logger
+
+	// Mappers for efficient component access
+	stateMapper *ecs.Map[components.MonitorState]
+	ResultChan  <-chan []jobs.Result
 }
 
-// NewBatchInterventionResultSystem creates a new batch intervention result system using the original approach
-func NewBatchInterventionResultSystem(resultChan <-chan jobs.Result, mapper *entities.EntityManager, logger Logger) *BatchInterventionResultSystem {
+// NewBatchInterventionResultSystem creates a new BatchInterventionResultSystem.
+func NewBatchInterventionResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger) *BatchInterventionResultSystem {
 	return &BatchInterventionResultSystem{
-		ResultChan: resultChan,
-		Mapper:     mapper,
-		logger:     logger,
+		world:       world,
+		logger:      logger,
+		stateMapper: ecs.NewMap[components.MonitorState](world),
+		ResultChan:  results,
 	}
 }
 
-// Initialize initializes the system exactly like sys_intervention.go
-func (birs *BatchInterventionResultSystem) Initialize(w *ecs.World) {
-	// Nothing to initialize - original system doesn't either
+func (s *BatchInterventionResultSystem) Initialize(w *ecs.World) {
 }
 
-// collectInterventionResults collects results exactly like sys_intervention.go
-func (birs *BatchInterventionResultSystem) collectInterventionResults() map[ecs.Entity]jobs.Result {
-	out := make(map[ecs.Entity]jobs.Result)
+func (s *BatchInterventionResultSystem) Update(w *ecs.World) {
+	resultsBatches := make([][]jobs.Result, 0)
 loop:
 	for {
 		select {
-		case res, ok := <-birs.ResultChan:
-			if !ok {
-				break loop
-			}
-			out[res.Entity()] = res
+		case res := <-s.ResultChan:
+			resultsBatches = append(resultsBatches, res)
 		default:
 			break loop
 		}
 	}
-	return out
-}
 
-// processInterventionResultsAndQueueStructuralChanges processes results exactly like sys_intervention.go
-func (birs *BatchInterventionResultSystem) processInterventionResultsAndQueueStructuralChanges(
-	w *ecs.World, results map[ecs.Entity]jobs.Result,
-) {
-	for _, res := range results {
-		entity := res.Entity()
-
-		if !w.Alive(entity) || !birs.Mapper.InterventionPending.HasAll(entity) {
-			continue
-		}
-
-		namePtr := birs.Mapper.Name.Get(entity)
-		if namePtr == nil {
-			birs.logger.Warn("Entity %d has nil name component", entity.ID())
-			continue
-		}
-		name := *namePtr
-
-		if res.Error() != nil {
-			// ---- FAILURE - exact same logic as sys_intervention.go ----
-			maxFailures := birs.Mapper.InterventionConfig.Get(entity).MaxFailures
-			statusCopy := birs.Mapper.InterventionStatus.Get(entity)
-
-			statusCopy.LastStatus = "failed"
-			statusCopy.LastError = res.Error()
-			statusCopy.ConsecutiveFailures++
-
-			birs.logger.Debug("Monitor %s failed (attempt %d/%d): %v",
-				name, statusCopy.ConsecutiveFailures, maxFailures, res.Error())
-			birs.logger.Info("Monitor %s intervention failed (attempt %d/%d)", name, statusCopy.ConsecutiveFailures, maxFailures)
-
-			if maxFailures <= statusCopy.ConsecutiveFailures {
-				if birs.Mapper.RedCode.HasAll(entity) {
-					birs.logger.Info("Monitor %s intervention failed completely - triggering red critical code", name)
-					if !birs.Mapper.CodeNeeded.HasAll(entity) {
-						birs.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "red"})
-						birs.logger.LogComponentState(entity.ID(), "CodeNeeded", "red added")
-					}
-				}
-			} else {
-				birs.Mapper.InterventionNeeded.Add(entity, &components.InterventionNeeded{})
-				birs.logger.LogComponentState(entity.ID(), "InterventionNeeded", "added")
-			}
-
-		} else {
-			// ---- SUCCESS - exact same logic as sys_intervention.go ----
-			statusCopy := birs.Mapper.InterventionStatus.Get(entity)
-
-			statusCopy.LastStatus = "success"
-			statusCopy.LastError = nil
-			statusCopy.ConsecutiveFailures = 0
-			statusCopy.LastSuccessTime = time.Now()
-
-			birs.logger.Debug("Monitor %s intervention successful", name)
-			birs.logger.Info("Monitor %s intervention succeeded", name)
-
-			// Trigger cyan code when intervention succeeds (interventions are only triggered when needed)
-			if birs.Mapper.CyanCode.HasAll(entity) {
-				birs.logger.Info("Monitor %s intervention succeeded - triggering cyan success code", name)
-				if !birs.Mapper.CodeNeeded.HasAll(entity) {
-					birs.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "cyan"})
-					birs.logger.LogComponentState(entity.ID(), "CodeNeeded", "cyan added")
-				}
-			}
-		}
-
-		// Always remove pending after processing - exact same as original
-		birs.Mapper.InterventionPending.Remove(entity)
-		birs.logger.LogComponentState(entity.ID(), "InterventionPending", "removed")
+	for _, res := range resultsBatches {
+		s.ProcessBatch(res)
 	}
 }
 
-// Update processes results exactly like sys_intervention.go
-func (birs *BatchInterventionResultSystem) Update(w *ecs.World) {
-	results := birs.collectInterventionResults()
-	birs.processInterventionResultsAndQueueStructuralChanges(w, results)
+// ProcessBatch processes a batch of intervention results.
+func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
+	startTime := time.Now()
+	processedCount := 0
+
+	for _, result := range results {
+		ent := result.Entity()
+		if !s.world.Alive(ent) {
+			continue
+		}
+
+		state := s.stateMapper.Get(ent)
+		if state == nil {
+			continue
+		}
+
+		// Ensure we are processing a pending intervention
+		if (atomic.LoadUint32(&state.Flags) & components.StateInterventionPending) == 0 {
+			s.logger.Warn("Entity[%d] received InterventionResult but was not in InterventionPending state", ent.ID())
+			continue
+		}
+
+		processedCount++
+		state.LastCheckTime = time.Now()
+
+		if result.Error() != nil {
+			// --- FAILURE ---
+			state.ConsecutiveFailures++
+			state.LastError = result.Error()
+			s.logger.Error("Monitor '%s' intervention failed: %v", state.Name, state.LastError)
+			s.triggerCode(ent, state, "red")
+		} else {
+			// --- SUCCESS ---
+			s.logger.Info("Monitor '%s' intervention succeeded.", state.Name)
+			state.ConsecutiveFailures = 0
+			state.LastError = nil
+			state.LastSuccessTime = state.LastCheckTime
+			s.triggerCode(ent, state, "cyan")
+		}
+
+		// Unset the pending flag, regardless of outcome.
+		atomic.AndUint32(&state.Flags, ^uint32(components.StateInterventionPending))
+	}
+
+	if processedCount > 0 {
+		s.logger.LogSystemPerformance("BatchInterventionResultSystem", time.Since(startTime), processedCount)
+	}
 }
 
-// Finalize cleans up like the original system
-func (birs *BatchInterventionResultSystem) Finalize(w *ecs.World) {
-	// Nothing to clean up like original
+func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
+	codeConfigMapper := ecs.NewMap[components.CodeConfig](s.world)
+	if !codeConfigMapper.Has(entity) {
+		return
+	}
+	codeConfig := codeConfigMapper.Get(entity)
+	if _, ok := codeConfig.Configs[color]; ok {
+		state.PendingCode = color
+		atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+		s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
+	}
 }
+
+// Finalize is a no-op for this system.
+func (s *BatchInterventionResultSystem) Finalize(w *ecs.World) {}

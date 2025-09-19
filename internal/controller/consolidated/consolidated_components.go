@@ -1,17 +1,4 @@
-// Package components defines the consolidated Entity-Component-System (ECS) components
-// for the CPRA monitoring application. This design follows the principles of data-oriented
-// design to maximize performance and minimize memory usage, as required for handling
-// over one million concurrent monitors.
-//
-// By consolidating state, configuration, and jobs into a few coarse-grained components,
-// we dramatically reduce the number of archetypes in the ECS world. This leads to:
-//   - Improved cache locality and iteration speed.
-//   - Reduced memory fragmentation.
-//   - Simplified system logic by avoiding complex component additions/removals for state transitions.
-//
-// State management is handled via a bitfield in the MonitorState component, allowing for
-// efficient, atomic updates to an entity's status without changing its archetype.
-package components
+package consolidated
 
 import (
 	"cpra/internal/jobs"
@@ -22,8 +9,8 @@ import (
 	"time"
 )
 
-// MonitorState consolidates all monitor state into a single component.
-// This approach dramatically reduces archetype fragmentation and improves cache locality.
+// MonitorState consolidates all monitor state into single component
+// This approach dramatically reduces archetype fragmentation and improves cache locality
 type MonitorState struct {
 	// Entity identification
 	Name string
@@ -40,46 +27,32 @@ type MonitorState struct {
 	ConsecutiveFailures int
 	LastError           error
 
-	// Pending action data
-	PendingCode string
+	// Performance padding to cache line boundary (64 bytes)
+	_ [16]byte
 }
 
 // State flag constants - replaces separate components like PulseNeeded, PulsePending, etc.
 const (
-	StateDisabled           uint32 = 1 << 0
-	StatePulseNeeded        uint32 = 1 << 1
-	StatePulsePending       uint32 = 1 << 2
-	StatePulseFirstCheck    uint32 = 1 << 3
+	StateDisabled         uint32 = 1 << 0
+	StatePulseNeeded      uint32 = 1 << 1
+	StatePulsePending     uint32 = 1 << 2
+	StatePulseFirstCheck  uint32 = 1 << 3
 	StateInterventionNeeded uint32 = 1 << 4
 	StateInterventionPending uint32 = 1 << 5
-	StateCodeNeeded         uint32 = 1 << 6
-	StateCodePending        uint32 = 1 << 7
+	StateCodeNeeded       uint32 = 1 << 6
+	StateCodePending      uint32 = 1 << 7
 	// Room for more states without adding components
 )
 
 // Efficient state management methods using atomic operations
 func (m *MonitorState) IsDisabled() bool { return atomic.LoadUint32(&m.Flags)&StateDisabled != 0 }
-func (m *MonitorState) IsPulseNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulseNeeded != 0
-}
-func (m *MonitorState) IsPulsePending() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulsePending != 0
-}
-func (m *MonitorState) IsPulseFirstCheck() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulseFirstCheck != 0
-}
-func (m *MonitorState) IsInterventionNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StateInterventionNeeded != 0
-}
-func (m *MonitorState) IsInterventionPending() bool {
-	return atomic.LoadUint32(&m.Flags)&StateInterventionPending != 0
-}
-func (m *MonitorState) IsCodeNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StateCodeNeeded != 0
-}
-func (m *MonitorState) IsCodePending() bool {
-	return atomic.LoadUint32(&m.Flags)&StateCodePending != 0
-}
+func (m *MonitorState) IsPulseNeeded() bool { return atomic.LoadUint32(&m.Flags)&StatePulseNeeded != 0 }
+func (m *MonitorState) IsPulsePending() bool { return atomic.LoadUint32(&m.Flags)&StatePulsePending != 0 }
+func (m *MonitorState) IsPulseFirstCheck() bool { return atomic.LoadUint32(&m.Flags)&StatePulseFirstCheck != 0 }
+func (m *MonitorState) IsInterventionNeeded() bool { return atomic.LoadUint32(&m.Flags)&StateInterventionNeeded != 0 }
+func (m *MonitorState) IsInterventionPending() bool { return atomic.LoadUint32(&m.Flags)&StateInterventionPending != 0 }
+func (m *MonitorState) IsCodeNeeded() bool { return atomic.LoadUint32(&m.Flags)&StateCodeNeeded != 0 }
+func (m *MonitorState) IsCodePending() bool { return atomic.LoadUint32(&m.Flags)&StateCodePending != 0 }
 
 func (m *MonitorState) SetDisabled(disabled bool) {
 	if disabled {
@@ -195,7 +168,7 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 	return cpy
 }
 
-// CodeConfig consolidates all code configurations instead of separate color components.
+// CodeConfig consolidates all code configurations instead of separate color components
 // This single component replaces RedCodeConfig, GreenCodeConfig, CyanCodeConfig, etc.
 type CodeConfig struct {
 	// Color-specific configurations stored as map instead of separate components
@@ -294,7 +267,7 @@ func (c *CodeStatus) Copy() *CodeStatus {
 	return cpy
 }
 
-// JobStorage consolidates all job storage instead of separate job components.
+// JobStorage consolidates all job storage instead of separate job components
 // This single component replaces PulseJob, InterventionJob, CodeJob, etc.
 type JobStorage struct {
 	PulseJob        jobs.Job
@@ -323,17 +296,5 @@ func (j *JobStorage) Copy() *JobStorage {
 	return cpy
 }
 
-// Result components are used to convey job completion information back to the ECS.
-// They are added to entities by the result handling logic and removed by the corresponding result system.
-
-type PulseResult struct {
-	Result jobs.Result
-}
-
-type InterventionResult struct {
-	Result jobs.Result
-}
-
-type CodeResult struct {
-	Result jobs.Result
-}
+// Legacy compatibility - keeping minimal existing components that are still needed
+// These will be gradually phased out

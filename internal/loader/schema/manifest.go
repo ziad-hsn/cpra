@@ -85,6 +85,7 @@ type PulseICMPConfig struct {
 	Host      string `yaml:"host"`
 	Privilege bool   `yaml:"ignore_privilege"`
 	Count     int    `yaml:"count"`
+	Retries   int    `yaml:"retries"`
 }
 
 func (c *PulseICMPConfig) Copy() PulseConfig {
@@ -469,6 +470,38 @@ type Monitor struct {
 	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
 	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
 	Codes        Codes        `yaml:"codes" json:"codes"`
+}
+
+// UnmarshalYAML sets default values for the Monitor struct, specifically for the Enabled field.
+func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
+	// Create a temporary struct with a pointer to a bool for 'Enabled'
+	type TmpMonitor struct {
+		Name         string       `yaml:"name"`
+		Enabled      *bool        `yaml:"enabled"`
+		Pulse        Pulse        `yaml:"pulse_check"`
+		Intervention Intervention `yaml:"intervention,omitempty"`
+		Codes        Codes        `yaml:"codes"`
+	}
+
+	var tmp TmpMonitor
+	if err := value.Decode(&tmp); err != nil {
+		return err
+	}
+
+	// Assign fields to the actual monitor struct
+	m.Name = tmp.Name
+	m.Pulse = tmp.Pulse
+	m.Intervention = tmp.Intervention
+	m.Codes = tmp.Codes
+
+	// Set 'Enabled' to true if it's not specified in the YAML
+	if tmp.Enabled == nil {
+		m.Enabled = true
+	} else {
+		m.Enabled = *tmp.Enabled
+	}
+
+	return nil
 }
 
 type Manifest struct {

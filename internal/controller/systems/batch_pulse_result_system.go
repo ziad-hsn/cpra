@@ -1,159 +1,126 @@
 package systems
 
 import (
+	"cpra/internal/controller/components"
+	"cpra/internal/jobs"
+	"sync/atomic"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/jobs"
 	"github.com/mlange-42/ark/ecs"
 )
 
-// BatchPulseResultSystem processes pulse results exactly like sys_pulse.go
+// BatchPulseResultSystem processes completed pulse checks.
+// It queries for entities with a PulseResult component and updates their state accordingly.
 type BatchPulseResultSystem struct {
-	ResultChan <-chan jobs.Result
-	Mapper     *entities.EntityManager
-	logger     Logger
+	world  *ecs.World
+	logger Logger
+
+	// Mappers are used for efficient component access
+	stateMapper      *ecs.Map1[components.MonitorState]
+	configMapper     *ecs.Map1[components.PulseConfig]
+	codeConfigMapper *ecs.Map1[components.CodeConfig]
+	ResultChan       <-chan []jobs.Result
 }
 
-// NewBatchPulseResultSystem creates a new batch pulse result system using the original approach
-func NewBatchPulseResultSystem(resultChan <-chan jobs.Result, mapper *entities.EntityManager, logger Logger) *BatchPulseResultSystem {
+// NewBatchPulseResultSystem creates a new BatchPulseResultSystem.
+func NewBatchPulseResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger) *BatchPulseResultSystem {
 	return &BatchPulseResultSystem{
-		ResultChan: resultChan,
-		Mapper:     mapper,
-		logger:     logger,
+		world:            world,
+		logger:           logger,
+		stateMapper:      ecs.NewMap1[components.MonitorState](world),
+		configMapper:     ecs.NewMap1[components.PulseConfig](world),
+		codeConfigMapper: ecs.NewMap1[components.CodeConfig](world),
+		ResultChan:       results,
 	}
 }
-
-// Initialize initializes the system exactly like sys_pulse.go
-func (bprs *BatchPulseResultSystem) Initialize(w *ecs.World) {
-	// Nothing to initialize - original system doesn't either
+func (s *BatchPulseResultSystem) Initialize(w *ecs.World) {
 }
 
-// collectPulseResults collects results exactly like sys_pulse.go
-func (bprs *BatchPulseResultSystem) collectPulseResults() map[ecs.Entity]jobs.Result {
-	out := make(map[ecs.Entity]jobs.Result)
+func (s *BatchPulseResultSystem) Update(w *ecs.World) {
+	resultsBatches := make([][]jobs.Result, 0)
 loop:
 	for {
 		select {
-		case res, ok := <-bprs.ResultChan:
-			if !ok {
-				break loop
-			}
-			out[res.Entity()] = res
+		case res := <-s.ResultChan:
+			resultsBatches = append(resultsBatches, res)
 		default:
 			break loop
 		}
 	}
-	return out
-}
 
-// processPulseResultsAndQueueStructuralChanges processes results exactly like sys_pulse.go
-func (bprs *BatchPulseResultSystem) processPulseResultsAndQueueStructuralChanges(
-	w *ecs.World, results map[ecs.Entity]jobs.Result,
-) {
-	for _, res := range results {
-		entity := res.Entity()
-
-		if !w.Alive(entity) || !bprs.Mapper.PulsePending.HasAll(entity) {
-			continue
-		}
-
-		namePtr := bprs.Mapper.Name.Get(entity)
-		if namePtr == nil {
-			bprs.logger.Warn("Entity %d has nil name component", entity.ID())
-			continue
-		}
-		name := *namePtr
-
-		if res.Error() != nil {
-			// ---- FAILURE - exact same logic as sys_pulse.go ----
-			maxFailures := bprs.Mapper.PulseConfig.Get(entity).MaxFailures
-			statusCopy := bprs.Mapper.PulseStatus.Get(entity)
-
-			// DEBUG: Check maxFailures value
-			bprs.logger.Debug("DEBUG: maxFailures=%d, current ConsecutiveFailures=%d", maxFailures, statusCopy.ConsecutiveFailures)
-			monitorCopy := bprs.Mapper.MonitorStatus.Get(entity)
-
-			statusCopy.LastStatus = "failed"
-			statusCopy.LastError = res.Error()
-			statusCopy.ConsecutiveFailures++
-			statusCopy.LastCheckTime = time.Now()
-
-			// Store the updated value for correct logging
-			currentFailures := statusCopy.ConsecutiveFailures
-
-			bprs.logger.Debug("Monitor %s failed (attempt %d/%d): %v",
-				name, currentFailures, maxFailures, res.Error())
-
-			// yellow code on first failure - EXACT same logic as sys_pulse.go
-			if statusCopy.ConsecutiveFailures == 1 &&
-				bprs.Mapper.YellowCode.HasAll(entity) {
-				bprs.logger.Info("Monitor %s pulse failed - triggering yellow alert code", name)
-				if !bprs.Mapper.CodeNeeded.HasAll(entity) {
-					bprs.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "yellow"})
-					bprs.logger.LogComponentState(entity.ID(), "CodeNeeded", "yellow added")
-				}
-			}
-
-			// interventions - EXACT same logic as sys_pulse.go but fixed
-			if currentFailures > 0 && currentFailures%maxFailures == 0 &&
-				bprs.Mapper.InterventionConfig.HasAll(entity) {
-				bprs.logger.Warn("Monitor %s failed %d times - triggering intervention", name, currentFailures)
-				bprs.Mapper.InterventionNeeded.Add(entity, &components.InterventionNeeded{})
-				monitorCopy.Status = "failed"
-				bprs.logger.LogComponentState(entity.ID(), "InterventionNeeded", "added")
-			}
-
-			// Always retry on failure - original logic
-			if currentFailures < maxFailures {
-				bprs.logger.Info("Monitor %s pulse failed - will retry (%d/%d)", name, currentFailures, maxFailures)
-				bprs.Mapper.PulseNeeded.Add(entity, &components.PulseNeeded{})
-				bprs.logger.LogComponentState(entity.ID(), "PulseNeeded", "added")
-			}
-
-		} else {
-			// ---- SUCCESS - exact same logic as sys_pulse.go ----
-			statusCopy := bprs.Mapper.PulseStatus.Get(entity)
-			monitorCopy := bprs.Mapper.MonitorStatus.Get(entity)
-			lastStatus := statusCopy.LastStatus
-			wasFailure := statusCopy.ConsecutiveFailures > 0
-
-			statusCopy.LastStatus = "success"
-			statusCopy.LastError = nil
-			statusCopy.ConsecutiveFailures = 0
-			statusCopy.LastSuccessTime = time.Now()
-			statusCopy.LastCheckTime = time.Now()
-			monitorCopy.Status = "success"
-
-			if wasFailure {
-				bprs.logger.Info("Monitor %s pulse succeeded - recovered after failure", name)
-			} else {
-				bprs.logger.Info("Monitor %s pulse succeeded", name)
-			}
-
-			if lastStatus == "failed" && bprs.Mapper.GreenCode.HasAll(entity) {
-				bprs.logger.Info("Monitor %s pulse recovered - triggering green recovery code", name)
-				if !bprs.Mapper.CodeNeeded.HasAll(entity) {
-					bprs.Mapper.CodeNeeded.Add(entity, &components.CodeNeeded{Color: "green"})
-					bprs.logger.LogComponentState(entity.ID(), "CodeNeeded", "green added")
-				}
-			}
-		}
-
-		// Always remove pending after processing - exact same as original
-		bprs.Mapper.PulsePending.Remove(entity)
-		bprs.logger.LogComponentState(entity.ID(), "PulsePending", "removed")
+	for _, res := range resultsBatches {
+		s.ProcessBatch(res)
 	}
 }
 
-// Update processes results exactly like sys_pulse.go
-func (bprs *BatchPulseResultSystem) Update(w *ecs.World) {
-	results := bprs.collectPulseResults()
-	bprs.processPulseResultsAndQueueStructuralChanges(w, results)
+// ProcessBatch processes a batch of pulse results.
+func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
+	startTime := time.Now()
+	processedCount := 0
+
+	for _, result := range results {
+		ent := result.Entity()
+		if !s.world.Alive(ent) {
+			continue
+		}
+
+		state := s.stateMapper.Get(ent)
+		config := s.configMapper.Get(ent)
+
+		if (atomic.LoadUint32(&state.Flags) & components.StatePulsePending) == 0 {
+			s.logger.Warn("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
+			continue
+		}
+
+		processedCount++
+		state.LastCheckTime = time.Now()
+
+		if result.Error() != nil {
+			// --- FAILURE ---
+			state.ConsecutiveFailures++
+			state.LastError = result.Error()
+			s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.ConsecutiveFailures, config.MaxFailures, state.LastError)
+
+			if state.ConsecutiveFailures >= config.MaxFailures {
+				s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
+				atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
+				state.ConsecutiveFailures = 0 // Reset after triggering
+			} else if state.ConsecutiveFailures == 1 {
+				s.triggerCode(ent, state, "yellow")
+			}
+		} else {
+			// --- SUCCESS ---
+			wasFailure := state.ConsecutiveFailures > 0
+			if wasFailure {
+				s.logger.Info("Monitor '%s' pulse recovered.", state.Name)
+				s.triggerCode(ent, state, "green")
+			}
+			state.ConsecutiveFailures = 0
+			state.LastError = nil
+			state.LastSuccessTime = state.LastCheckTime
+		}
+
+		// Unset the pending flag, regardless of outcome.
+		atomic.AndUint32(&state.Flags, ^uint32(components.StatePulsePending))
+	}
+
+	if processedCount > 0 {
+		s.logger.LogSystemPerformance("BatchPulseResultSystem", time.Since(startTime), processedCount)
+	}
 }
 
-// Finalize cleans up like the original system
-func (bprs *BatchPulseResultSystem) Finalize(w *ecs.World) {
-	// Nothing to clean up like original
+func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
+	codeConfig := s.codeConfigMapper.Get(entity)
+	if codeConfig == nil {
+		return
+	}
+	if _, ok := codeConfig.Configs[color]; ok {
+		// TODO: This is a placeholder for a more robust CodeNeeded implementation
+		// For now, we directly set the flag.
+		atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+		s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
+	}
 }
+
+// Finalize is a no-op for this system.
+func (s *BatchPulseResultSystem) Finalize(w *ecs.World) {}

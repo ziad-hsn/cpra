@@ -20,6 +20,7 @@ type StreamingEntityCreator struct {
 	entitiesCreated  int64
 	batchesProcessed int64
 	startTime        time.Time
+	pulseRate        float64
 	mu               sync.RWMutex
 }
 
@@ -92,17 +93,23 @@ func (c *StreamingEntityCreator) ProcessBatches(ctx context.Context, batchChan <
 
 // processBatch creates entities for a single batch of monitors.
 func (c *StreamingEntityCreator) processBatch(batch MonitorBatch) error {
+	var pulseSum float64
 	for _, monitor := range batch.Monitors {
 		if err := c.entityManager.CreateEntityFromMonitor(&monitor, c.world); err != nil {
-			// In a real-world scenario, we might want to log this and continue,
-			// but for now, we fail the entire batch.
 			return fmt.Errorf("failed to create entity for monitor '%s': %w", monitor.Name, err)
+		}
+		if monitor.Enabled && monitor.Pulse.Interval > 0 {
+			sec := monitor.Pulse.Interval.Seconds()
+			if sec > 0 {
+				pulseSum += 1.0 / sec
+			}
 		}
 	}
 
 	c.mu.Lock()
 	c.entitiesCreated += int64(len(batch.Monitors))
 	c.batchesProcessed++
+	c.pulseRate += pulseSum
 	c.mu.Unlock()
 
 	return nil
@@ -133,6 +140,13 @@ func (c *StreamingEntityCreator) reportProgress(progressChan chan<- EntityProgre
 	}:
 	default:
 	}
+}
+
+// PulseRate returns the aggregated expected pulse arrival rate (jobs/sec).
+func (c *StreamingEntityCreator) PulseRate() float64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.pulseRate
 }
 
 // GetStats returns current creation statistics.

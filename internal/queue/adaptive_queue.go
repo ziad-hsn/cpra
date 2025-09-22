@@ -4,6 +4,7 @@ import (
 	"cpra/internal/jobs"
 	"errors"
 	"sync/atomic"
+	"time"
 )
 
 // AdaptiveQueue is a lock-free, thread-safe, fixed-size circular queue.
@@ -15,6 +16,14 @@ type AdaptiveQueue struct {
 	head     uint64
 	tail     uint64
 	closed   int32
+
+	enqueuedCount       int64
+	dequeuedCount       int64
+	totalQueueWaitNanos int64
+	maxQueueWaitNanos   int64
+	startUnixNano       int64
+	lastEnqueueUnixNano int64
+	lastDequeueUnixNano int64
 }
 
 // NewAdaptiveQueue creates a new AdaptiveQueue with the given capacity.
@@ -23,10 +32,12 @@ func NewAdaptiveQueue(capacity uint64) (*AdaptiveQueue, error) {
 	if (capacity & (capacity - 1)) != 0 {
 		return nil, errors.New("capacity must be a power of 2")
 	}
-	return &AdaptiveQueue{
-		buffer:   make([]jobs.Job, capacity),
-		capacity: capacity,
-	}, nil
+	queue := &AdaptiveQueue{
+		buffer:        make([]jobs.Job, capacity),
+		capacity:      capacity,
+		startUnixNano: time.Now().UnixNano(),
+	}
+	return queue, nil
 }
 
 // Enqueue adds a single job to the queue.
@@ -35,6 +46,7 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 		return ErrQueueClosed
 	}
 
+	now := time.Now()
 	for {
 		head := atomic.LoadUint64(&q.head)
 		tail := atomic.LoadUint64(&q.tail)
@@ -45,7 +57,12 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 
 		// Attempt to claim the next spot
 		if atomic.CompareAndSwapUint64(&q.tail, tail, tail+1) {
-			q.buffer[tail& (q.capacity-1)] = job
+			if job != nil {
+				job.SetEnqueueTime(now)
+			}
+			q.buffer[tail&(q.capacity-1)] = job
+			atomic.AddInt64(&q.enqueuedCount, 1)
+			atomic.StoreInt64(&q.lastEnqueueUnixNano, now.UnixNano())
 			return nil
 		}
 	}
@@ -71,6 +88,7 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 	}
 	n := uint64(len(convertedJobs))
 
+	now := time.Now()
 	for {
 		head := atomic.LoadUint64(&q.head)
 		tail := atomic.LoadUint64(&q.tail)
@@ -83,8 +101,14 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 		if atomic.CompareAndSwapUint64(&q.tail, tail, tail+n) {
 			// Once the slot is claimed, we can write the batch without further atomics
 			for i := uint64(0); i < n; i++ {
-				q.buffer[(tail+i)&(q.capacity-1)] = convertedJobs[i]
+				job := convertedJobs[i]
+				if job != nil {
+					job.SetEnqueueTime(now)
+				}
+				q.buffer[(tail+i)&(q.capacity-1)] = job
 			}
+			atomic.AddInt64(&q.enqueuedCount, int64(n))
+			atomic.StoreInt64(&q.lastEnqueueUnixNano, now.UnixNano())
 			return nil
 		}
 		// If CAS fails, another producer got there first. Loop and try again.
@@ -113,11 +137,31 @@ func (q *AdaptiveQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 		// Atomically claim the batch for dequeuing
 		if atomic.CompareAndSwapUint64(&q.head, head, head+n) {
 			batch := make([]jobs.Job, n)
+			now := time.Now()
 			for i := uint64(0); i < n; i++ {
 				batch[i] = q.buffer[(head+i)&(q.capacity-1)]
 				// Nil out the buffer slot to help the GC
 				q.buffer[(head+i)&(q.capacity-1)] = nil
+
+				if batch[i] != nil {
+					enqueueTime := batch[i].GetEnqueueTime()
+					if !enqueueTime.IsZero() {
+						wait := now.Sub(enqueueTime)
+						atomic.AddInt64(&q.totalQueueWaitNanos, int64(wait))
+						for {
+							currentMax := atomic.LoadInt64(&q.maxQueueWaitNanos)
+							if waitNs := int64(wait); waitNs <= currentMax {
+								break
+							}
+							if atomic.CompareAndSwapInt64(&q.maxQueueWaitNanos, currentMax, int64(wait)) {
+								break
+							}
+						}
+					}
+				}
 			}
+			atomic.AddInt64(&q.dequeuedCount, int64(n))
+			atomic.StoreInt64(&q.lastDequeueUnixNano, now.UnixNano())
 			return batch, nil
 		}
 		// If CAS fails, another consumer got there first. Loop and try again.
@@ -142,6 +186,25 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 
 		// Attempt to move the head pointer
 		if atomic.CompareAndSwapUint64(&q.head, head, head+1) {
+			now := time.Now()
+			if job != nil {
+				enqueueTime := job.GetEnqueueTime()
+				if !enqueueTime.IsZero() {
+					wait := now.Sub(enqueueTime)
+					atomic.AddInt64(&q.totalQueueWaitNanos, int64(wait))
+					for {
+						currentMax := atomic.LoadInt64(&q.maxQueueWaitNanos)
+						if waitNs := int64(wait); waitNs <= currentMax {
+							break
+						}
+						if atomic.CompareAndSwapInt64(&q.maxQueueWaitNanos, currentMax, int64(wait)) {
+							break
+						}
+					}
+				}
+			}
+			atomic.AddInt64(&q.dequeuedCount, 1)
+			atomic.StoreInt64(&q.lastDequeueUnixNano, now.UnixNano())
 			return job, nil
 		}
 	}
@@ -162,7 +225,30 @@ func (q *AdaptiveQueue) Close() {
 func (q *AdaptiveQueue) Stats() QueueStats {
 	head := atomic.LoadUint64(&q.head)
 	tail := atomic.LoadUint64(&q.tail)
-	return QueueStats{
-		QueueDepth: int(tail - head),
+	depth := tail - head
+	enq := atomic.LoadInt64(&q.enqueuedCount)
+	deq := atomic.LoadInt64(&q.dequeuedCount)
+	elapsed := time.Since(time.Unix(0, atomic.LoadInt64(&q.startUnixNano)))
+	if elapsed <= 0 {
+		elapsed = time.Millisecond
 	}
+	avgWaitNs := int64(0)
+	if deq > 0 {
+		avgWaitNs = atomic.LoadInt64(&q.totalQueueWaitNanos) / deq
+	}
+	stats := QueueStats{
+		QueueDepth:   int(depth),
+		Capacity:     int(q.capacity),
+		Enqueued:     enq,
+		Dequeued:     deq,
+		Dropped:      0,
+		MaxQueueTime: time.Duration(atomic.LoadInt64(&q.maxQueueWaitNanos)),
+		AvgQueueTime: time.Duration(avgWaitNs),
+		EnqueueRate:  float64(enq) / elapsed.Seconds(),
+		DequeueRate:  float64(deq) / elapsed.Seconds(),
+		LastEnqueue:  time.Unix(0, atomic.LoadInt64(&q.lastEnqueueUnixNano)),
+		LastDequeue:  time.Unix(0, atomic.LoadInt64(&q.lastDequeueUnixNano)),
+		SampleWindow: elapsed,
+	}
+	return stats
 }

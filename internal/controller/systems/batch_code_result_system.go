@@ -34,11 +34,22 @@ func (s *BatchCodeResultSystem) Initialize(w *ecs.World) {
 }
 
 func (s *BatchCodeResultSystem) Update(w *ecs.World) {
+	if s.ResultChan == nil {
+		return
+	}
+
 	resultsBatches := make([][]jobs.Result, 0)
 loop:
 	for {
 		select {
-		case res := <-s.ResultChan:
+		case res, ok := <-s.ResultChan:
+			if !ok {
+				s.ResultChan = nil
+				break loop
+			}
+			if len(res) == 0 {
+				continue
+			}
 			resultsBatches = append(resultsBatches, res)
 		default:
 			break loop

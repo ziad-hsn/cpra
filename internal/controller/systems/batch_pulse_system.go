@@ -13,10 +13,11 @@ import (
 // It identifies entities with the StatePulseNeeded flag, enqueues the corresponding job,
 // and transitions the entity state to StatePulsePending.
 type BatchPulseSystem struct {
-	world     *ecs.World
-	queue     queue.Queue // Using a generic queue interface
-	logger    Logger
-	batchSize int
+	world       *ecs.World
+	queue       queue.Queue // Using a generic queue interface
+	logger      Logger
+	batchSize   int
+	maxDispatch int
 
 	// Filter for entities that require a pulse check.
 	filter             *ecs.Filter2[components.MonitorState, components.JobStorage]
@@ -39,10 +40,35 @@ func (s *BatchPulseSystem) Initialize(w *ecs.World) {
 
 }
 
+func (s *BatchPulseSystem) SetMaxDispatch(n int) {
+	s.maxDispatch = n
+}
+
 // Update finds and processes all monitors that need a pulse check.
 func (s *BatchPulseSystem) Update(w *ecs.World) {
 	startTime := time.Now()
+	stats := s.queue.Stats()
+	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
+		s.logger.Debug("Pulse queue saturated (%d/%d); deferring dispatch", stats.QueueDepth, stats.Capacity)
+	}
+
 	query := s.filter.Query()
+	free := stats.Capacity - stats.QueueDepth
+	if free <= 0 {
+		return
+	}
+	tokens := int(float64(free) * 0.8)
+	if tokens <= 0 {
+		tokens = free
+	}
+	if tokens <= 0 {
+		tokens = 1
+	}
+	if s.maxDispatch > 0 && tokens > s.maxDispatch {
+		tokens = s.maxDispatch
+	}
+
+	earlyExit := false
 
 	jobsToQueue := make([]interface{}, 0, s.batchSize)
 	entitiesToUpdate := make([]ecs.Entity, 0, s.batchSize)
@@ -65,16 +91,21 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 		jobsToQueue = append(jobsToQueue, jobStorage.PulseJob)
 		entitiesToUpdate = append(entitiesToUpdate, ent)
 
-		// Process in batches
-		if len(jobsToQueue) >= s.batchSize {
+		if len(jobsToQueue) >= tokens {
 			s.processBatch(&jobsToQueue, &entitiesToUpdate)
 			processedCount += len(jobsToQueue)
 			jobsToQueue = make([]interface{}, 0, s.batchSize)
 			entitiesToUpdate = make([]ecs.Entity, 0, s.batchSize)
+			earlyExit = true
+			break
 		}
 	}
 
 	// Process any remaining entities
+	if earlyExit {
+		query.Close()
+	}
+
 	if len(jobsToQueue) > 0 {
 		s.processBatch(&jobsToQueue, &entitiesToUpdate)
 		processedCount += len(jobsToQueue)
@@ -88,6 +119,11 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 
 // processBatch attempts to enqueue a batch of jobs and updates entity states on success.
 func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Entity) {
+	stats := s.queue.Stats()
+	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
+		s.logger.Debug("Pulse queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
+		return
+	}
 	err := s.queue.EnqueueBatch(*jobs)
 	if err != nil {
 		s.logger.Warn("Failed to enqueue pulse job batch, queue may be full: %v", err)
@@ -106,13 +142,18 @@ func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Ent
 			continue
 		}
 
-		// Atomically update flags: remove PulseNeeded, add PulsePending.
-		flags := atomic.LoadUint32(&state.Flags)
-		newFlags := (flags & ^uint32(components.StatePulseNeeded)) | uint32(components.StatePulsePending)
-		atomic.StoreUint32(&state.Flags, newFlags)
+		for {
+			flags := atomic.LoadUint32(&state.Flags)
+			if flags&components.StatePulseNeeded == 0 {
+				break
+			}
 
-		// Update LastCheckTime immediately upon dispatch.
-		state.LastCheckTime = now
+			updated := (flags & ^uint32(components.StatePulseNeeded)) | uint32(components.StatePulsePending)
+			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
+				state.LastCheckTime = now
+				break
+			}
+		}
 	}
 }
 

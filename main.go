@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -42,7 +44,15 @@ func main() {
 	// Enable profiling if requested
 	if *profile {
 		fmt.Println("CPU profiling enabled")
-		// CPU profiling would be initialized here
+		f, err := os.Create("cpu.pprof")
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	// Create the new optimized controller
@@ -94,8 +104,6 @@ func main() {
 	// Wait for shutdown signal
 	<-ctx.Done()
 	fmt.Println("Shutting down...")
-
-	// oc.PrintShutdownMetrics() // This method was part of the old controller and has been removed.
 
 	// Print memory Usage
 	PrintMemUsage()

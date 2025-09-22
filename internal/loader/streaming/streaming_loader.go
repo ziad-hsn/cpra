@@ -70,6 +70,7 @@ type LoadingStats struct {
 	CreationRate  float64
 	MemoryUsage   int64
 	GCCount       int
+	PulseRate     float64
 }
 
 // DefaultStreamingConfig returns optimized default configuration for large files
@@ -161,6 +162,7 @@ func (sl *StreamingLoader) finalizeStats(creator *StreamingEntityCreator) {
 	entitiesCreated, _, creationRate := creator.GetStats()
 	sl.loadingStats.TotalEntities = entitiesCreated
 	sl.loadingStats.CreationRate = creationRate
+	sl.loadingStats.PulseRate = creator.PulseRate()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	sl.loadingStats.MemoryUsage = int64(m.Alloc)

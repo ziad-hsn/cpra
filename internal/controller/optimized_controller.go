@@ -6,6 +6,7 @@ import (
 	"cpra/internal/queue"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -39,11 +40,17 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 
 // OptimizedController manages the ECS world and its systems using ark-tools.
 type OptimizedController struct {
-	app        *app.App
-	world      *ecs.World
-	mapper     *entities.EntityManager
-	queue      queue.Queue
-	workerPool *queue.DynamicWorkerPool
+	app    *app.App
+	world  *ecs.World
+	mapper *entities.EntityManager
+
+	pulseQueue        queue.Queue
+	interventionQueue queue.Queue
+	codeQueue         queue.Queue
+
+	pulsePool        *queue.DynamicWorkerPool
+	interventionPool *queue.DynamicWorkerPool
+	codePool         *queue.DynamicWorkerPool
 
 	// ECS Systems
 	pulseScheduleSystem      *systems.BatchPulseScheduleSystem
@@ -86,32 +93,51 @@ func NewOptimizedController(config Config) *OptimizedController {
 	mapper := entities.NewEntityManager(world)
 
 	// Instantiate the new adaptive queue and dynamic worker pool.
-	adaptiveQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	pulseQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
 	if err != nil {
-		log.Fatalf("Failed to create adaptive queue: %v", err)
+		log.Fatalf("Failed to create pulse queue: %v", err)
+	}
+	interventionQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	if err != nil {
+		log.Fatalf("Failed to create intervention queue: %v", err)
+	}
+	codeQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	if err != nil {
+		log.Fatalf("Failed to create code queue: %v", err)
 	}
 
-	// A simple logger for the worker pool
-	workerLogger := log.New(os.Stdout, "[WorkerPool] ", log.LstdFlags)
-
-	dynamicPool, err := queue.NewDynamicWorkerPool(adaptiveQueue, config.WorkerConfig, workerLogger)
+	pulseLogger := log.New(os.Stdout, "[PulsePool] ", log.LstdFlags)
+	pulsePool, err := queue.NewDynamicWorkerPool(pulseQueue, config.WorkerConfig, pulseLogger)
 	if err != nil {
-		log.Fatalf("Failed to create dynamic worker pool: %v", err)
+		log.Fatalf("Failed to create pulse worker pool: %v", err)
+	}
+	interventionLogger := log.New(os.Stdout, "[InterventionPool] ", log.LstdFlags)
+	interventionPool, err := queue.NewDynamicWorkerPool(interventionQueue, config.WorkerConfig, interventionLogger)
+	if err != nil {
+		log.Fatalf("Failed to create intervention worker pool: %v", err)
+	}
+	codeLogger := log.New(os.Stdout, "[CodePool] ", log.LstdFlags)
+	codePool, err := queue.NewDynamicWorkerPool(codeQueue, config.WorkerConfig, codeLogger)
+	if err != nil {
+		log.Fatalf("Failed to create code worker pool: %v", err)
 	}
 
 	logger := &LoggerAdapter{logger: SystemLogger}
 
-	// Instantiate the refactored systems.
-	router := dynamicPool.GetRouter()
+	// Instantiate the refactored systems with dedicated queues and worker pools.
+	pulseRouter := pulsePool.GetRouter()
+	interventionRouter := interventionPool.GetRouter()
+	codeRouter := codePool.GetRouter()
+
 	pulseScheduleSystem := systems.NewBatchPulseScheduleSystem(world, logger)
-	pulseSystem := systems.NewBatchPulseSystem(world, adaptiveQueue, config.BatchSize, logger)
-	pulseResultSystem := systems.NewBatchPulseResultSystem(world, router.PulseResultChan, logger)
+	pulseSystem := systems.NewBatchPulseSystem(world, pulseQueue, config.BatchSize, logger)
+	pulseResultSystem := systems.NewBatchPulseResultSystem(world, pulseRouter.PulseResultChan, logger)
 
-	interventionSystem := systems.NewBatchInterventionSystem(world, adaptiveQueue, config.BatchSize, logger)
-	interventionResultSystem := systems.NewBatchInterventionResultSystem(world, router.InterventionResultChan, logger)
+	interventionSystem := systems.NewBatchInterventionSystem(world, interventionQueue, config.BatchSize, logger)
+	interventionResultSystem := systems.NewBatchInterventionResultSystem(world, interventionRouter.InterventionResultChan, logger)
 
-	codeSystem := systems.NewBatchCodeSystem(world, adaptiveQueue, config.BatchSize, logger)
-	codeResultSystem := systems.NewBatchCodeResultSystem(world, router.CodeResultChan, logger)
+	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, config.BatchSize, logger)
+	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, logger)
 
 	arkApp.AddSystem(pulseScheduleSystem)
 	arkApp.AddSystem(pulseSystem)
@@ -125,8 +151,12 @@ func NewOptimizedController(config Config) *OptimizedController {
 		app:                      arkApp,
 		world:                    world,
 		mapper:                   mapper,
-		queue:                    adaptiveQueue,
-		workerPool:               dynamicPool,
+		pulseQueue:               pulseQueue,
+		interventionQueue:        interventionQueue,
+		codeQueue:                codeQueue,
+		pulsePool:                pulsePool,
+		interventionPool:         interventionPool,
+		codePool:                 codePool,
 		pulseScheduleSystem:      pulseScheduleSystem,
 		pulseSystem:              pulseSystem,
 		pulseResultSystem:        pulseResultSystem,
@@ -147,6 +177,13 @@ func (c *OptimizedController) LoadMonitors(ctx context.Context, filename string)
 	}
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
+	if stats.PulseRate > 0 {
+		limit := int(math.Ceil(stats.PulseRate * c.config.UpdateInterval.Seconds()))
+		if limit < 1 {
+			limit = 1
+		}
+		c.pulseSystem.SetMaxDispatch(limit)
+	}
 	return nil
 }
 
@@ -155,7 +192,9 @@ func (c *OptimizedController) Start(ctx context.Context) error {
 	if c.running {
 		return fmt.Errorf("controller already running")
 	}
-	c.workerPool.Start()
+	c.pulsePool.Start()
+	c.interventionPool.Start()
+	c.codePool.Start()
 	c.running = true
 	go c.app.Run()
 	SystemLogger.Info("Optimized controller started successfully")
@@ -170,9 +209,44 @@ func (c *OptimizedController) Stop() {
 	SystemLogger.Info("Stopping controller...")
 	c.app.Finalize()
 	c.running = false
-	c.workerPool.Stop()
-	c.queue.Close()
+	c.pulsePool.DrainAndStop()
+	c.interventionPool.DrainAndStop()
+	c.codePool.DrainAndStop()
+	c.PrintShutdownMetrics()
+	c.pulseQueue.Close()
+	c.interventionQueue.Close()
+	c.codeQueue.Close()
 	SystemLogger.Info("Controller stopped")
+}
+
+// PrintShutdownMetrics logs queue, worker pool, and world statistics at shutdown.
+func (c *OptimizedController) PrintShutdownMetrics() {
+	logQueue := func(label string, stats queue.QueueStats) {
+		SystemLogger.Info("%s Queue: depth=%d/%d enqueued=%d dequeued=%d dropped=%d", label, stats.QueueDepth, stats.Capacity, stats.Enqueued, stats.Dequeued, stats.Dropped)
+		SystemLogger.Info("%s Queue timings: avg_wait=%v max_wait=%v window=%v", label, stats.AvgQueueTime, stats.MaxQueueTime, stats.SampleWindow)
+		SystemLogger.Info("%s Queue rates: arrival=%.2f/s service=%.2f/s last_enqueue=%v last_dequeue=%v", label, stats.EnqueueRate, stats.DequeueRate, stats.LastEnqueue, stats.LastDequeue)
+	}
+	logWorkers := func(label string, stats queue.WorkerPoolStats) {
+		SystemLogger.Info("%s Workers: running=%d capacity=%d target=%d min=%d max=%d waiting=%d", label, stats.RunningWorkers, stats.CurrentCapacity, stats.TargetWorkers, stats.MinWorkers, stats.MaxWorkers, stats.WaitingTasks)
+		SystemLogger.Info("%s Tasks: submitted=%d completed=%d pending_results=%d scaling_events=%d last_scale=%v", label, stats.TasksSubmitted, stats.TasksCompleted, stats.PendingResults, stats.ScalingEvents, stats.LastScaleTime)
+	}
+
+	SystemLogger.Info("=== SHUTDOWN METRICS ===")
+
+	logQueue("Pulse", c.pulseQueue.Stats())
+	logQueue("Intervention", c.interventionQueue.Stats())
+	logQueue("Code", c.codeQueue.Stats())
+
+	logWorkers("Pulse", c.pulsePool.Stats())
+	logWorkers("Intervention", c.interventionPool.Stats())
+	logWorkers("Code", c.codePool.Stats())
+
+	worldStats := c.world.Stats()
+	SystemLogger.Info("World: entities_used=%d recycled=%d total=%d archetypes=%d components=%d filters=%d locked=%t",
+		worldStats.Entities.Used, worldStats.Entities.Recycled, worldStats.Entities.Total,
+		len(worldStats.Archetypes), len(worldStats.ComponentTypes), worldStats.CachedFilters, worldStats.Locked)
+	SystemLogger.Info("World memory: reserved=%dB used=%dB", worldStats.Memory, worldStats.MemoryUsed)
+	SystemLogger.Info("=========================")
 }
 
 // GetWorld returns the ECS world for external access (e.g., testing, debugging).

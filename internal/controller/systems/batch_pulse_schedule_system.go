@@ -45,19 +45,23 @@ func (s *BatchPulseScheduleSystem) Update(w *ecs.World) {
 	for query.Next() {
 		state, config := query.Get()
 
-		// Skip if disabled, or a pulse is already needed or pending.
-		flags := atomic.LoadUint32(&state.Flags)
-		if (flags&components.StateDisabled != 0) || (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
-			continue
-		}
+		for {
+			flags := atomic.LoadUint32(&state.Flags)
 
-		// Schedule if it's the first check or the interval has passed.
-		if (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval) {
-			// Set PulseNeeded flag, and unset FirstCheck flag.
-			// This is an atomic operation that does not change the entity's archetype,
-			// making it vastly more performant than adding/removing components.
-			atomic.StoreUint32(&state.Flags, (flags|components.StatePulseNeeded)&^components.StatePulseFirstCheck)
-			scheduledCount++
+			if (flags&components.StateDisabled != 0) || (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
+				break
+			}
+
+			due := (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval)
+			if !due {
+				break
+			}
+
+			updated := (flags | components.StatePulseNeeded) &^ components.StatePulseFirstCheck
+			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
+				scheduledCount++
+				break
+			}
 		}
 	}
 

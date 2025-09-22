@@ -40,7 +40,26 @@ func (s *BatchInterventionSystem) Initialize(w *ecs.World) {}
 // Update finds and processes all monitors that need an intervention.
 func (s *BatchInterventionSystem) Update(w *ecs.World) {
 	startTime := time.Now()
+	stats := s.queue.Stats()
+	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
+		s.logger.Debug("Intervention queue saturated (%d/%d); deferring dispatch", stats.QueueDepth, stats.Capacity)
+	}
+
 	query := s.filter.Query()
+
+	free := stats.Capacity - stats.QueueDepth
+	if free <= 0 {
+		return
+	}
+	tokens := int(float64(free) * 0.8)
+	if tokens <= 0 {
+		tokens = free
+	}
+	if tokens <= 0 {
+		tokens = 1
+	}
+
+	earlyExit := false
 
 	jobsToQueue := make([]interface{}, 0, s.batchSize)
 	entitiesToUpdate := make([]ecs.Entity, 0, s.batchSize)
@@ -63,16 +82,21 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 		jobsToQueue = append(jobsToQueue, jobStorage.InterventionJob)
 		entitiesToUpdate = append(entitiesToUpdate, ent)
 
-		// Process in batches
-		if len(jobsToQueue) >= s.batchSize {
+		if len(jobsToQueue) >= tokens {
 			s.processBatch(&jobsToQueue, &entitiesToUpdate)
 			processedCount += len(jobsToQueue)
 			jobsToQueue = make([]interface{}, 0, s.batchSize)
 			entitiesToUpdate = make([]ecs.Entity, 0, s.batchSize)
+			earlyExit = true
+			break
 		}
 	}
 
 	// Process any remaining entities
+	if earlyExit {
+		query.Close()
+	}
+
 	if len(jobsToQueue) > 0 {
 		s.processBatch(&jobsToQueue, &entitiesToUpdate)
 		processedCount += len(jobsToQueue)
@@ -86,6 +110,11 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 
 // processBatch attempts to enqueue a batch of jobs and updates entity states on success.
 func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Entity) {
+	stats := s.queue.Stats()
+	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
+		s.logger.Debug("Intervention queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
+		return
+	}
 	err := s.queue.EnqueueBatch(*jobs)
 	if err != nil {
 		s.logger.Warn("Failed to enqueue intervention job batch, queue may be full: %v", err)
@@ -103,12 +132,18 @@ func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]
 			continue
 		}
 
-		// Atomically update flags: remove InterventionNeeded, add InterventionPending.
-		flags := atomic.LoadUint32(&state.Flags)
-		newFlags := (flags & ^uint32(components.StateInterventionNeeded)) | uint32(components.StateInterventionPending)
-		atomic.StoreUint32(&state.Flags, newFlags)
+		for {
+			flags := atomic.LoadUint32(&state.Flags)
+			if flags&components.StateInterventionNeeded == 0 {
+				break
+			}
 
-		s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
+			updated := (flags & ^uint32(components.StateInterventionNeeded)) | uint32(components.StateInterventionPending)
+			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
+				s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
+				break
+			}
+		}
 	}
 }
 

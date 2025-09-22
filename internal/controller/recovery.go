@@ -64,7 +64,12 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 
 	// Check for required components
 	if r.Mapper != nil {
-		if r.Mapper.GetMonitorState(entity).Name == "" {
+		state := r.Mapper.GetMonitorState(entity)
+		if state == nil {
+			log.Printf("Entity %v missing MonitorState component", entity)
+			return false
+		}
+		if state.Name == "" {
 			log.Printf("Entity %v missing Name component", entity)
 			return false
 		}

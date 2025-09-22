@@ -134,5 +134,6 @@ func (q *BoundedQueue) Stats() QueueStats {
 		Dequeued:   atomic.LoadInt64(&q.dequeued),
 		Dropped:    atomic.LoadInt64(&q.dropped),
 		QueueDepth: len(q.batches),
+		Capacity:   int(q.maxSize),
 	}
 }

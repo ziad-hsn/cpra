@@ -2,7 +2,9 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
+	"cpra/internal/jobs"
 	"cpra/internal/queue"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -12,7 +14,7 @@ import (
 // jobInfo is a helper struct to associate a job with its entity and color for batch processing.
 type jobInfo struct {
 	Entity ecs.Entity
-	Job    interface{}
+	Job    jobs.Job
 	Color  string
 }
 
@@ -54,16 +56,24 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 
 	query := s.filter.Query()
 
-	free := stats.Capacity - stats.QueueDepth
-	if free <= 0 {
-		return
-	}
-	tokens := int(float64(free) * 0.8)
-	if tokens <= 0 {
-		tokens = free
-	}
-	if tokens <= 0 {
-		tokens = 1
+	var tokens int
+	if stats.Capacity <= 0 {
+		tokens = s.batchSize
+		if tokens <= 0 {
+			tokens = 1
+		}
+	} else {
+		free := stats.Capacity - stats.QueueDepth
+		if free <= 0 {
+			return
+		}
+		tokens = int(float64(free) * 0.8)
+		if tokens <= 0 {
+			tokens = free
+		}
+		if tokens <= 0 {
+			tokens = 1
+		}
 	}
 
 	earlyExit := false
@@ -88,7 +98,7 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 		}
 
 		job, ok := jobStorage.CodeJobs[color]
-		if !ok || job == nil {
+		if !ok || isNilJob(job) {
 			s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
 			// Clear the flag if no job is found to prevent spinning.
 			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
@@ -129,9 +139,19 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		s.logger.Debug("Code queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
 		return
 	}
-	jobs := make([]interface{}, len(*jobsInfo))
-	for i, info := range *jobsInfo {
-		jobs[i] = info.Job
+	jobs := make([]interface{}, 0, len(*jobsInfo))
+	submitted := make([]jobInfo, 0, len(*jobsInfo))
+	for _, info := range *jobsInfo {
+		if isNilJob(info.Job) {
+			s.logger.Warn("Entity[%d] code job became nil before enqueue; skipping", info.Entity.ID())
+			continue
+		}
+		jobs = append(jobs, info.Job)
+		submitted = append(submitted, info)
+	}
+
+	if len(jobs) == 0 {
+		return
 	}
 
 	err := s.queue.EnqueueBatch(jobs)
@@ -140,7 +160,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		return
 	}
 
-	for _, info := range *jobsInfo {
+	for _, info := range submitted {
 		if !s.world.Alive(info.Entity) {
 			continue
 		}
@@ -167,3 +187,16 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 
 // Finalize is a no-op for this system.
 func (s *BatchCodeSystem) Finalize(w *ecs.World) {}
+
+func isNilJob(job jobs.Job) bool {
+	if job == nil {
+		return true
+	}
+	v := reflect.ValueOf(job)
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
+		return v.IsNil()
+	default:
+		return false
+	}
+}

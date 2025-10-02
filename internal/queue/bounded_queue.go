@@ -128,8 +128,8 @@ func (q *BoundedQueue) Close() {
 }
 
 // Stats returns current queue statistics.
-func (q *BoundedQueue) Stats() QueueStats {
-	return QueueStats{
+func (q *BoundedQueue) Stats() Stats {
+	return Stats{
 		Enqueued:   atomic.LoadInt64(&q.enqueued),
 		Dequeued:   atomic.LoadInt64(&q.dequeued),
 		Dropped:    atomic.LoadInt64(&q.dropped),

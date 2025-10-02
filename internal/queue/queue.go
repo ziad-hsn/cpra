@@ -24,11 +24,11 @@ type Queue interface {
 	Close()
 
 	// Stats returns statistics about the queue's performance.
-	Stats() QueueStats
+	Stats() Stats
 }
 
-// QueueStats holds performance metrics for a queue.
-type QueueStats struct {
+// Stats holds performance metrics for a queue.
+type Stats struct {
 	QueueDepth    int
 	Capacity      int
 	Enqueued      int64

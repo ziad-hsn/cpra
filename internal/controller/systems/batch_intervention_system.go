@@ -47,16 +47,24 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 
 	query := s.filter.Query()
 
-	free := stats.Capacity - stats.QueueDepth
-	if free <= 0 {
-		return
-	}
-	tokens := int(float64(free) * 0.8)
-	if tokens <= 0 {
-		tokens = free
-	}
-	if tokens <= 0 {
-		tokens = 1
+	var tokens int
+	if stats.Capacity <= 0 {
+		tokens = s.batchSize
+		if tokens <= 0 {
+			tokens = 1
+		}
+	} else {
+		free := stats.Capacity - stats.QueueDepth
+		if free <= 0 {
+			return
+		}
+		tokens = int(float64(free) * 0.8)
+		if tokens <= 0 {
+			tokens = free
+		}
+		if tokens <= 0 {
+			tokens = 1
+		}
 	}
 
 	earlyExit := false

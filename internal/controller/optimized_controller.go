@@ -6,8 +6,8 @@ import (
 	"cpra/internal/queue"
 	"fmt"
 	"log"
-	"math"
 	"os"
+	"sync"
 	"time"
 
 	"cpra/internal/controller/entities"
@@ -63,6 +63,11 @@ type OptimizedController struct {
 
 	config  Config
 	running bool
+
+	// Queue switching state
+	entityCountThreshold int64
+	useAdaptiveQueue     bool
+	queueSwitchMutex     sync.RWMutex
 }
 
 // Config holds all configuration for the controller.
@@ -81,7 +86,104 @@ func DefaultConfig() Config {
 		QueueCapacity:   65536, // Must be a power of 2
 		WorkerConfig:    queue.DefaultWorkerPoolConfig(),
 		BatchSize:       1000,
-		UpdateInterval:  100 * time.Millisecond,
+		// UpdateInterval removed - ark-tools TPS=100 controls all timing
+	}
+}
+
+// NewOptimizedControllerWithEntityThreshold creates a controller with automatic queue switching based on entity count.
+func NewOptimizedControllerWithEntityThreshold(config Config, entityThreshold int64) *OptimizedController {
+	// Create ark-tools app with initial capacity
+	arkApp := app.New(1024)
+	arkApp.TPS = 100 // High-frequency updates for 1s monitor intervals
+	world := &arkApp.World
+	mapper := entities.NewEntityManager(world)
+
+	var pulseQueue, interventionQueue, codeQueue queue.Queue
+	var err error
+	var useAdaptiveQueue bool
+
+	// Check initial entity count to determine starting queue type
+	worldStats := world.Stats()
+	// Always use AdaptiveQueue for consistent behavior
+	useAdaptiveQueue = true
+
+	// Create AdaptiveQueues
+	pulseQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		log.Fatalf("Failed to create pulse AdaptiveQueue: %v", err)
+	}
+	interventionQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		log.Fatalf("Failed to create intervention AdaptiveQueue: %v", err)
+	}
+	codeQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		log.Fatalf("Failed to create code AdaptiveQueue: %v", err)
+	}
+	SystemLogger.Info("Starting with AdaptiveQueue (entity count: %d)", worldStats.Entities.Used)
+
+	// Create dynamic worker pools
+	pulseLogger := log.New(os.Stdout, "[PulsePool] ", log.LstdFlags)
+	pulsePool, err := queue.NewDynamicWorkerPool(pulseQueue, config.WorkerConfig, pulseLogger)
+	if err != nil {
+		log.Fatalf("Failed to create pulse worker pool: %v", err)
+	}
+	interventionLogger := log.New(os.Stdout, "[InterventionPool] ", log.LstdFlags)
+	interventionPool, err := queue.NewDynamicWorkerPool(interventionQueue, config.WorkerConfig, interventionLogger)
+	if err != nil {
+		log.Fatalf("Failed to create intervention worker pool: %v", err)
+	}
+	codeLogger := log.New(os.Stdout, "[CodePool] ", log.LstdFlags)
+	codePool, err := queue.NewDynamicWorkerPool(codeQueue, config.WorkerConfig, codeLogger)
+	if err != nil {
+		log.Fatalf("Failed to create code worker pool: %v", err)
+	}
+
+	logger := &LoggerAdapter{logger: SystemLogger}
+
+	// Instantiate the refactored systems with dedicated queues and worker pools.
+	pulseRouter := pulsePool.GetRouter()
+	interventionRouter := interventionPool.GetRouter()
+	codeRouter := codePool.GetRouter()
+
+	pulseScheduleSystem := systems.NewBatchPulseScheduleSystem(world, logger)
+	pulseSystem := systems.NewBatchPulseSystem(world, pulseQueue, config.BatchSize, logger)
+	pulseResultSystem := systems.NewBatchPulseResultSystem(world, pulseRouter.PulseResultChan, logger)
+
+	interventionSystem := systems.NewBatchInterventionSystem(world, interventionQueue, config.BatchSize, logger)
+	interventionResultSystem := systems.NewBatchInterventionResultSystem(world, interventionRouter.InterventionResultChan, logger)
+
+	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, config.BatchSize, logger)
+	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, logger)
+
+	arkApp.AddSystem(pulseScheduleSystem)
+	arkApp.AddSystem(pulseSystem)
+	arkApp.AddSystem(interventionSystem)
+	arkApp.AddSystem(codeSystem)
+	arkApp.AddSystem(pulseResultSystem)
+	arkApp.AddSystem(interventionResultSystem)
+	arkApp.AddSystem(codeResultSystem)
+
+	return &OptimizedController{
+		app:                      arkApp,
+		world:                    world,
+		mapper:                   mapper,
+		pulseQueue:               pulseQueue,
+		interventionQueue:        interventionQueue,
+		codeQueue:                codeQueue,
+		pulsePool:                pulsePool,
+		interventionPool:         interventionPool,
+		codePool:                 codePool,
+		pulseScheduleSystem:      pulseScheduleSystem,
+		pulseSystem:              pulseSystem,
+		pulseResultSystem:        pulseResultSystem,
+		interventionSystem:       interventionSystem,
+		interventionResultSystem: interventionResultSystem,
+		codeSystem:               codeSystem,
+		codeResultSystem:         codeResultSystem,
+		config:                   config,
+		entityCountThreshold:     entityThreshold,
+		useAdaptiveQueue:         useAdaptiveQueue,
 	}
 }
 
@@ -89,21 +191,22 @@ func DefaultConfig() Config {
 func NewOptimizedController(config Config) *OptimizedController {
 	// Create ark-tools app with initial capacity
 	arkApp := app.New(1024)
+	arkApp.TPS = 100 // High-frequency updates for 1s monitor intervals
 	world := &arkApp.World
 	mapper := entities.NewEntityManager(world)
 
-	// Instantiate the new adaptive queue and dynamic worker pool.
-	pulseQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	// Default to Adaptive queues
+	pulseQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
 	if err != nil {
-		log.Fatalf("Failed to create pulse queue: %v", err)
+		log.Fatalf("Failed to create pulse AdaptiveQueue: %v", err)
 	}
-	interventionQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	interventionQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
 	if err != nil {
-		log.Fatalf("Failed to create intervention queue: %v", err)
+		log.Fatalf("Failed to create intervention AdaptiveQueue: %v", err)
 	}
-	codeQueue, err := queue.NewAdaptiveQueue(config.QueueCapacity)
+	codeQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
 	if err != nil {
-		log.Fatalf("Failed to create code queue: %v", err)
+		log.Fatalf("Failed to create code AdaptiveQueue: %v", err)
 	}
 
 	pulseLogger := log.New(os.Stdout, "[PulsePool] ", log.LstdFlags)
@@ -177,13 +280,10 @@ func (c *OptimizedController) LoadMonitors(ctx context.Context, filename string)
 	}
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
-	if stats.PulseRate > 0 {
-		limit := int(math.Ceil(stats.PulseRate * c.config.UpdateInterval.Seconds()))
-		if limit < 1 {
-			limit = 1
-		}
-		c.pulseSystem.SetMaxDispatch(limit)
-	}
+	// UpdateInterval logic removed - ark-tools TPS=100 handles all timing
+
+	// Check if we need to switch to AdaptiveQueue due to high entity count
+	c.CheckEntityCountAndSwitchQueue()
 	return nil
 }
 
@@ -221,7 +321,7 @@ func (c *OptimizedController) Stop() {
 
 // PrintShutdownMetrics logs queue, worker pool, and world statistics at shutdown.
 func (c *OptimizedController) PrintShutdownMetrics() {
-	logQueue := func(label string, stats queue.QueueStats) {
+	logQueue := func(label string, stats queue.Stats) {
 		SystemLogger.Info("%s Queue: depth=%d/%d enqueued=%d dequeued=%d dropped=%d", label, stats.QueueDepth, stats.Capacity, stats.Enqueued, stats.Dequeued, stats.Dropped)
 		SystemLogger.Info("%s Queue timings: avg_wait=%v max_wait=%v window=%v", label, stats.AvgQueueTime, stats.MaxQueueTime, stats.SampleWindow)
 		SystemLogger.Info("%s Queue rates: arrival=%.2f/s service=%.2f/s last_enqueue=%v last_dequeue=%v", label, stats.EnqueueRate, stats.DequeueRate, stats.LastEnqueue, stats.LastDequeue)
@@ -252,4 +352,114 @@ func (c *OptimizedController) PrintShutdownMetrics() {
 // GetWorld returns the ECS world for external access (e.g., testing, debugging).
 func (c *OptimizedController) GetWorld() *ecs.World {
 	return c.world
+}
+
+// switchToAdaptiveQueues drains current queues and switches to AdaptiveQueue implementation.
+func (c *OptimizedController) switchToAdaptiveQueues() {
+	c.queueSwitchMutex.Lock()
+	defer c.queueSwitchMutex.Unlock()
+
+	if c.useAdaptiveQueue {
+		SystemLogger.Info("Already using AdaptiveQueue, no switch needed")
+		return
+	}
+
+	SystemLogger.Info("Switching to AdaptiveQueue due to high entity count...")
+
+	// Pause worker pools
+	c.pulsePool.Pause()
+	c.interventionPool.Pause()
+	c.codePool.Pause()
+
+	// Drain current queues
+	c.drainQueue("Pulse", c.pulseQueue)
+	c.drainQueue("Intervention", c.interventionQueue)
+	c.drainQueue("Code", c.codeQueue)
+
+	// Create new AdaptiveQueues
+	newPulseQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		SystemLogger.Error("Failed to create new pulse AdaptiveQueue: %v", err)
+		return
+	}
+	newInterventionQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		SystemLogger.Error("Failed to create new intervention AdaptiveQueue: %v", err)
+		return
+	}
+	newCodeQueue, err := queue.NewQueue(queue.DefaultQueueConfig())
+	if err != nil {
+		SystemLogger.Error("Failed to create new code AdaptiveQueue: %v", err)
+		return
+	}
+
+	// Replace queues in worker pools
+	if err := c.pulsePool.ReplaceQueue(newPulseQueue); err != nil {
+		SystemLogger.Error("Failed to replace pulse queue: %v", err)
+		return
+	}
+	if err := c.interventionPool.ReplaceQueue(newInterventionQueue); err != nil {
+		SystemLogger.Error("Failed to replace intervention queue: %v", err)
+		return
+	}
+	if err := c.codePool.ReplaceQueue(newCodeQueue); err != nil {
+		SystemLogger.Error("Failed to replace code queue: %v", err)
+		return
+	}
+
+	// Close old queues and update references
+	c.pulseQueue.Close()
+	c.interventionQueue.Close()
+	c.codeQueue.Close()
+
+	c.pulseQueue = newPulseQueue
+	c.interventionQueue = newInterventionQueue
+	c.codeQueue = newCodeQueue
+
+	c.useAdaptiveQueue = true
+
+	// Resume worker pools
+	c.codePool.Resume()
+	c.interventionPool.Resume()
+	c.pulsePool.Resume()
+
+	SystemLogger.Info("Successfully switched to AdaptiveQueue")
+}
+
+// drainQueue empties a queue and logs the drained items count.
+func (c *OptimizedController) drainQueue(name string, q queue.Queue) {
+	drainedCount := 0
+	for {
+		items, err := q.DequeueBatch(1000)
+		if err != nil {
+			break
+		}
+		if len(items) == 0 {
+			break
+		}
+		drainedCount += len(items)
+	}
+	if drainedCount > 0 {
+		SystemLogger.Info("Drained %d items from %s queue", drainedCount, name)
+	}
+}
+
+// CheckEntityCountAndSwitchQueue monitors entity count and switches queues if threshold exceeded.
+func (c *OptimizedController) CheckEntityCountAndSwitchQueue() {
+	if c.entityCountThreshold <= 0 {
+		return // No threshold set
+	}
+
+	worldStats := c.world.Stats()
+	entityCount := int64(worldStats.Entities.Used)
+
+	c.queueSwitchMutex.RLock()
+	alreadyAdaptive := c.useAdaptiveQueue
+	c.queueSwitchMutex.RUnlock()
+
+	if !alreadyAdaptive && entityCount > c.entityCountThreshold {
+		SystemLogger.Info("Entity count (%d) exceeded threshold (%d), switching to AdaptiveQueue",
+			entityCount, c.entityCountThreshold)
+		c.switchToAdaptiveQueues()
+	}
 }

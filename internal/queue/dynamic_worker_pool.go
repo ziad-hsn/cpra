@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"cpra/internal/jobs"
+	"errors"
 	"log"
 	"math"
 	"sync"
@@ -125,12 +126,12 @@ type DynamicWorkerPool struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	tasksSubmitted int64
-	tasksCompleted int64
-	scalingEvents  int64
-	lastTarget     int64
-	lastScaleTime  int64
-	stopping       int32
+	tasksSubmitted atomic.Int64
+	tasksCompleted atomic.Int64
+	scalingEvents  atomic.Int64
+	lastTarget     atomic.Int64
+	lastScaleTime  atomic.Int64
+	stopping       atomic.Int32
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
@@ -141,17 +142,24 @@ type WorkerPoolConfig struct {
 	ResultBatchSize    int
 	ResultBatchTimeout time.Duration
 	TargetQueueLatency time.Duration
+	// Ants-specific options
+	PreAlloc       bool
+	NonBlocking    bool
+	ExpiryDuration time.Duration
 }
 
 // DefaultWorkerPoolConfig returns a default configuration for the worker pool.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
-		MinWorkers:         10,
+		MinWorkers:         5,  // Reduced from 10 to allow smaller workloads
 		MaxWorkers:         10000,
-		AdjustmentInterval: 5 * time.Second,
+		AdjustmentInterval: 10 * time.Second, // Increased from 5s to reduce oscillation
 		ResultBatchSize:    1000,
 		ResultBatchTimeout: 10 * time.Millisecond,
 		TargetQueueLatency: 100 * time.Millisecond,
+		PreAlloc:          false,
+		NonBlocking:       false,
+		ExpiryDuration:     5 * time.Minute, // Better aligned with job timeouts (1m-1h)
 	}
 }
 
@@ -185,11 +193,13 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	workerFunc := func(job interface{}) {
 		j, ok := job.(jobs.Job)
 		if !ok {
-			pool.logger.Printf("Error: Invalid job type in worker pool: %T", job)
+			if pool.logger != nil {
+				pool.logger.Printf("Error: Invalid job type in worker pool: %T", job)
+			}
 			return
 		}
 		result := j.Execute()
-		if atomic.LoadInt32(&pool.stopping) == 1 {
+		if pool.stopping.Load() == 1 {
 			return
 		}
 		select {
@@ -198,16 +208,32 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		}
 	}
 
-	antsPool, err := ants.NewPoolWithFunc(config.MaxWorkers, workerFunc, ants.WithPanicHandler(func(err interface{}) {
-		pool.logger.Printf("Worker panic: %v", err)
+	// Build ants options
+	var antsOptions []ants.Option
+	antsOptions = append(antsOptions, ants.WithPanicHandler(func(err interface{}) {
+		if pool.logger != nil {
+			pool.logger.Printf("Worker panic: %v", err)
+		}
 	}))
+
+	if config.PreAlloc {
+		antsOptions = append(antsOptions, ants.WithPreAlloc(true))
+	}
+	if config.NonBlocking {
+		antsOptions = append(antsOptions, ants.WithNonblocking(true))
+	}
+	if config.ExpiryDuration > 0 {
+		antsOptions = append(antsOptions, ants.WithExpiryDuration(config.ExpiryDuration))
+	}
+
+	antsPool, err := ants.NewPoolWithFunc(config.MaxWorkers, workerFunc, antsOptions...)
 	if err != nil {
 		return nil, err
 	}
 	pool.antsPool = antsPool
 	pool.antsPool.Tune(config.MinWorkers)
-	atomic.StoreInt64(&pool.lastTarget, int64(config.MinWorkers))
-	atomic.StoreInt64(&pool.lastScaleTime, time.Now().UnixNano())
+	pool.lastTarget.Store(int64(config.MinWorkers))
+	pool.lastScaleTime.Store(time.Now().UnixNano())
 
 	return pool, nil
 }
@@ -224,7 +250,9 @@ func (p *DynamicWorkerPool) Start() {
 	if p.config.AdjustmentInterval > 0 {
 		go p.autoScale()
 	}
-	p.logger.Println("DynamicWorkerPool started")
+	if p.logger != nil {
+		p.logger.Println("DynamicWorkerPool started")
+	}
 }
 
 // GetRouter returns the result router for accessing type-specific result channels.
@@ -234,10 +262,12 @@ func (p *DynamicWorkerPool) GetRouter() *ResultRouter {
 
 // DrainAndStop waits for outstanding tasks to finish before stopping the worker pool.
 func (p *DynamicWorkerPool) DrainAndStop() {
-	if !atomic.CompareAndSwapInt32(&p.stopping, 0, 1) {
+	if !p.stopping.CompareAndSwap(0, 1) {
 		return
 	}
-	p.logger.Println("Draining DynamicWorkerPool...")
+	if p.logger != nil {
+		p.logger.Println("Draining DynamicWorkerPool...")
+	}
 	p.cancel()
 	done := make(chan struct{})
 	go func() {
@@ -247,16 +277,20 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	select {
 	case <-done:
 	case <-time.After(p.config.TargetQueueLatency * 5):
-		p.logger.Println("Draining timed out, continuing shutdown")
+		if p.logger != nil {
+			p.logger.Println("Draining timed out, continuing shutdown")
+		}
 	}
 	remaining := len(p.resultChan)
-	if remaining > 0 {
+	if remaining > 0 && p.logger != nil {
 		p.logger.Printf("Flushing %d queued results before close", remaining)
 	}
 	close(p.resultChan)
 	p.router.Close()
 	p.antsPool.Release()
-	p.logger.Println("DynamicWorkerPool stopped")
+	if p.logger != nil {
+		p.logger.Println("DynamicWorkerPool stopped")
+	}
 }
 
 // dispatcher fetches batches of jobs from the queue and submits them to the ants pool.
@@ -278,22 +312,22 @@ func (p *DynamicWorkerPool) dispatcher() {
 				batchTarget = 1
 			}
 
-			jobs, err := p.queue.DequeueBatch(batchTarget)
+			batch, err := p.queue.DequeueBatch(batchTarget)
 			if err != nil {
-				if err != ErrQueueClosed {
+				if !errors.Is(err, ErrQueueClosed) {
 					p.logger.Printf("Error dequeuing job batch: %v", err)
 				}
 				time.Sleep(100 * time.Millisecond) // Wait a bit if there's an error
 				continue
 			}
-			if len(jobs) == 0 {
+			if len(batch) == 0 {
 				time.Sleep(10 * time.Millisecond) // Wait if the queue is empty
 				continue
 			}
 
-			atomic.AddInt64(&p.tasksSubmitted, int64(len(jobs)))
+			p.tasksSubmitted.Add(int64(len(batch)))
 
-			for _, job := range jobs {
+			for _, job := range batch {
 				if err := p.antsPool.Invoke(job); err != nil {
 					p.logger.Printf("Error invoking job: %v", err)
 				}
@@ -325,7 +359,7 @@ func (p *DynamicWorkerPool) resultProcessor() {
 				}
 				return
 			}
-			atomic.AddInt64(&p.tasksCompleted, 1)
+			p.tasksCompleted.Add(1)
 			batch = append(batch, result)
 			if len(batch) >= p.config.ResultBatchSize {
 				p.router.RouteResults(batch)
@@ -360,16 +394,18 @@ func (p *DynamicWorkerPool) autoScale() {
 			current := p.antsPool.Cap()
 			if desired != current {
 				p.antsPool.Tune(desired)
-				p.logger.Printf("Tuned worker pool capacity to %d (queue depth=%d)", desired, stats.QueueDepth)
-				atomic.StoreInt64(&p.lastTarget, int64(desired))
-				atomic.StoreInt64(&p.lastScaleTime, time.Now().UnixNano())
-				atomic.AddInt64(&p.scalingEvents, 1)
+				if p.logger != nil {
+					p.logger.Printf("Tuned worker pool capacity to %d (queue depth=%d)", desired, stats.QueueDepth)
+				}
+				p.lastTarget.Store(int64(desired))
+				p.lastScaleTime.Store(time.Now().UnixNano())
+				p.scalingEvents.Add(1)
 			}
 		}
 	}
 }
 
-func (p *DynamicWorkerPool) desiredCapacity(stats QueueStats) int {
+func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 	current := p.antsPool.Cap()
 	if current <= 0 {
 		current = p.config.MinWorkers
@@ -413,7 +449,14 @@ func (p *DynamicWorkerPool) desiredCapacity(stats QueueStats) int {
 			scale := depth / targetDepth
 			desired = int(math.Ceil(float64(desired) * scale))
 		} else if depth < targetDepth/2 && desired > minWorkers {
-			desired = int(math.Max(float64(minWorkers), math.Ceil(float64(desired)*0.8)))
+			// More conservative scaling down for small workloads
+			if current > minWorkers*2 {
+				// Scale down gradually for larger pools
+				desired = int(math.Max(float64(minWorkers), math.Ceil(float64(desired)*0.9)))
+			} else {
+				// For small pools near minimum, maintain capacity longer
+				desired = int(math.Max(float64(minWorkers), math.Ceil(float64(desired)*0.95)))
+			}
 		}
 	}
 
@@ -434,11 +477,58 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 		CurrentCapacity: p.antsPool.Cap(),
 		RunningWorkers:  p.antsPool.Running(),
 		WaitingTasks:    p.antsPool.Waiting(),
-		TargetWorkers:   int(atomic.LoadInt64(&p.lastTarget)),
-		TasksSubmitted:  atomic.LoadInt64(&p.tasksSubmitted),
-		TasksCompleted:  atomic.LoadInt64(&p.tasksCompleted),
-		ScalingEvents:   atomic.LoadInt64(&p.scalingEvents),
-		LastScaleTime:   time.Unix(0, atomic.LoadInt64(&p.lastScaleTime)),
+		TargetWorkers:   int(p.lastTarget.Load()),
+		TasksSubmitted:  p.tasksSubmitted.Load(),
+		TasksCompleted:  p.tasksCompleted.Load(),
+		ScalingEvents:   p.scalingEvents.Load(),
+		LastScaleTime:   time.Unix(0, p.lastScaleTime.Load()),
 		PendingResults:  len(p.resultChan),
 	}
+}
+
+// Pause temporarily stops the worker pool from processing new tasks.
+func (p *DynamicWorkerPool) Pause() {
+	if p.logger != nil {
+		p.logger.Println("Pausing worker pool...")
+	}
+	if p.antsPool != nil {
+		p.antsPool.Tune(0) // Reduce capacity to 0 to pause processing
+	}
+}
+
+// Resume resumes worker pool processing after a pause.
+func (p *DynamicWorkerPool) Resume() {
+	if p.logger != nil {
+		p.logger.Println("Resuming worker pool...")
+	}
+	if p.antsPool != nil {
+		// Restore to minimum workers
+		p.antsPool.Tune(p.config.MinWorkers)
+	}
+}
+
+// ReplaceQueue replaces the current queue with a new one.
+// This is used for dynamic queue switching (e.g., from Workiva to Adaptive).
+func (p *DynamicWorkerPool) ReplaceQueue(newQueue Queue) error {
+	if newQueue == nil {
+		return errors.New("new queue cannot be nil")
+	}
+
+	if p.logger != nil {
+		p.logger.Println("Replacing queue in worker pool...")
+	}
+
+	// Pause processing to prevent race conditions
+	p.Pause()
+
+	// Replace the queue reference
+	p.queue = newQueue
+
+	// Resume processing with new queue
+	p.Resume()
+
+	if p.logger != nil {
+		p.logger.Println("Queue replacement completed")
+	}
+	return nil
 }

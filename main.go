@@ -96,7 +96,7 @@ func main() {
 	}
 
 	// Start the optimized controller
-	if err := oc.Start(ctx); err != nil {
+	if err := oc.Start(); err != nil {
 		fmt.Printf("Error starting controller: %v\n", err)
 		os.Exit(1)
 	}

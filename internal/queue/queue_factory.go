@@ -1,7 +1,5 @@
 package queue
 
-import ()
-
 // QueueType represents the type of queue to create
 type QueueType string
 
@@ -32,8 +30,7 @@ func NewQueue(config QueueConfig) (Queue, error) {
 // DefaultQueueConfig returns the default queue configuration
 func DefaultQueueConfig() QueueConfig {
 	return QueueConfig{
-		Type:     QueueTypeAdaptive,
+		Type:     QueueTypeWorkiva,
 		Capacity: 1 << 16, // 65536
 	}
 }
-

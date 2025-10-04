@@ -52,15 +52,6 @@ type OptimizedController struct {
 	interventionPool *queue.DynamicWorkerPool
 	codePool         *queue.DynamicWorkerPool
 
-	// ECS Systems
-	pulseScheduleSystem      *systems.BatchPulseScheduleSystem
-	pulseSystem              *systems.BatchPulseSystem
-	pulseResultSystem        *systems.BatchPulseResultSystem
-	interventionSystem       *systems.BatchInterventionSystem
-	interventionResultSystem *systems.BatchInterventionResultSystem
-	codeSystem               *systems.BatchCodeSystem
-	codeResultSystem         *systems.BatchCodeResultSystem
-
 	config  Config
 	running bool
 
@@ -87,103 +78,6 @@ func DefaultConfig() Config {
 		WorkerConfig:    queue.DefaultWorkerPoolConfig(),
 		BatchSize:       1000,
 		// UpdateInterval removed - ark-tools TPS=100 controls all timing
-	}
-}
-
-// NewOptimizedControllerWithEntityThreshold creates a controller with automatic queue switching based on entity count.
-func NewOptimizedControllerWithEntityThreshold(config Config, entityThreshold int64) *OptimizedController {
-	// Create ark-tools app with initial capacity
-	arkApp := app.New(1024)
-	arkApp.TPS = 100 // High-frequency updates for 1s monitor intervals
-	world := &arkApp.World
-	mapper := entities.NewEntityManager(world)
-
-	var pulseQueue, interventionQueue, codeQueue queue.Queue
-	var err error
-	var useAdaptiveQueue bool
-
-	// Check initial entity count to determine starting queue type
-	worldStats := world.Stats()
-	// Always use AdaptiveQueue for consistent behavior
-	useAdaptiveQueue = true
-
-	// Create AdaptiveQueues
-	pulseQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
-	if err != nil {
-		log.Fatalf("Failed to create pulse AdaptiveQueue: %v", err)
-	}
-	interventionQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
-	if err != nil {
-		log.Fatalf("Failed to create intervention AdaptiveQueue: %v", err)
-	}
-	codeQueue, err = queue.NewQueue(queue.DefaultQueueConfig())
-	if err != nil {
-		log.Fatalf("Failed to create code AdaptiveQueue: %v", err)
-	}
-	SystemLogger.Info("Starting with AdaptiveQueue (entity count: %d)", worldStats.Entities.Used)
-
-	// Create dynamic worker pools
-	pulseLogger := log.New(os.Stdout, "[PulsePool] ", log.LstdFlags)
-	pulsePool, err := queue.NewDynamicWorkerPool(pulseQueue, config.WorkerConfig, pulseLogger)
-	if err != nil {
-		log.Fatalf("Failed to create pulse worker pool: %v", err)
-	}
-	interventionLogger := log.New(os.Stdout, "[InterventionPool] ", log.LstdFlags)
-	interventionPool, err := queue.NewDynamicWorkerPool(interventionQueue, config.WorkerConfig, interventionLogger)
-	if err != nil {
-		log.Fatalf("Failed to create intervention worker pool: %v", err)
-	}
-	codeLogger := log.New(os.Stdout, "[CodePool] ", log.LstdFlags)
-	codePool, err := queue.NewDynamicWorkerPool(codeQueue, config.WorkerConfig, codeLogger)
-	if err != nil {
-		log.Fatalf("Failed to create code worker pool: %v", err)
-	}
-
-	logger := &LoggerAdapter{logger: SystemLogger}
-
-	// Instantiate the refactored systems with dedicated queues and worker pools.
-	pulseRouter := pulsePool.GetRouter()
-	interventionRouter := interventionPool.GetRouter()
-	codeRouter := codePool.GetRouter()
-
-	pulseScheduleSystem := systems.NewBatchPulseScheduleSystem(world, logger)
-	pulseSystem := systems.NewBatchPulseSystem(world, pulseQueue, config.BatchSize, logger)
-	pulseResultSystem := systems.NewBatchPulseResultSystem(world, pulseRouter.PulseResultChan, logger)
-
-	interventionSystem := systems.NewBatchInterventionSystem(world, interventionQueue, config.BatchSize, logger)
-	interventionResultSystem := systems.NewBatchInterventionResultSystem(world, interventionRouter.InterventionResultChan, logger)
-
-	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, config.BatchSize, logger)
-	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, logger)
-
-	arkApp.AddSystem(pulseScheduleSystem)
-	arkApp.AddSystem(pulseSystem)
-	arkApp.AddSystem(interventionSystem)
-	arkApp.AddSystem(codeSystem)
-	arkApp.AddSystem(pulseResultSystem)
-	arkApp.AddSystem(interventionResultSystem)
-	arkApp.AddSystem(codeResultSystem)
-
-	return &OptimizedController{
-		app:                      arkApp,
-		world:                    world,
-		mapper:                   mapper,
-		pulseQueue:               pulseQueue,
-		interventionQueue:        interventionQueue,
-		codeQueue:                codeQueue,
-		pulsePool:                pulsePool,
-		interventionPool:         interventionPool,
-		codePool:                 codePool,
-		pulseScheduleSystem:      pulseScheduleSystem,
-		pulseSystem:              pulseSystem,
-		pulseResultSystem:        pulseResultSystem,
-		interventionSystem:       interventionSystem,
-		interventionResultSystem: interventionResultSystem,
-		codeSystem:               codeSystem,
-		codeResultSystem:         codeResultSystem,
-		config:                   config,
-		entityCountThreshold:     entityThreshold,
-		useAdaptiveQueue:         useAdaptiveQueue,
 	}
 }
 
@@ -251,23 +145,16 @@ func NewOptimizedController(config Config) *OptimizedController {
 	arkApp.AddSystem(codeResultSystem)
 
 	return &OptimizedController{
-		app:                      arkApp,
-		world:                    world,
-		mapper:                   mapper,
-		pulseQueue:               pulseQueue,
-		interventionQueue:        interventionQueue,
-		codeQueue:                codeQueue,
-		pulsePool:                pulsePool,
-		interventionPool:         interventionPool,
-		codePool:                 codePool,
-		pulseScheduleSystem:      pulseScheduleSystem,
-		pulseSystem:              pulseSystem,
-		pulseResultSystem:        pulseResultSystem,
-		interventionSystem:       interventionSystem,
-		interventionResultSystem: interventionResultSystem,
-		codeSystem:               codeSystem,
-		codeResultSystem:         codeResultSystem,
-		config:                   config,
+		app:               arkApp,
+		world:             world,
+		mapper:            mapper,
+		pulseQueue:        pulseQueue,
+		interventionQueue: interventionQueue,
+		codeQueue:         codeQueue,
+		pulsePool:         pulsePool,
+		interventionPool:  interventionPool,
+		codePool:          codePool,
+		config:            config,
 	}
 }
 
@@ -288,7 +175,7 @@ func (c *OptimizedController) LoadMonitors(ctx context.Context, filename string)
 }
 
 // Start begins the main processing loop of the controller.
-func (c *OptimizedController) Start(ctx context.Context) error {
+func (c *OptimizedController) Start() error {
 	if c.running {
 		return fmt.Errorf("controller already running")
 	}

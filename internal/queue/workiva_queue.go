@@ -1,254 +1,281 @@
 package queue
 
 import (
-	"cpra/internal/jobs"
-	"errors"
-	"sync"
-	"sync/atomic"
-	"time"
+    "cpra/internal/jobs"
+    "errors"
+    wqueue "github.com/Workiva/go-datastructures/queue"
+    "runtime"
+    "sync/atomic"
+    "time"
 )
 
-// WorkivaQueue is a queue implementation inspired by Workiva's go-datastructures
-// It combines the best aspects: unbounded growth with better performance characteristics
-// while maintaining compatibility with the existing Queue interface
+// Wrapper built on Workiva's lock-free RingBuffer, with capacity expansion.
+// Uses linked RingBuffer segments; producers expand when current segment is full.
+
+var (
+    errNilJobType = errors.New("invalid job type in batch")
+)
+
+type rbSeg struct {
+    rb   *wqueue.RingBuffer
+    cap  uint64
+    next atomic.Pointer[rbSeg]
+}
+
+// WorkivaQueue is a lock-free, capacity-expanding MPMC queue using Workiva RBs.
 type WorkivaQueue struct {
-	items    []jobs.Job
-	head     int64
-	tail     int64
-	mu       sync.RWMutex
-	disposed int32
+    head atomic.Pointer[rbSeg]
+    tail atomic.Pointer[rbSeg]
 
-	// Metrics
-	enqueuedCount       int64
-	dequeuedCount       int64
-	totalQueueWaitNanos int64
-	maxQueueWaitNanos   int64
-	startUnixNano       int64
-	lastEnqueueUnixNano atomic.Int64
-	lastDequeueUnixNano atomic.Int64
+    closed atomic.Int32
+
+    // metrics
+    capacity             atomic.Uint64 // cumulative capacity across segments
+    enqueuedCount        atomic.Int64
+    dequeuedCount        atomic.Int64
+    totalQueueWaitNanos  atomic.Int64
+    maxQueueWaitNanos    atomic.Int64
+    startUnixNano        atomic.Int64
+    lastEnqueueUnixNano  atomic.Int64
+    lastDequeueUnixNano  atomic.Int64
 }
 
-// NewWorkivaQueue creates a new Workiva-inspired queue
-func NewWorkivaQueue(initialCapacity int) *WorkivaQueue {
-	return &WorkivaQueue{
-		items:         make([]jobs.Job, 0, initialCapacity),
-		startUnixNano: time.Now().UnixNano(),
-	}
+// NewWorkivaQueue creates a new expanding queue backed by Workiva RingBuffers.
+func NewWorkivaQueue(capacity int) Queue {
+    if capacity < 1 {
+        capacity = 1
+    }
+    rb := wqueue.NewRingBuffer(uint64(capacity))
+    seg := &rbSeg{rb: rb, cap: rb.Cap()}
+    q := &WorkivaQueue{}
+    q.head.Store(seg)
+    q.tail.Store(seg)
+    q.capacity.Store(seg.cap)
+    q.startUnixNano.Store(time.Now().UnixNano())
+    return q
 }
 
-// Enqueue adds a single job to the queue
+// Enqueue adds a single job; expands capacity if the current segment is full.
 func (q *WorkivaQueue) Enqueue(job jobs.Job) error {
-	if q.isDisposed() {
-		return ErrQueueClosed
-	}
+    if q.closed.Load() == 1 {
+        return ErrQueueClosed
+    }
+    now := time.Now()
+    if !isNilJob(job) {
+        job.SetEnqueueTime(now)
+    }
 
-	now := time.Now()
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	if q.isDisposed() {
-		return ErrQueueClosed
-	}
-
-	q.items = append(q.items, job)
-	q.enqueuedCount++
-	q.lastEnqueueUnixNano.Store(now.UnixNano())
-
-	return nil
+    for {
+        tail := q.tail.Load()
+        if ok, err := tail.rb.Offer(job); err != nil {
+            return err
+        } else if ok {
+            q.enqueuedCount.Add(1)
+            q.lastEnqueueUnixNano.Store(now.UnixNano())
+            return nil
+        }
+        // Full: attempt to expand by linking a larger segment
+        if next := tail.next.Load(); next == nil {
+            newRB := wqueue.NewRingBuffer(tail.cap << 1)
+            newSeg := &rbSeg{rb: newRB, cap: newRB.Cap()}
+            if tail.next.CompareAndSwap(nil, newSeg) {
+                q.capacity.Add(newSeg.cap)
+                q.tail.CompareAndSwap(tail, newSeg)
+            }
+        } else {
+            q.tail.CompareAndSwap(tail, next)
+        }
+        runtime.Gosched()
+    }
 }
 
-// EnqueueBatch adds a batch of jobs to the queue
-func (q *WorkivaQueue) EnqueueBatch(jobsInterface []interface{}) error {
-	if len(jobsInterface) == 0 {
-		return nil
-	}
+// EnqueueBatch enqueues a slice of jobs, expanding as needed.
+func (q *WorkivaQueue) EnqueueBatch(items []interface{}) error {
+    if len(items) == 0 {
+        return nil
+    }
+    if q.closed.Load() == 1 {
+        return ErrQueueClosed
+    }
+    now := time.Now()
+    batch := make([]jobs.Job, len(items))
+    for i, it := range items {
+        j, ok := it.(jobs.Job)
+        if !ok {
+            return errNilJobType
+        }
+        if !isNilJob(j) {
+            j.SetEnqueueTime(now)
+        }
+        batch[i] = j
+    }
 
-	if q.isDisposed() {
-		return ErrQueueClosed
-	}
-
-	// Convert interface{} slice to jobs.Job slice
-	convertedJobs := make([]jobs.Job, 0, len(jobsInterface))
-	for _, job := range jobsInterface {
-		if j, ok := job.(jobs.Job); ok {
-			convertedJobs = append(convertedJobs, j)
-		} else {
-			return errors.New("invalid job type in batch")
-		}
-	}
-
-	now := time.Now()
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	if q.isDisposed() {
-		return ErrQueueClosed
-	}
-
-	q.items = append(q.items, convertedJobs...)
-	q.enqueuedCount += int64(len(convertedJobs))
-	q.lastEnqueueUnixNano.Store(now.UnixNano())
-
-	return nil
+    enq := int64(0)
+    for i := range batch {
+        for {
+            tail := q.tail.Load()
+            if ok, err := tail.rb.Offer(batch[i]); err != nil {
+                return err
+            } else if ok {
+                enq++
+                break
+            }
+            if next := tail.next.Load(); next == nil {
+                newRB := wqueue.NewRingBuffer(tail.cap << 1)
+                newSeg := &rbSeg{rb: newRB, cap: newRB.Cap()}
+                if tail.next.CompareAndSwap(nil, newSeg) {
+                    q.capacity.Add(newSeg.cap)
+                    q.tail.CompareAndSwap(tail, newSeg)
+                }
+            } else {
+                q.tail.CompareAndSwap(tail, next)
+            }
+            runtime.Gosched()
+        }
+    }
+    if enq > 0 {
+        q.enqueuedCount.Add(enq)
+        q.lastEnqueueUnixNano.Store(now.UnixNano())
+    }
+    return nil
 }
 
-// Dequeue removes and returns a single job from the queue
+// Dequeue removes and returns a job. Returns (nil, nil) if empty.
 func (q *WorkivaQueue) Dequeue() (jobs.Job, error) {
-	if q.isDisposed() && q.IsEmpty() {
-		return nil, ErrQueueClosed
-	}
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	if q.isDisposed() {
-		return nil, ErrQueueClosed
-	}
-
-	if len(q.items) == 0 {
-		return nil, nil // Queue is empty
-	}
-
-	job := q.items[0]
-	// Remove first element by slicing
-	q.items = q.items[1:]
-
-	q.dequeuedCount++
-	now := time.Now()
-	q.lastDequeueUnixNano.Store(now.UnixNano())
-
-	// Track wait time if job has enqueue time
-	if job != nil {
-		enqueueTime := job.GetEnqueueTime()
-		if !enqueueTime.IsZero() {
-			wait := now.Sub(enqueueTime)
-			q.updateWaitMetrics(wait)
-		}
-	}
-
-	return job, nil
+    if q.closed.Load() == 1 && q.IsEmpty() {
+        return nil, ErrQueueClosed
+    }
+    for {
+        head := q.head.Load()
+        item, err := head.rb.Poll(1 * time.Microsecond)
+        if err == nil && item != nil {
+            job := item.(jobs.Job)
+            now := time.Now()
+            if !isNilJob(job) {
+                enqueueTime := job.GetEnqueueTime()
+                if !enqueueTime.IsZero() {
+                    wait := now.Sub(enqueueTime)
+                    q.totalQueueWaitNanos.Add(int64(wait))
+                    for {
+                        currentMax := q.maxQueueWaitNanos.Load()
+                        if int64(wait) <= currentMax {
+                            break
+                        }
+                        if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
+                            break
+                        }
+                    }
+                }
+            }
+            q.dequeuedCount.Add(1)
+            q.lastDequeueUnixNano.Store(now.UnixNano())
+            return job, nil
+        }
+        if err != nil && err != wqueue.ErrTimeout {
+            return nil, err
+        }
+        // Try to advance to next segment if drained
+        if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
+            q.head.CompareAndSwap(head, next)
+            continue
+        }
+        return nil, nil // observed empty
+    }
 }
 
-// DequeueBatch removes and returns a batch of jobs from the queue
+// DequeueBatch removes up to maxSize jobs. Returns quickly if empty.
 func (q *WorkivaQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
-	if q.isDisposed() && q.IsEmpty() {
-		return nil, ErrQueueClosed
-	}
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	if q.isDisposed() {
-		return nil, ErrQueueClosed
-	}
-
-	if len(q.items) == 0 {
-		return nil, nil // Queue is empty
-	}
-
-	batchSize := len(q.items)
-	if batchSize > maxSize {
-		batchSize = maxSize
-	}
-
-	batch := make([]jobs.Job, batchSize)
-	copy(batch, q.items[:batchSize])
-
-	// Remove batched items
-	q.items = q.items[batchSize:]
-
-	q.dequeuedCount += int64(batchSize)
-	now := time.Now()
-	q.lastDequeueUnixNano.Store(now.UnixNano())
-
-	// Track wait times for batched jobs
-	for _, job := range batch {
-		if job != nil {
-			enqueueTime := job.GetEnqueueTime()
-			if !enqueueTime.IsZero() {
-				wait := now.Sub(enqueueTime)
-				q.updateWaitMetrics(wait)
-			}
-		}
-	}
-
-	return batch, nil
+    if q.closed.Load() == 1 && q.IsEmpty() {
+        return nil, ErrQueueClosed
+    }
+    if maxSize <= 0 {
+        return nil, nil
+    }
+    out := make([]jobs.Job, 0, maxSize)
+    for len(out) < maxSize {
+        head := q.head.Load()
+        item, err := head.rb.Poll(1 * time.Microsecond)
+        if err == nil && item != nil {
+            out = append(out, item.(jobs.Job))
+            continue
+        }
+        if err != nil && err != wqueue.ErrTimeout {
+            return nil, err
+        }
+        if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
+            q.head.CompareAndSwap(head, next)
+            continue
+        }
+        break
+    }
+    if len(out) > 0 {
+        now := time.Now()
+        var totalWait, maxWait int64
+        for _, j := range out {
+            if !isNilJob(j) {
+                enqueueTime := j.GetEnqueueTime()
+                if !enqueueTime.IsZero() {
+                    w := int64(now.Sub(enqueueTime))
+                    totalWait += w
+                    if w > maxWait {
+                        maxWait = w
+                    }
+                }
+            }
+        }
+        if totalWait > 0 {
+            q.totalQueueWaitNanos.Add(totalWait)
+            for {
+                currentMax := q.maxQueueWaitNanos.Load()
+                if maxWait <= currentMax {
+                    break
+                }
+                if q.maxQueueWaitNanos.CompareAndSwap(currentMax, maxWait) {
+                    break
+                }
+            }
+        }
+        q.dequeuedCount.Add(int64(len(out)))
+        q.lastDequeueUnixNano.Store(now.UnixNano())
+    }
+    return out, nil
 }
 
-// IsEmpty checks if the queue is empty
 func (q *WorkivaQueue) IsEmpty() bool {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
-	return len(q.items) == 0
+    return q.enqueuedCount.Load() <= q.dequeuedCount.Load()
 }
 
-// Close marks the queue as closed
 func (q *WorkivaQueue) Close() {
-	atomic.StoreInt32(&q.disposed, 1)
+    q.closed.Store(1)
 }
 
-// Stats returns the current statistics for the queue
 func (q *WorkivaQueue) Stats() Stats {
-	q.mu.RLock()
-	queueDepth := len(q.items)
-	capacity := cap(q.items)
-	q.mu.RUnlock()
-
-	enq := atomic.LoadInt64(&q.enqueuedCount)
-	deq := atomic.LoadInt64(&q.dequeuedCount)
-	elapsed := time.Since(time.Unix(0, q.startUnixNano))
-	if elapsed <= 0 {
-		elapsed = time.Millisecond
-	}
-	avgWaitNs := int64(0)
-	if deq > 0 {
-		avgWaitNs = atomic.LoadInt64(&q.totalQueueWaitNanos) / deq
-	}
-
-	// WorkivaQueue is intentionally unbounded; once the slice is drained Go reports a
-	// zero capacity even though future appends grow it without blocking. Expose a
-	// sentinel capacity so callers can detect the unbounded behaviour instead of
-	// treating the queue as full.
-	if capacity == 0 {
-		capacity = -1
-	}
-
-	return Stats{
-		QueueDepth:   queueDepth,
-		Capacity:     capacity,
-		Enqueued:     enq,
-		Dequeued:     deq,
-		Dropped:      0,
-		MaxQueueTime: time.Duration(atomic.LoadInt64(&q.maxQueueWaitNanos)),
-		AvgQueueTime: time.Duration(avgWaitNs),
-		EnqueueRate:  float64(enq) / elapsed.Seconds(),
-		DequeueRate:  float64(deq) / elapsed.Seconds(),
-		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
-		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
-		SampleWindow: elapsed,
-	}
-}
-
-// Helper methods
-
-func (q *WorkivaQueue) isDisposed() bool {
-	return atomic.LoadInt32(&q.disposed) == 1
-}
-
-func (q *WorkivaQueue) updateWaitMetrics(wait time.Duration) {
-	waitNs := int64(wait)
-	atomic.AddInt64(&q.totalQueueWaitNanos, waitNs)
-
-	// Update max wait time atomically
-	for {
-		currentMax := atomic.LoadInt64(&q.maxQueueWaitNanos)
-		if waitNs <= currentMax {
-			break
-		}
-		if atomic.CompareAndSwapInt64(&q.maxQueueWaitNanos, currentMax, waitNs) {
-			break
-		}
-	}
+    enq := q.enqueuedCount.Load()
+    deq := q.dequeuedCount.Load()
+    depth := enq - deq
+    if depth < 0 {
+        depth = 0
+    }
+    elapsed := time.Since(time.Unix(0, q.startUnixNano.Load()))
+    if elapsed <= 0 {
+        elapsed = time.Millisecond
+    }
+    avgWaitNs := int64(0)
+    if deq > 0 {
+        avgWaitNs = q.totalQueueWaitNanos.Load() / deq
+    }
+    return Stats{
+        QueueDepth:   int(depth),
+        Capacity:     int(q.capacity.Load()),
+        Enqueued:     enq,
+        Dequeued:     deq,
+        Dropped:      0,
+        MaxQueueTime: time.Duration(q.maxQueueWaitNanos.Load()),
+        AvgQueueTime: time.Duration(avgWaitNs),
+        EnqueueRate:  float64(enq) / elapsed.Seconds(),
+        DequeueRate:  float64(deq) / elapsed.Seconds(),
+        LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
+        LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
+        SampleWindow: elapsed,
+    }
 }

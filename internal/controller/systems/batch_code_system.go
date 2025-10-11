@@ -83,7 +83,7 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 
     for query.Next() {
         ent := query.Entity()
-        state, _, jobStorage := query.Get()
+        state, codeConfig, jobStorage := query.Get()
 
 		// Process only entities that need a code alert.
 		if (atomic.LoadUint32(&state.Flags) & components.StateCodeNeeded) == 0 {
@@ -96,6 +96,19 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
 			continue
 		}
+
+        // Honor dispatch flag and presence of color config before enqueuing
+        cfg, hasColor := codeConfig.Configs[color]
+        if !hasColor {
+            s.logger.Warn("Entity[%d] missing '%s' code config; clearing pending code", ent.ID(), color)
+            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            continue
+        }
+        if !cfg.Dispatch {
+            s.logger.Info("Entity[%d] '%s' code dispatch disabled; clearing pending code", ent.ID(), color)
+            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            continue
+        }
 
         job, ok := jobStorage.CodeJobs[color]
         if !ok || isNilJob(job) {

@@ -116,11 +116,18 @@ func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *co
         return
     }
     codeConfig := codeConfigMapper.Get(entity)
-    if _, ok := codeConfig.Configs[color]; ok {
-        state.PendingCode = color
-        atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
-        s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
+    cfg, ok := codeConfig.Configs[color]
+    if !ok {
+        s.logger.Warn("Monitor '%s' has no '%s' code config; skipping alert flag", state.Name, color)
+        return
     }
+    if !cfg.Dispatch {
+        s.logger.Info("Monitor '%s' '%s' code dispatch disabled; not flagging", state.Name, color)
+        return
+    }
+    state.PendingCode = color
+    atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+    s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
 }
 
 // Finalize is a no-op for this system.

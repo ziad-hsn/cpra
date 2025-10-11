@@ -12,14 +12,14 @@ import (
 // BatchPulseResultSystem processes completed pulse checks.
 // It queries for entities with a PulseResult component and updates their state accordingly.
 type BatchPulseResultSystem struct {
-	world  *ecs.World
-	logger Logger
+    world  *ecs.World
+    logger Logger
 
-	// Mappers are used for efficient component access
-	stateMapper      *ecs.Map1[components.MonitorState]
-	configMapper     *ecs.Map1[components.PulseConfig]
-	codeConfigMapper *ecs.Map1[components.CodeConfig]
-	ResultChan       <-chan []jobs.Result
+    // Mappers are used for efficient component access
+    stateMapper      *ecs.Map1[components.MonitorState]
+    configMapper     *ecs.Map1[components.PulseConfig]
+    codeConfigMapper *ecs.Map1[components.CodeConfig]
+    ResultChan       <-chan []jobs.Result
 }
 
 // NewBatchPulseResultSystem creates a new BatchPulseResultSystem.
@@ -83,21 +83,29 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 		processedCount++
 		state.LastCheckTime = time.Now()
 
-		if result.Error() != nil {
-			// --- FAILURE ---
-			state.ConsecutiveFailures++
-			state.LastError = result.Error()
-			s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.ConsecutiveFailures, config.MaxFailures, state.LastError)
+        if result.Error() != nil {
+            // --- FAILURE ---
+            state.ConsecutiveFailures++
+            state.LastError = result.Error()
+            s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.ConsecutiveFailures, config.MaxFailures, state.LastError)
 
-			if state.ConsecutiveFailures >= config.MaxFailures {
-				s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
-				atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
-				state.ConsecutiveFailures = 0 // Reset after triggering
-			} else if state.ConsecutiveFailures == 1 {
-				s.triggerCode(ent, state, "yellow")
-			}
-		} else {
-			// --- SUCCESS ---
+            if state.ConsecutiveFailures >= config.MaxFailures {
+                // If there is no intervention configured, escalate directly to RED.
+                interventionMapper := ecs.NewMap1[components.InterventionConfig](s.world)
+                if interventionMapper.Has(ent) {
+                    s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
+                    atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
+                    state.ConsecutiveFailures = 0 // Reset after triggering
+                } else {
+                    s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
+                    s.triggerCode(ent, state, "red")
+                    state.ConsecutiveFailures = 0
+                }
+            } else if state.ConsecutiveFailures == 1 {
+                s.triggerCode(ent, state, "yellow")
+            }
+        } else {
+            // --- SUCCESS ---
 			wasFailure := state.ConsecutiveFailures > 0
 			if wasFailure {
 				s.logger.Info("Monitor '%s' pulse recovered.", state.Name)
@@ -122,13 +130,20 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
     if codeConfig == nil {
         return
     }
-    if _, ok := codeConfig.Configs[color]; ok {
-        // TODO: This is a placeholder for a more robust CodeNeeded implementation
-        // For now, we directly set the flag.
-        state.PendingCode = color
-        atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
-        s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
+    cfg, ok := codeConfig.Configs[color]
+    if !ok {
+        s.logger.Warn("Monitor '%s' has no '%s' code config; skipping alert trigger", state.Name, color)
+        return
     }
+    if !cfg.Dispatch {
+        s.logger.Info("Monitor '%s' '%s' code dispatch disabled; not triggering", state.Name, color)
+        return
+    }
+    // TODO: This is a placeholder for a more robust CodeNeeded implementation
+    // For now, we directly set the flag.
+    state.PendingCode = color
+    atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+    s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
 }
 
 // Finalize is a no-op for this system.

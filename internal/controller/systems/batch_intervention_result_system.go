@@ -63,8 +63,8 @@ loop:
 
 // ProcessBatch processes a batch of intervention results.
 func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
-	startTime := time.Now()
-	processedCount := 0
+    startTime := time.Now()
+    processedCount := 0
 
 	for _, result := range results {
 		ent := result.Entity()
@@ -86,20 +86,24 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 		processedCount++
 		state.LastCheckTime = time.Now()
 
-		if result.Error() != nil {
-			// --- FAILURE ---
-			state.ConsecutiveFailures++
-			state.LastError = result.Error()
-			s.logger.Error("Monitor '%s' intervention failed: %v", state.Name, state.LastError)
-			s.triggerCode(ent, state, "red")
-		} else {
-			// --- SUCCESS ---
-			s.logger.Info("Monitor '%s' intervention succeeded.", state.Name)
-			state.ConsecutiveFailures = 0
-			state.LastError = nil
-			state.LastSuccessTime = state.LastCheckTime
-			s.triggerCode(ent, state, "cyan")
-		}
+        if result.Error() != nil {
+            // --- FAILURE ---
+            state.InterventionFailures++
+            state.LastError = result.Error()
+            s.logger.Error("Monitor '%s' intervention failed: %v", state.Name, state.LastError)
+            s.triggerCode(ent, state, "red")
+            atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+        } else {
+            // --- SUCCESS ---
+            s.logger.Info("Monitor '%s' intervention succeeded.", state.Name)
+            state.ConsecutiveFailures = 0
+            state.LastError = nil
+            state.LastSuccessTime = state.LastCheckTime
+            // Begin verification window (Phase 2)
+            state.VerifyRemaining = 3 // default M; TODO: parameterize
+            atomic.OrUint32(&state.Flags, components.StateVerifying)
+            s.triggerCode(ent, state, "cyan")
+        }
 
 		// Unset the pending flag, regardless of outcome.
 		atomic.AndUint32(&state.Flags, ^uint32(components.StateInterventionPending))

@@ -36,9 +36,15 @@ type MonitorState struct {
 	LastSuccessTime time.Time
 	NextCheckTime   time.Time
 
-	// Error tracking
-	ConsecutiveFailures int
-	LastError           error
+    // Error tracking
+    ConsecutiveFailures int // deprecated in favor of PulseFailures/InterventionFailures
+    LastError           error
+
+    // Phase 2 counters and tracking
+    PulseFailures        int
+    InterventionFailures int
+    RecoveryStreak       int
+    VerifyRemaining      int
 
 	// Pending action data
 	PendingCode string
@@ -46,16 +52,18 @@ type MonitorState struct {
 
 // State flag constants - replaces separate components like PulseNeeded, PulsePending, etc.
 const (
-	StateDisabled            uint32 = 1 << 0
-	StatePulseNeeded         uint32 = 1 << 1
-	StatePulsePending        uint32 = 1 << 2
-	StatePulseFirstCheck     uint32 = 1 << 3
-	StateHasIntervention     uint32 = 1 << 4
-	StateInterventionNeeded  uint32 = 1 << 5
-	StateInterventionPending uint32 = 1 << 6
-	StateCodeNeeded          uint32 = 1 << 7
-	StateCodePending         uint32 = 1 << 8
-	// Room for more states without adding components
+    StateDisabled            uint32 = 1 << 0
+    StatePulseNeeded         uint32 = 1 << 1
+    StatePulsePending        uint32 = 1 << 2
+    StatePulseFirstCheck     uint32 = 1 << 3
+    StateHasIntervention     uint32 = 1 << 4
+    StateInterventionNeeded  uint32 = 1 << 5
+    StateInterventionPending uint32 = 1 << 6
+    StateCodeNeeded          uint32 = 1 << 7
+    StateCodePending         uint32 = 1 << 8
+    StateIncidentOpen        uint32 = 1 << 9
+    StateVerifying           uint32 = 1 << 10
+    // Room for more states without adding components
 )
 
 // Efficient state management methods using atomic operations

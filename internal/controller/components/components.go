@@ -46,14 +46,15 @@ type MonitorState struct {
 
 // State flag constants - replaces separate components like PulseNeeded, PulsePending, etc.
 const (
-	StateDisabled           uint32 = 1 << 0
-	StatePulseNeeded        uint32 = 1 << 1
-	StatePulsePending       uint32 = 1 << 2
-	StatePulseFirstCheck    uint32 = 1 << 3
-	StateInterventionNeeded uint32 = 1 << 4
-	StateInterventionPending uint32 = 1 << 5
-	StateCodeNeeded         uint32 = 1 << 6
-	StateCodePending        uint32 = 1 << 7
+	StateDisabled            uint32 = 1 << 0
+	StatePulseNeeded         uint32 = 1 << 1
+	StatePulsePending        uint32 = 1 << 2
+	StatePulseFirstCheck     uint32 = 1 << 3
+	StateHasIntervention     uint32 = 1 << 4
+	StateInterventionNeeded  uint32 = 1 << 5
+	StateInterventionPending uint32 = 1 << 6
+	StateCodeNeeded          uint32 = 1 << 7
+	StateCodePending         uint32 = 1 << 8
 	// Room for more states without adding components
 )
 

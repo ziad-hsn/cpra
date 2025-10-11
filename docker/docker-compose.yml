@@ -1,0 +1,34 @@
+services:
+  cpra-memory-test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: cpra-memory-test
+    # Memory limits - configure these in the environment variables section
+    deploy:
+      resources:
+        limits:
+          memory: 850M  # Default 1GB memory limit
+        reservations:
+          memory: 500M
+    environment:
+      # Go memory limit (1GiB = 1073741824 bytes)
+      - GOMEMLIMIT=${GOMEMLIMIT:-1073741824}
+      # Garbage collection percentage (100 = default)
+      - GOGC=${GOGC:-100}
+      # Enable debug logging if needed
+      - CPRA_DEBUG=${CPRA_DEBUG:-false}
+    volumes:
+      # Mount samples directory for access to different YAML files
+      - ../samples:/app/samples:ro
+    command: ["./cpra", "--yaml", "${YAML_FILE:-samples/replicated_test_10k.yaml}"]
+    # If you need to add other parameters, you can extend the command:
+    # command: ["./cpra", "--yaml", "${YAML_FILE}", "--debug", "--profile"]
+    restart: unless-stopped
+    networks:
+      - cpra-network
+networks:
+  cpra-network:
+    driver: bridge
+
+

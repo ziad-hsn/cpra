@@ -111,16 +111,16 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 }
 
 func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
-	codeConfigMapper := ecs.NewMap[components.CodeConfig](s.world)
-	if !codeConfigMapper.Has(entity) {
-		return
-	}
-	codeConfig := codeConfigMapper.Get(entity)
-	if _, ok := codeConfig.Configs[color]; ok {
-		state.PendingCode = color
-		atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
-		s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
-	}
+    codeConfigMapper := ecs.NewMap[components.CodeConfig](s.world)
+    if !codeConfigMapper.Has(entity) {
+        return
+    }
+    codeConfig := codeConfigMapper.Get(entity)
+    if _, ok := codeConfig.Configs[color]; ok {
+        state.PendingCode = color
+        atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+        s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
+    }
 }
 
 // Finalize is a no-op for this system.

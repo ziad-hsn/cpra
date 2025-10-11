@@ -118,17 +118,17 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 }
 
 func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
-	codeConfig := s.codeConfigMapper.Get(entity)
-	if codeConfig == nil {
-		return
-	}
-	if _, ok := codeConfig.Configs[color]; ok {
-		// TODO: This is a placeholder for a more robust CodeNeeded implementation
-		// For now, we directly set the flag.
-		state.PendingCode = color
-		atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
-		s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
-	}
+    codeConfig := s.codeConfigMapper.Get(entity)
+    if codeConfig == nil {
+        return
+    }
+    if _, ok := codeConfig.Configs[color]; ok {
+        // TODO: This is a placeholder for a more robust CodeNeeded implementation
+        // For now, we directly set the flag.
+        state.PendingCode = color
+        atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+        s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
+    }
 }
 
 // Finalize is a no-op for this system.

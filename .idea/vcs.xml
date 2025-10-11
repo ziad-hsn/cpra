@@ -2,5 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ai-knowledge/ark-tools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ai-knowledge/asynq" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ai-knowledge/go-datastructures" vcs="Git" />
   </component>
 </project>

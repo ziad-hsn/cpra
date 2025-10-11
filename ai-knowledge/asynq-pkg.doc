@@ -1,0 +1,150 @@
+package asynq // import "github.com/hibiken/asynq"
+
+Package asynq provides a framework for Redis based distrubted task queue.
+
+Asynq uses Redis as a message broker. To connect to redis, specify the
+connection using one of RedisConnOpt types.
+
+    redisConnOpt = asynq.RedisClientOpt{
+        Addr:     "127.0.0.1:6379",
+        Password: "xxxxx",
+        DB:       2,
+    }
+
+The Client is used to enqueue a task.
+
+    client := asynq.NewClient(redisConnOpt)
+
+    // Task is created with two parameters: its type and payload.
+    // Payload data is simply an array of bytes. It can be encoded in JSON, Protocol Buffer, Gob, etc.
+    b, err := json.Marshal(ExamplePayload{UserID: 42})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    task := asynq.NewTask("example", b)
+
+    // Enqueue the task to be processed immediately.
+    info, err := client.Enqueue(task)
+
+    // Schedule the task to be processed after one minute.
+    info, err = client.Enqueue(t, asynq.ProcessIn(1*time.Minute))
+
+The Server is used to run the task processing workers with a given handler.
+
+    srv := asynq.NewServer(redisConnOpt, asynq.Config{
+        Concurrency: 10,
+    })
+
+    if err := srv.Run(handler); err != nil {
+        log.Fatal(err)
+    }
+
+Handler is an interface type with a method which takes a task and returns an
+error. Handler should return nil if the processing is successful, otherwise
+return a non-nil error. If handler panics or returns a non-nil error, the task
+will be retried in the future.
+
+Example of a type that implements the Handler interface.
+
+    type TaskHandler struct {
+        // ...
+    }
+
+    func (h *TaskHandler) ProcessTask(ctx context.Context, task *asynq.Task) error {
+        switch task.Type {
+        case "example":
+            var data ExamplePayload
+            if err := json.Unmarshal(task.Payload(), &data); err != nil {
+                return err
+            }
+            // perform task with the data
+
+        default:
+            return fmt.Errorf("unexpected task type %q", task.Type)
+        }
+        return nil
+    }
+
+var ErrQueueNotFound = errors.New("queue not found") ...
+var ErrDuplicateTask = errors.New("task already exists")
+var ErrLeaseExpired = errors.New("asynq: task lease expired")
+var ErrServerClosed = errors.New("asynq: Server closed")
+var ErrTaskIDConflict = errors.New("task ID conflicts with another task")
+var RevokeTask = errors.New("revoke task")
+var SkipRetry = errors.New("skip retry for the task")
+func DefaultRetryDelayFunc(n int, e error, t *Task) time.Duration
+func GetMaxRetry(ctx context.Context) (n int, ok bool)
+func GetQueueName(ctx context.Context) (queue string, ok bool)
+func GetRetryCount(ctx context.Context) (n int, ok bool)
+func GetTaskID(ctx context.Context) (id string, ok bool)
+func IsPanicError(err error) bool
+func NotFound(ctx context.Context, task *Task) error
+type Client struct{ ... }
+    func NewClient(r RedisConnOpt) *Client
+    func NewClientFromRedisClient(c redis.UniversalClient) *Client
+type ClusterNode struct{ ... }
+type Config struct{ ... }
+type DailyStats struct{ ... }
+type ErrorHandler interface{ ... }
+type ErrorHandlerFunc func(ctx context.Context, task *Task, err error)
+type GroupAggregator interface{ ... }
+type GroupAggregatorFunc func(group string, tasks []*Task) *Task
+type GroupInfo struct{ ... }
+type Handler interface{ ... }
+    func NotFoundHandler() Handler
+type HandlerFunc func(context.Context, *Task) error
+type Inspector struct{ ... }
+    func NewInspector(r RedisConnOpt) *Inspector
+    func NewInspectorFromRedisClient(c redis.UniversalClient) *Inspector
+type ListOption interface{}
+    func Page(n int) ListOption
+    func PageSize(n int) ListOption
+type LogLevel int32
+    const DebugLevel LogLevel ...
+type Logger interface{ ... }
+type MiddlewareFunc func(Handler) Handler
+type Option interface{ ... }
+    func Deadline(t time.Time) Option
+    func Group(name string) Option
+    func MaxRetry(n int) Option
+    func ProcessAt(t time.Time) Option
+    func ProcessIn(d time.Duration) Option
+    func Queue(name string) Option
+    func Retention(d time.Duration) Option
+    func TaskID(id string) Option
+    func Timeout(d time.Duration) Option
+    func Unique(ttl time.Duration) Option
+type OptionType int
+    const MaxRetryOpt OptionType = iota ...
+type PeriodicTaskConfig struct{ ... }
+type PeriodicTaskConfigProvider interface{ ... }
+type PeriodicTaskManager struct{ ... }
+    func NewPeriodicTaskManager(opts PeriodicTaskManagerOpts) (*PeriodicTaskManager, error)
+type PeriodicTaskManagerOpts struct{ ... }
+type QueueInfo struct{ ... }
+type RedisClientOpt struct{ ... }
+type RedisClusterClientOpt struct{ ... }
+type RedisConnOpt interface{ ... }
+    func ParseRedisURI(uri string) (RedisConnOpt, error)
+type RedisFailoverClientOpt struct{ ... }
+type ResultWriter struct{ ... }
+type RetryDelayFunc func(n int, e error, t *Task) time.Duration
+type Scheduler struct{ ... }
+    func NewScheduler(r RedisConnOpt, opts *SchedulerOpts) *Scheduler
+    func NewSchedulerFromRedisClient(c redis.UniversalClient, opts *SchedulerOpts) *Scheduler
+type SchedulerEnqueueEvent struct{ ... }
+type SchedulerEntry struct{ ... }
+type SchedulerOpts struct{ ... }
+type ServeMux struct{ ... }
+    func NewServeMux() *ServeMux
+type Server struct{ ... }
+    func NewServer(r RedisConnOpt, cfg Config) *Server
+    func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server
+type ServerInfo struct{ ... }
+type Task struct{ ... }
+    func NewTask(typename string, payload []byte, opts ...Option) *Task
+type TaskInfo struct{ ... }
+type TaskState int
+    const TaskStateActive TaskState = iota + 1 ...
+type WorkerInfo struct{ ... }

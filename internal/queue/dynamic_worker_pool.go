@@ -151,14 +151,14 @@ type WorkerPoolConfig struct {
 // DefaultWorkerPoolConfig returns a default configuration for the worker pool.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
-		MinWorkers:         5,  // Reduced from 10 to allow smaller workloads
-		MaxWorkers:         10000,
-		AdjustmentInterval: 10 * time.Second, // Increased from 5s to reduce oscillation
+		MinWorkers:         5, // Reduced from 10 to allow smaller workloads
+		MaxWorkers:         120000,
+		AdjustmentInterval: 5 * time.Second, // Increased from 5s to reduce oscillation
 		ResultBatchSize:    1000,
 		ResultBatchTimeout: 10 * time.Millisecond,
 		TargetQueueLatency: 100 * time.Millisecond,
-		PreAlloc:          false,
-		NonBlocking:       false,
+		PreAlloc:           false,
+		NonBlocking:        false,
 		ExpiryDuration:     5 * time.Minute, // Better aligned with job timeouts (1m-1h)
 	}
 }

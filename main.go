@@ -8,7 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"runtime/pprof"
+	"net/http"
+	_ "net/http/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -17,11 +18,13 @@ import (
 )
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	// Command line flags
 	var (
 		configFile = flag.String("config", "", "Configuration file path")
 		yamlFile   = flag.String("yaml", "internal/loader/replicated_test.yaml", "YAML file with monitors")
-		profile    = flag.Bool("profile", false, "Enable CPU profiling")
 		debug      = flag.Bool("debug", false, "Enable debug logging")
 	)
 	flag.Parse()
@@ -30,6 +33,7 @@ func main() {
 	controller.InitializeLoggers(*debug)
 
 	controller.SystemLogger.Info("Starting CPRA Optimized Controller for 1M Monitors")
+	controller.SystemLogger.Info("Profiling server started at http://localhost:6060/debug/pprof/")
 	controller.SystemLogger.Info("Input file: %s", *yamlFile)
 
 	// Create optimized configuration
@@ -39,20 +43,6 @@ func main() {
 	if *configFile != "" {
 		fmt.Printf("Loading configuration from: %s\n", *configFile)
 		// Configuration loading would be implemented here
-	}
-
-	// Enable profiling if requested
-	if *profile {
-		fmt.Println("CPU profiling enabled")
-		f, err := os.Create("cpu.pprof")
-		if err != nil {
-			log.Fatal("could not create CPU profile: ", err)
-		}
-		defer f.Close() // error handling omitted for example
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
 	}
 
 	// Create the new optimized controller

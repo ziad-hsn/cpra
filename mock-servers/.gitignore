@@ -1,0 +1,5 @@
+bin/
+logs/
+.mock-servers.pid
+.mock-servers-state.json
+nohup.out

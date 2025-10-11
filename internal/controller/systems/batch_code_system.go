@@ -81,9 +81,9 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 	jobsToProcess := make([]jobInfo, 0, s.batchSize)
 	processedCount := 0
 
-	for query.Next() {
-		ent := query.Entity()
-		state, _, jobStorage := query.Get()
+    for query.Next() {
+        ent := query.Entity()
+        state, _, jobStorage := query.Get()
 
 		// Process only entities that need a code alert.
 		if (atomic.LoadUint32(&state.Flags) & components.StateCodeNeeded) == 0 {
@@ -97,13 +97,13 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 			continue
 		}
 
-		job, ok := jobStorage.CodeJobs[color]
-		if !ok || isNilJob(job) {
-			s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
-			// Clear the flag if no job is found to prevent spinning.
-			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
-			continue
-		}
+        job, ok := jobStorage.CodeJobs[color]
+        if !ok || isNilJob(job) {
+            s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
+            // Clear the flag if no job is found to prevent spinning.
+            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            continue
+        }
 
 		jobsToProcess = append(jobsToProcess, jobInfo{Entity: ent, Job: job, Color: color})
 

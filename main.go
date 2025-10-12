@@ -1,40 +1,52 @@
 package main
 
 import (
-	"context"
-	"flag"
-	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"runtime"
-	"net/http"
-	_ "net/http/pprof"
-	"sync"
-	"syscall"
-	"time"
+    "context"
+    "flag"
+    "fmt"
+    "log"
+    "os"
+    "os/signal"
+    "runtime"
+    "net/http"
+    pprof "net/http/pprof"
+    "sync"
+    "syscall"
+    "time"
 
-	"cpra/internal/controller"
+    "cpra/internal/controller"
 )
 
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-	// Command line flags
-	var (
-		configFile = flag.String("config", "", "Configuration file path")
-		yamlFile   = flag.String("yaml", "internal/loader/replicated_test.yaml", "YAML file with monitors")
-		debug      = flag.Bool("debug", false, "Enable debug logging")
-	)
-	flag.Parse()
+    // Command line flags
+    var (
+        configFile = flag.String("config", "", "Configuration file path")
+        yamlFile   = flag.String("yaml", "internal/loader/replicated_test.yaml", "YAML file with monitors")
+        debug      = flag.Bool("debug", false, "Enable debug logging")
+        pprofEnable = flag.Bool("pprof", true, "Enable pprof web server")
+        pprofAddr   = flag.String("pprof.addr", "localhost:6060", "pprof listen address (host:port)")
+    )
+    flag.Parse()
 
-	// Initialize loggers first
-	controller.InitializeLoggers(*debug)
+    // Initialize loggers first
+    controller.InitializeLoggers(*debug)
 
-	controller.SystemLogger.Info("Starting CPRA Optimized Controller for 1M Monitors")
-	controller.SystemLogger.Info("Profiling server started at http://localhost:6060/debug/pprof/")
-	controller.SystemLogger.Info("Input file: %s", *yamlFile)
+    controller.SystemLogger.Info("Starting CPRA Optimized Controller for 1M Monitors")
+    if *pprofEnable {
+        go func(addr string) {
+            mux := http.NewServeMux()
+            mux.HandleFunc("/debug/pprof/", pprof.Index)
+            mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+            mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+            mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+            mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+            controller.SystemLogger.Info("Profiling server listening at http://%s/debug/pprof/", addr)
+            if err := http.ListenAndServe(addr, mux); err != nil {
+                controller.SystemLogger.Warn("Profiling server error: %v", err)
+            }
+        }(*pprofAddr)
+    }
+    controller.SystemLogger.Info("Input file: %s", *yamlFile)
 
 	// Create optimized configuration
 	config := controller.DefaultConfig()

@@ -12,22 +12,24 @@ import (
 // BatchInterventionResultSystem processes completed intervention jobs.
 // It processes batches of results passed directly from the result router.
 type BatchInterventionResultSystem struct {
-	world  *ecs.World
-	logger Logger
+    world  *ecs.World
+    logger Logger
 
-	// Mappers for efficient component access
-	stateMapper *ecs.Map[components.MonitorState]
-	ResultChan  <-chan []jobs.Result
+    // Mappers for efficient component access
+    stateMapper *ecs.Map[components.MonitorState]
+    codeConfigMapper *ecs.Map1[components.CodeConfig]
+    ResultChan  <-chan []jobs.Result
 }
 
 // NewBatchInterventionResultSystem creates a new BatchInterventionResultSystem.
 func NewBatchInterventionResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger) *BatchInterventionResultSystem {
-	return &BatchInterventionResultSystem{
-		world:       world,
-		logger:      logger,
-		stateMapper: ecs.NewMap[components.MonitorState](world),
-		ResultChan:  results,
-	}
+    return &BatchInterventionResultSystem{
+        world:       world,
+        logger:      logger,
+        stateMapper: ecs.NewMap[components.MonitorState](world),
+        codeConfigMapper: ecs.NewMap1[components.CodeConfig](world),
+        ResultChan:  results,
+    }
 }
 
 func (s *BatchInterventionResultSystem) Initialize(w *ecs.World) {
@@ -128,11 +130,10 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 }
 
 func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
-    codeConfigMapper := ecs.NewMap[components.CodeConfig](s.world)
-    if !codeConfigMapper.Has(entity) {
+    codeConfig := s.codeConfigMapper.Get(entity)
+    if codeConfig == nil {
         return
     }
-    codeConfig := codeConfigMapper.Get(entity)
     cfg, ok := codeConfig.Configs[color]
     if !ok {
         s.logger.Warn("Monitor '%s' has no '%s' code config; skipping alert flag", state.Name, color)

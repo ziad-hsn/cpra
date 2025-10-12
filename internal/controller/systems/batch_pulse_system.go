@@ -37,7 +37,9 @@ func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger 
 }
 
 func (s *BatchPulseSystem) Initialize(w *ecs.World) {
-
+    if s.filter != nil {
+        s.filter.Register()
+    }
 }
 
 func (s *BatchPulseSystem) SetMaxDispatch(n int) {

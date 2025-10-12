@@ -35,7 +35,11 @@ func NewBatchInterventionSystem(world *ecs.World, q queue.Queue, batchSize int, 
 	}
 }
 
-func (s *BatchInterventionSystem) Initialize(w *ecs.World) {}
+func (s *BatchInterventionSystem) Initialize(w *ecs.World) {
+    if s.filter != nil {
+        s.filter.Register()
+    }
+}
 
 // Update finds and processes all monitors that need an intervention.
 func (s *BatchInterventionSystem) Update(w *ecs.World) {

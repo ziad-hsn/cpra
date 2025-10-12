@@ -43,7 +43,9 @@ func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger L
 	}
 }
 func (s *BatchCodeSystem) Initialize(w *ecs.World) {
-
+    if s.filter != nil {
+        s.filter.Register()
+    }
 }
 
 // Update finds and processes all monitors that need a code alert.

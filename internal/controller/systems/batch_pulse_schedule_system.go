@@ -31,7 +31,9 @@ func NewBatchPulseScheduleSystem(world *ecs.World, logger Logger) *BatchPulseSch
 }
 
 func (s *BatchPulseScheduleSystem) Initialize(w *ecs.World) {
-
+    if s.filter != nil {
+        s.filter.Register()
+    }
 }
 
 // Update finds and schedules all monitors that are due for a pulse check.

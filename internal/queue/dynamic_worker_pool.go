@@ -136,31 +136,33 @@ type DynamicWorkerPool struct {
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
 type WorkerPoolConfig struct {
-	MinWorkers         int
-	MaxWorkers         int
-	AdjustmentInterval time.Duration
-	ResultBatchSize    int
-	ResultBatchTimeout time.Duration
-	TargetQueueLatency time.Duration
-	// Ants-specific options
-	PreAlloc       bool
-	NonBlocking    bool
-	ExpiryDuration time.Duration
+    MinWorkers         int
+    MaxWorkers         int
+    AdjustmentInterval time.Duration
+    ResultBatchSize    int
+    ResultBatchTimeout time.Duration
+    TargetQueueLatency time.Duration
+    // Ants-specific options
+    PreAlloc       bool
+    NonBlocking    bool
+    MaxBlockingTasks int
+    ExpiryDuration time.Duration
 }
 
 // DefaultWorkerPoolConfig returns a default configuration for the worker pool.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
-	return WorkerPoolConfig{
-		MinWorkers:         5, // Reduced from 10 to allow smaller workloads
-		MaxWorkers:         120000,
-		AdjustmentInterval: 5 * time.Second, // Increased from 5s to reduce oscillation
-		ResultBatchSize:    1000,
-		ResultBatchTimeout: 10 * time.Millisecond,
-		TargetQueueLatency: 100 * time.Millisecond,
-		PreAlloc:           false,
-		NonBlocking:        false,
-		ExpiryDuration:     5 * time.Minute, // Better aligned with job timeouts (1m-1h)
-	}
+    return WorkerPoolConfig{
+        MinWorkers:         5, // Reduced from 10 to allow smaller workloads
+        MaxWorkers:         120000,
+        AdjustmentInterval: 5 * time.Second, // Increased from 5s to reduce oscillation
+        ResultBatchSize:    1000,
+        ResultBatchTimeout: 10 * time.Millisecond,
+        TargetQueueLatency: 100 * time.Millisecond,
+        PreAlloc:           false,
+        NonBlocking:        false,
+        MaxBlockingTasks:   0,
+        ExpiryDuration:     5 * time.Minute, // Better aligned with job timeouts (1m-1h)
+    }
 }
 
 // NewDynamicWorkerPool creates a new dynamic worker pool.
@@ -208,23 +210,29 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		}
 	}
 
-	// Build ants options
-	var antsOptions []ants.Option
-	antsOptions = append(antsOptions, ants.WithPanicHandler(func(err interface{}) {
-		if pool.logger != nil {
-			pool.logger.Printf("Worker panic: %v", err)
-		}
-	}))
+    // Build ants options
+    var antsOptions []ants.Option
+    if pool.logger != nil {
+        antsOptions = append(antsOptions, ants.WithLogger(pool.logger))
+    }
+    antsOptions = append(antsOptions, ants.WithPanicHandler(func(err interface{}) {
+        if pool.logger != nil {
+            pool.logger.Printf("Worker panic: %v", err)
+        }
+    }))
 
 	if config.PreAlloc {
 		antsOptions = append(antsOptions, ants.WithPreAlloc(true))
 	}
-	if config.NonBlocking {
-		antsOptions = append(antsOptions, ants.WithNonblocking(true))
-	}
-	if config.ExpiryDuration > 0 {
-		antsOptions = append(antsOptions, ants.WithExpiryDuration(config.ExpiryDuration))
-	}
+    if config.NonBlocking {
+        antsOptions = append(antsOptions, ants.WithNonblocking(true))
+    }
+    if config.MaxBlockingTasks > 0 {
+        antsOptions = append(antsOptions, ants.WithMaxBlockingTasks(config.MaxBlockingTasks))
+    }
+    if config.ExpiryDuration > 0 {
+        antsOptions = append(antsOptions, ants.WithExpiryDuration(config.ExpiryDuration))
+    }
 
 	antsPool, err := ants.NewPoolWithFunc(config.MaxWorkers, workerFunc, antsOptions...)
 	if err != nil {

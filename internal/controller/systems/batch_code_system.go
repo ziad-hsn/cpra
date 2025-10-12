@@ -4,7 +4,7 @@ import (
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
 	"cpra/internal/queue"
-	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +29,8 @@ type BatchCodeSystem struct {
 	// Filter for entities that require a code alert.
 	filter      *ecs.Filter3[components.MonitorState, components.CodeConfig, components.JobStorage]
 	stateMapper *ecs.Map1[components.MonitorState]
+
+	jobInfoPool *sync.Pool
 }
 
 // NewBatchCodeSystem creates a new BatchCodeSystem.
@@ -40,6 +42,12 @@ func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger L
 		batchSize:   batchSize,
 		filter:      ecs.NewFilter3[components.MonitorState, components.CodeConfig, components.JobStorage](world),
 		stateMapper: ecs.NewMap1[components.MonitorState](world),
+		jobInfoPool: &sync.Pool{
+			New: func() interface{} {
+				s := make([]jobInfo, 0, batchSize)
+				return &s
+			},
+		},
 	}
 }
 func (s *BatchCodeSystem) Initialize(w *ecs.World) {
@@ -80,8 +88,13 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 
 	earlyExit := false
 
-	jobsToProcess := make([]jobInfo, 0, s.batchSize)
+	jobInfoPtr := s.jobInfoPool.Get().(*[]jobInfo)
+	jobsToProcess := (*jobInfoPtr)[:0]
 	processedCount := 0
+
+	defer func() {
+		s.jobInfoPool.Put(jobInfoPtr)
+	}()
 
     for query.Next() {
         ent := query.Entity()
@@ -125,7 +138,7 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
 		if len(jobsToProcess) >= tokens {
 			s.processBatch(&jobsToProcess)
 			processedCount += len(jobsToProcess)
-			jobsToProcess = make([]jobInfo, 0, s.batchSize)
+			jobsToProcess = jobsToProcess[:0]
 			earlyExit = true
 			break
 		}
@@ -203,15 +216,4 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 // Finalize is a no-op for this system.
 func (s *BatchCodeSystem) Finalize(w *ecs.World) {}
 
-func isNilJob(job jobs.Job) bool {
-	if job == nil {
-		return true
-	}
-	v := reflect.ValueOf(job)
-	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
-		return v.IsNil()
-	default:
-		return false
-	}
-}
+func isNilJob(job jobs.Job) bool { return job == nil || job.IsNil() }

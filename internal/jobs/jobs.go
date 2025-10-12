@@ -23,12 +23,13 @@ import (
 
 // Job defines the interface for any executable task in the system.
 type Job interface {
-	Execute() Result
-	Copy() Job
-	GetEnqueueTime() time.Time
-	SetEnqueueTime(time.Time)
-	GetStartTime() time.Time
-	SetStartTime(time.Time)
+    Execute() Result
+    Copy() Job
+    GetEnqueueTime() time.Time
+    SetEnqueueTime(time.Time)
+    GetStartTime() time.Time
+    SetStartTime(time.Time)
+    IsNil() bool
 }
 
 // CreatePulseJob creates a new pulse job based on the provided schema.
@@ -257,8 +258,10 @@ func (p *PulseHTTPJob) Execute() Result {
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// Close response body immediately after checking status
+		statusOk := resp.StatusCode >= 200 && resp.StatusCode < 300
+		resp.Body.Close()
+		if statusOk {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = fmt.Errorf("received non-2xx status code: %s", resp.Status)
@@ -271,6 +274,7 @@ func (p *PulseHTTPJob) GetEnqueueTime() time.Time  { return p.EnqueueTime }
 func (p *PulseHTTPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseHTTPJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseHTTPJob) SetStartTime(t time.Time)   { p.StartTime = t }
+func (p *PulseHTTPJob) IsNil() bool                { return p == nil }
 
 // PulseTCPJob is a placeholder for a TCP pulse job.
 type PulseTCPJob struct {
@@ -320,6 +324,7 @@ func (p *PulseTCPJob) GetEnqueueTime() time.Time  { return p.EnqueueTime }
 func (p *PulseTCPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseTCPJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseTCPJob) SetStartTime(t time.Time)   { p.StartTime = t }
+func (p *PulseTCPJob) IsNil() bool                { return p == nil }
 
 // PulseICMPJob is a placeholder for an ICMP pulse job.
 type PulseICMPJob struct {
@@ -463,6 +468,7 @@ func (p *PulseICMPJob) GetEnqueueTime() time.Time  { return p.EnqueueTime }
 func (p *PulseICMPJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseICMPJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseICMPJob) SetStartTime(t time.Time)   { p.StartTime = t }
+func (p *PulseICMPJob) IsNil() bool                { return p == nil }
 
 // --- Intervention Job Implementations ---
 
@@ -488,10 +494,10 @@ func (i *InterventionDockerJob) Execute() Result {
 	attempts := i.Retries + 1
 	for attempt := 0; attempt < attempts; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), i.Timeout)
-		defer cancel()
 		timeout := int(i.Timeout.Seconds())
 		restartOptions := container.StopOptions{Timeout: &timeout}
 		err := cli.ContainerRestart(ctx, i.Container, restartOptions)
+		cancel() // Clean up context immediately after use
 		if err == nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: nil, Payload: payload}
 		}
@@ -505,6 +511,7 @@ func (i *InterventionDockerJob) GetEnqueueTime() time.Time  { return i.EnqueueTi
 func (i *InterventionDockerJob) SetEnqueueTime(t time.Time) { i.EnqueueTime = t }
 func (i *InterventionDockerJob) GetStartTime() time.Time    { return i.StartTime }
 func (i *InterventionDockerJob) SetStartTime(t time.Time)   { i.StartTime = t }
+func (i *InterventionDockerJob) IsNil() bool                { return i == nil }
 
 // --- Code Job Implementations ---
 
@@ -583,6 +590,7 @@ func (c *CodeLogJob) GetEnqueueTime() time.Time  { return c.EnqueueTime }
 func (c *CodeLogJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
 func (c *CodeLogJob) GetStartTime() time.Time    { return c.StartTime }
 func (c *CodeLogJob) SetStartTime(t time.Time)   { c.StartTime = t }
+func (c *CodeLogJob) IsNil() bool                { return c == nil }
 
 // CodePagerDutyJob is a placeholder for a PagerDuty notification job.
 type CodePagerDutyJob struct {
@@ -605,6 +613,7 @@ func (c *CodePagerDutyJob) GetEnqueueTime() time.Time  { return c.EnqueueTime }
 func (c *CodePagerDutyJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
 func (c *CodePagerDutyJob) GetStartTime() time.Time    { return c.StartTime }
 func (c *CodePagerDutyJob) SetStartTime(t time.Time)   { c.StartTime = t }
+func (c *CodePagerDutyJob) IsNil() bool                { return c == nil }
 
 // CodeSlackJob is a placeholder for a Slack notification job.
 type CodeSlackJob struct {
@@ -627,6 +636,7 @@ func (c *CodeSlackJob) GetEnqueueTime() time.Time  { return c.EnqueueTime }
 func (c *CodeSlackJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
 func (c *CodeSlackJob) GetStartTime() time.Time    { return c.StartTime }
 func (c *CodeSlackJob) SetStartTime(t time.Time)   { c.StartTime = t }
+func (c *CodeSlackJob) IsNil() bool                { return c == nil }
 
 // CodeEmailJob is a placeholder for an email notification job.
 type CodeEmailJob struct {
@@ -649,6 +659,7 @@ func (c *CodeEmailJob) GetEnqueueTime() time.Time  { return c.EnqueueTime }
 func (c *CodeEmailJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
 func (c *CodeEmailJob) GetStartTime() time.Time    { return c.StartTime }
 func (c *CodeEmailJob) SetStartTime(t time.Time)   { c.StartTime = t }
+func (c *CodeEmailJob) IsNil() bool                { return c == nil }
 
 // CodeWebhookJob is a placeholder for a webhook notification job.
 type CodeWebhookJob struct {
@@ -671,3 +682,4 @@ func (c *CodeWebhookJob) GetEnqueueTime() time.Time  { return c.EnqueueTime }
 func (c *CodeWebhookJob) SetEnqueueTime(t time.Time) { c.EnqueueTime = t }
 func (c *CodeWebhookJob) GetStartTime() time.Time    { return c.StartTime }
 func (c *CodeWebhookJob) SetStartTime(t time.Time)   { c.StartTime = t }
+func (c *CodeWebhookJob) IsNil() bool                { return c == nil }

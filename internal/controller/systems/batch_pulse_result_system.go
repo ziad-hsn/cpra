@@ -19,19 +19,21 @@ type BatchPulseResultSystem struct {
     stateMapper      *ecs.Map1[components.MonitorState]
     configMapper     *ecs.Map1[components.PulseConfig]
     codeConfigMapper *ecs.Map1[components.CodeConfig]
+    interventionConfigMapper *ecs.Map1[components.InterventionConfig]
     ResultChan       <-chan []jobs.Result
 }
 
 // NewBatchPulseResultSystem creates a new BatchPulseResultSystem.
 func NewBatchPulseResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger) *BatchPulseResultSystem {
-	return &BatchPulseResultSystem{
-		world:            world,
-		logger:           logger,
-		stateMapper:      ecs.NewMap1[components.MonitorState](world),
-		configMapper:     ecs.NewMap1[components.PulseConfig](world),
-		codeConfigMapper: ecs.NewMap1[components.CodeConfig](world),
-		ResultChan:       results,
-	}
+    return &BatchPulseResultSystem{
+        world:            world,
+        logger:           logger,
+        stateMapper:      ecs.NewMap1[components.MonitorState](world),
+        configMapper:     ecs.NewMap1[components.PulseConfig](world),
+        codeConfigMapper: ecs.NewMap1[components.CodeConfig](world),
+        interventionConfigMapper: ecs.NewMap1[components.InterventionConfig](world),
+        ResultChan:       results,
+    }
 }
 func (s *BatchPulseResultSystem) Initialize(w *ecs.World) {
 }
@@ -79,7 +81,8 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 		state := s.stateMapper.Get(ent)
 		config := s.configMapper.Get(ent)
 
-		if (atomic.LoadUint32(&state.Flags) & components.StatePulsePending) == 0 {
+		flags := atomic.LoadUint32(&state.Flags)
+		if (flags & components.StatePulsePending) == 0 {
 			s.logger.Warn("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
 			continue
 		}
@@ -91,10 +94,10 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			// --- FAILURE ---
 			state.LastError = result.Error()
 			// If we are in verification window, escalate to RED and close verification
-			if atomic.LoadUint32(&state.Flags)&components.StateVerifying != 0 {
+			if flags&components.StateVerifying != 0 {
 				s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
 				// Only trigger red if incident not already open (defensive)
-				if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+				if (flags & components.StateIncidentOpen) == 0 {
 					s.triggerCode(ent, state, "red")
 					atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
 					s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
@@ -106,7 +109,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 				state.PulseFailures++
             s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
 				// First failure: only send yellow if no incident is open
-				if state.PulseFailures == 1 && (atomic.LoadUint32(&state.Flags)&components.StateIncidentOpen) == 0 {
+				if state.PulseFailures == 1 && (flags&components.StateIncidentOpen) == 0 {
 					s.triggerCode(ent, state, "yellow")
 				}
                 unhealthy := config.UnhealthyThreshold
@@ -114,15 +117,14 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
                     unhealthy = 1
                 }
                 if state.PulseFailures >= unhealthy {
-					interventionMapper := ecs.NewMap1[components.InterventionConfig](s.world)
-					if interventionMapper.Get(ent) != nil {
-						s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
-						atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
-						state.PulseFailures = 0
-						state.RecoveryStreak = 0
-					} else {
+                    if s.interventionConfigMapper.Get(ent) != nil {
+                        s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
+                        atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
+                        state.PulseFailures = 0
+                        state.RecoveryStreak = 0
+                    } else {
 						// No intervention configured - trigger RED alert once
-						if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+						if (flags & components.StateIncidentOpen) == 0 {
 							s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
 							s.triggerCode(ent, state, "red")
 							atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
@@ -139,7 +141,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			// --- SUCCESS ---
 			state.LastError = nil
 			state.LastSuccessTime = state.LastCheckTime
-            if atomic.LoadUint32(&state.Flags)&components.StateVerifying != 0 {
+            if flags&components.StateVerifying != 0 {
                 if state.VerifyRemaining <= 0 {
 					// safety: conclude verification immediately
 					atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
@@ -157,7 +159,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
                 }
             } else {
                 // Normal recovery path
-                if state.PulseFailures > 0 || (atomic.LoadUint32(&state.Flags)&components.StateIncidentOpen) != 0 {
+                if state.PulseFailures > 0 || (flags&components.StateIncidentOpen) != 0 {
                     state.RecoveryStreak++
                     k := config.HealthyThreshold
                     if k <= 0 {

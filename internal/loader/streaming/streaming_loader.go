@@ -114,7 +114,9 @@ func (sl *StreamingLoader) Load(ctx context.Context) (*LoadingStats, error) {
 		ProgressChan: sl.parseProgress,
 	}
 
-	if strings.HasSuffix(strings.ToLower(sl.filename), ".json") {
+	lower := strings.ToLower(sl.filename)
+	trimmed := strings.TrimSuffix(lower, ".gz")
+	if strings.HasSuffix(trimmed, ".json") {
 		jsonParser, err := NewStreamingJsonParser(sl.filename, parseConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create JSON parser: %w", err)

@@ -3,7 +3,6 @@ package queue
 import (
 	"cpra/internal/jobs"
 	"errors"
-	"reflect"
 	"sync/atomic"
 	"time"
 )
@@ -144,19 +143,17 @@ func (q *AdaptiveQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 				// Nil out the buffer slot to help the GC
 				q.buffer[(head+i)&(q.capacity.Load()-1)] = nil
 
-				if !isNilJob(batch[i]) {
-					enqueueTime := batch[i].GetEnqueueTime()
-					if !enqueueTime.IsZero() {
-						wait := now.Sub(enqueueTime)
-						q.totalQueueWaitNanos.Add(int64(wait))
-						for {
-							currentMax := q.maxQueueWaitNanos.Load()
-							if waitNs := int64(wait); waitNs <= currentMax {
-								break
-							}
-							if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
-								break
-							}
+				enqueueTime := batch[i].GetEnqueueTime()
+				if !enqueueTime.IsZero() {
+					wait := now.Sub(enqueueTime)
+					q.totalQueueWaitNanos.Add(int64(wait))
+					for {
+						currentMax := q.maxQueueWaitNanos.Load()
+						if waitNs := int64(wait); waitNs <= currentMax {
+							break
+						}
+						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
+							break
 						}
 					}
 				}
@@ -188,19 +185,17 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 		// Attempt to move the head pointer
 		if q.head.CompareAndSwap(head, head+1) {
 			now := time.Now()
-			if !isNilJob(job) {
-				enqueueTime := job.GetEnqueueTime()
-				if !enqueueTime.IsZero() {
-					wait := now.Sub(enqueueTime)
-					q.totalQueueWaitNanos.Add(int64(wait))
-					for {
-						currentMax := q.maxQueueWaitNanos.Load()
-						if waitNs := int64(wait); waitNs <= currentMax {
-							break
-						}
-						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
-							break
-						}
+			enqueueTime := job.GetEnqueueTime()
+			if !enqueueTime.IsZero() {
+				wait := now.Sub(enqueueTime)
+				q.totalQueueWaitNanos.Add(int64(wait))
+				for {
+					currentMax := q.maxQueueWaitNanos.Load()
+					if waitNs := int64(wait); waitNs <= currentMax {
+						break
+					}
+					if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
+						break
 					}
 				}
 			}
@@ -221,18 +216,7 @@ func (q *AdaptiveQueue) Close() {
 	q.closed.Store(1)
 }
 
-func isNilJob(job jobs.Job) bool {
-	if job == nil {
-		return true
-	}
-	val := reflect.ValueOf(job)
-	switch val.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
-		return val.IsNil()
-	default:
-		return false
-	}
-}
+func isNilJob(job jobs.Job) bool { return job == nil || job.IsNil() }
 
 // Stats returns the current statistics for the queue.
 // Note: This is a simplified version. A full implementation would track more metrics.

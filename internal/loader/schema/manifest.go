@@ -428,7 +428,7 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 				Config:   t,
 			}
 		default:
-			return fmt.Errorf("unknown notificiation type: %q", temp.Notify)
+			return fmt.Errorf("unknown notification type: %q", temp.Notify)
 		}
 	}
 	*c = colors

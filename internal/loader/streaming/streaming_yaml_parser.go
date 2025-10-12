@@ -1,13 +1,16 @@
 package streaming
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"os"
+    "bufio"
+    "compress/gzip"
+    "context"
+    "fmt"
+    "io"
+    "os"
 
-	"cpra/internal/loader/schema"
-	"gopkg.in/yaml.v3"
+    "cpra/internal/loader/schema"
+    "gopkg.in/yaml.v3"
+    "strings"
 )
 
 // StreamingYamlParser handles true streaming parsing of a YAML file.
@@ -51,7 +54,19 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	}
 	defer file.Close()
 
-	decoder := yaml.NewDecoder(file)
+	var r io.Reader = file
+	if strings.HasSuffix(strings.ToLower(p.filename), ".gz") {
+		gz, gzErr := gzip.NewReader(file)
+		if gzErr != nil {
+			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
+		}
+		defer gz.Close()
+		r = gz
+	}
+	bufr := bufio.NewReaderSize(r, 64*1024)
+
+	decoder := yaml.NewDecoder(bufr)
+	decoder.KnownFields(true)
 
 	// The YAML file is expected to have a root structure like:
 	// monitors:

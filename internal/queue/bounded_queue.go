@@ -84,8 +84,14 @@ func (q *BoundedQueue) EnqueueBatch(jobs []jobs.Job) error {
 func (q *BoundedQueue) Dequeue() (jobs.Job, error) {
 	// This is inefficient for a bounded queue, but it satisfies the interface.
 	// The adaptive queue will have a proper single-item dequeue.
+	timer := time.NewTimer(10 * time.Millisecond)
+	defer timer.Stop()
+
 	select {
 	case batch, ok := <-q.batches:
+		if !timer.Stop() {
+			<-timer.C // Drain if already fired
+		}
 		if !ok {
 			return nil, ErrQueueClosed
 		}
@@ -95,7 +101,7 @@ func (q *BoundedQueue) Dequeue() (jobs.Job, error) {
 			go func() { q.batches <- batch[1:] }()
 		}
 		return batch[0], nil
-	case <-time.After(10 * time.Millisecond): // Non-blocking with a small timeout
+	case <-timer.C:
 		return nil, nil // Queue is empty
 	}
 }

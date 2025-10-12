@@ -35,6 +35,8 @@ var (
 		"interval":     {Required: true},
 		"timeout":      {Required: true},
 		"max_failures": {Required: false},
+		"unhealthy_threshold": {Required: false},
+		"healthy_threshold":   {Required: false},
 		"config":       {Required: true},
 	}
 	PulseConfigHTTPFields = map[string]FieldType{
@@ -120,6 +122,8 @@ func (p *YamlParser) Parse(r io.Reader) (schema.Manifest, error) {
 	var state parseState
 	var manifest schema.Manifest
 	decoder := yaml.NewDecoder(r)
+	// Enforce strict unknown-field handling where applicable when decoding into structs
+	decoder.KnownFields(true)
 
 	for {
 		var node map[string]yaml.Node
@@ -203,10 +207,12 @@ func (p *YamlParser) ParseMonitor(m yaml.Node, state *parseState) (schema.Monito
 	}
 	monitor.Name = state.monitorName
 	if enabled, ok := keys["enabled"]; ok {
-		if enabled.Value == "false" {
-			monitor.Enabled = false
+		var b bool
+		if err := enabled.Decode(&b); err == nil {
+			monitor.Enabled = b
 		} else {
-			monitor.Enabled = true
+			// Fallback to legacy string value handling
+			monitor.Enabled = enabled.Value != "false"
 		}
 	} else {
 		monitor.Enabled = true

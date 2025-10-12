@@ -1,13 +1,16 @@
 package streaming
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"os"
+    "context"
+    "encoding/json"
+    "bufio"
+    "compress/gzip"
+    "fmt"
+    "io"
+    "os"
 
-	"cpra/internal/loader/schema"
+    "cpra/internal/loader/schema"
+    "strings"
 )
 
 // StreamingJsonParser handles true streaming parsing of a JSON file.
@@ -50,7 +53,20 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
+	var reader io.Reader = file
+	if strings.HasSuffix(strings.ToLower(p.filename), ".gz") {
+		gz, gzErr := gzip.NewReader(file)
+		if gzErr != nil {
+			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
+		}
+		defer gz.Close()
+		reader = gz
+	}
+	bufr := bufio.NewReaderSize(reader, 64*1024)
+
+	decoder := json.NewDecoder(bufr)
+	decoder.DisallowUnknownFields()
+	decoder.UseNumber()
 
 	// Read the opening bracket of the object.
 	t, err := decoder.Token()
@@ -93,7 +109,8 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 			for i := 0; i < p.config.BatchSize && decoder.More(); i++ {
 				var monitor schema.Monitor
 				if err := decoder.Decode(&monitor); err != nil {
-					return fmt.Errorf("failed to decode monitor object: %w", err)
+					off := decoder.InputOffset()
+					return fmt.Errorf("failed to decode monitor object at byte %d: %w", off, err)
 				}
 				batch = append(batch, monitor)
 			}

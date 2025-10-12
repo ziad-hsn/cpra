@@ -3,6 +3,7 @@ package systems
 import (
 	"cpra/internal/controller/components"
 	"cpra/internal/queue"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,9 @@ type BatchPulseSystem struct {
 	// Filter for entities that require a pulse check.
 	filter             *ecs.Filter2[components.MonitorState, components.JobStorage]
 	monitorStateMapper *ecs.Map[components.MonitorState]
+
+	jobPool    *sync.Pool
+	entityPool *sync.Pool
 }
 
 // NewBatchPulseSystem creates a new BatchPulseSystem.
@@ -33,6 +37,18 @@ func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger 
 		batchSize:          batchSize,
 		filter:             ecs.NewFilter2[components.MonitorState, components.JobStorage](world),
 		monitorStateMapper: ecs.NewMap[components.MonitorState](world),
+		jobPool: &sync.Pool{
+			New: func() interface{} {
+				s := make([]interface{}, 0, batchSize)
+				return &s
+			},
+		},
+		entityPool: &sync.Pool{
+			New: func() interface{} {
+				s := make([]ecs.Entity, 0, batchSize)
+				return &s
+			},
+		},
 	}
 }
 
@@ -82,9 +98,16 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 
 	earlyExit := false
 
-	jobsToQueue := make([]interface{}, 0, s.batchSize)
-	entitiesToUpdate := make([]ecs.Entity, 0, s.batchSize)
+	jobsPtr := s.jobPool.Get().(*[]interface{})
+	entitiesPtr := s.entityPool.Get().(*[]ecs.Entity)
+	jobsToQueue := (*jobsPtr)[:0]
+	entitiesToUpdate := (*entitiesPtr)[:0]
 	processedCount := 0
+
+	defer func() {
+		s.jobPool.Put(jobsPtr)
+		s.entityPool.Put(entitiesPtr)
+	}()
 
 	for query.Next() {
 		ent := query.Entity()
@@ -106,8 +129,8 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 		if len(jobsToQueue) >= tokens {
 			s.processBatch(&jobsToQueue, &entitiesToUpdate)
 			processedCount += len(jobsToQueue)
-			jobsToQueue = make([]interface{}, 0, s.batchSize)
-			entitiesToUpdate = make([]ecs.Entity, 0, s.batchSize)
+			jobsToQueue = jobsToQueue[:0]
+			entitiesToUpdate = entitiesToUpdate[:0]
 			earlyExit = true
 			break
 		}

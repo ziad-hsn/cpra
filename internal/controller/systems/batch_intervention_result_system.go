@@ -18,6 +18,7 @@ type BatchInterventionResultSystem struct {
     // Mappers for efficient component access
     stateMapper *ecs.Map[components.MonitorState]
     codeConfigMapper *ecs.Map1[components.CodeConfig]
+    pulseConfigMapper *ecs.Map1[components.PulseConfig]
     ResultChan  <-chan []jobs.Result
 }
 
@@ -28,6 +29,7 @@ func NewBatchInterventionResultSystem(world *ecs.World, results <-chan []jobs.Re
         logger:      logger,
         stateMapper: ecs.NewMap[components.MonitorState](world),
         codeConfigMapper: ecs.NewMap1[components.CodeConfig](world),
+        pulseConfigMapper: ecs.NewMap1[components.PulseConfig](world),
         ResultChan:  results,
     }
 }
@@ -79,8 +81,9 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
+		flags := atomic.LoadUint32(&state.Flags)
 		// Ensure we are processing a pending intervention
-		if (atomic.LoadUint32(&state.Flags) & components.StateInterventionPending) == 0 {
+		if (flags & components.StateInterventionPending) == 0 {
 			s.logger.Warn("Entity[%d] received InterventionResult but was not in InterventionPending state", ent.ID())
 			continue
 		}
@@ -95,7 +98,7 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
             s.logger.Error("Monitor '%s' intervention failed: %v", state.Name, state.LastError)
 
             // Only trigger red alert if incident is NOT already open
-            if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+            if (flags & components.StateIncidentOpen) == 0 {
                 s.triggerCode(ent, state, "red")
                 atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
                 s.logger.Info("Monitor '%s' - RED ALERT: incident opened", state.Name)
@@ -110,7 +113,7 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
             state.LastSuccessTime = state.LastCheckTime
             // Begin verification window (Phase 2)
             // Use pulse HealthyThreshold as verification count if available, else default
-            pulseCfg := ecs.NewMap1[components.PulseConfig](s.world).Get(ent)
+            pulseCfg := s.pulseConfigMapper.Get(ent)
             m := 3
             if pulseCfg != nil && pulseCfg.HealthyThreshold > 0 {
                 m = pulseCfg.HealthyThreshold

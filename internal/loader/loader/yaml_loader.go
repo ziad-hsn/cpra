@@ -4,6 +4,7 @@ import (
 	"cpra/internal/loader/parser"
 	"errors"
 	"fmt"
+	"bufio"
 	"strings"
 
 	//"cpra/internal/loader/parser"
@@ -30,11 +31,11 @@ func NewYamlLoader(fileName string) *YamlLoader {
 
 func (l *YamlLoader) Load() error {
 	file, err := os.Open(l.File)
-	defer file.Close()
-
 	if err != nil {
 		return err
 	}
+	defer file.Close()
+
 	//decoder := yaml.NewDecoder(file)
 	//var manifest schema.Manifest
 	//if err := decoder.Decode(&manifest); err != nil {
@@ -43,7 +44,8 @@ func (l *YamlLoader) Load() error {
 	//	log.Fatal(err)
 	//}
 	yamlParser := parser.NewYamlParser()
-	manifest, err := yamlParser.Parse(file)
+	reader := bufio.NewReaderSize(file, 64*1024)
+	manifest, err := yamlParser.Parse(reader)
 	if err != nil {
 		var typeErr *yaml.TypeError
 		if errors.As(err, &typeErr) {

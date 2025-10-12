@@ -97,21 +97,26 @@ func (c *PulseICMPConfig) Copy() PulseConfig {
 func (*PulseICMPConfig) isPulseConfigs() {}
 
 type Pulse struct {
-	Type        string        `yaml:"type" json:"type"`
-	Interval    time.Duration `yaml:"interval" json:"interval"`
-	Timeout     time.Duration `yaml:"timeout" json:"timeout"`
-	MaxFailures int           `yaml:"max_failures" json:"max_failures"`
-	Groups      StringList    `yaml:"groups" json:"groups"`
-	Config      PulseConfig   `json:"config"`
+    Type        string        `yaml:"type" json:"type"`
+    Interval    time.Duration `yaml:"interval" json:"interval"`
+    Timeout     time.Duration `yaml:"timeout" json:"timeout"`
+    // Deprecated: MaxFailures kept for backward compatibility; mapped to UnhealthyThreshold.
+    MaxFailures        int           `yaml:"max_failures" json:"max_failures"`
+    UnhealthyThreshold int           `yaml:"unhealthy_threshold" json:"unhealthy_threshold"`
+    HealthyThreshold   int           `yaml:"healthy_threshold" json:"healthy_threshold"`
+    Groups      StringList    `yaml:"groups" json:"groups"`
+    Config      PulseConfig   `json:"config"`
 }
 
 type rawPulse struct {
-	Type        string        `yaml:"type"`
-	Interval    time.Duration `yaml:"interval"`
-	Timeout     time.Duration `yaml:"timeout"`
-	Retries     int           `yaml:"retries"`
-	MaxFailures int           `yaml:"max_failures"`
-	Groups      StringList    `yaml:"groups"`
+    Type        string        `yaml:"type"`
+    Interval    time.Duration `yaml:"interval"`
+    Timeout     time.Duration `yaml:"timeout"`
+    Retries     int           `yaml:"retries"`
+    MaxFailures        int        `yaml:"max_failures"`
+    UnhealthyThreshold int        `yaml:"unhealthy_threshold"`
+    HealthyThreshold   int        `yaml:"healthy_threshold"`
+    Groups      StringList    `yaml:"groups"`
 }
 
 func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
@@ -122,13 +127,19 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode(&temp); err != nil {
 		return err
 	}
-	*p = Pulse{
-		Type:        temp.Type,
-		Interval:    temp.Interval,
-		Timeout:     temp.Timeout,
-		MaxFailures: temp.MaxFailures,
-		Groups:      temp.Groups,
-	}
+    *p = Pulse{
+        Type:              temp.Type,
+        Interval:          temp.Interval,
+        Timeout:           temp.Timeout,
+        MaxFailures:       temp.MaxFailures,
+        UnhealthyThreshold: temp.UnhealthyThreshold,
+        HealthyThreshold:   temp.HealthyThreshold,
+        Groups:            temp.Groups,
+    }
+    // Backward compatibility: if UnhealthyThreshold not set, use MaxFailures
+    if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
+        p.UnhealthyThreshold = p.MaxFailures
+    }
 	switch temp.Type {
 	case "http":
 		var c = &PulseHTTPConfig{} // FIX: Allocate on the heap
@@ -156,13 +167,15 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 
 // UnmarshalJSON handles JSON unmarshaling for Pulse (needed for JSON parser)  
 func (p *Pulse) UnmarshalJSON(data []byte) error {
-	var temp struct {
-		Type        string          `json:"type"`
-		Interval    string          `json:"interval"`    // Parse as string first
-		Timeout     string          `json:"timeout"`     // Parse as string first
-		MaxFailures int             `json:"max_failures"`
-		Config      json.RawMessage `json:"config"`
-	}
+    var temp struct {
+        Type        string          `json:"type"`
+        Interval    string          `json:"interval"`    // Parse as string first
+        Timeout     string          `json:"timeout"`     // Parse as string first
+        MaxFailures        int             `json:"max_failures"`
+        UnhealthyThreshold int             `json:"unhealthy_threshold"`
+        HealthyThreshold   int             `json:"healthy_threshold"`
+        Config      json.RawMessage `json:"config"`
+    }
 	
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
@@ -179,12 +192,17 @@ func (p *Pulse) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid timeout duration %q: %w", temp.Timeout, err)
 	}
 	
-	*p = Pulse{
-		Type:        temp.Type,
-		Interval:    interval,
-		Timeout:     timeout,
-		MaxFailures: temp.MaxFailures,
-	}
+    *p = Pulse{
+        Type:               temp.Type,
+        Interval:           interval,
+        Timeout:            timeout,
+        MaxFailures:        temp.MaxFailures,
+        UnhealthyThreshold: temp.UnhealthyThreshold,
+        HealthyThreshold:   temp.HealthyThreshold,
+    }
+    if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
+        p.UnhealthyThreshold = p.MaxFailures
+    }
 	
 	switch temp.Type {
 	case "http":
@@ -346,16 +364,16 @@ func (c *CodeNotificationSlack) IsCodeNotification() {
 }
 
 type CodeConfig struct {
-	Dispatch bool             `yaml:"dispatch"`
-	Notify   string           `yaml:"notify"`
-	Config   CodeNotification `yaml:"config"` // or more specific struct if desired
+	Dispatch bool             `yaml:"dispatch" json:"dispatch"`
+	Notify   string           `yaml:"notify" json:"notify"`
+	Config   CodeNotification `yaml:"config" json:"config"` // or more specific struct if desired
 }
 
 type Codes map[string]CodeConfig
 
 type rawCodes struct {
-	Dispatch bool   `yaml:"dispatch"`
-	Notify   string `yaml:"notify"`
+	Dispatch *bool  `yaml:"dispatch" json:"dispatch"` // Pointer to detect omitted field
+	Notify   string `yaml:"notify" json:"notify"`
 }
 
 func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
@@ -372,6 +390,12 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 		if err := config.Decode(&temp); err != nil {
 			return err
 		}
+		// Default dispatch to true if omitted
+		dispatch := true
+		if temp.Dispatch != nil {
+			dispatch = *temp.Dispatch
+		}
+
 		switch temp.Notify {
 		case "log":
 			var t = &CodeNotificationLog{} // FIX: Allocate on the heap
@@ -379,7 +403,7 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: temp.Dispatch,
+				Dispatch: dispatch,
 				Notify:   temp.Notify,
 				Config:   t,
 			}
@@ -389,7 +413,7 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: temp.Dispatch,
+				Dispatch: dispatch,
 				Notify:   temp.Notify,
 				Config:   t,
 			}
@@ -399,7 +423,7 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: temp.Dispatch,
+				Dispatch: dispatch,
 				Notify:   temp.Notify,
 				Config:   t,
 			}
@@ -414,17 +438,23 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 // UnmarshalJSON handles JSON unmarshaling for Codes (needed for JSON parser)
 func (c *Codes) UnmarshalJSON(data []byte) error {
 	var codes map[string]struct {
-		Dispatch bool            `json:"dispatch"`
+		Dispatch *bool           `json:"dispatch"` // Pointer to detect omitted field
 		Notify   string          `json:"notify"`
 		Config   json.RawMessage `json:"config"`
 	}
-	
+
 	if err := json.Unmarshal(data, &codes); err != nil {
 		return err
 	}
-	
+
 	colors := make(map[string]CodeConfig)
 	for color, config := range codes {
+		// Default dispatch to true if omitted
+		dispatch := true
+		if config.Dispatch != nil {
+			dispatch = *config.Dispatch
+		}
+
 		switch config.Notify {
 		case "log":
 			var t = &CodeNotificationLog{}
@@ -432,7 +462,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: config.Dispatch,
+				Dispatch: dispatch,
 				Notify:   config.Notify,
 				Config:   t,
 			}
@@ -442,7 +472,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: config.Dispatch,
+				Dispatch: dispatch,
 				Notify:   config.Notify,
 				Config:   t,
 			}
@@ -452,7 +482,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 				return err
 			}
 			colors[color] = CodeConfig{
-				Dispatch: config.Dispatch,
+				Dispatch: dispatch,
 				Notify:   config.Notify,
 				Config:   t,
 			}

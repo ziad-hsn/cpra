@@ -66,9 +66,9 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 	startTime := time.Now()
 	processedCount := 0
 
-	// Phase 2 thresholds (TODO: make configurable)
-	const recoverySuccessesK = 2
-	const verificationWindowM = 3
+    // Thresholds now come from PulseConfig; fall back to defaults if unset
+    const defaultK = 2
+    const defaultM = 3
 
 	for _, result := range results {
 		ent := result.Entity()
@@ -93,19 +93,27 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			// If we are in verification window, escalate to RED and close verification
 			if atomic.LoadUint32(&state.Flags)&components.StateVerifying != 0 {
 				s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
-				s.triggerCode(ent, state, "red")
-				atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+				// Only trigger red if incident not already open (defensive)
+				if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+					s.triggerCode(ent, state, "red")
+					atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+					s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
+				}
 				atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
 				state.VerifyRemaining = 0
 				state.RecoveryStreak = 0
 			} else {
 				state.PulseFailures++
-				s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.MaxFailures, state.LastError)
+            s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
 				// First failure: only send yellow if no incident is open
 				if state.PulseFailures == 1 && (atomic.LoadUint32(&state.Flags)&components.StateIncidentOpen) == 0 {
 					s.triggerCode(ent, state, "yellow")
 				}
-				if state.PulseFailures >= config.MaxFailures {
+                unhealthy := config.UnhealthyThreshold
+                if unhealthy <= 0 {
+                    unhealthy = 1
+                }
+                if state.PulseFailures >= unhealthy {
 					interventionMapper := ecs.NewMap1[components.InterventionConfig](s.world)
 					if interventionMapper.Get(ent) != nil {
 						s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
@@ -113,9 +121,15 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 						state.PulseFailures = 0
 						state.RecoveryStreak = 0
 					} else {
-						s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
-						s.triggerCode(ent, state, "red")
-						atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+						// No intervention configured - trigger RED alert once
+						if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+							s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
+							s.triggerCode(ent, state, "red")
+							atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+							s.logger.Info("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
+						} else {
+							s.logger.Debug("Monitor '%s' - max failures reached but incident already open, no duplicate red alert", state.Name)
+						}
 						state.PulseFailures = 0
 						state.RecoveryStreak = 0
 					}
@@ -125,38 +139,42 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			// --- SUCCESS ---
 			state.LastError = nil
 			state.LastSuccessTime = state.LastCheckTime
-			if atomic.LoadUint32(&state.Flags)&components.StateVerifying != 0 {
-				if state.VerifyRemaining <= 0 {
+            if atomic.LoadUint32(&state.Flags)&components.StateVerifying != 0 {
+                if state.VerifyRemaining <= 0 {
 					// safety: conclude verification immediately
 					atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
 					s.triggerCode(ent, state, "green")
 					atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
 					state.RecoveryStreak = 0
-				} else {
-					state.VerifyRemaining--
-					if state.VerifyRemaining <= 0 {
-						atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
-						s.triggerCode(ent, state, "green")
-						atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
-						state.RecoveryStreak = 0
-					}
-				}
-			} else {
-				// Normal recovery path
-				if state.PulseFailures > 0 || (atomic.LoadUint32(&state.Flags)&components.StateIncidentOpen) != 0 {
-					state.RecoveryStreak++
-					if state.RecoveryStreak >= recoverySuccessesK {
-						s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, recoverySuccessesK)
-						s.triggerCode(ent, state, "green")
-						atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
-						state.RecoveryStreak = 0
-					}
-				} else {
-					// steady state success, nothing to do
-				}
-			}
-			state.PulseFailures = 0
-		}
+                } else {
+                    state.VerifyRemaining--
+                    if state.VerifyRemaining <= 0 {
+                        atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
+                        s.triggerCode(ent, state, "green")
+                        atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
+                        state.RecoveryStreak = 0
+                    }
+                }
+            } else {
+                // Normal recovery path
+                if state.PulseFailures > 0 || (atomic.LoadUint32(&state.Flags)&components.StateIncidentOpen) != 0 {
+                    state.RecoveryStreak++
+                    k := config.HealthyThreshold
+                    if k <= 0 {
+                        k = defaultK
+                    }
+                    if state.RecoveryStreak >= k {
+                        s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
+                        s.triggerCode(ent, state, "green")
+                        atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
+                        state.RecoveryStreak = 0
+                    }
+                } else {
+                    // steady state success, nothing to do
+                }
+            }
+            state.PulseFailures = 0
+        }
 
 		// Unset the pending flag, regardless of outcome.
 		atomic.AndUint32(&state.Flags, ^uint32(components.StatePulsePending))

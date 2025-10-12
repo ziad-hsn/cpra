@@ -156,25 +156,29 @@ func (m *MonitorState) SetCodePending(pending bool) {
 
 // PulseConfig consolidates pulse configuration
 type PulseConfig struct {
-	Type        string
-	Timeout     time.Duration
-	Interval    time.Duration
-	Retries     int
-	MaxFailures int
-	Config      schema.PulseConfig
+    Type        string
+    Timeout     time.Duration
+    Interval    time.Duration
+    Retries     int
+    // UnhealthyThreshold: consecutive pulse failures to consider unhealthy (trigger intervention/no-intervention RED)
+    UnhealthyThreshold int
+    // HealthyThreshold: consecutive pulse successes to consider recovered (send green)
+    HealthyThreshold   int
+    Config      schema.PulseConfig
 }
 
 func (c *PulseConfig) Copy() *PulseConfig {
-	if c == nil {
-		return nil
-	}
-	cpy := &PulseConfig{
-		Type:        strings.Clone(c.Type),
-		Timeout:     c.Timeout,
-		Interval:    c.Interval,
-		Retries:     c.Retries,
-		MaxFailures: c.MaxFailures,
-	}
+    if c == nil {
+        return nil
+    }
+    cpy := &PulseConfig{
+        Type:        strings.Clone(c.Type),
+        Timeout:     c.Timeout,
+        Interval:    c.Interval,
+        Retries:     c.Retries,
+        UnhealthyThreshold: c.UnhealthyThreshold,
+        HealthyThreshold:   c.HealthyThreshold,
+    }
 
 	if c.Config != nil {
 		cpy.Config = c.Config.Copy()

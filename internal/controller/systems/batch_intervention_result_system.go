@@ -91,8 +91,15 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
             state.InterventionFailures++
             state.LastError = result.Error()
             s.logger.Error("Monitor '%s' intervention failed: %v", state.Name, state.LastError)
-            s.triggerCode(ent, state, "red")
-            atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+
+            // Only trigger red alert if incident is NOT already open
+            if (atomic.LoadUint32(&state.Flags) & components.StateIncidentOpen) == 0 {
+                s.triggerCode(ent, state, "red")
+                atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+                s.logger.Info("Monitor '%s' - RED ALERT: incident opened", state.Name)
+            } else {
+                s.logger.Debug("Monitor '%s' - intervention failed but incident already open, no duplicate red alert", state.Name)
+            }
         } else {
             // --- SUCCESS ---
             s.logger.Info("Monitor '%s' intervention succeeded.", state.Name)
@@ -100,7 +107,13 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
             state.LastError = nil
             state.LastSuccessTime = state.LastCheckTime
             // Begin verification window (Phase 2)
-            state.VerifyRemaining = 3 // default M; TODO: parameterize
+            // Use pulse HealthyThreshold as verification count if available, else default
+            pulseCfg := ecs.NewMap1[components.PulseConfig](s.world).Get(ent)
+            m := 3
+            if pulseCfg != nil && pulseCfg.HealthyThreshold > 0 {
+                m = pulseCfg.HealthyThreshold
+            }
+            state.VerifyRemaining = m
             atomic.OrUint32(&state.Flags, components.StateVerifying)
             s.triggerCode(ent, state, "cyan")
         }

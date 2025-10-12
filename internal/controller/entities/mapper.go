@@ -75,13 +75,19 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	e.MonitorState.Add(entity, monitorState)
 
 	// Add pulse configuration
-	pulseConfig := &components.PulseConfig{
-		Type:        strings.Clone(monitor.Pulse.Type),
-		MaxFailures: monitor.Pulse.MaxFailures,
-		Timeout:     monitor.Pulse.Timeout,
-		Interval:    monitor.Pulse.Interval,
-		Config:      monitor.Pulse.Config.Copy(),
-	}
+    // Map thresholds: unhealthy from either explicit unhealthy_threshold or legacy max_failures
+    unhealthy := monitor.Pulse.UnhealthyThreshold
+    if unhealthy <= 0 {
+        unhealthy = monitor.Pulse.MaxFailures
+    }
+    pulseConfig := &components.PulseConfig{
+        Type:               strings.Clone(monitor.Pulse.Type),
+        UnhealthyThreshold: unhealthy,
+        HealthyThreshold:   monitor.Pulse.HealthyThreshold,
+        Timeout:            monitor.Pulse.Timeout,
+        Interval:           monitor.Pulse.Interval,
+        Config:             monitor.Pulse.Config.Copy(),
+    }
 	e.PulseConfig.Add(entity, pulseConfig)
 
 	// Create consolidated job storage

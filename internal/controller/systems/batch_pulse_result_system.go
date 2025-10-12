@@ -159,25 +159,16 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
                 }
             } else {
                 // Normal recovery path
-                // Re-evaluate flags at success time to avoid stale reads
-                curFlags := atomic.LoadUint32(&state.Flags)
-                if state.PulseFailures > 0 || (curFlags&components.StateIncidentOpen) != 0 {
+                if state.PulseFailures > 0 || (flags&components.StateIncidentOpen) != 0 {
                     state.RecoveryStreak++
                     k := config.HealthyThreshold
                     if k <= 0 {
                         k = defaultK
                     }
                     if state.RecoveryStreak >= k {
-                        curFlags = atomic.LoadUint32(&state.Flags)
-                        if (curFlags & components.StateIncidentOpen) != 0 {
-                            // Recovering from an incident: log and trigger green
-                            s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
-                            s.triggerCode(ent, state, "green")
-                            atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
-                        } else {
-                            // Recovering from a warning (yellow) state: log-only, do not trigger green
-                            s.logger.Info("Monitor '%s' pulse recovered from warning (K=%d), no green dispatch.", state.Name, k)
-                        }
+                        s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
+                        s.triggerCode(ent, state, "green")
+                        atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
                         state.RecoveryStreak = 0
                     }
                 } else {

@@ -1,8 +1,7 @@
 package systems
 
 import (
-	"sync/atomic"
-	"time"
+    "time"
 
 	"cpra/internal/controller/components"
 	"github.com/mlange-42/ark/ecs"
@@ -44,28 +43,24 @@ func (s *BatchPulseScheduleSystem) Update(w *ecs.World) {
 
 	now := time.Now()
 
-	for query.Next() {
-		state, config := query.Get()
+    for query.Next() {
+        state, config := query.Get()
 
-		for {
-			flags := atomic.LoadUint32(&state.Flags)
+        flags := state.Flags
 
-			if (flags&components.StateDisabled != 0) || (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
-				break
-			}
+        if (flags&components.StateDisabled != 0) || (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
+            continue
+        }
 
-			due := (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval)
-			if !due {
-				break
-			}
+        due := (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval)
+        if !due {
+            continue
+        }
 
-			updated := (flags | components.StatePulseNeeded) &^ components.StatePulseFirstCheck
-			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
-				scheduledCount++
-				break
-			}
-		}
-	}
+        state.Flags |= components.StatePulseNeeded
+        state.Flags &^= components.StatePulseFirstCheck
+        scheduledCount++
+    }
 
 	if scheduledCount > 0 {
 		s.logger.LogSystemPerformance("BatchPulseScheduleSystem", time.Since(start), scheduledCount)

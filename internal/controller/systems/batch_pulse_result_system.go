@@ -1,10 +1,9 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/jobs"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -81,11 +80,11 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 		state := s.stateMapper.Get(ent)
 		config := s.configMapper.Get(ent)
 
-		flags := atomic.LoadUint32(&state.Flags)
-		if (flags & components.StatePulsePending) == 0 {
-			s.logger.Warn("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
-			continue
-		}
+        flags := state.Flags
+        if (flags & components.StatePulsePending) == 0 {
+            s.logger.Warn("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
+            continue
+        }
 
 		processedCount++
 		state.LastCheckTime = time.Now()
@@ -94,24 +93,24 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			// --- FAILURE ---
 			state.LastError = result.Error()
 			// If we are in verification window, escalate to RED and close verification
-			if flags&components.StateVerifying != 0 {
-				s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
-				// Only trigger red if incident not already open (defensive)
-				if (flags & components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, "red")
-					atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
-					s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
-				}
-				atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
-				state.VerifyRemaining = 0
-				state.RecoveryStreak = 0
-			} else {
-				state.PulseFailures++
-            s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
-				// First failure: only send yellow if no incident is open
-				if state.PulseFailures == 1 && (flags&components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, "yellow")
-				}
+            if flags&components.StateVerifying != 0 {
+                s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
+                // Only trigger red if incident not already open (defensive)
+                if (flags & components.StateIncidentOpen) == 0 {
+                    s.triggerCode(ent, state, "red")
+                    state.Flags |= components.StateIncidentOpen
+                    s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
+                }
+                state.Flags &^= components.StateVerifying
+                state.VerifyRemaining = 0
+                state.RecoveryStreak = 0
+            } else {
+                state.PulseFailures++
+                s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
+                // First failure: only send yellow if no incident is open
+                if state.PulseFailures == 1 && (flags&components.StateIncidentOpen) == 0 {
+                    s.triggerCode(ent, state, "yellow")
+                }
                 unhealthy := config.UnhealthyThreshold
                 if unhealthy <= 0 {
                     unhealthy = 1
@@ -119,41 +118,41 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
                 if state.PulseFailures >= unhealthy {
                     if s.interventionConfigMapper.Get(ent) != nil {
                         s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
-                        atomic.OrUint32(&state.Flags, components.StateInterventionNeeded)
+                        state.Flags |= components.StateInterventionNeeded
                         state.PulseFailures = 0
                         state.RecoveryStreak = 0
                     } else {
-						// No intervention configured - trigger RED alert once
-						if (flags & components.StateIncidentOpen) == 0 {
-							s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
-							s.triggerCode(ent, state, "red")
-							atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
-							s.logger.Info("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
-						} else {
-							s.logger.Debug("Monitor '%s' - max failures reached but incident already open, no duplicate red alert", state.Name)
-						}
-						state.PulseFailures = 0
-						state.RecoveryStreak = 0
-					}
-				}
-			}
-		} else {
-			// --- SUCCESS ---
-			state.LastError = nil
-			state.LastSuccessTime = state.LastCheckTime
+                        // No intervention configured - trigger RED alert once
+                        if (flags & components.StateIncidentOpen) == 0 {
+                            s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
+                            s.triggerCode(ent, state, "red")
+                            state.Flags |= components.StateIncidentOpen
+                            s.logger.Info("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
+                        } else {
+                            s.logger.Debug("Monitor '%s' - max failures reached but incident already open, no duplicate red alert", state.Name)
+                        }
+                        state.PulseFailures = 0
+                        state.RecoveryStreak = 0
+                    }
+                }
+            }
+        } else {
+            // --- SUCCESS ---
+            state.LastError = nil
+            state.LastSuccessTime = state.LastCheckTime
             if flags&components.StateVerifying != 0 {
                 if state.VerifyRemaining <= 0 {
-					// safety: conclude verification immediately
-					atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
-					s.triggerCode(ent, state, "green")
-					atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
-					state.RecoveryStreak = 0
+                    // safety: conclude verification immediately
+                    state.Flags &^= components.StateVerifying
+                    s.triggerCode(ent, state, "green")
+                    state.Flags &^= components.StateIncidentOpen
+                    state.RecoveryStreak = 0
                 } else {
                     state.VerifyRemaining--
                     if state.VerifyRemaining <= 0 {
-                        atomic.AndUint32(&state.Flags, ^uint32(components.StateVerifying))
+                        state.Flags &^= components.StateVerifying
                         s.triggerCode(ent, state, "green")
-                        atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
+                        state.Flags &^= components.StateIncidentOpen
                         state.RecoveryStreak = 0
                     }
                 }
@@ -168,7 +167,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
                     if state.RecoveryStreak >= k {
                         s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
                         s.triggerCode(ent, state, "green")
-                        atomic.AndUint32(&state.Flags, ^uint32(components.StateIncidentOpen))
+                        state.Flags &^= components.StateIncidentOpen
                         state.RecoveryStreak = 0
                     }
                 } else {
@@ -178,9 +177,9 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
             state.PulseFailures = 0
         }
 
-		// Unset the pending flag, regardless of outcome.
-		atomic.AndUint32(&state.Flags, ^uint32(components.StatePulsePending))
-	}
+        // Unset the pending flag, regardless of outcome.
+        state.Flags &^= components.StatePulsePending
+    }
 
 	if processedCount > 0 {
 		s.logger.LogSystemPerformance("BatchPulseResultSystem", time.Since(startTime), processedCount)
@@ -204,7 +203,7 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
     // TODO: This is a placeholder for a more robust CodeNeeded implementation
     // For now, we directly set the flag.
     state.PendingCode = color
-    atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+    state.Flags |= components.StateCodeNeeded
     s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
 }
 

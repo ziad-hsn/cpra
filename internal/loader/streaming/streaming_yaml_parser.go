@@ -7,6 +7,7 @@ import (
     "fmt"
     "io"
     "os"
+    "sync"
 
     "cpra/internal/loader/schema"
     "gopkg.in/yaml.v3"
@@ -16,8 +17,9 @@ import (
 // StreamingYamlParser handles true streaming parsing of a YAML file.
 // It reads the file document by document, creating batches without loading the entire file into memory.
 type StreamingYamlParser struct {
-	filename string
-	config   ParseConfig
+	filename  string
+	config    ParseConfig
+	batchPool *sync.Pool
 }
 
 // NewStreamingYamlParser creates a new streaming YAML parser.
@@ -25,6 +27,12 @@ func NewStreamingYamlParser(filename string, config ParseConfig) (*StreamingYaml
 	return &StreamingYamlParser{
 		filename: filename,
 		config:   config,
+		batchPool: &sync.Pool{
+			New: func() interface{} {
+				s := make([]schema.Monitor, 0, config.BatchSize)
+				return &s
+			},
+		},
 	}, nil
 }
 
@@ -92,7 +100,8 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 
 	// 3. Iterate through the sequence and decode each monitor.
 	batchID := 0
-	batch := make([]schema.Monitor, 0, p.config.BatchSize)
+	batchPtr := p.batchPool.Get().(*[]schema.Monitor)
+	batch := (*batchPtr)[:0]
 
 	for _, monitorNode := range topLevel.Monitors.Content {
 		select {
@@ -116,8 +125,8 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 			if len(batch) >= p.config.BatchSize {
 				// Send the full batch.
 				batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
-				// Reset batch.
-				batch = make([]schema.Monitor, 0, p.config.BatchSize)
+				// Reset batch length to reuse slice.
+				batch = batch[:0]
 				batchID++
 			}
 		}
@@ -127,6 +136,9 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	if len(batch) > 0 {
 		batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
 	}
+
+	// Return slice to pool
+	p.batchPool.Put(batchPtr)
 
 	return nil
 }

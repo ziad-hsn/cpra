@@ -1,10 +1,9 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/jobs"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -81,7 +80,7 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
-		flags := atomic.LoadUint32(&state.Flags)
+    flags := state.Flags
 		// Ensure we are processing a pending intervention
 		if (flags & components.StateInterventionPending) == 0 {
 			s.logger.Warn("Entity[%d] received InterventionResult but was not in InterventionPending state", ent.ID())
@@ -100,7 +99,7 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
             // Only trigger red alert if incident is NOT already open
             if (flags & components.StateIncidentOpen) == 0 {
                 s.triggerCode(ent, state, "red")
-                atomic.OrUint32(&state.Flags, components.StateIncidentOpen)
+                state.Flags |= components.StateIncidentOpen
                 s.logger.Info("Monitor '%s' - RED ALERT: incident opened", state.Name)
             } else {
                 s.logger.Debug("Monitor '%s' - intervention failed but incident already open, no duplicate red alert", state.Name)
@@ -119,13 +118,13 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
                 m = pulseCfg.HealthyThreshold
             }
             state.VerifyRemaining = m
-            atomic.OrUint32(&state.Flags, components.StateVerifying)
+            state.Flags |= components.StateVerifying
             s.triggerCode(ent, state, "cyan")
         }
 
-		// Unset the pending flag, regardless of outcome.
-		atomic.AndUint32(&state.Flags, ^uint32(components.StateInterventionPending))
-	}
+        // Unset the pending flag, regardless of outcome.
+        state.Flags &^= components.StateInterventionPending
+    }
 
 	if processedCount > 0 {
 		s.logger.LogSystemPerformance("BatchInterventionResultSystem", time.Since(startTime), processedCount)
@@ -147,7 +146,7 @@ func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *co
         return
     }
     state.PendingCode = color
-    atomic.OrUint32(&state.Flags, components.StateCodeNeeded)
+    state.Flags |= components.StateCodeNeeded
     s.logger.Info("Monitor '%s' - flagging for %s alert code", state.Name, color)
 }
 

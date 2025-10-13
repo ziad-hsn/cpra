@@ -1,10 +1,9 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/jobs"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -77,11 +76,11 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
-		// Ensure we are processing a pending code alert.
-		if (atomic.LoadUint32(&state.Flags) & components.StateCodePending) == 0 {
-			s.logger.Warn("Entity[%d] received CodeResult but was not in CodePending state", ent.ID())
-			continue
-		}
+        // Ensure we are processing a pending code alert.
+        if (state.Flags & components.StateCodePending) == 0 {
+            s.logger.Warn("Entity[%d] received CodeResult but was not in CodePending state", ent.ID())
+            continue
+        }
 
 		processedCount++
 
@@ -103,9 +102,9 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 			s.logger.Info("Monitor '%s' %s alert sent successfully.", state.Name, color)
 		}
 
-		// Unset the pending flag.
-		atomic.AndUint32(&state.Flags, ^uint32(components.StateCodePending))
-	}
+        // Unset the pending flag.
+        state.Flags &^= components.StateCodePending
+    }
 
 	if processedCount > 0 {
 		s.logger.LogSystemPerformance("BatchCodeResultSystem", time.Since(startTime), processedCount)

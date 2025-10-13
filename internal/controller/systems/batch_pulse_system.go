@@ -1,11 +1,10 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/queue"
-	"sync"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/queue"
+    "sync"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -113,10 +112,10 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 		ent := query.Entity()
 		state, jobStorage := query.Get()
 
-		// Process only entities that need a pulse check.
-		if (atomic.LoadUint32(&state.Flags) & components.StatePulseNeeded) == 0 {
-			continue
-		}
+    // Process only entities that need a pulse check.
+    if (state.Flags & components.StatePulseNeeded) == 0 {
+        continue
+    }
 
 		if jobStorage.PulseJob == nil {
 			s.logger.Warn("Entity[%d] has PulseNeeded state but no PulseJob", ent.ID())
@@ -168,28 +167,22 @@ func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Ent
 
 	// If enqueue is successful, transition the state for all entities in the batch.
 	now := time.Now()
-	for _, ent := range *entities {
-		if !s.world.Alive(ent) {
-			continue
-		}
-		state := s.monitorStateMapper.Get(ent)
-		if state == nil {
-			continue
-		}
+    for _, ent := range *entities {
+        if !s.world.Alive(ent) {
+            continue
+        }
+        state := s.monitorStateMapper.Get(ent)
+        if state == nil {
+            continue
+        }
 
-		for {
-			flags := atomic.LoadUint32(&state.Flags)
-			if flags&components.StatePulseNeeded == 0 {
-				break
-			}
-
-			updated := (flags & ^uint32(components.StatePulseNeeded)) | uint32(components.StatePulsePending)
-			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
-				state.LastCheckTime = now
-				break
-			}
-		}
-	}
+        // Transition from Needed -> Pending
+        if state.Flags&components.StatePulseNeeded != 0 {
+            state.Flags &^= components.StatePulseNeeded
+            state.Flags |= components.StatePulsePending
+            state.LastCheckTime = now
+        }
+    }
 }
 
 // Finalize is a no-op for this system.

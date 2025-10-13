@@ -1,12 +1,11 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/queue"
-	"sync"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/jobs"
+    "cpra/internal/queue"
+    "sync"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -100,28 +99,28 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
         ent := query.Entity()
         state, codeConfig, jobStorage := query.Get()
 
-		// Process only entities that need a code alert.
-		if (atomic.LoadUint32(&state.Flags) & components.StateCodeNeeded) == 0 {
-			continue
-		}
+        // Process only entities that need a code alert.
+        if (state.Flags & components.StateCodeNeeded) == 0 {
+            continue
+        }
 
 		color := state.PendingCode
-		if color == "" {
-			// This should not happen if StateCodeNeeded is set, but as a safeguard:
-			atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
-			continue
-		}
+        if color == "" {
+            // This should not happen if StateCodeNeeded is set, but as a safeguard:
+            state.Flags &^= components.StateCodeNeeded
+            continue
+        }
 
         // Honor dispatch flag and presence of color config before enqueuing
         cfg, hasColor := codeConfig.Configs[color]
         if !hasColor {
             s.logger.Warn("Entity[%d] missing '%s' code config; clearing pending code", ent.ID(), color)
-            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            state.Flags &^= components.StateCodeNeeded
             continue
         }
         if !cfg.Dispatch {
             s.logger.Info("Entity[%d] '%s' code dispatch disabled; clearing pending code", ent.ID(), color)
-            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            state.Flags &^= components.StateCodeNeeded
             continue
         }
 
@@ -129,7 +128,7 @@ func (s *BatchCodeSystem) Update(w *ecs.World) {
         if !ok || isNilJob(job) {
             s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
             // Clear the flag if no job is found to prevent spinning.
-            atomic.AndUint32(&state.Flags, ^uint32(components.StateCodeNeeded))
+            state.Flags &^= components.StateCodeNeeded
             continue
         }
 
@@ -188,29 +187,23 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		return
 	}
 
-	for _, info := range submitted {
-		if !s.world.Alive(info.Entity) {
-			continue
-		}
-		state := s.stateMapper.Get(info.Entity)
-		if state == nil {
-			continue
-		}
+    for _, info := range submitted {
+        if !s.world.Alive(info.Entity) {
+            continue
+        }
+        state := s.stateMapper.Get(info.Entity)
+        if state == nil {
+            continue
+        }
 
-		for {
-			flags := atomic.LoadUint32(&state.Flags)
-			if flags&components.StateCodeNeeded == 0 {
-				break
-			}
-
-			updated := (flags & ^uint32(components.StateCodeNeeded)) | uint32(components.StateCodePending)
-			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
-				state.PendingCode = ""
-				s.logger.Info("CODE DISPATCHED: %s (%s)", state.Name, info.Color)
-				break
-			}
-		}
-	}
+        // Transition from Needed -> Pending
+        if state.Flags&components.StateCodeNeeded != 0 {
+            state.Flags &^= components.StateCodeNeeded
+            state.Flags |= components.StateCodePending
+            state.PendingCode = ""
+            s.logger.Info("CODE DISPATCHED: %s (%s)", state.Name, info.Color)
+        }
+    }
 }
 
 // Finalize is a no-op for this system.

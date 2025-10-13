@@ -1,11 +1,10 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/queue"
-	"sync"
-	"sync/atomic"
-	"time"
+    "cpra/internal/controller/components"
+    "cpra/internal/queue"
+    "sync"
+    "time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -104,10 +103,10 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 		ent := query.Entity()
 		state, _, jobStorage := query.Get()
 
-		// Process only entities that need an intervention.
-		if (atomic.LoadUint32(&state.Flags) & components.StateInterventionNeeded) == 0 {
-			continue
-		}
+    // Process only entities that need an intervention.
+    if (state.Flags & components.StateInterventionNeeded) == 0 {
+        continue
+    }
 
 		if jobStorage.InterventionJob == nil {
 			s.logger.Warn("Entity[%d] has InterventionNeeded state but no InterventionJob", ent.ID())
@@ -158,28 +157,22 @@ func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]
 	}
 
 	// If enqueue is successful, transition the state for all entities in the batch.
-	for _, ent := range *entities {
-		if !s.world.Alive(ent) {
-			continue
-		}
-		state := s.monitorStateMapper.Get(ent)
-		if state == nil {
-			continue
-		}
+    for _, ent := range *entities {
+        if !s.world.Alive(ent) {
+            continue
+        }
+        state := s.monitorStateMapper.Get(ent)
+        if state == nil {
+            continue
+        }
 
-		for {
-			flags := atomic.LoadUint32(&state.Flags)
-			if flags&components.StateInterventionNeeded == 0 {
-				break
-			}
-
-			updated := (flags & ^uint32(components.StateInterventionNeeded)) | uint32(components.StateInterventionPending)
-			if atomic.CompareAndSwapUint32(&state.Flags, flags, updated) {
-				s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
-				break
-			}
-		}
-	}
+        // Transition from Needed -> Pending
+        if state.Flags&components.StateInterventionNeeded != 0 {
+            state.Flags &^= components.StateInterventionNeeded
+            state.Flags |= components.StateInterventionPending
+            s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
+        }
+    }
 }
 
 // Finalize is a no-op for this system.

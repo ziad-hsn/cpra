@@ -14,12 +14,11 @@
 package components
 
 import (
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"errors"
-	"strings"
-	"sync/atomic"
-	"time"
+    "cpra/internal/jobs"
+    "cpra/internal/loader/schema"
+    "errors"
+    "strings"
+    "time"
 )
 
 // MonitorState consolidates all monitor state into a single component.
@@ -66,92 +65,78 @@ const (
     // Room for more states without adding components
 )
 
-// Efficient state management methods using atomic operations
-func (m *MonitorState) IsDisabled() bool { return atomic.LoadUint32(&m.Flags)&StateDisabled != 0 }
-func (m *MonitorState) IsPulseNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulseNeeded != 0
-}
-func (m *MonitorState) IsPulsePending() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulsePending != 0
-}
-func (m *MonitorState) IsPulseFirstCheck() bool {
-	return atomic.LoadUint32(&m.Flags)&StatePulseFirstCheck != 0
-}
-func (m *MonitorState) IsInterventionNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StateInterventionNeeded != 0
-}
-func (m *MonitorState) IsInterventionPending() bool {
-	return atomic.LoadUint32(&m.Flags)&StateInterventionPending != 0
-}
-func (m *MonitorState) IsCodeNeeded() bool {
-	return atomic.LoadUint32(&m.Flags)&StateCodeNeeded != 0
-}
-func (m *MonitorState) IsCodePending() bool {
-	return atomic.LoadUint32(&m.Flags)&StateCodePending != 0
-}
+// Efficient state management helpers using simple bit operations
+func (m *MonitorState) IsDisabled() bool { return m.Flags&StateDisabled != 0 }
+func (m *MonitorState) IsPulseNeeded() bool { return m.Flags&StatePulseNeeded != 0 }
+func (m *MonitorState) IsPulsePending() bool { return m.Flags&StatePulsePending != 0 }
+func (m *MonitorState) IsPulseFirstCheck() bool { return m.Flags&StatePulseFirstCheck != 0 }
+func (m *MonitorState) IsInterventionNeeded() bool { return m.Flags&StateInterventionNeeded != 0 }
+func (m *MonitorState) IsInterventionPending() bool { return m.Flags&StateInterventionPending != 0 }
+func (m *MonitorState) IsCodeNeeded() bool { return m.Flags&StateCodeNeeded != 0 }
+func (m *MonitorState) IsCodePending() bool { return m.Flags&StateCodePending != 0 }
 
 func (m *MonitorState) SetDisabled(disabled bool) {
-	if disabled {
-		atomic.OrUint32(&m.Flags, StateDisabled)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StateDisabled)
-	}
+    if disabled {
+        m.Flags |= StateDisabled
+    } else {
+        m.Flags &^= StateDisabled
+    }
 }
 
 func (m *MonitorState) SetPulseNeeded(needed bool) {
-	if needed {
-		atomic.OrUint32(&m.Flags, StatePulseNeeded)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StatePulseNeeded)
-	}
+    if needed {
+        m.Flags |= StatePulseNeeded
+    } else {
+        m.Flags &^= StatePulseNeeded
+    }
 }
 
 func (m *MonitorState) SetPulsePending(pending bool) {
-	if pending {
-		atomic.OrUint32(&m.Flags, StatePulsePending)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StatePulsePending)
-	}
+    if pending {
+        m.Flags |= StatePulsePending
+    } else {
+        m.Flags &^= StatePulsePending
+    }
 }
 
 func (m *MonitorState) SetPulseFirstCheck(firstCheck bool) {
-	if firstCheck {
-		atomic.OrUint32(&m.Flags, StatePulseFirstCheck)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StatePulseFirstCheck)
-	}
+    if firstCheck {
+        m.Flags |= StatePulseFirstCheck
+    } else {
+        m.Flags &^= StatePulseFirstCheck
+    }
 }
 
 func (m *MonitorState) SetInterventionNeeded(needed bool) {
-	if needed {
-		atomic.OrUint32(&m.Flags, StateInterventionNeeded)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StateInterventionNeeded)
-	}
+    if needed {
+        m.Flags |= StateInterventionNeeded
+    } else {
+        m.Flags &^= StateInterventionNeeded
+    }
 }
 
 func (m *MonitorState) SetInterventionPending(pending bool) {
-	if pending {
-		atomic.OrUint32(&m.Flags, StateInterventionPending)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StateInterventionPending)
-	}
+    if pending {
+        m.Flags |= StateInterventionPending
+    } else {
+        m.Flags &^= StateInterventionPending
+    }
 }
 
 func (m *MonitorState) SetCodeNeeded(needed bool) {
-	if needed {
-		atomic.OrUint32(&m.Flags, StateCodeNeeded)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StateCodeNeeded)
-	}
+    if needed {
+        m.Flags |= StateCodeNeeded
+    } else {
+        m.Flags &^= StateCodeNeeded
+    }
 }
 
 func (m *MonitorState) SetCodePending(pending bool) {
-	if pending {
-		atomic.OrUint32(&m.Flags, StateCodePending)
-	} else {
-		atomic.AndUint32(&m.Flags, ^StateCodePending)
-	}
+    if pending {
+        m.Flags |= StateCodePending
+    } else {
+        m.Flags &^= StateCodePending
+    }
 }
 
 // PulseConfig consolidates pulse configuration

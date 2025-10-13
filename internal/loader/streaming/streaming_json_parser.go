@@ -8,6 +8,7 @@ import (
     "fmt"
     "io"
     "os"
+    "sync"
 
     "cpra/internal/loader/schema"
     "strings"
@@ -16,8 +17,9 @@ import (
 // StreamingJsonParser handles true streaming parsing of a JSON file.
 // It reads the file object by object, creating batches without loading the entire file into memory.
 type StreamingJsonParser struct {
-	filename string
-	config   ParseConfig
+	filename  string
+	config    ParseConfig
+	batchPool *sync.Pool
 }
 
 // NewStreamingJsonParser creates a new streaming JSON parser.

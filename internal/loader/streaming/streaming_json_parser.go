@@ -66,9 +66,13 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	}
 	bufr := bufio.NewReaderSize(reader, 64*1024)
 
-	decoder := json.NewDecoder(bufr)
-	decoder.DisallowUnknownFields()
-	decoder.UseNumber()
+    decoder := json.NewDecoder(bufr)
+    if p.config.StrictUnknownFields {
+        decoder.DisallowUnknownFields()
+    }
+    if p.config.JSONUseNumber {
+        decoder.UseNumber()
+    }
 
 	// Read the opening bracket of the object.
 	t, err := decoder.Token()

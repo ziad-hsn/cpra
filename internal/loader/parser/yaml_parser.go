@@ -111,19 +111,18 @@ var ManifestFields = map[string]map[string]FieldType{
 }
 
 type YamlParser struct {
+    StrictUnknownFields bool
 }
 
-func NewYamlParser() *YamlParser {
-	return &YamlParser{}
-}
+func NewYamlParser() *YamlParser { return &YamlParser{StrictUnknownFields: false} }
 
 func (p *YamlParser) Parse(r io.Reader) (schema.Manifest, error) {
 
 	var state parseState
 	var manifest schema.Manifest
-	decoder := yaml.NewDecoder(r)
-	// Enforce strict unknown-field handling where applicable when decoding into structs
-	decoder.KnownFields(true)
+    decoder := yaml.NewDecoder(r)
+    // Optionally enforce strict unknown-field handling
+    decoder.KnownFields(p.StrictUnknownFields)
 
 	for {
 		var node map[string]yaml.Node

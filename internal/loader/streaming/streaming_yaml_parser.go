@@ -73,8 +73,8 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	}
 	bufr := bufio.NewReaderSize(r, 64*1024)
 
-	decoder := yaml.NewDecoder(bufr)
-	decoder.KnownFields(true)
+    decoder := yaml.NewDecoder(bufr)
+    decoder.KnownFields(p.config.StrictUnknownFields)
 
 	// The YAML file is expected to have a root structure like:
 	// monitors:

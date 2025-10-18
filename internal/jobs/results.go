@@ -8,10 +8,10 @@ import (
 // Result is a generic structure for returning the outcome of a job.
 // It includes the entity it belongs to, any error that occurred, and a flexible payload.
 type Result struct {
-	ID      uuid.UUID
-	Ent     ecs.Entity
 	Err     error
 	Payload map[string]interface{}
+	Ent     ecs.Entity
+	ID      uuid.UUID
 }
 
 // Entity returns the entity associated with the result.

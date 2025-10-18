@@ -29,9 +29,9 @@ func NewQueue(config QueueConfig) (Queue, error) {
 
 // DefaultQueueConfig returns the default queue configuration
 func DefaultQueueConfig() QueueConfig {
-	return QueueConfig{
-		Type: QueueTypeWorkiva,
-		//Capacity: 1 << 16, // 65536
-		Capacity: 1e6,
-	}
+    return QueueConfig{
+        Type:     QueueTypeWorkiva,
+        //Capacity: 1 << 16, // 65536
+        Capacity: 1e6,
+    }
 }

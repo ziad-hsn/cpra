@@ -1,25 +1,26 @@
 package streaming
 
 import (
-    "context"
-    "encoding/json"
-    "bufio"
-    "compress/gzip"
-    "fmt"
-    "io"
-    "os"
-    "sync"
+	"bufio"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"sync"
 
-    "cpra/internal/loader/schema"
-    "strings"
+	"cpra/internal/loader/schema"
 )
 
 // StreamingJsonParser handles true streaming parsing of a JSON file.
 // It reads the file object by object, creating batches without loading the entire file into memory.
 type StreamingJsonParser struct {
-	filename  string
-	config    ParseConfig
 	batchPool *sync.Pool
+	config    ParseConfig
+	filename  string
 }
 
 // NewStreamingJsonParser creates a new streaming JSON parser.
@@ -48,12 +49,12 @@ func (p *StreamingJsonParser) ParseBatches(ctx context.Context, progressChan cha
 }
 
 // parseFile performs the actual streaming JSON parsing.
-func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- MonitorBatch, progressChan chan<- Progress) error {
+func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- MonitorBatch, _ chan<- Progress) error {
 	file, err := os.Open(p.filename)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var reader io.Reader = file
 	if strings.HasSuffix(strings.ToLower(p.filename), ".gz") {
@@ -61,18 +62,18 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 		if gzErr != nil {
 			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		reader = gz
 	}
 	bufr := bufio.NewReaderSize(reader, 64*1024)
 
-    decoder := json.NewDecoder(bufr)
-    if p.config.StrictUnknownFields {
-        decoder.DisallowUnknownFields()
-    }
-    if p.config.JSONUseNumber {
-        decoder.UseNumber()
-    }
+	decoder := json.NewDecoder(bufr)
+	if p.config.StrictUnknownFields {
+		decoder.DisallowUnknownFields()
+	}
+	if p.config.JSONUseNumber {
+		decoder.UseNumber()
+	}
 
 	// Read the opening bracket of the object.
 	t, err := decoder.Token()
@@ -132,7 +133,7 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 
 	// Read the closing bracket of the array.
 	t, err = decoder.Token()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("failed to read closing token: %w", err)
 	}
 	if t != json.Delim(']') {

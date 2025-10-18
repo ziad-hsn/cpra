@@ -29,18 +29,18 @@ type Queue interface {
 
 // Stats holds performance metrics for a queue.
 type Stats struct {
-	QueueDepth    int
-	Capacity      int
-	Enqueued      int64
+	LastEnqueue   time.Time
+	LastDequeue   time.Time
+	AvgQueueTime  time.Duration
 	Dequeued      int64
 	Dropped       int64
 	MaxQueueTime  time.Duration
-	AvgQueueTime  time.Duration
+	QueueDepth    int
 	MaxJobLatency time.Duration
 	AvgJobLatency time.Duration
-	EnqueueRate   float64 // jobs per second since queue creation
-	DequeueRate   float64 // jobs per second since queue creation
-	LastEnqueue   time.Time
-	LastDequeue   time.Time
-	SampleWindow  time.Duration // elapsed time used for rate calculations
+	EnqueueRate   float64
+	DequeueRate   float64
+	Enqueued      int64
+	Capacity      int
+	SampleWindow  time.Duration
 }

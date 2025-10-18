@@ -33,10 +33,10 @@ func NewBatchInterventionResultSystem(world *ecs.World, results <-chan []jobs.Re
     }
 }
 
-func (s *BatchInterventionResultSystem) Initialize(w *ecs.World) {
+func (s *BatchInterventionResultSystem) Initialize(_ *ecs.World) {
 }
 
-func (s *BatchInterventionResultSystem) Update(w *ecs.World) {
+func (s *BatchInterventionResultSystem) Update(_ *ecs.World) {
 	if s.ResultChan == nil {
 		return
 	}
@@ -151,4 +151,4 @@ func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *co
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchInterventionResultSystem) Finalize(w *ecs.World) {}
+func (s *BatchInterventionResultSystem) Finalize(_ *ecs.World) {}

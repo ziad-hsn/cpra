@@ -10,15 +10,13 @@ import (
 
 // MemoryEfficientSystem provides memory optimization utilities for ECS systems
 type MemoryEfficientSystem struct {
+	lastGC          time.Time
 	world           *ecs.World
 	gcInterval      time.Duration
-	lastGC          time.Time
 	memoryThreshold int64
-
-	// Memory statistics
-	allocsBefore uint64
-	allocsAfter  uint64
-	gcCount      uint32
+	allocsBefore    uint64
+	allocsAfter     uint64
+	gcCount         uint32
 }
 
 // MemoryConfig holds memory management configuration
@@ -30,12 +28,12 @@ type MemoryConfig struct {
 
 // MemoryStats holds memory statistics
 type MemoryStats struct {
-	Alloc        uint64        // Current allocated memory
-	TotalAlloc   uint64        // Total allocated memory
-	Sys          uint64        // System memory
-	GCCount      uint32        // Number of GC runs
-	LastGCTime   time.Time     // Last GC time
-	GCPauseTotal time.Duration // Total GC pause time
+	LastGCTime   time.Time
+	Alloc        uint64
+	TotalAlloc   uint64
+	Sys          uint64
+	GCPauseTotal time.Duration
+	GCCount      uint32
 }
 
 // NewMemoryEfficientSystem creates a new memory management system

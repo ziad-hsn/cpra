@@ -2,6 +2,7 @@ package parser
 
 import (
 	"cpra/internal/loader/schema"
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -12,13 +13,13 @@ type FieldType struct {
 }
 
 type parseState struct {
-	line                     int
 	monitorName              string
 	pulseType                string
 	interventionTarget       string
 	interventionTargetFields string
 	codeColor                string
 	fields                   string
+	line                     int
 }
 
 var (
@@ -31,13 +32,13 @@ var (
 		"notify_groups": {Required: false},
 	}
 	PulseFields = map[string]FieldType{
-		"type":         {Required: true},
-		"interval":     {Required: true},
-		"timeout":      {Required: true},
-		"max_failures": {Required: false},
+		"type":                {Required: true},
+		"interval":            {Required: true},
+		"timeout":             {Required: true},
+		"max_failures":        {Required: false},
 		"unhealthy_threshold": {Required: false},
 		"healthy_threshold":   {Required: false},
-		"config":       {Required: true},
+		"config":              {Required: true},
 	}
 	PulseConfigHTTPFields = map[string]FieldType{
 		"url":     {Required: true},
@@ -111,7 +112,7 @@ var ManifestFields = map[string]map[string]FieldType{
 }
 
 type YamlParser struct {
-    StrictUnknownFields bool
+	StrictUnknownFields bool
 }
 
 func NewYamlParser() *YamlParser { return &YamlParser{StrictUnknownFields: false} }
@@ -120,14 +121,14 @@ func (p *YamlParser) Parse(r io.Reader) (schema.Manifest, error) {
 
 	var state parseState
 	var manifest schema.Manifest
-    decoder := yaml.NewDecoder(r)
-    // Optionally enforce strict unknown-field handling
-    decoder.KnownFields(p.StrictUnknownFields)
+	decoder := yaml.NewDecoder(r)
+	// Optionally enforce strict unknown-field handling
+	decoder.KnownFields(p.StrictUnknownFields)
 
 	for {
 		var node map[string]yaml.Node
 		err := decoder.Decode(&node)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

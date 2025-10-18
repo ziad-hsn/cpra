@@ -1,10 +1,10 @@
 package systems
 
 import (
-    "cpra/internal/controller/components"
-    "cpra/internal/queue"
-    "sync"
-    "time"
+	"cpra/internal/controller/components"
+	"cpra/internal/queue"
+	"sync"
+	"time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -13,27 +13,25 @@ import (
 // It identifies entities with the StateInterventionNeeded flag, enqueues the corresponding job,
 // and transitions the entity state to StateInterventionPending.
 type BatchInterventionSystem struct {
-	world     *ecs.World
-	queue     queue.Queue // Using a generic queue interface
-	logger    Logger
-	batchSize int
-
-	// Filter for entities that require an intervention.
+	queue              queue.Queue
+	logger             Logger
+	world              *ecs.World
 	filter             *ecs.Filter3[components.MonitorState, components.InterventionConfig, components.JobStorage]
 	monitorStateMapper *ecs.Map[components.MonitorState]
-
-	jobPool    *sync.Pool
-	entityPool *sync.Pool
+	jobPool            *sync.Pool
+	entityPool         *sync.Pool
+	batchSize          int
 }
 
 // NewBatchInterventionSystem creates a new BatchInterventionSystem.
 func NewBatchInterventionSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchInterventionSystem {
 	return &BatchInterventionSystem{
-		world:              world,
-		queue:              q,
-		logger:             logger,
-		batchSize:          batchSize,
-		filter:             ecs.NewFilter3[components.MonitorState, components.InterventionConfig, components.JobStorage](world),
+		world:     world,
+		queue:     q,
+		logger:    logger,
+		batchSize: batchSize,
+		filter: ecs.NewFilter3[components.MonitorState, components.InterventionConfig, components.JobStorage](world).
+			Without(ecs.C[components.Disabled]()),
 		monitorStateMapper: ecs.NewMap[components.MonitorState](world),
 		jobPool: &sync.Pool{
 			New: func() interface{} {
@@ -50,14 +48,14 @@ func NewBatchInterventionSystem(world *ecs.World, q queue.Queue, batchSize int, 
 	}
 }
 
-func (s *BatchInterventionSystem) Initialize(w *ecs.World) {
-    if s.filter != nil {
-        s.filter.Register()
-    }
+func (s *BatchInterventionSystem) Initialize(_ *ecs.World) {
+	if s.filter != nil {
+		s.filter.Register()
+	}
 }
 
 // Update finds and processes all monitors that need an intervention.
-func (s *BatchInterventionSystem) Update(w *ecs.World) {
+func (s *BatchInterventionSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
@@ -81,9 +79,6 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 		if tokens <= 0 {
 			tokens = free
 		}
-		if tokens <= 0 {
-			tokens = 1
-		}
 	}
 
 	earlyExit := false
@@ -103,13 +98,14 @@ func (s *BatchInterventionSystem) Update(w *ecs.World) {
 		ent := query.Entity()
 		state, _, jobStorage := query.Get()
 
-    // Process only entities that need an intervention.
-    if (state.Flags & components.StateInterventionNeeded) == 0 {
-        continue
-    }
+		// Process only entities that need an intervention.
+		if (state.Flags & components.StateInterventionNeeded) == 0 {
+			continue
+		}
 
-		if jobStorage.InterventionJob == nil {
-			s.logger.Warn("Entity[%d] has InterventionNeeded state but no InterventionJob", ent.ID())
+		// Guard against typed-nil jobs (interfaces holding nil pointers)
+		if jobStorage.InterventionJob == nil || jobStorage.InterventionJob.IsNil() {
+			s.logger.Warn("Entity[%d] has InterventionNeeded state but no valid InterventionJob", ent.ID())
 			continue
 		}
 
@@ -157,23 +153,23 @@ func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]
 	}
 
 	// If enqueue is successful, transition the state for all entities in the batch.
-    for _, ent := range *entities {
-        if !s.world.Alive(ent) {
-            continue
-        }
-        state := s.monitorStateMapper.Get(ent)
-        if state == nil {
-            continue
-        }
+	for _, ent := range *entities {
+		if !s.world.Alive(ent) {
+			continue
+		}
+		state := s.monitorStateMapper.Get(ent)
+		if state == nil {
+			continue
+		}
 
-        // Transition from Needed -> Pending
-        if state.Flags&components.StateInterventionNeeded != 0 {
-            state.Flags &^= components.StateInterventionNeeded
-            state.Flags |= components.StateInterventionPending
-            s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
-        }
-    }
+		// Transition from Needed -> Pending
+		if state.Flags&components.StateInterventionNeeded != 0 {
+			state.Flags &^= components.StateInterventionNeeded
+			state.Flags |= components.StateInterventionPending
+			s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
+		}
+	}
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchInterventionSystem) Finalize(w *ecs.World) {}
+func (s *BatchInterventionSystem) Finalize(_ *ecs.World) {}

@@ -1,25 +1,26 @@
 package streaming
 
 import (
-    "bufio"
-    "compress/gzip"
-    "context"
-    "fmt"
-    "io"
-    "os"
-    "sync"
+	"bufio"
+	"compress/gzip"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"sync"
 
-    "cpra/internal/loader/schema"
-    "gopkg.in/yaml.v3"
-    "strings"
+	"cpra/internal/loader/schema"
+	"gopkg.in/yaml.v3"
 )
 
 // StreamingYamlParser handles true streaming parsing of a YAML file.
 // It reads the file document by document, creating batches without loading the entire file into memory.
 type StreamingYamlParser struct {
-	filename  string
-	config    ParseConfig
 	batchPool *sync.Pool
+	config    ParseConfig
+	filename  string
 }
 
 // NewStreamingYamlParser creates a new streaming YAML parser.
@@ -55,12 +56,12 @@ func (p *StreamingYamlParser) ParseBatches(ctx context.Context, progressChan cha
 
 // parseFile performs the actual streaming YAML parsing.
 // It decodes the main `monitors` list and then streams each monitor entry.
-func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- MonitorBatch, progressChan chan<- Progress) error {
+func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- MonitorBatch, _ chan<- Progress) error {
 	file, err := os.Open(p.filename)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var r io.Reader = file
 	if strings.HasSuffix(strings.ToLower(p.filename), ".gz") {
@@ -68,13 +69,13 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 		if gzErr != nil {
 			return fmt.Errorf("failed to create gzip reader: %w", gzErr)
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		r = gz
 	}
 	bufr := bufio.NewReaderSize(r, 64*1024)
 
-    decoder := yaml.NewDecoder(bufr)
-    decoder.KnownFields(p.config.StrictUnknownFields)
+	decoder := yaml.NewDecoder(bufr)
+	decoder.KnownFields(p.config.StrictUnknownFields)
 
 	// The YAML file is expected to have a root structure like:
 	// monitors:
@@ -87,7 +88,7 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 		Monitors yaml.Node `yaml:"monitors"`
 	}
 	if err := decoder.Decode(&topLevel); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil // Empty file is not an error
 		}
 		return fmt.Errorf("failed to decode top-level 'monitors' field: %w", err)

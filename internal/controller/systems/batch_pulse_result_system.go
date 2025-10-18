@@ -34,10 +34,10 @@ func NewBatchPulseResultSystem(world *ecs.World, results <-chan []jobs.Result, l
         ResultChan:       results,
     }
 }
-func (s *BatchPulseResultSystem) Initialize(w *ecs.World) {
+func (s *BatchPulseResultSystem) Initialize(_ *ecs.World) {
 }
 
-func (s *BatchPulseResultSystem) Update(w *ecs.World) {
+func (s *BatchPulseResultSystem) Update(_ *ecs.World) {
 	if s.ResultChan == nil {
 		return
 	}
@@ -208,4 +208,4 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchPulseResultSystem) Finalize(w *ecs.World) {}
+func (s *BatchPulseResultSystem) Finalize(_ *ecs.World) {}

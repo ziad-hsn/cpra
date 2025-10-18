@@ -14,156 +14,138 @@
 package components
 
 import (
-    "cpra/internal/jobs"
-    "cpra/internal/loader/schema"
-    "errors"
-    "strings"
-    "time"
+	"errors"
+	"strings"
+	"time"
+
+	"cpra/internal/jobs"
+	"cpra/internal/loader/schema"
 )
+
+// Disabled is a zero-size tag component marking an entity as disabled.
+// Using a tag allows filters to exclude disabled entities efficiently at the archetype level.
+type Disabled struct{}
 
 // MonitorState consolidates all monitor state into a single component.
 // This approach dramatically reduces archetype fragmentation and improves cache locality.
 type MonitorState struct {
-	// Entity identification
-	Name string
-
-	// State flags (bitfield for efficiency) - replaces multiple tag components
-	Flags uint32
-
-	// Timing data
-	LastCheckTime   time.Time
-	LastSuccessTime time.Time
-	NextCheckTime   time.Time
-
-    // Error tracking
-    ConsecutiveFailures int // deprecated in favor of PulseFailures/InterventionFailures
-    LastError           error
-
-    // Phase 2 counters and tracking
-    PulseFailures        int
-    InterventionFailures int
-    RecoveryStreak       int
-    VerifyRemaining      int
-
-	// Pending action data
-	PendingCode string
+	LastCheckTime        time.Time
+	LastSuccessTime      time.Time
+	NextCheckTime        time.Time
+	LastError            error
+	Name                 string
+	PendingCode          string
+	ConsecutiveFailures  int
+	PulseFailures        int
+	InterventionFailures int
+	RecoveryStreak       int
+	VerifyRemaining      int
+	Flags                uint32
 }
 
-// State flag constants - replaces separate components like PulseNeeded, PulsePending, etc.
+// StatePulseNeeded is a state flag constant; additional related flags follow in this block.
 const (
-    StateDisabled            uint32 = 1 << 0
-    StatePulseNeeded         uint32 = 1 << 1
-    StatePulsePending        uint32 = 1 << 2
-    StatePulseFirstCheck     uint32 = 1 << 3
-    StateHasIntervention     uint32 = 1 << 4
-    StateInterventionNeeded  uint32 = 1 << 5
-    StateInterventionPending uint32 = 1 << 6
-    StateCodeNeeded          uint32 = 1 << 7
-    StateCodePending         uint32 = 1 << 8
-    StateIncidentOpen        uint32 = 1 << 9
-    StateVerifying           uint32 = 1 << 10
-    // Room for more states without adding components
+	// Disabled moved to a tag component (components.Disabled)
+	StatePulseNeeded         uint32 = 1 << 1
+	StatePulsePending        uint32 = 1 << 2
+	StatePulseFirstCheck     uint32 = 1 << 3
+	StateInterventionNeeded  uint32 = 1 << 5
+	StateInterventionPending uint32 = 1 << 6
+	StateCodeNeeded          uint32 = 1 << 7
+	StateCodePending         uint32 = 1 << 8
+	StateIncidentOpen        uint32 = 1 << 9
+	StateVerifying           uint32 = 1 << 10
+	// Room for more states without adding components
 )
 
-// Efficient state management helpers using simple bit operations
-func (m *MonitorState) IsDisabled() bool { return m.Flags&StateDisabled != 0 }
-func (m *MonitorState) IsPulseNeeded() bool { return m.Flags&StatePulseNeeded != 0 }
-func (m *MonitorState) IsPulsePending() bool { return m.Flags&StatePulsePending != 0 }
-func (m *MonitorState) IsPulseFirstCheck() bool { return m.Flags&StatePulseFirstCheck != 0 }
-func (m *MonitorState) IsInterventionNeeded() bool { return m.Flags&StateInterventionNeeded != 0 }
+// IsPulseNeeded reports whether a pulse is needed for the monitor; related helpers follow.
+func (m *MonitorState) IsPulseNeeded() bool         { return m.Flags&StatePulseNeeded != 0 }
+func (m *MonitorState) IsPulsePending() bool        { return m.Flags&StatePulsePending != 0 }
+func (m *MonitorState) IsPulseFirstCheck() bool     { return m.Flags&StatePulseFirstCheck != 0 }
+func (m *MonitorState) IsInterventionNeeded() bool  { return m.Flags&StateInterventionNeeded != 0 }
 func (m *MonitorState) IsInterventionPending() bool { return m.Flags&StateInterventionPending != 0 }
-func (m *MonitorState) IsCodeNeeded() bool { return m.Flags&StateCodeNeeded != 0 }
-func (m *MonitorState) IsCodePending() bool { return m.Flags&StateCodePending != 0 }
-
-func (m *MonitorState) SetDisabled(disabled bool) {
-    if disabled {
-        m.Flags |= StateDisabled
-    } else {
-        m.Flags &^= StateDisabled
-    }
-}
+func (m *MonitorState) IsCodeNeeded() bool          { return m.Flags&StateCodeNeeded != 0 }
+func (m *MonitorState) IsCodePending() bool         { return m.Flags&StateCodePending != 0 }
 
 func (m *MonitorState) SetPulseNeeded(needed bool) {
-    if needed {
-        m.Flags |= StatePulseNeeded
-    } else {
-        m.Flags &^= StatePulseNeeded
-    }
+	if needed {
+		m.Flags |= StatePulseNeeded
+	} else {
+		m.Flags &^= StatePulseNeeded
+	}
 }
 
 func (m *MonitorState) SetPulsePending(pending bool) {
-    if pending {
-        m.Flags |= StatePulsePending
-    } else {
-        m.Flags &^= StatePulsePending
-    }
+	if pending {
+		m.Flags |= StatePulsePending
+	} else {
+		m.Flags &^= StatePulsePending
+	}
 }
 
 func (m *MonitorState) SetPulseFirstCheck(firstCheck bool) {
-    if firstCheck {
-        m.Flags |= StatePulseFirstCheck
-    } else {
-        m.Flags &^= StatePulseFirstCheck
-    }
+	if firstCheck {
+		m.Flags |= StatePulseFirstCheck
+	} else {
+		m.Flags &^= StatePulseFirstCheck
+	}
 }
 
 func (m *MonitorState) SetInterventionNeeded(needed bool) {
-    if needed {
-        m.Flags |= StateInterventionNeeded
-    } else {
-        m.Flags &^= StateInterventionNeeded
-    }
+	if needed {
+		m.Flags |= StateInterventionNeeded
+	} else {
+		m.Flags &^= StateInterventionNeeded
+	}
 }
 
 func (m *MonitorState) SetInterventionPending(pending bool) {
-    if pending {
-        m.Flags |= StateInterventionPending
-    } else {
-        m.Flags &^= StateInterventionPending
-    }
+	if pending {
+		m.Flags |= StateInterventionPending
+	} else {
+		m.Flags &^= StateInterventionPending
+	}
 }
 
 func (m *MonitorState) SetCodeNeeded(needed bool) {
-    if needed {
-        m.Flags |= StateCodeNeeded
-    } else {
-        m.Flags &^= StateCodeNeeded
-    }
+	if needed {
+		m.Flags |= StateCodeNeeded
+	} else {
+		m.Flags &^= StateCodeNeeded
+	}
 }
 
 func (m *MonitorState) SetCodePending(pending bool) {
-    if pending {
-        m.Flags |= StateCodePending
-    } else {
-        m.Flags &^= StateCodePending
-    }
+	if pending {
+		m.Flags |= StateCodePending
+	} else {
+		m.Flags &^= StateCodePending
+	}
 }
 
 // PulseConfig consolidates pulse configuration
 type PulseConfig struct {
-    Type        string
-    Timeout     time.Duration
-    Interval    time.Duration
-    Retries     int
-    // UnhealthyThreshold: consecutive pulse failures to consider unhealthy (trigger intervention/no-intervention RED)
-    UnhealthyThreshold int
-    // HealthyThreshold: consecutive pulse successes to consider recovered (send green)
-    HealthyThreshold   int
-    Config      schema.PulseConfig
+	Config             schema.PulseConfig
+	Type               string
+	Timeout            time.Duration
+	Interval           time.Duration
+	Retries            int
+	UnhealthyThreshold int
+	HealthyThreshold   int
 }
 
 func (c *PulseConfig) Copy() *PulseConfig {
-    if c == nil {
-        return nil
-    }
-    cpy := &PulseConfig{
-        Type:        strings.Clone(c.Type),
-        Timeout:     c.Timeout,
-        Interval:    c.Interval,
-        Retries:     c.Retries,
-        UnhealthyThreshold: c.UnhealthyThreshold,
-        HealthyThreshold:   c.HealthyThreshold,
-    }
+	if c == nil {
+		return nil
+	}
+	cpy := &PulseConfig{
+		Type:               strings.Clone(c.Type),
+		Timeout:            c.Timeout,
+		Interval:           c.Interval,
+		Retries:            c.Retries,
+		UnhealthyThreshold: c.UnhealthyThreshold,
+		HealthyThreshold:   c.HealthyThreshold,
+	}
 
 	if c.Config != nil {
 		cpy.Config = c.Config.Copy()
@@ -173,9 +155,9 @@ func (c *PulseConfig) Copy() *PulseConfig {
 
 // InterventionConfig consolidates intervention configuration
 type InterventionConfig struct {
+	Target      schema.InterventionTarget
 	Action      string
 	MaxFailures int
-	Target      schema.InterventionTarget
 }
 
 func (c *InterventionConfig) Copy() *InterventionConfig {
@@ -201,10 +183,10 @@ type CodeConfig struct {
 }
 
 type ColorCodeConfig struct {
-	Dispatch    bool
-	MaxFailures int
-	Notify      string
 	Config      schema.CodeNotification
+	Notify      string
+	MaxFailures int
+	Dispatch    bool
 }
 
 func (c *ColorCodeConfig) Copy() *ColorCodeConfig {
@@ -242,11 +224,11 @@ type CodeStatus struct {
 }
 
 type ColorCodeStatus struct {
-	LastStatus          string
-	ConsecutiveFailures int
 	LastAlertTime       time.Time
 	LastSuccessTime     time.Time
 	LastError           error
+	LastStatus          string
+	ConsecutiveFailures int
 }
 
 func (s *ColorCodeStatus) SetSuccess(t time.Time) {

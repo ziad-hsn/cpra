@@ -12,35 +12,35 @@ import (
 
 // TraceSpan represents a single trace span
 type TraceSpan struct {
-	ID         string
-	ParentID   string
-	Operation  string
-	StartTime  time.Time
-	EndTime    time.Time
-	Duration   time.Duration
-	Metadata   map[string]interface{}
-	Tags       map[string]string
-	Success    bool
-	Error      error
-	Component  string
-	EntityID   *uint64 // Optional entity ID for monitoring operations
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
+	Metadata  map[string]interface{}
+	Tags      map[string]string
+	EntityID  *uint64
+	ID        string
+	ParentID  string
+	Operation string
+	Component string
+	Duration  time.Duration
+	Success   bool
 }
 
 // TraceContext holds trace information
 type TraceContext struct {
+	Baggage map[string]string
 	TraceID string
 	SpanID  string
-	Baggage map[string]string
 }
 
 // Tracer manages trace collection and storage
 type Tracer struct {
-	mu        sync.RWMutex
 	spans     map[string]*TraceSpan
-	traces    map[string][]*TraceSpan // traceID -> spans
-	enabled   bool
-	component string
+	traces    map[string][]*TraceSpan
 	logger    *Logger
+	component string
+	mu        sync.RWMutex
+	enabled   bool
 }
 
 // NewTracer creates a new tracer instance
@@ -55,7 +55,7 @@ func NewTracer(component string, enabled bool) *Tracer {
 		timezone:    time.Local,
 		tracer:      nil, // No tracer to avoid recursion
 	}
-	
+
 	return &Tracer{
 		spans:     make(map[string]*TraceSpan),
 		traces:    make(map[string][]*TraceSpan),
@@ -72,7 +72,7 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 	}
 
 	var traceID, parentSpanID string
-	
+
 	// Check if there's an existing trace context
 	if traceCtx, ok := ctx.Value("traceContext").(*TraceContext); ok {
 		traceID = traceCtx.TraceID
@@ -82,7 +82,7 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 	}
 
 	spanID := uuid.New().String()
-	
+
 	span := &TraceSpan{
 		ID:        spanID,
 		ParentID:  parentSpanID,
@@ -111,10 +111,10 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 		SpanID:  spanID,
 		Baggage: make(map[string]string),
 	}
-	
+
 	newCtx := context.WithValue(ctx, "traceContext", newTraceCtx)
 
-	t.logger.Debug("Started span %s for operation %s (trace: %s, parent: %s)", 
+	t.logger.Debug("Started span %s for operation %s (trace: %s, parent: %s)",
 		spanID, operation, traceID, parentSpanID)
 
 	return newCtx, span
@@ -142,7 +142,7 @@ func (t *Tracer) FinishSpan(span *TraceSpan, err error) {
 		status = "ERROR"
 	}
 
-	t.logger.Debug("Finished span %s (%s) in %v [%s]", 
+	t.logger.Debug("Finished span %s (%s) in %v [%s]",
 		span.ID, span.Operation, span.Duration, status)
 
 	if err != nil {
@@ -183,7 +183,7 @@ func (t *Tracer) GetTrace(traceID string) []*TraceSpan {
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	
+
 	spans := make([]*TraceSpan, len(t.traces[traceID]))
 	copy(spans, t.traces[traceID])
 	return spans
@@ -197,7 +197,7 @@ func (t *Tracer) GetSpan(spanID string) *TraceSpan {
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	
+
 	if span, exists := t.spans[spanID]; exists {
 		// Return a copy
 		spanCopy := *span
@@ -217,10 +217,10 @@ func (t *Tracer) GetStats() map[string]interface{} {
 
 	totalSpans := len(t.spans)
 	totalTraces := len(t.traces)
-	
+
 	var avgDuration time.Duration
 	var successCount, errorCount int
-	
+
 	if totalSpans > 0 {
 		var totalDuration time.Duration
 		for _, span := range t.spans {
@@ -239,13 +239,13 @@ func (t *Tracer) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"enabled":        true,
-		"total_spans":    totalSpans,
-		"total_traces":   totalTraces,
-		"success_count":  successCount,
-		"error_count":    errorCount,
-		"avg_duration":   avgDuration.String(),
-		"component":      t.component,
+		"enabled":       true,
+		"total_spans":   totalSpans,
+		"total_traces":  totalTraces,
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"avg_duration":  avgDuration.String(),
+		"component":     t.component,
 	}
 }
 

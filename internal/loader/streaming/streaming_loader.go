@@ -1,13 +1,12 @@
 package streaming
 
 import (
-    "context"
-    "cpra/internal/loader/schema"
-    "fmt"
-    "os"
-    "runtime"
-    "strings"
-    "time"
+	"context"
+	"cpra/internal/loader/schema"
+	"fmt"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -21,12 +20,12 @@ type MonitorBatch struct {
 
 // ParseConfig holds configuration for the streaming parsers.
 type ParseConfig struct {
-    BatchSize    int
-    BufferSize   int
-    MaxMemory    int64
-    ProgressChan chan<- Progress
-    StrictUnknownFields bool
-    JSONUseNumber       bool
+	ProgressChan        chan<- Progress
+	BatchSize           int
+	BufferSize          int
+	MaxMemory           int64
+	StrictUnknownFields bool
+	JSONUseNumber       bool
 }
 
 // Progress represents parsing progress.
@@ -41,30 +40,28 @@ type Progress struct {
 
 // StreamingLoader orchestrates the streaming loading process
 type StreamingLoader struct {
-	filename string
-	world    *ecs.World
-	config   StreamingConfig
-
+	totalStartTime time.Time
+	world          *ecs.World
 	parseProgress  chan Progress
 	entityProgress chan EntityProgress
-
-	totalStartTime time.Time
+	filename       string
+	config         StreamingConfig
 	loadingStats   LoadingStats
 }
 
 // StreamingConfig holds all streaming configuration
 type StreamingConfig struct {
-    ParseBatchSize   int
-    ParseBufferSize  int
-    MaxParseMemory   int64
-    EntityBatchSize  int
-    PreAllocateCount int
-    MaxWorkers       int
-    ProgressInterval time.Duration
-    GCInterval       time.Duration
-    MemoryLimit      int64
-    StrictUnknownFields bool
-    JSONUseNumber       bool
+	ParseBatchSize      int
+	ParseBufferSize     int
+	MaxParseMemory      int64
+	EntityBatchSize     int
+	PreAllocateCount    int
+	MaxWorkers          int
+	ProgressInterval    time.Duration
+	GCInterval          time.Duration
+	MemoryLimit         int64
+	StrictUnknownFields bool
+	JSONUseNumber       bool
 }
 
 // LoadingStats holds comprehensive loading statistics
@@ -80,19 +77,19 @@ type LoadingStats struct {
 
 // DefaultStreamingConfig returns optimized default configuration for large files
 func DefaultStreamingConfig() StreamingConfig {
-    return StreamingConfig{
-        ParseBatchSize:   10000,
-        ParseBufferSize:  4 * 1024 * 1024,
-        MaxParseMemory:   1 * 1024 * 1024 * 1024,
-        EntityBatchSize:  10000,
-        PreAllocateCount: 500000,
-        MaxWorkers:       runtime.NumCPU() * 2,
-        ProgressInterval: 1 * time.Second,
-        GCInterval:       5 * time.Second,
-        MemoryLimit:      2 * 1024 * 1024 * 1024,
-        StrictUnknownFields: false,
-        JSONUseNumber:       false,
-    }
+	return StreamingConfig{
+		ParseBatchSize:      10000,
+		ParseBufferSize:     4 * 1024 * 1024,
+		MaxParseMemory:      1 * 1024 * 1024 * 1024,
+		EntityBatchSize:     10000,
+		PreAllocateCount:    500000,
+		MaxWorkers:          runtime.NumCPU() * 2,
+		ProgressInterval:    1 * time.Second,
+		GCInterval:          5 * time.Second,
+		MemoryLimit:         2 * 1024 * 1024 * 1024,
+		StrictUnknownFields: false,
+		JSONUseNumber:       false,
+	}
 }
 
 // NewStreamingLoader creates a new streaming loader
@@ -114,38 +111,30 @@ func (sl *StreamingLoader) Load(ctx context.Context) (*LoadingStats, error) {
 	var batchChan <-chan MonitorBatch
 	var errorChan <-chan error
 
-    parseConfig := ParseConfig{
-        BatchSize:    sl.config.ParseBatchSize,
-        BufferSize:   sl.config.ParseBufferSize,
-        MaxMemory:    sl.config.MaxParseMemory,
-        ProgressChan: sl.parseProgress,
-        StrictUnknownFields: sl.config.StrictUnknownFields,
-        JSONUseNumber:       sl.config.JSONUseNumber,
-    }
+	parseConfig := ParseConfig{
+		BatchSize:           sl.config.ParseBatchSize,
+		BufferSize:          sl.config.ParseBufferSize,
+		MaxMemory:           sl.config.MaxParseMemory,
+		ProgressChan:        sl.parseProgress,
+		StrictUnknownFields: sl.config.StrictUnknownFields,
+		JSONUseNumber:       sl.config.JSONUseNumber,
+	}
 
-    lower := strings.ToLower(sl.filename)
-    trimmed := strings.TrimSuffix(lower, ".gz")
-    if strings.HasSuffix(trimmed, ".json") {
-        jsonParser, err := NewStreamingJsonParser(sl.filename, parseConfig)
-        if err != nil {
-            return nil, fmt.Errorf("failed to create JSON parser: %w", err)
-        }
-        batchChan, errorChan = jsonParser.ParseBatches(ctx, sl.parseProgress)
-    } else {
-        // YAML parsing is significantly more memory intensive in go-yaml v3.
-        // If the file is very large, recommend converting to JSON for true streaming.
-        if fi, err := os.Stat(sl.filename); err == nil {
-            // Heuristic threshold: ~10MB and above
-            if fi.Size() > 10*1024*1024 {
-                fmt.Printf("Warning: large YAML file (%0.1f MB). For lower memory usage, convert to JSON and use the streaming JSON parser.\n", float64(fi.Size())/1024.0/1024.0)
-            }
-        }
-        yamlParser, err := NewStreamingYamlParser(sl.filename, parseConfig)
-        if err != nil {
-            return nil, fmt.Errorf("failed to create YAML parser: %w", err)
-        }
-        batchChan, errorChan = yamlParser.ParseBatches(ctx, sl.parseProgress)
-    }
+	lower := strings.ToLower(sl.filename)
+	trimmed := strings.TrimSuffix(lower, ".gz")
+	if strings.HasSuffix(trimmed, ".json") {
+		jsonParser, err := NewStreamingJsonParser(sl.filename, parseConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create JSON parser: %w", err)
+		}
+		batchChan, errorChan = jsonParser.ParseBatches(ctx, sl.parseProgress)
+	} else {
+		yamlParser, err := NewStreamingYamlParser(sl.filename, parseConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create YAML parser: %w", err)
+		}
+		batchChan, errorChan = yamlParser.ParseBatches(ctx, sl.parseProgress)
+	}
 
 	entityCreator := NewStreamingEntityCreator(sl.world, EntityCreationConfig{
 		BatchSize:    sl.config.EntityBatchSize,

@@ -29,10 +29,10 @@ func NewBatchCodeResultSystem(world *ecs.World, results <-chan []jobs.Result, lo
 	}
 }
 
-func (s *BatchCodeResultSystem) Initialize(w *ecs.World) {
+func (s *BatchCodeResultSystem) Initialize(_ *ecs.World) {
 }
 
-func (s *BatchCodeResultSystem) Update(w *ecs.World) {
+func (s *BatchCodeResultSystem) Update(_ *ecs.World) {
 	if s.ResultChan == nil {
 		return
 	}
@@ -98,12 +98,17 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 
 		if err := result.Error(); err != nil {
 			s.logger.Error("Monitor '%s' %s alert failed to send: %v", state.Name, color, err)
+			// On failure, re-flag for retry: clear Pending, set Needed and restore PendingCode.
+			state.Flags &^= components.StateCodePending
+			state.Flags |= components.StateCodeNeeded
+			if state.PendingCode == "" {
+				state.PendingCode = color
+			}
 		} else {
 			s.logger.Info("Monitor '%s' %s alert sent successfully.", state.Name, color)
+			// On success, clear Pending.
+			state.Flags &^= components.StateCodePending
 		}
-
-        // Unset the pending flag.
-        state.Flags &^= components.StateCodePending
     }
 
 	if processedCount > 0 {
@@ -112,4 +117,4 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchCodeResultSystem) Finalize(w *ecs.World) {}
+func (s *BatchCodeResultSystem) Finalize(_ *ecs.World) {}

@@ -1,20 +1,16 @@
 package loader
 
 import (
-	"cpra/internal/loader/parser"
+	"bufio"
 	"errors"
 	"fmt"
-	"bufio"
+	"os"
 	"strings"
 
-	//"cpra/internal/loader/parser"
-	"cpra/internal/loader/schema"
-	//"errors"
-	//"fmt"
 	"gopkg.in/yaml.v3"
-	//"strings"
 
-	"os"
+	"cpra/internal/loader/parser"
+	"cpra/internal/loader/schema"
 )
 
 type YamlLoader struct {
@@ -30,11 +26,11 @@ func NewYamlLoader(fileName string) *YamlLoader {
 }
 
 func (l *YamlLoader) Load() error {
-	file, err := os.Open(l.File)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+    file, err := os.Open(l.File)
+    if err != nil {
+        return err
+    }
+    defer func() { _ = file.Close() }()
 
 	//decoder := yaml.NewDecoder(file)
 	//var manifest schema.Manifest

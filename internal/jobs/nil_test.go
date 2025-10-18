@@ -7,9 +7,9 @@ import (
 // TestIsNilInterface verifies that IsNil() correctly handles the typed-nil problem
 func TestIsNilInterface(t *testing.T) {
 	tests := []struct {
-		name     string
-		job      Job
-		wantNil  bool
+		job     Job
+		name    string
+		wantNil bool
 	}{
 		{
 			name:    "nil interface",
@@ -101,9 +101,9 @@ func TestIsNilHelperFunction(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		job      Job
-		wantNil  bool
+		job     Job
+		name    string
+		wantNil bool
 	}{
 		{
 			name:    "nil interface",

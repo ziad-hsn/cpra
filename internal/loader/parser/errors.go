@@ -12,11 +12,11 @@ var (
 )
 
 type requiredMonitorFieldError struct {
+	reason    error
 	monitor   string
 	parentKey string
 	field     string
 	line      int
-	reason    error
 }
 
 func (e *requiredMonitorFieldError) Error() string {
@@ -39,11 +39,11 @@ func (r *monitorFieldTypeError) Error() string {
 }
 
 type invalidMonitorFieldError struct {
+	reason    error
 	monitor   string
 	parentKey string
 	field     string
 	line      int
-	reason    error
 }
 
 func (e *invalidMonitorFieldError) Error() string {

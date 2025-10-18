@@ -22,21 +22,22 @@ type BatchPulseScheduleSystem struct {
 
 // NewBatchPulseScheduleSystem creates a new BatchPulseScheduleSystem.
 func NewBatchPulseScheduleSystem(world *ecs.World, logger Logger) *BatchPulseScheduleSystem {
-	return &BatchPulseScheduleSystem{
-		world:  world,
-		logger: logger,
-		filter: ecs.NewFilter2[components.MonitorState, components.PulseConfig](world),
-	}
+    return &BatchPulseScheduleSystem{
+        world:  world,
+        logger: logger,
+        filter: ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
+            Without(ecs.C[components.Disabled]()),
+    }
 }
 
-func (s *BatchPulseScheduleSystem) Initialize(w *ecs.World) {
+func (s *BatchPulseScheduleSystem) Initialize(_ *ecs.World) {
     if s.filter != nil {
         s.filter.Register()
     }
 }
 
 // Update finds and schedules all monitors that are due for a pulse check.
-func (s *BatchPulseScheduleSystem) Update(w *ecs.World) {
+func (s *BatchPulseScheduleSystem) Update(_ *ecs.World) {
 	start := time.Now()
 	query := s.filter.Query()
 	var scheduledCount int
@@ -48,7 +49,8 @@ func (s *BatchPulseScheduleSystem) Update(w *ecs.World) {
 
         flags := state.Flags
 
-        if (flags&components.StateDisabled != 0) || (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
+        // Disabled entities are excluded at the filter level via Without(Disabled)
+        if (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
             continue
         }
 
@@ -69,6 +71,6 @@ func (s *BatchPulseScheduleSystem) Update(w *ecs.World) {
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchPulseScheduleSystem) Finalize(w *ecs.World) {
+func (s *BatchPulseScheduleSystem) Finalize(_ *ecs.World) {
 	// Nothing to clean up
 }

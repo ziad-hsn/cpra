@@ -9,11 +9,11 @@ import (
 
 // MemoryManager handles memory optimization and monitoring
 type MemoryManager struct {
-	maxMemory     uint64
-	gcInterval    time.Duration
-	lastGC        time.Time
-	memoryStats   runtime.MemStats
-	alertThreshold float64 // Percentage of max memory before alert
+	lastGC         time.Time
+	memoryStats    runtime.MemStats
+	maxMemory      uint64
+	gcInterval     time.Duration
+	alertThreshold float64
 }
 
 func NewMemoryManager(maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager {
@@ -27,20 +27,20 @@ func NewMemoryManager(maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager 
 // MonitorMemory checks current memory usage and triggers cleanup if needed
 func (m *MemoryManager) MonitorMemory() {
 	runtime.ReadMemStats(&m.memoryStats)
-	
+
 	currentUsage := m.memoryStats.Alloc
 	usagePercent := float64(currentUsage) / float64(m.maxMemory)
-	
+
 	if usagePercent > m.alertThreshold {
-		log.Printf("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)", 
-			usagePercent*100, 
-			currentUsage>>20, 
+		log.Printf("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
+			usagePercent*100,
+			currentUsage>>20,
 			m.maxMemory>>20)
-		
+
 		// Force garbage collection
 		m.ForceGC()
 	}
-	
+
 	// Periodic garbage collection
 	if time.Since(m.lastGC) > m.gcInterval {
 		runtime.GC()
@@ -54,11 +54,11 @@ func (m *MemoryManager) ForceGC() {
 	runtime.GC()
 	runtime.ReadMemStats(&m.memoryStats)
 	after := m.memoryStats.Alloc
-	
+
 	freed := before - after
-	log.Printf("Forced GC: freed %d MB (before: %d MB, after: %d MB)", 
+	log.Printf("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
 		freed>>20, before>>20, after>>20)
-	
+
 	m.lastGC = time.Now()
 }
 
@@ -77,7 +77,7 @@ func (m *MemoryManager) SetMemoryLimit() {
 // LogMemoryStats provides detailed memory information
 func (m *MemoryManager) LogMemoryStats() {
 	stats := m.GetMemoryStats()
-	
+
 	log.Printf("Memory Stats:")
 	log.Printf("  Alloc: %d MB", stats.Alloc>>20)
 	log.Printf("  TotalAlloc: %d MB", stats.TotalAlloc>>20)

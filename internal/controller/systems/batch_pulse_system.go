@@ -1,10 +1,10 @@
 package systems
 
 import (
-    "cpra/internal/controller/components"
-    "cpra/internal/queue"
-    "sync"
-    "time"
+	"cpra/internal/controller/components"
+	"cpra/internal/queue"
+	"sync"
+	"time"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -13,28 +13,26 @@ import (
 // It identifies entities with the StatePulseNeeded flag, enqueues the corresponding job,
 // and transitions the entity state to StatePulsePending.
 type BatchPulseSystem struct {
-	world       *ecs.World
-	queue       queue.Queue // Using a generic queue interface
-	logger      Logger
-	batchSize   int
-	maxDispatch int
-
-	// Filter for entities that require a pulse check.
+	queue              queue.Queue
+	logger             Logger
+	world              *ecs.World
 	filter             *ecs.Filter2[components.MonitorState, components.JobStorage]
 	monitorStateMapper *ecs.Map[components.MonitorState]
-
-	jobPool    *sync.Pool
-	entityPool *sync.Pool
+	jobPool            *sync.Pool
+	entityPool         *sync.Pool
+	batchSize          int
+	maxDispatch        int
 }
 
 // NewBatchPulseSystem creates a new BatchPulseSystem.
 func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchPulseSystem {
 	return &BatchPulseSystem{
-		world:              world,
-		queue:              q,
-		logger:             logger,
-		batchSize:          batchSize,
-		filter:             ecs.NewFilter2[components.MonitorState, components.JobStorage](world),
+		world:     world,
+		queue:     q,
+		logger:    logger,
+		batchSize: batchSize,
+		filter: ecs.NewFilter2[components.MonitorState, components.JobStorage](world).
+			Without(ecs.C[components.Disabled]()),
 		monitorStateMapper: ecs.NewMap[components.MonitorState](world),
 		jobPool: &sync.Pool{
 			New: func() interface{} {
@@ -51,10 +49,10 @@ func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger 
 	}
 }
 
-func (s *BatchPulseSystem) Initialize(w *ecs.World) {
-    if s.filter != nil {
-        s.filter.Register()
-    }
+func (s *BatchPulseSystem) Initialize(_ *ecs.World) {
+	if s.filter != nil {
+		s.filter.Register()
+	}
 }
 
 func (s *BatchPulseSystem) SetMaxDispatch(n int) {
@@ -62,7 +60,7 @@ func (s *BatchPulseSystem) SetMaxDispatch(n int) {
 }
 
 // Update finds and processes all monitors that need a pulse check.
-func (s *BatchPulseSystem) Update(w *ecs.World) {
+func (s *BatchPulseSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
@@ -87,9 +85,6 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 		if tokens <= 0 {
 			tokens = free
 		}
-		if tokens <= 0 {
-			tokens = 1
-		}
 	}
 	if s.maxDispatch > 0 && tokens > s.maxDispatch {
 		tokens = s.maxDispatch
@@ -112,13 +107,14 @@ func (s *BatchPulseSystem) Update(w *ecs.World) {
 		ent := query.Entity()
 		state, jobStorage := query.Get()
 
-    // Process only entities that need a pulse check.
-    if (state.Flags & components.StatePulseNeeded) == 0 {
-        continue
-    }
+		// Process only entities that need a pulse check.
+		if (state.Flags & components.StatePulseNeeded) == 0 {
+			continue
+		}
 
-		if jobStorage.PulseJob == nil {
-			s.logger.Warn("Entity[%d] has PulseNeeded state but no PulseJob", ent.ID())
+		// Guard against typed-nil jobs (interfaces holding nil pointers)
+		if jobStorage.PulseJob == nil || jobStorage.PulseJob.IsNil() {
+			s.logger.Warn("Entity[%d] has PulseNeeded state but no valid PulseJob", ent.ID())
 			continue
 		}
 
@@ -167,23 +163,23 @@ func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Ent
 
 	// If enqueue is successful, transition the state for all entities in the batch.
 	now := time.Now()
-    for _, ent := range *entities {
-        if !s.world.Alive(ent) {
-            continue
-        }
-        state := s.monitorStateMapper.Get(ent)
-        if state == nil {
-            continue
-        }
+	for _, ent := range *entities {
+		if !s.world.Alive(ent) {
+			continue
+		}
+		state := s.monitorStateMapper.Get(ent)
+		if state == nil {
+			continue
+		}
 
-        // Transition from Needed -> Pending
-        if state.Flags&components.StatePulseNeeded != 0 {
-            state.Flags &^= components.StatePulseNeeded
-            state.Flags |= components.StatePulsePending
-            state.LastCheckTime = now
-        }
-    }
+		// Transition from Needed -> Pending
+		if state.Flags&components.StatePulseNeeded != 0 {
+			state.Flags &^= components.StatePulseNeeded
+			state.Flags |= components.StatePulsePending
+			state.LastCheckTime = now
+		}
+	}
 }
 
 // Finalize is a no-op for this system.
-func (s *BatchPulseSystem) Finalize(w *ecs.World) {}
+func (s *BatchPulseSystem) Finalize(_ *ecs.World) {}

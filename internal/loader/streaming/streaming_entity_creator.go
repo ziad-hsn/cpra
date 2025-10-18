@@ -13,22 +13,20 @@ import (
 // StreamingEntityCreator handles batch entity creation for Ark ECS.
 // It now uses the consolidated EntityManager to create entities.
 type StreamingEntityCreator struct {
-	world         *ecs.World
-	entityManager *entities.EntityManager
-
-	// Statistics
+	startTime        time.Time
+	world            *ecs.World
+	entityManager    *entities.EntityManager
 	entitiesCreated  int64
 	batchesProcessed int64
-	startTime        time.Time
 	pulseRate        float64
 	mu               sync.RWMutex
 }
 
 // EntityCreationConfig holds entity creation configuration.
 type EntityCreationConfig struct {
+	ProgressChan chan<- EntityProgress
 	BatchSize    int
 	PreAllocate  int
-	ProgressChan chan<- EntityProgress
 }
 
 // EntityProgress represents entity creation progress.

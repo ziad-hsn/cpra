@@ -40,14 +40,14 @@ const colorReset = "\033[0m"
 
 // Logger provides structured logging with levels and context
 type Logger struct {
-	level       LogLevel
-	component   string
-	enableColor bool
-	debugMode   bool
-	prodMode    bool
 	file        *os.File
 	timezone    *time.Location
 	tracer      *Tracer
+	component   string
+	level       LogLevel
+	enableColor bool
+	debugMode   bool
+	prodMode    bool
 }
 
 // NewLogger creates a new logger instance
@@ -128,7 +128,7 @@ func (l *Logger) setupFileLogging() {
 // Close closes the log file if open
 func (l *Logger) Close() {
 	if l.file != nil {
-		l.file.Close()
+		_ = l.file.Close()
 	}
 }
 
@@ -171,15 +171,15 @@ func (l *Logger) log(level LogLevel, msg string, args ...interface{}) {
 
 	// Always output to stdout/stderr
 	if level >= LogLevelError {
-		fmt.Fprintf(os.Stderr, "%s\n", formatted)
+		_, _ = fmt.Fprintf(os.Stderr, "%s\n", formatted)
 	} else {
-		fmt.Fprintf(os.Stdout, "%s\n", formatted)
+		_, _ = fmt.Fprintf(os.Stdout, "%s\n", formatted)
 	}
 
 	// Also write to file in production
 	if l.file != nil {
-		fmt.Fprintf(l.file, "%s\n", formatted)
-		l.file.Sync() // Ensure immediate write
+		_, _ = fmt.Fprintf(l.file, "%s\n", formatted)
+		_ = l.file.Sync() // Ensure immediate write
 	}
 }
 
@@ -284,7 +284,7 @@ func (l *Logger) LogEntityOperation(operation string, entityID uint64, details s
 }
 
 // LogWorkerPool logs worker pool statistics - debug only, completely silent otherwise
-func (l *Logger) LogWorkerPool(poolName string, stats map[string]interface{}) {
+func (l *Logger) LogWorkerPool(_ string, _ map[string]interface{}) {
 	// Only log in debug mode, completely silent otherwise
 }
 

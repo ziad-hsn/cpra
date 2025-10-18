@@ -10,10 +10,10 @@ type ErrNoPulseJob struct {
 }
 
 type ErrPulseJobTimeout struct {
+	Err       error
 	PulseType string
 	Timeout   time.Duration
 	Retries   int
-	Err       error
 }
 
 func (e *ErrPulseJobTimeout) Error() string {

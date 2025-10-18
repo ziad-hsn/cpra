@@ -97,49 +97,48 @@ func (c *PulseICMPConfig) Copy() PulseConfig {
 func (*PulseICMPConfig) isPulseConfigs() {}
 
 type Pulse struct {
-    Type        string        `yaml:"type" json:"type"`
-    Interval    time.Duration `yaml:"interval" json:"interval"`
-    Timeout     time.Duration `yaml:"timeout" json:"timeout"`
-    // Deprecated: MaxFailures kept for backward compatibility; mapped to UnhealthyThreshold.
-    MaxFailures        int           `yaml:"max_failures" json:"max_failures"`
-    UnhealthyThreshold int           `yaml:"unhealthy_threshold" json:"unhealthy_threshold"`
-    HealthyThreshold   int           `yaml:"healthy_threshold" json:"healthy_threshold"`
-    Groups      StringList    `yaml:"groups" json:"groups"`
-    Config      PulseConfig   `json:"config"`
+	Config             PulseConfig   `json:"config"`
+	Type               string        `yaml:"type" json:"type"`
+	Groups             StringList    `yaml:"groups" json:"groups"`
+	Interval           time.Duration `yaml:"interval" json:"interval"`
+	Timeout            time.Duration `yaml:"timeout" json:"timeout"`
+	MaxFailures        int           `yaml:"max_failures" json:"max_failures"`
+	UnhealthyThreshold int           `yaml:"unhealthy_threshold" json:"unhealthy_threshold"`
+	HealthyThreshold   int           `yaml:"healthy_threshold" json:"healthy_threshold"`
 }
 
 type rawPulse struct {
-    Type        string        `yaml:"type"`
-    Interval    time.Duration `yaml:"interval"`
-    Timeout     time.Duration `yaml:"timeout"`
-    Retries     int           `yaml:"retries"`
-    MaxFailures        int        `yaml:"max_failures"`
-    UnhealthyThreshold int        `yaml:"unhealthy_threshold"`
-    HealthyThreshold   int        `yaml:"healthy_threshold"`
-    Groups      StringList    `yaml:"groups"`
+	Type               string        `yaml:"type"`
+	Groups             StringList    `yaml:"groups"`
+	Interval           time.Duration `yaml:"interval"`
+	Timeout            time.Duration `yaml:"timeout"`
+	Retries            int           `yaml:"retries"`
+	MaxFailures        int           `yaml:"max_failures"`
+	UnhealthyThreshold int           `yaml:"unhealthy_threshold"`
+	HealthyThreshold   int           `yaml:"healthy_threshold"`
 }
 
 func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	var temp struct {
-		Config   yaml.Node `yaml:"config"`
 		rawPulse `yaml:",inline"`
+		Config   yaml.Node `yaml:"config"`
 	}
 	if err := value.Decode(&temp); err != nil {
 		return err
 	}
-    *p = Pulse{
-        Type:              temp.Type,
-        Interval:          temp.Interval,
-        Timeout:           temp.Timeout,
-        MaxFailures:       temp.MaxFailures,
-        UnhealthyThreshold: temp.UnhealthyThreshold,
-        HealthyThreshold:   temp.HealthyThreshold,
-        Groups:            temp.Groups,
-    }
-    // Backward compatibility: if UnhealthyThreshold not set, use MaxFailures
-    if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
-        p.UnhealthyThreshold = p.MaxFailures
-    }
+	*p = Pulse{
+		Type:               temp.Type,
+		Interval:           temp.Interval,
+		Timeout:            temp.Timeout,
+		MaxFailures:        temp.MaxFailures,
+		UnhealthyThreshold: temp.UnhealthyThreshold,
+		HealthyThreshold:   temp.HealthyThreshold,
+		Groups:             temp.Groups,
+	}
+	// Backward compatibility: if UnhealthyThreshold not set, use MaxFailures
+	if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
+		p.UnhealthyThreshold = p.MaxFailures
+	}
 	switch temp.Type {
 	case "http":
 		var c = &PulseHTTPConfig{} // FIX: Allocate on the heap
@@ -165,45 +164,45 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// UnmarshalJSON handles JSON unmarshaling for Pulse (needed for JSON parser)  
+// UnmarshalJSON handles JSON unmarshaling for Pulse (needed for JSON parser)
 func (p *Pulse) UnmarshalJSON(data []byte) error {
-    var temp struct {
-        Type        string          `json:"type"`
-        Interval    string          `json:"interval"`    // Parse as string first
-        Timeout     string          `json:"timeout"`     // Parse as string first
-        MaxFailures        int             `json:"max_failures"`
-        UnhealthyThreshold int             `json:"unhealthy_threshold"`
-        HealthyThreshold   int             `json:"healthy_threshold"`
-        Config      json.RawMessage `json:"config"`
-    }
-	
+	var temp struct {
+		Type               string          `json:"type"`
+		Interval           string          `json:"interval"`
+		Timeout            string          `json:"timeout"`
+		Config             json.RawMessage `json:"config"`
+		MaxFailures        int             `json:"max_failures"`
+		UnhealthyThreshold int             `json:"unhealthy_threshold"`
+		HealthyThreshold   int             `json:"healthy_threshold"`
+	}
+
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
-	
+
 	// Parse duration strings
 	interval, err := time.ParseDuration(temp.Interval)
 	if err != nil {
 		return fmt.Errorf("invalid interval duration %q: %w", temp.Interval, err)
 	}
-	
+
 	timeout, err := time.ParseDuration(temp.Timeout)
 	if err != nil {
 		return fmt.Errorf("invalid timeout duration %q: %w", temp.Timeout, err)
 	}
-	
-    *p = Pulse{
-        Type:               temp.Type,
-        Interval:           interval,
-        Timeout:            timeout,
-        MaxFailures:        temp.MaxFailures,
-        UnhealthyThreshold: temp.UnhealthyThreshold,
-        HealthyThreshold:   temp.HealthyThreshold,
-    }
-    if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
-        p.UnhealthyThreshold = p.MaxFailures
-    }
-	
+
+	*p = Pulse{
+		Type:               temp.Type,
+		Interval:           interval,
+		Timeout:            timeout,
+		MaxFailures:        temp.MaxFailures,
+		UnhealthyThreshold: temp.UnhealthyThreshold,
+		HealthyThreshold:   temp.HealthyThreshold,
+	}
+	if p.UnhealthyThreshold == 0 && p.MaxFailures > 0 {
+		p.UnhealthyThreshold = p.MaxFailures
+	}
+
 	switch temp.Type {
 	case "http":
 		var c = &PulseHTTPConfig{}
@@ -232,9 +231,9 @@ func (p *Pulse) UnmarshalJSON(data []byte) error {
 //// INTERVENTION TYPES
 
 type Intervention struct {
+	Target      InterventionTarget `yaml:"target"`
 	Action      string             `yaml:"action"`
 	Retries     int                `yaml:"retries"`
-	Target      InterventionTarget `yaml:"target"`
 	MaxFailures int                `yaml:"max_failures"`
 }
 type rawIntervention struct {
@@ -244,8 +243,8 @@ type rawIntervention struct {
 
 func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 	var temp struct {
-		Target          yaml.Node `yaml:"target"`
 		rawIntervention `yaml:",inline"`
+		Target          yaml.Node `yaml:"target"`
 	}
 	if err := value.Decode(&temp); err != nil {
 		return err
@@ -271,19 +270,19 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 func (i *Intervention) UnmarshalJSON(data []byte) error {
 	var temp struct {
 		Action  string          `json:"action"`
-		Retries int             `json:"retries"`
 		Target  json.RawMessage `json:"target"`
+		Retries int             `json:"retries"`
 	}
-	
+
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
-	
+
 	*i = Intervention{
 		Action:  temp.Action,
 		Retries: temp.Retries,
 	}
-	
+
 	switch temp.Action {
 	case "docker":
 		var t = &InterventionTargetDocker{}
@@ -364,9 +363,9 @@ func (c *CodeNotificationSlack) IsCodeNotification() {
 }
 
 type CodeConfig struct {
-	Dispatch bool             `yaml:"dispatch" json:"dispatch"`
+	Config   CodeNotification `yaml:"config" json:"config"`
 	Notify   string           `yaml:"notify" json:"notify"`
-	Config   CodeNotification `yaml:"config" json:"config"` // or more specific struct if desired
+	Dispatch bool             `yaml:"dispatch" json:"dispatch"`
 }
 
 type Codes map[string]CodeConfig
@@ -384,8 +383,8 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 	colors := make(map[string]CodeConfig)
 	for color, config := range codes {
 		var temp struct {
-			Config   yaml.Node `yaml:"config"`
 			rawCodes `yaml:",inline"`
+			Config   yaml.Node `yaml:"config"`
 		}
 		if err := config.Decode(&temp); err != nil {
 			return err
@@ -495,22 +494,22 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 }
 
 type Monitor struct {
+	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
+	Codes        Codes        `yaml:"codes" json:"codes"`
+	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
 	Name         string       `yaml:"name" json:"name"`
 	Enabled      bool         `yaml:"enabled" json:"enabled"`
-	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
-	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
-	Codes        Codes        `yaml:"codes" json:"codes"`
 }
 
 // UnmarshalYAML sets default values for the Monitor struct, specifically for the Enabled field.
 func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	// Create a temporary struct with a pointer to a bool for 'Enabled'
 	type TmpMonitor struct {
-		Name         string       `yaml:"name"`
-		Enabled      *bool        `yaml:"enabled"`
 		Pulse        Pulse        `yaml:"pulse_check"`
-		Intervention Intervention `yaml:"intervention,omitempty"`
+		Enabled      *bool        `yaml:"enabled"`
 		Codes        Codes        `yaml:"codes"`
+		Intervention Intervention `yaml:"intervention,omitempty"`
+		Name         string       `yaml:"name"`
 	}
 
 	var tmp TmpMonitor

@@ -11,11 +11,11 @@ import (
 
 // RecoverySystem provides system-level error recovery and health monitoring
 type RecoverySystem struct {
-	ErrorCount  int
 	LastError   time.Time
+	Mapper      *entities.EntityManager
+	ErrorCount  int
 	MaxErrors   int
 	ResetWindow time.Duration
-	Mapper      *entities.EntityManager
 }
 
 func NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem {

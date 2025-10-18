@@ -1,16 +1,19 @@
 package controller
 
 import (
-	"context"
-	"cpra/internal/controller/systems"
-	"cpra/internal/queue"
-	"fmt"
-	"log"
-	"os"
-	"sync"
-	"time"
+    "context"
+    "cpra/internal/controller/systems"
+    "cpra/internal/queue"
+    "fmt"
+    "math"
+    "log"
+    "os"
+    "strconv"
+    "sync"
+    "time"
 
 	"cpra/internal/controller/entities"
+	"cpra/internal/controller/components"
 	"cpra/internal/loader/streaming"
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"
@@ -40,45 +43,49 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 
 // OptimizedController manages the ECS world and its systems using ark-tools.
 type OptimizedController struct {
-	app    *app.App
-	world  *ecs.World
-	mapper *entities.EntityManager
-
-	pulseQueue        queue.Queue
-	interventionQueue queue.Queue
-	codeQueue         queue.Queue
-
-	pulsePool        *queue.DynamicWorkerPool
-	interventionPool *queue.DynamicWorkerPool
-	codePool         *queue.DynamicWorkerPool
-
-	config  Config
-	running bool
-
-	// Queue switching state
+	pulseQueue           queue.Queue
+	codeQueue            queue.Queue
+	interventionQueue    queue.Queue
+	pulsePool            *queue.DynamicWorkerPool
+	mapper               *entities.EntityManager
+	world                *ecs.World
+	app                  *app.App
+	interventionPool     *queue.DynamicWorkerPool
+	codePool             *queue.DynamicWorkerPool
+	config               Config
 	entityCountThreshold int64
-	useAdaptiveQueue     bool
 	queueSwitchMutex     sync.RWMutex
+	running              bool
+	useAdaptiveQueue     bool
 }
 
 // Config holds all configuration for the controller.
 type Config struct {
-	StreamingConfig streaming.StreamingConfig
-	QueueCapacity   uint64
-	WorkerConfig    queue.WorkerPoolConfig
-	BatchSize       int
-	UpdateInterval  time.Duration
+    StreamingConfig streaming.StreamingConfig
+    QueueCapacity   uint64
+    WorkerConfig    queue.WorkerPoolConfig
+    BatchSize       int
+    UpdateInterval  time.Duration
+    // Optional pre-sizing parameters; can be overridden by env vars
+    // CPRA_SIZING_TAU_MS and CPRA_SIZING_SLO_MS (milliseconds)
+    SizingServiceTime time.Duration // τ
+    SizingSLO         time.Duration // W target (end-to-end)
+    // Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
+    SizingHeadroomPct float64
 }
 
 // DefaultConfig returns a default configuration.
 func DefaultConfig() Config {
-	return Config{
-		StreamingConfig: streaming.DefaultStreamingConfig(),
-		QueueCapacity:   65536, // Must be a power of 2
-		WorkerConfig:    queue.DefaultWorkerPoolConfig(),
-		BatchSize:       1000,
-		// UpdateInterval removed - ark-tools TPS=100 controls all timing
-	}
+    return Config{
+        StreamingConfig: streaming.DefaultStreamingConfig(),
+        QueueCapacity:   65536, // Must be a power of 2
+        WorkerConfig:    queue.DefaultWorkerPoolConfig(),
+        BatchSize:       1000,
+        // UpdateInterval removed - ark-tools TPS=100 controls all timing
+        SizingServiceTime: 0,
+        SizingSLO:         0,
+        SizingHeadroomPct: 0,
+    }
 }
 
 // NewOptimizedController creates a new controller with the refactored systems using ark-tools.
@@ -160,18 +167,92 @@ func NewOptimizedController(config Config) *OptimizedController {
 
 // LoadMonitors loads monitors using the streaming loader.
 func (c *OptimizedController) LoadMonitors(ctx context.Context, filename string) error {
-	loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
-	stats, err := loader.Load(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load monitors: %w", err)
+    loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
+    stats, err := loader.Load(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to load monitors: %w", err)
 	}
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
 	// UpdateInterval logic removed - ark-tools TPS=100 handles all timing
 
-	// Check if we need to switch to AdaptiveQueue due to high entity count
-	c.CheckEntityCountAndSwitchQueue()
-	return nil
+    // Check if we need to switch to AdaptiveQueue due to high entity count
+    c.CheckEntityCountAndSwitchQueue()
+
+    // Pre-calculate worker sizing from initial configuration/world (Pulse only)
+    c.precomputeSizingFromConfig()
+    return nil
+}
+
+// precomputeSizingFromConfig computes a recommended worker count from initial world contents
+// and configured (or env) service time and latency SLO. It currently targets the Pulse pool only.
+func (c *OptimizedController) precomputeSizingFromConfig() {
+    // Determine τ (service time) and W_slo from env or config; fallback to sane defaults
+    tau := c.config.SizingServiceTime
+    if v := os.Getenv("CPRA_SIZING_TAU_MS"); v != "" {
+        if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+            tau = time.Duration(ms) * time.Millisecond
+        }
+    }
+    if tau <= 0 {
+        tau = 20 * time.Millisecond
+    }
+    wSLO := c.config.SizingSLO
+    if v := os.Getenv("CPRA_SIZING_SLO_MS"); v != "" {
+        if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+            wSLO = time.Duration(ms) * time.Millisecond
+        }
+    }
+    if wSLO <= 0 {
+        wSLO = 200 * time.Millisecond
+    }
+
+    // Compute λ for Pulse from world: sum over active monitors of 1/Interval
+    lambda := computePulseLambda(c.world)
+    if lambda <= 0 {
+        SystemLogger.Warn("[Pre-Sizing] No active pulse workload detected; skipping sizing")
+        return
+    }
+
+    cMin, w, err := queue.FindCForSLO(lambda, tau.Seconds(), wSLO.Seconds(), 0, 0, 0)
+    if err != nil {
+        SystemLogger.Warn("[Pre-Sizing] Could not compute Pulse workers: %v", err)
+        return
+    }
+    // Determine safe headroom: env CPRA_SIZING_HEADROOM_PCT (e.g., 0.15 or 15), or config, default 0.15
+    headroom := c.config.SizingHeadroomPct
+    if v := os.Getenv("CPRA_SIZING_HEADROOM_PCT"); v != "" {
+        if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+            // Accept both 0.xx and percentage like 15 or 15.0
+            if f > 1.0 { headroom = f / 100.0 } else { headroom = f }
+        }
+    }
+    if headroom <= 0 { headroom = 0.15 } // default 15%%
+    // Compute a safe recommended c with headroom
+    cSafe := int(math.Ceil(float64(cMin) * (1.0 + headroom)))
+    if cSafe <= cMin { cSafe = cMin + 1 }
+    // Predict W for cSafe (informational)
+    mu := 1.0 / tau.Seconds()
+    _, wSafe, errSafe := queue.MmcWait(lambda, mu, cSafe, 0, 0)
+    if errSafe != nil { wSafe = w } // fallback
+    SystemLogger.Info("[Pre-Sizing] Pulse: λ=%.2f/s τ=%.3fs W_slo=%.3fs => c_min=%d (W≈%.3fs), recommended c_safe=%d (+%.0f%%) (predicted W≈%.3fs)",
+        lambda, tau.Seconds(), wSLO.Seconds(), cMin, w, cSafe, headroom*100.0, wSafe)
+}
+
+// computePulseLambda estimates arrival rate (jobs/sec) from Pulse intervals of enabled monitors.
+func computePulseLambda(world *ecs.World) float64 {
+    f := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
+        Without(ecs.C[components.Disabled]())
+    q := f.Query()
+    sum := 0.0
+    for q.Next() {
+        _, cfg := q.Get()
+        if cfg == nil || cfg.Interval <= 0 {
+            continue
+        }
+        sum += 1.0 / cfg.Interval.Seconds()
+    }
+    return sum
 }
 
 // Start begins the main processing loop of the controller.
@@ -220,13 +301,45 @@ func (c *OptimizedController) PrintShutdownMetrics() {
 
 	SystemLogger.Info("=== SHUTDOWN METRICS ===")
 
-	logQueue("Pulse", c.pulseQueue.Stats())
-	logQueue("Intervention", c.interventionQueue.Stats())
-	logQueue("Code", c.codeQueue.Stats())
+    pulseQ := c.pulseQueue.Stats()
+    intQ := c.interventionQueue.Stats()
+    codeQ := c.codeQueue.Stats()
+    logQueue("Pulse", pulseQ)
+    logQueue("Intervention", intQ)
+    logQueue("Code", codeQ)
 
-	logWorkers("Pulse", c.pulsePool.Stats())
-	logWorkers("Intervention", c.interventionPool.Stats())
-	logWorkers("Code", c.codePool.Stats())
+    pulseWP := c.pulsePool.Stats()
+    intWP := c.interventionPool.Stats()
+    codeWP := c.codePool.Stats()
+    logWorkers("Pulse", pulseWP)
+    logWorkers("Intervention", intWP)
+    logWorkers("Code", codeWP)
+
+    // Sizing recommendations temporarily disabled
+    // Enable later by wrapping with a feature flag or env check
+    // sizingRecommendationsEnabled := false
+    // if sizingRecommendationsEnabled {
+    //     ca, cs := 0.0, 0.0 // default to exponential; set >0 from telemetry if available
+    //     wqTarget := c.config.WorkerConfig.TargetQueueLatency
+    //     if wqTarget <= 0 {
+    //         wqTarget = 100 * time.Millisecond
+    //     }
+    //     if rec, w, err := queue.RecommendCFromObserved(pulseQ, pulseWP, wqTarget, ca, cs); err == nil {
+    //         SystemLogger.Info("[Sizing] Pulse recommended workers: %d (predicted W≈%.3fs)", rec, w)
+    //     } else {
+    //         SystemLogger.Warn("[Sizing] Pulse sizing unavailable: %v", err)
+    //     }
+    //     if rec, w, err := queue.RecommendCFromObserved(intQ, intWP, wqTarget, ca, cs); err == nil {
+    //         SystemLogger.Info("[Sizing] Intervention recommended workers: %d (predicted W≈%.3fs)", rec, w)
+    //     } else {
+    //         SystemLogger.Warn("[Sizing] Intervention sizing unavailable: %v", err)
+    //     }
+    //     if rec, w, err := queue.RecommendCFromObserved(codeQ, codeWP, wqTarget, ca, cs); err == nil {
+    //         SystemLogger.Info("[Sizing] Code recommended workers: %d (predicted W≈%.3fs)", rec, w)
+    //     } else {
+    //         SystemLogger.Warn("[Sizing] Code sizing unavailable: %v", err)
+    //     }
+    // }
 
 	worldStats := c.world.Stats()
 	SystemLogger.Info("World: entities_used=%d recycled=%d total=%d archetypes=%d components=%d filters=%d locked=%t",

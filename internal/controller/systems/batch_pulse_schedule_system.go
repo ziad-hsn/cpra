@@ -1,9 +1,10 @@
 package systems
 
 import (
-    "time"
+	"time"
 
 	"cpra/internal/controller/components"
+
 	"github.com/mlange-42/ark/ecs"
 )
 
@@ -13,27 +14,29 @@ import (
 // This system is a critical part of the monitoring pipeline, ensuring that checks
 // are scheduled in a timely and efficient manner.
 type BatchPulseScheduleSystem struct {
-	world  *ecs.World
-	logger Logger
+	world       *ecs.World
+	logger      Logger
+	stateLogger *StateLogger
 
 	// Filter for entities that are candidates for a pulse check.
 	filter *ecs.Filter2[components.MonitorState, components.PulseConfig]
 }
 
 // NewBatchPulseScheduleSystem creates a new BatchPulseScheduleSystem.
-func NewBatchPulseScheduleSystem(world *ecs.World, logger Logger) *BatchPulseScheduleSystem {
-    return &BatchPulseScheduleSystem{
-        world:  world,
-        logger: logger,
-        filter: ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
-            Without(ecs.C[components.Disabled]()),
-    }
+func NewBatchPulseScheduleSystem(world *ecs.World, logger Logger, stateLogger *StateLogger) *BatchPulseScheduleSystem {
+	return &BatchPulseScheduleSystem{
+		world:       world,
+		logger:      logger,
+		stateLogger: stateLogger,
+		filter: ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
+			Without(ecs.C[components.Disabled]()),
+	}
 }
 
 func (s *BatchPulseScheduleSystem) Initialize(_ *ecs.World) {
-    if s.filter != nil {
-        s.filter.Register()
-    }
+	if s.filter != nil {
+		s.filter.Register()
+	}
 }
 
 // Update finds and schedules all monitors that are due for a pulse check.
@@ -44,25 +47,28 @@ func (s *BatchPulseScheduleSystem) Update(_ *ecs.World) {
 
 	now := time.Now()
 
-    for query.Next() {
-        state, config := query.Get()
+	for query.Next() {
+		entity := query.Entity()
+		state, config := query.Get()
 
-        flags := state.Flags
+		flags := state.Flags
 
-        // Disabled entities are excluded at the filter level via Without(Disabled)
-        if (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
-            continue
-        }
+		// Disabled entities are excluded at the filter level via Without(Disabled)
+		if (flags&components.StatePulseNeeded != 0) || (flags&components.StatePulsePending != 0) {
+			continue
+		}
 
-        due := (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval)
-        if !due {
-            continue
-        }
+		due := (flags&components.StatePulseFirstCheck != 0) || (now.Sub(state.LastCheckTime) >= config.Interval)
+		if !due {
+			continue
+		}
 
-        state.Flags |= components.StatePulseNeeded
-        state.Flags &^= components.StatePulseFirstCheck
-        scheduledCount++
-    }
+		oldState := *state
+		state.Flags |= components.StatePulseNeeded
+		state.Flags &^= components.StatePulseFirstCheck
+		s.stateLogger.LogTransition(entity, oldState, *state)
+		scheduledCount++
+	}
 
 	if scheduledCount > 0 {
 		s.logger.LogSystemPerformance("BatchPulseScheduleSystem", time.Since(start), scheduledCount)

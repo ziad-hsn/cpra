@@ -3,6 +3,7 @@ package queue
 import (
 	"cpra/internal/jobs"
 	"errors"
+	"runtime"
 	"sync/atomic"
 	"time"
 )
@@ -47,23 +48,38 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 	}
 
 	now := time.Now()
+	capacity := q.capacity.Load() // Cache capacity to avoid repeated loads
+	backoff := uint64(1)
+	maxBackoff := uint64(1024)
+
 	for {
 		head := q.head.Load()
 		tail := q.tail.Load()
 
-		if tail-head >= q.capacity.Load() {
+		// Check capacity before attempting CAS to avoid unnecessary operations
+		if tail-head >= capacity {
 			return ErrQueueFull // Queue is full
 		}
 
 		// Attempt to claim the next spot
-		if q.tail.CompareAndSwap(tail, tail+1) {
+		newTail := tail + 1
+		if q.tail.CompareAndSwap(tail, newTail) {
 			if !isNilJob(job) {
 				job.SetEnqueueTime(now)
 			}
-			q.buffer[tail&(q.capacity.Load()-1)] = job
+			q.buffer[tail&(capacity-1)] = job
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
 			return nil
+		}
+		// CAS failed - another producer got there first, use exponential backoff
+		if backoff < maxBackoff {
+			for i := uint64(0); i < backoff; i++ {
+				runtime.Gosched()
+			}
+			backoff <<= 1
+		} else {
+			runtime.Gosched()
 		}
 	}
 }
@@ -89,29 +105,42 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 	n := uint64(len(convertedJobs))
 
 	now := time.Now()
+	capacity := q.capacity.Load() // Cache capacity
+	backoff := uint64(1)
+	maxBackoff := uint64(1024)
+
 	for {
 		head := q.head.Load()
 		tail := q.tail.Load()
-
-		if tail-head+n > q.capacity.Load() {
+		available := capacity - (tail - head)
+		if available < n {
 			return ErrQueueFull
 		}
-
-		// Atomically claim a slot for the entire batch
-		if q.tail.CompareAndSwap(tail, tail+n) {
-			// Once the slot is claimed, we can write the batch without further atomics
+		// Atomically claim slots for the entire batch
+		newTail := tail + n
+		if q.tail.CompareAndSwap(tail, newTail) {
+			// Once slots are claimed atomically, we can safely write
+			mask := capacity - 1
 			for i := uint64(0); i < n; i++ {
 				job := convertedJobs[i]
 				if !isNilJob(job) {
 					job.SetEnqueueTime(now)
 				}
-				q.buffer[(tail+i)&(q.capacity.Load()-1)] = job
+				q.buffer[(tail+i)&mask] = job
 			}
 			q.enqueuedCount.Add(int64(n))
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
 			return nil
 		}
-		// If CAS fails, another producer got there first. Loop and try again.
+		// CAS failed - use exponential backoff
+		if backoff < maxBackoff {
+			for i := uint64(0); i < backoff; i++ {
+				runtime.Gosched()
+			}
+			backoff <<= 1
+		} else {
+			runtime.Gosched()
+		}
 	}
 }
 
@@ -121,35 +150,37 @@ func (q *AdaptiveQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 		return nil, ErrQueueClosed
 	}
 
+	capacity := q.capacity.Load() // Cache capacity
+	backoff := uint64(1)
+	maxBackoff := uint64(1024)
+
 	for {
 		head := q.head.Load()
 		tail := q.tail.Load()
-
 		if head >= tail {
 			return nil, nil // Queue is empty
 		}
-
 		n := tail - head
 		if n > uint64(maxSize) {
 			n = uint64(maxSize)
 		}
-
-		// Atomically claim the batch for dequeuing
-		if q.head.CompareAndSwap(head, head+n) {
+		// Atomically claim batch for dequeuing
+		newHead := head + n
+		if q.head.CompareAndSwap(head, newHead) {
 			batch := make([]jobs.Job, n)
 			now := time.Now()
+			mask := capacity - 1
 			for i := uint64(0); i < n; i++ {
-				batch[i] = q.buffer[(head+i)&(q.capacity.Load()-1)]
-				// Nil out the buffer slot to help the GC
-				q.buffer[(head+i)&(q.capacity.Load()-1)] = nil
-
+				idx := (head + i) & mask
+				batch[i] = q.buffer[idx]
+				q.buffer[idx] = nil // Help GC
 				enqueueTime := batch[i].GetEnqueueTime()
 				if !enqueueTime.IsZero() {
 					wait := now.Sub(enqueueTime)
 					q.totalQueueWaitNanos.Add(int64(wait))
 					for {
 						currentMax := q.maxQueueWaitNanos.Load()
-						if waitNs := int64(wait); waitNs <= currentMax {
+						if int64(wait) <= currentMax {
 							break
 						}
 						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
@@ -162,7 +193,15 @@ func (q *AdaptiveQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 			q.lastDequeueUnixNano.Store(now.UnixNano())
 			return batch, nil
 		}
-		// If CAS fails, another consumer got there first. Loop and try again.
+		// CAS failed - backoff
+		if backoff < maxBackoff {
+			for i := uint64(0); i < backoff; i++ {
+				runtime.Gosched()
+			}
+			backoff <<= 1
+		} else {
+			runtime.Gosched()
+		}
 	}
 }
 
@@ -172,18 +211,19 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 		return nil, ErrQueueClosed
 	}
 
+	capacity := q.capacity.Load()
+	backoff := uint64(1)
+	maxBackoff := uint64(1024)
+
 	for {
 		head := q.head.Load()
 		tail := q.tail.Load()
-
 		if head >= tail {
 			return nil, nil // Queue is empty
 		}
-
-		job := q.buffer[head&(q.capacity.Load()-1)]
-
-		// Attempt to move the head pointer
-		if q.head.CompareAndSwap(head, head+1) {
+		job := q.buffer[head&(capacity-1)]
+		newHead := head + 1
+		if q.head.CompareAndSwap(head, newHead) {
 			now := time.Now()
 			enqueueTime := job.GetEnqueueTime()
 			if !enqueueTime.IsZero() {
@@ -191,7 +231,7 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 				q.totalQueueWaitNanos.Add(int64(wait))
 				for {
 					currentMax := q.maxQueueWaitNanos.Load()
-					if waitNs := int64(wait); waitNs <= currentMax {
+					if int64(wait) <= currentMax {
 						break
 					}
 					if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
@@ -202,6 +242,14 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 			q.dequeuedCount.Add(1)
 			q.lastDequeueUnixNano.Store(now.UnixNano())
 			return job, nil
+		}
+		if backoff < maxBackoff {
+			for i := uint64(0); i < backoff; i++ {
+				runtime.Gosched()
+			}
+			backoff <<= 1
+		} else {
+			runtime.Gosched()
 		}
 	}
 }
@@ -219,7 +267,6 @@ func (q *AdaptiveQueue) Close() {
 func isNilJob(job jobs.Job) bool { return job == nil || job.IsNil() }
 
 // Stats returns the current statistics for the queue.
-// Note: This is a simplified version. A full implementation would track more metrics.
 func (q *AdaptiveQueue) Stats() Stats {
 	head := q.head.Load()
 	tail := q.tail.Load()
@@ -249,4 +296,9 @@ func (q *AdaptiveQueue) Stats() Stats {
 		SampleWindow: elapsed,
 	}
 	return stats
+}
+
+// EnsureCapacity is a no-op for AdaptiveQueue as it has a fixed capacity.
+func (q *AdaptiveQueue) EnsureCapacity(targetCap int) {
+	// No-op: AdaptiveQueue has fixed capacity set at construction
 }

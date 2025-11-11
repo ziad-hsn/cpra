@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"sync"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,36 +24,36 @@ import (
 
 // Global ICMP pinger pool (Option B): host-keyed reusable pingers with bounded concurrency.
 var (
-    icmpPingerPool sync.Map            // map[string]*pooledPinger
-    icmpPingerSem  = make(chan struct{}, 2048) // limit concurrent ICMP executions
+	icmpPingerPool sync.Map                    // map[string]*pooledPinger
+	icmpPingerSem  = make(chan struct{}, 2048) // limit concurrent ICMP executions
 )
 
 type pooledPinger struct {
-    mu   sync.Mutex
-    host string
-    pr   *ping.Pinger
+	mu   sync.Mutex
+	host string
+	pr   *ping.Pinger
 }
 
 func getPooledPinger(host string) (*pooledPinger, error) {
-    if v, ok := icmpPingerPool.Load(host); ok {
-        return v.(*pooledPinger), nil
-    }
-    pr, err := ping.NewPinger(host)
-    if err != nil {
-        return nil, err
-    }
-    switch runtime.GOOS {
-    case "linux":
-        pr.SetPrivileged(false)
-    default:
-        pr.SetPrivileged(true)
-    }
-    pp := &pooledPinger{host: host, pr: pr}
-    actual, _ := icmpPingerPool.LoadOrStore(host, pp)
-    if actual != pp {
-        pp = actual.(*pooledPinger)
-    }
-    return pp, nil
+	if v, ok := icmpPingerPool.Load(host); ok {
+		return v.(*pooledPinger), nil
+	}
+	pr, err := ping.NewPinger(host)
+	if err != nil {
+		return nil, err
+	}
+	switch runtime.GOOS {
+	case "linux":
+		pr.SetPrivileged(false)
+	default:
+		pr.SetPrivileged(true)
+	}
+	pp := &pooledPinger{host: host, pr: pr}
+	actual, _ := icmpPingerPool.LoadOrStore(host, pp)
+	if actual != pp {
+		pp = actual.(*pooledPinger)
+	}
+	return pp, nil
 }
 
 // Job defines the interface for any executable task in the system.
@@ -71,38 +71,38 @@ type Job interface {
 func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 	timeout := pulseSchema.Timeout
 	switch cfg := pulseSchema.Config.(type) {
-    case *schema.PulseHTTPConfig:
-        return &PulseHTTPJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            URL:     cfg.Url,
-            Method:  cfg.Method,
-            Timeout: timeout,
-            Retries: cfg.Retries,
-            Client:  *GetHTTPClient(timeout),
-            payload: map[string]interface{}{"type": "pulse", "driver": "http"},
-        }, nil
-    case *schema.PulseTCPConfig:
-        return &PulseTCPJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            Host:    cfg.Host,
-            Port:    cfg.Port,
-            Timeout: timeout,
-            Retries: cfg.Retries,
-            payload: map[string]interface{}{"type": "pulse", "driver": "tcp"},
-        }, nil
-    case *schema.PulseICMPConfig:
-        return &PulseICMPJob{
-            ID:              uuid.New(),
-            Entity:          jobID,
-            Host:            cfg.Host,
-            Timeout:         timeout,
-            Count:           cfg.Count,
-            Retries:         cfg.Retries,
-            IgnorePrivilege: cfg.Privilege,
-            payload:         map[string]interface{}{"type": "pulse", "driver": "icmp"},
-        }, nil
+	case *schema.PulseHTTPConfig:
+		return &PulseHTTPJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			URL:     cfg.Url,
+			Method:  cfg.Method,
+			Timeout: timeout,
+			Retries: cfg.Retries,
+			Client:  *GetHTTPClient(timeout),
+			payload: map[string]interface{}{"type": "pulse", "driver": "http"},
+		}, nil
+	case *schema.PulseTCPConfig:
+		return &PulseTCPJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			Host:    cfg.Host,
+			Port:    cfg.Port,
+			Timeout: timeout,
+			Retries: cfg.Retries,
+			payload: map[string]interface{}{"type": "pulse", "driver": "tcp"},
+		}, nil
+	case *schema.PulseICMPConfig:
+		return &PulseICMPJob{
+			ID:              uuid.New(),
+			Entity:          jobID,
+			Host:            cfg.Host,
+			Timeout:         timeout,
+			Count:           cfg.Count,
+			Retries:         cfg.Retries,
+			IgnorePrivilege: cfg.Privilege,
+			payload:         map[string]interface{}{"type": "pulse", "driver": "icmp"},
+		}, nil
 
 	// ... other pulse job types
 	default:
@@ -115,13 +115,13 @@ func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Ent
 	retries := interventionSchema.Retries
 	switch interventionSchema.Action {
 	case "docker":
-        return &InterventionDockerJob{
-            ID:        uuid.New(),
-            Entity:    jobID,
-            Container: interventionSchema.Target.(*schema.InterventionTargetDocker).Container,
-            Retries:   retries,
-            Timeout:   interventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
-        }, nil
+		return &InterventionDockerJob{
+			ID:        uuid.New(),
+			Entity:    jobID,
+			Container: interventionSchema.Target.(*schema.InterventionTargetDocker).Container,
+			Retries:   retries,
+			Timeout:   interventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown intervention action : %T for job creation", interventionSchema.Action)
 	}
@@ -220,52 +220,52 @@ func buildCodeNotificationMessage(monitor string, tpl codeAlertTemplate) string 
 
 // CreateCodeJob creates a new code alert job based on the provided configuration.
 func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, color string) (Job, error) {
-    template := codeAlertTemplateFor(color)
-    colorClone := color
-    monitorClone := monitor
+	template := codeAlertTemplateFor(color)
+	colorClone := color
+	monitorClone := monitor
 
 	switch config.Notify {
 	case "log":
-        return &CodeLogJob{
-            ID:        uuid.New(),
-            File:      config.Config.(*schema.CodeNotificationLog).File,
-            Entity:    jobID,
-            Monitor:   monitorClone,
-            Color:     colorClone,
-            Status:    template.Status,
-            Severity:  template.Severity,
-            Summary:   template.Summary,
-            Action:    template.Action,
-            NextSteps: template.NextSteps,
-        }, nil
+		return &CodeLogJob{
+			ID:        uuid.New(),
+			File:      config.Config.(*schema.CodeNotificationLog).File,
+			Entity:    jobID,
+			Monitor:   monitorClone,
+			Color:     colorClone,
+			Status:    template.Status,
+			Severity:  template.Severity,
+			Summary:   template.Summary,
+			Action:    template.Action,
+			NextSteps: template.NextSteps,
+		}, nil
 	case "pagerduty":
-        return &CodePagerDutyJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            Monitor: monitorClone,
-            Color:   colorClone,
-        }, nil
+		return &CodePagerDutyJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			Monitor: monitorClone,
+			Color:   colorClone,
+		}, nil
 	case "slack":
-        return &CodeSlackJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            Monitor: monitorClone,
-            Color:   colorClone,
-        }, nil
+		return &CodeSlackJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			Monitor: monitorClone,
+			Color:   colorClone,
+		}, nil
 	case "email":
-        return &CodeEmailJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            Monitor: monitorClone,
-            Color:   colorClone,
-        }, nil
+		return &CodeEmailJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			Monitor: monitorClone,
+			Color:   colorClone,
+		}, nil
 	case "webhook":
-        return &CodeWebhookJob{
-            ID:      uuid.New(),
-            Entity:  jobID,
-            Monitor: monitorClone,
-            Color:   colorClone,
-        }, nil
+		return &CodeWebhookJob{
+			ID:      uuid.New(),
+			Entity:  jobID,
+			Monitor: monitorClone,
+			Color:   colorClone,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown code notification type: %s for job creation", config.Notify)
 	}
@@ -282,14 +282,14 @@ type PulseHTTPJob struct {
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
-    ID          uuid.UUID
-    payload     map[string]interface{}
+	ID          uuid.UUID
+	payload     map[string]interface{}
 }
 
 func (p *PulseHTTPJob) Execute() Result {
-    var lastErr error
-    attempts := p.Retries + 1
-    payload := p.payload
+	var lastErr error
+	attempts := p.Retries + 1
+	payload := p.payload
 
 	for i := 0; i < attempts; i++ {
 		req, err := http.NewRequest(p.Method, p.URL, nil)
@@ -329,12 +329,12 @@ type PulseTCPJob struct {
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
-    ID          uuid.UUID
-    payload     map[string]interface{}
+	ID          uuid.UUID
+	payload     map[string]interface{}
 }
 
 func (p *PulseTCPJob) Execute() Result {
-    payload := p.payload
+	payload := p.payload
 	attempts := p.Retries + 1
 	if attempts < 1 {
 		attempts = 1
@@ -373,104 +373,104 @@ func (p *PulseTCPJob) IsNil() bool                { return p == nil }
 
 // PulseICMPJob is a placeholder for an ICMP pulse job.
 type PulseICMPJob struct {
-    EnqueueTime     time.Time
-    StartTime       time.Time
-    Host            string
-    Timeout         time.Duration
-    Count           int
-    Retries         int
-    Entity          ecs.Entity
-    ID              uuid.UUID
-    IgnorePrivilege bool
-    payload         map[string]interface{}
+	EnqueueTime     time.Time
+	StartTime       time.Time
+	Host            string
+	Timeout         time.Duration
+	Count           int
+	Retries         int
+	Entity          ecs.Entity
+	ID              uuid.UUID
+	IgnorePrivilege bool
+	payload         map[string]interface{}
 }
 
 //var errICMPPrivilege = errors.New("icmp requires elevated privileges")
 
 func (p *PulseICMPJob) Execute() Result {
-    // Concurrency bound to avoid socket pressure
-    icmpPingerSem <- struct{}{}
-    defer func() { <-icmpPingerSem }()
+	// Concurrency bound to avoid socket pressure
+	icmpPingerSem <- struct{}{}
+	defer func() { <-icmpPingerSem }()
 
-    payload := p.payload
-    // Reset per-execution dynamic fields
-    delete(payload, "privilege_ignored")
+	payload := p.payload
+	// Reset per-execution dynamic fields
+	delete(payload, "privilege_ignored")
 
-    attempts := p.Retries + 1
-    if attempts < 1 {
-        attempts = 1
-    }
+	attempts := p.Retries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
 
-    count := p.Count
-    if count <= 0 {
-        count = 1
-    }
-    payload["count"] = count
+	count := p.Count
+	if count <= 0 {
+		count = 1
+	}
+	payload["count"] = count
 
-    // Get pooled pinger for host
-    pp, err := getPooledPinger(p.Host)
-    if err != nil {
-        return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
-    }
+	// Get pooled pinger for host
+	pp, err := getPooledPinger(p.Host)
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+	}
 
-    var lastErr error
-    for attempt := 0; attempt < attempts; attempt++ {
-        pp.mu.Lock()
-        pr := pp.pr
-        pr.Count = count
-        if p.Timeout > 0 {
-            pr.Timeout = p.Timeout
-        } else {
-            pr.Timeout = time.Duration(count)*time.Second + 500*time.Millisecond
-        }
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		pp.mu.Lock()
+		pr := pp.pr
+		pr.Count = count
+		if p.Timeout > 0 {
+			pr.Timeout = p.Timeout
+		} else {
+			pr.Timeout = time.Duration(count)*time.Second + 500*time.Millisecond
+		}
 
-        if err := pr.Run(); err == nil {
-            stats := pr.Statistics()
-            pp.mu.Unlock()
-            if stats != nil && stats.PacketsRecv > 0 {
-                return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
-            }
-            lastErr = fmt.Errorf("no packets received")
-        } else {
-            // privilege fallback
-            if !pr.Privileged() && isPrivilegeError(err) {
-                pr.SetPrivileged(true)
-                if err2 := pr.Run(); err2 == nil {
-                    stats := pr.Statistics()
-                    pp.mu.Unlock()
-                    if stats != nil && stats.PacketsRecv > 0 {
-                        return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
-                    }
-                    lastErr = fmt.Errorf("no packets received")
-                } else {
-                    pp.mu.Unlock()
-                    if p.IgnorePrivilege && isPrivilegeError(err2) {
-                        payload["privilege_ignored"] = true
-                        return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
-                    }
-                    lastErr = err2
-                }
-            } else {
-                pp.mu.Unlock()
-                if p.IgnorePrivilege && isPrivilegeError(err) {
-                    payload["privilege_ignored"] = true
-                    return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
-                }
-                lastErr = err
-            }
-        }
+		if err := pr.Run(); err == nil {
+			stats := pr.Statistics()
+			pp.mu.Unlock()
+			if stats != nil && stats.PacketsRecv > 0 {
+				return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
+			}
+			lastErr = fmt.Errorf("no packets received")
+		} else {
+			// privilege fallback
+			if !pr.Privileged() && isPrivilegeError(err) {
+				pr.SetPrivileged(true)
+				if err2 := pr.Run(); err2 == nil {
+					stats := pr.Statistics()
+					pp.mu.Unlock()
+					if stats != nil && stats.PacketsRecv > 0 {
+						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
+					}
+					lastErr = fmt.Errorf("no packets received")
+				} else {
+					pp.mu.Unlock()
+					if p.IgnorePrivilege && isPrivilegeError(err2) {
+						payload["privilege_ignored"] = true
+						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
+					}
+					lastErr = err2
+				}
+			} else {
+				pp.mu.Unlock()
+				if p.IgnorePrivilege && isPrivilegeError(err) {
+					payload["privilege_ignored"] = true
+					return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
+				}
+				lastErr = err
+			}
+		}
 
-        if attempt < attempts-1 {
-            time.Sleep(50 * time.Millisecond)
-        }
-    }
+		if attempt < attempts-1 {
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
 
-    return Result{
-        ID:      p.ID,
-        Ent:     p.Entity,
-        Err:     fmt.Errorf("icmp check failed for %s after %d attempt(s): %w", p.Host, attempts, lastErr),
-        Payload: payload,
-    }
+	return Result{
+		ID:      p.ID,
+		Ent:     p.Entity,
+		Err:     fmt.Errorf("icmp check failed for %s after %d attempt(s): %w", p.Host, attempts, lastErr),
+		Payload: payload,
+	}
 }
 
 // isPrivilegeError checks common privilege-related error strings from pinger
@@ -537,44 +537,44 @@ func (i *InterventionDockerJob) IsNil() bool                { return i == nil }
 // --- Code Job Implementations ---
 
 type CodeLogJob struct {
-    EnqueueTime time.Time
-    StartTime   time.Time
-    Status      string
-    Monitor     string
-    Color       string
-    Severity    string
-    Summary     string
-    Action      string
-    NextSteps   string
-    File        string
-    Entity      ecs.Entity
-    ID          uuid.UUID
+	EnqueueTime time.Time
+	StartTime   time.Time
+	Status      string
+	Monitor     string
+	Color       string
+	Severity    string
+	Summary     string
+	Action      string
+	NextSteps   string
+	File        string
+	Entity      ecs.Entity
+	ID          uuid.UUID
 }
 
 func (c *CodeLogJob) Execute() Result {
-    payload := map[string]interface{}{
-        "type":     "code",
-        "color":    c.Color,
-        "severity": c.Severity,
-        "status":   c.Status,
-    }
+	payload := map[string]interface{}{
+		"type":     "code",
+		"color":    c.Color,
+		"severity": c.Severity,
+		"status":   c.Status,
+	}
 
-    // Build message on-demand
-    tpl := codeAlertTemplate{
-        Title:     codeAlertTemplateFor(c.Color).Title,
-        Status:    c.Status,
-        Severity:  c.Severity,
-        Summary:   c.Summary,
-        Action:    c.Action,
-        NextSteps: c.NextSteps,
-    }
-    message := buildCodeNotificationMessage(c.Monitor, tpl)
+	// Build message on-demand
+	tpl := codeAlertTemplate{
+		Title:     codeAlertTemplateFor(c.Color).Title,
+		Status:    c.Status,
+		Severity:  c.Severity,
+		Summary:   c.Summary,
+		Action:    c.Action,
+		NextSteps: c.NextSteps,
+	}
+	message := buildCodeNotificationMessage(c.Monitor, tpl)
 
-    f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-    if err != nil {
-        return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-    }
-    defer func() { _ = f.Close() }()
+	f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
+	defer func() { _ = f.Close() }()
 
 	now := time.Now().UTC()
 	entry := struct {
@@ -588,20 +588,20 @@ func (c *CodeLogJob) Execute() Result {
 		Summary   string `json:"summary"`
 		Action    string `json:"action"`
 		NextSteps string `json:"next_steps,omitempty"`
-        Message   string `json:"message,omitempty"`
-    }{
-        Timestamp: now.Format(time.RFC3339Nano),
-        Type:      "code",
-        Monitor:   c.Monitor,
-        JobID:     c.ID.String(),
-        Color:     c.Color,
-        Status:    c.Status,
-        Severity:  c.Severity,
-        Summary:   c.Summary,
-        Action:    c.Action,
-        NextSteps: c.NextSteps,
-        Message:   message,
-    }
+		Message   string `json:"message,omitempty"`
+	}{
+		Timestamp: now.Format(time.RFC3339Nano),
+		Type:      "code",
+		Monitor:   c.Monitor,
+		JobID:     c.ID.String(),
+		Color:     c.Color,
+		Status:    c.Status,
+		Severity:  c.Severity,
+		Summary:   c.Summary,
+		Action:    c.Action,
+		NextSteps: c.NextSteps,
+		Message:   message,
+	}
 
 	line, err := json.Marshal(entry)
 	if err != nil {

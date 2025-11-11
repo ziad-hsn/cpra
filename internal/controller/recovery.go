@@ -2,7 +2,6 @@ package controller
 
 import (
 	"cpra/internal/controller/entities"
-	"log"
 	"runtime/debug"
 	"time"
 
@@ -32,13 +31,16 @@ func (r *RecoverySystem) SafeSystemUpdate(systemName string, updateFunc func() e
 			r.ErrorCount++
 			r.LastError = time.Now()
 
-			log.Printf("PANIC in system %s: %v", systemName, recovered)
-			log.Printf("Stack trace: %s", debug.Stack())
+			if SystemLogger != nil {
+				SystemLogger.Error("PANIC in system %s: %v", systemName, recovered)
+				SystemLogger.Error("Stack trace: %s", debug.Stack())
+			}
 
 			// Circuit breaker logic
 			if r.ErrorCount >= r.MaxErrors {
-				log.Printf("System %s exceeded max errors (%d), entering degraded mode",
-					systemName, r.MaxErrors)
+				if SystemLogger != nil {
+					SystemLogger.Error("System %s exceeded max errors (%d), entering degraded mode", systemName, r.MaxErrors)
+				}
 			}
 		}
 	}()
@@ -66,11 +68,15 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 	if r.Mapper != nil {
 		state := r.Mapper.GetMonitorState(entity)
 		if state == nil {
-			log.Printf("Entity %v missing MonitorState component", entity)
+			if SystemLogger != nil {
+				SystemLogger.Warn("Entity %v missing MonitorState component", entity)
+			}
 			return false
 		}
 		if state.Name == "" {
-			log.Printf("Entity %v missing Name component", entity)
+			if SystemLogger != nil {
+				SystemLogger.Warn("Entity %v missing Name component", entity)
+			}
 			return false
 		}
 	}
@@ -82,5 +88,7 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 func (r *RecoverySystem) CleanupOrphanedComponents(w *ecs.World) {
 	// This would need specific implementation based on component tracking
 	// For now, log the cleanup intent
-	log.Printf("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
+	if SystemLogger != nil {
+		SystemLogger.Info("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
+	}
 }

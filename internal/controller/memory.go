@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"log"
 	"runtime"
 	"runtime/debug"
 	"time"
@@ -32,10 +31,12 @@ func (m *MemoryManager) MonitorMemory() {
 	usagePercent := float64(currentUsage) / float64(m.maxMemory)
 
 	if usagePercent > m.alertThreshold {
-		log.Printf("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
-			usagePercent*100,
-			currentUsage>>20,
-			m.maxMemory>>20)
+		if SystemLogger != nil {
+			SystemLogger.Warn("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
+				usagePercent*100,
+				currentUsage>>20,
+				m.maxMemory>>20)
+		}
 
 		// Force garbage collection
 		m.ForceGC()
@@ -56,8 +57,10 @@ func (m *MemoryManager) ForceGC() {
 	after := m.memoryStats.Alloc
 
 	freed := before - after
-	log.Printf("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
-		freed>>20, before>>20, after>>20)
+	if SystemLogger != nil {
+		SystemLogger.Info("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
+			freed>>20, before>>20, after>>20)
+	}
 
 	m.lastGC = time.Now()
 }
@@ -71,17 +74,20 @@ func (m *MemoryManager) GetMemoryStats() runtime.MemStats {
 // SetMemoryLimit configures runtime memory limits
 func (m *MemoryManager) SetMemoryLimit() {
 	debug.SetMemoryLimit(int64(m.maxMemory))
-	log.Printf("Memory limit set to: %d GB", m.maxMemory>>30)
+	if SystemLogger != nil {
+		SystemLogger.Info("Memory limit set to: %d GB", m.maxMemory>>30)
+	}
 }
 
 // LogMemoryStats provides detailed memory information
 func (m *MemoryManager) LogMemoryStats() {
 	stats := m.GetMemoryStats()
-
-	log.Printf("Memory Stats:")
-	log.Printf("  Alloc: %d MB", stats.Alloc>>20)
-	log.Printf("  TotalAlloc: %d MB", stats.TotalAlloc>>20)
-	log.Printf("  Sys: %d MB", stats.Sys>>20)
-	log.Printf("  NumGC: %d", stats.NumGC)
-	log.Printf("  GCCPUFraction: %.4f", stats.GCCPUFraction)
+	if SystemLogger != nil {
+		SystemLogger.Info("Memory Stats:")
+		SystemLogger.Info("  Alloc: %d MB", stats.Alloc>>20)
+		SystemLogger.Info("  TotalAlloc: %d MB", stats.TotalAlloc>>20)
+		SystemLogger.Info("  Sys: %d MB", stats.Sys>>20)
+		SystemLogger.Info("  NumGC: %d", stats.NumGC)
+		SystemLogger.Info("  GCCPUFraction: %.4f", stats.GCCPUFraction)
+	}
 }

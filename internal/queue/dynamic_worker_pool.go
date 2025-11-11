@@ -40,7 +40,7 @@ type WorkerPoolStats struct {
 
 // NewResultRouter creates a new result router with buffered channels.
 func NewResultRouter(config WorkerPoolConfig, logger *log.Logger) *ResultRouter {
-	bufferSize := config.MaxWorkers // Buffer size based on max workers
+	bufferSize := config.ResultChannelDepth
 	return &ResultRouter{
 		PulseResultChan:        make(chan []jobs.Result, bufferSize),
 		InterventionResultChan: make(chan []jobs.Result, bufferSize),
@@ -114,21 +114,22 @@ func (r *ResultRouter) Close() {
 // DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
 // It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
-	queue          Queue
-	ctx            context.Context
-	cancel         context.CancelFunc
-	antsPool       *ants.PoolWithFunc
-	logger         *log.Logger
-	resultChan     chan jobs.Result
-	router         *ResultRouter
-	config         WorkerPoolConfig
-	wg             sync.WaitGroup
-	tasksSubmitted atomic.Int64
-	tasksCompleted atomic.Int64
-	scalingEvents  atomic.Int64
-	lastTarget     atomic.Int64
-	lastScaleTime  atomic.Int64
-	stopping       atomic.Int32
+	queue           Queue
+	ctx             context.Context
+	cancel          context.CancelFunc
+	antsPool        *ants.PoolWithFunc
+	logger          *log.Logger
+	resultChan      chan jobs.Result
+	router          *ResultRouter
+	config          WorkerPoolConfig
+	wg              sync.WaitGroup
+	tasksSubmitted  atomic.Int64
+	tasksCompleted  atomic.Int64
+	scalingEvents   atomic.Int64
+	lastTarget      atomic.Int64
+	lastScaleTime   atomic.Int64
+	stopping        atomic.Int32
+	resultBatchPool sync.Pool
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
@@ -138,6 +139,7 @@ type WorkerPoolConfig struct {
 	AdjustmentInterval time.Duration
 	ResultBatchSize    int
 	ResultBatchTimeout time.Duration
+	ResultChannelDepth int
 	TargetQueueLatency time.Duration
 	// Ants-specific options
 	PreAlloc         bool
@@ -149,16 +151,17 @@ type WorkerPoolConfig struct {
 // DefaultWorkerPoolConfig returns a default configuration for the worker pool.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
-		MinWorkers:         5, // Reduced from 10 to allow smaller workloads
-		MaxWorkers:         120000,
-		AdjustmentInterval: 5 * time.Second, // Increased from 5s to reduce oscillation
-		ResultBatchSize:    1000,
+		MinWorkers:         5,
+		MaxWorkers:         8192,
+		AdjustmentInterval: 5 * time.Second,
+		ResultBatchSize:    512,
 		ResultBatchTimeout: 10 * time.Millisecond,
+		ResultChannelDepth: 2048,
 		TargetQueueLatency: 100 * time.Millisecond,
 		PreAlloc:           false,
 		NonBlocking:        false,
 		MaxBlockingTasks:   0,
-		ExpiryDuration:     5 * time.Minute, // Better aligned with job timeouts (1m-1h)
+		ExpiryDuration:     5 * time.Minute,
 	}
 }
 
@@ -171,7 +174,19 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		config.MaxWorkers = config.MinWorkers
 	}
 	if config.ResultBatchSize <= 0 {
-		config.ResultBatchSize = config.MaxWorkers
+		config.ResultBatchSize = 256
+	}
+	if config.ResultChannelDepth <= 0 {
+		config.ResultChannelDepth = config.ResultBatchSize * 4
+	}
+	if config.ResultChannelDepth > config.MaxWorkers {
+		config.ResultChannelDepth = config.MaxWorkers
+	}
+	if config.ResultChannelDepth <= 0 {
+		config.ResultChannelDepth = config.MinWorkers * 2
+	}
+	if config.ResultChannelDepth < config.ResultBatchSize {
+		config.ResultChannelDepth = config.ResultBatchSize
 	}
 	if config.TargetQueueLatency <= 0 {
 		config.TargetQueueLatency = 100 * time.Millisecond
@@ -183,10 +198,13 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		queue:      q,
 		logger:     logger,
 		config:     config,
-		resultChan: make(chan jobs.Result, config.MaxWorkers),
+		resultChan: make(chan jobs.Result, config.ResultChannelDepth),
 		router:     NewResultRouter(config, logger),
 		ctx:        ctx,
 		cancel:     cancel,
+	}
+	pool.resultBatchPool.New = func() any {
+		return make([]jobs.Result, 0, pool.config.ResultBatchSize)
 	}
 
 	workerFunc := func(job interface{}) {
@@ -345,7 +363,7 @@ func (p *DynamicWorkerPool) dispatcher() {
 func (p *DynamicWorkerPool) resultProcessor() {
 	defer p.wg.Done()
 
-	batch := make([]jobs.Result, 0, p.config.ResultBatchSize)
+	batch := p.getResultBatch()
 	ticker := time.NewTicker(p.config.ResultBatchTimeout)
 	defer ticker.Stop()
 
@@ -355,12 +373,14 @@ func (p *DynamicWorkerPool) resultProcessor() {
 			// Route any remaining results before shutting down
 			if len(batch) > 0 {
 				p.router.RouteResults(batch)
+				p.putResultBatch(batch)
 			}
 			return
 		case result, ok := <-p.resultChan:
 			if !ok { // resultChan was closed
 				if len(batch) > 0 {
 					p.router.RouteResults(batch)
+					p.putResultBatch(batch)
 				}
 				return
 			}
@@ -368,7 +388,8 @@ func (p *DynamicWorkerPool) resultProcessor() {
 			batch = append(batch, result)
 			if len(batch) >= p.config.ResultBatchSize {
 				p.router.RouteResults(batch)
-				batch = make([]jobs.Result, 0, p.config.ResultBatchSize)
+				p.putResultBatch(batch)
+				batch = p.getResultBatch()
 				// Reset the ticker to prevent immediate firing
 				ticker.Reset(p.config.ResultBatchTimeout)
 			}
@@ -376,10 +397,25 @@ func (p *DynamicWorkerPool) resultProcessor() {
 			// Route partial batches on timeout
 			if len(batch) > 0 {
 				p.router.RouteResults(batch)
-				batch = make([]jobs.Result, 0, p.config.ResultBatchSize)
+				p.putResultBatch(batch)
+				batch = p.getResultBatch()
 			}
 		}
 	}
+}
+
+func (p *DynamicWorkerPool) getResultBatch() []jobs.Result {
+	if v := p.resultBatchPool.Get(); v != nil {
+		return v.([]jobs.Result)[:0]
+	}
+	return make([]jobs.Result, 0, p.config.ResultBatchSize)
+}
+
+func (p *DynamicWorkerPool) putResultBatch(batch []jobs.Result) {
+	if batch == nil {
+		return
+	}
+	p.resultBatchPool.Put(batch[:0])
 }
 
 // autoScale periodically tunes the ants pool capacity based on queue depth.

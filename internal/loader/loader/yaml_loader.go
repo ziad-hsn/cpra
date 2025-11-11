@@ -26,11 +26,11 @@ func NewYamlLoader(fileName string) *YamlLoader {
 }
 
 func (l *YamlLoader) Load() error {
-    file, err := os.Open(l.File)
-    if err != nil {
-        return err
-    }
-    defer func() { _ = file.Close() }()
+	file, err := os.Open(l.File)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
 
 	//decoder := yaml.NewDecoder(file)
 	//var manifest schema.Manifest

@@ -15,6 +15,7 @@ import (
 type BatchPulseSystem struct {
 	queue              queue.Queue
 	logger             Logger
+	stateLogger        *StateLogger
 	world              *ecs.World
 	filter             *ecs.Filter2[components.MonitorState, components.JobStorage]
 	monitorStateMapper *ecs.Map[components.MonitorState]
@@ -25,12 +26,13 @@ type BatchPulseSystem struct {
 }
 
 // NewBatchPulseSystem creates a new BatchPulseSystem.
-func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchPulseSystem {
+func NewBatchPulseSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger *StateLogger) *BatchPulseSystem {
 	return &BatchPulseSystem{
-		world:     world,
-		queue:     q,
-		logger:    logger,
-		batchSize: batchSize,
+		world:       world,
+		queue:       q,
+		logger:      logger,
+		stateLogger: stateLogger,
+		batchSize:   batchSize,
 		filter: ecs.NewFilter2[components.MonitorState, components.JobStorage](world).
 			Without(ecs.C[components.Disabled]()),
 		monitorStateMapper: ecs.NewMap[components.MonitorState](world),
@@ -64,7 +66,7 @@ func (s *BatchPulseSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Pulse queue saturated (%d/%d); deferring dispatch", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Pulse queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 	}
 
 	query := s.filter.Query()
@@ -114,7 +116,7 @@ func (s *BatchPulseSystem) Update(_ *ecs.World) {
 
 		// Guard against typed-nil jobs (interfaces holding nil pointers)
 		if jobStorage.PulseJob == nil || jobStorage.PulseJob.IsNil() {
-			s.logger.Warn("Entity[%d] has PulseNeeded state but no valid PulseJob", ent.ID())
+			s.logger.Warn("Entity has PulseNeeded state but no valid PulseJob", "entity_id", ent.ID())
 			continue
 		}
 
@@ -151,12 +153,12 @@ func (s *BatchPulseSystem) Update(_ *ecs.World) {
 func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Entity) {
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Pulse queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Pulse queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 		return
 	}
 	err := s.queue.EnqueueBatch(*jobs)
 	if err != nil {
-		s.logger.Warn("Failed to enqueue pulse job batch, queue may be full: %v", err)
+		s.logger.Warn("Failed to enqueue pulse job batch, queue may be full", "error", err)
 		// Do not transition state if enqueue fails, allowing retry on the next tick.
 		return
 	}
@@ -174,9 +176,11 @@ func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Ent
 
 		// Transition from Needed -> Pending
 		if state.Flags&components.StatePulseNeeded != 0 {
+			oldState := *state
 			state.Flags &^= components.StatePulseNeeded
 			state.Flags |= components.StatePulsePending
 			state.LastCheckTime = now
+			s.stateLogger.LogTransition(ent, oldState, *state)
 		}
 	}
 }

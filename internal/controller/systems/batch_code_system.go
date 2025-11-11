@@ -22,6 +22,7 @@ type jobInfo struct {
 type BatchCodeSystem struct {
 	queue       queue.Queue
 	logger      Logger
+	stateLogger *StateLogger
 	world       *ecs.World
 	filter      *ecs.Filter3[components.MonitorState, components.CodeConfig, components.JobStorage]
 	stateMapper *ecs.Map1[components.MonitorState]
@@ -30,12 +31,13 @@ type BatchCodeSystem struct {
 }
 
 // NewBatchCodeSystem creates a new BatchCodeSystem.
-func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchCodeSystem {
+func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger *StateLogger) *BatchCodeSystem {
 	return &BatchCodeSystem{
-		world:     world,
-		queue:     q,
-		logger:    logger,
-		batchSize: batchSize,
+		world:       world,
+		queue:       q,
+		logger:      logger,
+		stateLogger: stateLogger,
+		batchSize:   batchSize,
 		filter: ecs.NewFilter3[components.MonitorState, components.CodeConfig, components.JobStorage](world).
 			Without(ecs.C[components.Disabled]()),
 		stateMapper: ecs.NewMap1[components.MonitorState](world),
@@ -58,7 +60,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Code queue saturated (%d/%d); deferring dispatch", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Code queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 	}
 
 	query := s.filter.Query()
@@ -109,19 +111,19 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 		// Honor dispatch flag and presence of color config before enqueuing
 		cfg, hasColor := codeConfig.Configs[color]
 		if !hasColor {
-			s.logger.Warn("Entity[%d] missing '%s' code config; clearing pending code", ent.ID(), color)
+			s.logger.Warn("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
 		if !cfg.Dispatch {
-			s.logger.Info("Entity[%d] '%s' code dispatch disabled; clearing pending code", ent.ID(), color)
+			s.logger.Info("Code dispatch disabled; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
 
 		job, ok := jobStorage.CodeJobs[color]
 		if !ok || isNilJob(job) {
-			s.logger.Warn("Entity[%d] needs '%s' code alert, but no job is configured.", ent.ID(), color)
+			s.logger.Warn("Entity needs code alert, but no job is configured", "entity_id", ent.ID(), "color", color)
 			// Clear the flag if no job is found to prevent spinning.
 			state.Flags &^= components.StateCodeNeeded
 			continue
@@ -158,14 +160,14 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Code queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Code queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 		return
 	}
 	items := make([]interface{}, 0, len(*jobsInfo))
 	submitted := make([]jobInfo, 0, len(*jobsInfo))
 	for _, info := range *jobsInfo {
 		if isNilJob(info.Job) {
-			s.logger.Warn("Entity[%d] code job became nil before enqueue; skipping", info.Entity.ID())
+			s.logger.Warn("Code job became nil before enqueue; skipping", "entity_id", info.Entity.ID())
 			continue
 		}
 		items = append(items, info.Job)
@@ -178,7 +180,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 
 	err := s.queue.EnqueueBatch(items)
 	if err != nil {
-		s.logger.Warn("Failed to enqueue code job batch, queue may be full: %v", err)
+		s.logger.Warn("Failed to enqueue code job batch, queue may be full", "error", err)
 		return
 	}
 
@@ -193,10 +195,12 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 
 		// Transition from Needed -> Pending
 		if state.Flags&components.StateCodeNeeded != 0 {
+			oldState := *state
 			state.Flags &^= components.StateCodeNeeded
 			state.Flags |= components.StateCodePending
 			state.PendingCode = ""
-			s.logger.Info("CODE DISPATCHED: %s (%s)", state.Name, info.Color)
+			s.stateLogger.LogTransition(info.Entity, oldState, *state)
+			s.logger.Info("Code dispatched", "monitor_name", state.Name, "color", info.Color)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	applogger "cpra/internal/logger"
 	"fmt"
 	"log"
 	"os"
@@ -48,6 +49,8 @@ type Logger struct {
 	enableColor bool
 	debugMode   bool
 	prodMode    bool
+	// base provides a zap-backed structured logger sink when set
+	base applogger.Logger
 }
 
 // NewLogger creates a new logger instance
@@ -167,6 +170,82 @@ func (l *Logger) log(level LogLevel, msg string, args ...interface{}) {
 		return
 	}
 
+	// If a zap-backed base logger is configured, prefer structured logging sink
+	if l.base != nil {
+		// Decide between printf-style formatting vs key/value pairs
+		if containsFmtVerb(msg) {
+			m := fmt.Sprintf(msg, args...)
+			switch level {
+			case LogLevelDebug:
+				l.base.Debug(m)
+			case LogLevelInfo:
+				l.base.Info(m)
+			case LogLevelWarn:
+				l.base.Warn(m)
+			case LogLevelError:
+				l.base.Error(m)
+			case LogLevelFatal:
+				l.base.Fatal(m)
+			default:
+				l.base.Info(m)
+			}
+		} else {
+			// Try to interpret args as key/value pairs
+			if fields, ok := kvToFields(args...); ok && len(fields) > 0 {
+				switch level {
+				case LogLevelDebug:
+					l.base.Debug(msg, fields...)
+				case LogLevelInfo:
+					l.base.Info(msg, fields...)
+				case LogLevelWarn:
+					l.base.Warn(msg, fields...)
+				case LogLevelError:
+					l.base.Error(msg, fields...)
+				case LogLevelFatal:
+					l.base.Fatal(msg, fields...)
+				default:
+					l.base.Info(msg, fields...)
+				}
+			} else {
+				// Fallback: concatenate args to message without printf semantics
+				if len(args) > 0 {
+					m := fmt.Sprint(append([]interface{}{msg}, args...)...)
+					switch level {
+					case LogLevelDebug:
+						l.base.Debug(m)
+					case LogLevelInfo:
+						l.base.Info(m)
+					case LogLevelWarn:
+						l.base.Warn(m)
+					case LogLevelError:
+						l.base.Error(m)
+					case LogLevelFatal:
+						l.base.Fatal(m)
+					default:
+						l.base.Info(m)
+					}
+				} else {
+					switch level {
+					case LogLevelDebug:
+						l.base.Debug(msg)
+					case LogLevelInfo:
+						l.base.Info(msg)
+					case LogLevelWarn:
+						l.base.Warn(msg)
+					case LogLevelError:
+						l.base.Error(msg)
+					case LogLevelFatal:
+						l.base.Fatal(msg)
+					default:
+						l.base.Info(msg)
+					}
+				}
+			}
+		}
+		// Do not duplicate output to stdout or files when using zap sink
+		return
+	}
+
 	formatted := l.formatMessage(level, msg, args...)
 
 	// Always output to stdout/stderr
@@ -181,6 +260,44 @@ func (l *Logger) log(level LogLevel, msg string, args ...interface{}) {
 		_, _ = fmt.Fprintf(l.file, "%s\n", formatted)
 		_ = l.file.Sync() // Ensure immediate write
 	}
+}
+
+// containsFmtVerb detects if the message contains a printf-style verb.
+func containsFmtVerb(s string) bool {
+	// Fast path: no '%' at all
+	if !strings.Contains(s, "%") {
+		return false
+	}
+	// Scan for a '%' not followed by another '%'
+	// This is a heuristic sufficient for our use case.
+	b := []byte(s)
+	for i := 0; i < len(b); i++ {
+		if b[i] == '%' {
+			if i+1 < len(b) && b[i+1] == '%' { // escaped percent
+				i++
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// kvToFields converts variadic args into key/value structured fields when possible.
+// Returns (fields, true) if args length is even and keys are strings.
+func kvToFields(args ...interface{}) ([]applogger.Field, bool) {
+	if len(args) == 0 || len(args)%2 != 0 {
+		return nil, false
+	}
+	fields := make([]applogger.Field, 0, len(args)/2)
+	for i := 0; i < len(args); i += 2 {
+		key, ok := args[i].(string)
+		if !ok {
+			return nil, false
+		}
+		fields = append(fields, applogger.Field{Key: key, Value: args[i+1]})
+	}
+	return fields, true
 }
 
 // Debug logs a debug message (only in debug mode)
@@ -220,6 +337,7 @@ func (l *Logger) WithContext(context string) *Logger {
 		file:        l.file,
 		timezone:    l.timezone,
 		tracer:      l.tracer,
+		base:        l.base,
 	}
 }
 
@@ -329,12 +447,45 @@ var (
 
 // InitializeLoggers sets up all component loggers
 func InitializeLoggers(debugMode bool) {
-	SystemLogger = NewLogger("SYSTEM", debugMode)
-	SchedulerLogger = NewLogger("SCHEDULER", debugMode)
-	DispatchLogger = NewLogger("DISPATCH", debugMode)
-	ResultLogger = NewLogger("RESULT", debugMode)
-	WorkerPoolLogger = NewLogger("WORKER", debugMode)
-	EntityLogger = NewLogger("ENTITY", debugMode)
+	// Build a single zap-backed base logger and derive component loggers
+	var cfg applogger.LoggerConfig
+	if debugMode || strings.ToLower(os.Getenv("CPRA_ENV")) != "production" {
+		cfg = applogger.DevelopmentConfig()
+	} else {
+		cfg = applogger.DefaultConfig()
+	}
+	base, err := applogger.NewZapLogger(cfg)
+	if err != nil {
+		// Fallback to legacy stdout loggers on failure
+		SystemLogger = NewLogger("SYSTEM", debugMode)
+		SchedulerLogger = NewLogger("SCHEDULER", debugMode)
+		DispatchLogger = NewLogger("DISPATCH", debugMode)
+		ResultLogger = NewLogger("RESULT", debugMode)
+		WorkerPoolLogger = NewLogger("WORKER", debugMode)
+		EntityLogger = NewLogger("ENTITY", debugMode)
+		return
+	}
+
+	// Helper to create a controller logger bound to a zap sub-logger
+	bind := func(name string) *Logger {
+		l := NewLogger(name, debugMode)
+		// Close any opened file handles from legacy setup to avoid dup writes
+		if l.file != nil {
+			_ = l.file.Close()
+			l.file = nil
+		}
+		// Attach component field and set as sink
+		comp := base.With(applogger.Field{Key: "component", Value: name})
+		l.base = comp
+		return l
+	}
+
+	SystemLogger = bind("SYSTEM")
+	SchedulerLogger = bind("SCHEDULER")
+	DispatchLogger = bind("DISPATCH")
+	ResultLogger = bind("RESULT")
+	WorkerPoolLogger = bind("WORKER")
+	EntityLogger = bind("ENTITY")
 }
 
 // CloseLoggers closes all logger files
@@ -346,6 +497,11 @@ func CloseLoggers() {
 
 	for _, logger := range loggers {
 		if logger != nil {
+			// Flush zap sink if configured
+			if logger.base != nil {
+				_ = logger.base.Sync()
+			}
+			// Close legacy file handle if present
 			logger.Close()
 		}
 	}

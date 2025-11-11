@@ -15,6 +15,7 @@ import (
 type BatchInterventionSystem struct {
 	queue              queue.Queue
 	logger             Logger
+	stateLogger        *StateLogger
 	world              *ecs.World
 	filter             *ecs.Filter3[components.MonitorState, components.InterventionConfig, components.JobStorage]
 	monitorStateMapper *ecs.Map[components.MonitorState]
@@ -24,12 +25,13 @@ type BatchInterventionSystem struct {
 }
 
 // NewBatchInterventionSystem creates a new BatchInterventionSystem.
-func NewBatchInterventionSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger) *BatchInterventionSystem {
+func NewBatchInterventionSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger *StateLogger) *BatchInterventionSystem {
 	return &BatchInterventionSystem{
-		world:     world,
-		queue:     q,
-		logger:    logger,
-		batchSize: batchSize,
+		world:       world,
+		queue:       q,
+		logger:      logger,
+		stateLogger: stateLogger,
+		batchSize:   batchSize,
 		filter: ecs.NewFilter3[components.MonitorState, components.InterventionConfig, components.JobStorage](world).
 			Without(ecs.C[components.Disabled]()),
 		monitorStateMapper: ecs.NewMap[components.MonitorState](world),
@@ -59,7 +61,7 @@ func (s *BatchInterventionSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Intervention queue saturated (%d/%d); deferring dispatch", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Intervention queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 	}
 
 	query := s.filter.Query()
@@ -105,7 +107,7 @@ func (s *BatchInterventionSystem) Update(_ *ecs.World) {
 
 		// Guard against typed-nil jobs (interfaces holding nil pointers)
 		if jobStorage.InterventionJob == nil || jobStorage.InterventionJob.IsNil() {
-			s.logger.Warn("Entity[%d] has InterventionNeeded state but no valid InterventionJob", ent.ID())
+			s.logger.Warn("Entity has InterventionNeeded state but no valid InterventionJob", "entity_id", ent.ID())
 			continue
 		}
 
@@ -142,12 +144,12 @@ func (s *BatchInterventionSystem) Update(_ *ecs.World) {
 func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]ecs.Entity) {
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Intervention queue near capacity (%d/%d); skipping enqueue", stats.QueueDepth, stats.Capacity)
+		s.logger.Debug("Intervention queue near capacity", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 		return
 	}
 	err := s.queue.EnqueueBatch(*jobs)
 	if err != nil {
-		s.logger.Warn("Failed to enqueue intervention job batch, queue may be full: %v", err)
+		s.logger.Warn("Failed to enqueue intervention job batch, queue may be full", "error", err)
 		// Do not transition state if enqueue fails, allowing retry on the next tick.
 		return
 	}
@@ -164,9 +166,11 @@ func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]
 
 		// Transition from Needed -> Pending
 		if state.Flags&components.StateInterventionNeeded != 0 {
+			oldState := *state
 			state.Flags &^= components.StateInterventionNeeded
 			state.Flags |= components.StateInterventionPending
-			s.logger.Info("INTERVENTION DISPATCHED: %s", state.Name)
+			s.stateLogger.LogTransition(ent, oldState, *state)
+			s.logger.Info("Intervention dispatched", "monitor_name", state.Name)
 		}
 	}
 }

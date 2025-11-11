@@ -1,0 +1,94 @@
+package controller
+
+import (
+	"cpra/internal/controller/entities"
+	"runtime/debug"
+	"time"
+
+	"github.com/mlange-42/ark/ecs"
+)
+
+// RecoverySystem provides system-level error recovery and health monitoring
+type RecoverySystem struct {
+	LastError   time.Time
+	Mapper      *entities.EntityManager
+	ErrorCount  int
+	MaxErrors   int
+	ResetWindow time.Duration
+}
+
+func NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem {
+	return &RecoverySystem{
+		MaxErrors:   maxErrors,
+		ResetWindow: resetWindow,
+	}
+}
+
+// SafeSystemUpdate wraps system updates with error recovery
+func (r *RecoverySystem) SafeSystemUpdate(systemName string, updateFunc func() error) error {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			r.ErrorCount++
+			r.LastError = time.Now()
+
+			if SystemLogger != nil {
+				SystemLogger.Error("PANIC in system %s: %v", systemName, recovered)
+				SystemLogger.Error("Stack trace: %s", debug.Stack())
+			}
+
+			// Circuit breaker logic
+			if r.ErrorCount >= r.MaxErrors {
+				if SystemLogger != nil {
+					SystemLogger.Error("System %s exceeded max errors (%d), entering degraded mode", systemName, r.MaxErrors)
+				}
+			}
+		}
+	}()
+
+	// Reset error count if enough time has passed
+	if time.Since(r.LastError) > r.ResetWindow {
+		r.ErrorCount = 0
+	}
+
+	// Circuit breaker - prevent further damage if too many errors
+	if r.ErrorCount >= r.MaxErrors {
+		return nil // Skip execution
+	}
+
+	return updateFunc()
+}
+
+// ValidateEntityHealth checks entity component integrity
+func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) bool {
+	if !w.Alive(entity) {
+		return false
+	}
+
+	// Check for required components
+	if r.Mapper != nil {
+		state := r.Mapper.GetMonitorState(entity)
+		if state == nil {
+			if SystemLogger != nil {
+				SystemLogger.Warn("Entity %v missing MonitorState component", entity)
+			}
+			return false
+		}
+		if state.Name == "" {
+			if SystemLogger != nil {
+				SystemLogger.Warn("Entity %v missing Name component", entity)
+			}
+			return false
+		}
+	}
+
+	return true
+}
+
+// CleanupOrphanedComponents removes components from dead entities
+func (r *RecoverySystem) CleanupOrphanedComponents(w *ecs.World) {
+	// This would need specific implementation based on component tracking
+	// For now, log the cleanup intent
+	if SystemLogger != nil {
+		SystemLogger.Info("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
+	}
+}

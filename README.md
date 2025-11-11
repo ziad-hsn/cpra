@@ -1,253 +1,83 @@
-# CPRA - Continuous Pulse and Recovery Agent
+# CPRA - High-Performance Monitoring System
 
-> High-performance uptime monitoring system designed to handle **1M+ concurrent monitors** in minimal memory footprint (**≤1GB RAM**)
+CPRA is a high-performance, event-driven monitoring application designed for massive-scale environments. It is built on a data-oriented **Entity-Component-System (ECS)** architecture, which provides a highly decoupled, modular, and performant foundation.
 
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Architecture](https://img.shields.io/badge/Architecture-ECS-green.svg)](explanation/architecture-overview.md)
+## TL;DR
 
-## 🎯 What is CPRA?
+CPRA is a monitoring system that can handle over a million concurrent monitors. It's fast, resilient, and extensible.
 
-CPRA is an open-source monitoring and alerting system built with extreme performance in mind. Using an Entity-Component-System (ECS) architecture powered by the [Ark](https://github.com/mlange-42/ark) framework, CPRA achieves unprecedented scalability for uptime monitoring.
+**Key features:**
+- **Scalability:** Designed to handle over one million concurrent monitors.
+- **High Performance:** Optimized for high throughput and low latency, with features like batch processing, backpressure, and memory optimization.
+- **Resilience:** The system is designed to be resilient to failures, with automated recovery and remediation mechanisms.
 
-### Key Features
+## Features
 
-- 🚀 **Extreme Scalability** - Monitor 1M+ endpoints concurrently in ≤1GB RAM
-- ⚡ **High Performance** - ECS architecture with optimized queue systems
-- 🔄 **Auto-Recovery** - Automated intervention actions (Docker container restarts, etc.)
-- 🎨 **Color-Coded Alerts** - Red/Yellow/Green/Cyan/Gray alert levels
-- 📊 **Real-time Monitoring** - HTTP, TCP, ICMP health checks (DNS/Docker planned)
-- 🔧 **Dynamic Configuration** - YAML/JSON streaming configuration loader
-- 📈 **Built-in Profiling** - pprof integration for performance analysis
+*   **Scalability:** Designed to handle over one million concurrent monitors.
+*   **High Performance:** Optimized for high throughput and low latency, with features like batch processing, backpressure, and memory optimization.
+*   **Resilience:** The system is designed to be resilient to failures, with automated recovery and remediation mechanisms.
+*   **Modularity:** The ECS architecture makes the system highly modular and extensible.
+*   **Advanced Performance Modeling:** Uses M/M/c queuing theory to proactively calculate the optimal number of workers to meet SLOs.
 
-## 🏗️ Architecture
+## Architecture
 
-CPRA uses a **three-state system**:
+The core of the application consists of three independent processing pipelines:
 
-1. **Pulse** - Health checks (HTTP, TCP, ICMP)
-2. **Intervention** - Automated recovery actions
-3. **Code** - Color-coded alerting system
+1.  **Pulse Pipeline:** The primary health-checking mechanism.
+2.  **Intervention Pipeline:** An automated recovery/remediation system.
+3.  **Code Pipeline:** An alerting and notification system.
 
-**Technology Stack:**
-- **Language**: Go 1.22+
-- **ECS Framework**: [Ark](https://github.com/mlange-42/ark)
-- **Worker Pools**: [Ants](https://github.com/panjf2000/ants)
-- **Queue Systems**: Adaptive, Workiva, Hybrid queues
-- **Configuration**: Streaming YAML/JSON parsers
+These pipelines are implemented as state machines using an ECS architecture, and they communicate indirectly through component state changes.
 
-For detailed architecture documentation, see [Architecture Overview](explanation/architecture-overview.md).
-
-## ⚡ Quick Start
+## Getting Started
 
 ### Prerequisites
 
-- Go 1.22 or later
-- Docker (optional, for intervention features)
+*   Go 1.18 or later
 
-### Installation
+### Building from Source
 
-```bash
-# Clone the repository
-git clone https://github.com/your-org/cpra.git
-cd cpra
+1.  Clone the repository:
+    ```sh
+    git clone https://github.com/ziad-mid/cpra.git
+    cd cpra
+    ```
 
-# Build the binary
-make build
+2.  Build the application:
+    ```sh
+    go build .
+    ```
 
-# Or use Go directly
-go build -o cpra .
+### Running the Application
+
+```sh
+./cpra --yaml <path_to_your_monitors.yaml>
 ```
 
-### Running CPRA
+## Configuration
 
-```bash
-# Run with default configuration
-./cpra
+The application can be configured through a YAML file. See `internal/loader/replicated_test.yaml` for an example.
 
-# Run with custom YAML file
-./cpra -yaml path/to/monitors.yaml
+## Docker
 
-# Enable debug logging
-./cpra -debug
+The application can also be run in a Docker container.
 
-# Custom pprof address
-./cpra -pprof.addr localhost:6060
-```
+1.  Build the Docker image:
+    ```sh
+    docker build -t cpra .
+    ```
 
-### Your First Monitor
+2.  Run the Docker container:
+    ```sh
+    docker run -it --rm cpra
+    ```
 
-Create a `monitors.yaml` file:
+## Contributing
 
-```yaml
-monitors:
-  - name: "My API Health Check"
-    pulse_check:
-      type: http
-      interval: 1m
-      timeout: 10s
-      max_failures: 3
-      config:
-        url: https://api.example.com/health
-        method: GET
-        expected_status: 200
-    codes:
-      red:
-        dispatch: true
-        notify: log
-        config:
-          file: alerts.log
-```
+Contributions are welcome! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more information on how to get started. We also have a [Code of Conduct](CODE_OF_CONDUCT.md) that we expect all contributors to adhere to.
 
-See [Getting Started Tutorial](tutorials/getting-started.md) for a complete walkthrough.
+We use GitHub Issues to track bugs and feature requests. Please search for existing issues before creating a new one. If you're looking for a good place to start, check out our issues labeled "good first issue".
 
-## 📚 Documentation
+## License
 
-Our documentation follows the [Diataxis](https://diataxis.fr/) framework:
-
-- **[Tutorials](tutorials/)** - Learning-oriented guides
-  - [Getting Started](tutorials/getting-started.md)
-  - [Scaling to 1000s of Monitors](tutorials/scaling-guide.md)
-
-- **[How-To Guides](how-to/)** - Task-oriented guides
-  - [Configure Monitors](how-to/configure-monitors.md)
-  - [Setup Interventions](how-to/setup-interventions.md)
-  - [Configure Alerts](how-to/configure-alerts.md)
-  - [Performance Tuning](how-to/performance-tuning.md)
-
-- **[Reference](reference/)** - Information-oriented documentation
-  - [Configuration Schema](reference/configuration-schema.md)
-  - [API Reference](reference/api-documentation.md)
-  - [CLI Reference](reference/cli-reference.md)
-  - [Metrics Reference](reference/metrics.md)
-
-- **[Explanation](explanation/)** - Understanding-oriented articles
-  - [Architecture Overview](explanation/architecture-overview.md)
-  - [ECS Design Rationale](explanation/ecs-design.md)
-  - [Queue Strategies](explanation/queue-strategies.md)
-  - [Memory Optimization](explanation/memory-optimization.md)
-
-## 🔧 Configuration
-
-CPRA supports configuration via:
-
-- **YAML files** - Primary configuration method
-- **JSON files** - Alternative format
-- **Command-line flags** - Runtime overrides
-
-### Basic Configuration Example
-
-```yaml
-monitors:
-  - name: "Production API"
-    pulse_check:
-      type: http
-      interval: 30s
-      timeout: 5s
-      max_failures: 3
-      config:
-        url: https://api.prod.example.com
-        method: GET
-    intervention:
-      action: docker
-      retries: 1
-      target:
-        container: api-service
-    codes:
-      red:
-        dispatch: true
-        notify: pagerduty
-        config:
-          integration_key: ${PAGERDUTY_KEY}
-```
-
-See [Configuration Schema](reference/configuration-schema.md) for all options.
-
-## 📊 Performance
-
-CPRA is designed for extreme performance:
-
-- **Memory Usage**: ≤1GB for 1M monitors
-- **Latency**: ≤2s for health checks
-- **Uptime**: 99.9% target
-
-### Profiling
-
-CPRA includes built-in pprof support:
-
-```bash
-# Start CPRA with pprof enabled (default: localhost:6060)
-./cpra -pprof
-
-# Access profiles
-# CPU: http://localhost:6060/debug/pprof/profile?seconds=30
-# Heap: http://localhost:6060/debug/pprof/heap
-# Goroutines: http://localhost:6060/debug/pprof/goroutine
-```
-
-See [Performance Tuning Guide](how-to/performance-tuning.md) for optimization strategies.
-
-## 🛠️ Development
-
-### Building
-
-```bash
-# Standard build
-make build
-
-# Secure build with hardening flags
-make buildsec
-
-# Run tests
-make test
-
-# Format code
-make fmt
-
-# Clean build artifacts
-make clean
-```
-
-### Project Structure
-
-```
-cpra/
-├── internal/
-│   ├── controller/     # Main controller and ECS systems
-│   ├── queue/          # Queue implementations (Adaptive, Workiva, Hybrid)
-│   ├── jobs/           # Job definitions (Pulse, Intervention, Code)
-│   ├── loader/         # Configuration loaders (YAML/JSON streaming)
-│   ├── logger/         # Structured logging
-│   └── alerts/         # Alert management
-├── main.go             # Application entry point
-├── Makefile            # Build automation
-└── go.mod              # Go module dependencies
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-
-- Development setup
-- Coding standards
-- Pull request process
-- Issue reporting
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Ark](https://github.com/mlange-42/ark) - ECS framework
-- [Ants](https://github.com/panjf2000/ants) - Goroutine pool library
-- [Workiva](https://github.com/Workiva/go-datastructures) - Lock-free data structures
-
-## 📞 Support
-
-- **Documentation**: [CPRA Docs](https://your-org.github.io/cpra)
-- **Issues**: [GitHub Issues](https://github.com/your-org/cpra/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/cpra/discussions)
-
----
-
-**Made with ❤️ by the CPRA community**
+This project is licensed under the terms of the MIT license. See the [LICENSE](LICENSE) file for details.

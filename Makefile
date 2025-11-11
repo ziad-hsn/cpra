@@ -1,6 +1,6 @@
 # Define variables
 GO_CMD = go
-GO_BUILD_FLAGS = -v
+GO_BUILD_FLAGS = -v -tags ark_tiny
 GO_SECURE_FLAGS = -buildmode=pie -ldflags="-s -w"
 GO_TEST_FLAGS = -v -race -coverprofile=coverage.out
 

@@ -19,6 +19,7 @@ import (
 	"github.com/moby/moby/client"
 	ping "github.com/prometheus-community/pro-bing"
 
+	"cpra/internal/interning"
 	"cpra/internal/loader/schema"
 )
 
@@ -67,42 +68,53 @@ type Job interface {
 	IsNil() bool
 }
 
+func seedJobPayload(payload map[string]interface{}, jobType, driver string) map[string]interface{} {
+	if payload == nil {
+		payload = make(map[string]interface{}, 4)
+	} else {
+		clearPayload(payload)
+	}
+	payload["type"] = jobType
+	payload["driver"] = driver
+	return payload
+}
+
 // CreatePulseJob creates a new pulse job based on the provided schema.
 func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 	timeout := pulseSchema.Timeout
 	switch cfg := pulseSchema.Config.(type) {
 	case *schema.PulseHTTPConfig:
-		return &PulseHTTPJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			URL:     cfg.Url,
-			Method:  cfg.Method,
-			Timeout: timeout,
-			Retries: cfg.Retries,
-			Client:  *GetHTTPClient(timeout),
-			payload: map[string]interface{}{"type": "pulse", "driver": "http"},
-		}, nil
+		job := getPulseHTTPJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.URL = cfg.Url
+		job.Method = interning.Intern(cfg.Method)
+		job.Timeout = timeout
+		job.Retries = cfg.Retries
+		job.Client = *GetHTTPClient(timeout)
+		job.payload = seedJobPayload(job.payload, "pulse", "http")
+		return job, nil
 	case *schema.PulseTCPConfig:
-		return &PulseTCPJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Host:    cfg.Host,
-			Port:    cfg.Port,
-			Timeout: timeout,
-			Retries: cfg.Retries,
-			payload: map[string]interface{}{"type": "pulse", "driver": "tcp"},
-		}, nil
+		job := getPulseTCPJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Host = cfg.Host
+		job.Port = cfg.Port
+		job.Timeout = timeout
+		job.Retries = cfg.Retries
+		job.payload = seedJobPayload(job.payload, "pulse", "tcp")
+		return job, nil
 	case *schema.PulseICMPConfig:
-		return &PulseICMPJob{
-			ID:              uuid.New(),
-			Entity:          jobID,
-			Host:            cfg.Host,
-			Timeout:         timeout,
-			Count:           cfg.Count,
-			Retries:         cfg.Retries,
-			IgnorePrivilege: cfg.Privilege,
-			payload:         map[string]interface{}{"type": "pulse", "driver": "icmp"},
-		}, nil
+		job := getPulseICMPJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Host = cfg.Host
+		job.Timeout = timeout
+		job.Count = cfg.Count
+		job.Retries = cfg.Retries
+		job.IgnorePrivilege = cfg.Privilege
+		job.payload = seedJobPayload(job.payload, "pulse", "icmp")
+		return job, nil
 
 	// ... other pulse job types
 	default:
@@ -115,13 +127,17 @@ func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Ent
 	retries := interventionSchema.Retries
 	switch interventionSchema.Action {
 	case "docker":
-		return &InterventionDockerJob{
-			ID:        uuid.New(),
-			Entity:    jobID,
-			Container: interventionSchema.Target.(*schema.InterventionTargetDocker).Container,
-			Retries:   retries,
-			Timeout:   interventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
-		}, nil
+		target, ok := interventionSchema.Target.(*schema.InterventionTargetDocker)
+		if !ok || target == nil {
+			return nil, fmt.Errorf("docker intervention missing target configuration")
+		}
+		job := getInterventionDockerJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Container = target.Container
+		job.Retries = retries
+		job.Timeout = target.Timeout
+		return job, nil
 	default:
 		return nil, fmt.Errorf("unknown intervention action : %T for job creation", interventionSchema.Action)
 	}
@@ -221,51 +237,54 @@ func buildCodeNotificationMessage(monitor string, tpl codeAlertTemplate) string 
 // CreateCodeJob creates a new code alert job based on the provided configuration.
 func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, color string) (Job, error) {
 	template := codeAlertTemplateFor(color)
-	colorClone := color
-	monitorClone := monitor
+	colorValue := color
+	monitorValue := monitor
 
 	switch config.Notify {
 	case "log":
-		return &CodeLogJob{
-			ID:        uuid.New(),
-			File:      config.Config.(*schema.CodeNotificationLog).File,
-			Entity:    jobID,
-			Monitor:   monitorClone,
-			Color:     colorClone,
-			Status:    template.Status,
-			Severity:  template.Severity,
-			Summary:   template.Summary,
-			Action:    template.Action,
-			NextSteps: template.NextSteps,
-		}, nil
+		logJob := getCodeLogJob()
+		logJob.ID = uuid.New()
+		logJob.Entity = jobID
+		logJob.Monitor = monitorValue
+		logJob.Color = colorValue
+		logJob.Status = template.Status
+		logJob.Severity = template.Severity
+		logJob.Summary = template.Summary
+		logJob.Action = template.Action
+		logJob.NextSteps = template.NextSteps
+		logJob.File = ""
+		if logCfg, ok := config.Config.(*schema.CodeNotificationLog); ok && logCfg != nil {
+			logJob.File = logCfg.File
+		}
+		return logJob, nil
 	case "pagerduty":
-		return &CodePagerDutyJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Monitor: monitorClone,
-			Color:   colorClone,
-		}, nil
+		job := getCodePagerDutyJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Monitor = monitorValue
+		job.Color = colorValue
+		return job, nil
 	case "slack":
-		return &CodeSlackJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Monitor: monitorClone,
-			Color:   colorClone,
-		}, nil
+		job := getCodeSlackJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Monitor = monitorValue
+		job.Color = colorValue
+		return job, nil
 	case "email":
-		return &CodeEmailJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Monitor: monitorClone,
-			Color:   colorClone,
-		}, nil
+		job := getCodeEmailJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Monitor = monitorValue
+		job.Color = colorValue
+		return job, nil
 	case "webhook":
-		return &CodeWebhookJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Monitor: monitorClone,
-			Color:   colorClone,
-		}, nil
+		job := getCodeWebhookJob()
+		job.ID = uuid.New()
+		job.Entity = jobID
+		job.Monitor = monitorValue
+		job.Color = colorValue
+		return job, nil
 	default:
 		return nil, fmt.Errorf("unknown code notification type: %s for job creation", config.Notify)
 	}

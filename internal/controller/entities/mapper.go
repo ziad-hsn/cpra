@@ -2,6 +2,7 @@ package entities
 
 import (
 	"cpra/internal/controller/components"
+	"cpra/internal/interning"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"fmt"
@@ -63,13 +64,13 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	now := time.Now()
 
 	// Create consolidated MonitorState component
-	monitorName := monitor.Name
-	monitorState := &components.MonitorState{
-		Name:            monitorName,
-		LastCheckTime:   now,
-		LastSuccessTime: now,
-		NextCheckTime:   now,
-	}
+	monitorName := interning.Intern(monitor.Name)
+	monitorState := GetMonitorState()
+	*monitorState = components.MonitorState{}
+	monitorState.Name = monitorName
+	monitorState.LastCheckTime = now
+	monitorState.LastSuccessTime = now
+	monitorState.NextCheckTime = now
 
 	// Set initial state flags or Disabled tag
 	if monitor.Enabled {
@@ -78,21 +79,20 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	// Prepare pulse configuration (added during entity creation)
 	// Map thresholds: prefer explicit unhealthy_threshold; loader maps legacy max_failures into it
-	unhealthy := monitor.Pulse.UnhealthyThreshold
-	pulseConfig := &components.PulseConfig{
-		Type:               monitor.Pulse.Type,
-		UnhealthyThreshold: unhealthy,
-		HealthyThreshold:   monitor.Pulse.HealthyThreshold,
-		Timeout:            monitor.Pulse.Timeout,
-		Interval:           monitor.Pulse.Interval,
-		// Assign schema config directly; ownership is at ECS component.
-		// Future updates should replace the component (copy-on-write), not mutate in place.
-		Config: monitor.Pulse.Config,
-	}
+	pulseConfig := GetPulseConfig()
+	*pulseConfig = components.PulseConfig{}
+	pulseConfig.Type = interning.Intern(monitor.Pulse.Type)
+	pulseConfig.UnhealthyThreshold = monitor.Pulse.UnhealthyThreshold
+	pulseConfig.HealthyThreshold = monitor.Pulse.HealthyThreshold
+	pulseConfig.Timeout = monitor.Pulse.Timeout
+	pulseConfig.Interval = monitor.Pulse.Interval
+	// Assign schema config directly; ownership is at ECS component.
+	// Future updates should replace the component (copy-on-write), not mutate in place.
+	pulseConfig.Config = monitor.Pulse.Config
 	// Create consolidated job storage (empty at first; jobs filled after we have the entity ID)
 	// Pre-size maps based on number of codes to minimize rehashing/resizes
 	codeCount := len(monitor.Codes)
-	jobStorage := &components.JobStorage{CodeJobs: make(map[string]jobs.Job, codeCount)}
+	jobStorage := GetJobStorage(codeCount)
 
 	// Create entity with base components in a single archetype transition
 	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage)
@@ -116,12 +116,12 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			maxFailures = monitor.Intervention.MaxFailures
 		}
 
-		interventionConfig := &components.InterventionConfig{
-			Action: monitor.Intervention.Action,
-			// Assign schema target directly; updates should replace the component (COW).
-			Target:      monitor.Intervention.Target,
-			MaxFailures: maxFailures,
-		}
+		interventionConfig := GetInterventionConfig()
+		*interventionConfig = components.InterventionConfig{}
+		interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
+		// Assign schema target directly; updates should replace the component (COW).
+		interventionConfig.Target = monitor.Intervention.Target
+		interventionConfig.MaxFailures = maxFailures
 		e.InterventionConfig.Add(entity, interventionConfig)
 
 		// Add intervention job
@@ -136,30 +136,30 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	// Add consolidated code configuration instead of separate color components
 	if codeCount > 0 {
-		codeConfig := &components.CodeConfig{Configs: make(map[string]*components.ColorCodeConfig, codeCount)}
-		codeStatus := &components.CodeStatus{Status: make(map[string]*components.ColorCodeStatus, codeCount)}
+		codeConfig := GetCodeConfig(codeCount)
+		codeStatus := GetCodeStatus(codeCount)
 
 		for color, config := range monitor.Codes {
+			colorKey := interning.Intern(color)
 			// Single consolidated entry instead of separate components
-			codeConfig.Configs[color] = &components.ColorCodeConfig{
-				Dispatch: config.Dispatch,
-				Notify:   config.Notify,
-				// Assign schema notification config directly; updates should replace (COW).
-				Config: config.Config,
-			}
+			colorCodeConfig := GetColorCodeConfig()
+			colorCodeConfig.Dispatch = config.Dispatch
+			colorCodeConfig.Notify = interning.Intern(config.Notify)
+			// Assign schema notification config directly; updates should replace (COW).
+			colorCodeConfig.Config = config.Config
+			codeConfig.Configs[colorKey] = colorCodeConfig
 
-			codeStatus.Status[color] = &components.ColorCodeStatus{
-				LastAlertTime: now,
-			}
+			colorCodeStatus := GetColorCodeStatus()
+			colorCodeStatus.LastAlertTime = now
+			codeStatus.Status[colorKey] = colorCodeStatus
 
 			// Add code job to consolidated storage
-			// Reuse cloned monitor name for all code jobs
-			codeJob, err := jobs.CreateCodeJob(monitorName, config, entity, color)
+			codeJob, err := jobs.CreateCodeJob(monitorName, config, entity, colorKey)
 			if err != nil {
 				return err
 			}
 			if js := e.JobStorage.Get(entity); js != nil {
-				js.CodeJobs[color] = codeJob
+				js.CodeJobs[colorKey] = codeJob
 			}
 		}
 
@@ -209,7 +209,7 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		i++
 
 		// Monitor name & times
-		monitorName := monitor.Name
+		monitorName := interning.Intern(monitor.Name)
 		monitorState.Name = monitorName
 		monitorState.LastCheckTime = now
 		monitorState.LastSuccessTime = now
@@ -221,7 +221,7 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		}
 
 		// Pulse configuration: prefer explicit unhealthy_threshold; loader fills from legacy max_failures if provided
-		pulseConfig.Type = monitor.Pulse.Type
+		pulseConfig.Type = interning.Intern(monitor.Pulse.Type)
 		pulseConfig.UnhealthyThreshold = monitor.Pulse.UnhealthyThreshold
 		pulseConfig.HealthyThreshold = monitor.Pulse.HealthyThreshold
 		pulseConfig.Timeout = monitor.Pulse.Timeout
@@ -229,13 +229,21 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		if monitor.Pulse.Config != nil {
 			// Assign schema config directly; future changes should replace component (COW).
 			pulseConfig.Config = monitor.Pulse.Config
+		} else {
+			pulseConfig.Config = nil
 		}
 
 		// Job storage: pre-size code jobs map based on number of configured colors
 		codeCount := len(monitor.Codes)
 		if jobStorage.CodeJobs == nil {
 			jobStorage.CodeJobs = make(map[string]jobs.Job, codeCount)
+		} else {
+			for color := range jobStorage.CodeJobs {
+				delete(jobStorage.CodeJobs, color)
+			}
 		}
+		jobStorage.PulseJob = nil
+		jobStorage.InterventionJob = nil
 
 		// Create pulse job and attach to JobStorage
 		if pj, err := jobs.CreatePulseJob(monitor.Pulse, entity); err != nil {
@@ -251,15 +259,12 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			if monitor.Intervention.MaxFailures > 0 {
 				maxFailures = monitor.Intervention.MaxFailures
 			}
-			interventionConfig := &components.InterventionConfig{
-				Action:      monitor.Intervention.Action,
-				Target:      nil,
-				MaxFailures: maxFailures,
-			}
-			if monitor.Intervention.Target != nil {
-				// Assign schema target directly; future changes should replace component (COW).
-				interventionConfig.Target = monitor.Intervention.Target
-			}
+			interventionConfig := GetInterventionConfig()
+			*interventionConfig = components.InterventionConfig{}
+			interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
+			// Assign schema target directly; future changes should replace component (COW).
+			interventionConfig.Target = monitor.Intervention.Target
+			interventionConfig.MaxFailures = maxFailures
 			e.InterventionConfig.Add(entity, interventionConfig)
 
 			// Create intervention job and attach
@@ -273,30 +278,34 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 
 		// Consolidated code configuration & status
 		if codeCount > 0 {
-			codeConfig := &components.CodeConfig{Configs: make(map[string]*components.ColorCodeConfig, codeCount)}
-			codeStatus := &components.CodeStatus{Status: make(map[string]*components.ColorCodeStatus, codeCount)}
+			codeConfig := GetCodeConfig(codeCount)
+			codeStatus := GetCodeStatus(codeCount)
 
 			for color, cfg := range monitor.Codes {
+				colorKey := interning.Intern(color)
 				// Per-color config
-				cc := &components.ColorCodeConfig{
-					Dispatch: cfg.Dispatch,
-					Notify:   cfg.Notify,
-				}
+				cc := GetColorCodeConfig()
+				cc.Dispatch = cfg.Dispatch
+				cc.Notify = interning.Intern(cfg.Notify)
 				if cfg.Config != nil {
 					// Assign schema notification config directly; updates should replace (COW).
 					cc.Config = cfg.Config
+				} else {
+					cc.Config = nil
 				}
-				codeConfig.Configs[color] = cc
+				codeConfig.Configs[colorKey] = cc
 
 				// Per-color status
-				codeStatus.Status[color] = &components.ColorCodeStatus{LastAlertTime: now}
+				status := GetColorCodeStatus()
+				status.LastAlertTime = now
+				codeStatus.Status[colorKey] = status
 
 				// Create code job and attach to JobStorage
-				if cj, err := jobs.CreateCodeJob(monitorName, cfg, entity, color); err != nil {
+				if cj, err := jobs.CreateCodeJob(monitorName, cfg, entity, colorKey); err != nil {
 					firstErr = err
 					return
 				} else {
-					jobStorage.CodeJobs[color] = cj
+					jobStorage.CodeJobs[colorKey] = cj
 				}
 			}
 			// Add both code components in a single step to reduce archetype moves

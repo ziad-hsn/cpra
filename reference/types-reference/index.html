@@ -1,0 +1,2032 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A high-performance monitoring system designed for large-scale environments.">
+      
+      
+      
+      
+        <link rel="prev" href="../api-reference/">
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.0">
+    
+    
+      
+        <title>Types Reference - CPRA</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.9f615399.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.649f08f9.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#types-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRA" class="md-header__button md-logo" aria-label="CPRA" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRA
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Types Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ziad/cpra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/getting-started/" class="md-tabs__link">
+          
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+          
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/common-tasks/" class="md-tabs__link">
+          
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../api-reference/" class="md-tabs__link">
+          
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRA" class="md-nav__button md-logo" aria-label="CPRA" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    CPRA
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ziad/cpra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common Tasks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Deploy to Production
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Types Reference
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Types Reference
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontroller" class="md-nav__link">
+    Package: internal/controller
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#config" class="md-nav__link">
+    Config
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller" class="md-nav__link">
+    Controller
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logger" class="md-nav__link">
+    Logger
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loggeradapter" class="md-nav__link">
+    LoggerAdapter
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricsaggregator" class="md-nav__link">
+    MetricsAggregator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memorymanager" class="md-nav__link">
+    MemoryManager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recoverysystem" class="md-nav__link">
+    RecoverySystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tracer" class="md-nav__link">
+    Tracer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tracespan" class="md-nav__link">
+    TraceSpan
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalqueue" class="md-nav__link">
+    Package: internal/queue
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queue-interface" class="md-nav__link">
+    Queue (Interface)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    Stats
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queueconfig" class="md-nav__link">
+    QueueConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuetype" class="md-nav__link">
+    QueueType
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool" class="md-nav__link">
+    DynamicWorkerPool
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerpoolconfig" class="md-nav__link">
+    WorkerPoolConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerpoolstats" class="md-nav__link">
+    WorkerPoolStats
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resultrouter" class="md-nav__link">
+    ResultRouter
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaptivequeue" class="md-nav__link">
+    AdaptiveQueue
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hybridqueue" class="md-nav__link">
+    HybridQueue
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hybridqueueconfig" class="md-nav__link">
+    HybridQueueConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#droppolicy" class="md-nav__link">
+    DropPolicy
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundedqueue" class="md-nav__link">
+    BoundedQueue
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontrollercomponents" class="md-nav__link">
+    Package: internal/controller/components
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller/components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#disabled" class="md-nav__link">
+    Disabled
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitorstate" class="md-nav__link">
+    MonitorState
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulseconfig" class="md-nav__link">
+    PulseConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interventionconfig" class="md-nav__link">
+    InterventionConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#codeconfig" class="md-nav__link">
+    CodeConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colorcodeconfig" class="md-nav__link">
+    ColorCodeConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#codestatus" class="md-nav__link">
+    CodeStatus
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#colorcodestatus" class="md-nav__link">
+    ColorCodeStatus
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobstorage" class="md-nav__link">
+    JobStorage
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulseresult" class="md-nav__link">
+    PulseResult
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interventionresult" class="md-nav__link">
+    InterventionResult
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coderesult" class="md-nav__link">
+    CodeResult
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalloaderstreaming" class="md-nav__link">
+    Package: internal/loader/streaming
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/loader/streaming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamingloader" class="md-nav__link">
+    StreamingLoader
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingconfig" class="md-nav__link">
+    StreamingConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loadingstats" class="md-nav__link">
+    LoadingStats
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingentitycreator" class="md-nav__link">
+    StreamingEntityCreator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entitycreationconfig" class="md-nav__link">
+    EntityCreationConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitorbatch" class="md-nav__link">
+    MonitorBatch
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parseconfig" class="md-nav__link">
+    ParseConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#progress" class="md-nav__link">
+    Progress
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entityprogress" class="md-nav__link">
+    EntityProgress
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontrollersystems" class="md-nav__link">
+    Package: internal/controller/systems
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller/systems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logger-interface" class="md-nav__link">
+    Logger (Interface)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#statelogger" class="md-nav__link">
+    StateLogger
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memoryconfig" class="md-nav__link">
+    MemoryConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memorystats" class="md-nav__link">
+    MemoryStats
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errnopulsejob" class="md-nav__link">
+    ErrNoPulseJob
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errpulsejobtimeout" class="md-nav__link">
+    ErrPulseJobTimeout
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="types-reference">Types Reference<a class="headerlink" href="#types-reference" title="Permanent link">&para;</a></h1>
+<p>This document provides detailed documentation for all exported types in the CPRA monitoring system.</p>
+<h2 id="package-internalcontroller">Package: internal/controller<a class="headerlink" href="#package-internalcontroller" title="Permanent link">&para;</a></h2>
+<h3 id="config">Config<a class="headerlink" href="#config" title="Permanent link">&para;</a></h3>
+<p>Configuration struct for the Controller.</p>
+<p><strong>Fields:</strong>
+- <strong>Debug</strong> (bool) - Enable debug-level logging
+- <strong>StreamingConfig</strong> (streaming.StreamingConfig) - Configuration for streaming loader
+- <strong>QueueCapacity</strong> (uint64) - Initial queue capacity (must be power of 2)
+- <strong>WorkerConfig</strong> (queue.WorkerPoolConfig) - Worker pool configuration
+- <strong>BatchSize</strong> (int) - Batch size for system processing
+- <strong>UpdateInterval</strong> (time.Duration) - Update interval (deprecated, ark-tools TPS=100 controls timing)
+- <strong>SizingServiceTime</strong> (time.Duration) - τ (tau) - expected service time per job
+- <strong>SizingSLO</strong> (time.Duration) - W target - end-to-end latency SLO
+- <strong>SizingHeadroomPct</strong> (float64) - Safe headroom as fraction (e.g., 0.15 = 15%)</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When creating a new Controller instance
+- When customizing system behavior before initialization</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">DefaultConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">Debug</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">QueueCapacity</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">131072</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">BatchSize</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">2000</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">SizingServiceTime</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">20</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">SizingSLO</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">SizingHeadroomPct</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mf">0.15</span>
+<span class="nx">ctrl</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewController</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="controller">Controller<a class="headerlink" href="#controller" title="Permanent link">&para;</a></h3>
+<p>Manages the ECS world and its systems using ark-tools.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported (internal state)</p>
+<p><strong>Methods:</strong>
+- LoadMonitors(ctx context.Context, filename string) error
+- Start() error
+- Stop()
+- GetWorld() *ecs.World
+- PrintShutdownMetrics()
+- CheckEntityCountAndSwitchQueue()</p>
+<p><strong>Used by:</strong>
+- Main application entry point
+- Integration tests</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">DefaultConfig</span><span class="p">()</span>
+<span class="nx">ctrl</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewController</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">Stop</span><span class="p">()</span>
+
+<span class="nx">ctx</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">()</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">LoadMonitors</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;monitors.yaml&quot;</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">Start</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h3 id="logger">Logger<a class="headerlink" href="#logger" title="Permanent link">&para;</a></h3>
+<p>Structured logger for component-specific logging with multiple log levels.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Debug(format string, args ...interface{})
+- Info(format string, args ...interface{})
+- Warn(format string, args ...interface{})
+- Error(format string, args ...interface{})
+- LogSystemPerformance(name string, duration time.Duration, count int)</p>
+<p><strong>When to use:</strong>
+- When creating component-specific loggers
+- For structured logging with different severity levels</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewLogger</span><span class="p">(</span><span class="s">&quot;MyComponent&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="nx">logger</span><span class="p">.</span><span class="nx">Info</span><span class="p">(</span><span class="s">&quot;Component started&quot;</span><span class="p">)</span>
+<span class="nx">logger</span><span class="p">.</span><span class="nx">Debug</span><span class="p">(</span><span class="s">&quot;Processing item %d&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">itemID</span><span class="p">)</span>
+<span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="s">&quot;Failed to process: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="loggeradapter">LoggerAdapter<a class="headerlink" href="#loggeradapter" title="Permanent link">&para;</a></h3>
+<p>Adapts the controller loggers to the systems interface.</p>
+<p><strong>Fields:</strong>
+- logger (interface) - Logger implementation</p>
+<p><strong>Methods:</strong>
+- Info(format string, args ...interface{})
+- Debug(format string, args ...interface{})
+- Warn(format string, args ...interface{})
+- Error(format string, args ...interface{})
+- LogSystemPerformance(name string, duration time.Duration, count int)
+- LogComponentState(entityID uint32, component string, action string)</p>
+<p><strong>When to use:</strong>
+- Internal adapter - typically not used directly by applications</p>
+<h3 id="metricsaggregator">MetricsAggregator<a class="headerlink" href="#metricsaggregator" title="Permanent link">&para;</a></h3>
+<p>Aggregates system performance metrics.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- RecordSystemMetric(name string, count int, duration time.Duration)
+- GetAggregateMetrics() AggregateMetrics</p>
+<p><strong>When to use:</strong>
+- When collecting and aggregating system performance data
+- For performance monitoring and analysis</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">metrics</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewMetricsAggregator</span><span class="p">()</span>
+<span class="nx">metrics</span><span class="p">.</span><span class="nx">RecordSystemMetric</span><span class="p">(</span><span class="s">&quot;pulse&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">50</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span><span class="p">)</span>
+<span class="nx">aggregate</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">metrics</span><span class="p">.</span><span class="nx">GetAggregateMetrics</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Total operations: %d\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">aggregate</span><span class="p">.</span><span class="nx">TotalOperations</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="memorymanager">MemoryManager<a class="headerlink" href="#memorymanager" title="Permanent link">&para;</a></h3>
+<p>Monitors and controls application memory usage.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Start()
+- Stop()
+- GetMemoryStats() (alloc, totalAlloc, sys uint64)</p>
+<p><strong>When to use:</strong>
+- When managing application memory limits
+- For automatic GC triggering based on memory thresholds</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">memMgr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewMemoryManager</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">)</span><span class="w"> </span><span class="c1">// 8GB max, 30s GC interval</span>
+<span class="nx">memMgr</span><span class="p">.</span><span class="nx">Start</span><span class="p">()</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">memMgr</span><span class="p">.</span><span class="nx">Stop</span><span class="p">()</span>
+</code></pre></div></p>
+<h3 id="recoverysystem">RecoverySystem<a class="headerlink" href="#recoverysystem" title="Permanent link">&para;</a></h3>
+<p>Tracks errors and provides circuit breaker functionality.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- RecordError()
+- ShouldRecover() bool
+- Reset()</p>
+<p><strong>When to use:</strong>
+- When implementing error tracking and recovery logic
+- For circuit breaker patterns</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">recovery</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewRecoverySystem</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">doOperation</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">recovery</span><span class="p">.</span><span class="nx">RecordError</span><span class="p">()</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">recovery</span><span class="p">.</span><span class="nx">ShouldRecover</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Trigger recovery logic</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h3 id="tracer">Tracer<a class="headerlink" href="#tracer" title="Permanent link">&para;</a></h3>
+<p>Distributed tracer for component tracing.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- StartSpan(operation string) <em>TraceSpan
+- GetSpan(spanID string) (</em>TraceSpan, bool)</p>
+<p><strong>When to use:</strong>
+- When implementing distributed tracing
+- For performance analysis and debugging</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">tracer</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewTracer</span><span class="p">(</span><span class="s">&quot;PulseSystem&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="nx">span</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">tracer</span><span class="p">.</span><span class="nx">StartSpan</span><span class="p">(</span><span class="s">&quot;ProcessPulse&quot;</span><span class="p">)</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">span</span><span class="p">.</span><span class="nx">End</span><span class="p">()</span>
+<span class="c1">// ... do work ...</span>
+</code></pre></div></p>
+<h3 id="tracespan">TraceSpan<a class="headerlink" href="#tracespan" title="Permanent link">&para;</a></h3>
+<p>Represents a single trace span.</p>
+<p><strong>Fields:</strong>
+- SpanID (string) - Unique span identifier
+- Operation (string) - Operation name
+- StartTime (time.Time) - Span start time
+- EndTime (time.Time) - Span end time (zero if not ended)
+- Duration (time.Duration) - Span duration
+- Component (string) - Component name</p>
+<p><strong>Methods:</strong>
+- End()
+- AddMetadata(key string, value interface{})</p>
+<p><strong>When to use:</strong>
+- Automatically created by Tracer.StartSpan()
+- For tracking operation timing</p>
+<hr />
+<h2 id="package-internalqueue">Package: internal/queue<a class="headerlink" href="#package-internalqueue" title="Permanent link">&para;</a></h2>
+<p><img alt="Queue and Worker Pool Architecture" src="../../images/queue-worker-pool.png" /></p>
+<p><em>The queue package provides multiple queue implementations and a dynamic worker pool system. For detailed architecture explanation, see the <a href="../../explanation/architecture-overview/">Architecture Overview</a> document.</em></p>
+<h3 id="queue-interface">Queue (Interface)<a class="headerlink" href="#queue-interface" title="Permanent link">&para;</a></h3>
+<p>Defines the interface for a generic, thread-safe queue system.</p>
+<p><strong>Methods:</strong>
+- Enqueue(job jobs.Job) error
+- EnqueueBatch(jobs []interface{}) error
+- Dequeue() (jobs.Job, error)
+- DequeueBatch(maxSize int) ([]jobs.Job, error)
+- Close()
+- Stats() Stats</p>
+<p><strong>Implementations:</strong>
+- AdaptiveQueue
+- WorkivaQueue
+- HybridQueue
+- BoundedQueue</p>
+<p><strong>When to use:</strong>
+- When you need a decoupled queue interface
+- For dependency injection and testing</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">Queue</span>
+<span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultQueueConfig</span><span class="p">()</span>
+<span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">q</span><span class="p">.</span><span class="nx">Close</span><span class="p">()</span>
+
+<span class="nx">err</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">q</span><span class="p">.</span><span class="nx">Enqueue</span><span class="p">(</span><span class="nx">myJob</span><span class="p">)</span>
+<span class="nx">stats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">q</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Queue depth: %d\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">QueueDepth</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="stats">Stats<a class="headerlink" href="#stats" title="Permanent link">&para;</a></h3>
+<p>Performance metrics for a queue.</p>
+<p><strong>Fields:</strong>
+- <strong>LastEnqueue</strong> (time.Time) - Time of last enqueue operation
+- <strong>LastDequeue</strong> (time.Time) - Time of last dequeue operation
+- <strong>AvgQueueTime</strong> (time.Duration) - Average time jobs spend in queue
+- <strong>MaxQueueTime</strong> (time.Duration) - Maximum time a job spent in queue
+- <strong>Dequeued</strong> (int64) - Total jobs dequeued
+- <strong>Dropped</strong> (int64) - Total jobs dropped
+- <strong>QueueDepth</strong> (int) - Current number of jobs in queue
+- <strong>MaxJobLatency</strong> (time.Duration) - Maximum job latency observed
+- <strong>AvgJobLatency</strong> (time.Duration) - Average job latency
+- <strong>EnqueueRate</strong> (float64) - Enqueue rate (jobs/sec)
+- <strong>DequeueRate</strong> (float64) - Dequeue rate (jobs/sec)
+- <strong>Enqueued</strong> (int64) - Total jobs enqueued
+- <strong>Capacity</strong> (int) - Queue capacity
+- <strong>SampleWindow</strong> (time.Duration) - Time window for rate calculations</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When monitoring queue performance
+- For capacity planning and sizing decisions</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">stats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">myQueue</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Enqueue rate: %.2f jobs/sec\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">EnqueueRate</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Queue depth: %d/%d (%.1f%% full)\n&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w">    </span><span class="nx">stats</span><span class="p">.</span><span class="nx">QueueDepth</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">Capacity</span><span class="p">,</span><span class="w"> </span>
+<span class="w">    </span><span class="mf">100.0</span><span class="o">*</span><span class="nb">float64</span><span class="p">(</span><span class="nx">stats</span><span class="p">.</span><span class="nx">QueueDepth</span><span class="p">)</span><span class="o">/</span><span class="nb">float64</span><span class="p">(</span><span class="nx">stats</span><span class="p">.</span><span class="nx">Capacity</span><span class="p">))</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Avg queue time: %v\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">AvgQueueTime</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="queueconfig">QueueConfig<a class="headerlink" href="#queueconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for queue creation.</p>
+<p><strong>Fields:</strong>
+- <strong>Name</strong> (string) - Queue name for logging
+- <strong>Type</strong> (QueueType) - Type of queue to create
+- <strong>Capacity</strong> (int) - Queue capacity
+- <strong>HybridConfig</strong> (HybridQueueConfig) - Configuration for hybrid queues</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When creating queues with specific configuration
+- For customizing queue behavior</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">QueueConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Name</span><span class="p">:</span><span class="w">     </span><span class="s">&quot;pulse&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Type</span><span class="p">:</span><span class="w">     </span><span class="nx">queue</span><span class="p">.</span><span class="nx">QueueTypeHybrid</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Capacity</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">HybridConfig</span><span class="p">:</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">HybridQueueConfig</span><span class="p">{</span>
+<span class="w">        </span><span class="nx">RingCapacity</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">HeapCapacity</span><span class="p">:</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">DropPolicy</span><span class="p">:</span><span class="w">   </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DropPolicyDropNewest</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="p">}</span>
+<span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="queuetype">QueueType<a class="headerlink" href="#queuetype" title="Permanent link">&para;</a></h3>
+<p>Represents the type of queue to create.</p>
+<p><strong>Constants:</strong>
+- <strong>QueueTypeAdaptive</strong> ("adaptive") - Adaptive queue that adjusts behavior
+- <strong>QueueTypeWorkiva</strong> ("workiva") - Workiva ring buffer queue
+- <strong>QueueTypeHybrid</strong> ("hybrid") - Hybrid ring buffer + heap queue</p>
+<p><strong>When to use:</strong>
+- When specifying queue type in QueueConfig</p>
+<h3 id="dynamicworkerpool">DynamicWorkerPool<a class="headerlink" href="#dynamicworkerpool" title="Permanent link">&para;</a></h3>
+<p>Manages a pool of workers that execute jobs from a queue with dynamic scaling.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Start()
+- DrainAndStop()
+- GetRouter() *ResultRouter
+- Stats() WorkerPoolStats
+- Pause()
+- Resume()
+- ReplaceQueue(newQueue Queue) error</p>
+<p><strong>When to use:</strong>
+- When you need concurrent job processing with auto-scaling
+- For processing jobs from queues with result routing</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultWorkerPoolConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">MinWorkers</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">5</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">MaxWorkers</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">100</span>
+<span class="nx">pool</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewDynamicWorkerPool</span><span class="p">(</span><span class="nx">myQueue</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">pool</span><span class="p">.</span><span class="nx">Start</span><span class="p">()</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">DrainAndStop</span><span class="p">()</span>
+
+<span class="nx">router</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">GetRouter</span><span class="p">()</span>
+<span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">router</span><span class="p">.</span><span class="nx">PulseResultChan</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">processResults</span><span class="p">(</span><span class="nx">results</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}()</span>
+</code></pre></div></p>
+<h3 id="workerpoolconfig">WorkerPoolConfig<a class="headerlink" href="#workerpoolconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for the DynamicWorkerPool.</p>
+<p><strong>Fields:</strong>
+- <strong>MinWorkers</strong> (int) - Minimum number of workers
+- <strong>MaxWorkers</strong> (int) - Maximum number of workers
+- <strong>AdjustmentInterval</strong> (time.Duration) - How often to adjust worker count
+- <strong>ResultBatchSize</strong> (int) - Batch size for result processing
+- <strong>ResultBatchTimeout</strong> (time.Duration) - Timeout for partial batches
+- <strong>ResultChannelDepth</strong> (int) - Buffer size for result channels
+- <strong>TargetQueueLatency</strong> (time.Duration) - Target queue latency for scaling
+- <strong>PreAlloc</strong> (bool) - Pre-allocate worker goroutines
+- <strong>NonBlocking</strong> (bool) - Use non-blocking mode
+- <strong>MaxBlockingTasks</strong> (int) - Max tasks to block on (0 = unlimited)
+- <strong>ExpiryDuration</strong> (time.Duration) - Worker expiry duration</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When creating DynamicWorkerPool instances
+- For customizing worker pool behavior</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">WorkerPoolConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">MinWorkers</span><span class="p">:</span><span class="w">         </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">MaxWorkers</span><span class="p">:</span><span class="w">         </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">AdjustmentInterval</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ResultBatchSize</span><span class="p">:</span><span class="w">    </span><span class="mi">512</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ResultBatchTimeout</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ResultChannelDepth</span><span class="p">:</span><span class="w"> </span><span class="mi">2048</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">TargetQueueLatency</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">PreAlloc</span><span class="p">:</span><span class="w">           </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">NonBlocking</span><span class="p">:</span><span class="w">        </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ExpiryDuration</span><span class="p">:</span><span class="w">     </span><span class="mi">5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">pool</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewDynamicWorkerPool</span><span class="p">(</span><span class="nx">myQueue</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="workerpoolstats">WorkerPoolStats<a class="headerlink" href="#workerpoolstats" title="Permanent link">&para;</a></h3>
+<p>Runtime metrics for the dynamic worker pool.</p>
+<p><strong>Fields:</strong>
+- <strong>LastScaleTime</strong> (time.Time) - Time of last scaling event
+- <strong>MinWorkers</strong> (int) - Minimum worker limit
+- <strong>MaxWorkers</strong> (int) - Maximum worker limit
+- <strong>CurrentCapacity</strong> (int) - Current worker capacity
+- <strong>RunningWorkers</strong> (int) - Currently running workers
+- <strong>WaitingTasks</strong> (int) - Tasks waiting for workers
+- <strong>TargetWorkers</strong> (int) - Target worker count
+- <strong>TasksSubmitted</strong> (int64) - Total tasks submitted
+- <strong>TasksCompleted</strong> (int64) - Total tasks completed
+- <strong>ScalingEvents</strong> (int64) - Number of scaling events
+- <strong>PendingResults</strong> (int) - Results waiting to be processed</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When monitoring worker pool performance
+- For debugging worker pool behavior</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">stats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">utilization</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">100.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nb">float64</span><span class="p">(</span><span class="nx">stats</span><span class="p">.</span><span class="nx">RunningWorkers</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nb">float64</span><span class="p">(</span><span class="nx">stats</span><span class="p">.</span><span class="nx">CurrentCapacity</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Workers: %d/%d (%.1f%% utilized)\n&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w">    </span><span class="nx">stats</span><span class="p">.</span><span class="nx">RunningWorkers</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">CurrentCapacity</span><span class="p">,</span><span class="w"> </span><span class="nx">utilization</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Tasks: %d submitted, %d completed\n&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w">    </span><span class="nx">stats</span><span class="p">.</span><span class="nx">TasksSubmitted</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">TasksCompleted</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="resultrouter">ResultRouter<a class="headerlink" href="#resultrouter" title="Permanent link">&para;</a></h3>
+<p>Routes job results to type-specific channels.</p>
+<p><strong>Fields:</strong>
+- <strong>PulseResultChan</strong> (chan []jobs.Result) - Channel for pulse results
+- <strong>InterventionResultChan</strong> (chan []jobs.Result) - Channel for intervention results
+- <strong>CodeResultChan</strong> (chan []jobs.Result) - Channel for code results</p>
+<p><strong>Methods:</strong>
+- RouteResults(results []jobs.Result)
+- Close()</p>
+<p><strong>When to use:</strong>
+- Automatically used by DynamicWorkerPool
+- For accessing type-specific result channels</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">router</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">GetRouter</span><span class="p">()</span>
+
+<span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">router</span><span class="p">.</span><span class="nx">PulseResultChan</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">processPulseResult</span><span class="p">(</span><span class="nx">result</span><span class="p">)</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}()</span>
+
+<span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">router</span><span class="p">.</span><span class="nx">InterventionResultChan</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">processInterventionResult</span><span class="p">(</span><span class="nx">result</span><span class="p">)</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}()</span>
+</code></pre></div></p>
+<h3 id="adaptivequeue">AdaptiveQueue<a class="headerlink" href="#adaptivequeue" title="Permanent link">&para;</a></h3>
+<p>Adaptive queue that adjusts its behavior based on load.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Implements Queue interface</p>
+<p><strong>When to use:</strong>
+- For very large entity counts (&gt;500K monitors)
+- When load patterns are unpredictable</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewAdaptiveQueue</span><span class="p">(</span><span class="mi">65536</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h3 id="hybridqueue">HybridQueue<a class="headerlink" href="#hybridqueue" title="Permanent link">&para;</a></h3>
+<p>Combines ring buffer and heap with configurable drop policy.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Implements Queue interface</p>
+<p><strong>When to use:</strong>
+- Default queue choice for most workloads
+- When you need configurable drop policies</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultHybridQueueConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">DropPolicy</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DropPolicyDropNewest</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">RingCapacity</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">32768</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">HeapCapacity</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">100000</span>
+<span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewHybridQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="hybridqueueconfig">HybridQueueConfig<a class="headerlink" href="#hybridqueueconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for HybridQueue.</p>
+<p><strong>Fields:</strong>
+- <strong>Name</strong> (string) - Queue name for logging
+- <strong>RingCapacity</strong> (int) - Ring buffer capacity (must be power of 2)
+- <strong>HeapCapacity</strong> (int) - Heap capacity
+- <strong>DropPolicy</strong> (DropPolicy) - Policy when both ring and heap are full
+- <strong>SampleWindow</strong> (time.Duration) - Window for statistics calculation</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- When creating HybridQueue instances</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">HybridQueueConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Name</span><span class="p">:</span><span class="w">         </span><span class="s">&quot;myqueue&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">RingCapacity</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">HeapCapacity</span><span class="p">:</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">DropPolicy</span><span class="p">:</span><span class="w">   </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DropPolicyDropOldest</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">SampleWindow</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h3 id="droppolicy">DropPolicy<a class="headerlink" href="#droppolicy" title="Permanent link">&para;</a></h3>
+<p>Policy for dropping items when queue is full.</p>
+<p><strong>Constants:</strong>
+- <strong>DropPolicyReject</strong> - Reject new items (return error)
+- <strong>DropPolicyDropOldest</strong> - Drop oldest items
+- <strong>DropPolicyDropNewest</strong> - Drop newest items</p>
+<p><strong>When to use:</strong>
+- When configuring HybridQueue behavior</p>
+<h3 id="boundedqueue">BoundedQueue<a class="headerlink" href="#boundedqueue" title="Permanent link">&para;</a></h3>
+<p>Fixed-capacity queue with blocking behavior.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Implements Queue interface</p>
+<p><strong>When to use:</strong>
+- When you need strict capacity limits
+- For testing or simple scenarios</p>
+<hr />
+<h2 id="package-internalcontrollercomponents">Package: internal/controller/components<a class="headerlink" href="#package-internalcontrollercomponents" title="Permanent link">&para;</a></h2>
+<h3 id="disabled">Disabled<a class="headerlink" href="#disabled" title="Permanent link">&para;</a></h3>
+<p>Zero-size tag component marking an entity as disabled.</p>
+<p><strong>Fields:</strong>
+- None (zero-size struct)</p>
+<p><strong>Methods:</strong>
+- None</p>
+<p><strong>When to use:</strong>
+- Added to entities that should be excluded from processing
+- Using a tag allows filters to exclude disabled entities efficiently at the archetype level</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="c1">// Add Disabled component to an entity</span>
+<span class="nx">world</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="nx">entity</span><span class="p">,</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">Disabled</span><span class="p">]())</span>
+
+<span class="c1">// Filter excludes disabled entities</span>
+<span class="nx">filter</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">NewFilter2</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">MonitorState</span><span class="p">,</span><span class="w"> </span><span class="nx">components</span><span class="p">.</span><span class="nx">PulseConfig</span><span class="p">](</span><span class="nx">world</span><span class="p">).</span>
+<span class="w">    </span><span class="nx">Without</span><span class="p">(</span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">Disabled</span><span class="p">]())</span>
+</code></pre></div></p>
+<h3 id="monitorstate">MonitorState<a class="headerlink" href="#monitorstate" title="Permanent link">&para;</a></h3>
+<p>Consolidates all monitor state into a single component.</p>
+<p><strong>Fields:</strong>
+- <strong>LastCheckTime</strong> (time.Time) - Time of last health check
+- <strong>LastSuccessTime</strong> (time.Time) - Time of last successful check
+- <strong>NextCheckTime</strong> (time.Time) - Scheduled time for next check
+- <strong>LastError</strong> (error) - Last error encountered
+- <strong>Name</strong> (string) - Monitor name
+- <strong>PendingCode</strong> (string) - Pending code color
+- <strong>ConsecutiveFailures</strong> (int) - Number of consecutive failures
+- <strong>PulseFailures</strong> (int) - Total pulse failures
+- <strong>InterventionFailures</strong> (int) - Total intervention failures
+- <strong>RecoveryStreak</strong> (int) - Current recovery streak
+- <strong>VerifyRemaining</strong> (int) - Remaining verification checks
+- <strong>Flags</strong> (uint32) - Bitfield for state flags</p>
+<p><strong>State Flag Constants:</strong>
+- StatePulseNeeded (1 &lt;&lt; 1)
+- StatePulsePending (1 &lt;&lt; 2)
+- StatePulseFirstCheck (1 &lt;&lt; 3)
+- StateInterventionNeeded (1 &lt;&lt; 5)
+- StateInterventionPending (1 &lt;&lt; 6)
+- StateCodeNeeded (1 &lt;&lt; 7)
+- StateCodePending (1 &lt;&lt; 8)
+- StateIncidentOpen (1 &lt;&lt; 9)
+- StateVerifying (1 &lt;&lt; 10)</p>
+<p><strong>Methods:</strong>
+- IsPulseNeeded() bool
+- IsPulsePending() bool
+- IsPulseFirstCheck() bool
+- IsInterventionNeeded() bool
+- IsInterventionPending() bool
+- IsCodeNeeded() bool
+- IsCodePending() bool
+- SetPulseNeeded(needed bool)
+- SetPulsePending(pending bool)
+- SetPulseFirstCheck(firstCheck bool)
+- SetInterventionNeeded(needed bool)
+- SetInterventionPending(pending bool)
+- SetCodeNeeded(needed bool)
+- SetCodePending(pending bool)</p>
+<p><strong>When to use:</strong>
+- Required component for all monitor entities
+- Tracks complete monitor state in a single component</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">state</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">MonitorState</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Name</span><span class="p">:</span><span class="w">         </span><span class="s">&quot;web-server-01&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">NextCheckTime</span><span class="p">:</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">().</span><span class="nx">Add</span><span class="p">(</span><span class="mi">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">),</span>
+<span class="p">}</span>
+<span class="nx">state</span><span class="p">.</span><span class="nx">SetPulseNeeded</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+<span class="nx">world</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="nx">entity</span><span class="p">,</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">MonitorState</span><span class="p">](),</span><span class="w"> </span><span class="nx">state</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="pulseconfig">PulseConfig<a class="headerlink" href="#pulseconfig" title="Permanent link">&para;</a></h3>
+<p>Consolidates pulse configuration.</p>
+<p><strong>Fields:</strong>
+- <strong>Config</strong> (schema.PulseConfig) - Type-specific pulse configuration
+- <strong>Type</strong> (string) - Pulse type (http, tcp, icmp, etc.)
+- <strong>Timeout</strong> (time.Duration) - Check timeout
+- <strong>Interval</strong> (time.Duration) - Check interval
+- <strong>Retries</strong> (int) - Number of retries on failure
+- <strong>UnhealthyThreshold</strong> (int) - Failures before marking unhealthy
+- <strong>HealthyThreshold</strong> (int) - Successes before marking healthy</p>
+<p><strong>Methods:</strong>
+- Copy() *PulseConfig - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Attached to entities that require health checking
+- Defines how and when pulse checks are performed</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">pulseCfg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">PulseConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Type</span><span class="p">:</span><span class="w">               </span><span class="s">&quot;http&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Interval</span><span class="p">:</span><span class="w">           </span><span class="mi">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Timeout</span><span class="p">:</span><span class="w">            </span><span class="mi">5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Retries</span><span class="p">:</span><span class="w">            </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">UnhealthyThreshold</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">HealthyThreshold</span><span class="p">:</span><span class="w">   </span><span class="mi">2</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">world</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="nx">entity</span><span class="p">,</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">PulseConfig</span><span class="p">](),</span><span class="w"> </span><span class="nx">pulseCfg</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="interventionconfig">InterventionConfig<a class="headerlink" href="#interventionconfig" title="Permanent link">&para;</a></h3>
+<p>Consolidates intervention configuration.</p>
+<p><strong>Fields:</strong>
+- <strong>Target</strong> (schema.InterventionTarget) - Intervention target configuration
+- <strong>Action</strong> (string) - Action to perform (restart, reboot, etc.)
+- <strong>MaxFailures</strong> (int) - Maximum failures before giving up</p>
+<p><strong>Methods:</strong>
+- Copy() *InterventionConfig - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Attached to entities that support automated remediation
+- Defines remediation actions</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">intCfg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">InterventionConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Action</span><span class="p">:</span><span class="w">      </span><span class="s">&quot;restart&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">MaxFailures</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">world</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="nx">entity</span><span class="p">,</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">InterventionConfig</span><span class="p">](),</span><span class="w"> </span><span class="nx">intCfg</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="codeconfig">CodeConfig<a class="headerlink" href="#codeconfig" title="Permanent link">&para;</a></h3>
+<p>Consolidates all code configurations.</p>
+<p><strong>Fields:</strong>
+- <strong>Configs</strong> (map[string]*ColorCodeConfig) - Map of color to configuration</p>
+<p><strong>Methods:</strong>
+- Copy() *CodeConfig - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Attached to entities that require alerting
+- Supports multiple code colors per monitor</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">codeConfig</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">CodeConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Configs</span><span class="p">:</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="nx">components</span><span class="p">.</span><span class="nx">ColorCodeConfig</span><span class="p">{</span>
+<span class="w">        </span><span class="s">&quot;red&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">Notify</span><span class="p">:</span><span class="w">   </span><span class="s">&quot;pagerduty&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nx">Dispatch</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="s">&quot;yellow&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nx">Notify</span><span class="p">:</span><span class="w">   </span><span class="s">&quot;slack&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nx">Dispatch</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="p">}</span>
+<span class="nx">world</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="nx">entity</span><span class="p">,</span><span class="w"> </span><span class="nx">ecs</span><span class="p">.</span><span class="nx">C</span><span class="p">[</span><span class="nx">components</span><span class="p">.</span><span class="nx">CodeConfig</span><span class="p">](),</span><span class="w"> </span><span class="nx">codeConfig</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="colorcodeconfig">ColorCodeConfig<a class="headerlink" href="#colorcodeconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for a specific code color.</p>
+<p><strong>Fields:</strong>
+- <strong>Config</strong> (schema.CodeNotification) - Notification configuration
+- <strong>Notify</strong> (string) - Notification target
+- <strong>MaxFailures</strong> (int) - Max failures before escalation
+- <strong>Dispatch</strong> (bool) - Whether to dispatch immediately</p>
+<p><strong>Methods:</strong>
+- Copy() *ColorCodeConfig - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Used within CodeConfig map</p>
+<h3 id="codestatus">CodeStatus<a class="headerlink" href="#codestatus" title="Permanent link">&para;</a></h3>
+<p>Consolidates all code status.</p>
+<p><strong>Fields:</strong>
+- <strong>Status</strong> (map[string]*ColorCodeStatus) - Map of color to status</p>
+<p><strong>Methods:</strong>
+- Copy() *CodeStatus - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Tracks status of code notifications per color</p>
+<h3 id="colorcodestatus">ColorCodeStatus<a class="headerlink" href="#colorcodestatus" title="Permanent link">&para;</a></h3>
+<p>Status for a specific code color.</p>
+<p><strong>Fields:</strong>
+- <strong>LastAlertTime</strong> (time.Time) - Time of last alert
+- <strong>LastSuccessTime</strong> (time.Time) - Time of last successful notification
+- <strong>LastError</strong> (error) - Last error encountered
+- <strong>LastStatus</strong> (string) - Last status ("success" or "failed")
+- <strong>ConsecutiveFailures</strong> (int) - Consecutive notification failures</p>
+<p><strong>Methods:</strong>
+- SetSuccess(t time.Time)
+- SetFailure(err error)
+- Copy() *ColorCodeStatus - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Used within CodeStatus map</p>
+<h3 id="jobstorage">JobStorage<a class="headerlink" href="#jobstorage" title="Permanent link">&para;</a></h3>
+<p>Consolidates all job storage.</p>
+<p><strong>Fields:</strong>
+- <strong>PulseJob</strong> (jobs.Job) - Pulse job
+- <strong>InterventionJob</strong> (jobs.Job) - Intervention job
+- <strong>CodeJobs</strong> (map[string]jobs.Job) - Code jobs by color</p>
+<p><strong>Methods:</strong>
+- Copy() *JobStorage - Creates a deep copy</p>
+<p><strong>When to use:</strong>
+- Stores pre-created jobs for an entity
+- Added before jobs are enqueued</p>
+<h3 id="pulseresult">PulseResult<a class="headerlink" href="#pulseresult" title="Permanent link">&para;</a></h3>
+<p>Result component for pulse jobs.</p>
+<p><strong>Fields:</strong>
+- <strong>Result</strong> (jobs.Result) - Job result</p>
+<p><strong>Methods:</strong>
+- None</p>
+<p><strong>When to use:</strong>
+- Added by worker pool result router
+- Removed by BatchPulseResultSystem after processing</p>
+<h3 id="interventionresult">InterventionResult<a class="headerlink" href="#interventionresult" title="Permanent link">&para;</a></h3>
+<p>Result component for intervention jobs.</p>
+<p><strong>Fields:</strong>
+- <strong>Result</strong> (jobs.Result) - Job result</p>
+<p><strong>Methods:</strong>
+- None</p>
+<p><strong>When to use:</strong>
+- Added by worker pool result router
+- Removed by BatchInterventionResultSystem after processing</p>
+<h3 id="coderesult">CodeResult<a class="headerlink" href="#coderesult" title="Permanent link">&para;</a></h3>
+<p>Result component for code notification jobs.</p>
+<p><strong>Fields:</strong>
+- <strong>Result</strong> (jobs.Result) - Job result</p>
+<p><strong>Methods:</strong>
+- None</p>
+<p><strong>When to use:</strong>
+- Added by worker pool result router
+- Removed by BatchCodeResultSystem after processing</p>
+<hr />
+<h2 id="package-internalloaderstreaming">Package: internal/loader/streaming<a class="headerlink" href="#package-internalloaderstreaming" title="Permanent link">&para;</a></h2>
+<h3 id="streamingloader">StreamingLoader<a class="headerlink" href="#streamingloader" title="Permanent link">&para;</a></h3>
+<p>Orchestrates the streaming loading process.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- Load(ctx context.Context) (*LoadingStats, error)</p>
+<p><strong>When to use:</strong>
+- When loading monitor configurations from large files
+- Supports streaming for memory-efficient loading</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">DefaultStreamingConfig</span><span class="p">()</span>
+<span class="nx">loader</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">NewStreamingLoader</span><span class="p">(</span><span class="s">&quot;monitors.yaml&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+<span class="nx">stats</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">loader</span><span class="p">.</span><span class="nx">Load</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Loaded %d monitors\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">TotalEntities</span><span class="p">)</span>
+</code></pre></div></p>
+<h3 id="streamingconfig">StreamingConfig<a class="headerlink" href="#streamingconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for streaming loader.</p>
+<p><strong>Fields:</strong>
+- <strong>ParseBatchSize</strong> (int) - Batch size for parsing
+- <strong>ParseBufferSize</strong> (int) - Buffer size for file reading
+- <strong>MaxParseMemory</strong> (int64) - Maximum memory for parsing
+- <strong>EntityBatchSize</strong> (int) - Batch size for entity creation
+- <strong>PreAllocateCount</strong> (int) - Number of entities to pre-allocate
+- <strong>MaxWorkers</strong> (int) - Maximum concurrent workers
+- <strong>ProgressInterval</strong> (time.Duration) - Progress reporting interval
+- <strong>GCInterval</strong> (time.Duration) - GC interval during loading
+- <strong>MemoryLimit</strong> (int64) - Memory limit
+- <strong>StrictUnknownFields</strong> (bool) - Error on unknown fields
+- <strong>JSONUseNumber</strong> (bool) - Use number type for JSON numbers</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Configuring StreamingLoader behavior</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">StreamingConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">ParseBatchSize</span><span class="p">:</span><span class="w">   </span><span class="mi">20000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">EntityBatchSize</span><span class="p">:</span><span class="w">  </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">PreAllocateCount</span><span class="p">:</span><span class="w"> </span><span class="mi">1000000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">ProgressInterval</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h3 id="loadingstats">LoadingStats<a class="headerlink" href="#loadingstats" title="Permanent link">&para;</a></h3>
+<p>Comprehensive loading statistics.</p>
+<p><strong>Fields:</strong>
+- <strong>TotalEntities</strong> (int64) - Total entities loaded
+- <strong>LoadingTime</strong> (time.Duration) - Total loading time
+- <strong>ParseRate</strong> (float64) - Parse rate (entities/sec)
+- <strong>CreationRate</strong> (float64) - Creation rate (entities/sec)
+- <strong>MemoryUsage</strong> (int64) - Memory used during loading
+- <strong>GCCount</strong> (int) - Number of GC cycles
+- <strong>PulseRate</strong> (float64) - Expected pulse arrival rate (jobs/sec)</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Returned by StreamingLoader.Load()
+- For analyzing loading performance</p>
+<h3 id="streamingentitycreator">StreamingEntityCreator<a class="headerlink" href="#streamingentitycreator" title="Permanent link">&para;</a></h3>
+<p>Handles batch entity creation for Ark ECS.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- ProcessBatches(ctx context.Context, batchChan &lt;-chan MonitorBatch, progressChan chan&lt;- EntityProgress) error
+- GetStats() (entitiesCreated int64, batchesProcessed int64, rate float64)
+- PulseRate() float64</p>
+<p><strong>When to use:</strong>
+- Used internally by StreamingLoader
+- Can be used standalone for custom loading</p>
+<h3 id="entitycreationconfig">EntityCreationConfig<a class="headerlink" href="#entitycreationconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for entity creation.</p>
+<p><strong>Fields:</strong>
+- <strong>ProgressChan</strong> (chan&lt;- EntityProgress) - Channel for progress updates
+- <strong>BatchSize</strong> (int) - Batch size
+- <strong>PreAllocate</strong> (int) - Number of entities to pre-allocate</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Configuring StreamingEntityCreator</p>
+<h3 id="monitorbatch">MonitorBatch<a class="headerlink" href="#monitorbatch" title="Permanent link">&para;</a></h3>
+<p>Represents a batch of monitors read from a file.</p>
+<p><strong>Fields:</strong>
+- <strong>Monitors</strong> ([]schema.Monitor) - Monitors in batch
+- <strong>BatchID</strong> (int) - Batch identifier
+- <strong>Offset</strong> (int64) - File offset</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Internal data structure for streaming</p>
+<h3 id="parseconfig">ParseConfig<a class="headerlink" href="#parseconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for streaming parsers.</p>
+<p><strong>Fields:</strong>
+- <strong>ProgressChan</strong> (chan&lt;- Progress) - Channel for progress updates
+- <strong>BatchSize</strong> (int) - Parse batch size
+- <strong>BufferSize</strong> (int) - File buffer size
+- <strong>MaxMemory</strong> (int64) - Maximum memory for parsing
+- <strong>StrictUnknownFields</strong> (bool) - Error on unknown fields
+- <strong>JSONUseNumber</strong> (bool) - Use number type for JSON</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Configuring streaming parsers</p>
+<h3 id="progress">Progress<a class="headerlink" href="#progress" title="Permanent link">&para;</a></h3>
+<p>Represents parsing progress.</p>
+<p><strong>Fields:</strong>
+- <strong>EntitiesProcessed</strong> (int64) - Entities processed
+- <strong>TotalBytes</strong> (int64) - Total file bytes
+- <strong>ProcessedBytes</strong> (int64) - Bytes processed
+- <strong>Percentage</strong> (float64) - Completion percentage
+- <strong>Rate</strong> (float64) - Processing rate (entities/sec)
+- <strong>EstimatedRemaining</strong> (time.Duration) - Estimated remaining time</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Progress monitoring during loading</p>
+<h3 id="entityprogress">EntityProgress<a class="headerlink" href="#entityprogress" title="Permanent link">&para;</a></h3>
+<p>Represents entity creation progress.</p>
+<p><strong>Fields:</strong>
+- <strong>EntitiesCreated</strong> (int64) - Entities created
+- <strong>BatchesProcessed</strong> (int64) - Batches processed
+- <strong>Rate</strong> (float64) - Creation rate (entities/sec)
+- <strong>MemoryUsage</strong> (int64) - Current memory usage</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Progress monitoring during entity creation</p>
+<hr />
+<h2 id="package-internalcontrollersystems">Package: internal/controller/systems<a class="headerlink" href="#package-internalcontrollersystems" title="Permanent link">&para;</a></h2>
+<h3 id="logger-interface">Logger (Interface)<a class="headerlink" href="#logger-interface" title="Permanent link">&para;</a></h3>
+<p>Interface for system loggers.</p>
+<p><strong>Methods:</strong>
+- Info(format string, args ...interface{})
+- Debug(format string, args ...interface{})
+- Warn(format string, args ...interface{})
+- Error(format string, args ...interface{})
+- LogSystemPerformance(name string, duration time.Duration, count int)</p>
+<p><strong>When to use:</strong>
+- Interface for injecting loggers into systems</p>
+<h3 id="statelogger">StateLogger<a class="headerlink" href="#statelogger" title="Permanent link">&para;</a></h3>
+<p>Tracks entity state transitions.</p>
+<p><strong>Fields:</strong>
+- All fields are unexported</p>
+<p><strong>Methods:</strong>
+- LogStateChange(entityID uint32, component string, action string)
+- LogSystemMetrics(systemName string, processed int, duration time.Duration)</p>
+<p><strong>When to use:</strong>
+- Debugging state transitions
+- Performance analysis</p>
+<h3 id="memoryconfig">MemoryConfig<a class="headerlink" href="#memoryconfig" title="Permanent link">&para;</a></h3>
+<p>Configuration for memory-efficient system.</p>
+<p><strong>Fields:</strong>
+- <strong>MaxEntities</strong> (int) - Maximum entities
+- <strong>PreAllocate</strong> (bool) - Pre-allocate memory</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Configuring MemoryEfficientSystem</p>
+<h3 id="memorystats">MemoryStats<a class="headerlink" href="#memorystats" title="Permanent link">&para;</a></h3>
+<p>Memory statistics.</p>
+<p><strong>Fields:</strong>
+- <strong>AllocatedEntities</strong> (int) - Allocated entities
+- <strong>ActiveEntities</strong> (int) - Active entities
+- <strong>MemoryUsage</strong> (int64) - Memory usage in bytes</p>
+<p><strong>Methods:</strong>
+- None (data struct)</p>
+<p><strong>When to use:</strong>
+- Returned by MemoryEfficientSystem for monitoring</p>
+<h3 id="errnopulsejob">ErrNoPulseJob<a class="headerlink" href="#errnopulsejob" title="Permanent link">&para;</a></h3>
+<p>Error when no pulse job is found for an entity.</p>
+<p><strong>Fields:</strong>
+- <strong>EntityID</strong> (uint32) - Entity ID</p>
+<p><strong>Methods:</strong>
+- Error() string</p>
+<p><strong>When to use:</strong>
+- Error handling in pulse systems</p>
+<h3 id="errpulsejobtimeout">ErrPulseJobTimeout<a class="headerlink" href="#errpulsejobtimeout" title="Permanent link">&para;</a></h3>
+<p>Error when pulse job times out.</p>
+<p><strong>Fields:</strong>
+- <strong>EntityID</strong> (uint32) - Entity ID
+- <strong>Timeout</strong> (time.Duration) - Timeout duration</p>
+<p><strong>Methods:</strong>
+- Error() string</p>
+<p><strong>When to use:</strong>
+- Error handling in pulse systems</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.4e0fa4ba.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2236 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A high-performance monitoring system designed for large-scale environments.">
+      
+      
+      
+      
+        <link rel="prev" href="../../how-to/deploy-to-production/">
+      
+      
+        <link rel="next" href="../types-reference/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.0">
+    
+    
+      
+        <title>API Reference - CPRA</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.9f615399.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.649f08f9.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRA" class="md-header__button md-logo" aria-label="CPRA" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRA
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ziad/cpra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/getting-started/" class="md-tabs__link">
+          
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+          
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/common-tasks/" class="md-tabs__link">
+          
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRA" class="md-nav__button md-logo" aria-label="CPRA" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    CPRA
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ziad/cpra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common Tasks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Deploy to Production
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontroller" class="md-nav__link">
+    Package: internal/controller
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functions" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#defaultconfig-config" class="md-nav__link">
+    DefaultConfig() Config
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newcontrollerconfig-config-controller" class="md-nav__link">
+    NewController(config Config) *Controller
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initializeloggersdebugmode-bool" class="md-nav__link">
+    InitializeLoggers(debugMode bool)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closeloggers" class="md-nav__link">
+    CloseLoggers()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initializetracersenabled-bool" class="md-nav__link">
+    InitializeTracers(enabled bool)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startperiodiccleanupinterval-maxage-timeduration" class="md-nav__link">
+    StartPeriodicCleanup(interval, maxAge time.Duration)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newloggercomponent-string-debugmode-bool-logger" class="md-nav__link">
+    NewLogger(component string, debugMode bool) *Logger
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newmemorymanagermaxmemorygb-uint64-gcintervalseconds-int-memorymanager" class="md-nav__link">
+    NewMemoryManager(maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newmetricsaggregator-metricsaggregator" class="md-nav__link">
+    NewMetricsAggregator() *MetricsAggregator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newrecoverysystemmaxerrors-int-resetwindow-timeduration-recoverysystem" class="md-nav__link">
+    NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newtracercomponent-string-enabled-bool-tracer" class="md-nav__link">
+    NewTracer(component string, enabled bool) *Tracer
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-methods" class="md-nav__link">
+    Controller Methods
+  </a>
+  
+    <nav class="md-nav" aria-label="Controller Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#controller-loadmonitorsctx-contextcontext-filename-string-error" class="md-nav__link">
+    (*Controller) LoadMonitors(ctx context.Context, filename string) error
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-start-error" class="md-nav__link">
+    (*Controller) Start() error
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-stop" class="md-nav__link">
+    (*Controller) Stop()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-getworld-ecsworld" class="md-nav__link">
+    (Controller) GetWorld() ecs.World
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-printshutdownmetrics" class="md-nav__link">
+    (*Controller) PrintShutdownMetrics()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controller-checkentitycountandswitchqueue" class="md-nav__link">
+    (*Controller) CheckEntityCountAndSwitchQueue()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalqueue" class="md-nav__link">
+    Package: internal/queue
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functions_1" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newqueueconfig-queueconfig-queue-error" class="md-nav__link">
+    NewQueue(config QueueConfig) (Queue, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaultqueueconfig-queueconfig" class="md-nav__link">
+    DefaultQueueConfig() QueueConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newdynamicworkerpoolq-queue-config-workerpoolconfig-logger-loglogger-dynamicworkerpool-error" class="md-nav__link">
+    NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger log.Logger) (DynamicWorkerPool, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaultworkerpoolconfig-workerpoolconfig" class="md-nav__link">
+    DefaultWorkerPoolConfig() WorkerPoolConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newresultrouterconfig-workerpoolconfig-logger-loglogger-resultrouter" class="md-nav__link">
+    NewResultRouter(config WorkerPoolConfig, logger log.Logger) ResultRouter
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmcwaitlambda-mu-float64-c-int-ca-cs-float64-wq-w-float64-err-error" class="md-nav__link">
+    MmcWait(lambda, mu float64, c int, ca, cs float64) (wq, w float64, err error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#findcforslolambda-tau-wtarget-ca-cs-float64-cmax-int-int-float64-error" class="md-nav__link">
+    FindCForSLO(lambda, tau, wTarget, ca, cs float64, cMax int) (int, float64, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendcfromobservedqs-stats-wp-workerpoolstats-wqtarget-timeduration-ca-cs-float64-int-float64-error" class="md-nav__link">
+    RecommendCFromObserved(qs Stats, wp WorkerPoolStats, wqTarget time.Duration, ca, cs float64) (int, float64, error)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queue-specific-constructors" class="md-nav__link">
+    Queue-Specific Constructors
+  </a>
+  
+    <nav class="md-nav" aria-label="Queue-Specific Constructors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newadaptivequeuecapacity-uint64-adaptivequeue-error" class="md-nav__link">
+    NewAdaptiveQueue(capacity uint64) (*AdaptiveQueue, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newworkivaqueuecapacity-int-queue" class="md-nav__link">
+    NewWorkivaQueue(capacity int) Queue
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newhybridqueueconfig-hybridqueueconfig-hybridqueue-error" class="md-nav__link">
+    NewHybridQueue(config HybridQueueConfig) (*HybridQueue, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaulthybridqueueconfig-hybridqueueconfig" class="md-nav__link">
+    DefaultHybridQueueConfig() HybridQueueConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newboundedqueueconfig-boundedqueueconfig-boundedqueue" class="md-nav__link">
+    NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-methods" class="md-nav__link">
+    DynamicWorkerPool Methods
+  </a>
+  
+    <nav class="md-nav" aria-label="DynamicWorkerPool Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-start" class="md-nav__link">
+    (*DynamicWorkerPool) Start()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-drainandstop" class="md-nav__link">
+    (*DynamicWorkerPool) DrainAndStop()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-getrouter-resultrouter" class="md-nav__link">
+    (DynamicWorkerPool) GetRouter() ResultRouter
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-stats-workerpoolstats" class="md-nav__link">
+    (*DynamicWorkerPool) Stats() WorkerPoolStats
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-pause" class="md-nav__link">
+    (*DynamicWorkerPool) Pause()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-resume" class="md-nav__link">
+    (*DynamicWorkerPool) Resume()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicworkerpool-replacequeuenewqueue-queue-error" class="md-nav__link">
+    (*DynamicWorkerPool) ReplaceQueue(newQueue Queue) error
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontrollercomponents" class="md-nav__link">
+    Package: internal/controller/components
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller/components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#types-and-methods" class="md-nav__link">
+    Types and Methods
+  </a>
+  
+    <nav class="md-nav" aria-label="Types and Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#monitorstate" class="md-nav__link">
+    MonitorState
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulseconfig" class="md-nav__link">
+    PulseConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interventionconfig" class="md-nav__link">
+    InterventionConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#codeconfig" class="md-nav__link">
+    CodeConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobstorage" class="md-nav__link">
+    JobStorage
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalloaderstreaming" class="md-nav__link">
+    Package: internal/loader/streaming
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/loader/streaming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functions_2" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newstreamingloaderfilename-string-world-ecsworld-config-streamingconfig-streamingloader" class="md-nav__link">
+    NewStreamingLoader(filename string, world ecs.World, config StreamingConfig) StreamingLoader
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaultstreamingconfig-streamingconfig" class="md-nav__link">
+    DefaultStreamingConfig() StreamingConfig
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newstreamingentitycreatorworld-ecsworld-config-entitycreationconfig-streamingentitycreator" class="md-nav__link">
+    NewStreamingEntityCreator(world ecs.World, config EntityCreationConfig) StreamingEntityCreator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newstreamingjsonparserfilename-string-config-parseconfig-streamingjsonparser-error" class="md-nav__link">
+    NewStreamingJsonParser(filename string, config ParseConfig) (*StreamingJsonParser, error)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newstreamingyamlparserfilename-string-config-parseconfig-streamingyamlparser-error" class="md-nav__link">
+    NewStreamingYamlParser(filename string, config ParseConfig) (*StreamingYamlParser, error)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingloader-methods" class="md-nav__link">
+    StreamingLoader Methods
+  </a>
+  
+    <nav class="md-nav" aria-label="StreamingLoader Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamingloader-loadctx-contextcontext-loadingstats-error" class="md-nav__link">
+    (StreamingLoader) Load(ctx context.Context) (LoadingStats, error)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingentitycreator-methods" class="md-nav__link">
+    StreamingEntityCreator Methods
+  </a>
+  
+    <nav class="md-nav" aria-label="StreamingEntityCreator Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamingentitycreator-processbatchesctx-contextcontext-batchchan-chan-monitorbatch-progresschan-chan-entityprogress-error" class="md-nav__link">
+    (*StreamingEntityCreator) ProcessBatches(ctx context.Context, batchChan &lt;-chan MonitorBatch, progressChan chan&lt;- EntityProgress) error
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingentitycreator-getstats-entitiescreated-int64-batchesprocessed-int64-rate-float64" class="md-nav__link">
+    (*StreamingEntityCreator) GetStats() (entitiesCreated int64, batchesProcessed int64, rate float64)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamingentitycreator-pulserate-float64" class="md-nav__link">
+    (*StreamingEntityCreator) PulseRate() float64
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-internalcontrollersystems" class="md-nav__link">
+    Package: internal/controller/systems
+  </a>
+  
+    <nav class="md-nav" aria-label="Package: internal/controller/systems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functions_3" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newbatchpulseschedulesystemworld-ecsworld-logger-logger-statelogger-statelogger-batchpulseschedulesystem" class="md-nav__link">
+    NewBatchPulseScheduleSystem(world ecs.World, logger Logger, stateLogger StateLogger) *BatchPulseScheduleSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchpulsesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchpulsesystem" class="md-nav__link">
+    NewBatchPulseSystem(world ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger StateLogger) *BatchPulseSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchpulseresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchpulseresultsystem" class="md-nav__link">
+    NewBatchPulseResultSystem(world ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger StateLogger) *BatchPulseResultSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchinterventionsystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchinterventionsystem" class="md-nav__link">
+    NewBatchInterventionSystem(world ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger StateLogger) *BatchInterventionSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchinterventionresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchinterventionresultsystem" class="md-nav__link">
+    NewBatchInterventionResultSystem(world ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger StateLogger) *BatchInterventionResultSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchcodesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchcodesystem" class="md-nav__link">
+    NewBatchCodeSystem(world ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger StateLogger) *BatchCodeSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newbatchcoderesultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchcoderesultsystem" class="md-nav__link">
+    NewBatchCodeResultSystem(world ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger StateLogger) *BatchCodeResultSystem
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newstateloggerdebugmode-bool-statelogger" class="md-nav__link">
+    NewStateLogger(debugMode bool) *StateLogger
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#newmemoryefficientsystemworld-ecsworld-config-memoryconfig-memoryefficientsystem" class="md-nav__link">
+    NewMemoryEfficientSystem(world ecs.World, config MemoryConfig) MemoryEfficientSystem
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types-reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Types Reference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h1>
+<p>This document provides comprehensive API reference documentation for all exported functions and types in the CPRA monitoring system.</p>
+<h2 id="package-internalcontroller">Package: internal/controller<a class="headerlink" href="#package-internalcontroller" title="Permanent link">&para;</a></h2>
+<!-- [IMPROVED] Added explanation of ECS and ark-tools for beginners -->
+<p>The controller package manages the <strong>ECS</strong> (Entity-Component-System) world and its systems using <strong>ark-tools</strong> (a Go ECS library from github.com/mlange-42/ark).</p>
+<p><strong>Key Concepts:</strong>
+- <strong>Entity</strong>: A unique ID representing a monitor
+- <strong>Component</strong>: Data attached to entities (e.g., MonitorState, PulseConfig)
+- <strong>System</strong>: Logic that processes entities with specific components</p>
+<p><img alt="ECS Architecture" src="../../images/ecs-architecture.png" /></p>
+<p><em>For a comprehensive overview of the system architecture, see the <a href="../../explanation/architecture-overview/">Architecture Overview</a> document.</em></p>
+<p>It orchestrates the entire application flow including initialization, monitoring, and lifecycle management.</p>
+<h3 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h3>
+<h4 id="defaultconfig-config">DefaultConfig() Config<a class="headerlink" href="#defaultconfig-config" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns a default configuration for the Controller</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: Config - A Config struct with sensible defaults</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">DefaultConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">Debug</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">BatchSize</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">2000</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newcontrollerconfig-config-controller">NewController(config Config) *Controller<a class="headerlink" href="#newcontrollerconfig-config-controller" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new controller with the refactored systems using ark-tools</li>
+<li><strong>Parameters</strong>: </li>
+<li>config (Config) - Configuration for the controller including queue settings, worker pool config, and batch processing parameters</li>
+<li><strong>Returns</strong>: *Controller - A fully initialized controller ready to load monitors and start processing</li>
+<li><strong>Errors</strong>: Fatal errors logged if queue or worker pool creation fails</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">DefaultConfig</span><span class="p">()</span>
+<span class="nx">ctrl</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewController</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="initializeloggersdebugmode-bool">InitializeLoggers(debugMode bool)<a class="headerlink" href="#initializeloggersdebugmode-bool" title="Permanent link">&para;</a></h4>
+<!-- [IMPROVED] Added note about package-level logger initialization -->
+<ul>
+<li><strong>Purpose</strong>: Initializes all system loggers with the specified debug mode. <strong>Must be called before using the controller</strong> to set up package-level loggers (SystemLogger, SchedulerLogger, etc.)</li>
+<li><strong>Parameters</strong>:</li>
+<li>debugMode (bool) - Whether to enable debug-level logging</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">controller</span><span class="p">.</span><span class="nx">InitializeLoggers</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span><span class="w">  </span><span class="c1">// Call this first, before NewController</span>
+</code></pre></div></li>
+</ul>
+<h4 id="closeloggers">CloseLoggers()<a class="headerlink" href="#closeloggers" title="Permanent link">&para;</a></h4>
+<!-- [IMPROVED] Added note about deferred cleanup -->
+<ul>
+<li><strong>Purpose</strong>: Closes all system loggers and flushes buffered log entries. <strong>Should be called on application shutdown</strong> (typically with defer)</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="k">defer</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">CloseLoggers</span><span class="p">()</span><span class="w">  </span><span class="c1">// Ensures logs are flushed on exit</span>
+</code></pre></div></li>
+</ul>
+<h4 id="initializetracersenabled-bool">InitializeTracers(enabled bool)<a class="headerlink" href="#initializetracersenabled-bool" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Initializes distributed tracing for all components</li>
+<li><strong>Parameters</strong>: </li>
+<li>enabled (bool) - Whether to enable tracing</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">controller</span><span class="p">.</span><span class="nx">InitializeTracers</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="startperiodiccleanupinterval-maxage-timeduration">StartPeriodicCleanup(interval, maxAge time.Duration)<a class="headerlink" href="#startperiodiccleanupinterval-maxage-timeduration" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Starts periodic cleanup of old trace spans to prevent memory leaks</li>
+<li><strong>Parameters</strong>: </li>
+<li>interval (time.Duration) - How often to run cleanup</li>
+<li>maxAge (time.Duration) - Maximum age of spans to retain</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">controller</span><span class="p">.</span><span class="nx">StartPeriodicCleanup</span><span class="p">(</span><span class="mi">5</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newloggercomponent-string-debugmode-bool-logger">NewLogger(component string, debugMode bool) *Logger<a class="headerlink" href="#newloggercomponent-string-debugmode-bool-logger" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new logger for a specific component</li>
+<li><strong>Parameters</strong>: </li>
+<li>component (string) - Name of the component for log prefixing</li>
+<li>debugMode (bool) - Whether to enable debug-level logging</li>
+<li><strong>Returns</strong>: *Logger - A configured logger instance</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewLogger</span><span class="p">(</span><span class="s">&quot;MyComponent&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span>
+<span class="nx">logger</span><span class="p">.</span><span class="nx">Info</span><span class="p">(</span><span class="s">&quot;Component initialized&quot;</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newmemorymanagermaxmemorygb-uint64-gcintervalseconds-int-memorymanager">NewMemoryManager(maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager<a class="headerlink" href="#newmemorymanagermaxmemorygb-uint64-gcintervalseconds-int-memorymanager" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a memory manager that monitors and controls application memory usage</li>
+<li><strong>Parameters</strong>: </li>
+<li>maxMemoryGB (uint64) - Maximum memory in gigabytes before triggering GC</li>
+<li>gcIntervalSeconds (int) - Interval between GC cycles</li>
+<li><strong>Returns</strong>: *MemoryManager - A configured memory manager</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">memMgr</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewMemoryManager</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">)</span>
+<span class="nx">memMgr</span><span class="p">.</span><span class="nx">Start</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newmetricsaggregator-metricsaggregator">NewMetricsAggregator() *MetricsAggregator<a class="headerlink" href="#newmetricsaggregator-metricsaggregator" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a metrics aggregator for collecting system performance metrics</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: *MetricsAggregator - A new metrics aggregator instance</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">metrics</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewMetricsAggregator</span><span class="p">()</span>
+<span class="nx">metrics</span><span class="p">.</span><span class="nx">RecordSystemMetric</span><span class="p">(</span><span class="s">&quot;pulse&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="mi">50</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newrecoverysystemmaxerrors-int-resetwindow-timeduration-recoverysystem">NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem<a class="headerlink" href="#newrecoverysystemmaxerrors-int-resetwindow-timeduration-recoverysystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a recovery system that tracks errors and provides circuit breaker functionality</li>
+<li><strong>Parameters</strong>: </li>
+<li>maxErrors (int) - Maximum errors before triggering recovery</li>
+<li>resetWindow (time.Duration) - Time window for error counting</li>
+<li><strong>Returns</strong>: *RecoverySystem - A configured recovery system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">recovery</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewRecoverySystem</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">recovery</span><span class="p">.</span><span class="nx">ShouldRecover</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Trigger recovery logic</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newtracercomponent-string-enabled-bool-tracer">NewTracer(component string, enabled bool) *Tracer<a class="headerlink" href="#newtracercomponent-string-enabled-bool-tracer" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a distributed tracer for a specific component</li>
+<li><strong>Parameters</strong>: </li>
+<li>component (string) - Name of the component being traced</li>
+<li>enabled (bool) - Whether tracing is enabled</li>
+<li><strong>Returns</strong>: *Tracer - A configured tracer instance</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">tracer</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">controller</span><span class="p">.</span><span class="nx">NewTracer</span><span class="p">(</span><span class="s">&quot;PulseSystem&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span>
+<span class="nx">span</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">tracer</span><span class="p">.</span><span class="nx">StartSpan</span><span class="p">(</span><span class="s">&quot;ProcessPulse&quot;</span><span class="p">)</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">span</span><span class="p">.</span><span class="nx">End</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h3 id="controller-methods">Controller Methods<a class="headerlink" href="#controller-methods" title="Permanent link">&para;</a></h3>
+<h4 id="controller-loadmonitorsctx-contextcontext-filename-string-error">(*Controller) LoadMonitors(ctx context.Context, filename string) error<a class="headerlink" href="#controller-loadmonitorsctx-contextcontext-filename-string-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Loads monitors using the streaming loader from a YAML or JSON file</li>
+<li><strong>Parameters</strong>: </li>
+<li>ctx (context.Context) - Context for cancellation</li>
+<li>filename (string) - Path to the monitor configuration file</li>
+<li><strong>Returns</strong>: error - Error if loading fails</li>
+<li><strong>Errors</strong>: Returns error if file cannot be read, parsed, or entities cannot be created</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">ctx</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">()</span>
+<span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">LoadMonitors</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;monitors.yaml&quot;</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to load monitors: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="controller-start-error">(*Controller) Start() error<a class="headerlink" href="#controller-start-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Begins the main processing loop of the controller</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: error - Error if controller is already running</li>
+<li><strong>Errors</strong>: Returns error if controller is already started</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">Start</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to start controller: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="controller-stop">(*Controller) Stop()<a class="headerlink" href="#controller-stop" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Gracefully shuts down the controller</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="k">defer</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">Stop</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="controller-getworld-ecsworld">(<em>Controller) GetWorld() </em>ecs.World<a class="headerlink" href="#controller-getworld-ecsworld" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns the ECS world for external access (e.g., testing, debugging)</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: *ecs.World - The underlying ECS world</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">world</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">ctrl</span><span class="p">.</span><span class="nx">GetWorld</span><span class="p">()</span>
+<span class="nx">stats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">world</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Entities: %d\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">Entities</span><span class="p">.</span><span class="nx">Used</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="controller-printshutdownmetrics">(*Controller) PrintShutdownMetrics()<a class="headerlink" href="#controller-printshutdownmetrics" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Logs queue, worker pool, and world statistics at shutdown</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">ctrl</span><span class="p">.</span><span class="nx">PrintShutdownMetrics</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="controller-checkentitycountandswitchqueue">(*Controller) CheckEntityCountAndSwitchQueue()<a class="headerlink" href="#controller-checkentitycountandswitchqueue" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Monitors entity count and switches queues if threshold exceeded</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">ctrl</span><span class="p">.</span><span class="nx">CheckEntityCountAndSwitchQueue</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<hr />
+<h2 id="package-internalqueue">Package: internal/queue<a class="headerlink" href="#package-internalqueue" title="Permanent link">&para;</a></h2>
+<p>The queue package implements the worker pool and queue patterns that form the basis of the project's concurrency model.</p>
+<h3 id="functions_1">Functions<a class="headerlink" href="#functions_1" title="Permanent link">&para;</a></h3>
+<h4 id="newqueueconfig-queueconfig-queue-error">NewQueue(config QueueConfig) (Queue, error)<a class="headerlink" href="#newqueueconfig-queueconfig-queue-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new queue based on the provided configuration</li>
+<li><strong>Parameters</strong>: </li>
+<li>config (QueueConfig) - Configuration specifying queue type and parameters</li>
+<li><strong>Returns</strong>: </li>
+<li>Queue - The created queue interface implementation</li>
+<li>error - Error if queue creation fails</li>
+<li><strong>Errors</strong>: Returns error if configuration is invalid or queue cannot be initialized</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultQueueConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">Type</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">QueueTypeHybrid</span>
+<span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create queue: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="defaultqueueconfig-queueconfig">DefaultQueueConfig() QueueConfig<a class="headerlink" href="#defaultqueueconfig-queueconfig" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns the default queue configuration</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: QueueConfig - A QueueConfig with sensible defaults</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultQueueConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">Name</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;myqueue&quot;</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newdynamicworkerpoolq-queue-config-workerpoolconfig-logger-loglogger-dynamicworkerpool-error">NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger <em>log.Logger) (</em>DynamicWorkerPool, error)<a class="headerlink" href="#newdynamicworkerpoolq-queue-config-workerpoolconfig-logger-loglogger-dynamicworkerpool-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new dynamic worker pool that executes jobs from a queue</li>
+<li><strong>Parameters</strong>: </li>
+<li>q (Queue) - The queue to consume jobs from</li>
+<li>config (WorkerPoolConfig) - Worker pool configuration</li>
+<li>logger (*log.Logger) - Logger for worker pool events</li>
+<li><strong>Returns</strong>: </li>
+<li>*DynamicWorkerPool - The created worker pool</li>
+<li>error - Error if worker pool creation fails</li>
+<li><strong>Errors</strong>: Returns error if ants pool cannot be created or configuration is invalid</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultWorkerPoolConfig</span><span class="p">()</span>
+<span class="nx">pool</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewDynamicWorkerPool</span><span class="p">(</span><span class="nx">myQueue</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create worker pool: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">pool</span><span class="p">.</span><span class="nx">Start</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="defaultworkerpoolconfig-workerpoolconfig">DefaultWorkerPoolConfig() WorkerPoolConfig<a class="headerlink" href="#defaultworkerpoolconfig-workerpoolconfig" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns a default configuration for the worker pool</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: WorkerPoolConfig - A WorkerPoolConfig with sensible defaults</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultWorkerPoolConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">MinWorkers</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">10</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">MaxWorkers</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newresultrouterconfig-workerpoolconfig-logger-loglogger-resultrouter">NewResultRouter(config WorkerPoolConfig, logger <em>log.Logger) </em>ResultRouter<a class="headerlink" href="#newresultrouterconfig-workerpoolconfig-logger-loglogger-resultrouter" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new result router with buffered channels</li>
+<li><strong>Parameters</strong>: </li>
+<li>config (WorkerPoolConfig) - Configuration for result channel depths</li>
+<li>logger (*log.Logger) - Logger for routing events</li>
+<li><strong>Returns</strong>: *ResultRouter - A configured result router</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultWorkerPoolConfig</span><span class="p">()</span>
+<span class="nx">router</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewResultRouter</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
+<span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">router</span><span class="p">.</span><span class="nx">PulseResultChan</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Process pulse results</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="mmcwaitlambda-mu-float64-c-int-ca-cs-float64-wq-w-float64-err-error">MmcWait(lambda, mu float64, c int, ca, cs float64) (wq, w float64, err error)<a class="headerlink" href="#mmcwaitlambda-mu-float64-c-int-ca-cs-float64-wq-w-float64-err-error" title="Permanent link">&para;</a></h4>
+<!-- [IMPROVED] Added beginner-friendly explanation of queueing theory -->
+<ul>
+<li><strong>Purpose</strong>: Calculates average wait times using queueing theory. This helps predict how many workers you need to meet latency targets. Returns Wq (queue wait time) and W (total time) for an M/M/c queue; if Ca,Cs &gt; 0, applies Allen–Cunneen variability inflation</li>
+</ul>
+<p><strong>Simplified</strong>: Given a job arrival rate and processing time, this tells you how long jobs will wait in the queue</p>
+<ul>
+<li><strong>Parameters</strong>:</li>
+<li>lambda (float64) - Arrival rate (jobs/sec) - how fast jobs arrive</li>
+<li>mu (float64) - Service rate per server (jobs/sec) - how fast one worker processes jobs</li>
+<li>c (int) - Number of servers (workers)</li>
+<li>ca (float64) - Coefficient of variation for arrivals (0 for exponential, use 0 if unsure)</li>
+<li>cs (float64) - Coefficient of variation for service (0 for exponential, use 0 if unsure)</li>
+<li><strong>Returns</strong>:</li>
+<li>wq (float64) - Average waiting time in queue (seconds)</li>
+<li>w (float64) - Average total time in system (seconds) = waiting + processing</li>
+<li>err (error) - Error if system is unstable or parameters invalid</li>
+<li><strong>Errors</strong>: Returns error if rho &gt;= 1 (unstable system - more jobs arriving than can be processed) or invalid parameters</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">lambda</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">100.0</span><span class="w"> </span><span class="c1">// 100 jobs/sec</span>
+<span class="nx">tau</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">0.02</span><span class="w">     </span><span class="c1">// 20ms service time</span>
+<span class="nx">mu</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nx">tau</span>
+<span class="nx">c</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mi">10</span><span class="w">         </span><span class="c1">// 10 workers</span>
+<span class="nx">wq</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">MmcWait</span><span class="p">(</span><span class="nx">lambda</span><span class="p">,</span><span class="w"> </span><span class="nx">mu</span><span class="p">,</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Queue unstable: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Wait time: %.3fs, Total time: %.3fs\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">wq</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="findcforslolambda-tau-wtarget-ca-cs-float64-cmax-int-int-float64-error">FindCForSLO(lambda, tau, wTarget, ca, cs float64, cMax int) (int, float64, error)<a class="headerlink" href="#findcforslolambda-tau-wtarget-ca-cs-float64-cmax-int-int-float64-error" title="Permanent link">&para;</a></h4>
+<!-- [IMPROVED] Added practical explanation -->
+<ul>
+<li><strong>Purpose</strong>: Finds the minimum number of workers needed to meet your latency target (SLO = Service Level Objective)</li>
+</ul>
+<p><strong>Simplified</strong>: "I want jobs to complete in under 100ms - how many workers do I need?"</p>
+<ul>
+<li><strong>Parameters</strong>: </li>
+<li>lambda (float64) - Arrival rate (jobs/sec)</li>
+<li>tau (float64) - Service time per job (seconds)</li>
+<li>wTarget (float64) - Target total latency SLO (seconds)</li>
+<li>ca (float64) - Coefficient of variation for arrivals</li>
+<li>cs (float64) - Coefficient of variation for service</li>
+<li>cMax (int) - Maximum workers to search (0 for default 1M)</li>
+<li><strong>Returns</strong>: </li>
+<li>int - Minimum number of workers needed</li>
+<li>float64 - Predicted wait time with that worker count</li>
+<li>error - Error if no solution found or invalid parameters</li>
+<li><strong>Errors</strong>: Returns error if no worker count meets SLO within cMax</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">lambda</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">100.0</span><span class="w">           </span><span class="c1">// 100 jobs/sec</span>
+<span class="nx">tau</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">0.02</span><span class="w">               </span><span class="c1">// 20ms service time</span>
+<span class="nx">wTarget</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mf">0.1</span><span class="w">            </span><span class="c1">// 100ms SLO</span>
+<span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">FindCForSLO</span><span class="p">(</span><span class="nx">lambda</span><span class="p">,</span><span class="w"> </span><span class="nx">tau</span><span class="p">,</span><span class="w"> </span><span class="nx">wTarget</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Cannot meet SLO: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Need %d workers for %.3fs latency\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="recommendcfromobservedqs-stats-wp-workerpoolstats-wqtarget-timeduration-ca-cs-float64-int-float64-error">RecommendCFromObserved(qs Stats, wp WorkerPoolStats, wqTarget time.Duration, ca, cs float64) (int, float64, error)<a class="headerlink" href="#recommendcfromobservedqs-stats-wp-workerpoolstats-wqtarget-timeduration-ca-cs-float64-int-float64-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Computes a recommended worker count from observed queue and worker pool statistics</li>
+<li><strong>Parameters</strong>: </li>
+<li>qs (Stats) - Queue statistics including arrival and service rates</li>
+<li>wp (WorkerPoolStats) - Worker pool statistics</li>
+<li>wqTarget (time.Duration) - Target queue wait time</li>
+<li>ca (float64) - Coefficient of variation for arrivals</li>
+<li>cs (float64) - Coefficient of variation for service</li>
+<li><strong>Returns</strong>: </li>
+<li>int - Recommended worker count</li>
+<li>float64 - Predicted wait time</li>
+<li>error - Error if insufficient data or computation fails</li>
+<li><strong>Errors</strong>: Returns error if no arrivals observed or insufficient throughput data</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">qStats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">myQueue</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">wpStats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">myPool</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">target</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Millisecond</span>
+<span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">RecommendCFromObserved</span><span class="p">(</span><span class="nx">qStats</span><span class="p">,</span><span class="w"> </span><span class="nx">wpStats</span><span class="p">,</span><span class="w"> </span><span class="nx">target</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Recommend %d workers for %.3fs latency\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">w</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h3 id="queue-specific-constructors">Queue-Specific Constructors<a class="headerlink" href="#queue-specific-constructors" title="Permanent link">&para;</a></h3>
+<h4 id="newadaptivequeuecapacity-uint64-adaptivequeue-error">NewAdaptiveQueue(capacity uint64) (*AdaptiveQueue, error)<a class="headerlink" href="#newadaptivequeuecapacity-uint64-adaptivequeue-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates an adaptive queue that adjusts its behavior based on load</li>
+<li><strong>Parameters</strong>: </li>
+<li>capacity (uint64) - Initial capacity (must be power of 2)</li>
+<li><strong>Returns</strong>: </li>
+<li>*AdaptiveQueue - The created adaptive queue</li>
+<li>error - Error if capacity is invalid</li>
+<li><strong>Errors</strong>: Returns error if capacity is not a power of 2</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewAdaptiveQueue</span><span class="p">(</span><span class="mi">65536</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create adaptive queue: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newworkivaqueuecapacity-int-queue">NewWorkivaQueue(capacity int) Queue<a class="headerlink" href="#newworkivaqueuecapacity-int-queue" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a Workiva ring buffer based queue</li>
+<li><strong>Parameters</strong>: </li>
+<li>capacity (int) - Queue capacity</li>
+<li><strong>Returns</strong>: Queue - The created queue</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">q</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewWorkivaQueue</span><span class="p">(</span><span class="mi">32768</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newhybridqueueconfig-hybridqueueconfig-hybridqueue-error">NewHybridQueue(config HybridQueueConfig) (*HybridQueue, error)<a class="headerlink" href="#newhybridqueueconfig-hybridqueueconfig-hybridqueue-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a hybrid queue combining ring buffer and heap with configurable drop policy</li>
+<li><strong>Parameters</strong>: </li>
+<li>config (HybridQueueConfig) - Configuration including drop policy and capacities</li>
+<li><strong>Returns</strong>: </li>
+<li>*HybridQueue - The created hybrid queue</li>
+<li>error - Error if configuration is invalid</li>
+<li><strong>Errors</strong>: Returns error if ring capacity is not a power of 2</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultHybridQueueConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">DropPolicy</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DropPolicyDropNewest</span>
+<span class="nx">q</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewHybridQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create hybrid queue: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="defaulthybridqueueconfig-hybridqueueconfig">DefaultHybridQueueConfig() HybridQueueConfig<a class="headerlink" href="#defaulthybridqueueconfig-hybridqueueconfig" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns default configuration for hybrid queue</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: HybridQueueConfig - Default hybrid queue configuration</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">DefaultHybridQueueConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">HeapCapacity</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">100000</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newboundedqueueconfig-boundedqueueconfig-boundedqueue">NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue<a class="headerlink" href="#newboundedqueueconfig-boundedqueueconfig-boundedqueue" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a bounded queue with fixed capacity</li>
+<li><strong>Parameters</strong>: </li>
+<li>config (BoundedQueueConfig) - Configuration for the bounded queue</li>
+<li><strong>Returns</strong>: *BoundedQueue - The created bounded queue</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">BoundedQueueConfig</span><span class="p">{</span><span class="nx">Capacity</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">}</span>
+<span class="nx">q</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewBoundedQueue</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h3 id="dynamicworkerpool-methods">DynamicWorkerPool Methods<a class="headerlink" href="#dynamicworkerpool-methods" title="Permanent link">&para;</a></h3>
+<h4 id="dynamicworkerpool-start">(*DynamicWorkerPool) Start()<a class="headerlink" href="#dynamicworkerpool-start" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Begins the worker pool's operations</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">pool</span><span class="p">.</span><span class="nx">Start</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-drainandstop">(*DynamicWorkerPool) DrainAndStop()<a class="headerlink" href="#dynamicworkerpool-drainandstop" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Waits for outstanding tasks to finish before stopping the worker pool</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">pool</span><span class="p">.</span><span class="nx">DrainAndStop</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-getrouter-resultrouter">(<em>DynamicWorkerPool) GetRouter() </em>ResultRouter<a class="headerlink" href="#dynamicworkerpool-getrouter-resultrouter" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns the result router for accessing type-specific result channels</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: *ResultRouter - The result router instance</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">router</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">GetRouter</span><span class="p">()</span>
+<span class="k">go</span><span class="w"> </span><span class="nx">processResults</span><span class="p">(</span><span class="nx">router</span><span class="p">.</span><span class="nx">PulseResultChan</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-stats-workerpoolstats">(*DynamicWorkerPool) Stats() WorkerPoolStats<a class="headerlink" href="#dynamicworkerpool-stats-workerpoolstats" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns runtime statistics for the worker pool</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: WorkerPoolStats - Current worker pool statistics</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">stats</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">Stats</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Running: %d, Waiting: %d\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">RunningWorkers</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">WaitingTasks</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-pause">(*DynamicWorkerPool) Pause()<a class="headerlink" href="#dynamicworkerpool-pause" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Temporarily stops the worker pool from processing new tasks</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">pool</span><span class="p">.</span><span class="nx">Pause</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-resume">(*DynamicWorkerPool) Resume()<a class="headerlink" href="#dynamicworkerpool-resume" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Resumes worker pool processing after a pause</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: None</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">pool</span><span class="p">.</span><span class="nx">Resume</span><span class="p">()</span>
+</code></pre></div></li>
+</ul>
+<h4 id="dynamicworkerpool-replacequeuenewqueue-queue-error">(*DynamicWorkerPool) ReplaceQueue(newQueue Queue) error<a class="headerlink" href="#dynamicworkerpool-replacequeuenewqueue-queue-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Replaces the current queue with a new one for dynamic queue switching</li>
+<li><strong>Parameters</strong>: </li>
+<li>newQueue (Queue) - The new queue to use</li>
+<li><strong>Returns</strong>: error - Error if newQueue is nil</li>
+<li><strong>Errors</strong>: Returns error if newQueue is nil</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">newQueue</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">queue</span><span class="p">.</span><span class="nx">NewAdaptiveQueue</span><span class="p">(</span><span class="mi">65536</span><span class="p">)</span>
+<span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pool</span><span class="p">.</span><span class="nx">ReplaceQueue</span><span class="p">(</span><span class="nx">newQueue</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Failed to replace queue: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<hr />
+<h2 id="package-internalcontrollercomponents">Package: internal/controller/components<a class="headerlink" href="#package-internalcontrollercomponents" title="Permanent link">&para;</a></h2>
+<p>The components package defines the consolidated Entity-Component-System (ECS) components for the CPRA monitoring application.</p>
+<h3 id="types-and-methods">Types and Methods<a class="headerlink" href="#types-and-methods" title="Permanent link">&para;</a></h3>
+<h4 id="monitorstate">MonitorState<a class="headerlink" href="#monitorstate" title="Permanent link">&para;</a></h4>
+<p>MonitorState consolidates all monitor state into a single component with bitfield-based state management.</p>
+<p><strong>State Check Methods:</strong></p>
+<ul>
+<li><strong>IsPulseNeeded() bool</strong> - Reports whether a pulse is needed for the monitor</li>
+<li><strong>IsPulsePending() bool</strong> - Reports whether a pulse is currently pending</li>
+<li><strong>IsPulseFirstCheck() bool</strong> - Reports whether this is the first pulse check</li>
+<li><strong>IsInterventionNeeded() bool</strong> - Reports whether intervention is needed</li>
+<li><strong>IsInterventionPending() bool</strong> - Reports whether intervention is pending</li>
+<li><strong>IsCodeNeeded() bool</strong> - Reports whether code notification is needed</li>
+<li><strong>IsCodePending() bool</strong> - Reports whether code notification is pending</li>
+</ul>
+<p><strong>State Setter Methods:</strong></p>
+<ul>
+<li><strong>SetPulseNeeded(needed bool)</strong> - Sets whether a pulse is needed</li>
+<li><strong>SetPulsePending(pending bool)</strong> - Sets whether a pulse is pending</li>
+<li><strong>SetPulseFirstCheck(firstCheck bool)</strong> - Sets whether this is the first check</li>
+<li><strong>SetInterventionNeeded(needed bool)</strong> - Sets whether intervention is needed</li>
+<li><strong>SetInterventionPending(pending bool)</strong> - Sets whether intervention is pending</li>
+<li><strong>SetCodeNeeded(needed bool)</strong> - Sets whether code notification is needed</li>
+<li><strong>SetCodePending(pending bool)</strong> - Sets whether code notification is pending</li>
+</ul>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">state</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">MonitorState</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;web-server-01&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">state</span><span class="p">.</span><span class="nx">SetPulseNeeded</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">state</span><span class="p">.</span><span class="nx">IsPulseNeeded</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Schedule pulse check</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<h4 id="pulseconfig">PulseConfig<a class="headerlink" href="#pulseconfig" title="Permanent link">&para;</a></h4>
+<p><strong>Copy() *PulseConfig</strong> - Creates a deep copy of the pulse configuration</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><span class="nx">pulseCfg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">components</span><span class="p">.</span><span class="nx">PulseConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">Type</span><span class="p">:</span><span class="w">     </span><span class="s">&quot;http&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Interval</span><span class="p">:</span><span class="w"> </span><span class="mi">60</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">Timeout</span><span class="p">:</span><span class="w">  </span><span class="mi">5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">copy</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">pulseCfg</span><span class="p">.</span><span class="nx">Copy</span><span class="p">()</span>
+</code></pre></div></p>
+<h4 id="interventionconfig">InterventionConfig<a class="headerlink" href="#interventionconfig" title="Permanent link">&para;</a></h4>
+<p><strong>Copy() *InterventionConfig</strong> - Creates a deep copy of the intervention configuration</p>
+<h4 id="codeconfig">CodeConfig<a class="headerlink" href="#codeconfig" title="Permanent link">&para;</a></h4>
+<p><strong>Copy() *CodeConfig</strong> - Creates a deep copy of the code configuration</p>
+<h4 id="jobstorage">JobStorage<a class="headerlink" href="#jobstorage" title="Permanent link">&para;</a></h4>
+<p><strong>Copy() *JobStorage</strong> - Creates a deep copy of the job storage</p>
+<hr />
+<h2 id="package-internalloaderstreaming">Package: internal/loader/streaming<a class="headerlink" href="#package-internalloaderstreaming" title="Permanent link">&para;</a></h2>
+<p>The streaming package handles loading and parsing of monitor configuration files with streaming support for large files.</p>
+<h3 id="functions_2">Functions<a class="headerlink" href="#functions_2" title="Permanent link">&para;</a></h3>
+<h4 id="newstreamingloaderfilename-string-world-ecsworld-config-streamingconfig-streamingloader">NewStreamingLoader(filename string, world <em>ecs.World, config StreamingConfig) </em>StreamingLoader<a class="headerlink" href="#newstreamingloaderfilename-string-world-ecsworld-config-streamingconfig-streamingloader" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new streaming loader for loading monitors from files</li>
+<li><strong>Parameters</strong>: </li>
+<li>filename (string) - Path to the monitor configuration file</li>
+<li>world (*ecs.World) - The ECS world to create entities in</li>
+<li>config (StreamingConfig) - Streaming configuration</li>
+<li><strong>Returns</strong>: *StreamingLoader - A configured streaming loader</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">DefaultStreamingConfig</span><span class="p">()</span>
+<span class="nx">loader</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">NewStreamingLoader</span><span class="p">(</span><span class="s">&quot;monitors.yaml&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="defaultstreamingconfig-streamingconfig">DefaultStreamingConfig() StreamingConfig<a class="headerlink" href="#defaultstreamingconfig-streamingconfig" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns optimized default configuration for large files</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: StreamingConfig - Default streaming configuration</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">DefaultStreamingConfig</span><span class="p">()</span>
+<span class="nx">config</span><span class="p">.</span><span class="nx">ParseBatchSize</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">20000</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newstreamingentitycreatorworld-ecsworld-config-entitycreationconfig-streamingentitycreator">NewStreamingEntityCreator(world <em>ecs.World, config EntityCreationConfig) </em>StreamingEntityCreator<a class="headerlink" href="#newstreamingentitycreatorworld-ecsworld-config-entitycreationconfig-streamingentitycreator" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a new entity creator for batch entity creation</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>config (EntityCreationConfig) - Entity creation configuration</li>
+<li><strong>Returns</strong>: *StreamingEntityCreator - A configured entity creator</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">EntityCreationConfig</span><span class="p">{</span>
+<span class="w">    </span><span class="nx">BatchSize</span><span class="p">:</span><span class="w">   </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">PreAllocate</span><span class="p">:</span><span class="w"> </span><span class="mi">500000</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="nx">creator</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">NewStreamingEntityCreator</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newstreamingjsonparserfilename-string-config-parseconfig-streamingjsonparser-error">NewStreamingJsonParser(filename string, config ParseConfig) (*StreamingJsonParser, error)<a class="headerlink" href="#newstreamingjsonparserfilename-string-config-parseconfig-streamingjsonparser-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a streaming JSON parser for large JSON files</li>
+<li><strong>Parameters</strong>: </li>
+<li>filename (string) - Path to the JSON file</li>
+<li>config (ParseConfig) - Parser configuration</li>
+<li><strong>Returns</strong>: </li>
+<li>*StreamingJsonParser - The created parser</li>
+<li>error - Error if file cannot be opened</li>
+<li><strong>Errors</strong>: Returns error if file cannot be opened or read</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">ParseConfig</span><span class="p">{</span><span class="nx">BatchSize</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">}</span>
+<span class="nx">parser</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">NewStreamingJsonParser</span><span class="p">(</span><span class="s">&quot;monitors.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create parser: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newstreamingyamlparserfilename-string-config-parseconfig-streamingyamlparser-error">NewStreamingYamlParser(filename string, config ParseConfig) (*StreamingYamlParser, error)<a class="headerlink" href="#newstreamingyamlparserfilename-string-config-parseconfig-streamingyamlparser-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a streaming YAML parser for large YAML files</li>
+<li><strong>Parameters</strong>: </li>
+<li>filename (string) - Path to the YAML file</li>
+<li>config (ParseConfig) - Parser configuration</li>
+<li><strong>Returns</strong>: </li>
+<li>*StreamingYamlParser - The created parser</li>
+<li>error - Error if file cannot be opened</li>
+<li><strong>Errors</strong>: Returns error if file cannot be opened or read</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">ParseConfig</span><span class="p">{</span><span class="nx">BatchSize</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">}</span>
+<span class="nx">parser</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">streaming</span><span class="p">.</span><span class="nx">NewStreamingYamlParser</span><span class="p">(</span><span class="s">&quot;monitors.yaml&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to create parser: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h3 id="streamingloader-methods">StreamingLoader Methods<a class="headerlink" href="#streamingloader-methods" title="Permanent link">&para;</a></h3>
+<h4 id="streamingloader-loadctx-contextcontext-loadingstats-error">(<em>StreamingLoader) Load(ctx context.Context) (</em>LoadingStats, error)<a class="headerlink" href="#streamingloader-loadctx-contextcontext-loadingstats-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Performs the complete streaming load operation</li>
+<li><strong>Parameters</strong>: </li>
+<li>ctx (context.Context) - Context for cancellation</li>
+<li><strong>Returns</strong>: </li>
+<li>*LoadingStats - Statistics about the loading operation</li>
+<li>error - Error if loading fails</li>
+<li><strong>Errors</strong>: Returns error if parsing or entity creation fails</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">ctx</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">()</span>
+<span class="nx">stats</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">loader</span><span class="p">.</span><span class="nx">Load</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to load: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Loaded %d monitors in %v\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">TotalEntities</span><span class="p">,</span><span class="w"> </span><span class="nx">stats</span><span class="p">.</span><span class="nx">LoadingTime</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h3 id="streamingentitycreator-methods">StreamingEntityCreator Methods<a class="headerlink" href="#streamingentitycreator-methods" title="Permanent link">&para;</a></h3>
+<h4 id="streamingentitycreator-processbatchesctx-contextcontext-batchchan-chan-monitorbatch-progresschan-chan-entityprogress-error">(*StreamingEntityCreator) ProcessBatches(ctx context.Context, batchChan &lt;-chan MonitorBatch, progressChan chan&lt;- EntityProgress) error<a class="headerlink" href="#streamingentitycreator-processbatchesctx-contextcontext-batchchan-chan-monitorbatch-progresschan-chan-entityprogress-error" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Processes monitor batches and creates entities</li>
+<li><strong>Parameters</strong>: </li>
+<li>ctx (context.Context) - Context for cancellation</li>
+<li>batchChan (&lt;-chan MonitorBatch) - Channel receiving monitor batches</li>
+<li>progressChan (chan&lt;- EntityProgress) - Channel for progress updates</li>
+<li><strong>Returns</strong>: error - Error if processing fails</li>
+<li><strong>Errors</strong>: Returns error if entity creation fails</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">creator</span><span class="p">.</span><span class="nx">ProcessBatches</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">batchChan</span><span class="p">,</span><span class="w"> </span><span class="nx">progressChan</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatalf</span><span class="p">(</span><span class="s">&quot;Failed to process batches: %v&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></li>
+</ul>
+<h4 id="streamingentitycreator-getstats-entitiescreated-int64-batchesprocessed-int64-rate-float64">(*StreamingEntityCreator) GetStats() (entitiesCreated int64, batchesProcessed int64, rate float64)<a class="headerlink" href="#streamingentitycreator-getstats-entitiescreated-int64-batchesprocessed-int64-rate-float64" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns current creation statistics</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: </li>
+<li>entitiesCreated (int64) - Total entities created</li>
+<li>batchesProcessed (int64) - Total batches processed</li>
+<li>rate (float64) - Creation rate (entities/sec)</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">created</span><span class="p">,</span><span class="w"> </span><span class="nx">batches</span><span class="p">,</span><span class="w"> </span><span class="nx">rate</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">creator</span><span class="p">.</span><span class="nx">GetStats</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Created %d entities (%.0f/sec)\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">created</span><span class="p">,</span><span class="w"> </span><span class="nx">rate</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="streamingentitycreator-pulserate-float64">(*StreamingEntityCreator) PulseRate() float64<a class="headerlink" href="#streamingentitycreator-pulserate-float64" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Returns the aggregated expected pulse arrival rate (jobs/sec)</li>
+<li><strong>Parameters</strong>: None</li>
+<li><strong>Returns</strong>: float64 - Pulse arrival rate in jobs/sec</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">rate</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">creator</span><span class="p">.</span><span class="nx">PulseRate</span><span class="p">()</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Expected pulse rate: %.2f jobs/sec\n&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">rate</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<hr />
+<h2 id="package-internalcontrollersystems">Package: internal/controller/systems<a class="headerlink" href="#package-internalcontrollersystems" title="Permanent link">&para;</a></h2>
+<p>The systems package contains the business logic that operates on entities and components within the ECS framework.</p>
+<h3 id="functions_3">Functions<a class="headerlink" href="#functions_3" title="Permanent link">&para;</a></h3>
+<h4 id="newbatchpulseschedulesystemworld-ecsworld-logger-logger-statelogger-statelogger-batchpulseschedulesystem">NewBatchPulseScheduleSystem(world <em>ecs.World, logger Logger, stateLogger </em>StateLogger) *BatchPulseScheduleSystem<a class="headerlink" href="#newbatchpulseschedulesystemworld-ecsworld-logger-logger-statelogger-statelogger-batchpulseschedulesystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that schedules pulse checks based on monitor intervals</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchPulseScheduleSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchPulseScheduleSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchpulsesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchpulsesystem">NewBatchPulseSystem(world <em>ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger </em>StateLogger) *BatchPulseSystem<a class="headerlink" href="#newbatchpulsesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchpulsesystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that enqueues pulse jobs to the queue</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>q (queue.Queue) - Queue to enqueue pulse jobs</li>
+<li>batchSize (int) - Maximum batch size for enqueueing</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchPulseSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchPulseSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">pulseQueue</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchpulseresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchpulseresultsystem">NewBatchPulseResultSystem(world <em>ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger </em>StateLogger) *BatchPulseResultSystem<a class="headerlink" href="#newbatchpulseresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchpulseresultsystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that processes pulse job results</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>results (&lt;-chan []jobs.Result) - Channel receiving pulse results</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchPulseResultSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchPulseResultSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">resultChan</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchinterventionsystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchinterventionsystem">NewBatchInterventionSystem(world <em>ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger </em>StateLogger) *BatchInterventionSystem<a class="headerlink" href="#newbatchinterventionsystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchinterventionsystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that enqueues intervention jobs</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>q (queue.Queue) - Queue to enqueue intervention jobs</li>
+<li>batchSize (int) - Maximum batch size</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchInterventionSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchInterventionSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">intQueue</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchinterventionresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchinterventionresultsystem">NewBatchInterventionResultSystem(world <em>ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger </em>StateLogger) *BatchInterventionResultSystem<a class="headerlink" href="#newbatchinterventionresultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchinterventionresultsystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that processes intervention job results</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>results (&lt;-chan []jobs.Result) - Channel receiving intervention results</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchInterventionResultSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchInterventionResultSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">resultChan</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchcodesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchcodesystem">NewBatchCodeSystem(world <em>ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger </em>StateLogger) *BatchCodeSystem<a class="headerlink" href="#newbatchcodesystemworld-ecsworld-q-queuequeue-batchsize-int-logger-logger-statelogger-statelogger-batchcodesystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that enqueues code notification jobs</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>q (queue.Queue) - Queue to enqueue code jobs</li>
+<li>batchSize (int) - Maximum batch size</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchCodeSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchCodeSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">codeQueue</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newbatchcoderesultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchcoderesultsystem">NewBatchCodeResultSystem(world <em>ecs.World, results &lt;-chan []jobs.Result, logger Logger, stateLogger </em>StateLogger) *BatchCodeResultSystem<a class="headerlink" href="#newbatchcoderesultsystemworld-ecsworld-results-chan-jobsresult-logger-logger-statelogger-statelogger-batchcoderesultsystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system that processes code notification job results</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>results (&lt;-chan []jobs.Result) - Channel receiving code results</li>
+<li>logger (Logger) - System logger</li>
+<li>stateLogger (*StateLogger) - State change logger</li>
+<li><strong>Returns</strong>: *BatchCodeResultSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewBatchCodeResultSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">resultChan</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">stateLogger</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newstateloggerdebugmode-bool-statelogger">NewStateLogger(debugMode bool) *StateLogger<a class="headerlink" href="#newstateloggerdebugmode-bool-statelogger" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a state logger for tracking entity state transitions</li>
+<li><strong>Parameters</strong>: </li>
+<li>debugMode (bool) - Whether to enable debug logging</li>
+<li><strong>Returns</strong>: *StateLogger - A configured state logger</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">stateLogger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewStateLogger</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+<h4 id="newmemoryefficientsystemworld-ecsworld-config-memoryconfig-memoryefficientsystem">NewMemoryEfficientSystem(world <em>ecs.World, config MemoryConfig) </em>MemoryEfficientSystem<a class="headerlink" href="#newmemoryefficientsystemworld-ecsworld-config-memoryconfig-memoryefficientsystem" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Purpose</strong>: Creates a system for memory-efficient entity management</li>
+<li><strong>Parameters</strong>: </li>
+<li>world (*ecs.World) - The ECS world</li>
+<li>config (MemoryConfig) - Memory management configuration</li>
+<li><strong>Returns</strong>: *MemoryEfficientSystem - The created system</li>
+<li><strong>Errors</strong>: None</li>
+<li><strong>Example</strong>:
+  <div class="highlight"><pre><span></span><code><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">MemoryConfig</span><span class="p">{</span><span class="nx">MaxEntities</span><span class="p">:</span><span class="w"> </span><span class="mi">1000000</span><span class="p">}</span>
+<span class="nx">system</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">systems</span><span class="p">.</span><span class="nx">NewMemoryEfficientSystem</span><span class="p">(</span><span class="nx">world</span><span class="p">,</span><span class="w"> </span><span class="nx">config</span><span class="p">)</span>
+</code></pre></div></li>
+</ul>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.4e0fa4ba.min.js"></script>
+      
+    
+  </body>
+</html>

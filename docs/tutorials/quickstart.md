@@ -3,7 +3,7 @@
 CPRA is a high-performance monitoring system designed for large-scale environments, using a data-oriented design for performance and scalability.
 
 ## Prerequisites
-- Go 1.18 or later
+- Go 1.25 or later
 - Docker (optional, for running mock servers for testing)
 
 **Note:** This guide takes approximately 5-10 minutes to complete, including setup time. <!-- [IMPROVED] Realistic time estimate -->
@@ -12,13 +12,13 @@ CPRA is a high-performance monitoring system designed for large-scale environmen
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/cpra.git
+    git clone https://github.com/ziad/cpra.git
     cd cpra
     ```
 
 2.  **Build the application:**
     ```bash
-    go build -o cpra main.go
+    go build .
     ```
 
 ## First Working Example

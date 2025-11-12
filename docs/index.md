@@ -10,7 +10,7 @@ Welcome to the official documentation for CPRA, a high-performance, event-driven
 
 ## What is CPRA?
 
-CPRA (Concurrent Pulse and Remediation Agent) is a monitoring system built in Go. It is designed to be highly scalable, performant, and resilient. It uses a data-oriented Entity-Component-System (ECS) architecture to efficiently manage over one million concurrent monitors.
+CPRA (Concurrent Pulse-Remediation-Alerting) is a monitoring system built in Go. It is designed to be highly scalable, performant, and resilient. It uses a data-oriented Entity-Component-System (ECS) architecture to efficiently manage over one million concurrent monitors.
 
 ## Key Features
 

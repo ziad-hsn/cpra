@@ -11,14 +11,14 @@ This guide will walk you through the process of setting up and running CPRA on y
 
 ## Prerequisites
 
-*   Go 1.18 or later
+*   Go 1.25 or later
 *   Docker (optional, for running in a container)
 
 ## Building from Source
 
 1.  Clone the repository:
     ```sh
-    git clone https://github.com/ziad-mid/cpra.git
+    git clone https://github.com/ziad/cpra.git
     cd cpra
     ```
 
@@ -29,10 +29,10 @@ This guide will walk you through the process of setting up and running CPRA on y
 
 ## Running the Application
 
-To run the application, you need to provide a YAML file with the monitor configurations. An example file is provided at `internal/loader/replicated_test.yaml`.
+To run the application, you need to provide a YAML file with the monitor configurations. An example file is provided at `mock-servers/test_10k.yaml`.
 
 ```sh
-./cpra --yaml internal/loader/replicated_test.yaml
+./cpra --yaml mock-servers/test_10k.yaml
 ```
 
 You should see output indicating that the controller is starting and loading the monitors.
@@ -41,14 +41,19 @@ You should see output indicating that the controller is starting and loading the
 
 You can also run the application in a Docker container.
 
-1.  Build the Docker image:
+1.  Build the Docker image using the provided Dockerfile:
     ```sh
-    docker build -t cpra .
+    docker build -f docker/Dockerfile -t cpra .
     ```
 
-2.  Run the Docker container:
+    Note: If the build fails due to a missing `samples/` directory referenced in the Dockerfile, either create `cpra/samples` with your YAML files, or remove the `COPY samples samples` line from `docker/Dockerfile` before building.
+
+2.  Run the container with a YAML file mounted (example uses the 10k mock monitors):
     ```sh
-    docker run -it --rm cpra
+    docker run -it --rm \
+      -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml \
+      cpra \
+      ./cpra --yaml /app/monitors.yaml
     ```
 
 ## What's Next?

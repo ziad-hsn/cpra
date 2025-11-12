@@ -319,5 +319,5 @@ Memory usage:
 
 - [API Reference](../reference/api-reference.md): Detailed function signatures and usage
 - [Types Reference](../reference/types-reference.md): Data structures and component definitions
-- [How-To Guide](../guides/how-to-common-tasks.md): Common configuration and operational tasks
-- [Quickstart](../guides/quickstart.md): Get a basic monitor running in 5-10 minutes
+- [How-To Guide](../how-to/common-tasks.md): Common configuration and operational tasks
+- [Quickstart](../tutorials/quickstart.md): Get a basic monitor running in 5-10 minutes

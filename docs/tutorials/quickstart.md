@@ -116,6 +116,6 @@ For a complete explanation of the system architecture and all three processing p
 
 ## What's Next?
 
--   Learn about common tasks in the [How-To Guide](./how-to-common-tasks.md)
+-   Learn about common tasks in the [How-To Guide](../how-to/common-tasks.md)
 -   Explore the full API in the [API Reference](../reference/api-reference.md)
 -   Understand the architecture in the [Architecture Overview](../explanation/architecture-overview.md)

@@ -2,6 +2,9 @@
 
 This guide provides step-by-step instructions for common tasks you might perform with the CPRA monitoring system.
 
+!!! note "Before you start"
+    Complete the [Getting Started](../tutorials/getting-started.md) walkthrough so that the binary, monitors YAML, and mock servers are already running from the `cpra/` directory.
+
 ## System Overview
 
 CPRA uses a three-pipeline architecture for processing monitors:
@@ -21,7 +24,7 @@ Each pipeline operates independently with its own queue and worker pool. For a d
 **Goal**: Define a new monitor in a YAML file to check a service.
 
 **Prerequisites**:
-- A running CPRA application.
+- A running CPRA application (see [Quick Start](../tutorials/quickstart.md)).
 - An endpoint to monitor.
 
 **Steps**:
@@ -58,6 +61,7 @@ Each pipeline operates independently with its own queue and worker pool. For a d
 
 **Prerequisites**:
 - A `main.go` file to initialize the controller.
+- Familiarity with `controller.DefaultConfig()` structure (review the [API Reference](../reference/api-reference.md)).
 
 **Steps**:
 

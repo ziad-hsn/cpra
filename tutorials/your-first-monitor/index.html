@@ -8,9 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/tutorials/your-first-monitor/">
       
       
+        <link rel="prev" href="../quickstart/">
+      
+      
+        <link rel="next" href="../../how-to/performance-tuning/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Deploy To Production - CPRA Documentation</title>
+        <title>Your First Custom Monitor - CPRA Documentation</title>
       
     
     
@@ -72,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#deploy-to-production" class="md-skip">
+        <a href="#your-first-custom-monitor" class="md-skip">
           Skip to content
         </a>
       
@@ -106,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Deploy To Production
+              Your First Custom Monitor
             
           </span>
         </div>
@@ -236,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../quickstart/" class="md-tabs__link">
           
   
   
@@ -260,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../performance-tuning/" class="md-tabs__link">
+        <a href="../../how-to/performance-tuning/" class="md-tabs__link">
           
   
   
@@ -390,26 +396,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -427,7 +438,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -445,7 +456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/quickstart/" class="md-nav__link">
+      <a href="../quickstart/" class="md-nav__link">
         
   
   
@@ -470,10 +481,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../tutorials/your-first-monitor/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Custom Monitor
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -489,6 +527,87 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#monitor-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitor Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-create-the-monitor-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Create the Monitor YAML
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-understand-the-pipeline-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Understand the Pipeline Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-run-with-your-monitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Run with Your Monitor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3: Run with Your Monitor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -560,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../performance-tuning/" class="md-nav__link">
+      <a href="../../how-to/performance-tuning/" class="md-nav__link">
         
   
   
@@ -810,116 +929,66 @@
   
 
 
-<h1 id="deploy-to-production">Deploy To Production<a class="headerlink" href="#deploy-to-production" title="Permanent link">&para;</a></h1>
-<p>This guide covers production deployment options for CPRA: running a compiled binary, Docker containers, and basic Kubernetes notes. It assumes Go 1.25+ and a monitors YAML file.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Go 1.25+</li>
-<li>A monitors YAML file (for example <code>mock-servers/test_10k.yaml</code>)</li>
-<li>Optional: Docker (for containerized deployment)</li>
-</ul>
-<h2 id="option-a-deploy-the-compiled-binary">Option A: Deploy the Compiled Binary<a class="headerlink" href="#option-a-deploy-the-compiled-binary" title="Permanent link">&para;</a></h2>
+<h1 id="your-first-custom-monitor">Your First Custom Monitor<a class="headerlink" href="#your-first-custom-monitor" title="Permanent link">&para;</a></h1>
+<p>This tutorial walks you through creating a single, comprehensive monitor that utilizes all three of CPRA's processing pipelines: <strong>Pulse</strong>, <strong>Intervention</strong>, and <strong>Code</strong>.</p>
+<h2 id="monitor-structure">Monitor Structure<a class="headerlink" href="#monitor-structure" title="Permanent link">&para;</a></h2>
+<p>A CPRA monitor is defined in a YAML file and consists of three main sections:</p>
 <ol>
-<li>
-<p>Build a static binary:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>cpra
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>go<span class="w"> </span>build<span class="w"> </span>-trimpath<span class="w"> </span>-ldflags<span class="w"> </span><span class="s2">&quot;-s -w&quot;</span><span class="w"> </span>-o<span class="w"> </span>cpra<span class="w"> </span>.
-</code></pre></div></p>
-</li>
-<li>
-<p>Copy the binary and your YAML file to the target host, then run:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>./cpra<span class="w"> </span>--yaml<span class="w"> </span>/path/to/monitors.yaml
-</code></pre></div></p>
-</li>
-<li>
-<p>(Optional) Enable/disable profiling flags at runtime:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./cpra<span class="w"> </span>--yaml<span class="w"> </span>/path/to/monitors.yaml<span class="w"> </span>--pprof<span class="o">=</span><span class="nb">true</span><span class="w"> </span>--pprof.addr<span class="w"> </span>localhost:6060
-</code></pre></div></p>
-</li>
-<li>
-<p>(Optional) systemd unit example:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[Unit]</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="na">Description</span><span class="o">=</span><span class="s">CPRA Monitoring</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="na">After</span><span class="o">=</span><span class="s">network.target</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">[Service]</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/opt/cpra/cpra --yaml /opt/cpra/monitors.yaml --pprof=false</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="na">Restart</span><span class="o">=</span><span class="s">always</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="na">User</span><span class="o">=</span><span class="s">cpra</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="na">Group</span><span class="o">=</span><span class="s">cpra</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="na">LimitNOFILE</span><span class="o">=</span><span class="s">1048576</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="k">[Install]</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
-</code></pre></div></p>
-</li>
+<li><strong><code>pulse</code></strong>: Defines the health check (e.g., HTTP GET, TCP ping).</li>
+<li><strong><code>intervention</code></strong>: Defines the automated action to take on failure (e.g., run a script, restart a service).</li>
+<li><strong><code>codes</code></strong>: Defines the alerting policy (e.g., send an alert after 3 failures).</li>
 </ol>
-<h2 id="option-b-deploy-with-docker">Option B: Deploy with Docker<a class="headerlink" href="#option-b-deploy-with-docker" title="Permanent link">&para;</a></h2>
+<h2 id="step-1-create-the-monitor-yaml">Step 1: Create the Monitor YAML<a class="headerlink" href="#step-1-create-the-monitor-yaml" title="Permanent link">&para;</a></h2>
+<p>Create a new file named <code>my-monitor.yaml</code> and add the following content. This monitor checks an HTTP endpoint every 30 seconds. If it fails 3 times, it attempts an intervention, and if the intervention fails, it sends an alert.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">monitors</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;critical-api-health-check&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">pulse</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30s</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">unhealthy_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w"> </span><span class="c1"># Fail after 3 consecutive failures</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">        </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GET</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://my-critical-api.internal/health</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="nt">expected_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nt">intervention</span><span class="p">:</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">script</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="nt">max_failures</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w"> </span><span class="c1"># Trigger intervention on the first failure after threshold</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin/restart_api.sh</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">        </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;--force&quot;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nt">codes</span><span class="p">:</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">      </span><span class="c1"># The &#39;Red&#39; code is typically for critical alerts</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">      </span><span class="nt">Red</span><span class="p">:</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">        </span><span class="nt">dispatch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">failure</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">        </span><span class="nt">notify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">webhook</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">        </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">          </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pagerduty.com/api/v2/alerts</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">          </span><span class="nt">payload</span><span class="p">:</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">            </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;critical-api&quot;</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">            </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;down&quot;</span>
+</code></pre></div>
+<h2 id="step-2-understand-the-pipeline-flow">Step 2: Understand the Pipeline Flow<a class="headerlink" href="#step-2-understand-the-pipeline-flow" title="Permanent link">&para;</a></h2>
+<p>When this monitor is loaded, it will follow this flow:</p>
 <ol>
-<li>Build the image:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>docker/Dockerfile<span class="w"> </span>-t<span class="w"> </span>cpra<span class="w"> </span>.
-</code></pre></div></li>
+<li><strong>Pulse Pipeline:</strong> Executes the <code>http</code> check every 30 seconds.</li>
+<li><strong>Failure Condition:</strong> If the check fails, the <code>unhealthy_threshold</code> counter increments.</li>
+<li><strong>Intervention Trigger:</strong> After 3 consecutive failures, the <strong>Intervention Pipeline</strong> is triggered. It executes the <code>/usr/local/bin/restart_api.sh</code> script.</li>
+<li><strong>Code Trigger:</strong> If the Intervention fails, or if the Pulse check continues to fail after the Intervention, the <strong>Code Pipeline</strong> is triggered, dispatching the <code>Red</code> alert via the configured webhook.</li>
 </ol>
-<p>Note: If the build fails due to a missing <code>samples/</code> directory referenced in the Dockerfile, either create <code>cpra/samples</code> with your YAML files, or remove the <code>COPY samples samples</code> line from <code>docker/Dockerfile</code> before building.</p>
-<ol>
-<li>
-<p>Run with a mounted YAML file:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>cpra<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/mock-servers/test_10k.yaml:/app/monitors.yaml:ro<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>cpra<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>./cpra<span class="w"> </span>--yaml<span class="w"> </span>/app/monitors.yaml
-</code></pre></div></p>
-</li>
-<li>
-<p>Control logging and memory via env if needed:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>cpra<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">GOMEMLIMIT</span><span class="o">=</span><span class="m">1073741824</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">GOGC</span><span class="o">=</span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/mock-servers/test_10k.yaml:/app/monitors.yaml:ro<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>cpra<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>./cpra<span class="w"> </span>--yaml<span class="w"> </span>/app/monitors.yaml<span class="w"> </span>--debug
-</code></pre></div></p>
-</li>
-</ol>
-<h2 id="option-c-kubernetes-basic-outline">Option C: Kubernetes (basic outline)<a class="headerlink" href="#option-c-kubernetes-basic-outline" title="Permanent link">&para;</a></h2>
-<p>Use a Deployment with a ConfigMap or Secret for your YAML, and a small PVC if you want to persist logs.</p>
-<p>Example Deployment snippet:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpra</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">selector</span><span class="p">:</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> app</span><span class="p">:</span><span class="w"> </span><span class="nv">cpra</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> app</span><span class="p">:</span><span class="w"> </span><span class="nv">cpra</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">      </span><span class="nt">containers</span><span class="p">:</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpra</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpra:latest</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">          </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;./cpra&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;--yaml&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;/config/monitors.yaml&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;--pprof=false&quot;</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">          </span><span class="nt">volumeMounts</span><span class="p">:</span>
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config</span>
-<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="w">              </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/config</span>
-<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="w">              </span><span class="nt">readOnly</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">      </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config</span>
-<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="w">          </span><span class="nt">configMap</span><span class="p">:</span>
-<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpra-monitors</span>
-</code></pre></div></p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h2 id="step-3-run-with-your-monitor">Step 3: Run with Your Monitor<a class="headerlink" href="#step-3-run-with-your-monitor" title="Permanent link">&para;</a></h2>
+<p>To run CPRA with your new monitor, use the same command as the Quickstart, but point to your new file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>docker<span class="w"> </span>run<span class="w"> </span>-it<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/my-monitor.yaml:/app/monitors.yaml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>cpra:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>./cpra<span class="w"> </span>--yaml<span class="w"> </span>/app/monitors.yaml
+</code></pre></div>
+<hr />
+<h3 id="next-steps"><strong>Next Steps</strong><a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h3>
 <ul>
-<li>High memory usage: reduce worker max or queue capacity in code/config; consider <code>GOMEMLIMIT</code> and lower <code>GOGC</code>.</li>
-<li>No monitors loaded: confirm YAML path and file permissions; run with <code>--debug</code>.</li>
-<li>Slow processing: adjust <code>SizingServiceTime</code>, <code>SizingSLO</code>, and worker min/max in config.</li>
-</ul>
-<h2 id="related-guides">Related Guides<a class="headerlink" href="#related-guides" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../common-tasks/">Common Tasks</a></li>
-<li><a href="../../reference/api-reference/">API Reference</a></li>
+<li><strong><a href="../../reference/config-schema/">Monitor Configuration Schema</a></strong>: Explore all available options for <code>pulse</code>, <code>intervention</code>, and <code>codes</code>.</li>
+<li><strong><a href="../../explanation/architecture-overview/">Architecture Overview</a></strong>: Understand the ECS core that powers this high-performance flow.</li>
 </ul>
 
 

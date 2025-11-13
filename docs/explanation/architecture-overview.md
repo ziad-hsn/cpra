@@ -23,7 +23,7 @@ By storing component data in contiguous memory blocks, ECS ensures that the CPU'
 
 Monitoring tasks are divided into three distinct, concurrent pipelines. This separation is a core design decision that provides **fault isolation** and allows each pipeline to be optimized for its specific workload.
 
-![Pipeline Flow Diagram](../../docs/images/pipeline-flow.png)
+![Pipeline Flow Diagram](../images/pipeline-flow.png)
 
 | Pipeline | Primary Function | Triggered By | Key Characteristic |
 | :--- | :--- | :--- | :--- |

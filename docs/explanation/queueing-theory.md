@@ -49,5 +49,5 @@ This intelligent, mathematically-grounded approach is what allows CPRA to guaran
 
 ### **Next Steps**
 
-*   **[Performance Tuning & SLOs](how-to/performance-tuning.md)**: Learn how to configure and tune the SLO targets for your environment.
-*   **[Monitor Configuration Schema](reference/config-schema.md)**: See where to define the `interval` and `timeout` that feed into the $\lambda$ and $\mu$ calculations.
+*   **[Performance Tuning & SLOs](../how-to/performance-tuning.md)**: Learn how to configure and tune the SLO targets for your environment.
+*   **[Monitor Configuration Schema](../reference/config-schema.md)**: See where to define the `interval` and `timeout` that feed into the $\lambda$ and $\mu$ calculations.

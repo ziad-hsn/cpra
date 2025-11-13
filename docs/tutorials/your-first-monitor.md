@@ -74,5 +74,5 @@ $ docker run -it --rm \
 
 ### **Next Steps**
 
-*   **[Monitor Configuration Schema](reference/config-schema.md)**: Explore all available options for `pulse`, `intervention`, and `codes`.
-*   **[Architecture Overview](explanation/architecture-overview.md)**: Understand the ECS core that powers this high-performance flow.
+*   **[Monitor Configuration Schema](../reference/config-schema.md)**: Explore all available options for `pulse`, `intervention`, and `codes`.
+*   **[Architecture Overview](../explanation/architecture-overview.md)**: Understand the ECS core that powers this high-performance flow.

@@ -47,5 +47,5 @@ To validate your tuning efforts, use the built-in profiling tools:
 
 ### **Next Steps**
 
-*   **[Queueing Theory for Dynamic Scaling](explanation/queueing-theory.md)**: Understand the mathematical model behind the dynamic scaling.
-*   **[Monitor Configuration Schema](reference/config-schema.md)**: Review the configuration fields that affect job arrival and service rates.
+*   **[Queueing Theory for Dynamic Scaling](../explanation/queueing-theory.md)**: Understand the mathematical model behind the dynamic scaling.
+*   **[Monitor Configuration Schema](../reference/config-schema.md)**: Review the configuration fields that affect job arrival and service rates.

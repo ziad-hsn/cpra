@@ -1,0 +1,66 @@
+site_name: CPRA Documentation
+site_url: https://ziad-hsn.github.io/cpra/
+repo_url: https://github.com/ziad-hsn/cpra
+repo_name: ziad-hsn/cpra
+edit_uri: edit/v0.5/docs/
+
+nav:
+  - Home: index.md
+  - Tutorials:
+    - Quickstart: tutorials/quickstart.md
+    - Your First Custom Monitor: tutorials/your-first-monitor.md
+  - How-to Guides:
+    - Performance Tuning & SLOs: how-to/performance-tuning.md
+  - Explanation:
+    - Architecture Overview: explanation/architecture-overview.md
+    - Queueing Theory for Scaling: explanation/queueing-theory.md
+  - Reference:
+    - Monitor Configuration Schema: reference/config-schema.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+      primary: blue grey
+      accent: cyan
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+      primary: blue grey
+      accent: cyan
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    logo: material/monitor-dashboard
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - attr_list
+  - md_in_html

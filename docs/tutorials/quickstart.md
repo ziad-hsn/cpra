@@ -1,121 +1,75 @@
-# Quick Start Guide
+---
+title: Quickstart
+parent: Tutorials
+---
 
-CPRA is a high-performance monitoring system designed for large-scale environments, using a data-oriented design for performance and scalability.
+# Quickstart
+
+This tutorial provides the fastest way to get CPRA running on your local machine using Docker. In just a few minutes, you will build the application, run it with a sample configuration of 10,000 monitors, and observe the system's core functionality.
+
+This approach is ideal for a first-time evaluation of CPRA, as it requires no Go environment setup.
 
 ## Prerequisites
-- Go 1.25 or later
-- Docker (optional, for running mock servers for testing)
 
-**Note:** This guide takes approximately 5-10 minutes to complete, including setup time. <!-- [IMPROVED] Realistic time estimate -->
+*   **Docker:** You must have Docker installed and the Docker daemon running. You can find installation instructions at the [official Docker website](https://docs.docker.com/get-docker/).
+*   **Git:** You will need Git to clone the project repository.
 
-## Installation
+## Step 1: Clone the Repository
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/ziad/cpra.git
-    cd cpra
-    ```
+First, open your terminal and clone the `ziad-hsn/cpra` repository to your local machine.
 
-2.  **Build the application:**
-    ```bash
-    go build .
-    ```
+```bash
+$ git clone https://github.com/ziad-hsn/cpra.git
+$ cd cpra
+```
 
-## First Working Example
+This will download the project source code, including the Dockerfile and the sample monitor configurations we will use.
 
-This example shows how to initialize the controller, load a simple monitor, and run the monitoring system.
+## Step 2: Build the Docker Image
 
-1.  **Create a `monitors.yaml` file:**
+Next, use the provided Dockerfile to build a container image for CPRA. This command compiles the Go application inside a controlled Docker environment and packages it into a lightweight image named `cpra:latest`.
 
-    ```yaml
-    - name: "example-http-check"
-      pulse:
-        type: "http"
-        interval: "10s"
-        timeout: "5s"
-        http:
-          url: "http://localhost:8080/health"
-    ```
+```bash
+$ docker build -f docker/Dockerfile -t cpra:latest .
+```
 
-2.  **Create a `main.go` file to run the controller:**
+## Step 3: Run the CPRA Container
 
-    ```go
-    package main
+Now, run the container you just built. This command starts CPRA and uses a volume mount (`-v`) to provide the `test_10k.yaml` file from your local machine as the monitor configuration inside the container.
 
-    import (
-    	"context"
-    	"log"
-    	"os"
-    	"os/signal"
-    	"syscall"
-    	"time"
+```bash
+$ docker run -it --rm \
+  -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml \
+  cpra:latest \
+  ./cpra --yaml /app/monitors.yaml
+```
 
-    	"cpra/internal/controller" // [IMPROVED] Fixed import path to match actual module
-    )
+## Step 4: Analyze the Output
 
-    func main() {
-    	// Initialize loggers
-    	controller.InitializeLoggers(true)
-    	defer controller.CloseLoggers()
+If successful, you will see log messages indicating that the controller has started, loaded the 10,000 monitors, and dynamically scaled its worker pool to meet the default performance targets.
 
-    	// Create a new controller
-    	config := controller.DefaultConfig()
-    	ctrl := controller.NewController(config)
+```text
+# Expected Log Output
 
-    	// Load monitors
-    	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    	defer cancel()
-    	if err := ctrl.LoadMonitors(ctx, "monitors.yaml"); err != nil {
-    		log.Fatalf("Failed to load monitors: %v", err)
-    	}
+Starting CPRA Optimized Controller for 1M Monitors
+Profiling server listening at http://localhost:6060/debug/pprof/
+Loading monitors from mock-servers/test_10k.yaml...
+Monitor loading completed in 1.2s
+[INFO] Controller started successfully
+[INFO] Pulse pipeline processing 10,000 monitors
+[INFO] Worker pool scaled to 143 workers (target SLO: 100ms)
+```
 
-    	// Start the controller
-    	if err := ctrl.Start(); err != nil {
-    		log.Fatalf("Failed to start controller: %v", err)
-    	}
-    	defer ctrl.Stop()
+This output confirms that:
+1.  The application started correctly.
+2.  It successfully parsed the YAML configuration file.
+3.  The **Pulse Pipeline** is active and processing checks.
+4.  The **dynamic scaling** feature has calculated and provisioned the optimal number of workers (143 in this example) to handle the load while respecting the 100ms Service Level Objective (SLO).
 
-    	// Wait for shutdown signal
-    	shutdown := make(chan os.Signal, 1)
-    	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
-    	<-shutdown
+---
 
-    	log.Println("Shutting down...")
-    }
-    ```
+### **Next Steps**
 
-3.  **Run the example:**
+Congratulations! You have successfully started CPRA. To learn how to define your own health checks, proceed to the next tutorial:
 
-    Before running, you can start the mock server provided in the `mock-servers` directory to have a running endpoint for the monitor to check.
-
-    ```bash
-    # In a separate terminal, from the mock-servers directory
-    go run main.go &
-
-    # Run the main application
-    go run main.go
-    ```
-
-    You should see output indicating that the monitor is being checked.
-
-## Understanding Monitor Lifecycle
-
-Each monitor goes through a lifecycle of states as it processes health checks:
-
-![Monitor Lifecycle State Machine](../images/monitor-lifecycle.png)
-
-**States:**
-- **Idle**: Monitor is ready for scheduling
-- **Scheduled**: System has identified the monitor for processing
-- **Enqueued**: Job is in the queue waiting for a worker
-- **Executing**: Worker is actively processing the job
-- **ProcessingResult**: Job complete, result being processed
-- **Failed**: Error occurred, monitor will be reset
-
-For a complete explanation of the system architecture and all three processing pipelines (Pulse, Intervention, Code), see the [Architecture Overview](../explanation/architecture-overview.md) document.
-
-## What's Next?
-
--   Learn about common tasks in the [How-To Guide](../how-to/common-tasks.md)
--   Explore the full API in the [API Reference](../reference/api-reference.md)
--   Understand the architecture in the [Architecture Overview](../explanation/architecture-overview.md)
+*   **[Your First Custom Monitor](your-first-monitor.md)**

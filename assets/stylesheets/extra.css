@@ -1,0 +1,238 @@
+/* /docs/assets/stylesheets/extra.css */
+
+/* --- Font Imports --- */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Source+Sans+Pro:wght@400;600&family=Fira+Code&display=swap");
+
+/* --- Variable Definitions --- */
+:root {
+  --md-primary-fg-color:        #2c3e50;
+  --md-primary-fg-color--light: #34495e;
+  --md-primary-fg-color--dark:  #1f2c38;
+  --md-accent-fg-color:         #e91e63;
+  --md-accent-fg-color--light:  #f06292;
+  --md-accent-fg-color--dark:   #e91e63;
+
+  --md-text-font: "Source Sans Pro", sans-serif;
+  --md-heading-font: "Inter", sans-serif;
+  --md-code-font: "Fira Code", monospace;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #1f2c38;
+  --md-primary-fg-color--light: #2c3e50;
+  --md-primary-fg-color--dark:  #161e26;
+  --md-accent-fg-color:         #f06292;
+  --md-default-bg-color:        #161e26;
+}
+
+/* --- Typography Overrides --- */
+body {
+  font-family: var(--md-text-font);
+}
+
+h1, h2, h3, h4, h5, h6, .md-tabs__link, .md-nav__link {
+  font-family: var(--md-heading-font);
+}
+
+.md-typeset code {
+    font-family: var(--md-code-font);
+}
+
+/* --- UI Enhancements --- */
+.md-header {
+    box-shadow: 0 0 0.5rem rgba(0,0,0,.1), 0 0 0.2rem rgba(0,0,0,.2);
+}
+
+.md-tabs__link--active {
+    border-bottom: 2px solid var(--md-accent-fg-color);
+}
+
+.md-code-block {
+    border-radius: 4px;
+}
+
+.md-admonition {
+    border-radius: 4px;
+}
+
+/* --- Homepage Hero --- */
+.cpra-hero {
+    position: relative;
+    display: grid;
+    gap: 1.5rem;
+    padding: 3rem 2rem;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(44,62,80,0.96), rgba(22,30,38,0.94));
+    border: 1px solid rgba(240,240,240,0.08);
+    box-shadow: 0 18px 48px rgba(0,0,0,0.45);
+    color: #ecf0f1;
+    overflow: hidden;
+}
+
+.cpra-hero::after {
+    content: "";
+    position: absolute;
+    inset: -40% 45% auto auto;
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle at center, rgba(240,98,146,0.35), transparent 70%);
+    transform: rotate(-25deg);
+    pointer-events: none;
+}
+
+.cpra-hero__eyebrow {
+    font-size: 0.875rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #f06292;
+    margin: 0;
+}
+
+.cpra-hero__title {
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    line-height: 1.1;
+    max-width: 28ch;
+    margin: 0;
+}
+
+.cpra-hero__lede {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    max-width: 60ch;
+    margin: 0;
+    color: rgba(236, 240, 241, 0.82);
+}
+
+.cpra-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.cpra-hero__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.cpra-hero__button--primary {
+    background: #e91e63;
+    color: #ffffff;
+    border-color: #e91e63;
+}
+
+.cpra-hero__button--primary:hover,
+.cpra-hero__button--primary:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(233,30,99,0.35);
+}
+
+.cpra-hero__button--secondary {
+    background: transparent;
+    color: #ecf0f1;
+    border-color: rgba(236,240,241,0.35);
+}
+
+.cpra-hero__button--secondary:hover,
+.cpra-hero__button--secondary:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(236,240,241,0.18);
+    border-color: rgba(236,240,241,0.65);
+}
+
+.cpra-hero__button:focus-visible {
+    outline: 3px solid #00d4ff;
+    outline-offset: 2px;
+}
+
+@media (min-width: 62rem) {
+    .cpra-hero {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+        align-items: center;
+        padding: 4rem 4.5rem;
+    }
+
+    .cpra-hero__graphic {
+        justify-self: end;
+    }
+}
+
+.cpra-hero__list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: rgba(236, 240, 241, 0.82);
+}
+
+.cpra-hero__metric {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    background: rgba(28, 38, 48, 0.65);
+    border: 1px solid rgba(240,240,240,0.08);
+}
+
+.cpra-hero__metric span {
+    font-weight: 600;
+    color: #f06292;
+}
+
+/* --- Content Enhancements --- */
+.md-typeset hr {
+    border-color: rgba(44, 62, 80, 0.15);
+}
+
+.md-typeset table {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.md-typeset table thead th {
+    background: rgba(44, 62, 80, 0.08);
+    color: #34495e;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table thead th {
+    background: rgba(240, 240, 240, 0.08);
+    color: #ecf0f1;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table tbody tr {
+    border-color: rgba(240, 240, 240, 0.08);
+}
+
+/* --- Link Styling --- */
+.md-typeset a {
+    color: var(--md-accent-fg-color);
+    font-weight: 600;
+}
+
+.md-typeset a:hover,
+.md-typeset a:focus-visible {
+    color: var(--md-accent-fg-color--light);
+}
+
+/* --- Code Blocks --- */
+[data-md-color-scheme="default"] .md-code-block {
+    background: #fafbfc;
+}
+
+[data-md-color-scheme="slate"] .md-code-block {
+    background: #111821;
+    border-color: rgba(240, 240, 240, 0.08);
+}
+
+.md-typeset pre code {
+    font-size: 0.95rem;
+}

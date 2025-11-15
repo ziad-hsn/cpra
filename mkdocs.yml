@@ -33,20 +33,23 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-      primary: blue grey
-      accent: cyan
+      primary: custom
+      accent: custom
     # Palette toggle for dark mode
     - scheme: slate
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-      primary: blue grey
-      accent: cyan
+      primary: custom
+      accent: custom
   font:
-    text: Roboto
-    code: Roboto Mono
+    text: Inter
+    code: Fira Code
   icon:
     logo: material/monitor-dashboard
+
+extra_css:
+  - assets/stylesheets/extra.css
 
 plugins:
   - search

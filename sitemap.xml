@@ -2,87 +2,70 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://ziad-hsn.github.io/cpra/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/explanation/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/explanation/architecture-overview/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/explanation/queueing-theory/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/how-to/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/how-to/common-tasks/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/how-to/performance-tuning/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/reference/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/reference/api-documentation/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/reference/api-reference/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/reference/config-schema/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/reference/types-reference/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/tutorials/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/tutorials/getting-started/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/tutorials/quickstart/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
     <url>
          <loc>https://ziad-hsn.github.io/cpra/tutorials/your-first-monitor/</loc>
-         <lastmod>2025-11-14</lastmod>
-         <changefreq>daily</changefreq>
+         <lastmod>2025-11-15</lastmod>
     </url>
 </urlset>

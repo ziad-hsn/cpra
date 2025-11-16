@@ -1,3 +1,76 @@
+// Package controller provides the core ECS-based controller for managing monitors
+// in the CPRA (Cloud Platform Reliability Automation) system.
+//
+// The controller orchestrates the Entity Component System (ECS) architecture,
+// managing monitor lifecycle, job queuing, worker pools, and system coordination.
+// It is designed to handle large-scale deployments (1M+ monitors) efficiently
+// through batch processing, adaptive queuing, and optimized memory management.
+//
+// # Architecture
+//
+// The controller uses the ark ECS library to manage monitor entities and their
+// components. Key architectural decisions:
+//
+//   - Batch Processing: Systems process entities in batches to maximize throughput
+//   - Queue Abstraction: Multiple queue implementations (Hybrid, Adaptive, Workiva)
+//     can be used based on workload characteristics
+//   - Worker Pools: Dynamic worker pools with automatic scaling for pulse, intervention,
+//     and code alert processing
+//   - Streaming Loader: Efficient YAML/JSON parsing for large monitor configurations
+//
+// # Components
+//
+// The controller manages three primary job types:
+//
+//   - Pulse: Health checks (HTTP, TCP, ICMP) performed at regular intervals
+//   - Intervention: Automated recovery actions (e.g., Docker container restarts)
+//   - Code: Alert notifications (Red, Yellow, Green, Cyan, Gray) sent via various channels
+//
+// # Systems
+//
+// The controller coordinates multiple ECS systems:
+//
+//   - BatchPulseScheduleSystem: Schedules pulse checks based on monitor intervals
+//   - BatchPulseSystem: Enqueues pulse jobs for execution
+//   - BatchPulseResultSystem: Processes pulse results and updates monitor state
+//   - BatchInterventionSystem: Enqueues intervention jobs when thresholds are exceeded
+//   - BatchInterventionResultSystem: Processes intervention results
+//   - BatchCodeSystem: Enqueues code alert jobs
+//   - BatchCodeResultSystem: Processes code alert results
+//
+// # Queue Management
+//
+// The controller supports dynamic queue switching based on entity count thresholds.
+// When the entity count exceeds a configured threshold, the system can automatically
+// switch from HybridQueue to AdaptiveQueue for better performance at scale.
+//
+// # Worker Sizing
+//
+// The controller includes pre-computation of optimal worker pool sizes based on:
+//
+//   - Arrival rate (λ): Computed from monitor pulse intervals
+//   - Service time (τ): Expected job execution time
+//   - SLO target (W): Maximum acceptable end-to-end latency
+//
+// This uses M/M/c queueing theory to determine minimum workers needed and applies
+// a configurable headroom percentage for safety margins.
+//
+// # Example
+//
+//	config := controller.DefaultConfig()
+//	config.Debug = true
+//	config.BatchSize = 1000
+//	oc := controller.NewController(config)
+//
+//	ctx := context.Background()
+//	if err := oc.LoadMonitors(ctx, "monitors.yaml"); err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	if err := oc.Start(); err != nil {
+//		log.Fatal(err)
+//	}
+//	defer oc.Stop()
 package controller
 
 import (
@@ -43,6 +116,15 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 }
 
 // Controller manages the ECS world and its systems using ark-tools.
+//
+// Controller coordinates all aspects of monitor management including:
+// entity lifecycle, job queuing, worker pool management, and system execution.
+// It provides a high-level API for loading monitors, starting/stopping the system,
+// and accessing the underlying ECS world for testing and debugging.
+//
+// The controller is thread-safe for concurrent access to read-only operations
+// like GetWorld(). Start() and Stop() should be called from a single goroutine
+// or with proper synchronization.
 type Controller struct {
 	stateLogger          *systems.StateLogger
 	pulseQueue           queue.Queue
@@ -62,6 +144,12 @@ type Controller struct {
 }
 
 // Config holds all configuration for the controller.
+//
+// Configuration can be set programmatically or via environment variables
+// for sizing parameters (CPRA_SIZING_TAU_MS, CPRA_SIZING_SLO_MS, CPRA_SIZING_HEADROOM_PCT).
+//
+// Default values are optimized for large-scale deployments but can be adjusted
+// based on workload characteristics and resource constraints.
 type Config struct {
 	Debug           bool
 	StreamingConfig streaming.StreamingConfig
@@ -77,7 +165,15 @@ type Config struct {
 	SizingHeadroomPct float64
 }
 
-// DefaultConfig returns a default configuration.
+// DefaultConfig returns a default configuration optimized for large-scale deployments.
+//
+// The default configuration uses:
+//   - Queue capacity of 65536 (must be power of 2)
+//   - Batch size of 1000 entities per system update
+//   - Default worker pool configuration
+//   - Streaming loader defaults optimized for large files
+//
+// These defaults can be overridden based on specific deployment requirements.
 func DefaultConfig() Config {
 	return Config{
 		StreamingConfig: streaming.DefaultStreamingConfig(),
@@ -92,6 +188,17 @@ func DefaultConfig() Config {
 }
 
 // NewController creates a new controller with the refactored systems using ark-tools.
+//
+// NewController initializes:
+//   - ECS world with initial capacity
+//   - Three queue instances (pulse, intervention, code) with HybridQueue by default
+//   - Three dynamic worker pools for job execution
+//   - All batch processing systems
+//   - Entity mapper for monitor management
+//
+// The controller is created in a stopped state. Call Start() to begin processing.
+//
+// Returns an error if queue or worker pool creation fails.
 func NewController(config Config) *Controller {
 	// Create ark-tools app with initial capacity
 	arkApp := app.New(1024)
@@ -182,9 +289,22 @@ func NewController(config Config) *Controller {
 	}
 }
 
-// LoadMonitors loads monitors using the streaming loader.
+// LoadMonitors loads monitors from a YAML or JSON file using the streaming loader.
+//
+// LoadMonitors parses the file in batches, creates ECS entities for each monitor,
+// and initializes all required components. It supports both YAML and JSON formats,
+// with optional gzip compression (.gz extension).
+//
+// After loading completes, the controller:
+//   - Checks entity count and may switch to AdaptiveQueue if threshold exceeded
+//   - Pre-computes optimal worker pool sizing for pulse jobs
+//
+// The context can be used to cancel the loading operation. Progress is logged
+// at regular intervals during the load process.
+//
+// Returns an error if file parsing or entity creation fails.
 func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
-	loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
+	loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig, c.mapper)
 	stats, err := loader.Load(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
@@ -283,6 +403,15 @@ func computePulseLambda(world *ecs.World) float64 {
 }
 
 // Start begins the main processing loop of the controller.
+//
+// Start initializes all worker pools and begins the ark-tools app execution loop.
+// The controller runs at 100 TPS (ticks per second) for high-frequency updates
+// required for 1-second monitor intervals.
+//
+// This method is idempotent - calling Start() multiple times returns an error
+// if the controller is already running.
+//
+// Returns an error if the controller is already running or if startup fails.
 func (c *Controller) Start() error {
 	if c.running {
 		return fmt.Errorf("controller already running")
@@ -297,6 +426,16 @@ func (c *Controller) Start() error {
 }
 
 // Stop gracefully shuts down the controller.
+//
+// Stop performs a graceful shutdown sequence:
+//   - Finalizes the ark-tools app (stops all systems)
+//   - Drains and stops all worker pools
+//   - Closes all queues
+//   - Logs shutdown metrics
+//
+// This method is idempotent - calling Stop() multiple times is safe.
+// After Stop() completes, the controller cannot be restarted; create a new
+// controller instance if needed.
 func (c *Controller) Stop() {
 	if !c.running {
 		return
@@ -391,6 +530,14 @@ func (c *Controller) PrintShutdownMetrics() {
 }
 
 // GetWorld returns the ECS world for external access (e.g., testing, debugging).
+//
+// GetWorld provides direct access to the underlying ECS world. This is useful for:
+//   - Testing: Inspecting entities and components in tests
+//   - Debugging: Querying entity state during development
+//   - Metrics: Accessing world statistics
+//
+// The returned world should not be modified directly while the controller is running,
+// as this may cause race conditions with the ECS systems.
 func (c *Controller) GetWorld() *ecs.World {
 	return c.world
 }

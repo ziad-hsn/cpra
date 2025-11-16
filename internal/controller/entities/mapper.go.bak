@@ -92,25 +92,14 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	// Create consolidated job storage (empty at first; jobs filled after we have the entity ID)
 	// Pre-size maps based on number of codes to minimize rehashing/resizes
 	codeCount := len(monitor.Codes)
-	codeCount = len(monitor.Codes)
 	jobStorage := GetJobStorage(codeCount)
 
 	// Create entity with base components in a single archetype transition
 	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage)
 	if !world.Alive(entity) {
-		// Return pooled components on error
-		PutMonitorState(monitorState)
-		PutPulseConfig(pulseConfig)
-		PutJobStorage(jobStorage)
 		return fmt.Errorf("failed to create valid entity")
 	}
 
-	// Return base components to pools immediately after Ark copies the values
-	PutMonitorState(monitorState)
-	PutPulseConfig(pulseConfig)
-	PutJobStorage(jobStorage)
-
-	// Add pulse job to existing JobStorage
 	// Add pulse job to existing JobStorage
 	pulseJob, err := jobs.CreatePulseJob(monitor.Pulse, entity)
 	if err != nil {
@@ -121,22 +110,19 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add intervention if configured
-	var interventionConfig *components.InterventionConfig
 	if monitor.Intervention.Action != "" {
 		maxFailures := 1
 		if monitor.Intervention.MaxFailures > 0 {
 			maxFailures = monitor.Intervention.MaxFailures
 		}
 
-		interventionConfig = GetInterventionConfig()
+		interventionConfig := GetInterventionConfig()
 		*interventionConfig = components.InterventionConfig{}
 		interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
 		// Assign schema target directly; updates should replace the component (COW).
 		interventionConfig.Target = monitor.Intervention.Target
 		interventionConfig.MaxFailures = maxFailures
 		e.InterventionConfig.Add(entity, interventionConfig)
-		// Return to pool after Ark copies the value
-		PutInterventionConfig(interventionConfig)
 
 		// Add intervention job
 		interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
@@ -149,11 +135,9 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add consolidated code configuration instead of separate color components
-	var codeConfig *components.CodeConfig
-	var codeStatus *components.CodeStatus
 	if codeCount > 0 {
-		codeConfig = GetCodeConfig(codeCount)
-		codeStatus = GetCodeStatus(codeCount)
+		codeConfig := GetCodeConfig(codeCount)
+		codeStatus := GetCodeStatus(codeCount)
 
 		for color, config := range monitor.Codes {
 			colorKey := interning.Intern(color)
@@ -172,9 +156,6 @@ func (e *EntityManager) CreateEntityFromMonitor(
 			// Add code job to consolidated storage
 			codeJob, err := jobs.CreateCodeJob(monitorName, config, entity, colorKey)
 			if err != nil {
-				// Clean up pooled components on error
-				PutCodeConfig(codeConfig)
-				PutCodeStatus(codeStatus)
 				return err
 			}
 			if js := e.JobStorage.Get(entity); js != nil {
@@ -184,10 +165,6 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 		// Add both code components in a single step to reduce archetype moves
 		e.codePair.Add(entity, codeConfig, codeStatus)
-		// Return to pools after Ark copies the values
-		// Note: PutCodeConfig/PutCodeStatus will handle nested colorCodeConfig/colorCodeStatus cleanup
-		PutCodeConfig(codeConfig)
-		PutCodeStatus(codeStatus)
 	}
 
 	// Apply Disabled tag after base creation if monitor is disabled
@@ -289,8 +266,6 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			interventionConfig.Target = monitor.Intervention.Target
 			interventionConfig.MaxFailures = maxFailures
 			e.InterventionConfig.Add(entity, interventionConfig)
-			// Return to pool after Ark copies the value
-			PutInterventionConfig(interventionConfig)
 
 			// Create intervention job and attach
 			if ij, err := jobs.CreateInterventionJob(monitor.Intervention, entity); err != nil {
@@ -327,9 +302,6 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 
 				// Create code job and attach to JobStorage
 				if cj, err := jobs.CreateCodeJob(monitorName, cfg, entity, colorKey); err != nil {
-					// Clean up pooled components on error
-					PutCodeConfig(codeConfig)
-					PutCodeStatus(codeStatus)
 					firstErr = err
 					return
 				} else {
@@ -338,10 +310,6 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			}
 			// Add both code components in a single step to reduce archetype moves
 			e.codePair.Add(entity, codeConfig, codeStatus)
-			// Return to pools after Ark copies the values
-			// Note: PutCodeConfig/PutCodeStatus will handle nested colorCodeConfig/colorCodeStatus cleanup
-			PutCodeConfig(codeConfig)
-			PutCodeStatus(codeStatus)
 		}
 
 		// Apply Disabled tag after base creation if monitor is disabled

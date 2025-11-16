@@ -1,8 +1,59 @@
+// Package jobs provides job types and execution logic for CPRA monitor operations.
+//
+// The jobs package defines the Job interface and implements various job types
+// for pulse checks, interventions, and code alerts. Jobs are executed by worker
+// pools and return Results that are processed by ECS systems.
+//
+// # Job Types
+//
+// Pulse Jobs:
+//   - PulseHTTPJob: HTTP health checks with configurable methods and retries
+//   - PulseTCPJob: TCP connection checks for port availability
+//   - PulseICMPJob: ICMP ping checks with privilege handling
+//
+// Intervention Jobs:
+//   - InterventionDockerJob: Docker container restart operations
+//
+// Code Alert Jobs:
+//   - CodeLogJob: Log-based alerts with JSON formatting
+//   - CodePagerDutyJob: PagerDuty integration (placeholder)
+//   - CodeSlackJob: Slack notifications (placeholder)
+//   - CodeEmailJob: Email notifications (placeholder)
+//   - CodeWebhookJob: Webhook notifications (placeholder)
+//
+// # Job Lifecycle
+//
+// Jobs are created via factory functions (CreatePulseJob, CreateInterventionJob,
+// CreateCodeJob), enqueued to queues, dequeued by worker pools, executed,
+// and results are returned to ECS systems for state updates.
+//
+// # Concurrency
+//
+// Jobs must be safe for concurrent execution. PulseICMPJob uses a semaphore
+// to limit concurrent ICMP operations and pools pingers per host to reduce
+// resource usage.
+//
+// # Example
+//
+//	pulseSchema := schema.Pulse{
+//		Config: &schema.PulseHTTPConfig{Url: "https://example.com", Method: "GET"},
+//		Timeout: 5 * time.Second,
+//		Retries: 2,
+//	}
+//	job, err := jobs.CreatePulseJob(pulseSchema, entityID)
+//	if err != nil {
+//		return err
+//	}
+//	result := job.Execute()
+//	if result.Err != nil {
+//		log.Printf("Pulse failed: %v", result.Err)
+//	}
 package jobs
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,6 +78,17 @@ import (
 var (
 	icmpPingerPool sync.Map                    // map[string]*pooledPinger
 	icmpPingerSem  = make(chan struct{}, 2048) // limit concurrent ICMP executions
+)
+
+// Predefined errors for job creation and execution
+var (
+	errNoPackets                  = errors.New("no packets received")
+	ErrUnknownPulseConfig         = errors.New("unknown pulse config type")
+	ErrDockerMissingTarget        = errors.New("docker intervention missing target configuration")
+	ErrUnknownInterventionAction  = errors.New("unknown intervention action")
+	ErrUnknownCodeNotification    = errors.New("unknown code notification type")
+	ErrFailedToCreateHTTPRequest  = errors.New("failed to create http request")
+	ErrFailedToCreateDockerClient = errors.New("failed to create docker client")
 )
 
 type pooledPinger struct {
@@ -58,6 +120,13 @@ func getPooledPinger(host string) (*pooledPinger, error) {
 }
 
 // Job defines the interface for any executable task in the system.
+//
+// All job implementations must be safe for concurrent execution. Jobs are
+// typically created via factory functions, enqueued, dequeued by worker pools,
+// executed, and results are processed by ECS systems.
+//
+// Jobs should implement Copy() to allow safe reuse of job pools. The IsNil()
+// method allows checking for nil jobs without type assertions.
 type Job interface {
 	Execute() Result
 	Copy() Job
@@ -66,17 +135,6 @@ type Job interface {
 	GetStartTime() time.Time
 	SetStartTime(time.Time)
 	IsNil() bool
-}
-
-func seedJobPayload(payload map[string]interface{}, jobType, driver string) map[string]interface{} {
-	if payload == nil {
-		payload = make(map[string]interface{}, 4)
-	} else {
-		clearPayload(payload)
-	}
-	payload["type"] = jobType
-	payload["driver"] = driver
-	return payload
 }
 
 // CreatePulseJob creates a new pulse job based on the provided schema.
@@ -91,8 +149,9 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		job.Method = interning.Intern(cfg.Method)
 		job.Timeout = timeout
 		job.Retries = cfg.Retries
-		job.Client = *GetHTTPClient(timeout)
-		job.payload = seedJobPayload(job.payload, "pulse", "http")
+		job.Client = GetHTTPClient(timeout)
+		job.JobType = "pulse"
+		job.Driver = "http"
 		return job, nil
 	case *schema.PulseTCPConfig:
 		job := getPulseTCPJob()
@@ -102,7 +161,8 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		job.Port = cfg.Port
 		job.Timeout = timeout
 		job.Retries = cfg.Retries
-		job.payload = seedJobPayload(job.payload, "pulse", "tcp")
+		job.JobType = "pulse"
+		job.Driver = "tcp"
 		return job, nil
 	case *schema.PulseICMPConfig:
 		job := getPulseICMPJob()
@@ -113,12 +173,13 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		job.Count = cfg.Count
 		job.Retries = cfg.Retries
 		job.IgnorePrivilege = cfg.Privilege
-		job.payload = seedJobPayload(job.payload, "pulse", "icmp")
+		job.JobType = "pulse"
+		job.Driver = "icmp"
 		return job, nil
 
 	// ... other pulse job types
 	default:
-		return nil, fmt.Errorf("unknown pulse config type: %T for job creation", pulseSchema.Config)
+		return nil, ErrUnknownPulseConfig
 	}
 }
 
@@ -129,7 +190,7 @@ func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Ent
 	case "docker":
 		target, ok := interventionSchema.Target.(*schema.InterventionTargetDocker)
 		if !ok || target == nil {
-			return nil, fmt.Errorf("docker intervention missing target configuration")
+			return nil, ErrDockerMissingTarget
 		}
 		job := getInterventionDockerJob()
 		job.ID = uuid.New()
@@ -137,9 +198,11 @@ func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Ent
 		job.Container = target.Container
 		job.Retries = retries
 		job.Timeout = target.Timeout
+		job.JobType = "intervention"
+		job.Driver = "docker"
 		return job, nil
 	default:
-		return nil, fmt.Errorf("unknown intervention action : %T for job creation", interventionSchema.Action)
+		return nil, ErrUnknownInterventionAction
 	}
 }
 
@@ -286,7 +349,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 		job.Color = colorValue
 		return job, nil
 	default:
-		return nil, fmt.Errorf("unknown code notification type: %s for job creation", config.Notify)
+		return nil, ErrUnknownCodeNotification
 	}
 }
 
@@ -295,25 +358,29 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 type PulseHTTPJob struct {
 	EnqueueTime time.Time
 	StartTime   time.Time
-	Client      http.Client
+	Client      *http.Client
 	URL         string
 	Method      string
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
-	payload     map[string]interface{}
+	JobType     string
+	Driver      string
 }
 
 func (p *PulseHTTPJob) Execute() Result {
 	var lastErr error
 	attempts := p.Retries + 1
-	payload := p.payload
+	payload := map[string]interface{}{
+		"type":   p.JobType,
+		"driver": p.Driver,
+	}
 
 	for i := 0; i < attempts; i++ {
 		req, err := http.NewRequest(p.Method, p.URL, nil)
 		if err != nil {
-			return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("failed to create http request: %w", err), Payload: payload}
+			return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateHTTPRequest, err), Payload: payload}
 		}
 		resp, err := p.Client.Do(req)
 		if err != nil {
@@ -349,11 +416,15 @@ type PulseTCPJob struct {
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
-	payload     map[string]interface{}
+	JobType     string
+	Driver      string
 }
 
 func (p *PulseTCPJob) Execute() Result {
-	payload := p.payload
+	payload := map[string]interface{}{
+		"type":   p.JobType,
+		"driver": p.Driver,
+	}
 	attempts := p.Retries + 1
 	if attempts < 1 {
 		attempts = 1
@@ -401,7 +472,8 @@ type PulseICMPJob struct {
 	Entity          ecs.Entity
 	ID              uuid.UUID
 	IgnorePrivilege bool
-	payload         map[string]interface{}
+	JobType         string
+	Driver          string
 }
 
 //var errICMPPrivilege = errors.New("icmp requires elevated privileges")
@@ -410,10 +482,6 @@ func (p *PulseICMPJob) Execute() Result {
 	// Concurrency bound to avoid socket pressure
 	icmpPingerSem <- struct{}{}
 	defer func() { <-icmpPingerSem }()
-
-	payload := p.payload
-	// Reset per-execution dynamic fields
-	delete(payload, "privilege_ignored")
 
 	attempts := p.Retries + 1
 	if attempts < 1 {
@@ -424,7 +492,12 @@ func (p *PulseICMPJob) Execute() Result {
 	if count <= 0 {
 		count = 1
 	}
-	payload["count"] = count
+
+	payload := map[string]interface{}{
+		"type":   p.JobType,
+		"driver": p.Driver,
+		"count":  count,
+	}
 
 	// Get pooled pinger for host
 	pp, err := getPooledPinger(p.Host)
@@ -449,7 +522,7 @@ func (p *PulseICMPJob) Execute() Result {
 			if stats != nil && stats.PacketsRecv > 0 {
 				return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 			}
-			lastErr = fmt.Errorf("no packets received")
+			lastErr = errNoPackets
 		} else {
 			// privilege fallback
 			if !pr.Privileged() && isPrivilegeError(err) {
@@ -460,7 +533,7 @@ func (p *PulseICMPJob) Execute() Result {
 					if stats != nil && stats.PacketsRecv > 0 {
 						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 					}
-					lastErr = fmt.Errorf("no packets received")
+					lastErr = errNoPackets
 				} else {
 					pp.mu.Unlock()
 					if p.IgnorePrivilege && isPrivilegeError(err2) {
@@ -520,13 +593,18 @@ type InterventionDockerJob struct {
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
+	JobType     string
+	Driver      string
 }
 
 func (i *InterventionDockerJob) Execute() Result {
-	payload := map[string]interface{}{"type": "intervention"}
+	payload := map[string]interface{}{
+		"type":   i.JobType,
+		"driver": i.Driver,
+	}
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to create docker client: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 	defer func() { _ = cli.Close() }()
 

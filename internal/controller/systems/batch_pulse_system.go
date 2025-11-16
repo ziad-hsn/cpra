@@ -1,3 +1,38 @@
+// Package systems provides ECS systems for processing monitor state transitions
+// and job execution coordination.
+//
+// Systems in this package implement the ark System interface and are registered
+// with the controller to process entities in batches. Each system handles a
+// specific aspect of monitor lifecycle management.
+//
+// # System Types
+//
+// Schedule Systems:
+//   - BatchPulseScheduleSystem: Determines when pulse checks are needed based on intervals
+//
+// Dispatch Systems:
+//   - BatchPulseSystem: Enqueues pulse jobs for execution
+//   - BatchInterventionSystem: Enqueues intervention jobs when thresholds exceeded
+//   - BatchCodeSystem: Enqueues code alert jobs
+//
+// Result Systems:
+//   - BatchPulseResultSystem: Processes pulse job results and updates monitor state
+//   - BatchInterventionResultSystem: Processes intervention job results
+//   - BatchCodeResultSystem: Processes code alert job results
+//
+// # Batch Processing
+//
+// All systems use batch processing to maximize throughput:
+//   - Systems query entities in batches using ECS filters
+//   - Jobs are enqueued in batches to reduce queue contention
+//   - Entity state updates are batched for cache efficiency
+//
+// # Performance
+//
+// Systems use object pooling (sync.Pool) to reduce allocations:
+//   - Job slices are pooled for batch enqueue operations
+//   - Entity slices are pooled for batch state updates
+//
 package systems
 
 import (
@@ -10,8 +45,14 @@ import (
 )
 
 // BatchPulseSystem processes entities that need a pulse check.
-// It identifies entities with the StatePulseNeeded flag, enqueues the corresponding job,
-// and transitions the entity state to StatePulsePending.
+//
+// BatchPulseSystem identifies entities with the StatePulseNeeded flag set,
+// enqueues the corresponding pulse job to the pulse queue, and transitions
+// the entity state to StatePulsePending.
+//
+// The system processes entities in batches to maximize throughput and uses
+// object pooling to reduce allocations. It respects queue capacity limits
+// and can be configured with a maximum dispatch rate.
 type BatchPulseSystem struct {
 	queue              queue.Queue
 	logger             Logger

@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"net/http"
 	"sync"
 	"time"
 
@@ -88,14 +87,14 @@ func resetPulseHTTPJob(job *PulseHTTPJob) {
 	}
 	job.EnqueueTime = time.Time{}
 	job.StartTime = time.Time{}
-	job.Client = http.Client{}
+	// DO NOT reset Client - it's shared and reused
 	job.URL = ""
 	job.Method = ""
 	job.Timeout = 0
 	job.Retries = 0
 	job.Entity = ecs.Entity{}
 	job.ID = uuid.Nil
-	clearPayload(job.payload)
+	// JobType and Driver are set on creation, don't clear
 }
 
 func resetPulseTCPJob(job *PulseTCPJob) {
@@ -110,7 +109,7 @@ func resetPulseTCPJob(job *PulseTCPJob) {
 	job.Retries = 0
 	job.Entity = ecs.Entity{}
 	job.ID = uuid.Nil
-	clearPayload(job.payload)
+	// JobType and Driver are set on creation, don't clear
 }
 
 func resetPulseICMPJob(job *PulseICMPJob) {
@@ -126,7 +125,7 @@ func resetPulseICMPJob(job *PulseICMPJob) {
 	job.Entity = ecs.Entity{}
 	job.ID = uuid.Nil
 	job.IgnorePrivilege = false
-	clearPayload(job.payload)
+	// JobType and Driver are set on creation, don't clear
 }
 
 func resetInterventionDockerJob(job *InterventionDockerJob) {
@@ -140,6 +139,7 @@ func resetInterventionDockerJob(job *InterventionDockerJob) {
 	job.Retries = 0
 	job.Entity = ecs.Entity{}
 	job.ID = uuid.Nil
+	// JobType and Driver are set on creation, don't clear
 }
 
 func resetCodeLogJob(job *CodeLogJob) {
@@ -210,13 +210,4 @@ func resetCodeWebhookJob(job *CodeWebhookJob) {
 	job.Color = ""
 	job.Entity = ecs.Entity{}
 	job.ID = uuid.Nil
-}
-
-func clearPayload(payload map[string]interface{}) {
-	if payload == nil {
-		return
-	}
-	for k := range payload {
-		delete(payload, k)
-	}
 }

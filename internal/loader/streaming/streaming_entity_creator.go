@@ -38,10 +38,16 @@ type EntityProgress struct {
 }
 
 // NewStreamingEntityCreator creates a new, simplified entity creator.
-func NewStreamingEntityCreator(world *ecs.World, config EntityCreationConfig) *StreamingEntityCreator {
+// If entityManager is nil, a new EntityManager will be created.
+// It's recommended to pass an existing EntityManager from the Controller to avoid duplication.
+func NewStreamingEntityCreator(world *ecs.World, config EntityCreationConfig, entityManager *entities.EntityManager) *StreamingEntityCreator {
+	em := entityManager
+	if em == nil {
+		em = entities.NewEntityManager(world)
+	}
 	creator := &StreamingEntityCreator{
 		world:         world,
-		entityManager: entities.NewEntityManager(world),
+		entityManager: em,
 		startTime:     time.Now(),
 	}
 

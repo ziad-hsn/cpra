@@ -1,7 +1,54 @@
+// Package streaming provides efficient streaming parsers and entity creators
+// for loading large monitor configurations into the ECS world.
+//
+// The streaming package is designed to handle very large YAML/JSON files
+// (1M+ monitors) without loading the entire file into memory. It uses:
+//
+//   - Batch parsing: Processes files in configurable batch sizes
+//   - Streaming JSON/YAML parsers: Parse incrementally without full deserialization
+//   - Batch entity creation: Creates ECS entities in batches for efficiency
+//   - Progress reporting: Provides real-time progress updates via channels
+//   - Memory management: Configurable memory limits and GC intervals
+//
+// # Supported Formats
+//
+//   - YAML (.yaml, .yml) with optional gzip compression (.gz)
+//   - JSON (.json) with optional gzip compression (.gz)
+//
+// # Architecture
+//
+// The loading process consists of three stages:
+//
+//  1. Parsing: Streaming parser reads file in batches and emits MonitorBatch
+//  2. Entity Creation: StreamingEntityCreator processes batches and creates ECS entities
+//  3. Statistics: Final statistics are computed and returned
+//
+// # Configuration
+//
+// StreamingConfig allows fine-tuning of:
+//   - Batch sizes for parsing and entity creation
+//   - Buffer sizes for file I/O
+//   - Memory limits and GC intervals
+//   - Worker counts for parallel processing
+//   - Progress reporting intervals
+//
+// # Example
+//
+//	config := streaming.DefaultStreamingConfig()
+//	config.ParseBatchSize = 10000
+//	config.EntityBatchSize = 10000
+//
+//	loader := streaming.NewStreamingLoader("monitors.yaml", world, config)
+//	stats, err := loader.Load(ctx)
+//	if err != nil {
+//		return err
+//	}
+//	fmt.Printf("Loaded %d monitors in %v\n", stats.TotalEntities, stats.LoadingTime)
 package streaming
 
 import (
 	"context"
+	"cpra/internal/controller/entities"
 	"cpra/internal/loader/schema"
 	"fmt"
 	"runtime"
@@ -42,6 +89,7 @@ type Progress struct {
 type StreamingLoader struct {
 	totalStartTime time.Time
 	world          *ecs.World
+	entityManager  *entities.EntityManager
 	parseProgress  chan Progress
 	entityProgress chan EntityProgress
 	filename       string
@@ -92,11 +140,14 @@ func DefaultStreamingConfig() StreamingConfig {
 	}
 }
 
-// NewStreamingLoader creates a new streaming loader
-func NewStreamingLoader(filename string, world *ecs.World, config StreamingConfig) *StreamingLoader {
+// NewStreamingLoader creates a new streaming loader.
+// If entityManager is nil, the loader will create a new EntityManager internally.
+// It's recommended to pass an existing EntityManager from the Controller to avoid duplication.
+func NewStreamingLoader(filename string, world *ecs.World, config StreamingConfig, entityManager *entities.EntityManager) *StreamingLoader {
 	return &StreamingLoader{
 		filename:       filename,
 		world:          world,
+		entityManager:  entityManager,
 		config:         config,
 		parseProgress:  make(chan Progress, 10),
 		entityProgress: make(chan EntityProgress, 10),
@@ -140,7 +191,7 @@ func (sl *StreamingLoader) Load(ctx context.Context) (*LoadingStats, error) {
 		BatchSize:    sl.config.EntityBatchSize,
 		PreAllocate:  sl.config.PreAllocateCount,
 		ProgressChan: sl.entityProgress,
-	})
+	}, sl.entityManager)
 
 	err := entityCreator.ProcessBatches(ctx, batchChan, sl.entityProgress)
 	if err != nil {

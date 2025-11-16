@@ -21,6 +21,7 @@ all: build
 # Standard build target
 # Builds the application with standard flags.
 build:
+	go clean -cache
 	@mkdir -p $(BUILD_DIR)
 	@echo "Building $(APP_NAME)..."
 	$(GO_CMD) build $(GO_BUILD_FLAGS) -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_PACKAGE)
@@ -28,6 +29,7 @@ build:
 # Secure build target
 # Builds the application with additional secure flags.
 buildsec:
+	go clean -cache
 	@mkdir -p $(BUILD_DIR)
 	@echo "Building secure $(APP_NAME)..."
 	$(GO_CMD) build $(GO_SECURE_FLAGS) -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_PACKAGE)

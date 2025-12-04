@@ -15,6 +15,8 @@ type jobInfo struct {
 	Job    jobs.Job
 	Color  string
 	Entity ecs.Entity
+	// OldState captures the state before transitioning to Pending so we can log/revert safely.
+	OldState components.MonitorState
 }
 
 // BatchCodeSystem processes entities that need a code alert dispatched.
@@ -101,6 +103,13 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			continue
 		}
 
+		// Skip if a code job is already in flight to prevent race conditions.
+		// Per FSM pattern: only one job of a type should be in-flight per entity.
+		// The current job will complete, then the next color (if any) will be processed.
+		if (state.Flags & components.StateCodePending) != 0 {
+			continue
+		}
+
 		color := state.PendingCode
 		if color == "" {
 			// This should not happen if StateCodeNeeded is set, but as a safeguard:
@@ -163,6 +172,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		s.logger.Debug("Code queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 		return
 	}
+
 	items := make([]interface{}, 0, len(*jobsInfo))
 	submitted := make([]jobInfo, 0, len(*jobsInfo))
 	for _, info := range *jobsInfo {
@@ -170,6 +180,23 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 			s.logger.Warn("Code job became nil before enqueue; skipping", "entity_id", info.Entity.ID())
 			continue
 		}
+		if !s.world.Alive(info.Entity) {
+			continue
+		}
+		state := s.stateMapper.Get(info.Entity)
+		if state == nil {
+			continue
+		}
+
+		// State might have already been updated if another system intervened; double-check guard.
+		if state.Flags&components.StateCodeNeeded == 0 {
+			continue
+		}
+
+		info.OldState = *state
+		state.Flags &^= components.StateCodeNeeded
+		state.Flags |= components.StateCodePending
+
 		items = append(items, info.Job)
 		submitted = append(submitted, info)
 	}
@@ -181,6 +208,18 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 	err := s.queue.EnqueueBatch(items)
 	if err != nil {
 		s.logger.Warn("Failed to enqueue code job batch, queue may be full", "error", err)
+		// Revert state transitions since dispatch failed.
+		for _, info := range submitted {
+			if !s.world.Alive(info.Entity) {
+				continue
+			}
+			state := s.stateMapper.Get(info.Entity)
+			if state == nil {
+				continue
+			}
+			state.Flags &^= components.StateCodePending
+			state.Flags |= components.StateCodeNeeded
+		}
 		return
 	}
 
@@ -193,15 +232,8 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 			continue
 		}
 
-		// Transition from Needed -> Pending
-		if state.Flags&components.StateCodeNeeded != 0 {
-			oldState := *state
-			state.Flags &^= components.StateCodeNeeded
-			state.Flags |= components.StateCodePending
-			state.PendingCode = ""
-			s.stateLogger.LogTransition(info.Entity, oldState, *state)
-			s.logger.Info("Code dispatched", "monitor_name", state.Name, "color", info.Color)
-		}
+		s.stateLogger.LogTransition(info.Entity, info.OldState, *state)
+		s.logger.Info("Code dispatched", "monitor_name", state.Name, "color", info.Color)
 	}
 }
 

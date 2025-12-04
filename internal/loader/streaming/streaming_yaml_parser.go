@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"cpra/internal/loader/schema"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -72,7 +73,12 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 		defer func() { _ = gz.Close() }()
 		r = gz
 	}
-	bufr := bufio.NewReaderSize(r, 64*1024)
+
+	bufferSize := p.config.BufferSize
+	if bufferSize <= 0 {
+		bufferSize = 64 * 1024
+	}
+	bufr := bufio.NewReaderSize(r, bufferSize)
 
 	decoder := yaml.NewDecoder(bufr)
 	decoder.KnownFields(p.config.StrictUnknownFields)
@@ -103,6 +109,7 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 	batchID := 0
 	batchPtr := p.batchPool.Get().(*[]schema.Monitor)
 	batch := (*batchPtr)[:0]
+	seen := make(map[string]struct{})
 
 	for _, monitorNode := range topLevel.Monitors.Content {
 		select {
@@ -121,12 +128,26 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 				continue
 			}
 
+			// Duplicate detection
+			if _, exists := seen[monitor.Name]; exists {
+				// Skip duplicate monitors to prevent ECS issues
+				continue
+			}
+			seen[monitor.Name] = struct{}{}
+
 			batch = append(batch, monitor)
 
 			if len(batch) >= p.config.BatchSize {
-				// Send the full batch.
-				batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
-				// Reset batch length to reuse slice.
+				// Clone the batch to avoid race conditions with the pool
+				// The slice 'batch' is backed by 'batchPtr' which we will reuse/return to pool.
+				// We must send a copy to the channel.
+				batchToSend := make([]schema.Monitor, len(batch))
+				copy(batchToSend, batch)
+
+				// Send the copy
+				batchChan <- MonitorBatch{Monitors: batchToSend, BatchID: batchID}
+
+				// Reset batch length to reuse slice backing array
 				batch = batch[:0]
 				batchID++
 			}
@@ -135,10 +156,12 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, batchChan chan<- Mo
 
 	// 4. Send any remaining monitors in the last batch.
 	if len(batch) > 0 {
-		batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
+		batchToSend := make([]schema.Monitor, len(batch))
+		copy(batchToSend, batch)
+		batchChan <- MonitorBatch{Monitors: batchToSend, BatchID: batchID}
 	}
 
-	// Return slice to pool
+	// Return working slice to pool
 	p.batchPool.Put(batchPtr)
 
 	return nil

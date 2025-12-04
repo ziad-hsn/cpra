@@ -57,7 +57,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -67,7 +66,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 	ping "github.com/prometheus-community/pro-bing"
 
 	"cpra/internal/interning"
@@ -196,6 +194,7 @@ func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Ent
 		job.ID = uuid.New()
 		job.Entity = jobID
 		job.Container = target.Container
+		job.DockerHost = target.DockerHost
 		job.Retries = retries
 		job.Timeout = target.Timeout
 		job.JobType = "intervention"
@@ -589,6 +588,7 @@ type InterventionDockerJob struct {
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Container   string
+	DockerHost  string
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
@@ -602,11 +602,12 @@ func (i *InterventionDockerJob) Execute() Result {
 		"type":   i.JobType,
 		"driver": i.Driver,
 	}
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	// Use pooled client instead of creating a new one
+	cli, err := GetDockerClient(i.DockerHost)
 	if err != nil {
 		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
-	defer func() { _ = cli.Close() }()
+	// Do not close pooled client
 
 	var lastErr error
 	attempts := i.Retries + 1
@@ -667,11 +668,7 @@ func (c *CodeLogJob) Execute() Result {
 	}
 	message := buildCodeNotificationMessage(c.Monitor, tpl)
 
-	f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	defer func() { _ = f.Close() }()
+	// File opening is handled by LogManager
 
 	now := time.Now().UTC()
 	entry := struct {
@@ -706,9 +703,9 @@ func (c *CodeLogJob) Execute() Result {
 	}
 
 	line = append(line, '\n')
-	if _, err = f.Write(line); err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: fmt.Errorf("failed to write log entry: %w", err), Payload: payload}
-	}
+
+	// Use asynchronous log manager
+	GetLogManager().WriteLog(c.File, line)
 
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}
 }

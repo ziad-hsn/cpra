@@ -21,9 +21,9 @@ type requiredMonitorFieldError struct {
 
 func (e *requiredMonitorFieldError) Error() string {
 	if e.monitor == "" {
-		return fmt.Sprintf("misssing required %s field %q (line %d)", e.parentKey, e.field, e.line)
+		return fmt.Sprintf("missing required %s field %q (line %d)", e.parentKey, e.field, e.line)
 	} else {
-		return fmt.Sprintf("misssing required %s field %q in monitor %q (line %d)", e.parentKey, e.field, e.monitor, e.line)
+		return fmt.Sprintf("missing required %s field %q in monitor %q (line %d)", e.parentKey, e.field, e.monitor, e.line)
 	}
 
 }

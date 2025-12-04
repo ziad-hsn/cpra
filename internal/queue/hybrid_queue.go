@@ -98,6 +98,8 @@ type HybridQueue struct {
 	softOverflowAlerted atomic.Bool
 	hardOverflowAlerted atomic.Bool
 	ringSaturated       atomic.Bool
+
+	signal chan struct{}
 }
 
 // NewHybridQueue builds a HybridQueue using the supplied configuration.
@@ -115,6 +117,7 @@ func NewHybridQueue(config HybridQueueConfig) (*HybridQueue, error) {
 		ring:   xsync.NewMPMCQueue[jobs.Job](cfg.RingCapacity),
 		cfg:    cfg,
 		logger: cfg.Logger,
+		signal: make(chan struct{}, 1),
 	}
 	if cfg.OverflowCapacity > 0 {
 		queue.overflow = make([]jobs.Job, 0, cfg.OverflowCapacity)
@@ -146,6 +149,7 @@ func (q *HybridQueue) Enqueue(job jobs.Job) error {
 	if q.ring.TryEnqueue(job) {
 		q.ringDepth.Add(1)
 		q.recordEnqueue(now)
+		q.notify()
 		return nil
 	}
 
@@ -154,6 +158,7 @@ func (q *HybridQueue) Enqueue(job jobs.Job) error {
 		return err
 	}
 	q.recordEnqueue(now)
+	q.notify()
 	return nil
 }
 
@@ -279,6 +284,17 @@ func (q *HybridQueue) Stats() Stats {
 		LastEnqueue:   time.Unix(0, q.lastEnqueueNano.Load()),
 		LastDequeue:   time.Unix(0, q.lastDequeueNano.Load()),
 		SampleWindow:  elapsed,
+	}
+}
+
+func (q *HybridQueue) Notify() <-chan struct{} {
+	return q.signal
+}
+
+func (q *HybridQueue) notify() {
+	select {
+	case q.signal <- struct{}{}:
+	default:
 	}
 }
 

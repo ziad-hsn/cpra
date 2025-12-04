@@ -25,6 +25,8 @@ type AdaptiveQueue struct {
 	startUnixNano       atomic.Int64
 	lastEnqueueUnixNano atomic.Int64
 	lastDequeueUnixNano atomic.Int64
+
+	signal chan struct{}
 }
 
 // NewAdaptiveQueue creates a new AdaptiveQueue with the given capacity.
@@ -35,6 +37,7 @@ func NewAdaptiveQueue(capacity uint64) (*AdaptiveQueue, error) {
 	}
 	queue := &AdaptiveQueue{
 		buffer: make([]jobs.Job, capacity),
+		signal: make(chan struct{}, 1),
 	}
 	queue.startUnixNano.Store(time.Now().UnixNano())
 	queue.capacity.Store(capacity)
@@ -70,6 +73,7 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 			q.buffer[tail&(capacity-1)] = job
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
+			q.notify()
 			return nil
 		}
 		// CAS failed - another producer got there first, use exponential backoff
@@ -130,6 +134,7 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 			}
 			q.enqueuedCount.Add(int64(n))
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
+			q.notify()
 			return nil
 		}
 		// CAS failed - use exponential backoff
@@ -301,4 +306,15 @@ func (q *AdaptiveQueue) Stats() Stats {
 // EnsureCapacity is a no-op for AdaptiveQueue as it has a fixed capacity.
 func (q *AdaptiveQueue) EnsureCapacity(targetCap int) {
 	// No-op: AdaptiveQueue has fixed capacity set at construction
+}
+
+func (q *AdaptiveQueue) Notify() <-chan struct{} {
+	return q.signal
+}
+
+func (q *AdaptiveQueue) notify() {
+	select {
+	case q.signal <- struct{}{}:
+	default:
+	}
 }

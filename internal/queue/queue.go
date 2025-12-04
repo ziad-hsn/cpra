@@ -47,7 +47,6 @@
 //	if err := q.Enqueue(job); err != nil {
 //		log.Printf("Failed to enqueue: %v", err)
 //	}
-//
 package queue
 
 import (
@@ -81,6 +80,9 @@ type Queue interface {
 
 	// Stats returns statistics about the queue's performance.
 	Stats() Stats
+
+	// Notify returns a channel that signals when new jobs are available.
+	Notify() <-chan struct{}
 }
 
 // Stats holds performance metrics for a queue.

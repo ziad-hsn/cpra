@@ -3,10 +3,11 @@ package queue
 import (
 	"cpra/internal/jobs"
 	"errors"
-	wqueue "github.com/Workiva/go-datastructures/queue"
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	wqueue "github.com/Workiva/go-datastructures/queue"
 )
 
 // Wrapper built on Workiva's lock-free RingBuffer, with capacity expansion.
@@ -38,6 +39,8 @@ type WorkivaQueue struct {
 	startUnixNano       atomic.Int64
 	lastEnqueueUnixNano atomic.Int64
 	lastDequeueUnixNano atomic.Int64
+
+	signal chan struct{}
 }
 
 // NewWorkivaQueue creates a new expanding queue backed by Workiva RingBuffers.
@@ -47,7 +50,9 @@ func NewWorkivaQueue(capacity int) Queue {
 	}
 	rb := wqueue.NewRingBuffer(uint64(capacity))
 	seg := &rbSeg{rb: rb, cap: rb.Cap()}
-	q := &WorkivaQueue{}
+	q := &WorkivaQueue{
+		signal: make(chan struct{}, 1),
+	}
 	q.head.Store(seg)
 	q.tail.Store(seg)
 	q.capacity.Store(seg.cap)
@@ -75,6 +80,7 @@ func (q *WorkivaQueue) Enqueue(job jobs.Job) error {
 		} else if ok {
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
+			q.notify()
 			return nil
 		}
 		// Full: attempt to expand by linking a larger segment
@@ -142,6 +148,7 @@ func (q *WorkivaQueue) EnqueueBatch(items []interface{}) error {
 	if enq > 0 {
 		q.enqueuedCount.Add(enq)
 		q.lastEnqueueUnixNano.Store(now.UnixNano())
+		q.notify()
 	}
 	return nil
 }
@@ -287,5 +294,16 @@ func (q *WorkivaQueue) Stats() Stats {
 		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
 		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
+	}
+}
+
+func (q *WorkivaQueue) Notify() <-chan struct{} {
+	return q.signal
+}
+
+func (q *WorkivaQueue) notify() {
+	select {
+	case q.signal <- struct{}{}:
+	default:
 	}
 }

@@ -302,15 +302,17 @@ type InterventionTarget interface {
 }
 
 type InterventionTargetDocker struct {
-	Type      string        `yaml:"type" json:"type"`
-	Container string        `yaml:"container" json:"container"`
-	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
+	Type       string        `yaml:"type" json:"type"`
+	Container  string        `yaml:"container" json:"container"`
+	DockerHost string        `yaml:"docker_host,omitempty" json:"docker_host,omitempty"`
+	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
 }
 
 func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
-		Type:      strings.Clone(i.Type),
-		Container: strings.Clone(i.Container),
+		Type:       strings.Clone(i.Type),
+		Container:  strings.Clone(i.Container),
+		DockerHost: strings.Clone(i.DockerHost),
 	}
 }
 

@@ -149,9 +149,48 @@ func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *co
 		s.logger.Info("Code dispatch disabled; not flagging", "monitor_name", state.Name, "color", color)
 		return
 	}
+
+	// FSM guard: If a code job is already in-flight (Pending), don't overwrite.
+	// The result system will clear Pending, then we can dispatch the next color.
+	if (state.Flags & components.StateCodePending) != 0 {
+		s.logger.Debug("Monitor '%s' already has code in-flight; deferring %s trigger", state.Name, color)
+		return
+	}
+
+	// If CodeNeeded is already set with a different color, use priority to decide.
+	// Priority: red > yellow > green/cyan/gray (critical alerts take precedence)
+	if (state.Flags & components.StateCodeNeeded) != 0 && state.PendingCode != "" {
+		if !colorHasHigherPriorityIntervention(color, state.PendingCode) {
+			s.logger.Debug("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingCode, color)
+			return
+		}
+		s.logger.Debug("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingCode, color)
+	}
+
 	state.PendingCode = color
 	state.Flags |= components.StateCodeNeeded
 	s.logger.Info("Flagging for alert code", "monitor_name", state.Name, "color", color)
+}
+
+// colorHasHigherPriorityIntervention returns true if newColor has higher priority than existingColor.
+// Priority order: red > yellow > green > cyan > gray (anything else)
+func colorHasHigherPriorityIntervention(newColor, existingColor string) bool {
+	priority := map[string]int{
+		"red":    5,
+		"yellow": 4,
+		"green":  3,
+		"cyan":   2,
+		"gray":   1,
+	}
+	newPri, newOk := priority[newColor]
+	existPri, existOk := priority[existingColor]
+	if !newOk {
+		newPri = 0
+	}
+	if !existOk {
+		existPri = 0
+	}
+	return newPri > existPri
 }
 
 // Finalize is a no-op for this system.

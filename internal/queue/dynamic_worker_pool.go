@@ -204,7 +204,8 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		cancel:     cancel,
 	}
 	pool.resultBatchPool.New = func() any {
-		return make([]jobs.Result, 0, pool.config.ResultBatchSize)
+		s := make([]jobs.Result, 0, pool.config.ResultBatchSize)
+		return &s
 	}
 
 	workerFunc := func(job interface{}) {
@@ -320,41 +321,51 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 func (p *DynamicWorkerPool) dispatcher() {
 	defer p.wg.Done()
 	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-			batchTarget := p.antsPool.Cap()
-			if batchTarget <= 0 {
-				batchTarget = p.config.MinWorkers
-			}
-			if batchTarget > p.config.ResultBatchSize {
-				batchTarget = p.config.ResultBatchSize
-			}
-			if batchTarget <= 0 {
-				batchTarget = 1
-			}
+		// 1. Determine batch size
+		batchTarget := p.antsPool.Cap()
+		if batchTarget <= 0 {
+			batchTarget = p.config.MinWorkers
+		}
+		if batchTarget > p.config.ResultBatchSize {
+			batchTarget = p.config.ResultBatchSize
+		}
+		if batchTarget <= 0 {
+			batchTarget = 1
+		}
 
-			batch, err := p.queue.DequeueBatch(batchTarget)
-			if err != nil {
-				if !errors.Is(err, ErrQueueClosed) {
-					p.logger.Printf("Error dequeuing job batch: %v", err)
-				}
-				time.Sleep(100 * time.Millisecond) // Wait a bit if there's an error
+		// 2. Try to dequeue
+		batch, err := p.queue.DequeueBatch(batchTarget)
+		if err != nil {
+			if !errors.Is(err, ErrQueueClosed) {
+				p.logger.Printf("Error dequeuing job batch: %v", err)
+			}
+			// On error, wait a bit to avoid tight loop
+			select {
+			case <-p.ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
 				continue
 			}
-			if len(batch) == 0 {
-				time.Sleep(10 * time.Millisecond) // Wait if the queue is empty
-				continue
-			}
+		}
 
+		// 3. If batch found, process it
+		if len(batch) > 0 {
 			p.tasksSubmitted.Add(int64(len(batch)))
-
 			for _, job := range batch {
 				if err := p.antsPool.Invoke(job); err != nil {
 					p.logger.Printf("Error invoking job: %v", err)
 				}
 			}
+			// Immediately try to get next batch without waiting
+			continue
+		}
+
+		// 4. If empty, wait for signal
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-p.queue.Notify():
+			// Signal received, loop back to dequeue
 		}
 	}
 }
@@ -371,23 +382,23 @@ func (p *DynamicWorkerPool) resultProcessor() {
 		select {
 		case <-p.ctx.Done():
 			// Route any remaining results before shutting down
-			if len(batch) > 0 {
-				p.router.RouteResults(batch)
+			if len(*batch) > 0 {
+				p.router.RouteResults(*batch)
 				p.putResultBatch(batch)
 			}
 			return
 		case result, ok := <-p.resultChan:
 			if !ok { // resultChan was closed
-				if len(batch) > 0 {
-					p.router.RouteResults(batch)
+				if len(*batch) > 0 {
+					p.router.RouteResults(*batch)
 					p.putResultBatch(batch)
 				}
 				return
 			}
 			p.tasksCompleted.Add(1)
-			batch = append(batch, result)
-			if len(batch) >= p.config.ResultBatchSize {
-				p.router.RouteResults(batch)
+			*batch = append(*batch, result)
+			if len(*batch) >= p.config.ResultBatchSize {
+				p.router.RouteResults(*batch)
 				p.putResultBatch(batch)
 				batch = p.getResultBatch()
 				// Reset the ticker to prevent immediate firing
@@ -395,8 +406,8 @@ func (p *DynamicWorkerPool) resultProcessor() {
 			}
 		case <-ticker.C:
 			// Route partial batches on timeout
-			if len(batch) > 0 {
-				p.router.RouteResults(batch)
+			if len(*batch) > 0 {
+				p.router.RouteResults(*batch)
 				p.putResultBatch(batch)
 				batch = p.getResultBatch()
 			}
@@ -404,18 +415,21 @@ func (p *DynamicWorkerPool) resultProcessor() {
 	}
 }
 
-func (p *DynamicWorkerPool) getResultBatch() []jobs.Result {
+func (p *DynamicWorkerPool) getResultBatch() *[]jobs.Result {
 	if v := p.resultBatchPool.Get(); v != nil {
-		return v.([]jobs.Result)[:0]
+		ptr := v.(*[]jobs.Result)
+		*ptr = (*ptr)[:0]
+		return ptr
 	}
-	return make([]jobs.Result, 0, p.config.ResultBatchSize)
+	s := make([]jobs.Result, 0, p.config.ResultBatchSize)
+	return &s
 }
 
-func (p *DynamicWorkerPool) putResultBatch(batch []jobs.Result) {
+func (p *DynamicWorkerPool) putResultBatch(batch *[]jobs.Result) {
 	if batch == nil {
 		return
 	}
-	p.resultBatchPool.Put(batch[:0])
+	p.resultBatchPool.Put(batch)
 }
 
 // autoScale periodically tunes the ants pool capacity based on queue depth.

@@ -80,7 +80,7 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 
 		// Ensure we are processing a pending code alert.
 		if (state.Flags & components.StateCodePending) == 0 {
-			s.logger.Warn("Entity received CodeResult but was not in CodePending state", "entity_id", ent.ID())
+			s.logger.Warn("Entity received CodeResult but was not in CodePending state", "entity_id", ent.ID(), "flags", state.Flags)
 			continue
 		}
 
@@ -101,16 +101,14 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 
 		if err := result.Error(); err != nil {
 			s.logger.Error("Monitor alert failed to send", "monitor_name", state.Name, "color", color, "error", err)
-			// On failure, re-flag for retry: clear Pending, set Needed and restore PendingCode.
+			// On failure, re-flag for retry: clear Pending and set Needed.
 			state.Flags &^= components.StateCodePending
 			state.Flags |= components.StateCodeNeeded
-			if state.PendingCode == "" {
-				state.PendingCode = color
-			}
 		} else {
 			s.logger.Info("Monitor alert sent successfully", "monitor_name", state.Name, "color", color)
-			// On success, clear Pending.
+			// On success, clear Pending and PendingCode.
 			state.Flags &^= components.StateCodePending
+			state.PendingCode = ""
 		}
 		s.stateLogger.LogTransition(ent, oldState, *state)
 	}

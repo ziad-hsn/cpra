@@ -96,18 +96,18 @@ import (
 // LoggerAdapter adapts the controller loggers to the systems interface.
 type LoggerAdapter struct {
 	logger interface {
-		Info(format string, args ...interface{})
-		Debug(format string, args ...interface{})
-		Warn(format string, args ...interface{})
-		Error(format string, args ...interface{})
+		Info(format string, args ...any)
+		Debug(format string, args ...any)
+		Warn(format string, args ...any)
+		Error(format string, args ...any)
 		LogSystemPerformance(name string, duration time.Duration, count int)
 	}
 }
 
-func (l *LoggerAdapter) Info(format string, args ...interface{})  { l.logger.Info(format, args...) }
-func (l *LoggerAdapter) Debug(format string, args ...interface{}) { l.logger.Debug(format, args...) }
-func (l *LoggerAdapter) Warn(format string, args ...interface{})  { l.logger.Warn(format, args...) }
-func (l *LoggerAdapter) Error(format string, args ...interface{}) { l.logger.Error(format, args...) }
+func (l *LoggerAdapter) Info(format string, args ...any)  { l.logger.Info(format, args...) }
+func (l *LoggerAdapter) Debug(format string, args ...any) { l.logger.Debug(format, args...) }
+func (l *LoggerAdapter) Warn(format string, args ...any)  { l.logger.Warn(format, args...) }
+func (l *LoggerAdapter) Error(format string, args ...any) { l.logger.Error(format, args...) }
 func (l *LoggerAdapter) LogSystemPerformance(name string, duration time.Duration, count int) {
 	l.logger.LogSystemPerformance(name, duration, count)
 }
@@ -141,6 +141,7 @@ type Controller struct {
 	queueSwitchMutex     sync.RWMutex
 	running              bool
 	useAdaptiveQueue     bool
+	logger               *Logger
 }
 
 // Config holds all configuration for the controller.
@@ -162,7 +163,9 @@ type Config struct {
 	SizingServiceTime time.Duration // τ
 	SizingSLO         time.Duration // W target (end-to-end)
 	// Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
+	// Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
 	SizingHeadroomPct float64
+	Logger            *Logger
 }
 
 // DefaultConfig returns a default configuration optimized for large-scale deployments.
@@ -249,7 +252,16 @@ func NewController(config Config) *Controller {
 	}
 
 	stateLogger := systems.NewStateLogger(config.Debug)
-	logger := &LoggerAdapter{logger: SystemLogger}
+
+	// Use provided logger or fallback to SystemLogger
+	ctrlLogger := config.Logger
+	if ctrlLogger == nil {
+		if SystemLogger == nil {
+			InitializeLoggers(config.Debug)
+		}
+		ctrlLogger = SystemLogger
+	}
+	logger := &LoggerAdapter{logger: ctrlLogger}
 
 	// Instantiate the refactored systems with dedicated queues and worker pools.
 	pulseRouter := pulsePool.GetRouter()
@@ -286,6 +298,7 @@ func NewController(config Config) *Controller {
 		codePool:          codePool,
 		config:            config,
 		stateLogger:       stateLogger,
+		logger:            ctrlLogger,
 	}
 }
 
@@ -309,7 +322,7 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
 	}
-	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
+	c.logger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
 	// UpdateInterval logic removed - ark-tools TPS=100 handles all timing
 
@@ -347,13 +360,13 @@ func (c *Controller) precomputeSizingFromConfig() {
 	// Compute λ for Pulse from world: sum over active monitors of 1/Interval
 	lambda := computePulseLambda(c.world)
 	if lambda <= 0 {
-		SystemLogger.Warn("[Pre-Sizing] No active pulse workload detected; skipping sizing")
+		c.logger.Warn("[Pre-Sizing] No active pulse workload detected; skipping sizing")
 		return
 	}
 
 	cMin, w, err := queue.FindCForSLO(lambda, tau.Seconds(), wSLO.Seconds(), 0, 0, 0)
 	if err != nil {
-		SystemLogger.Warn("[Pre-Sizing] Could not compute Pulse workers: %v", err)
+		c.logger.Warn("[Pre-Sizing] Could not compute Pulse workers: %v", err)
 		return
 	}
 	// Determine safe headroom: env CPRA_SIZING_HEADROOM_PCT (e.g., 0.15 or 15), or config, default 0.15
@@ -382,7 +395,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 	if errSafe != nil {
 		wSafe = w
 	} // fallback
-	SystemLogger.Info("[Pre-Sizing] Pulse: λ=%.2f/s τ=%.3fs W_slo=%.3fs => c_min=%d (W≈%.3fs), recommended c_safe=%d (+%.0f%%) (predicted W≈%.3fs)",
+	c.logger.Info("[Pre-Sizing] Pulse: λ=%.2f/s τ=%.3fs W_slo=%.3fs => c_min=%d (W≈%.3fs), recommended c_safe=%d (+%.0f%%) (predicted W≈%.3fs)",
 		lambda, tau.Seconds(), wSLO.Seconds(), cMin, w, cSafe, headroom*100.0, wSafe)
 }
 
@@ -421,7 +434,7 @@ func (c *Controller) Start() error {
 	c.codePool.Start()
 	c.running = true
 	go c.app.Run()
-	SystemLogger.Info("Controller started successfully")
+	c.logger.Info("Controller started successfully")
 	return nil
 }
 
@@ -440,7 +453,7 @@ func (c *Controller) Stop() {
 	if !c.running {
 		return
 	}
-	SystemLogger.Info("Stopping controller...")
+	c.logger.Info("Stopping controller...")
 	c.app.Finalize()
 	c.running = false
 	c.pulsePool.DrainAndStop()
@@ -450,7 +463,7 @@ func (c *Controller) Stop() {
 	c.pulseQueue.Close()
 	c.interventionQueue.Close()
 	c.codeQueue.Close()
-	SystemLogger.Info("Controller stopped")
+	c.logger.Info("Controller stopped")
 }
 
 // PrintShutdownMetrics logs queue, worker pool, and world statistics at shutdown.
@@ -470,16 +483,16 @@ func (c *Controller) PrintShutdownMetrics() {
 	}
 
 	logQueue := func(label string, stats queue.Stats) {
-		SystemLogger.Info("%s Queue: depth=%d/%d enqueued=%d dequeued=%d dropped=%d", label, stats.QueueDepth, stats.Capacity, stats.Enqueued, stats.Dequeued, stats.Dropped)
-		SystemLogger.Info("%s Queue timings: avg_wait=%s max_wait=%s window=%s", label, formatDur(stats.AvgQueueTime), formatDur(stats.MaxQueueTime), formatDur(stats.SampleWindow))
-		SystemLogger.Info("%s Queue rates: arrival=%.2f/s service=%.2f/s last_enqueue=%s last_dequeue=%s", label, stats.EnqueueRate, stats.DequeueRate, formatTS(stats.LastEnqueue), formatTS(stats.LastDequeue))
+		c.logger.Info("%s Queue: depth=%d/%d enqueued=%d dequeued=%d dropped=%d", label, stats.QueueDepth, stats.Capacity, stats.Enqueued, stats.Dequeued, stats.Dropped)
+		c.logger.Info("%s Queue timings: avg_wait=%s max_wait=%s window=%s", label, formatDur(stats.AvgQueueTime), formatDur(stats.MaxQueueTime), formatDur(stats.SampleWindow))
+		c.logger.Info("%s Queue rates: arrival=%.2f/s service=%.2f/s last_enqueue=%s last_dequeue=%s", label, stats.EnqueueRate, stats.DequeueRate, formatTS(stats.LastEnqueue), formatTS(stats.LastDequeue))
 	}
 	logWorkers := func(label string, stats queue.WorkerPoolStats) {
-		SystemLogger.Info("%s Workers: running=%d capacity=%d target=%d min=%d max=%d waiting=%d", label, stats.RunningWorkers, stats.CurrentCapacity, stats.TargetWorkers, stats.MinWorkers, stats.MaxWorkers, stats.WaitingTasks)
-		SystemLogger.Info("%s Tasks: submitted=%d completed=%d pending_results=%d scaling_events=%d last_scale=%s", label, stats.TasksSubmitted, stats.TasksCompleted, stats.PendingResults, stats.ScalingEvents, formatTS(stats.LastScaleTime))
+		c.logger.Info("%s Workers: running=%d capacity=%d target=%d min=%d max=%d waiting=%d", label, stats.RunningWorkers, stats.CurrentCapacity, stats.TargetWorkers, stats.MinWorkers, stats.MaxWorkers, stats.WaitingTasks)
+		c.logger.Info("%s Tasks: submitted=%d completed=%d pending_results=%d scaling_events=%d last_scale=%s", label, stats.TasksSubmitted, stats.TasksCompleted, stats.PendingResults, stats.ScalingEvents, formatTS(stats.LastScaleTime))
 	}
 
-	SystemLogger.Info("=== SHUTDOWN METRICS ===")
+	c.logger.Info("=== SHUTDOWN METRICS ===")
 
 	pulseQ := c.pulseQueue.Stats()
 	intQ := c.interventionQueue.Stats()
@@ -522,11 +535,11 @@ func (c *Controller) PrintShutdownMetrics() {
 	// }
 
 	worldStats := c.world.Stats()
-	SystemLogger.Info("World: entities_used=%d recycled=%d total=%d archetypes=%d components=%d filters=%d locked=%t",
+	c.logger.Info("World: entities_used=%d recycled=%d total=%d archetypes=%d components=%d filters=%d locked=%t",
 		worldStats.Entities.Used, worldStats.Entities.Recycled, worldStats.Entities.Total,
 		len(worldStats.Archetypes), len(worldStats.ComponentTypes), worldStats.CachedFilters, worldStats.Locked)
-	SystemLogger.Info("World memory: reserved=%dB used=%dB", worldStats.Memory, worldStats.MemoryUsed)
-	SystemLogger.Info("=========================")
+	c.logger.Info("World memory: reserved=%dB used=%dB", worldStats.Memory, worldStats.MemoryUsed)
+	c.logger.Info("=========================")
 }
 
 // GetWorld returns the ECS world for external access (e.g., testing, debugging).
@@ -548,11 +561,11 @@ func (c *Controller) switchToAdaptiveQueues() {
 	defer c.queueSwitchMutex.Unlock()
 
 	if c.useAdaptiveQueue {
-		SystemLogger.Info("Already using AdaptiveQueue, no switch needed")
+		c.logger.Info("Already using AdaptiveQueue, no switch needed")
 		return
 	}
 
-	SystemLogger.Info("Switching to AdaptiveQueue due to high entity count...")
+	c.logger.Info("Switching to AdaptiveQueue due to high entity count...")
 
 	// Pause worker pools
 	c.pulsePool.Pause()
@@ -570,7 +583,7 @@ func (c *Controller) switchToAdaptiveQueues() {
 	newPulseCfg.Name = "pulse"
 	newPulseQueue, err := queue.NewQueue(newPulseCfg)
 	if err != nil {
-		SystemLogger.Error("Failed to create new pulse AdaptiveQueue: %v", err)
+		c.logger.Error("Failed to create new pulse AdaptiveQueue: %v", err)
 		return
 	}
 	newInterventionCfg := queue.DefaultQueueConfig()
@@ -578,7 +591,7 @@ func (c *Controller) switchToAdaptiveQueues() {
 	newInterventionCfg.Name = "intervention"
 	newInterventionQueue, err := queue.NewQueue(newInterventionCfg)
 	if err != nil {
-		SystemLogger.Error("Failed to create new intervention AdaptiveQueue: %v", err)
+		c.logger.Error("Failed to create new intervention AdaptiveQueue: %v", err)
 		return
 	}
 	newCodeCfg := queue.DefaultQueueConfig()
@@ -586,21 +599,21 @@ func (c *Controller) switchToAdaptiveQueues() {
 	newCodeCfg.Name = "code"
 	newCodeQueue, err := queue.NewQueue(newCodeCfg)
 	if err != nil {
-		SystemLogger.Error("Failed to create new code AdaptiveQueue: %v", err)
+		c.logger.Error("Failed to create new code AdaptiveQueue: %v", err)
 		return
 	}
 
 	// Replace queues in worker pools
 	if err := c.pulsePool.ReplaceQueue(newPulseQueue); err != nil {
-		SystemLogger.Error("Failed to replace pulse queue: %v", err)
+		c.logger.Error("Failed to replace pulse queue: %v", err)
 		return
 	}
 	if err := c.interventionPool.ReplaceQueue(newInterventionQueue); err != nil {
-		SystemLogger.Error("Failed to replace intervention queue: %v", err)
+		c.logger.Error("Failed to replace intervention queue: %v", err)
 		return
 	}
 	if err := c.codePool.ReplaceQueue(newCodeQueue); err != nil {
-		SystemLogger.Error("Failed to replace code queue: %v", err)
+		c.logger.Error("Failed to replace code queue: %v", err)
 		return
 	}
 
@@ -620,7 +633,7 @@ func (c *Controller) switchToAdaptiveQueues() {
 	c.interventionPool.Resume()
 	c.pulsePool.Resume()
 
-	SystemLogger.Info("Successfully switched to AdaptiveQueue")
+	c.logger.Info("Successfully switched to AdaptiveQueue")
 }
 
 // drainQueue empties a queue and logs the drained items count.
@@ -637,7 +650,7 @@ func (c *Controller) drainQueue(name string, q queue.Queue) {
 		drainedCount += len(items)
 	}
 	if drainedCount > 0 {
-		SystemLogger.Info("Drained %d items from %s queue", drainedCount, name)
+		c.logger.Info("Drained %d items from %s queue", drainedCount, name)
 	}
 }
 
@@ -655,7 +668,7 @@ func (c *Controller) CheckEntityCountAndSwitchQueue() {
 	c.queueSwitchMutex.RUnlock()
 
 	if !alreadyAdaptive && entityCount > c.entityCountThreshold {
-		SystemLogger.Info("Entity count (%d) exceeded threshold (%d), switching to AdaptiveQueue",
+		c.logger.Info("Entity count (%d) exceeded threshold (%d), switching to AdaptiveQueue",
 			entityCount, c.entityCountThreshold)
 		c.switchToAdaptiveQueues()
 	}

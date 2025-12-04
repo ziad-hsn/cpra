@@ -92,7 +92,6 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	// Create consolidated job storage (empty at first; jobs filled after we have the entity ID)
 	// Pre-size maps based on number of codes to minimize rehashing/resizes
 	codeCount := len(monitor.Codes)
-	codeCount = len(monitor.Codes)
 	jobStorage := GetJobStorage(codeCount)
 
 	// Create entity with base components in a single archetype transition
@@ -121,22 +120,19 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add intervention if configured
-	var interventionConfig *components.InterventionConfig
+	// CRITICAL: We cannot use pooling because Ark stores pointers directly.
 	if monitor.Intervention.Action != "" {
 		maxFailures := 1
 		if monitor.Intervention.MaxFailures > 0 {
 			maxFailures = monitor.Intervention.MaxFailures
 		}
 
-		interventionConfig = GetInterventionConfig()
-		*interventionConfig = components.InterventionConfig{}
-		interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-		// Assign schema target directly; updates should replace the component (COW).
-		interventionConfig.Target = monitor.Intervention.Target
-		interventionConfig.MaxFailures = maxFailures
+		interventionConfig := &components.InterventionConfig{
+			Action:      interning.Intern(monitor.Intervention.Action),
+			Target:      monitor.Intervention.Target,
+			MaxFailures: maxFailures,
+		}
 		e.InterventionConfig.Add(entity, interventionConfig)
-		// Return to pool after Ark copies the value
-		PutInterventionConfig(interventionConfig)
 
 		// Add intervention job
 		interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
@@ -149,32 +145,35 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add consolidated code configuration instead of separate color components
-	var codeConfig *components.CodeConfig
-	var codeStatus *components.CodeStatus
+	// CRITICAL: We cannot use pooling for CodeConfig/CodeStatus because Ark stores
+	// pointers directly. If we pool, a subsequent GetCodeConfig call could return
+	// the same pointer and clear the map that Ark is using for a previous entity.
 	if codeCount > 0 {
-		codeConfig = GetCodeConfig(codeCount)
-		codeStatus = GetCodeStatus(codeCount)
+		codeConfig := &components.CodeConfig{
+			Configs: make(map[string]*components.ColorCodeConfig, codeCount),
+		}
+		codeStatus := &components.CodeStatus{
+			Status: make(map[string]*components.ColorCodeStatus, codeCount),
+		}
 
 		for color, config := range monitor.Codes {
 			colorKey := interning.Intern(color)
-			// Single consolidated entry instead of separate components
-			colorCodeConfig := GetColorCodeConfig()
-			colorCodeConfig.Dispatch = config.Dispatch
-			colorCodeConfig.Notify = interning.Intern(config.Notify)
-			// Assign schema notification config directly; updates should replace (COW).
-			colorCodeConfig.Config = config.Config
+			// Create new instances - do not pool these as Ark stores pointers
+			colorCodeConfig := &components.ColorCodeConfig{
+				Dispatch: config.Dispatch,
+				Notify:   interning.Intern(config.Notify),
+				Config:   config.Config,
+			}
 			codeConfig.Configs[colorKey] = colorCodeConfig
 
-			colorCodeStatus := GetColorCodeStatus()
-			colorCodeStatus.LastAlertTime = now
+			colorCodeStatus := &components.ColorCodeStatus{
+				LastAlertTime: now,
+			}
 			codeStatus.Status[colorKey] = colorCodeStatus
 
 			// Add code job to consolidated storage
 			codeJob, err := jobs.CreateCodeJob(monitorName, config, entity, colorKey)
 			if err != nil {
-				// Clean up pooled components on error
-				PutCodeConfig(codeConfig)
-				PutCodeStatus(codeStatus)
 				return err
 			}
 			if js := e.JobStorage.Get(entity); js != nil {
@@ -184,10 +183,6 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 		// Add both code components in a single step to reduce archetype moves
 		e.codePair.Add(entity, codeConfig, codeStatus)
-		// Return to pools after Ark copies the values
-		// Note: PutCodeConfig/PutCodeStatus will handle nested colorCodeConfig/colorCodeStatus cleanup
-		PutCodeConfig(codeConfig)
-		PutCodeStatus(codeStatus)
 	}
 
 	// Apply Disabled tag after base creation if monitor is disabled
@@ -277,20 +272,18 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		}
 
 		// Intervention configuration (optional)
+		// CRITICAL: We cannot use pooling because Ark stores pointers directly.
 		if monitor.Intervention.Action != "" {
 			maxFailures := 1
 			if monitor.Intervention.MaxFailures > 0 {
 				maxFailures = monitor.Intervention.MaxFailures
 			}
-			interventionConfig := GetInterventionConfig()
-			*interventionConfig = components.InterventionConfig{}
-			interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-			// Assign schema target directly; future changes should replace component (COW).
-			interventionConfig.Target = monitor.Intervention.Target
-			interventionConfig.MaxFailures = maxFailures
+			interventionConfig := &components.InterventionConfig{
+				Action:      interning.Intern(monitor.Intervention.Action),
+				Target:      monitor.Intervention.Target,
+				MaxFailures: maxFailures,
+			}
 			e.InterventionConfig.Add(entity, interventionConfig)
-			// Return to pool after Ark copies the value
-			PutInterventionConfig(interventionConfig)
 
 			// Create intervention job and attach
 			if ij, err := jobs.CreateInterventionJob(monitor.Intervention, entity); err != nil {
@@ -302,34 +295,35 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		}
 
 		// Consolidated code configuration & status
+		// CRITICAL: We cannot use pooling for CodeConfig/CodeStatus because Ark stores
+		// pointers directly. If we pool, a subsequent GetCodeConfig call could return
+		// the same pointer and clear the map that Ark is using for a previous entity.
 		if codeCount > 0 {
-			codeConfig := GetCodeConfig(codeCount)
-			codeStatus := GetCodeStatus(codeCount)
+			codeConfig := &components.CodeConfig{
+				Configs: make(map[string]*components.ColorCodeConfig, codeCount),
+			}
+			codeStatus := &components.CodeStatus{
+				Status: make(map[string]*components.ColorCodeStatus, codeCount),
+			}
 
 			for color, cfg := range monitor.Codes {
 				colorKey := interning.Intern(color)
-				// Per-color config
-				cc := GetColorCodeConfig()
-				cc.Dispatch = cfg.Dispatch
-				cc.Notify = interning.Intern(cfg.Notify)
-				if cfg.Config != nil {
-					// Assign schema notification config directly; updates should replace (COW).
-					cc.Config = cfg.Config
-				} else {
-					cc.Config = nil
+				// Create new instances - do not pool these as Ark stores pointers
+				cc := &components.ColorCodeConfig{
+					Dispatch: cfg.Dispatch,
+					Notify:   interning.Intern(cfg.Notify),
+					Config:   cfg.Config,
 				}
 				codeConfig.Configs[colorKey] = cc
 
-				// Per-color status
-				status := GetColorCodeStatus()
-				status.LastAlertTime = now
+				// Per-color status - new instance, not pooled
+				status := &components.ColorCodeStatus{
+					LastAlertTime: now,
+				}
 				codeStatus.Status[colorKey] = status
 
 				// Create code job and attach to JobStorage
 				if cj, err := jobs.CreateCodeJob(monitorName, cfg, entity, colorKey); err != nil {
-					// Clean up pooled components on error
-					PutCodeConfig(codeConfig)
-					PutCodeStatus(codeStatus)
 					firstErr = err
 					return
 				} else {
@@ -338,10 +332,6 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			}
 			// Add both code components in a single step to reduce archetype moves
 			e.codePair.Add(entity, codeConfig, codeStatus)
-			// Return to pools after Ark copies the values
-			// Note: PutCodeConfig/PutCodeStatus will handle nested colorCodeConfig/colorCodeStatus cleanup
-			PutCodeConfig(codeConfig)
-			PutCodeStatus(codeStatus)
 		}
 
 		// Apply Disabled tag after base creation if monitor is disabled

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cpra/internal/controller"
+	"cpra/internal/jobs"
 )
 
 func main() {
@@ -112,6 +113,9 @@ func main() {
 
 	// Stop the controller
 	oc.Stop()
+
+	// Shutdown the log manager to flush pending logs
+	jobs.GetLogManager().Shutdown()
 
 	// Close loggers after everything is done
 	controller.CloseLoggers()

@@ -3,6 +3,7 @@ package systems
 import (
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
+	"cpra/internal/loader/schema"
 	"cpra/internal/queue"
 	"sync"
 	"time"
@@ -26,7 +27,7 @@ type BatchCodeSystem struct {
 	logger      Logger
 	stateLogger *StateLogger
 	world       *ecs.World
-	filter      *ecs.Filter3[components.MonitorState, components.CodeConfig, components.JobStorage]
+	filter      *ecs.Filter2[components.MonitorState, components.CodeConfig]
 	stateMapper *ecs.Map1[components.MonitorState]
 	jobInfoPool *sync.Pool
 	batchSize   int
@@ -40,7 +41,7 @@ func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger L
 		logger:      logger,
 		stateLogger: stateLogger,
 		batchSize:   batchSize,
-		filter: ecs.NewFilter3[components.MonitorState, components.CodeConfig, components.JobStorage](world).
+		filter: ecs.NewFilter2[components.MonitorState, components.CodeConfig](world).
 			Without(ecs.C[components.Disabled]()),
 		stateMapper: ecs.NewMap1[components.MonitorState](world),
 		jobInfoPool: &sync.Pool{
@@ -96,7 +97,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 
 	for query.Next() {
 		ent := query.Entity()
-		state, codeConfig, jobStorage := query.Get()
+		state, codeConfig := query.Get()
 
 		// Process only entities that need a code alert.
 		if (state.Flags & components.StateCodeNeeded) == 0 {
@@ -118,8 +119,8 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 		}
 
 		// Honor dispatch flag and presence of color config before enqueuing
-		cfg, hasColor := codeConfig.Configs[color]
-		if !hasColor {
+		cfg := codeConfig.Configs[color]
+		if cfg == nil {
 			s.logger.Warn("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
@@ -130,9 +131,21 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			continue
 		}
 
-		job, ok := jobStorage.CodeJobs[color]
-		if !ok || isNilJob(job) {
-			s.logger.Warn("Entity needs code alert, but no job is configured", "entity_id", ent.ID(), "color", color)
+		// Construct schema.CodeConfig from component to create job JIT.
+		schemaCfg := schema.CodeConfig{
+			Dispatch: cfg.Dispatch,
+			Notify:   cfg.Notify,
+			Config:   cfg.Config, // This is already the correct schema type (CodeNotification interface)
+		}
+
+		job, err := jobs.CreateCodeJob(state.Name, schemaCfg, ent, color)
+		if err != nil {
+			s.logger.Error("Failed to create code job", "error", err, "entity_id", ent.ID())
+			state.Flags &^= components.StateCodeNeeded
+			continue
+		}
+		if job == nil || isNilJob(job) {
+			s.logger.Warn("Entity needs code alert, but job creation returned nil", "entity_id", ent.ID(), "color", color)
 			// Clear the flag if no job is found to prevent spinning.
 			state.Flags &^= components.StateCodeNeeded
 			continue

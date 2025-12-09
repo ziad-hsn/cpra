@@ -308,8 +308,9 @@ func InitializeTracers(enabled bool) {
 	EntityTracer = NewTracer("ENTITY", enabled)
 }
 
-// StartPeriodicCleanup starts a goroutine that periodically cleans up old traces
-func StartPeriodicCleanup(interval, maxAge time.Duration) {
+// StartPeriodicCleanup starts a goroutine that periodically cleans up old traces.
+// The goroutine exits when the context is cancelled.
+func StartPeriodicCleanup(ctx context.Context, interval, maxAge time.Duration) {
 	tracers := []*Tracer{
 		SystemTracer, SchedulerTracer, DispatchTracer,
 		ResultTracer, WorkerPoolTracer, EntityTracer,
@@ -319,10 +320,15 @@ func StartPeriodicCleanup(interval, maxAge time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			for _, tracer := range tracers {
-				if tracer != nil {
-					tracer.Cleanup(maxAge)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for _, tracer := range tracers {
+					if tracer != nil {
+						tracer.Cleanup(maxAge)
+					}
 				}
 			}
 		}

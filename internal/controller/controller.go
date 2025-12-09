@@ -76,18 +76,20 @@ package controller
 import (
 	"context"
 	"cpra/internal/controller/systems"
+	"cpra/internal/loader"
 	"cpra/internal/queue"
 	"fmt"
 	"log"
 	"math"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
 
 	"cpra/internal/controller/components"
 	"cpra/internal/controller/entities"
-	"cpra/internal/loader/streaming"
 
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"
@@ -152,17 +154,16 @@ type Controller struct {
 // Default values are optimized for large-scale deployments but can be adjusted
 // based on workload characteristics and resource constraints.
 type Config struct {
-	Debug           bool
-	StreamingConfig streaming.StreamingConfig
-	QueueCapacity   uint64
-	WorkerConfig    queue.WorkerPoolConfig
-	BatchSize       int
-	UpdateInterval  time.Duration
+	Debug          bool
+	PipelineConfig loader.PipelineConfig
+	QueueCapacity  uint64
+	WorkerConfig   queue.WorkerPoolConfig
+	BatchSize      int
+	UpdateInterval time.Duration
 	// Optional pre-sizing parameters; can be overridden by env vars
 	// CPRA_SIZING_TAU_MS and CPRA_SIZING_SLO_MS (milliseconds)
 	SizingServiceTime time.Duration // τ
 	SizingSLO         time.Duration // W target (end-to-end)
-	// Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
 	// Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
 	SizingHeadroomPct float64
 	Logger            *Logger
@@ -179,10 +180,10 @@ type Config struct {
 // These defaults can be overridden based on specific deployment requirements.
 func DefaultConfig() Config {
 	return Config{
-		StreamingConfig: streaming.DefaultStreamingConfig(),
-		QueueCapacity:   65536, // Must be a power of 2
-		WorkerConfig:    queue.DefaultWorkerPoolConfig(),
-		BatchSize:       1000,
+		PipelineConfig: loader.DefaultPipelineConfig(),
+		QueueCapacity:  8192, // Reduced from 65536 to save ~25MB memory per queue instance
+		WorkerConfig:   queue.DefaultWorkerPoolConfig(),
+		BatchSize:      1000,
 		// UpdateInterval removed - ark-tools TPS=100 controls all timing
 		SizingServiceTime: 0,
 		SizingSLO:         0,
@@ -302,29 +303,42 @@ func NewController(config Config) *Controller {
 	}
 }
 
-// LoadMonitors loads monitors from a YAML or JSON file using the streaming loader.
+// LoadMonitors loads monitors from a YAML file using the loader.
 //
-// LoadMonitors parses the file in batches, creates ECS entities for each monitor,
-// and initializes all required components. It supports both YAML and JSON formats,
-// with optional gzip compression (.gz extension).
+// LoadMonitors parses the file concurrently, creates ECS entities for each monitor,
+// and initializes all required components. It supports YAML formats with optional
+// gzip compression (.gz extension).
 //
 // After loading completes, the controller:
 //   - Checks entity count and may switch to AdaptiveQueue if threshold exceeded
 //   - Pre-computes optimal worker pool sizing for pulse jobs
 //
-// The context can be used to cancel the loading operation. Progress is logged
-// at regular intervals during the load process.
+// The context can be used to cancel the loading operation.
 //
 // Returns an error if file parsing or entity creation fails.
 func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
-	loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig, c.mapper)
-	stats, err := loader.Load(ctx)
+	loader := loader.NewPipeline(c.world, c.mapper, c.config.PipelineConfig)
+	stats, err := loader.Load(ctx, filename)
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
 	}
 	c.logger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
-		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
-	// UpdateInterval logic removed - ark-tools TPS=100 handles all timing
+		stats.EntitiesCreated, stats.LoadingTime, stats.CreationRate)
+
+	// Shrink the world incrementally to reclaim over-allocated memory.
+	// We use a small time budget per pass to allow context cancellation.
+	shrinkPasses := 0
+	for c.world.Shrink(10 * time.Millisecond) {
+		shrinkPasses++
+		if ctx.Err() != nil {
+			return fmt.Errorf("loading cancelled during memory shrink: %w", ctx.Err())
+		}
+	}
+	c.logger.Info("Shrunk world memory in %d passes", shrinkPasses+1)
+
+	// Explicitly trigger GC and release memory to OS to clear fragmentation from loading/shrinking
+	runtime.GC()
+	debug.FreeOSMemory()
 
 	// Check if we need to switch to AdaptiveQueue due to high entity count
 	c.CheckEntityCountAndSwitchQueue()

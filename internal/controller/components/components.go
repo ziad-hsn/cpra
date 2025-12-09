@@ -279,26 +279,18 @@ func (c *CodeStatus) Copy() *CodeStatus {
 type JobStorage struct {
 	PulseJob        jobs.Job
 	InterventionJob jobs.Job
-	CodeJobs        map[string]jobs.Job // Jobs for each code color
 }
 
 func (j *JobStorage) Copy() *JobStorage {
 	if j == nil {
 		return nil
 	}
-	cpy := &JobStorage{
-		CodeJobs: make(map[string]jobs.Job),
-	}
+	cpy := &JobStorage{}
 	if j.PulseJob != nil {
 		cpy.PulseJob = j.PulseJob.Copy()
 	}
 	if j.InterventionJob != nil {
 		cpy.InterventionJob = j.InterventionJob.Copy()
-	}
-	for color, job := range j.CodeJobs {
-		if job != nil {
-			cpy.CodeJobs[color] = job.Copy()
-		}
 	}
 	return cpy
 }

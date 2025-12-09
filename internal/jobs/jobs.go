@@ -87,6 +87,14 @@ var (
 	ErrUnknownCodeNotification    = errors.New("unknown code notification type")
 	ErrFailedToCreateHTTPRequest  = errors.New("failed to create http request")
 	ErrFailedToCreateDockerClient = errors.New("failed to create docker client")
+	ErrSemaphoreTimeout           = errors.New("ICMP semaphore acquire timeout")
+	// Predeclared errors for hot paths (memory optimization)
+	ErrHTTPNon2xxStatus   = errors.New("received non-2xx status code")
+	ErrHTTPCheckFailed    = errors.New("http check failed after retries")
+	ErrTCPCheckFailed     = errors.New("tcp check failed after retries")
+	ErrICMPCheckFailed    = errors.New("icmp check failed after retries")
+	ErrDockerActionFailed = errors.New("docker intervention failed after retries")
+	ErrLogMarshalFailed   = errors.New("failed to marshal log entry")
 )
 
 type pooledPinger struct {
@@ -369,7 +377,6 @@ type PulseHTTPJob struct {
 }
 
 func (p *PulseHTTPJob) Execute() Result {
-	var lastErr error
 	attempts := p.Retries + 1
 	payload := map[string]interface{}{
 		"type":   p.JobType,
@@ -383,7 +390,6 @@ func (p *PulseHTTPJob) Execute() Result {
 		}
 		resp, err := p.Client.Do(req)
 		if err != nil {
-			lastErr = err
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -393,9 +399,9 @@ func (p *PulseHTTPJob) Execute() Result {
 		if statusOk {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
-		lastErr = fmt.Errorf("received non-2xx status code: %s", resp.Status)
+		// Non-2xx status code: continue to next retry
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("http check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: ErrHTTPCheckFailed, Payload: payload}
 }
 
 func (p *PulseHTTPJob) Copy() Job                  { job := *p; return &job }
@@ -430,7 +436,6 @@ func (p *PulseTCPJob) Execute() Result {
 	}
 
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
-	var lastErr error
 
 	for attempt := 0; attempt < attempts; attempt++ {
 		conn, err := net.DialTimeout("tcp", address, p.Timeout)
@@ -439,7 +444,6 @@ func (p *PulseTCPJob) Execute() Result {
 			_ = conn.Close()
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
-		lastErr = err
 		if attempt < attempts-1 {
 			time.Sleep(50 * time.Millisecond)
 		}
@@ -448,7 +452,7 @@ func (p *PulseTCPJob) Execute() Result {
 	return Result{
 		ID:      p.ID,
 		Ent:     p.Entity,
-		Err:     fmt.Errorf("tcp check failed for %s after %d attempt(s): %w", address, attempts, lastErr),
+		Err:     ErrTCPCheckFailed,
 		Payload: payload,
 	}
 }
@@ -478,8 +482,18 @@ type PulseICMPJob struct {
 //var errICMPPrivilege = errors.New("icmp requires elevated privileges")
 
 func (p *PulseICMPJob) Execute() Result {
-	// Concurrency bound to avoid socket pressure
-	icmpPingerSem <- struct{}{}
+	payload := map[string]interface{}{
+		"type":   p.JobType,
+		"driver": p.Driver,
+	}
+
+	// Concurrency bound to avoid socket pressure - with timeout to prevent deadlock
+	select {
+	case icmpPingerSem <- struct{}{}:
+		// Acquired semaphore
+	case <-time.After(10 * time.Second):
+		return Result{ID: p.ID, Ent: p.Entity, Err: ErrSemaphoreTimeout, Payload: payload}
+	}
 	defer func() { <-icmpPingerSem }()
 
 	attempts := p.Retries + 1
@@ -492,11 +506,8 @@ func (p *PulseICMPJob) Execute() Result {
 		count = 1
 	}
 
-	payload := map[string]interface{}{
-		"type":   p.JobType,
-		"driver": p.Driver,
-		"count":  count,
-	}
+	// Add count to the existing payload (declared above for timeout case)
+	payload["count"] = count
 
 	// Get pooled pinger for host
 	pp, err := getPooledPinger(p.Host)
@@ -504,7 +515,6 @@ func (p *PulseICMPJob) Execute() Result {
 		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
 	}
 
-	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
 		pp.mu.Lock()
 		pr := pp.pr
@@ -521,7 +531,7 @@ func (p *PulseICMPJob) Execute() Result {
 			if stats != nil && stats.PacketsRecv > 0 {
 				return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 			}
-			lastErr = errNoPackets
+			// No packets received, continue retry
 		} else {
 			// privilege fallback
 			if !pr.Privileged() && isPrivilegeError(err) {
@@ -532,14 +542,13 @@ func (p *PulseICMPJob) Execute() Result {
 					if stats != nil && stats.PacketsRecv > 0 {
 						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 					}
-					lastErr = errNoPackets
+					// No packets received, continue retry
 				} else {
 					pp.mu.Unlock()
 					if p.IgnorePrivilege && isPrivilegeError(err2) {
 						payload["privilege_ignored"] = true
 						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 					}
-					lastErr = err2
 				}
 			} else {
 				pp.mu.Unlock()
@@ -547,7 +556,6 @@ func (p *PulseICMPJob) Execute() Result {
 					payload["privilege_ignored"] = true
 					return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 				}
-				lastErr = err
 			}
 		}
 
@@ -559,7 +567,7 @@ func (p *PulseICMPJob) Execute() Result {
 	return Result{
 		ID:      p.ID,
 		Ent:     p.Entity,
-		Err:     fmt.Errorf("icmp check failed for %s after %d attempt(s): %w", p.Host, attempts, lastErr),
+		Err:     ErrICMPCheckFailed,
 		Payload: payload,
 	}
 }
@@ -609,7 +617,6 @@ func (i *InterventionDockerJob) Execute() Result {
 	}
 	// Do not close pooled client
 
-	var lastErr error
 	attempts := i.Retries + 1
 	for attempt := 0; attempt < attempts; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), i.Timeout)
@@ -620,9 +627,8 @@ func (i *InterventionDockerJob) Execute() Result {
 		if err == nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: nil, Payload: payload}
 		}
-		lastErr = err
 	}
-	return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("docker intervention on '%s' failed after %d attempt(s): %w", i.Container, attempts, lastErr), Payload: payload}
+	return Result{ID: i.ID, Ent: i.Entity, Err: ErrDockerActionFailed, Payload: payload}
 }
 
 func (i *InterventionDockerJob) Copy() Job                  { job := *i; return &job }

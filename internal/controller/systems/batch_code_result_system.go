@@ -79,8 +79,10 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 		}
 
 		// Ensure we are processing a pending code alert.
+		// Note: If entity is not in CodePending state, it means another system already
+		// processed or cancelled this job. This is expected behavior in concurrent systems.
 		if (state.Flags & components.StateCodePending) == 0 {
-			s.logger.Warn("Entity received CodeResult but was not in CodePending state", "entity_id", ent.ID(), "flags", state.Flags)
+			s.logger.Debug("Entity received stale CodeResult (state already changed)", "entity_id", ent.ID(), "flags", state.Flags)
 			continue
 		}
 

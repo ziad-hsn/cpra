@@ -200,8 +200,8 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
 	if codeConfig == nil {
 		return
 	}
-	cfg, ok := codeConfig.Configs[color]
-	if !ok {
+	cfg := codeConfig.Configs[color]
+	if cfg == nil {
 		s.logger.Warn("Monitor '%s' has no '%s' code config; skipping alert trigger", state.Name, color)
 		return
 	}
@@ -219,7 +219,7 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
 
 	// If CodeNeeded is already set with a different color, use priority to decide.
 	// Priority: red > yellow > green/cyan/gray (critical alerts take precedence)
-	if (state.Flags & components.StateCodeNeeded) != 0 && state.PendingCode != "" {
+	if (state.Flags&components.StateCodeNeeded) != 0 && state.PendingCode != "" {
 		if !colorHasHigherPriority(color, state.PendingCode) {
 			s.logger.Debug("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingCode, color)
 			return

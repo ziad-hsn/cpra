@@ -16,7 +16,7 @@ var (
 	codeStatusPool         = sync.Pool{New: func() any { return &components.CodeStatus{} }}
 	colorCodeStatusPool    = sync.Pool{New: func() any { return &components.ColorCodeStatus{} }}
 	jobStoragePool         = sync.Pool{New: func() any {
-		return &components.JobStorage{CodeJobs: make(map[string]jobs.Job)}
+		return &components.JobStorage{}
 	}}
 )
 
@@ -144,16 +144,9 @@ func PutColorCodeStatus(c *components.ColorCodeStatus) {
 	colorCodeStatusPool.Put(c)
 }
 
-// GetJobStorage returns a pooled JobStorage with an initialized map sized for codeCount.
-func GetJobStorage(codeCount int) *components.JobStorage {
+// GetJobStorage returns a pooled JobStorage.
+func GetJobStorage() *components.JobStorage {
 	storage := jobStoragePool.Get().(*components.JobStorage)
-	if storage.CodeJobs == nil {
-		storage.CodeJobs = make(map[string]jobs.Job, codeCount)
-	} else {
-		for color := range storage.CodeJobs {
-			delete(storage.CodeJobs, color)
-		}
-	}
 	return storage
 }
 
@@ -169,12 +162,6 @@ func PutJobStorage(j *components.JobStorage) {
 	if j.InterventionJob != nil {
 		jobs.ReleaseInterventionJob(j.InterventionJob)
 		j.InterventionJob = nil
-	}
-	for color, job := range j.CodeJobs {
-		if job != nil {
-			jobs.ReleaseCodeJob(job)
-		}
-		delete(j.CodeJobs, color)
 	}
 	jobStoragePool.Put(j)
 }

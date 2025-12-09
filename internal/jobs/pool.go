@@ -8,18 +8,29 @@ import (
 	"github.com/mlange-42/ark/ecs"
 )
 
+// Top-level factory functions for sync.Pool - eliminates closure allocations at init
+func newPulseHTTPJob() any          { return &PulseHTTPJob{} }
+func newPulseTCPJob() any           { return &PulseTCPJob{} }
+func newPulseICMPJob() any          { return &PulseICMPJob{} }
+func newInterventionDockerJob() any { return &InterventionDockerJob{} }
+func newCodeLogJob() any            { return &CodeLogJob{} }
+func newCodePagerDutyJob() any      { return &CodePagerDutyJob{} }
+func newCodeSlackJob() any          { return &CodeSlackJob{} }
+func newCodeEmailJob() any          { return &CodeEmailJob{} }
+func newCodeWebhookJob() any        { return &CodeWebhookJob{} }
+
 var (
-	pulseHTTPJobPool = sync.Pool{New: func() any { return &PulseHTTPJob{} }}
-	pulseTCPJobPool  = sync.Pool{New: func() any { return &PulseTCPJob{} }}
-	pulseICMPJobPool = sync.Pool{New: func() any { return &PulseICMPJob{} }}
+	pulseHTTPJobPool = sync.Pool{New: newPulseHTTPJob}
+	pulseTCPJobPool  = sync.Pool{New: newPulseTCPJob}
+	pulseICMPJobPool = sync.Pool{New: newPulseICMPJob}
 
-	interventionDockerJobPool = sync.Pool{New: func() any { return &InterventionDockerJob{} }}
+	interventionDockerJobPool = sync.Pool{New: newInterventionDockerJob}
 
-	codeLogJobPool       = sync.Pool{New: func() any { return &CodeLogJob{} }}
-	codePagerDutyJobPool = sync.Pool{New: func() any { return &CodePagerDutyJob{} }}
-	codeSlackJobPool     = sync.Pool{New: func() any { return &CodeSlackJob{} }}
-	codeEmailJobPool     = sync.Pool{New: func() any { return &CodeEmailJob{} }}
-	codeWebhookJobPool   = sync.Pool{New: func() any { return &CodeWebhookJob{} }}
+	codeLogJobPool       = sync.Pool{New: newCodeLogJob}
+	codePagerDutyJobPool = sync.Pool{New: newCodePagerDutyJob}
+	codeSlackJobPool     = sync.Pool{New: newCodeSlackJob}
+	codeEmailJobPool     = sync.Pool{New: newCodeEmailJob}
+	codeWebhookJobPool   = sync.Pool{New: newCodeWebhookJob}
 )
 
 func getPulseHTTPJob() *PulseHTTPJob { return pulseHTTPJobPool.Get().(*PulseHTTPJob) }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 )
 
 // LogEntry represents a single log message to be written to a file.
@@ -14,9 +15,10 @@ type LogEntry struct {
 
 // LogManager handles asynchronous file logging.
 type LogManager struct {
-	logChan chan LogEntry
-	wg      sync.WaitGroup
-	once    sync.Once
+	logChan     chan LogEntry
+	wg          sync.WaitGroup
+	once        sync.Once
+	droppedLogs atomic.Int64 // Track dropped logs when buffer is full
 }
 
 var (
@@ -37,9 +39,23 @@ func GetLogManager() *LogManager {
 }
 
 // WriteLog queues a log entry for writing.
-// It is non-blocking unless the buffer is full.
+// It is non-blocking; if the buffer is full, the log is dropped and counted.
 func (m *LogManager) WriteLog(path string, data []byte) {
-	m.logChan <- LogEntry{Path: path, Data: data}
+	select {
+	case m.logChan <- LogEntry{Path: path, Data: data}:
+		// Successfully queued
+	default:
+		// Buffer full - drop log to prevent blocking job execution
+		dropped := m.droppedLogs.Add(1)
+		if dropped%1000 == 1 {
+			fmt.Fprintf(os.Stderr, "WARNING: Log buffer full, %d logs dropped\n", dropped)
+		}
+	}
+}
+
+// DroppedLogs returns the count of logs dropped due to buffer overflow.
+func (m *LogManager) DroppedLogs() int64 {
+	return m.droppedLogs.Load()
 }
 
 // start launches the background writer goroutine.

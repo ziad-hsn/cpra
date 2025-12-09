@@ -7,35 +7,57 @@ edit_uri: edit/v0.5/docs/
 nav:
   - Home: index.md
   - Tutorials:
-    - Quickstart: tutorials/quickstart.md
-    - Your First Custom Monitor: tutorials/your-first-monitor.md
+      - Overview: tutorials/index.md
+      - Getting Started: tutorials/getting-started.md
+      - Quickstart: tutorials/quickstart.md
+      - Your First Custom Monitor: tutorials/your-first-monitor.md
   - How-to Guides:
-    - Performance Tuning & SLOs: how-to/performance-tuning.md
+      - Overview: how-to/index.md
+      - Common Tasks: how-to/common-tasks.md
+      - Performance Tuning & SLOs: how-to/performance-tuning.md
+      - Deploy to Production: how-to/deploy-to-production.md
   - Explanation:
-    - Architecture Overview: explanation/architecture-overview.md
-    - Queueing Theory for Scaling: explanation/queueing-theory.md
+      - Overview: explanation/index.md
+      - Architecture Overview: explanation/architecture-overview.md
+      - Queueing Theory for Scaling: explanation/queueing-theory.md
   - Reference:
-    - Monitor Configuration Schema: reference/config-schema.md
+      - Overview: reference/index.md
+      - API Documentation: reference/api-documentation.md
+      - API Reference: reference/api-reference.md
+      - Types Reference: reference/types-reference.md
+      - Monitor Configuration Schema: reference/config-schema.md
 
 theme:
   name: material
+  custom_dir: docs/overrides
   features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - toc.integrate
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
     - search.suggest
     - search.highlight
+    - search.share
     - content.tabs.link
     - content.code.copy
+    - content.code.annotate
+    - content.tooltips
+    - toc.follow
+    - toc.integrate
   palette:
-    # Palette toggle for light mode
+    # Light mode - Modern blue-purple gradient scheme
     - scheme: default
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
       primary: custom
       accent: custom
-    # Palette toggle for dark mode
+    # Dark mode - Deep space theme
     - scheme: slate
       toggle:
         icon: material/brightness-4
@@ -44,26 +66,73 @@ theme:
       accent: custom
   font:
     text: Inter
-    code: Fira Code
+    code: JetBrains Mono
+  logo: images/cpra-logo.png
+  favicon: images/cpra-logo.png
   icon:
-    logo: material/monitor-dashboard
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+extra:
+  version:
+    provider: mike
+    default: stable
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ziad-hsn/cpra
+      name: CPRA on GitHub
+  generator: false
 
 extra_css:
   - assets/stylesheets/extra.css
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
 
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.critic:
+      mode: accept
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
+      permalink_title: Anchor link to this section
       toc_depth: 3
   - attr_list
   - md_in_html
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.arithmatex:
+      generic: true
+  - tables
+  - footnotes
+  - abbr

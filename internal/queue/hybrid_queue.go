@@ -46,13 +46,13 @@ func (p DropPolicy) String() string {
 
 // HybridQueueConfig controls the behaviour of a HybridQueue instance.
 type HybridQueueConfig struct {
+	Logger           *zap.Logger
 	Name             string
 	RingCapacity     int
 	OverflowCapacity int
 	SoftWatermark    float64
 	HardWatermark    float64
 	DropPolicy       DropPolicy
-	Logger           *zap.Logger
 }
 
 // DefaultHybridQueueConfig returns the recommended production defaults.
@@ -71,35 +71,29 @@ func DefaultHybridQueueConfig() HybridQueueConfig {
 // HybridQueue combines a lock-free xsync ring buffer with a mutex-protected overflow slice.
 // The ring handles steady-state work while the overflow absorbs bursts before optional dropping.
 type HybridQueue struct {
-	ring   *xsync.MPMCQueue[jobs.Job]
-	cfg    HybridQueueConfig
-	logger *zap.Logger
-
-	mu                sync.Mutex
-	overflow          []jobs.Job
-	softOverflowLimit int
-	hardOverflowLimit int
-
-	closed atomic.Bool
-
-	ringDepth     atomic.Int64
-	overflowDepth atomic.Int64
-
-	enqueuedCount   atomic.Int64
-	dequeuedCount   atomic.Int64
-	droppedCount    atomic.Int64
-	overflowEvents  atomic.Uint64
-	totalQueueWait  atomic.Int64
-	maxQueueWait    atomic.Int64
-	lastEnqueueNano atomic.Int64
-	lastDequeueNano atomic.Int64
-	startNano       atomic.Int64
-
+	ring                *xsync.MPMCQueue[jobs.Job]
+	logger              *zap.Logger
+	signal              chan struct{}
+	overflow            []jobs.Job
+	cfg                 HybridQueueConfig
+	softOverflowLimit   int
+	hardOverflowLimit   int
+	startNano           atomic.Int64
+	ringDepth           atomic.Int64
+	overflowDepth       atomic.Int64
+	enqueuedCount       atomic.Int64
+	dequeuedCount       atomic.Int64
+	droppedCount        atomic.Int64
+	overflowEvents      atomic.Uint64
+	totalQueueWait      atomic.Int64
+	maxQueueWait        atomic.Int64
+	lastEnqueueNano     atomic.Int64
+	lastDequeueNano     atomic.Int64
+	mu                  sync.Mutex
+	closed              atomic.Bool
 	softOverflowAlerted atomic.Bool
 	hardOverflowAlerted atomic.Bool
 	ringSaturated       atomic.Bool
-
-	signal chan struct{}
 }
 
 // NewHybridQueue builds a HybridQueue using the supplied configuration.

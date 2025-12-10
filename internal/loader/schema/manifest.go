@@ -120,8 +120,8 @@ type rawPulse struct {
 
 func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 	var temp struct {
-		rawPulse `yaml:",inline"`
 		Config   yaml.Node `yaml:"config"`
+		rawPulse `yaml:",inline"`
 	}
 	if err := value.Decode(&temp); err != nil {
 		return err
@@ -496,10 +496,10 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 }
 
 type Monitor struct {
-	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
 	Codes        Codes        `yaml:"codes" json:"codes"`
-	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
 	Name         string       `yaml:"name" json:"name"`
+	Intervention Intervention `yaml:"intervention,omitempty" json:"intervention,omitempty"`
+	Pulse        Pulse        `yaml:"pulse_check" json:"pulse_check"`
 	Enabled      bool         `yaml:"enabled" json:"enabled"`
 }
 
@@ -507,11 +507,11 @@ type Monitor struct {
 func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	// Create a temporary struct with a pointer to a bool for 'Enabled'
 	type TmpMonitor struct {
-		Pulse        Pulse        `yaml:"pulse_check"`
 		Enabled      *bool        `yaml:"enabled"`
 		Codes        Codes        `yaml:"codes"`
-		Intervention Intervention `yaml:"intervention,omitempty"`
 		Name         string       `yaml:"name"`
+		Intervention Intervention `yaml:"intervention,omitempty"`
+		Pulse        Pulse        `yaml:"pulse_check"`
 	}
 
 	var tmp TmpMonitor

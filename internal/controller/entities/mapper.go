@@ -155,24 +155,28 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 		for color, config := range monitor.Codes {
 			colorKey := interning.Intern(color)
-			// Single consolidated entry instead of separate components
-			colorCodeConfig := GetColorCodeConfig()
-			colorCodeConfig.Dispatch = config.Dispatch
-			colorCodeConfig.Notify = interning.Intern(config.Notify)
-			// Assign schema notification config directly; updates should replace (COW).
-			colorCodeConfig.Config = config.Config
-			codeConfig.Configs[colorKey] = colorCodeConfig
+			idx := components.ColorToIndex(colorKey)
+			if idx == components.ColorNone {
+				continue
+			}
 
-			colorCodeStatus := GetColorCodeStatus()
-			colorCodeStatus.LastAlertTime = now
-			codeStatus.Status[colorKey] = colorCodeStatus
+			// Value type assignment
+			cc := components.ColorCodeConfig{
+				Dispatch: config.Dispatch,
+				Notify:   interning.Intern(config.Notify),
+				Config:   config.Config, // Copy interface/pointer
+			}
+			codeConfig.Configs[idx] = cc
 
+			cs := components.ColorCodeStatus{
+				LastAlertTime: now.Unix(),
+			}
+			codeStatus.Status[idx] = cs
 		}
 
-		// Add both code components in a single step to reduce archetype moves
+		// Add both code components in a single step
 		e.codePair.Add(entity, codeConfig, codeStatus)
-		// Return to pools after Ark copies the values
-		// Note: PutCodeConfig/PutCodeStatus will handle nested colorCodeConfig/colorCodeStatus cleanup
+		// Pooling disabled, Put calls are no-ops but harmless
 		PutCodeConfig(codeConfig)
 		PutCodeStatus(codeStatus)
 	}
@@ -187,10 +191,10 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 // pendingExtra holds components to be added after batch creation
 type pendingExtra struct {
-	Entity             ecs.Entity
 	InterventionConfig *components.InterventionConfig
 	CodeConfig         *components.CodeConfig
 	CodeStatus         *components.CodeStatus
+	Entity             ecs.Entity
 	Disabled           bool
 }
 
@@ -309,23 +313,24 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 
 			for color, cfg := range monitor.Codes {
 				colorKey := interning.Intern(color)
-				// Per-color config
-				cc := GetColorCodeConfig()
-				cc.Dispatch = cfg.Dispatch
-				cc.Notify = interning.Intern(cfg.Notify)
-				if cfg.Config != nil {
-					// Assign schema notification config directly; updates should replace (COW).
-					cc.Config = cfg.Config
-				} else {
-					cc.Config = nil
+				idx := components.ColorToIndex(colorKey)
+				if idx == components.ColorNone {
+					continue
 				}
-				codeConfig.Configs[colorKey] = cc
+
+				// Per-color config
+				cc := components.ColorCodeConfig{
+					Dispatch: cfg.Dispatch,
+					Notify:   interning.Intern(cfg.Notify),
+					Config:   cfg.Config,
+				}
+				codeConfig.Configs[idx] = cc
 
 				// Per-color status
-				status := GetColorCodeStatus()
-				status.LastAlertTime = now
-				codeStatus.Status[colorKey] = status
-
+				cs := components.ColorCodeStatus{
+					LastAlertTime: now.Unix(),
+				}
+				codeStatus.Status[idx] = cs
 			}
 
 			extra.CodeConfig = codeConfig

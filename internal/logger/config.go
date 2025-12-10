@@ -3,10 +3,10 @@ package logger
 // LoggerConfig defines logging configuration
 type LoggerConfig struct {
 	Level            string `yaml:"level" env:"CPRA_LOG_LEVEL"`
-	Format           string `yaml:"format" env:"CPRA_LOG_FORMAT"` // json or console
-	EnableSampling   bool   `yaml:"enable_sampling" env:"CPRA_LOG_SAMPLING"`
+	Format           string `yaml:"format" env:"CPRA_LOG_FORMAT"`
 	SampleInitial    int    `yaml:"sample_initial" env:"CPRA_LOG_SAMPLE_INITIAL"`
 	SampleThereafter int    `yaml:"sample_thereafter" env:"CPRA_LOG_SAMPLE_THEREAFTER"`
+	EnableSampling   bool   `yaml:"enable_sampling" env:"CPRA_LOG_SAMPLING"`
 	Development      bool   `yaml:"development" env:"CPRA_LOG_DEVELOPMENT"`
 }
 

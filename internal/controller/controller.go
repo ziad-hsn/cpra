@@ -85,7 +85,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync"
 	"time"
 
 	"cpra/internal/controller/components"
@@ -128,22 +127,19 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 // like GetWorld(). Start() and Stop() should be called from a single goroutine
 // or with proper synchronization.
 type Controller struct {
-	stateLogger          *systems.StateLogger
-	pulseQueue           queue.Queue
-	codeQueue            queue.Queue
-	interventionQueue    queue.Queue
-	pulsePool            *queue.DynamicWorkerPool
-	mapper               *entities.EntityManager
-	world                *ecs.World
-	app                  *app.App
-	interventionPool     *queue.DynamicWorkerPool
-	codePool             *queue.DynamicWorkerPool
-	config               Config
-	entityCountThreshold int64
-	queueSwitchMutex     sync.RWMutex
-	running              bool
-	useAdaptiveQueue     bool
-	logger               *Logger
+	interventionQueue queue.Queue
+	pulseQueue        queue.Queue
+	codeQueue         queue.Queue
+	stateLogger       *systems.StateLogger
+	interventionPool  *queue.DynamicWorkerPool
+	mapper            *entities.EntityManager
+	world             *ecs.World
+	app               *app.App
+	codePool          *queue.DynamicWorkerPool
+	pulsePool         *queue.DynamicWorkerPool
+	logger            *Logger
+	config            Config
+	running           bool
 }
 
 // Config holds all configuration for the controller.
@@ -154,19 +150,16 @@ type Controller struct {
 // Default values are optimized for large-scale deployments but can be adjusted
 // based on workload characteristics and resource constraints.
 type Config struct {
-	Debug          bool
-	PipelineConfig loader.PipelineConfig
-	QueueCapacity  uint64
-	WorkerConfig   queue.WorkerPoolConfig
-	BatchSize      int
-	UpdateInterval time.Duration
-	// Optional pre-sizing parameters; can be overridden by env vars
-	// CPRA_SIZING_TAU_MS and CPRA_SIZING_SLO_MS (milliseconds)
-	SizingServiceTime time.Duration // τ
-	SizingSLO         time.Duration // W target (end-to-end)
-	// Optional safe headroom as a fraction (e.g., 0.15 = 15%); env override: CPRA_SIZING_HEADROOM_PCT
-	SizingHeadroomPct float64
 	Logger            *Logger
+	WorkerConfig      queue.WorkerPoolConfig
+	PipelineConfig    loader.PipelineConfig
+	QueueCapacity     uint64
+	BatchSize         int
+	UpdateInterval    time.Duration
+	SizingServiceTime time.Duration
+	SizingSLO         time.Duration
+	SizingHeadroomPct float64
+	Debug             bool
 }
 
 // DefaultConfig returns a default configuration optimized for large-scale deployments.
@@ -310,15 +303,14 @@ func NewController(config Config) *Controller {
 // gzip compression (.gz extension).
 //
 // After loading completes, the controller:
-//   - Checks entity count and may switch to AdaptiveQueue if threshold exceeded
 //   - Pre-computes optimal worker pool sizing for pulse jobs
 //
 // The context can be used to cancel the loading operation.
 //
 // Returns an error if file parsing or entity creation fails.
 func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
-	loader := loader.NewPipeline(c.world, c.mapper, c.config.PipelineConfig)
-	stats, err := loader.Load(ctx, filename)
+	pipeline := loader.NewPipeline(c.world, c.mapper, c.config.PipelineConfig)
+	stats, err := pipeline.Load(ctx, filename)
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
 	}
@@ -340,8 +332,12 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	runtime.GC()
 	debug.FreeOSMemory()
 
-	// Check if we need to switch to AdaptiveQueue due to high entity count
-	c.CheckEntityCountAndSwitchQueue()
+	// Log archetype stats for reflect.New analysis
+	worldStats := c.world.Stats()
+	c.logger.Info("ECS Archetypes: %d (more archetypes = more reflect.New)", len(worldStats.Archetypes))
+	for i, arch := range worldStats.Archetypes {
+		c.logger.Info("  Archetype[%d]: entities=%d components=%v", i, arch.Size, arch.ComponentTypeNames)
+	}
 
 	// Pre-calculate worker sizing from initial configuration/world (Pulse only)
 	c.precomputeSizingFromConfig()
@@ -567,123 +563,4 @@ func (c *Controller) PrintShutdownMetrics() {
 // as this may cause race conditions with the ECS systems.
 func (c *Controller) GetWorld() *ecs.World {
 	return c.world
-}
-
-// switchToAdaptiveQueues drains current queues and switches to AdaptiveQueue implementation.
-func (c *Controller) switchToAdaptiveQueues() {
-	c.queueSwitchMutex.Lock()
-	defer c.queueSwitchMutex.Unlock()
-
-	if c.useAdaptiveQueue {
-		c.logger.Info("Already using AdaptiveQueue, no switch needed")
-		return
-	}
-
-	c.logger.Info("Switching to AdaptiveQueue due to high entity count...")
-
-	// Pause worker pools
-	c.pulsePool.Pause()
-	c.interventionPool.Pause()
-	c.codePool.Pause()
-
-	// Drain current queues
-	c.drainQueue("Pulse", c.pulseQueue)
-	c.drainQueue("Intervention", c.interventionQueue)
-	c.drainQueue("Code", c.codeQueue)
-
-	// Create new AdaptiveQueues
-	newPulseCfg := queue.DefaultQueueConfig()
-	newPulseCfg.Type = queue.QueueTypeAdaptive
-	newPulseCfg.Name = "pulse"
-	newPulseQueue, err := queue.NewQueue(newPulseCfg)
-	if err != nil {
-		c.logger.Error("Failed to create new pulse AdaptiveQueue: %v", err)
-		return
-	}
-	newInterventionCfg := queue.DefaultQueueConfig()
-	newInterventionCfg.Type = queue.QueueTypeAdaptive
-	newInterventionCfg.Name = "intervention"
-	newInterventionQueue, err := queue.NewQueue(newInterventionCfg)
-	if err != nil {
-		c.logger.Error("Failed to create new intervention AdaptiveQueue: %v", err)
-		return
-	}
-	newCodeCfg := queue.DefaultQueueConfig()
-	newCodeCfg.Type = queue.QueueTypeAdaptive
-	newCodeCfg.Name = "code"
-	newCodeQueue, err := queue.NewQueue(newCodeCfg)
-	if err != nil {
-		c.logger.Error("Failed to create new code AdaptiveQueue: %v", err)
-		return
-	}
-
-	// Replace queues in worker pools
-	if err := c.pulsePool.ReplaceQueue(newPulseQueue); err != nil {
-		c.logger.Error("Failed to replace pulse queue: %v", err)
-		return
-	}
-	if err := c.interventionPool.ReplaceQueue(newInterventionQueue); err != nil {
-		c.logger.Error("Failed to replace intervention queue: %v", err)
-		return
-	}
-	if err := c.codePool.ReplaceQueue(newCodeQueue); err != nil {
-		c.logger.Error("Failed to replace code queue: %v", err)
-		return
-	}
-
-	// Close old queues and update references
-	c.pulseQueue.Close()
-	c.interventionQueue.Close()
-	c.codeQueue.Close()
-
-	c.pulseQueue = newPulseQueue
-	c.interventionQueue = newInterventionQueue
-	c.codeQueue = newCodeQueue
-
-	c.useAdaptiveQueue = true
-
-	// Resume worker pools
-	c.codePool.Resume()
-	c.interventionPool.Resume()
-	c.pulsePool.Resume()
-
-	c.logger.Info("Successfully switched to AdaptiveQueue")
-}
-
-// drainQueue empties a queue and logs the drained items count.
-func (c *Controller) drainQueue(name string, q queue.Queue) {
-	drainedCount := 0
-	for {
-		items, err := q.DequeueBatch(1000)
-		if err != nil {
-			break
-		}
-		if len(items) == 0 {
-			break
-		}
-		drainedCount += len(items)
-	}
-	if drainedCount > 0 {
-		c.logger.Info("Drained %d items from %s queue", drainedCount, name)
-	}
-}
-
-// CheckEntityCountAndSwitchQueue monitors entity count and switches queues if threshold exceeded.
-func (c *Controller) CheckEntityCountAndSwitchQueue() {
-	if c.entityCountThreshold <= 0 {
-		return // No threshold set
-	}
-
-	worldStats := c.world.Stats()
-	entityCount := int64(worldStats.Entities.Used)
-
-	c.queueSwitchMutex.RLock()
-	alreadyAdaptive := c.useAdaptiveQueue
-	c.queueSwitchMutex.RUnlock()
-
-	if !alreadyAdaptive && entityCount > c.entityCountThreshold {
-		c.logger.Info("Entity count (%d) exceeded threshold (%d), switching to AdaptiveQueue",
-			entityCount, c.entityCountThreshold)
-		c.switchToAdaptiveQueues()
-	}
 }

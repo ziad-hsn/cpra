@@ -13,11 +13,10 @@ import (
 
 // jobInfo is a helper struct to associate a job with its entity and color for batch processing.
 type jobInfo struct {
-	Job    jobs.Job
-	Color  string
-	Entity ecs.Entity
-	// OldState captures the state before transitioning to Pending so we can log/revert safely.
+	Job      jobs.Job
+	Color    string
 	OldState components.MonitorState
+	Entity   ecs.Entity
 }
 
 // BatchCodeSystem processes entities that need a code alert dispatched.
@@ -111,16 +110,20 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			continue
 		}
 
-		color := state.PendingCode
-		if color == "" {
+		color := state.PendingColor
+		if color == components.ColorNone {
 			// This should not happen if StateCodeNeeded is set, but as a safeguard:
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
 
 		// Honor dispatch flag and presence of color config before enqueuing
-		cfg := codeConfig.Configs[color]
-		if cfg == nil {
+		if color >= components.MaxColors {
+			state.Flags &^= components.StateCodeNeeded
+			continue
+		}
+		cfg := &codeConfig.Configs[color]
+		if cfg.Notify == "" {
 			s.logger.Warn("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
@@ -138,7 +141,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			Config:   cfg.Config, // This is already the correct schema type (CodeNotification interface)
 		}
 
-		job, err := jobs.CreateCodeJob(state.Name, schemaCfg, ent, color)
+		job, err := jobs.CreateCodeJob(state.Name, schemaCfg, ent, color.String())
 		if err != nil {
 			s.logger.Error("Failed to create code job", "error", err, "entity_id", ent.ID())
 			state.Flags &^= components.StateCodeNeeded
@@ -151,7 +154,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			continue
 		}
 
-		jobsToProcess = append(jobsToProcess, jobInfo{Entity: ent, Job: job, Color: color})
+		jobsToProcess = append(jobsToProcess, jobInfo{Entity: ent, Job: job, Color: color.String()})
 
 		if len(jobsToProcess) >= tokens {
 			s.processBatch(&jobsToProcess)

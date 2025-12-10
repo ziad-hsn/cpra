@@ -12,21 +12,19 @@ import (
 // It is designed for high-throughput scenarios with multiple producers and consumers.
 // It implements the Queue interface.
 type AdaptiveQueue struct {
-	buffer   []jobs.Job
-	capacity atomic.Uint64
-	head     atomic.Uint64
-	tail     atomic.Uint64
-	closed   atomic.Int32
-
-	enqueuedCount       atomic.Int64
+	signal              chan struct{}
+	buffer              []jobs.Job
 	dequeuedCount       atomic.Int64
+	tail                atomic.Uint64
+	enqueuedCount       atomic.Int64
+	head                atomic.Uint64
 	totalQueueWaitNanos atomic.Int64
 	maxQueueWaitNanos   atomic.Int64
 	startUnixNano       atomic.Int64
 	lastEnqueueUnixNano atomic.Int64
 	lastDequeueUnixNano atomic.Int64
-
-	signal chan struct{}
+	capacity            atomic.Uint64
+	closed              atomic.Int32
 }
 
 // NewAdaptiveQueue creates a new AdaptiveQueue with the given capacity.

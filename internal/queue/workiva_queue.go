@@ -25,13 +25,10 @@ type rbSeg struct {
 
 // WorkivaQueue is a lock-free, capacity-expanding MPMC queue using Workiva RBs.
 type WorkivaQueue struct {
-	head atomic.Pointer[rbSeg]
-	tail atomic.Pointer[rbSeg]
-
-	closed atomic.Int32
-
-	// metrics
-	capacity            atomic.Uint64 // cumulative capacity across segments
+	head                atomic.Pointer[rbSeg]
+	tail                atomic.Pointer[rbSeg]
+	signal              chan struct{}
+	capacity            atomic.Uint64
 	enqueuedCount       atomic.Int64
 	dequeuedCount       atomic.Int64
 	totalQueueWaitNanos atomic.Int64
@@ -39,8 +36,7 @@ type WorkivaQueue struct {
 	startUnixNano       atomic.Int64
 	lastEnqueueUnixNano atomic.Int64
 	lastDequeueUnixNano atomic.Int64
-
-	signal chan struct{}
+	closed              atomic.Int32
 }
 
 // NewWorkivaQueue creates a new expanding queue backed by Workiva RingBuffers.

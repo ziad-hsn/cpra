@@ -21,6 +21,8 @@ type ResultRouter struct {
 	CodeResultChan         chan []jobs.Result
 	logger                 *log.Logger
 	config                 WorkerPoolConfig
+	stopCh                 <-chan struct{}
+	closed                 atomic.Bool
 }
 
 // WorkerPoolStats exposes runtime metrics for the dynamic worker pool.
@@ -39,7 +41,7 @@ type WorkerPoolStats struct {
 }
 
 // NewResultRouter creates a new result router with buffered channels.
-func NewResultRouter(config WorkerPoolConfig, logger *log.Logger) *ResultRouter {
+func NewResultRouter(config WorkerPoolConfig, logger *log.Logger, stopCh <-chan struct{}) *ResultRouter {
 	bufferSize := config.ResultChannelDepth
 	return &ResultRouter{
 		PulseResultChan:        make(chan []jobs.Result, bufferSize),
@@ -47,12 +49,13 @@ func NewResultRouter(config WorkerPoolConfig, logger *log.Logger) *ResultRouter 
 		CodeResultChan:         make(chan []jobs.Result, bufferSize),
 		config:                 config,
 		logger:                 logger,
+		stopCh:                 stopCh,
 	}
 }
 
 // RouteResults takes a batch of mixed results and routes them to appropriate channels.
 func (r *ResultRouter) RouteResults(results []jobs.Result) {
-	if len(results) == 0 {
+	if len(results) == 0 || r.closed.Load() {
 		return
 	}
 
@@ -70,7 +73,9 @@ func (r *ResultRouter) RouteResults(results []jobs.Result) {
 		case "code":
 			codeResults = append(codeResults, result)
 		default:
-			r.logger.Printf("Unknown job type in result: %v", result.Payload["type"])
+			if r.logger != nil {
+				r.logger.Printf("Unknown job type in result: %v", result.Payload["type"])
+			}
 		}
 	}
 
@@ -87,6 +92,9 @@ func (r *ResultRouter) RouteResults(results []jobs.Result) {
 }
 
 func (r *ResultRouter) sendWithBackpressure(ch chan []jobs.Result, batch []jobs.Result, label string) {
+	if r.closed.Load() {
+		return
+	}
 	backoff := r.config.ResultBatchTimeout
 	if backoff <= 0 {
 		backoff = 50 * time.Millisecond
@@ -94,18 +102,43 @@ func (r *ResultRouter) sendWithBackpressure(ch chan []jobs.Result, batch []jobs.
 	ticker := time.NewTicker(backoff)
 	defer ticker.Stop()
 
+	attempts := 0
+	const maxAttempts = 10
 	for {
 		select {
 		case ch <- batch:
 			return
+		default:
+		}
+
+		select {
+		case ch <- batch:
+			return
 		case <-ticker.C:
-			r.logger.Printf("Backpressure: %s results stalled (%d jobs waiting)", label, len(batch))
+			if r.logger != nil {
+				r.logger.Printf("Backpressure: %s results stalled (%d jobs waiting)", label, len(batch))
+			}
+			attempts++
+			if attempts >= maxAttempts {
+				if r.logger != nil {
+					r.logger.Printf("Dropping %s results after %d stalled sends", label, attempts)
+				}
+				return
+			}
+		case <-r.stopCh:
+			if r.logger != nil {
+				r.logger.Printf("Dropping %s results during shutdown (%d jobs waiting)", label, len(batch))
+			}
+			return
 		}
 	}
 }
 
 // Close closes all result channels.
 func (r *ResultRouter) Close() {
+	if r.closed.Swap(true) {
+		return
+	}
 	close(r.PulseResultChan)
 	close(r.InterventionResultChan)
 	close(r.CodeResultChan)
@@ -114,22 +147,26 @@ func (r *ResultRouter) Close() {
 // DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
 // It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
-	queue           Queue
-	ctx             context.Context
-	cancel          context.CancelFunc
-	antsPool        *ants.PoolWithFunc
-	logger          *log.Logger
-	resultChan      chan jobs.Result
-	router          *ResultRouter
-	config          WorkerPoolConfig
-	wg              sync.WaitGroup
-	tasksSubmitted  atomic.Int64
-	tasksCompleted  atomic.Int64
-	scalingEvents   atomic.Int64
-	lastTarget      atomic.Int64
-	lastScaleTime   atomic.Int64
-	stopping        atomic.Int32
-	resultBatchPool sync.Pool
+	resultBatchPool  sync.Pool
+	ctx              context.Context
+	queue            Queue
+	cancel           context.CancelFunc
+	antsPool         *ants.PoolWithFunc
+	logger           *log.Logger
+	resultChan       chan jobs.Result
+	router           *ResultRouter
+	config           WorkerPoolConfig
+	wg               sync.WaitGroup
+	stopCh           chan struct{}
+	stopOnce         sync.Once
+	resultsClosed    atomic.Bool
+	resultsCloseOnce sync.Once
+	tasksCompleted   atomic.Int64
+	scalingEvents    atomic.Int64
+	lastTarget       atomic.Int64
+	lastScaleTime    atomic.Int64
+	tasksSubmitted   atomic.Int64
+	stopping         atomic.Int32
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
@@ -193,15 +230,17 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	stopCh := make(chan struct{})
 
 	pool := &DynamicWorkerPool{
 		queue:      q,
 		logger:     logger,
 		config:     config,
 		resultChan: make(chan jobs.Result, config.ResultChannelDepth),
-		router:     NewResultRouter(config, logger),
+		router:     NewResultRouter(config, logger, stopCh),
 		ctx:        ctx,
 		cancel:     cancel,
+		stopCh:     stopCh,
 	}
 	pool.resultBatchPool.New = func() any {
 		s := make([]jobs.Result, 0, pool.config.ResultBatchSize)
@@ -217,13 +256,7 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 			return
 		}
 		result := j.Execute()
-		if pool.stopping.Load() == 1 {
-			return
-		}
-		select {
-		case pool.resultChan <- result:
-		case <-pool.ctx.Done():
-		}
+		pool.deliverResult(result)
 	}
 
 	// Build ants options
@@ -292,29 +325,56 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	if p.logger != nil {
 		p.logger.Println("Draining DynamicWorkerPool...")
 	}
+	p.stopOnce.Do(func() { close(p.stopCh) })
 	p.cancel()
+
+	drainWindow := p.config.TargetQueueLatency * 5
+	if drainWindow < 2*time.Second {
+		drainWindow = 2 * time.Second
+	}
+	p.waitForResultsUntil(time.Now().Add(drainWindow))
+
 	done := make(chan struct{})
 	go func() {
 		p.wg.Wait()
 		close(done)
 	}()
+
+	waitTimeout := p.config.TargetQueueLatency * 2
+	if waitTimeout <= 0 {
+		waitTimeout = 2 * time.Second
+	}
 	select {
 	case <-done:
-	case <-time.After(p.config.TargetQueueLatency * 5):
+	case <-time.After(waitTimeout):
 		if p.logger != nil {
-			p.logger.Println("Draining timed out, continuing shutdown")
+			p.logger.Println("Draining timed out; forcing shutdown and dropping remaining results")
 		}
 	}
-	remaining := len(p.resultChan)
-	if remaining > 0 && p.logger != nil {
-		p.logger.Printf("Flushing %d queued results before close", remaining)
-	}
-	close(p.resultChan)
+
 	p.router.Close()
 	p.antsPool.Release()
 	if p.logger != nil {
 		p.logger.Println("DynamicWorkerPool stopped")
 	}
+}
+
+func (p *DynamicWorkerPool) waitForResultsUntil(deadline time.Time) {
+	for time.Now().Before(deadline) {
+		pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+		if pending <= 0 && len(p.resultChan) == 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	p.resultsCloseOnce.Do(func() {
+		p.resultsClosed.Store(true)
+		close(p.resultChan)
+		if pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load(); pending > 0 && p.logger != nil {
+			p.logger.Printf("Dropping %d results that were still pending at shutdown deadline", pending)
+		}
+	})
 }
 
 // dispatcher fetches batches of jobs from the queue and submits them to the ants pool.
@@ -343,6 +403,8 @@ func (p *DynamicWorkerPool) dispatcher() {
 			select {
 			case <-p.ctx.Done():
 				return
+			case <-p.stopCh:
+				return
 			case <-time.After(100 * time.Millisecond):
 				continue
 			}
@@ -364,6 +426,8 @@ func (p *DynamicWorkerPool) dispatcher() {
 		select {
 		case <-p.ctx.Done():
 			return
+		case <-p.stopCh:
+			return
 		case <-p.queue.Notify():
 			// Signal received, loop back to dequeue
 		}
@@ -378,15 +442,13 @@ func (p *DynamicWorkerPool) resultProcessor() {
 	ticker := time.NewTicker(p.config.ResultBatchTimeout)
 	defer ticker.Stop()
 
+	draining := false
 	for {
 		select {
+		case <-p.stopCh:
+			draining = true
 		case <-p.ctx.Done():
-			// Route any remaining results before shutting down
-			if len(*batch) > 0 {
-				p.router.RouteResults(*batch)
-				p.putResultBatch(batch)
-			}
-			return
+			draining = true
 		case result, ok := <-p.resultChan:
 			if !ok { // resultChan was closed
 				if len(*batch) > 0 {
@@ -411,6 +473,58 @@ func (p *DynamicWorkerPool) resultProcessor() {
 				p.putResultBatch(batch)
 				batch = p.getResultBatch()
 			}
+		}
+
+		if draining {
+			if len(*batch) > 0 && len(p.resultChan) == 0 {
+				p.router.RouteResults(*batch)
+				p.putResultBatch(batch)
+				return
+			}
+			if len(*batch) == 0 && len(p.resultChan) == 0 {
+				return
+			}
+		}
+	}
+}
+
+// deliverResult attempts to send a result without blocking shutdown.
+// Results are dropped when the pool is stopping to avoid deadlocks.
+func (p *DynamicWorkerPool) deliverResult(result jobs.Result) {
+	backoff := p.config.ResultBatchTimeout
+	if backoff <= 0 {
+		backoff = 10 * time.Millisecond
+	}
+	attempts := 0
+	for {
+		if p.resultsClosed.Load() {
+			return
+		}
+		select {
+		case p.resultChan <- result:
+			return
+		default:
+		}
+
+		select {
+		case p.resultChan <- result:
+			return
+		case <-p.stopCh:
+			if p.logger != nil {
+				p.logger.Printf("Dropping result during shutdown (result channel stalled)")
+			}
+			attempts++
+		case <-time.After(backoff):
+			if p.stopping.Load() == 0 {
+				continue
+			}
+			attempts++
+		}
+		if attempts >= 5 {
+			if p.logger != nil {
+				p.logger.Printf("Dropping result during shutdown after %d send attempts", attempts)
+			}
+			return
 		}
 	}
 }
@@ -442,6 +556,8 @@ func (p *DynamicWorkerPool) autoScale() {
 	for {
 		select {
 		case <-p.ctx.Done():
+			return
+		case <-p.stopCh:
 			return
 		case <-ticker.C:
 			stats := p.queue.Stats()
@@ -544,46 +660,13 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 // Pause temporarily stops the worker pool from processing new tasks.
 func (p *DynamicWorkerPool) Pause() {
 	if p.logger != nil {
-		p.logger.Println("Pausing worker pool...")
-	}
-	if p.antsPool != nil {
-		p.antsPool.Tune(0) // Reduce capacity to 0 to pause processing
+		p.logger.Println("Pause() is a no-op (queue replacement disabled)")
 	}
 }
 
 // Resume resumes worker pool processing after a pause.
 func (p *DynamicWorkerPool) Resume() {
 	if p.logger != nil {
-		p.logger.Println("Resuming worker pool...")
+		p.logger.Println("Resume() is a no-op (queue replacement disabled)")
 	}
-	if p.antsPool != nil {
-		// Restore to minimum workers
-		p.antsPool.Tune(p.config.MinWorkers)
-	}
-}
-
-// ReplaceQueue replaces the current queue with a new one.
-// This is used for dynamic queue switching (e.g., from Workiva to Adaptive).
-func (p *DynamicWorkerPool) ReplaceQueue(newQueue Queue) error {
-	if newQueue == nil {
-		return errors.New("new queue cannot be nil")
-	}
-
-	if p.logger != nil {
-		p.logger.Println("Replacing queue in worker pool...")
-	}
-
-	// Pause processing to prevent race conditions
-	p.Pause()
-
-	// Replace the queue reference
-	p.queue = newQueue
-
-	// Resume processing with new queue
-	p.Resume()
-
-	if p.logger != nil {
-		p.logger.Println("Queue replacement completed")
-	}
-	return nil
 }

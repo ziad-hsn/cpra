@@ -11,10 +11,6 @@ var (
 	monitorStatePool       = sync.Pool{New: func() any { return &components.MonitorState{} }}
 	pulseConfigPool        = sync.Pool{New: func() any { return &components.PulseConfig{} }}
 	interventionConfigPool = sync.Pool{New: func() any { return &components.InterventionConfig{} }}
-	codeConfigPool         = sync.Pool{New: func() any { return &components.CodeConfig{} }}
-	colorCodeConfigPool    = sync.Pool{New: func() any { return &components.ColorCodeConfig{} }}
-	codeStatusPool         = sync.Pool{New: func() any { return &components.CodeStatus{} }}
-	colorCodeStatusPool    = sync.Pool{New: func() any { return &components.ColorCodeStatus{} }}
 	jobStoragePool         = sync.Pool{New: func() any {
 		return &components.JobStorage{}
 	}}
@@ -62,86 +58,62 @@ func PutInterventionConfig(i *components.InterventionConfig) {
 	interventionConfigPool.Put(i)
 }
 
-// GetCodeConfig returns a pooled CodeConfig with an initialized map.
-func GetCodeConfig(codeCount int) *components.CodeConfig {
+// Pools for code components - now safe because arrays are value types, not reference types
+var (
+	codeConfigPool = sync.Pool{New: func() any { return &components.CodeConfig{} }}
+	codeStatusPool = sync.Pool{New: func() any { return &components.CodeStatus{} }}
+)
+
+// GetCodeConfig returns a pooled CodeConfig.
+// Safe to pool now because [MaxColors]ColorCodeConfig is a value type (copied by ECS).
+func GetCodeConfig(_ int) *components.CodeConfig {
 	cfg := codeConfigPool.Get().(*components.CodeConfig)
-	if cfg.Configs == nil {
-		cfg.Configs = make(map[string]*components.ColorCodeConfig, codeCount)
-	} else {
-		for k := range cfg.Configs {
-			delete(cfg.Configs, k)
-		}
-	}
+	*cfg = components.CodeConfig{} // Zero the array values
 	return cfg
 }
 
-// PutCodeConfig clears nested structures and pools the CodeConfig.
+// PutCodeConfig returns a CodeConfig to the pool.
 func PutCodeConfig(c *components.CodeConfig) {
 	if c == nil {
 		return
 	}
-	for k, cfg := range c.Configs {
-		if cfg != nil {
-			PutColorCodeConfig(cfg)
-		}
-		delete(c.Configs, k)
-	}
 	codeConfigPool.Put(c)
 }
 
-// GetColorCodeConfig returns a pooled ColorCodeConfig.
+// GetColorCodeConfig returns a new ColorCodeConfig.
 func GetColorCodeConfig() *components.ColorCodeConfig {
-	return colorCodeConfigPool.Get().(*components.ColorCodeConfig)
+	return &components.ColorCodeConfig{}
 }
 
-// PutColorCodeConfig resets and pools a ColorCodeConfig.
+// PutColorCodeConfig is a no-op (ColorCodeConfig is stored inline in the array).
 func PutColorCodeConfig(c *components.ColorCodeConfig) {
-	if c == nil {
-		return
-	}
-	*c = components.ColorCodeConfig{}
-	colorCodeConfigPool.Put(c)
+	// No-op: ColorCodeConfig is a value type stored inline in CodeConfig.Configs array
 }
 
-// GetCodeStatus returns a pooled CodeStatus with an initialized map.
-func GetCodeStatus(codeCount int) *components.CodeStatus {
+// GetCodeStatus returns a pooled CodeStatus.
+// Safe to pool now because [MaxColors]ColorCodeStatus is a value type (copied by ECS).
+func GetCodeStatus(_ int) *components.CodeStatus {
 	status := codeStatusPool.Get().(*components.CodeStatus)
-	if status.Status == nil {
-		status.Status = make(map[string]*components.ColorCodeStatus, codeCount)
-	} else {
-		for k := range status.Status {
-			delete(status.Status, k)
-		}
-	}
+	*status = components.CodeStatus{} // Zero the array values
 	return status
 }
 
-// PutCodeStatus clears nested status entries and pools the CodeStatus.
+// PutCodeStatus returns a CodeStatus to the pool.
 func PutCodeStatus(c *components.CodeStatus) {
 	if c == nil {
 		return
 	}
-	for k, status := range c.Status {
-		if status != nil {
-			PutColorCodeStatus(status)
-		}
-		delete(c.Status, k)
-	}
 	codeStatusPool.Put(c)
 }
 
-// GetColorCodeStatus returns a pooled ColorCodeStatus.
+// GetColorCodeStatus returns a new ColorCodeStatus.
 func GetColorCodeStatus() *components.ColorCodeStatus {
-	return colorCodeStatusPool.Get().(*components.ColorCodeStatus)
+	return &components.ColorCodeStatus{}
 }
 
-// PutColorCodeStatus resets and pools a ColorCodeStatus.
+// PutColorCodeStatus is a no-op (ColorCodeStatus is stored inline in the array).
 func PutColorCodeStatus(c *components.ColorCodeStatus) {
-	if c == nil {
-		return
-	}
-	*c = components.ColorCodeStatus{}
-	colorCodeStatusPool.Put(c)
+	// No-op: ColorCodeStatus is a value type stored inline in CodeStatus.Status array
 }
 
 // GetJobStorage returns a pooled JobStorage.

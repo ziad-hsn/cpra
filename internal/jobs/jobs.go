@@ -98,9 +98,9 @@ var (
 )
 
 type pooledPinger struct {
-	mu   sync.Mutex
-	host string
 	pr   *ping.Pinger
+	host string
+	mu   sync.Mutex
 }
 
 func getPooledPinger(host string) (*pooledPinger, error) {
@@ -368,12 +368,12 @@ type PulseHTTPJob struct {
 	Client      *http.Client
 	URL         string
 	Method      string
+	JobType     string
+	Driver      string
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
-	JobType     string
-	Driver      string
 }
 
 func (p *PulseHTTPJob) Execute() Result {
@@ -416,13 +416,13 @@ type PulseTCPJob struct {
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Host        string
+	JobType     string
+	Driver      string
 	Port        int
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
-	JobType     string
-	Driver      string
 }
 
 func (p *PulseTCPJob) Execute() Result {
@@ -469,14 +469,14 @@ type PulseICMPJob struct {
 	EnqueueTime     time.Time
 	StartTime       time.Time
 	Host            string
+	JobType         string
+	Driver          string
 	Timeout         time.Duration
 	Count           int
 	Retries         int
 	Entity          ecs.Entity
 	ID              uuid.UUID
 	IgnorePrivilege bool
-	JobType         string
-	Driver          string
 }
 
 //var errICMPPrivilege = errors.New("icmp requires elevated privileges")
@@ -597,12 +597,12 @@ type InterventionDockerJob struct {
 	StartTime   time.Time
 	Container   string
 	DockerHost  string
+	JobType     string
+	Driver      string
 	Timeout     time.Duration
 	Retries     int
 	Entity      ecs.Entity
 	ID          uuid.UUID
-	JobType     string
-	Driver      string
 }
 
 func (i *InterventionDockerJob) Execute() Result {

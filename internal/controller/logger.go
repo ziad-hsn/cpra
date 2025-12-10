@@ -41,6 +41,7 @@ const colorReset = "\033[0m"
 
 // Logger provides structured logging with levels and context
 type Logger struct {
+	base        applogger.Logger
 	file        *os.File
 	timezone    *time.Location
 	tracer      *Tracer
@@ -49,8 +50,6 @@ type Logger struct {
 	enableColor bool
 	debugMode   bool
 	prodMode    bool
-	// base provides a zap-backed structured logger sink when set
-	base applogger.Logger
 }
 
 // NewLogger creates a new logger instance

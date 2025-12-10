@@ -100,7 +100,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 				s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
 				// Only trigger red if incident not already open (defensive)
 				if (flags & components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, "red")
+					s.triggerCode(ent, state, components.ColorRed)
 					state.Flags |= components.StateIncidentOpen
 					s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
 				}
@@ -112,7 +112,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 				s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
 				// First failure: only send yellow if no incident is open
 				if state.PulseFailures == 1 && (flags&components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, "yellow")
+					s.triggerCode(ent, state, components.ColorYellow)
 				}
 				unhealthy := config.UnhealthyThreshold
 				if unhealthy <= 0 {
@@ -133,7 +133,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 						// No intervention configured - trigger RED alert once
 						if (flags & components.StateIncidentOpen) == 0 {
 							s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
-							s.triggerCode(ent, state, "red")
+							s.triggerCode(ent, state, components.ColorRed)
 							state.Flags |= components.StateIncidentOpen
 							s.logger.Info("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
 						} else {
@@ -152,14 +152,14 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 				if state.VerifyRemaining <= 0 {
 					// safety: conclude verification immediately
 					state.Flags &^= components.StateVerifying
-					s.triggerCode(ent, state, "green")
+					s.triggerCode(ent, state, components.ColorGreen)
 					state.Flags &^= components.StateIncidentOpen
 					state.RecoveryStreak = 0
 				} else {
 					state.VerifyRemaining--
 					if state.VerifyRemaining <= 0 {
 						state.Flags &^= components.StateVerifying
-						s.triggerCode(ent, state, "green")
+						s.triggerCode(ent, state, components.ColorGreen)
 						state.Flags &^= components.StateIncidentOpen
 						state.RecoveryStreak = 0
 					}
@@ -174,7 +174,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 					}
 					if state.RecoveryStreak >= k {
 						s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
-						s.triggerCode(ent, state, "green")
+						s.triggerCode(ent, state, components.ColorGreen)
 						state.Flags &^= components.StateIncidentOpen
 						state.RecoveryStreak = 0
 					}
@@ -195,13 +195,16 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 	}
 }
 
-func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
+func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color components.ColorCode) {
 	codeConfig := s.codeConfigMapper.Get(entity)
 	if codeConfig == nil {
 		return
 	}
-	cfg := codeConfig.Configs[color]
-	if cfg == nil {
+	if color >= components.MaxColors {
+		return
+	}
+	cfg := &codeConfig.Configs[color]
+	if cfg.Notify == "" {
 		s.logger.Warn("Monitor '%s' has no '%s' code config; skipping alert trigger", state.Name, color)
 		return
 	}
@@ -211,46 +214,23 @@ func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *component
 	}
 
 	// FSM guard: If a code job is already in-flight (Pending), don't overwrite.
-	// The result system will clear Pending, then we can dispatch the next color.
 	if (state.Flags & components.StateCodePending) != 0 {
 		s.logger.Debug("Monitor '%s' already has code in-flight; deferring %s trigger", state.Name, color)
 		return
 	}
 
-	// If CodeNeeded is already set with a different color, use priority to decide.
-	// Priority: red > yellow > green/cyan/gray (critical alerts take precedence)
-	if (state.Flags&components.StateCodeNeeded) != 0 && state.PendingCode != "" {
-		if !colorHasHigherPriority(color, state.PendingCode) {
-			s.logger.Debug("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingCode, color)
+	// If CodeNeeded is already set, use priority to decide.
+	if (state.Flags&components.StateCodeNeeded) != 0 && state.PendingColor != components.ColorNone {
+		if !color.HigherPriorityThan(state.PendingColor) {
+			s.logger.Debug("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingColor, color)
 			return
 		}
-		s.logger.Debug("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingCode, color)
+		s.logger.Debug("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingColor, color)
 	}
 
-	state.PendingCode = color
+	state.PendingColor = color
 	state.Flags |= components.StateCodeNeeded
 	s.logger.Info("Monitor '%s' - triggering %s alert code", state.Name, color)
-}
-
-// colorHasHigherPriority returns true if newColor has higher priority than existingColor.
-// Priority order: red > yellow > green > cyan > gray (anything else)
-func colorHasHigherPriority(newColor, existingColor string) bool {
-	priority := map[string]int{
-		"red":    5,
-		"yellow": 4,
-		"green":  3,
-		"cyan":   2,
-		"gray":   1,
-	}
-	newPri, newOk := priority[newColor]
-	existPri, existOk := priority[existingColor]
-	if !newOk {
-		newPri = 0
-	}
-	if !existOk {
-		existPri = 0
-	}
-	return newPri > existPri
 }
 
 // Finalize is a no-op for this system.

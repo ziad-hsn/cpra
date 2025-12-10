@@ -108,9 +108,9 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 			state.Flags |= components.StateCodeNeeded
 		} else {
 			s.logger.Info("Monitor alert sent successfully", "monitor_name", state.Name, "color", color)
-			// On success, clear Pending and PendingCode.
+			// On success, clear Pending and PendingColor.
 			state.Flags &^= components.StateCodePending
-			state.PendingCode = ""
+			state.PendingColor = components.ColorNone
 		}
 		s.stateLogger.LogTransition(ent, oldState, *state)
 	}

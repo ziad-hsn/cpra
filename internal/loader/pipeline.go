@@ -23,27 +23,22 @@ import (
 
 // Pipeline orchestrates concurrent loading of monitor configurations.
 type Pipeline struct {
-	config        PipelineConfig
+	startTime     time.Time
 	world         *ecs.World
 	entityManager *entities.EntityManager
 	validator     *MonitorValidator
-
-	// Channels for pipeline stages
 	rawChan       chan RawMonitor
 	validatedChan chan ValidatedMonitor
 	batchChan     chan MonitorBatch
-
-	// Statistics (atomic for thread-safety)
-	rawParsed  int64
-	validated  int64
-	skipped    int64
-	duplicates int64
-	batched    int64
-	created    int64
-	pulseRate  float64
-
-	startTime time.Time
-	mu        sync.RWMutex
+	config        PipelineConfig
+	validated     int64
+	skipped       int64
+	duplicates    int64
+	batched       int64
+	created       int64
+	pulseRate     float64
+	rawParsed     int64
+	mu            sync.RWMutex
 }
 
 // NewPipeline creates a new concurrent loading pipeline.

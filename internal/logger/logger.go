@@ -29,7 +29,6 @@
 //		logger.Field{Key: "version", Value: "1.0.0"},
 //		logger.Field{Key: "port", Value: 8080},
 //	)
-//
 package logger
 
 // Logger interface for CPRA - maintains backward compatibility
@@ -50,6 +49,6 @@ type Logger interface {
 
 // Field represents a structured log field
 type Field struct {
-	Key   string
 	Value interface{}
+	Key   string
 }

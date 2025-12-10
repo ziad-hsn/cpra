@@ -13,9 +13,9 @@ import (
 )
 
 type testHybridJob struct {
-	id          int
 	enqueueTime time.Time
 	startTime   time.Time
+	id          int
 }
 
 func newTestHybridJob(id int) *testHybridJob {
@@ -107,10 +107,10 @@ func TestHybridQueueOverflowDrainOrder(t *testing.T) {
 func TestHybridQueueDropPolicies(t *testing.T) {
 	tests := []struct {
 		name          string
-		policy        DropPolicy
-		expectErr     bool
 		expectedFront []int
+		policy        DropPolicy
 		expectedDrop  int64
+		expectErr     bool
 	}{
 		{
 			name:          "reject",

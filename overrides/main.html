@@ -8,3 +8,10 @@
     }
   </style>
 {% endblock %}
+
+{% block footer %}
+  {{ super() }}
+  <div class="cpra-disclaimer">
+    CPRA is infrastructure monitoring software. Not intended for medical use.
+  </div>
+{% endblock %}

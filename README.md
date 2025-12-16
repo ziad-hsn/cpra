@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](docs/explanation/architecture-overview.md)
 
-**Monitor millions of services concurrently with automated remediation and intelligent worker scaling.**
+**Monitor millions of services concurrently with automated remediation and dynamic worker scaling.**
 
 CPRA is a high-performance infrastructure monitoring system designed for platform teams managing large-scale microservice architectures. Built on Entity-Component-System (ECS) architecture and queueing theory principles, CPRA handles 1,000,000+ concurrent health checks with automatic worker pool scaling to meet SLO targets.
 
@@ -118,7 +118,7 @@ Each pipeline operates independently with its own queue and dynamically-scaled w
 ![Queue and Worker Pool](docs/images/queue-worker-pool.png)
 
 **Queue Implementations:**
-- **HybridQueue**: Ring buffer + min-heap for priority-based scheduling
+- **HybridQueue**: Ring buffer + overflow slice for reliable FIFO processing
 - **AdaptiveQueue**: Auto-scaling ring buffer for variable load
 - **WorkivaQueue**: Lock-free ring buffer for ultra-low latency
 
@@ -133,22 +133,7 @@ For a comprehensive architecture explanation, see the [Architecture Overview](do
 
 ## Quick Start
 
-### Option 1: Run with Docker (Fastest)
-
-```bash
-# Clone the repository
-git clone https://github.com/ziad/cpra.git
-cd cpra
-
-# Build the Docker image and run with 10,000 test monitors
-docker build -f docker/Dockerfile -t cpra .
-docker run -it --rm \
-  -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml \
-  cpra \
-  ./cpra --yaml /app/monitors.yaml
-```
-
-### Option 2: Build and Run Locally
+### Option 1: Build and Run Locally
 
 ```bash
 # Prerequisites: Go 1.25 or later
@@ -242,10 +227,10 @@ monitors:
         url: http://my-service.example.com/health
         retries: 2
     intervention:
-      type: script
+      action: docker
       config:
-        script: /scripts/restart-service.sh
-        timeout: 30s
+        container: my-service-container
+        action: restart
     codes:
       red:
         dispatch: true
@@ -259,10 +244,9 @@ monitors:
           file: /var/log/cpra-alerts.log
 ```
 
-**Example Configurations:**
-- [10,000 monitors](mock-servers/test_10k.yaml)
-- [50,000 monitors](mock-servers/test_50k.yaml)
-- [1,000,000 monitors](mock-servers/test_1m.yaml)
+**Generating Test Configurations:**
+
+Use `mock-servers/generate_monitors.py` to generate test configurations with any number of monitors.
 
 ### Application Configuration
 
@@ -345,7 +329,6 @@ See the [API Reference](docs/reference/api-reference.md) for complete configurat
 ### Additional Resources
 
 - **[Getting Started](docs/tutorials/getting-started.md)** - Detailed setup and deployment guide
-- **[Examples](docs/examples/)** - Code examples for common use cases
 
 ---
 
@@ -443,16 +426,13 @@ We welcome contributions from the community! CPRA is an open-source project and 
 
 **Getting Started:**
 
-1. Read the [Contributing Guidelines](CONTRIBUTING.md)
-2. Check the [Code of Conduct](CODE_OF_CONDUCT.md)
-3. Look for issues labeled [`good first issue`](https://github.com/ziad/cpra/labels/good%20first%20issue)
-4. Fork the repository and submit a pull request
+1. Look for issues labeled [`good first issue`](https://github.com/ziad/cpra/labels/good%20first%20issue)
+2. Fork the repository and submit a pull request
 
 **Development Resources:**
 
 - [Architecture Overview](docs/explanation/architecture-overview.md) - Understand the system design
 - [API Reference](docs/reference/api-reference.md) - Function signatures and usage
-- [Examples](docs/examples/) - Code examples for common patterns
 
 ---
 
@@ -475,7 +455,7 @@ CPRA is built on excellent open-source libraries:
 
 <div align="center">
 
-**[Documentation](docs/)** • **[Architecture](docs/explanation/architecture-overview.md)** • **[Contributing](CONTRIBUTING.md)** • **[Issues](https://github.com/ziad/cpra/issues)**
+**[Documentation](docs/)** • **[Architecture](docs/explanation/architecture-overview.md)** • **[Issues](https://github.com/ziad/cpra/issues)**
 
 Built with ❤️ for platform teams managing large-scale infrastructure
 

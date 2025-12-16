@@ -11,8 +11,8 @@ This tutorial walks you through creating a single, comprehensive monitor that ut
 
 A CPRA monitor is defined in a YAML file and consists of three main sections:
 
-1.  **`pulse`**: Defines the health check (e.g., HTTP GET, TCP ping).
-2.  **`intervention`**: Defines the automated action to take on failure (e.g., run a script, restart a service).
+1.  **`pulse_check`**: Defines the health check (e.g., HTTP GET, TCP ping).
+2.  **`intervention`**: Defines the automated action to take on failure (e.g., restart a Docker container).
 3.  **`codes`**: Defines the alerting policy (e.g., send an alert after 3 failures).
 
 ## Step 1: Create the Monitor YAML
@@ -23,7 +23,7 @@ Create a new file named `my-monitor.yaml` and add the following content. This mo
 monitors:
   - name: "critical-api-health-check"
     enabled: true
-    pulse:
+    pulse_check:
       type: http
       interval: 30s
       timeout: 5s
@@ -33,21 +33,18 @@ monitors:
         url: http://my-critical-api.internal/health
         expected_status: 200
     intervention:
-      action: script
+      action: docker
       max_failures: 1 # Trigger intervention on the first failure after threshold
       config:
-        path: /usr/local/bin/restart_api.sh
-        args: ["--force"]
+        container: critical-api-container
+        action: restart
     codes:
-      # The 'Red' code is typically for critical alerts
-      Red:
-        dispatch: failure
-        notify: webhook
+      # The 'red' code is typically for critical alerts
+      red:
+        dispatch: true
+        notify: pagerduty
         config:
-          url: https://pagerduty.com/api/v2/alerts
-          payload:
-            service: "critical-api"
-            status: "down"
+          url: https://events.pagerduty.com/v2/enqueue
 ```
 
 ## Step 2: Understand the Pipeline Flow
@@ -56,8 +53,8 @@ When this monitor is loaded, it will follow this flow:
 
 1.  **Pulse Pipeline:** Executes the `http` check every 30 seconds.
 2.  **Failure Condition:** If the check fails, the `unhealthy_threshold` counter increments.
-3.  **Intervention Trigger:** After 3 consecutive failures, the **Intervention Pipeline** is triggered. It executes the `/usr/local/bin/restart_api.sh` script.
-4.  **Code Trigger:** If the Intervention fails, or if the Pulse check continues to fail after the Intervention, the **Code Pipeline** is triggered, dispatching the `Red` alert via the configured webhook.
+3.  **Intervention Trigger:** After 3 consecutive failures, the **Intervention Pipeline** is triggered. It restarts the Docker container.
+4.  **Code Trigger:** If the Intervention fails, or if the Pulse check continues to fail after the Intervention, the **Code Pipeline** is triggered, dispatching the `red` alert via PagerDuty.
 
 ## Step 3: Run with Your Monitor
 

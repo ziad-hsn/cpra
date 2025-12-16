@@ -39,11 +39,49 @@ This approximation introduces the **Coefficient of Variation ($C_s$)** for servi
 
 ## Dynamic Scaling in Practice
 
-1.  **Measurement:** The system continuously measures the current job arrival rate ($\lambda$) and the average service time ($\mu$) for each pipeline.
-2.  **Calculation:** The **State Logger System** feeds this data into the M/M/c model (with the Allen-Cunneen approximation) to calculate the required number of workers ($c_{required}$) to meet the SLO.
-3.  **Adjustment:** The **Dynamic Worker Pool** adjusts its size (scaling up or down) to match $c_{required}$, ensuring resources are neither wasted nor insufficient.
+### Multi-Window Metrics Collection
 
-This intelligent, mathematically-grounded approach is what allows CPRA to guarantee performance targets even as the monitored environment and load fluctuate.
+CPRA collects metrics across three time windows to balance responsiveness with stability:
+
+| Window | Duration | Purpose |
+| :--- | :--- | :--- |
+| **Short** | 15 seconds | Spike detection, triggers scale-up |
+| **Medium** | 5 minutes | Trend detection |
+| **Long** | 30 minutes | Baseline, used for scale-down decisions |
+
+### Scaling Algorithm
+
+1. **Measurement:** The `ScalingMetrics` collector continuously tracks:
+   - Enqueue rate ($\lambda$)
+   - Queue depth
+   - Worker utilization
+   - Inter-arrival time variance ($C_a$)
+   - Service time variance ($C_s$)
+
+2. **Calculation:** The M/M/c model with Allen-Cunneen approximation computes the optimal worker count:
+   ```
+   c_optimal = FindCForSLO(λ, τ, W_target, Ca, Cs, c_max)
+   c_safe = c_optimal × 1.15  // 15% headroom
+   ```
+
+3. **Hysteresis:** To prevent oscillation, scaling only occurs when:
+   - **Scale-up:** Desired workers > current × 1.10 (10% threshold)
+   - **Scale-down:** Desired workers < current × 0.80 (20% threshold)
+
+4. **Cooldowns:** Asymmetric cooldowns prevent rapid changes:
+   - Scale-up cooldown: 30 seconds (react quickly to load)
+   - Scale-down cooldown: 120 seconds (conservative reduction)
+
+5. **Scale-down Safety:** Scale-down only triggers after sustained low utilization (< 25%) over the 30-minute long window.
+
+### Warmup Period
+
+During the first 60 seconds after startup, no scaling occurs. This allows:
+- Initial metrics to stabilize
+- Worker pools to warm up
+- Variability coefficients to be measured
+
+This mathematically-grounded approach allows CPRA to guarantee performance targets even as the monitored environment and load fluctuate.
 
 ---
 

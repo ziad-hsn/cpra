@@ -30,6 +30,18 @@ CPRA uses the ECS pattern to separate data from behavior—a technique borrowed 
 | **Component** | Data and configuration | Structs: `MonitorState`, `PulseConfig`, `InterventionConfig`, `CodeConfig` | ~100 bytes total |
 | **System** | Processing logic | Functions: `BatchPulseSystem`, `BatchInterventionSystem`, `BatchCodeSystem` | Zero (shared) |
 
+### Core Dependencies
+
+CPRA leverages proven Go libraries for its ECS implementation:
+
+| Library | Purpose | Version |
+| :--- | :--- | :--- |
+| **[github.com/mlange-42/ark](https://github.com/mlange-42/ark)** | High-performance ECS framework | v0.6.4 |
+| **[github.com/mlange-42/ark-tools](https://github.com/mlange-42/ark-tools)** | ECS application utilities | v0.2.1 |
+| **[github.com/panjf2000/ants/v2](https://github.com/panjf2000/ants)** | Goroutine pool for workers | v2.11.3 |
+| **[github.com/Workiva/go-datastructures](https://github.com/Workiva/go-datastructures)** | Lock-free ring buffer queue | v1.1.6 |
+| **[github.com/puzpuzpuz/xsync/v4](https://github.com/puzpuzpuz/xsync)** | Concurrent data structures | v4.2.0 |
+
 ### Memory Layout Advantage
 
 Traditional object-oriented monitoring stores each monitor as a complete object:
@@ -68,6 +80,9 @@ Monitoring tasks are divided into three distinct, concurrent pipelines. This sep
 | **Intervention** | Automated Remediation | Medium (100s ops/sec) | < 500ms | Pulse failures |
 | **Code** | Alert Notifications | Low (10s ops/sec) | < 1000ms | Intervention failures |
 
+!!! note "Terminology"
+    "Pulse" in CPRA refers to scheduled health check intervals for IT systems, not human physiological monitoring.
+
 ### Why Separate Pipelines?
 
 **Problem**: In monolithic systems, a slow alerting operation (e.g., email timeout) can block health checks, causing cascading failures.
@@ -100,17 +115,57 @@ To support 1,000,000+ monitors, CPRA employs several advanced optimization techn
 Instead of many small components, CPRA uses a few large, well-designed components to minimize ECS "archetypes" (component combinations):
 
 ```go
-// Core state consolidated into one component
+// Core state consolidated into one component with bitfield flags
 type MonitorState struct {
-    LastCheck      time.Time    // 8 bytes
-    NextCheck      time.Time    // 8 bytes
-    FailureCount   uint8        // 1 byte
-    Status         uint8        // 1 byte
-    // ... total: ~32 bytes
+    LastPulseCheckTime   time.Time  // 8 bytes
+    LastEventTime        time.Time  // 8 bytes
+    LastSuccessTime      time.Time  // 8 bytes
+    NextCheckTime        time.Time  // 8 bytes
+    LastError            error      // 16 bytes
+    Name                 string     // 16 bytes (pointer + len)
+    ConsecutiveFailures  int        // 8 bytes
+    PulseFailures        int        // 8 bytes
+    InterventionFailures int        // 8 bytes
+    RecoveryStreak       int        // 8 bytes
+    VerifyRemaining      int        // 8 bytes
+    Flags                uint32     // 4 bytes - bitfield for state
+    PendingColor         ColorCode  // 1 byte
 }
+
+// State flags managed via bitfield operations
+const (
+    StatePulseNeeded         uint32 = 1 << 1
+    StatePulsePending        uint32 = 1 << 2
+    StatePulseFirstCheck     uint32 = 1 << 3
+    StateInterventionNeeded  uint32 = 1 << 5
+    StateInterventionPending uint32 = 1 << 6
+    StateCodeNeeded          uint32 = 1 << 7
+    StateCodePending         uint32 = 1 << 8
+    StateIncidentOpen        uint32 = 1 << 9
+    StateVerifying           uint32 = 1 << 10
+)
 ```
 
-**Impact**: Fewer archetypes = less memory overhead and faster queries.
+**Impact**: Fewer archetypes = less memory overhead and faster queries. Bitfield state management enables atomic updates without archetype changes.
+
+### Color-Coded Alert System
+
+CPRA uses an 8-level color-coded alert system with priority ordering:
+
+```go
+type ColorCode uint8
+
+const (
+    ColorRed    ColorCode = 0  // Priority 5 - Critical
+    ColorOrange ColorCode = 1  // Priority 4 - High
+    ColorYellow ColorCode = 2  // Priority 4 - Warning
+    ColorGreen  ColorCode = 3  // Priority 2 - Recovered
+    ColorCyan   ColorCode = 4  // Priority 2 - Info
+    ColorBlue   ColorCode = 5  // Priority 1 - Low
+    ColorPurple ColorCode = 6  // Priority 1 - Maintenance
+    ColorGray   ColorCode = 7  // Priority 0 - Informational
+)
+```
 
 ### String Interning
 
@@ -186,22 +241,41 @@ Result: Maintains P95 < 100ms with 10 workers
 
 ### Automatic Adjustment
 
-CPRA continuously monitors queue depth and adjusts worker counts:
+CPRA continuously monitors queue metrics and adjusts worker counts using M/M/c queueing theory with hysteresis to prevent oscillation:
 
 ```go
-if queueDepth > threshold {
-    scaleUp()
-} else if queueDepth < lowThreshold && workers > minWorkers {
-    scaleDown()
+// Scale-up: React quickly to increased load
+if desiredWorkers > currentWorkers * 1.10 {  // 10% threshold
+    if timeSinceLastScaleUp > 30s {           // 30s cooldown
+        scaleUp(desiredWorkers)
+    }
+}
+
+// Scale-down: Conservative, only after sustained low utilization  
+if desiredWorkers < currentWorkers * 0.80 {  // 20% threshold
+    if longWindowUtilization < 0.25 {         // 30min sustained low
+        if timeSinceLastScaleDown > 120s {    // 120s cooldown
+            scaleDown(desiredWorkers)
+        }
+    }
 }
 ```
+
+**Key features**:
+
+- **Asymmetric cooldowns**: Fast scale-up (30s), slow scale-down (120s)
+- **Hysteresis thresholds**: Prevents oscillation on small changes
+- **Multi-window metrics**: Short (15s) for spikes, long (30m) for scale-down
+- **Warmup period**: No scaling during first 60s after startup
 
 **Configuration**:
 
 ```go
-config.WorkerConfig.MinWorkers = 10      // Never below this
-config.WorkerConfig.MaxWorkers = 500     // Never above this
-config.SizingSLO = 100 * time.Millisecond // Target latency
+config.WorkerConfig.MinWorkers = 10           // Never below this
+config.WorkerConfig.MaxWorkers = 500          // Never above this
+config.WorkerConfig.TargetQueueLatency = 100 * time.Millisecond
+config.WorkerConfig.ScaleUpCooldown = 30 * time.Second
+config.WorkerConfig.ScaleDownCooldown = 120 * time.Second
 ```
 
 ---
@@ -212,10 +286,10 @@ CPRA supports multiple queue types, each optimized for different workload patter
 
 ### HybridQueue (Default)
 
-- **Structure**: Ring buffer + min-heap
-- **Best For**: Priority-based scheduling
+- **Structure**: Ring buffer + overflow slice
+- **Best For**: High-throughput FIFO processing with overflow handling
 - **Overhead**: Low
-- **Trade-off**: Slightly higher insertion cost for priority sorting
+- **Trade-off**: Uses overflow slice when ring buffer is full
 
 ### AdaptiveQueue
 
@@ -226,17 +300,38 @@ CPRA supports multiple queue types, each optimized for different workload patter
 
 ### WorkivaQueue
 
-- **Structure**: Lock-free ring buffer
+- **Structure**: Lock-free ring buffer (from Workiva/go-datastructures)
 - **Best For**: Ultra-low latency requirements
 - **Overhead**: Minimal
 - **Trade-off**: Fixed capacity (must be power of 2)
 
+### BoundedQueue
+
+- **Structure**: Fixed-size buffer with blocking semantics
+- **Best For**: Memory-constrained environments
+- **Overhead**: Very low
+- **Trade-off**: Blocks when full
+
 **Selection Guide**:
 
 ```
-Use HybridQueue if: You need priority-based processing
+Use HybridQueue if: You need reliable FIFO with overflow handling
 Use AdaptiveQueue if: Load varies dramatically over time
 Use WorkivaQueue if: Minimizing P99 latency is critical
+Use BoundedQueue if: Memory is constrained and backpressure is acceptable
+```
+
+### Dynamic Queue Switching
+
+The controller can automatically switch queue implementations based on entity count:
+
+```go
+// When entity count exceeds threshold, switch from HybridQueue to AdaptiveQueue
+type Controller struct {
+    entityCountThreshold int64
+    useAdaptiveQueue     bool
+    queueSwitchMutex     sync.RWMutex
+}
 ```
 
 ---

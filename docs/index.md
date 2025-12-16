@@ -4,31 +4,37 @@ title: Welcome to CPRA Documentation
 
 <section class="cpra-hero" aria-labelledby="cpra-hero-title">
   <div class="cpra-hero__content">
-    <p class="cpra-hero__eyebrow">CPRA Documentation</p>
-    <h1 class="cpra-hero__title" id="cpra-hero-title">Operate at planetary scale with confident remediation.</h1>
-    <p class="cpra-hero__lede">Concurrent Pulse-Remediation-Alerting (CPRA) delivers ultra-low latency health checks, automated remediation, and resilient alerting pipelines tuned by queueing theory. Explore proven playbooks, deep architecture notes, and reference-grade APIs to master the platform.</p>
-    <div class="cpra-hero__actions">
-      <a class="cpra-hero__button cpra-hero__button--primary" href="tutorials/quickstart/" aria-label="Start the CPRA quickstart tutorial">Start the Quickstart</a>
-      <a class="cpra-hero__button cpra-hero__button--secondary" href="reference/config-schema/" aria-label="View the CPRA configuration schema">Explore the Reference</a>
+    <h1 class="cpra-hero__title" id="cpra-hero-title">CPRA</h1>
+    <p class="cpra-hero__tagline">High-throughput infrastructure monitoring with automated remediation</p>
+    <div class="cpra-hero__stats">
+      <div class="stat">
+        <span class="stat__value">1M+</span>
+        <span class="stat__label">concurrent monitors</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value">&lt;100ms</span>
+        <span class="stat__label">P95 latency</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value">~100B</span>
+        <span class="stat__label">per monitor</span>
+      </div>
     </div>
-  </div>
-  <div class="cpra-hero__graphic" aria-hidden="true">
-    <ul class="cpra-hero__list">
-      <li class="cpra-hero__metric"><span>1M+</span> concurrent health checks per cluster</li>
-      <li class="cpra-hero__metric"><span>&lt;120ms</span> remediation dispatch median</li>
-      <li class="cpra-hero__metric"><span>99.95%</span> SLO-backed event delivery</li>
-    </ul>
+    <div class="cpra-hero__actions">
+      <a class="cpra-button cpra-button--primary" href="tutorials/quickstart/" aria-label="Start the CPRA quickstart tutorial">Quickstart</a>
+      <a class="cpra-button cpra-button--secondary" href="reference/config-schema/" aria-label="View the CPRA configuration schema">Reference</a>
+    </div>
   </div>
 </section>
 
-## Why CPRA
+## Overview
 
-CPRA is a high-performance infrastructure monitoring system engineered for teams that demand both scale and precision.
+CPRA is a high-performance infrastructure monitoring system designed for large-scale deployments.
 
-- **Data-Oriented ECS Core:** Optimized memory layout drives cache-friendly execution across massive fleets.
-- **Independent Pulse / Intervention / Code Pipelines:** Tune and isolate workloads without cross-impact.
-- **Scientifically Tuned SLOs:** Worker pools scale dynamically using M/M/c queueing theory for predictable latency.
-- **Built for Extensibility:** Compose remediation recipes, pluggable transports, and custom monitors with safety rails.
+- **Data-Oriented ECS Core:** Optimized memory layout for cache-friendly execution at scale.
+- **Independent Pipelines:** Separate Pulse (health checks), Intervention (remediation), and Code (alerting) pipelines for fault isolation.
+- **Dynamic Worker Scaling:** Worker pools scale automatically using M/M/c queueing theory to meet SLO targets.
+- **Extensible Architecture:** Pluggable transports, custom monitors, and remediation recipes.
 
 ---
 
@@ -49,4 +55,5 @@ CPRA is a high-performance infrastructure monitoring system engineered for teams
 2. **Three Independent Pipelines:** Dedicated Pulse (health checks), Intervention (remediation), and Code (alerting) flows deliver fault isolation.
 3. **Dynamic Worker Scaling:** Queue-theory-derived autoscaling ensures SLO commitments during load spikes.
 
-Ready to dive deeper? Start with the [Quickstart tutorial](tutorials/quickstart.md), or jump into the [configuration reference](reference/config-schema.md) when you are wiring CPRA into production.
+Start with the [Quickstart tutorial](tutorials/quickstart.md) or see the [configuration reference](reference/config-schema.md) for production setup.
+

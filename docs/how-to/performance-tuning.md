@@ -19,7 +19,7 @@ The primary configuration for performance tuning is done in the `ControllerConfi
 
 | Configuration Field | Description | Tuning Impact |
 | :--- | :--- | :--- |
-| `SLOTargetMs` | The target latency in milliseconds for P95 job completion. | **Lowering** this value forces the system to provision **more workers** and can increase resource consumption. |
+| `SizingSLO` | The target latency for P95 job completion (as `time.Duration`, e.g., `100*time.Millisecond`). | **Lowering** this value forces the system to provision **more workers** and can increase resource consumption. |
 | `WorkerConfig.MinWorkers` | The minimum number of workers to keep active, even under no load. | Prevents cold start latency. Set to a small number (e.g., 10). |
 | `WorkerConfig.MaxWorkers` | The absolute maximum number of workers the pool can scale to. | Acts as a safety limit to prevent resource exhaustion during extreme load spikes. |
 | `BatchSize` | The number of entities processed by a System in a single iteration. | **Increasing** this value can improve throughput but may increase the latency of individual state updates. |
@@ -41,7 +41,7 @@ To validate your tuning efforts, use the built-in profiling tools:
 2.  **Access Metrics:** The profiling server will be available at `http://localhost:6060/debug/pprof/`.
 3.  **Analyze Worker Pool Metrics:** Pay close attention to the `queue_size` and `worker_count` metrics exposed by the controller. If the `queue_size` is consistently high, it indicates that the worker pool is undersized for the current load and SLO target.
 
-**Tip:** If you observe high CPU utilization but low throughput, consider increasing the `BatchSize` to reduce system overhead. If you observe high latency, consider lowering the `SLOTargetMs` (if resources allow) or increasing the `MaxWorkers`.
+**Tip:** If you observe high CPU utilization but low throughput, consider increasing the `BatchSize` to reduce system overhead. If you observe high latency, consider lowering the `SizingSLO` (if resources allow) or increasing the `MaxWorkers`.
 
 ---
 

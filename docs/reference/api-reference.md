@@ -234,17 +234,6 @@ It orchestrates the entire application flow including initialization, monitoring
   ctrl.PrintShutdownMetrics()
   ```
 
-#### (*Controller) CheckEntityCountAndSwitchQueue()
-
-- **Purpose**: Monitors entity count and switches queues if threshold exceeded
-- **Parameters**: None
-- **Returns**: None
-- **Errors**: None
-- **Example**:
-  ```go
-  ctrl.CheckEntityCountAndSwitchQueue()
-  ```
-
 ---
 
 ## Package: internal/queue
@@ -483,7 +472,7 @@ The queue package implements the worker pool and queue patterns that form the ba
 - **Example**:
   ```go
   config := queue.DefaultHybridQueueConfig()
-  config.HeapCapacity = 100000
+  config.OverflowCapacity = 100000
   ```
 
 #### NewBoundedQueue(config BoundedQueueConfig) *BoundedQueue
@@ -549,41 +538,19 @@ The queue package implements the worker pool and queue patterns that form the ba
 
 #### (*DynamicWorkerPool) Pause()
 
-- **Purpose**: Temporarily stops the worker pool from processing new tasks
+- **Purpose**: Placeholder for pausing the worker pool (currently a no-op in v0.5)
 - **Parameters**: None
 - **Returns**: None
 - **Errors**: None
-- **Example**:
-  ```go
-  pool.Pause()
-  ```
+- **Note**: This method exists for API compatibility but does not pause processing in v0.5
 
 #### (*DynamicWorkerPool) Resume()
 
-- **Purpose**: Resumes worker pool processing after a pause
+- **Purpose**: Placeholder for resuming the worker pool (currently a no-op in v0.5)
 - **Parameters**: None
 - **Returns**: None
 - **Errors**: None
-- **Example**:
-  ```go
-  pool.Resume()
-  ```
-
-#### (*DynamicWorkerPool) ReplaceQueue(newQueue Queue) error
-
-- **Purpose**: Replaces the current queue with a new one for dynamic queue switching
-- **Parameters**: 
-  - newQueue (Queue) - The new queue to use
-- **Returns**: error - Error if newQueue is nil
-- **Errors**: Returns error if newQueue is nil
-- **Example**:
-  ```go
-  newQueue, _ := queue.NewAdaptiveQueue(65536)
-  err := pool.ReplaceQueue(newQueue)
-  if err != nil {
-      log.Printf("Failed to replace queue: %v", err)
-  }
-  ```
+- **Note**: This method exists for API compatibility but does not resume processing in v0.5
 
 ---
 
@@ -653,163 +620,6 @@ copy := pulseCfg.Copy()
 #### JobStorage
 
 **Copy() *JobStorage** - Creates a deep copy of the job storage
-
----
-
-## Package: internal/loader/streaming
-
-The streaming package handles loading and parsing of monitor configuration files with streaming support for large files.
-
-### Functions
-
-#### NewStreamingLoader(filename string, world *ecs.World, config StreamingConfig) *StreamingLoader
-
-- **Purpose**: Creates a new streaming loader for loading monitors from files
-- **Parameters**: 
-  - filename (string) - Path to the monitor configuration file
-  - world (*ecs.World) - The ECS world to create entities in
-  - config (StreamingConfig) - Streaming configuration
-- **Returns**: *StreamingLoader - A configured streaming loader
-- **Errors**: None
-- **Example**:
-  ```go
-  config := streaming.DefaultStreamingConfig()
-  loader := streaming.NewStreamingLoader("monitors.yaml", world, config)
-  ```
-
-#### DefaultStreamingConfig() StreamingConfig
-
-- **Purpose**: Returns optimized default configuration for large files
-- **Parameters**: None
-- **Returns**: StreamingConfig - Default streaming configuration
-- **Errors**: None
-- **Example**:
-  ```go
-  config := streaming.DefaultStreamingConfig()
-  config.ParseBatchSize = 20000
-  ```
-
-#### NewStreamingEntityCreator(world *ecs.World, config EntityCreationConfig) *StreamingEntityCreator
-
-- **Purpose**: Creates a new entity creator for batch entity creation
-- **Parameters**: 
-  - world (*ecs.World) - The ECS world
-  - config (EntityCreationConfig) - Entity creation configuration
-- **Returns**: *StreamingEntityCreator - A configured entity creator
-- **Errors**: None
-- **Example**:
-  ```go
-  config := streaming.EntityCreationConfig{
-      BatchSize:   10000,
-      PreAllocate: 500000,
-  }
-  creator := streaming.NewStreamingEntityCreator(world, config)
-  ```
-
-#### NewStreamingJsonParser(filename string, config ParseConfig) (*StreamingJsonParser, error)
-
-- **Purpose**: Creates a streaming JSON parser for large JSON files
-- **Parameters**: 
-  - filename (string) - Path to the JSON file
-  - config (ParseConfig) - Parser configuration
-- **Returns**: 
-  - *StreamingJsonParser - The created parser
-  - error - Error if file cannot be opened
-- **Errors**: Returns error if file cannot be opened or read
-- **Example**:
-  ```go
-  config := streaming.ParseConfig{BatchSize: 10000}
-  parser, err := streaming.NewStreamingJsonParser("monitors.json", config)
-  if err != nil {
-      log.Fatalf("Failed to create parser: %v", err)
-  }
-  ```
-
-#### NewStreamingYamlParser(filename string, config ParseConfig) (*StreamingYamlParser, error)
-
-- **Purpose**: Creates a streaming YAML parser for large YAML files
-- **Parameters**: 
-  - filename (string) - Path to the YAML file
-  - config (ParseConfig) - Parser configuration
-- **Returns**: 
-  - *StreamingYamlParser - The created parser
-  - error - Error if file cannot be opened
-- **Errors**: Returns error if file cannot be opened or read
-- **Example**:
-  ```go
-  config := streaming.ParseConfig{BatchSize: 10000}
-  parser, err := streaming.NewStreamingYamlParser("monitors.yaml", config)
-  if err != nil {
-      log.Fatalf("Failed to create parser: %v", err)
-  }
-  ```
-
-### StreamingLoader Methods
-
-#### (*StreamingLoader) Load(ctx context.Context) (*LoadingStats, error)
-
-- **Purpose**: Performs the complete streaming load operation
-- **Parameters**: 
-  - ctx (context.Context) - Context for cancellation
-- **Returns**: 
-  - *LoadingStats - Statistics about the loading operation
-  - error - Error if loading fails
-- **Errors**: Returns error if parsing or entity creation fails
-- **Example**:
-  ```go
-  ctx := context.Background()
-  stats, err := loader.Load(ctx)
-  if err != nil {
-      log.Fatalf("Failed to load: %v", err)
-  }
-  fmt.Printf("Loaded %d monitors in %v\n", stats.TotalEntities, stats.LoadingTime)
-  ```
-
-### StreamingEntityCreator Methods
-
-#### (*StreamingEntityCreator) ProcessBatches(ctx context.Context, batchChan <-chan MonitorBatch, progressChan chan<- EntityProgress) error
-
-- **Purpose**: Processes monitor batches and creates entities
-- **Parameters**: 
-  - ctx (context.Context) - Context for cancellation
-  - batchChan (<-chan MonitorBatch) - Channel receiving monitor batches
-  - progressChan (chan<- EntityProgress) - Channel for progress updates
-- **Returns**: error - Error if processing fails
-- **Errors**: Returns error if entity creation fails
-- **Example**:
-  ```go
-  err := creator.ProcessBatches(ctx, batchChan, progressChan)
-  if err != nil {
-      log.Fatalf("Failed to process batches: %v", err)
-  }
-  ```
-
-#### (*StreamingEntityCreator) GetStats() (entitiesCreated int64, batchesProcessed int64, rate float64)
-
-- **Purpose**: Returns current creation statistics
-- **Parameters**: None
-- **Returns**: 
-  - entitiesCreated (int64) - Total entities created
-  - batchesProcessed (int64) - Total batches processed
-  - rate (float64) - Creation rate (entities/sec)
-- **Errors**: None
-- **Example**:
-  ```go
-  created, batches, rate := creator.GetStats()
-  fmt.Printf("Created %d entities (%.0f/sec)\n", created, rate)
-  ```
-
-#### (*StreamingEntityCreator) PulseRate() float64
-
-- **Purpose**: Returns the aggregated expected pulse arrival rate (jobs/sec)
-- **Parameters**: None
-- **Returns**: float64 - Pulse arrival rate in jobs/sec
-- **Errors**: None
-- **Example**:
-  ```go
-  rate := creator.PulseRate()
-  fmt.Printf("Expected pulse rate: %.2f jobs/sec\n", rate)
-  ```
 
 ---
 

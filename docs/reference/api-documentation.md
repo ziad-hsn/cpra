@@ -12,7 +12,7 @@ The CPRA binary exposes a concise flag set. All flags are optional; sensible def
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--yaml` | string | `internal/loader/replicated_test.yaml` | Path to the monitors YAML file. Override with your own config (for example `mock-servers/test_10k.yaml`). |
+| `--yaml` | string | `internal/loader/replicated_test.yaml` | Path to the monitors YAML file. Generate test configs with `mock-servers/generate_monitors.py`. |
 | `--config` | string | _empty_ | Optional application config file if you externalize controller settings. |
 | `--debug` | bool | `false` | Enables verbose logging and queue sizing diagnostics. |
 | `--pprof` | bool | `true` | Toggles the embedded profiling server. Disable in locked-down environments. |
@@ -32,14 +32,15 @@ monitors:
       type: http
       interval: 30s
       timeout: 5s
-      max_failures: 3
+      unhealthy_threshold: 3
       config:
         method: GET
         url: https://edge.example.com/health
     intervention:
-      type: script
+      action: docker
       config:
-        script: /opt/cpra/scripts/restart-edge.sh
+        container: edge-api-container
+        action: restart
     codes:
       red:
         dispatch: true
@@ -54,7 +55,7 @@ Key ideas:
 2. **Intervention** specifies the automated remediation handler.
 3. **Codes** let you map failure tiers to alert transports.
 
-For larger samples open `mock-servers/test_10k.yaml` or generate new datasets with `mock-servers/generate_monitors.py`.
+For larger samples, use `mock-servers/generate_monitors.py` to generate test configurations with any number of monitors.
 
 ## Environment Variables
 
@@ -65,7 +66,7 @@ Environment variables complement CLI flags when you containerize CPRA.
 | `GOMEMLIMIT` | Hard cap for Go’s soft memory limit. Helps prevent OOM kills in containers. | `1073741824` (1 GiB) |
 | `GOGC` | Target heap growth percentage for GC. Lower values trigger more frequent collections. | `100` (default), `50` for tighter control |
 | `CPRA_DEBUG` | Enables debug logging without changing CLI flags in Docker Compose/systemd. | `true`/`false` |
-| `YAML_FILE` | Convenience variable used in `docker-compose` examples to point CPRA at a specific monitors file. | `samples/replicated_test_10k.yaml` |
+| `YAML_FILE` | Convenience variable used in `docker-compose` examples to point CPRA at a specific monitors file. | Path to your monitors YAML file |
 
 !!! warning "Memory tuning"
     When you shrink `GOMEMLIMIT`, also review `config.WorkerConfig.MaxWorkers` at runtime. Too many workers with a small memory budget can still crash the process even if Go tries to respect the limit.

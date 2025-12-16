@@ -35,11 +35,11 @@ Each pipeline operates independently with its own queue and worker pool. For a d
 
     ```yaml
     - name: "my-service-health-check"
-      pulse:
+      pulse_check:
         type: "http"
         interval: "30s"
         timeout: "5s"
-        http:
+        config:
           url: "http://my-service.example.com/health"
           method: "GET"
           headers:

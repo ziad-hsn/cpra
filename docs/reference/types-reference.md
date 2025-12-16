@@ -10,7 +10,7 @@ Configuration struct for the Controller.
 
 **Fields:**
 - **Debug** (bool) - Enable debug-level logging
-- **StreamingConfig** (streaming.StreamingConfig) - Configuration for streaming loader
+- **PipelineConfig** (loader.PipelineConfig) - Configuration for the loader
 - **QueueCapacity** (uint64) - Initial queue capacity (must be power of 2)
 - **WorkerConfig** (queue.WorkerPoolConfig) - Worker pool configuration
 - **BatchSize** (int) - Batch size for system processing
@@ -51,7 +51,6 @@ Manages the ECS world and its systems using ark-tools.
 - Stop()
 - GetWorld() *ecs.World
 - PrintShutdownMetrics()
-- CheckEntityCountAndSwitchQueue()
 
 **Used by:**
 - Main application entry point
@@ -339,9 +338,9 @@ config := queue.QueueConfig{
     Type:     queue.QueueTypeHybrid,
     Capacity: 65536,
     HybridConfig: queue.HybridQueueConfig{
-        RingCapacity: 65536,
-        HeapCapacity: 100000,
-        DropPolicy:   queue.DropPolicyDropNewest,
+        RingCapacity:     65536,
+        OverflowCapacity: 100000,
+        DropPolicy:       queue.DropPolicyDropNewest,
     },
 }
 q, err := queue.NewQueue(config)
@@ -371,9 +370,8 @@ Manages a pool of workers that execute jobs from a queue with dynamic scaling.
 - DrainAndStop()
 - GetRouter() *ResultRouter
 - Stats() WorkerPoolStats
-- Pause()
-- Resume()
-- ReplaceQueue(newQueue Queue) error
+- Pause() - *Note: No-op in v0.5*
+- Resume() - *Note: No-op in v0.5*
 
 **When to use:**
 - When you need concurrent job processing with auto-scaling
@@ -553,7 +551,7 @@ Combines ring buffer and heap with configurable drop policy.
 config := queue.DefaultHybridQueueConfig()
 config.DropPolicy = queue.DropPolicyDropNewest
 config.RingCapacity = 32768
-config.HeapCapacity = 100000
+config.OverflowCapacity = 100000
 q, err := queue.NewHybridQueue(config)
 ```
 
@@ -564,9 +562,8 @@ Configuration for HybridQueue.
 **Fields:**
 - **Name** (string) - Queue name for logging
 - **RingCapacity** (int) - Ring buffer capacity (must be power of 2)
-- **HeapCapacity** (int) - Heap capacity
-- **DropPolicy** (DropPolicy) - Policy when both ring and heap are full
-- **SampleWindow** (time.Duration) - Window for statistics calculation
+- **OverflowCapacity** (int) - Overflow slice capacity
+- **DropPolicy** (DropPolicy) - Policy when both ring and overflow are full
 
 **Methods:**
 - None (data struct)
@@ -577,11 +574,10 @@ Configuration for HybridQueue.
 **Example:**
 ```go
 config := queue.HybridQueueConfig{
-    Name:         "myqueue",
-    RingCapacity: 65536,
-    HeapCapacity: 100000,
-    DropPolicy:   queue.DropPolicyDropOldest,
-    SampleWindow: 30 * time.Second,
+    Name:             "myqueue",
+    RingCapacity:     65536,
+    OverflowCapacity: 100000,
+    DropPolicy:       queue.DropPolicyDropOldest,
 }
 ```
 
@@ -644,12 +640,13 @@ filter := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world)
 Consolidates all monitor state into a single component.
 
 **Fields:**
-- **LastCheckTime** (time.Time) - Time of last health check
+- **LastPulseCheckTime** (time.Time) - Time the last pulse dispatch was enqueued (scheduling source of truth)
+- **LastEventTime** (time.Time) - Time of the last processed pipeline event
 - **LastSuccessTime** (time.Time) - Time of last successful check
 - **NextCheckTime** (time.Time) - Scheduled time for next check
 - **LastError** (error) - Last error encountered
 - **Name** (string) - Monitor name
-- **PendingCode** (string) - Pending code color
+- **PendingColor** (ColorCode) - Pending alert color (uses ColorCode enum, not string)
 - **ConsecutiveFailures** (int) - Number of consecutive failures
 - **PulseFailures** (int) - Total pulse failures
 - **InterventionFailures** (int) - Total intervention failures
@@ -758,34 +755,19 @@ world.Add(entity, ecs.C[components.InterventionConfig](), intCfg)
 
 ### CodeConfig
 
-Consolidates all code configurations.
+Consolidates all code configurations using a fixed array for memory efficiency.
 
 **Fields:**
-- **Configs** (map[string]*ColorCodeConfig) - Map of color to configuration
+- **Configs** ([MaxColors]ConfigID) - Fixed array of config IDs by color index
 
 **Methods:**
 - Copy() *CodeConfig - Creates a deep copy
 
 **When to use:**
 - Attached to entities that require alerting
-- Supports multiple code colors per monitor
+- Supports multiple code colors per monitor (up to MaxColors = 8)
 
-**Example:**
-```go
-codeConfig := &components.CodeConfig{
-    Configs: map[string]*components.ColorCodeConfig{
-        "red": {
-            Notify:   "pagerduty",
-            Dispatch: true,
-        },
-        "yellow": {
-            Notify:   "slack",
-            Dispatch: false,
-        },
-    },
-}
-world.Add(entity, ecs.C[components.CodeConfig](), codeConfig)
-```
+**Note:** Configurations are stored in a shared registry and referenced by ConfigID. Use the registry to resolve actual ColorCodeConfig values.
 
 ### ColorCodeConfig
 
@@ -805,12 +787,13 @@ Configuration for a specific code color.
 
 ### CodeStatus
 
-Consolidates all code status.
+Consolidates all code status using a fixed array for memory efficiency.
 
 **Fields:**
-- **Status** (map[string]*ColorCodeStatus) - Map of color to status
+- **Status** ([MaxColors]ColorCodeStatus) - Fixed array of status by color index
 
 **Methods:**
+- Get(color string) *ColorCodeStatus - Returns status for the given color
 - Copy() *CodeStatus - Creates a deep copy
 
 **When to use:**
@@ -818,22 +801,24 @@ Consolidates all code status.
 
 ### ColorCodeStatus
 
-Status for a specific code color.
+Status for a specific code color. Uses compact representation for memory efficiency.
 
 **Fields:**
-- **LastAlertTime** (time.Time) - Time of last alert
-- **LastSuccessTime** (time.Time) - Time of last successful notification
-- **LastError** (error) - Last error encountered
-- **LastStatus** (string) - Last status ("success" or "failed")
-- **ConsecutiveFailures** (int) - Consecutive notification failures
+- **LastAlertTime** (int64) - Unix timestamp of last alert
+- **LastSuccessTime** (int64) - Unix timestamp of last successful notification
+- **ConsecutiveFailures** (uint16) - Consecutive notification failures (max 65535)
+- **Flags** (uint8) - Bitfield: StatusSuccess (1<<0), StatusHasError (1<<1)
 
 **Methods:**
-- SetSuccess(t time.Time)
-- SetFailure(err error)
+- SetSuccess(t time.Time) - Sets success status and clears failures
+- SetFailure(err error) - Sets error status and increments failures
+- IsSuccess() bool - Returns true if last status was success
+- GetLastAlertTime() time.Time - Returns LastAlertTime as time.Time
+- GetLastSuccessTime() time.Time - Returns LastSuccessTime as time.Time
 - Copy() *ColorCodeStatus - Creates a deep copy
 
 **When to use:**
-- Used within CodeStatus map
+- Used within CodeStatus fixed array
 
 ### JobStorage
 
@@ -842,7 +827,6 @@ Consolidates all job storage.
 **Fields:**
 - **PulseJob** (jobs.Job) - Pulse job
 - **InterventionJob** (jobs.Job) - Intervention job
-- **CodeJobs** (map[string]jobs.Job) - Code jobs by color
 
 **Methods:**
 - Copy() *JobStorage - Creates a deep copy
@@ -892,186 +876,6 @@ Result component for code notification jobs.
 **When to use:**
 - Added by worker pool result router
 - Removed by BatchCodeResultSystem after processing
-
----
-
-## Package: internal/loader/streaming
-
-### StreamingLoader
-
-Orchestrates the streaming loading process.
-
-**Fields:**
-- All fields are unexported
-
-**Methods:**
-- Load(ctx context.Context) (*LoadingStats, error)
-
-**When to use:**
-- When loading monitor configurations from large files
-- Supports streaming for memory-efficient loading
-
-**Example:**
-```go
-config := streaming.DefaultStreamingConfig()
-loader := streaming.NewStreamingLoader("monitors.yaml", world, config)
-stats, err := loader.Load(context.Background())
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("Loaded %d monitors\n", stats.TotalEntities)
-```
-
-### StreamingConfig
-
-Configuration for streaming loader.
-
-**Fields:**
-- **ParseBatchSize** (int) - Batch size for parsing
-- **ParseBufferSize** (int) - Buffer size for file reading
-- **MaxParseMemory** (int64) - Maximum memory for parsing
-- **EntityBatchSize** (int) - Batch size for entity creation
-- **PreAllocateCount** (int) - Number of entities to pre-allocate
-- **MaxWorkers** (int) - Maximum concurrent workers
-- **ProgressInterval** (time.Duration) - Progress reporting interval
-- **GCInterval** (time.Duration) - GC interval during loading
-- **MemoryLimit** (int64) - Memory limit
-- **StrictUnknownFields** (bool) - Error on unknown fields
-- **JSONUseNumber** (bool) - Use number type for JSON numbers
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Configuring StreamingLoader behavior
-
-**Example:**
-```go
-config := streaming.StreamingConfig{
-    ParseBatchSize:   20000,
-    EntityBatchSize:  10000,
-    PreAllocateCount: 1000000,
-    ProgressInterval: 1 * time.Second,
-}
-```
-
-### LoadingStats
-
-Comprehensive loading statistics.
-
-**Fields:**
-- **TotalEntities** (int64) - Total entities loaded
-- **LoadingTime** (time.Duration) - Total loading time
-- **ParseRate** (float64) - Parse rate (entities/sec)
-- **CreationRate** (float64) - Creation rate (entities/sec)
-- **MemoryUsage** (int64) - Memory used during loading
-- **GCCount** (int) - Number of GC cycles
-- **PulseRate** (float64) - Expected pulse arrival rate (jobs/sec)
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Returned by StreamingLoader.Load()
-- For analyzing loading performance
-
-### StreamingEntityCreator
-
-Handles batch entity creation for Ark ECS.
-
-**Fields:**
-- All fields are unexported
-
-**Methods:**
-- ProcessBatches(ctx context.Context, batchChan <-chan MonitorBatch, progressChan chan<- EntityProgress) error
-- GetStats() (entitiesCreated int64, batchesProcessed int64, rate float64)
-- PulseRate() float64
-
-**When to use:**
-- Used internally by StreamingLoader
-- Can be used standalone for custom loading
-
-### EntityCreationConfig
-
-Configuration for entity creation.
-
-**Fields:**
-- **ProgressChan** (chan<- EntityProgress) - Channel for progress updates
-- **BatchSize** (int) - Batch size
-- **PreAllocate** (int) - Number of entities to pre-allocate
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Configuring StreamingEntityCreator
-
-### MonitorBatch
-
-Represents a batch of monitors read from a file.
-
-**Fields:**
-- **Monitors** ([]schema.Monitor) - Monitors in batch
-- **BatchID** (int) - Batch identifier
-- **Offset** (int64) - File offset
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Internal data structure for streaming
-
-### ParseConfig
-
-Configuration for streaming parsers.
-
-**Fields:**
-- **ProgressChan** (chan<- Progress) - Channel for progress updates
-- **BatchSize** (int) - Parse batch size
-- **BufferSize** (int) - File buffer size
-- **MaxMemory** (int64) - Maximum memory for parsing
-- **StrictUnknownFields** (bool) - Error on unknown fields
-- **JSONUseNumber** (bool) - Use number type for JSON
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Configuring streaming parsers
-
-### Progress
-
-Represents parsing progress.
-
-**Fields:**
-- **EntitiesProcessed** (int64) - Entities processed
-- **TotalBytes** (int64) - Total file bytes
-- **ProcessedBytes** (int64) - Bytes processed
-- **Percentage** (float64) - Completion percentage
-- **Rate** (float64) - Processing rate (entities/sec)
-- **EstimatedRemaining** (time.Duration) - Estimated remaining time
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Progress monitoring during loading
-
-### EntityProgress
-
-Represents entity creation progress.
-
-**Fields:**
-- **EntitiesCreated** (int64) - Entities created
-- **BatchesProcessed** (int64) - Batches processed
-- **Rate** (float64) - Creation rate (entities/sec)
-- **MemoryUsage** (int64) - Current memory usage
-
-**Methods:**
-- None (data struct)
-
-**When to use:**
-- Progress monitoring during entity creation
 
 ---
 

@@ -9,7 +9,7 @@ This guide covers production deployment options for CPRA: running a compiled bin
 ## Prerequisites
 
 - Go 1.25+
-- A monitors YAML file (for example `mock-servers/test_10k.yaml`)
+- A monitors YAML file (generate with `mock-servers/generate_monitors.py`)
 - Optional: Docker (for containerized deployment)
 
 ## Option A: Deploy the Compiled Binary
@@ -56,8 +56,11 @@ This guide covers production deployment options for CPRA: running a compiled bin
 
    Note: If the build fails due to a missing `samples/` directory referenced in the Dockerfile, either create `cpra/samples` with your YAML files, or remove the `COPY samples samples` line from `docker/Dockerfile` before building.
 
-2. Run with a mounted YAML file:
+2. Run with a mounted YAML file (generate test monitors first if needed):
    ```bash
+   # Generate test monitors (optional)
+   cd mock-servers && python generate_monitors.py --count 10000 --output test_10k.yaml && cd ..
+   
    docker run -d --name cpra \
      -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml:ro \
      --restart unless-stopped \
@@ -70,7 +73,7 @@ This guide covers production deployment options for CPRA: running a compiled bin
    docker run -d --name cpra \
      -e GOMEMLIMIT=1073741824 \
      -e GOGC=100 \
-     -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml:ro \
+     -v $(pwd)/your-monitors.yaml:/app/monitors.yaml:ro \
      cpra \
      ./cpra --yaml /app/monitors.yaml --debug
    ```

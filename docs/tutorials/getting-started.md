@@ -29,9 +29,13 @@ This guide will walk you through the process of setting up and running CPRA on y
 
 ## Running the Application
 
-To run the application, you need to provide a YAML file with the monitor configurations. An example file is provided at `mock-servers/test_10k.yaml`.
+To run the application, you need to provide a YAML file with the monitor configurations. Use `mock-servers/generate_monitors.py` to generate test configurations:
 
 ```sh
+# Generate test monitors
+cd mock-servers && python generate_monitors.py --count 10000 --output test_10k.yaml && cd ..
+
+# Run CPRA
 ./cpra --yaml mock-servers/test_10k.yaml
 ```
 
@@ -48,13 +52,7 @@ You can also run the application in a Docker container.
 
     Note: If the build fails due to a missing `samples/` directory referenced in the Dockerfile, either create `cpra/samples` with your YAML files, or remove the `COPY samples samples` line from `docker/Dockerfile` before building.
 
-2.  Run the container with a YAML file mounted (example uses the 10k mock monitors):
-    ```sh
-    docker run -it --rm \
-      -v $(pwd)/mock-servers/test_10k.yaml:/app/monitors.yaml \
-      cpra \
-      ./cpra --yaml /app/monitors.yaml
-    ```
+
 
 ## What's Next?
 

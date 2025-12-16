@@ -33,9 +33,19 @@ Next, use the provided Dockerfile to build a container image for CPRA. This comm
 $ docker build -f docker/Dockerfile -t cpra:latest .
 ```
 
-## Step 3: Run the CPRA Container
+## Step 3: Generate Test Monitors
 
-Now, run the container you just built. This command starts CPRA and uses a volume mount (`-v`) to provide the `test_10k.yaml` file from your local machine as the monitor configuration inside the container.
+Before running CPRA, generate a test configuration file with 10,000 monitors:
+
+```bash
+$ cd mock-servers
+$ python generate_monitors.py --count 10000 --output test_10k.yaml
+$ cd ..
+```
+
+## Step 4: Run the CPRA Container
+
+Now, run the container you just built. This command starts CPRA and uses a volume mount (`-v`) to provide the generated `test_10k.yaml` file as the monitor configuration inside the container.
 
 ```bash
 $ docker run -it --rm \
@@ -44,7 +54,7 @@ $ docker run -it --rm \
   ./cpra --yaml /app/monitors.yaml
 ```
 
-## Step 4: Analyze the Output
+## Step 5: Analyze the Output
 
 If successful, you will see log messages indicating that the controller has started, loaded the 10,000 monitors, and dynamically scaled its worker pool to meet the default performance targets.
 

@@ -6,26 +6,28 @@ edit_uri: edit/v0.5/docs/
 
 nav:
   - Home: index.md
-  - Tutorials:
+  - Get Started:
       - Overview: tutorials/index.md
       - Getting Started: tutorials/getting-started.md
       - Quickstart: tutorials/quickstart.md
-      - Your First Custom Monitor: tutorials/your-first-monitor.md
-  - How-to Guides:
+      - First Monitor: tutorials/your-first-monitor.md
+  - Guides:
       - Overview: how-to/index.md
       - Common Tasks: how-to/common-tasks.md
-      - Performance Tuning & SLOs: how-to/performance-tuning.md
-      - Deploy to Production: how-to/deploy-to-production.md
-  - Explanation:
+      - Performance: how-to/performance-tuning.md
+      - Production: how-to/deploy-to-production.md
+  - Concepts:
       - Overview: explanation/index.md
-      - Architecture Overview: explanation/architecture-overview.md
-      - Queueing Theory for Scaling: explanation/queueing-theory.md
+      - Architecture: explanation/architecture-overview.md
+      - Queueing Theory: explanation/queueing-theory.md
   - Reference:
       - Overview: reference/index.md
       - API Documentation: reference/api-documentation.md
       - API Reference: reference/api-reference.md
-      - Types Reference: reference/types-reference.md
-      - Monitor Configuration Schema: reference/config-schema.md
+      - Types: reference/types-reference.md
+      - Config Schema: reference/config-schema.md
+  - Legal:
+      - Disclaimer: legal/disclaimer.md
 
 theme:
   name: material
@@ -50,14 +52,14 @@ theme:
     - toc.follow
     - toc.integrate
   palette:
-    # Light mode - Modern blue-purple gradient scheme
+    # Light mode - Clinical warm theme
     - scheme: default
       toggle:
         icon: material/brightness-7
-        name: Switch to dark mode
+        name: Switch to dusk mode
       primary: custom
       accent: custom
-    # Dark mode - Deep space theme
+    # Dusk mode - Warm golden theme
     - scheme: slate
       toggle:
         icon: material/brightness-4
@@ -67,17 +69,14 @@ theme:
   font:
     text: Inter
     code: JetBrains Mono
-  logo: images/cpra-logo.png
-  favicon: images/cpra-logo.png
+  logo: images/cpra-icon.svg
+  favicon: images/cpra-icon.svg
   icon:
     repo: fontawesome/brands/github
     edit: material/pencil
     view: material/eye
 
 extra:
-  version:
-    provider: mike
-    default: stable
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/ziad-hsn/cpra

@@ -92,14 +92,20 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 		return nil
 	}
 
-	// Convert interface{} slice to jobs.Job slice
-	convertedJobs := make([]jobs.Job, len(jobsInterface))
-	for i, job := range jobsInterface {
+	// Convert interface{} slice to jobs.Job slice, skipping nils
+	convertedJobs := make([]jobs.Job, 0, len(jobsInterface))
+	for _, job := range jobsInterface {
+		if job == nil {
+			continue
+		}
 		if j, ok := job.(jobs.Job); ok {
-			convertedJobs[i] = j
+			convertedJobs = append(convertedJobs, j)
 		} else {
 			return errors.New("invalid job type in batch")
 		}
+	}
+	if len(convertedJobs) == 0 {
+		return nil
 	}
 	if q.closed.Load() == 1 {
 		return ErrQueueClosed
@@ -152,60 +158,26 @@ func (q *AdaptiveQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 	if q.closed.Load() == 1 && q.IsEmpty() {
 		return nil, ErrQueueClosed
 	}
-
-	capacity := q.capacity.Load() // Cache capacity
-	backoff := uint64(1)
-	maxBackoff := uint64(1024)
-
-	for {
-		head := q.head.Load()
-		tail := q.tail.Load()
-		if head >= tail {
-			return nil, nil // Queue is empty
-		}
-		n := tail - head
-		if n > uint64(maxSize) {
-			n = uint64(maxSize)
-		}
-		// Atomically claim batch for dequeuing
-		newHead := head + n
-		if q.head.CompareAndSwap(head, newHead) {
-			batch := make([]jobs.Job, n)
-			now := time.Now()
-			mask := capacity - 1
-			for i := uint64(0); i < n; i++ {
-				idx := (head + i) & mask
-				batch[i] = q.buffer[idx]
-				q.buffer[idx] = nil // Help GC
-				enqueueTime := batch[i].GetEnqueueTime()
-				if !enqueueTime.IsZero() {
-					wait := now.Sub(enqueueTime)
-					q.totalQueueWaitNanos.Add(int64(wait))
-					for {
-						currentMax := q.maxQueueWaitNanos.Load()
-						if int64(wait) <= currentMax {
-							break
-						}
-						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
-							break
-						}
-					}
-				}
-			}
-			q.dequeuedCount.Add(int64(n))
-			q.lastDequeueUnixNano.Store(now.UnixNano())
-			return batch, nil
-		}
-		// CAS failed - backoff
-		if backoff < maxBackoff {
-			for i := uint64(0); i < backoff; i++ {
-				runtime.Gosched()
-			}
-			backoff <<= 1
-		} else {
-			runtime.Gosched()
-		}
+	if maxSize <= 0 {
+		return nil, nil
 	}
+
+	batch := make([]jobs.Job, 0, maxSize)
+	for i := 0; i < maxSize; i++ {
+		job, err := q.Dequeue()
+		if err != nil {
+			// If queue closed mid-drain, return what we have
+			if errors.Is(err, ErrQueueClosed) && len(batch) > 0 {
+				return batch, nil
+			}
+			return batch, err
+		}
+		if job == nil {
+			break
+		}
+		batch = append(batch, job)
+	}
+	return batch, nil
 }
 
 // Dequeue removes and returns a single job from the queue.
@@ -224,21 +196,28 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 		if head >= tail {
 			return nil, nil // Queue is empty
 		}
-		job := q.buffer[head&(capacity-1)]
+		idx := head & (capacity - 1)
+		job := q.buffer[idx]
+		if job == nil || job.IsNil() {
+			runtime.Gosched()
+			continue
+		}
 		newHead := head + 1
 		if q.head.CompareAndSwap(head, newHead) {
 			now := time.Now()
-			enqueueTime := job.GetEnqueueTime()
-			if !enqueueTime.IsZero() {
-				wait := now.Sub(enqueueTime)
-				q.totalQueueWaitNanos.Add(int64(wait))
-				for {
-					currentMax := q.maxQueueWaitNanos.Load()
-					if int64(wait) <= currentMax {
-						break
-					}
-					if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
-						break
+			if job != nil && !job.IsNil() {
+				enqueueTime := job.GetEnqueueTime()
+				if !enqueueTime.IsZero() {
+					wait := now.Sub(enqueueTime)
+					q.totalQueueWaitNanos.Add(int64(wait))
+					for {
+						currentMax := q.maxQueueWaitNanos.Load()
+						if int64(wait) <= currentMax {
+							break
+						}
+						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
+							break
+						}
 					}
 				}
 			}

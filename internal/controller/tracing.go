@@ -2,12 +2,14 @@ package controller
 
 import (
 	"context"
+	"cpra/internal/logger"
 	"fmt"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // TraceSpan represents a single trace span
@@ -37,7 +39,7 @@ type TraceContext struct {
 type Tracer struct {
 	spans     map[string]*TraceSpan
 	traces    map[string][]*TraceSpan
-	logger    *Logger
+	logger    *zap.SugaredLogger
 	component string
 	mu        sync.RWMutex
 	enabled   bool
@@ -45,15 +47,12 @@ type Tracer struct {
 
 // NewTracer creates a new tracer instance
 func NewTracer(component string, enabled bool) *Tracer {
-	// Create a simple logger without tracing to avoid circular dependency
-	simpleLogger := &Logger{
-		level:       LogLevelDebug,
-		component:   fmt.Sprintf("TRACE:%s", component),
-		enableColor: false,
-		debugMode:   true,
-		prodMode:    false,
-		timezone:    time.Local,
-		tracer:      nil, // No tracer to avoid recursion
+	// Create a simple logger for tracing
+	cfg := logger.DevelopmentConfig()
+	traceLogger, err := logger.NewSugaredLoggerWithComponent(fmt.Sprintf("TRACE:%s", component), cfg)
+	if err != nil {
+		// Fallback to a nop logger if creation fails (should not happen)
+		traceLogger = zap.NewNop().Sugar()
 	}
 
 	return &Tracer{
@@ -61,7 +60,7 @@ func NewTracer(component string, enabled bool) *Tracer {
 		traces:    make(map[string][]*TraceSpan),
 		enabled:   enabled,
 		component: component,
-		logger:    simpleLogger,
+		logger:    traceLogger,
 	}
 }
 
@@ -114,7 +113,7 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 
 	newCtx := context.WithValue(ctx, "traceContext", newTraceCtx)
 
-	t.logger.Debug("Started span %s for operation %s (trace: %s, parent: %s)",
+	t.logger.Debugf("Started span %s for operation %s (trace: %s, parent: %s)",
 		spanID, operation, traceID, parentSpanID)
 
 	return newCtx, span
@@ -142,11 +141,11 @@ func (t *Tracer) FinishSpan(span *TraceSpan, err error) {
 		status = "ERROR"
 	}
 
-	t.logger.Debug("Finished span %s (%s) in %v [%s]",
+	t.logger.Debugf("Finished span %s (%s) in %v [%s]",
 		span.ID, span.Operation, span.Duration, status)
 
 	if err != nil {
-		t.logger.Debug("Span %s error: %v", span.ID, err)
+		t.logger.Debugf("Span %s error: %v", span.ID, err)
 	}
 }
 
@@ -284,7 +283,7 @@ func (t *Tracer) Cleanup(maxAge time.Duration) {
 	}
 
 	if removedSpans > 0 || removedTraces > 0 {
-		t.logger.Debug("Cleaned up %d spans and %d traces", removedSpans, removedTraces)
+		t.logger.Debugf("Cleaned up %d spans and %d traces", removedSpans, removedTraces)
 	}
 }
 

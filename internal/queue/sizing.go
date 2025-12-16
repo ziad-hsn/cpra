@@ -1,10 +1,13 @@
 package queue
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
 )
+
+var ErrUnstable = errors.New("unstable")
 
 // M/M/c Erlang C computations with numerically stable series expansions.
 // Returns P0 (empty probability), Pw (probability of waiting), and utilization rho.
@@ -14,7 +17,7 @@ func erlangC(lambda, mu float64, c int) (p0, pw, rho float64, err error) {
 	}
 	rho = lambda / (float64(c) * mu)
 	if rho >= 1.0 {
-		return 0, 0, rho, fmt.Errorf("unstable: rho >= 1")
+		return 0, 0, rho, fmt.Errorf("%w: rho >= 1", ErrUnstable)
 	}
 	a := lambda / mu
 	// Compute sum_{n=0}^{c-1} a^n / n!
@@ -34,18 +37,18 @@ func erlangC(lambda, mu float64, c int) (p0, pw, rho float64, err error) {
 // MmcWait returns Wq and W for M/M/c; if Ca,Cs > 0, applies Allen–Cunneen variability inflation.
 func MmcWait(lambda, mu float64, c int, ca, cs float64) (wq, w float64, err error) {
 	p0, pw, _, e := erlangC(lambda, mu, c)
-	if e != nil && !stringsContains(e.Error(), "unstable") { // allow unstable to bubble with values
+	if e != nil && !errors.Is(e, ErrUnstable) { // allow unstable to bubble with values
 		return 0, 0, e
 	}
 	_ = p0 // not used directly beyond Pw
 	denom := float64(c)*mu - lambda
 	if denom <= 0 {
-		return 0, 0, fmt.Errorf("unstable: capacity <= arrival")
+		return 0, 0, fmt.Errorf("%w: capacity <= arrival", ErrUnstable)
 	}
 	baseWq := pw / denom
 	// Variability inflation if provided (Allen–Cunneen)
 	infl := 1.0
-	if ca > 0 && cs > 0 {
+	if ca > 0 || cs > 0 {
 		infl = (ca*ca + cs*cs) / 2.0
 		if infl < 1.0 {
 			infl = 1.0 // never deflate; conservative
@@ -63,21 +66,60 @@ func FindCForSLO(lambda, tau, wTarget, ca, cs float64, cMax int) (int, float64, 
 	}
 	mu := 1.0 / tau
 	// lower bound: ceil(lambda/mu)+1
-	c := int(math.Ceil(lambda/mu)) + 1
-	if c < 1 {
-		c = 1
+	base := int(math.Ceil(lambda/mu)) + 1
+	if base < 1 {
+		base = 1
 	}
 	if cMax <= 0 {
-		cMax = 1_000_000
+		// Provide a sane upper bound to avoid runaway iteration; allow modest headroom.
+		cMax = maxInt(base*4, base+64)
 	}
-	for ; c <= cMax; c++ {
-		wq, w, err := MmcWait(lambda, mu, c, ca, cs)
-		if err == nil && w <= wTarget {
-			return c, w, nil
+
+	// Check base first
+	if _, w, err := MmcWait(lambda, mu, base, ca, cs); err == nil && w <= wTarget {
+		return base, w, nil
+	}
+
+	// Exponential search to find an upper bracket where w <= target.
+	lo, hi := base, base
+	var wHi float64
+	for {
+		hi *= 2
+		if hi > cMax {
+			hi = cMax
 		}
-		_ = wq
+		_, w, err := MmcWait(lambda, mu, hi, ca, cs)
+		if err == nil {
+			wHi = w
+		} else {
+			wHi = math.Inf(1)
+		}
+		if wHi <= wTarget || hi == cMax {
+			break
+		}
+		lo = hi
 	}
-	return 0, 0, fmt.Errorf("no c found up to %d to meet SLO", cMax)
+
+	if wHi > wTarget {
+		return 0, 0, fmt.Errorf("no c found up to %d to meet SLO", cMax)
+	}
+
+	// Binary search between lo (fails) and hi (meets) for minimal c.
+	for lo+1 < hi {
+		mid := (lo + hi) / 2
+		_, w, err := MmcWait(lambda, mu, mid, ca, cs)
+		if err != nil || w > wTarget {
+			lo = mid
+			continue
+		}
+		hi = mid
+	}
+
+	_, wFinal, err := MmcWait(lambda, mu, hi, ca, cs)
+	if err != nil {
+		return 0, 0, err
+	}
+	return hi, wFinal, nil
 }
 
 // RecommendCFromObserved computes a recommended worker count from observed queue stats and worker pool stats.
@@ -103,14 +145,9 @@ func RecommendCFromObserved(qs Stats, wp WorkerPoolStats, wqTarget time.Duration
 }
 
 // helper: avoid importing strings for one check
-func stringsContains(s, substr string) bool {
-	// simple contains
-	return len(substr) == 0 || (len(s) >= len(substr) && (func() bool {
-		for i := 0; i+len(substr) <= len(s); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-		return false
-	})())
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

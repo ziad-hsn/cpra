@@ -65,7 +65,7 @@ var (
 )
 
 // GetCodeConfig returns a pooled CodeConfig.
-// Safe to pool now because [MaxColors]ColorCodeConfig is a value type (copied by ECS).
+// Safe to pool now because [MaxColors]ConfigID is a value type (copied by ECS).
 func GetCodeConfig(_ int) *components.CodeConfig {
 	cfg := codeConfigPool.Get().(*components.CodeConfig)
 	*cfg = components.CodeConfig{} // Zero the array values
@@ -78,16 +78,6 @@ func PutCodeConfig(c *components.CodeConfig) {
 		return
 	}
 	codeConfigPool.Put(c)
-}
-
-// GetColorCodeConfig returns a new ColorCodeConfig.
-func GetColorCodeConfig() *components.ColorCodeConfig {
-	return &components.ColorCodeConfig{}
-}
-
-// PutColorCodeConfig is a no-op (ColorCodeConfig is stored inline in the array).
-func PutColorCodeConfig(c *components.ColorCodeConfig) {
-	// No-op: ColorCodeConfig is a value type stored inline in CodeConfig.Configs array
 }
 
 // GetCodeStatus returns a pooled CodeStatus.

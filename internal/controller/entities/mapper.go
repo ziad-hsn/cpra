@@ -21,11 +21,17 @@ type EntityManager struct {
 	CodeConfig         *ecs.Map1[components.CodeConfig]
 	CodeStatus         *ecs.Map1[components.CodeStatus]
 	JobStorage         *ecs.Map1[components.JobStorage]
+	Shard              *ecs.Map1[components.Shard]
 
 	// Grouped mappers to minimize archetype moves during creation
-	baseMapper *ecs.Map3[components.MonitorState, components.PulseConfig, components.JobStorage]
+	baseMapper *ecs.Map4[components.MonitorState, components.PulseConfig, components.JobStorage, components.Shard]
 	codePair   *ecs.Map2[components.CodeConfig, components.CodeStatus]
 	Disabled   *ecs.Map1[components.Disabled]
+
+	// nextShard tracks round-robin shard assignment across entity creations.
+	nextShard uint32
+	// shardSlots determines the modulus for shard assignment.
+	shardSlots uint32
 }
 
 // NewEntityManager creates a new consolidated entity manager.
@@ -37,10 +43,22 @@ func NewEntityManager(world *ecs.World) *EntityManager {
 		CodeConfig:         ecs.NewMap1[components.CodeConfig](world),
 		CodeStatus:         ecs.NewMap1[components.CodeStatus](world),
 		JobStorage:         ecs.NewMap1[components.JobStorage](world),
-		baseMapper:         ecs.NewMap3[components.MonitorState, components.PulseConfig, components.JobStorage](world),
+		Shard:              ecs.NewMap1[components.Shard](world),
+		baseMapper:         ecs.NewMap4[components.MonitorState, components.PulseConfig, components.JobStorage, components.Shard](world),
 		codePair:           ecs.NewMap2[components.CodeConfig, components.CodeStatus](world),
 		Disabled:           ecs.NewMap1[components.Disabled](world),
+		shardSlots:         components.DefaultShardSlots,
 	}
+}
+
+// SetShardSlots allows the controller to configure the number of shard slots dynamically.
+// Values less than 1 fall back to DefaultShardSlots.
+func (e *EntityManager) SetShardSlots(slots int) {
+	if slots <= 0 {
+		e.shardSlots = components.DefaultShardSlots
+		return
+	}
+	e.shardSlots = uint32(slots)
 }
 
 // CreateEntityFromMonitor creates an entity using the consolidated design.
@@ -62,13 +80,15 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	// Single time snapshot reused to avoid multiple now() calls
 	now := time.Now()
+	reg := components.DefaultConfigRegistry()
 
 	// Create consolidated MonitorState component
 	monitorName := interning.Intern(monitor.Name)
 	monitorState := GetMonitorState()
 	*monitorState = components.MonitorState{}
 	monitorState.Name = monitorName
-	monitorState.LastCheckTime = now
+	monitorState.LastPulseCheckTime = now
+	monitorState.LastEventTime = now
 	monitorState.LastSuccessTime = now
 	monitorState.NextCheckTime = now
 
@@ -86,7 +106,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	pulseConfig.HealthyThreshold = monitor.Pulse.HealthyThreshold
 	pulseConfig.Timeout = monitor.Pulse.Timeout
 	pulseConfig.Interval = monitor.Pulse.Interval
-	// Assign schema config directly; ownership is at ECS component.
+	// Assign schema config directly; ownership is at an ECS component.
 	// Future updates should replace the component (copy-on-write), not mutate in place.
 	pulseConfig.Config = monitor.Pulse.Config
 	// Create consolidated job storage (empty at first; jobs filled after we have the entity ID)
@@ -94,8 +114,13 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	codeCount := len(monitor.Codes)
 	jobStorage := GetJobStorage()
 
-	// Create entity with base components in a single archetype transition
-	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage)
+	// Assign shard in round-robin fashion to spread workload across ticks.
+	shardID := e.nextShard % e.shardSlots
+	e.nextShard = (e.nextShard + 1) % e.shardSlots
+
+	// Create an entity with base components in a single archetype transition
+	shard := &components.Shard{ID: uint8(shardID)}
+	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage, shard)
 	if !world.Alive(entity) {
 		// Return pooled components on error
 		PutMonitorState(monitorState)
@@ -109,7 +134,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	PutPulseConfig(pulseConfig)
 	PutJobStorage(jobStorage)
 
-	// Add pulse job to existing JobStorage
+	// Add a pulse job to existing JobStorage
 	pulseJob, err := jobs.CreatePulseJob(monitor.Pulse, entity)
 	if err != nil {
 		return err
@@ -129,14 +154,14 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		interventionConfig = GetInterventionConfig()
 		*interventionConfig = components.InterventionConfig{}
 		interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-		// Assign schema target directly; updates should replace the component (COW).
+		// Assign a schema target directly; updates should replace the component (COW).
 		interventionConfig.Target = monitor.Intervention.Target
 		interventionConfig.MaxFailures = maxFailures
 		e.InterventionConfig.Add(entity, interventionConfig)
-		// Return to pool after Ark copies the value
+		// Return to the pool after Ark copies the value
 		PutInterventionConfig(interventionConfig)
 
-		// Add intervention job
+		// Add an intervention job
 		interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
 		if err != nil {
 			return err
@@ -166,7 +191,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 				Notify:   interning.Intern(config.Notify),
 				Config:   config.Config, // Copy interface/pointer
 			}
-			codeConfig.Configs[idx] = cc
+			codeConfig.Configs[idx] = reg.GetOrAdd(cc)
 
 			cs := components.ColorCodeStatus{
 				LastAlertTime: now.Unix(),
@@ -181,7 +206,7 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		PutCodeStatus(codeStatus)
 	}
 
-	// Apply Disabled tag after base creation if monitor is disabled
+	// Apply the Disabled tag after base creation if the monitor is disabled
 	if !monitor.Enabled {
 		e.Disabled.Add(entity, &components.Disabled{})
 	}
@@ -198,9 +223,9 @@ type pendingExtra struct {
 	Disabled           bool
 }
 
-// CreateEntitiesFromMonitors creates entities in batch using Ark's Map3.NewBatchFn to minimize
+// CreateEntitiesFromMonitors creates entities in a batch using Ark's Map3.NewBatchFn to minimize
 // archetype transitions and reduce per-entity overhead. It mirrors CreateEntityFromMonitor logic
-// for each monitor without changing behavior. job creation error is recorded and returned
+// for each monitor without changing behavior. Job creation error is recorded and returned
 // after the batch completes; entities created before an error remain valid, identical to
 // one-by-one creation semantics.
 func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []schema.Monitor) error {
@@ -217,6 +242,7 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 
 	// Single time snapshot reused to avoid multiple now() calls across the batch
 	now := time.Now()
+	reg := components.DefaultConfigRegistry()
 
 	// Capture extras to add AFTER batch creation to avoid "locked world" panic
 	pending := make([]pendingExtra, 0, min(len(monitors)/4, 4096))
@@ -224,8 +250,9 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 	// We use a captured index to provide per-monitor data to the batch callback.
 	i := 0
 	var firstErr error
+	shardCursor := e.nextShard
 
-	e.baseMapper.NewBatchFn(len(monitors), func(entity ecs.Entity, monitorState *components.MonitorState, pulseConfig *components.PulseConfig, jobStorage *components.JobStorage) {
+	e.baseMapper.NewBatchFn(len(monitors), func(entity ecs.Entity, monitorState *components.MonitorState, pulseConfig *components.PulseConfig, jobStorage *components.JobStorage, shard *components.Shard) {
 		// If an error was already encountered, skip heavy work but still leave components initialized.
 		if firstErr != nil {
 			return
@@ -234,12 +261,20 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		monitor := monitors[i]
 		i++
 
-		// Monitor name & times
+		// Monitor name and times
 		monitorName := interning.Intern(monitor.Name)
 		monitorState.Name = monitorName
-		monitorState.LastCheckTime = now
+		monitorState.LastPulseCheckTime = now
+		monitorState.LastEventTime = now
 		monitorState.LastSuccessTime = now
 		monitorState.NextCheckTime = now
+
+		// Assign shard in round-robin order
+		shardID := shardCursor % e.shardSlots
+		shardCursor = (shardCursor + 1) % e.shardSlots
+		if shard != nil {
+			shard.ID = uint8(shardID)
+		}
 
 		// Initial state flags or Disabled tag
 		if monitor.Enabled {
@@ -259,11 +294,11 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			pulseConfig.Config = nil
 		}
 
-		// Job storage: pre-size code jobs map based on number of configured colors
+		// Job storage: pre-size code jobs map based on the number of configured colors
 		jobStorage.PulseJob = nil
 		jobStorage.InterventionJob = nil
 
-		// Create pulse job and attach to JobStorage
+		// Create a pulse job and attach to JobStorage
 		if pj, err := jobs.CreatePulseJob(monitor.Pulse, entity); err != nil {
 			firstErr = err
 			return
@@ -284,20 +319,20 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			interventionConfig := GetInterventionConfig()
 			*interventionConfig = components.InterventionConfig{}
 			interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-			// Assign schema target directly; future changes should replace component (COW).
+			// Assign a schema target directly; future changes should replace component (COW).
 			interventionConfig.Target = monitor.Intervention.Target
 			interventionConfig.MaxFailures = maxFailures
 
 			extra.InterventionConfig = interventionConfig
 			hasExtra = true
 
-			// Create intervention job and attach
+			// Create an intervention job and attach
 			if ij, err := jobs.CreateInterventionJob(monitor.Intervention, entity); err != nil {
 				firstErr = err
 				// Note: we still might add intervention config if we don't return here,
 				// but strict error handling says we should abort.
 				// However, if we abort, we leak the pooled component from GetInterventionConfig above?
-				// No, we haven't added it to pending list yet. We should Put it back if we fail.
+				// No, we haven't added it to a pending list yet. We should Put it back if we fail.
 				PutInterventionConfig(interventionConfig)
 				return
 			} else {
@@ -324,7 +359,7 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 					Notify:   interning.Intern(cfg.Notify),
 					Config:   cfg.Config,
 				}
-				codeConfig.Configs[idx] = cc
+				codeConfig.Configs[idx] = reg.GetOrAdd(cc)
 
 				// Per-color status
 				cs := components.ColorCodeStatus{
@@ -338,7 +373,7 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 			hasExtra = true
 		}
 
-		// Apply Disabled tag after base creation if monitor is disabled
+		// Apply the Disabled tag after base creation if the monitor is disabled
 		if !monitor.Enabled {
 			extra.Disabled = true
 			hasExtra = true
@@ -365,12 +400,15 @@ func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []
 		}
 	}
 
+	// Persist shard cursor for later batches
+	e.nextShard = shardCursor
+
 	return firstErr
 }
 
 // EnableMonitor enables a monitor using consolidated state flags
 func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
-	// Remove Disabled tag if present and schedule first check
+	// Remove the Disabled tag if present and schedule the first check
 	e.Disabled.Remove(entity)
 	if state := e.MonitorState.Get(entity); state != nil {
 		state.SetPulseFirstCheck(true)

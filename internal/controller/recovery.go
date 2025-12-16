@@ -32,14 +32,14 @@ func (r *RecoverySystem) SafeSystemUpdate(systemName string, updateFunc func() e
 			r.LastError = time.Now()
 
 			if SystemLogger != nil {
-				SystemLogger.Error("PANIC in system %s: %v", systemName, recovered)
-				SystemLogger.Error("Stack trace: %s", debug.Stack())
+				SystemLogger.Errorf("PANIC in system %s: %v", systemName, recovered)
+				SystemLogger.Errorf("Stack trace: %s", debug.Stack())
 			}
 
 			// Circuit breaker logic
 			if r.ErrorCount >= r.MaxErrors {
 				if SystemLogger != nil {
-					SystemLogger.Error("System %s exceeded max errors (%d), entering degraded mode", systemName, r.MaxErrors)
+					SystemLogger.Errorf("System %s exceeded max errors (%d), entering degraded mode", systemName, r.MaxErrors)
 				}
 			}
 		}
@@ -69,13 +69,13 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 		state := r.Mapper.GetMonitorState(entity)
 		if state == nil {
 			if SystemLogger != nil {
-				SystemLogger.Warn("Entity %v missing MonitorState component", entity)
+				SystemLogger.Warnf("Entity %v missing MonitorState component", entity)
 			}
 			return false
 		}
 		if state.Name == "" {
 			if SystemLogger != nil {
-				SystemLogger.Warn("Entity %v missing Name component", entity)
+				SystemLogger.Warnf("Entity %v missing Name component", entity)
 			}
 			return false
 		}
@@ -89,6 +89,6 @@ func (r *RecoverySystem) CleanupOrphanedComponents(w *ecs.World) {
 	// This would need specific implementation based on component tracking
 	// For now, log the cleanup intent
 	if SystemLogger != nil {
-		SystemLogger.Info("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
+		SystemLogger.Infof("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
 	}
 }

@@ -183,7 +183,11 @@ func (q *WorkivaQueue) Dequeue() (jobs.Job, error) {
 		}
 		// Try to advance to next segment if drained
 		if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
-			q.head.CompareAndSwap(head, next)
+			if q.head.CompareAndSwap(head, next) {
+				if head.rb != nil {
+					head.rb.Dispose()
+				}
+			}
 			continue
 		}
 		return nil, nil // observed empty
@@ -210,7 +214,11 @@ func (q *WorkivaQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 			return nil, err
 		}
 		if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
-			q.head.CompareAndSwap(head, next)
+			if q.head.CompareAndSwap(head, next) {
+				if head.rb != nil {
+					head.rb.Dispose()
+				}
+			}
 			continue
 		}
 		break

@@ -167,6 +167,12 @@ type DynamicWorkerPool struct {
 	lastScaleTime    atomic.Int64
 	tasksSubmitted   atomic.Int64
 	stopping         atomic.Int32
+
+	// M/M/c scaling infrastructure
+	metrics           *ScalingMetrics // Multi-window metrics collector
+	startTime         time.Time       // Pool start time for warmup period
+	lastScaleUpTime   time.Time       // For asymmetric cooldowns
+	lastScaleDownTime time.Time       // For asymmetric cooldowns
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
@@ -178,6 +184,19 @@ type WorkerPoolConfig struct {
 	ResultBatchTimeout time.Duration
 	ResultChannelDepth int
 	TargetQueueLatency time.Duration
+
+	// M/M/c scaling parameters
+	// Asymmetric cooldowns - fast up, slow down
+	ScaleUpCooldown   time.Duration // Minimum time between scale-up events (default 30s)
+	ScaleDownCooldown time.Duration // Minimum time between scale-down events (default 120s)
+
+	// Hysteresis thresholds to prevent oscillation
+	ScaleUpThreshold   float64 // Ratio above current to trigger scale-up (default 1.1 = 10% above)
+	ScaleDownThreshold float64 // Ratio below current to trigger scale-down (default 0.8 = 20% below)
+
+	// Warm-up period during which no scaling occurs
+	WarmupDuration time.Duration // Default 60s - allows system to stabilize after startup
+
 	// Ants-specific options
 	PreAlloc         bool
 	NonBlocking      bool
@@ -195,15 +214,22 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 		ResultBatchTimeout: 10 * time.Millisecond,
 		ResultChannelDepth: 2048,
 		TargetQueueLatency: 100 * time.Millisecond,
-		PreAlloc:           false,
-		NonBlocking:        false,
-		MaxBlockingTasks:   0,
-		ExpiryDuration:     5 * time.Minute,
+		// M/M/c scaling defaults
+		ScaleUpCooldown:    30 * time.Second,  // React quickly to increased load
+		ScaleDownCooldown:  120 * time.Second, // Be conservative about reducing capacity
+		ScaleUpThreshold:   1.10,              // Scale up when 10% more workers needed
+		ScaleDownThreshold: 0.80,              // Scale down when 20% fewer workers needed
+		WarmupDuration:     60 * time.Second,  // No scaling during first minute
+		// Ants-specific options
+		PreAlloc:         false,
+		NonBlocking:      false,
+		MaxBlockingTasks: 0,
+		ExpiryDuration:   5 * time.Minute,
 	}
 }
 
 // NewDynamicWorkerPool creates a new dynamic worker pool.
-func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) (*DynamicWorkerPool, error) {
+func NewDynamicWorkerPool(ctx context.Context, q Queue, config WorkerPoolConfig, logger *log.Logger) (*DynamicWorkerPool, error) {
 	if config.MinWorkers <= 0 {
 		config.MinWorkers = 1
 	}
@@ -228,19 +254,43 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	if config.TargetQueueLatency <= 0 {
 		config.TargetQueueLatency = 100 * time.Millisecond
 	}
+	// M/M/c scaling defaults
+	if config.ScaleUpCooldown <= 0 {
+		config.ScaleUpCooldown = 30 * time.Second
+	}
+	if config.ScaleDownCooldown <= 0 {
+		config.ScaleDownCooldown = 120 * time.Second
+	}
+	if config.ScaleUpThreshold <= 1.0 {
+		config.ScaleUpThreshold = 1.10 // 10% above current
+	}
+	if config.ScaleDownThreshold <= 0 || config.ScaleDownThreshold >= 1.0 {
+		config.ScaleDownThreshold = 0.80 // 20% below current
+	}
+	if config.WarmupDuration <= 0 {
+		config.WarmupDuration = 60 * time.Second
+	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
 	stopCh := make(chan struct{})
 
+	now := time.Now()
 	pool := &DynamicWorkerPool{
-		queue:      q,
-		logger:     logger,
-		config:     config,
-		resultChan: make(chan jobs.Result, config.ResultChannelDepth),
-		router:     NewResultRouter(config, logger, stopCh),
-		ctx:        ctx,
-		cancel:     cancel,
-		stopCh:     stopCh,
+		queue:             q,
+		logger:            logger,
+		config:            config,
+		resultChan:        make(chan jobs.Result, config.ResultChannelDepth),
+		router:            NewResultRouter(config, logger, stopCh),
+		ctx:               ctx,
+		cancel:            cancel,
+		stopCh:            stopCh,
+		metrics:           NewScalingMetrics(DefaultScalingMetricsConfig()),
+		startTime:         now,
+		lastScaleUpTime:   now,
+		lastScaleDownTime: now,
 	}
 	pool.resultBatchPool.New = func() any {
 		s := make([]jobs.Result, 0, pool.config.ResultBatchSize)
@@ -248,6 +298,12 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	}
 
 	workerFunc := func(job interface{}) {
+		// Track service time for Allen-Cunneen variance calculation
+		serviceStart := time.Now()
+		defer func() {
+			pool.metrics.RecordServiceTime(time.Since(serviceStart))
+		}()
+
 		j, ok := job.(jobs.Job)
 		if !ok {
 			if pool.logger != nil {
@@ -255,7 +311,7 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 			}
 			return
 		}
-		result := j.Execute()
+		result := j.Execute(pool.ctx)
 		pool.deliverResult(result)
 	}
 
@@ -295,6 +351,16 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	return pool, nil
 }
 
+// SetContext overrides the worker pool context. Call before Start().
+func (p *DynamicWorkerPool) SetContext(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	// Cancel previous context to avoid leaks; safe before Start.
+	p.cancel()
+	p.ctx, p.cancel = context.WithCancel(ctx)
+}
+
 // Start begins the worker pool's operations.
 func (p *DynamicWorkerPool) Start() {
 	routineCount := 2
@@ -322,18 +388,27 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	if !p.stopping.CompareAndSwap(0, 1) {
 		return
 	}
+
+	startTime := time.Now()
+	pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+
 	if p.logger != nil {
-		p.logger.Println("Draining DynamicWorkerPool...")
+		p.logger.Printf("Draining DynamicWorkerPool (pending=%d, running=%d)...",
+			pending, p.antsPool.Running())
 	}
+
+	// Signal all goroutines to stop
 	p.stopOnce.Do(func() { close(p.stopCh) })
 	p.cancel()
 
+	// Wait for pending results with timeout
 	drainWindow := p.config.TargetQueueLatency * 5
 	if drainWindow < 2*time.Second {
 		drainWindow = 2 * time.Second
 	}
 	p.waitForResultsUntil(time.Now().Add(drainWindow))
 
+	// Wait for goroutines to exit
 	done := make(chan struct{})
 	go func() {
 		p.wg.Wait()
@@ -344,18 +419,31 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	if waitTimeout <= 0 {
 		waitTimeout = 2 * time.Second
 	}
+
 	select {
 	case <-done:
+		if p.logger != nil {
+			finalPending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+			p.logger.Printf("Goroutines exited cleanly (remaining_pending=%d)", finalPending)
+		}
 	case <-time.After(waitTimeout):
 		if p.logger != nil {
-			p.logger.Println("Draining timed out; forcing shutdown and dropping remaining results")
+			finalPending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+			p.logger.Printf("Draining timed out after %v; forcing shutdown (dropping %d pending results)",
+				waitTimeout, finalPending)
 		}
 	}
 
+	// Close result router channels
 	p.router.Close()
+
+	// Release ants pool resources
 	p.antsPool.Release()
+
 	if p.logger != nil {
-		p.logger.Println("DynamicWorkerPool stopped")
+		completed := p.tasksCompleted.Load()
+		p.logger.Printf("DynamicWorkerPool stopped in %v (total_completed=%d)",
+			time.Since(startTime), completed)
 	}
 }
 
@@ -412,11 +500,19 @@ func (p *DynamicWorkerPool) dispatcher() {
 
 		// 3. If batch found, process it
 		if len(batch) > 0 {
-			p.tasksSubmitted.Add(int64(len(batch)))
+			// Record arrival times for Allen-Cunneen variance calculation
+			now := time.Now()
+			var submitted int64
 			for _, job := range batch {
+				p.metrics.RecordArrival(now)
 				if err := p.antsPool.Invoke(job); err != nil {
 					p.logger.Printf("Error invoking job: %v", err)
+					continue
 				}
+				submitted++
+			}
+			if submitted > 0 {
+				p.tasksSubmitted.Add(submitted)
 			}
 			// Immediately try to get next batch without waiting
 			continue
@@ -498,6 +594,7 @@ func (p *DynamicWorkerPool) deliverResult(result jobs.Result) {
 	attempts := 0
 	for {
 		if p.resultsClosed.Load() {
+			p.tasksCompleted.Add(1)
 			return
 		}
 		select {
@@ -513,7 +610,8 @@ func (p *DynamicWorkerPool) deliverResult(result jobs.Result) {
 			if p.logger != nil {
 				p.logger.Printf("Dropping result during shutdown (result channel stalled)")
 			}
-			attempts++
+			p.tasksCompleted.Add(1)
+			return
 		case <-time.After(backoff):
 			if p.stopping.Load() == 0 {
 				continue
@@ -524,6 +622,7 @@ func (p *DynamicWorkerPool) deliverResult(result jobs.Result) {
 			if p.logger != nil {
 				p.logger.Printf("Dropping result during shutdown after %d send attempts", attempts)
 			}
+			p.tasksCompleted.Add(1)
 			return
 		}
 	}
@@ -546,7 +645,8 @@ func (p *DynamicWorkerPool) putResultBatch(batch *[]jobs.Result) {
 	p.resultBatchPool.Put(batch)
 }
 
-// autoScale periodically tunes the ants pool capacity based on queue depth.
+// autoScale periodically tunes the ants pool capacity using M/M/c queueing theory.
+// Implements hysteresis and asymmetric cooldowns to prevent oscillation.
 func (p *DynamicWorkerPool) autoScale() {
 	defer p.wg.Done()
 
@@ -560,17 +660,90 @@ func (p *DynamicWorkerPool) autoScale() {
 		case <-p.stopCh:
 			return
 		case <-ticker.C:
+			// Skip scaling during warmup period
+			if time.Since(p.startTime) < p.config.WarmupDuration {
+				continue
+			}
+
 			stats := p.queue.Stats()
+
+			// Record metrics to rolling windows
+			p.metrics.Record(stats)
+			p.metrics.RecordUtilization(p.antsPool.Running(), p.antsPool.Cap())
+
 			desired := p.desiredCapacity(stats)
 			current := p.antsPool.Cap()
-			if desired != current {
-				p.antsPool.Tune(desired)
-				if p.logger != nil {
-					p.logger.Printf("Tuned worker pool capacity to %d (queue depth=%d)", desired, stats.QueueDepth)
+
+			// No change needed
+			if desired == current {
+				continue
+			}
+
+			now := time.Now()
+
+			if desired > current {
+				// SCALE UP: Check hysteresis threshold
+				ratio := float64(desired) / float64(current)
+				if ratio < p.config.ScaleUpThreshold {
+					// Change too small - skip to prevent oscillation
+					continue
 				}
+
+				// Check cooldown period
+				if now.Sub(p.lastScaleUpTime) < p.config.ScaleUpCooldown {
+					continue
+				}
+
+				// Apply scale up
+				p.antsPool.Tune(desired)
+				p.lastScaleUpTime = now
 				p.lastTarget.Store(int64(desired))
-				p.lastScaleTime.Store(time.Now().UnixNano())
+				p.lastScaleTime.Store(now.UnixNano())
 				p.scalingEvents.Add(1)
+
+				if p.logger != nil {
+					p.logger.Printf("Scaled UP worker pool: %d → %d (ratio=%.2f, queue=%d)",
+						current, desired, ratio, stats.QueueDepth)
+				}
+			} else {
+				// SCALE DOWN: More conservative - check hysteresis threshold
+				ratio := float64(desired) / float64(current)
+				if ratio > p.config.ScaleDownThreshold {
+					// Change too small - skip to prevent oscillation
+					continue
+				}
+
+				// Use long window to ensure sustained low utilization
+				longMetrics := p.metrics.GetLongWindowMetrics()
+				if longMetrics.SampleCount < 10 {
+					// Not enough history - don't scale down yet
+					continue
+				}
+				if longMetrics.AvgUtilization > 0.25 {
+					// Still moderately utilized over long term - don't scale down
+					continue
+				}
+				if longMetrics.AvgQueueDepth > float64(p.config.MinWorkers) {
+					// Queue not consistently empty - don't scale down
+					continue
+				}
+
+				// Check longer cooldown period for scale down
+				if now.Sub(p.lastScaleDownTime) < p.config.ScaleDownCooldown {
+					continue
+				}
+
+				// Apply scale down
+				p.antsPool.Tune(desired)
+				p.lastScaleDownTime = now
+				p.lastTarget.Store(int64(desired))
+				p.lastScaleTime.Store(now.UnixNano())
+				p.scalingEvents.Add(1)
+
+				if p.logger != nil {
+					p.logger.Printf("Scaled DOWN worker pool: %d → %d (ratio=%.2f, longUtil=%.2f)",
+						current, desired, ratio, longMetrics.AvgUtilization)
+				}
 			}
 		}
 	}
@@ -588,10 +761,91 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 		maxWorkers = minWorkers
 	}
 
-	enqueueRate := stats.EnqueueRate
-	if enqueueRate <= 0 {
-		enqueueRate = stats.DequeueRate
+	// 1. Get observed arrival rate from short window (reacts to spikes)
+	lambda := p.metrics.GetShortWindowMetrics().AvgEnqueueRate
+	if lambda <= 0 {
+		lambda = stats.EnqueueRate
 	}
+	if lambda <= 0 {
+		// No load - return minimum
+		return minWorkers
+	}
+
+	// 2. Estimate service time (τ) from observed throughput
+	tau := p.estimateServiceTime(stats, current)
+	if tau <= 0 {
+		// No throughput data yet - use heuristic from Little's Law fallback
+		return p.littleLawFallback(lambda, stats, current)
+	}
+
+	// 3. Get variability coefficients for Allen-Cunneen
+	ca, cs := p.metrics.GetVariabilityCoefficients()
+	// Defaults already set to 1.0 by GetVariabilityCoefficients() if insufficient data
+
+	// 4. Calculate optimal worker count using M/M/c + Allen-Cunneen
+	wTarget := p.config.TargetQueueLatency.Seconds()
+	cTheory, _, err := FindCForSLO(lambda, tau, wTarget, ca, cs, maxWorkers)
+
+	// 5. Fallback if M/M/c calculation fails (e.g., unstable system)
+	if err != nil {
+		if p.logger != nil {
+			p.logger.Printf("M/M/c calculation failed (λ=%.2f, τ=%.3fs): %v; using Little's Law fallback",
+				lambda, tau, err)
+		}
+		return p.littleLawFallback(lambda, stats, current)
+	}
+
+	// 6. Add 15% headroom for safety margin and clamp
+	desired := int(math.Ceil(float64(cTheory) * 1.15))
+	return clamp(desired, minWorkers, maxWorkers)
+}
+
+// estimateServiceTime estimates the average service time per job from observed metrics.
+// It prefers actual measured service times when available, falling back to throughput-based
+// estimation only when insufficient measurement data exists.
+func (p *DynamicWorkerPool) estimateServiceTime(stats Stats, currentWorkers int) float64 {
+	// Prefer actual measured service times (recorded in workerFunc)
+	measuredTau := p.metrics.GetAverageServiceTime()
+	if measuredTau > 0 {
+		// Sanity bounds: tau should be between 1ms and 30s
+		if measuredTau < 0.001 {
+			measuredTau = 0.001
+		}
+		if measuredTau > 30.0 {
+			measuredTau = 30.0
+		}
+		return measuredTau
+	}
+
+	// Fallback: estimate from throughput if no measured data yet
+	if currentWorkers <= 0 || stats.DequeueRate <= 0 {
+		return 0
+	}
+
+	running := p.antsPool.Running()
+	if running <= 0 {
+		running = 1
+	}
+
+	// Service time = active workers / throughput
+	// This is only used during initial warmup before we have measurements
+	tau := float64(running) / stats.DequeueRate
+
+	// Conservative bounds for fallback estimation
+	if tau < 0.001 {
+		tau = 0.001
+	}
+	if tau > 1.0 {
+		// Cap fallback at 1s - if jobs really take longer, measurements will show it
+		tau = 1.0
+	}
+	return tau
+}
+
+// littleLawFallback uses Little's Law (L = λW) as a fallback scaling heuristic.
+func (p *DynamicWorkerPool) littleLawFallback(lambda float64, stats Stats, current int) int {
+	minWorkers := p.config.MinWorkers
+	maxWorkers := p.config.MaxWorkers
 	targetLatency := p.config.TargetQueueLatency
 	if targetLatency <= 0 {
 		targetLatency = 100 * time.Millisecond
@@ -604,40 +858,35 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 	if current > 0 && stats.DequeueRate > 0 {
 		perWorker = stats.DequeueRate / float64(current)
 	}
-	if perWorker > 0 && enqueueRate > 0 {
-		desired = int(math.Ceil(enqueueRate / perWorker))
+	if perWorker > 0 && lambda > 0 {
+		desired = int(math.Ceil(lambda / perWorker))
 	}
 
-	// Enforce latency budget using Little's Law (L = λW)
-	if enqueueRate > 0 {
-		targetDepth := enqueueRate * targetLatency.Seconds()
-		// Always allow at least minWorkers entities worth of backlog
-		if targetDepth < float64(minWorkers) {
-			targetDepth = float64(minWorkers)
-		}
-		depth := float64(stats.QueueDepth)
-		if depth > targetDepth && targetDepth > 0 {
-			scale := depth / targetDepth
-			desired = int(math.Ceil(float64(desired) * scale))
-		} else if depth < targetDepth/2 && desired > minWorkers {
-			// More conservative scaling down for small workloads
-			if current > minWorkers*2 {
-				// Scale down gradually for larger pools
-				desired = int(math.Max(float64(minWorkers), math.Ceil(float64(desired)*0.9)))
-			} else {
-				// For small pools near minimum, maintain capacity longer
-				desired = int(math.Max(float64(minWorkers), math.Ceil(float64(desired)*0.95)))
-			}
-		}
+	// Enforce latency budget: target queue depth = λ * W_target
+	targetDepth := lambda * targetLatency.Seconds()
+	if targetDepth < float64(minWorkers) {
+		targetDepth = float64(minWorkers)
 	}
 
-	if desired < minWorkers {
-		desired = minWorkers
+	depth := float64(stats.QueueDepth)
+	if depth > targetDepth && targetDepth > 0 {
+		// Queue building up - scale up proportionally
+		scale := depth / targetDepth
+		desired = int(math.Ceil(float64(desired) * scale))
 	}
-	if desired > maxWorkers {
-		desired = maxWorkers
+
+	return clamp(desired, minWorkers, maxWorkers)
+}
+
+// clamp constrains a value between min and max bounds.
+func clamp(value, min, max int) int {
+	if value < min {
+		return min
 	}
-	return desired
+	if value > max {
+		return max
+	}
+	return value
 }
 
 // Stats returns runtime statistics for the worker pool.
@@ -654,6 +903,28 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 		ScalingEvents:   p.scalingEvents.Load(),
 		LastScaleTime:   time.Unix(0, p.lastScaleTime.Load()),
 		PendingResults:  len(p.resultChan),
+	}
+}
+
+// Tune adjusts the worker pool capacity to the specified number of workers.
+// This is used for initial pre-sizing based on M/M/c calculations.
+// The capacity is clamped between MinWorkers and MaxWorkers.
+func (p *DynamicWorkerPool) Tune(capacity int) {
+	if capacity < p.config.MinWorkers {
+		capacity = p.config.MinWorkers
+	}
+	if capacity > p.config.MaxWorkers {
+		capacity = p.config.MaxWorkers
+	}
+	current := p.antsPool.Cap()
+	if capacity != current {
+		p.antsPool.Tune(capacity)
+		p.lastTarget.Store(int64(capacity))
+		p.lastScaleTime.Store(time.Now().UnixNano())
+		p.scalingEvents.Add(1)
+		if p.logger != nil {
+			p.logger.Printf("Pre-sized worker pool from %d to %d workers", current, capacity)
+		}
 	}
 }
 

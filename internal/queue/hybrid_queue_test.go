@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -22,13 +23,13 @@ func newTestHybridJob(id int) *testHybridJob {
 	return &testHybridJob{id: id}
 }
 
-func (j *testHybridJob) Execute() jobs.Result       { return jobs.Result{} }
-func (j *testHybridJob) Copy() jobs.Job             { copy := *j; return &copy }
-func (j *testHybridJob) GetEnqueueTime() time.Time  { return j.enqueueTime }
-func (j *testHybridJob) SetEnqueueTime(t time.Time) { j.enqueueTime = t }
-func (j *testHybridJob) GetStartTime() time.Time    { return j.startTime }
-func (j *testHybridJob) SetStartTime(t time.Time)   { j.startTime = t }
-func (j *testHybridJob) IsNil() bool                { return false }
+func (j *testHybridJob) Execute(_ context.Context) jobs.Result { return jobs.Result{} }
+func (j *testHybridJob) Copy() jobs.Job                        { copy := *j; return &copy }
+func (j *testHybridJob) GetEnqueueTime() time.Time             { return j.enqueueTime }
+func (j *testHybridJob) SetEnqueueTime(t time.Time)            { j.enqueueTime = t }
+func (j *testHybridJob) GetStartTime() time.Time               { return j.startTime }
+func (j *testHybridJob) SetStartTime(t time.Time)              { j.startTime = t }
+func (j *testHybridJob) IsNil() bool                           { return false }
 
 func TestHybridQueueFastPath(t *testing.T) {
 	cfg := HybridQueueConfig{

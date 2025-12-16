@@ -3,6 +3,7 @@ package jobs
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 )
@@ -29,7 +30,6 @@ var (
 // GetLogManager returns the singleton LogManager instance.
 func GetLogManager() *LogManager {
 	initOnce.Do(func() {
-		fmt.Println("DEBUG: Initializing LogManager")
 		globalLogManager = &LogManager{
 			logChan: make(chan LogEntry, 4096), // Buffered channel for high throughput
 		}
@@ -74,27 +74,37 @@ func (m *LogManager) start() {
 		}()
 
 		for entry := range m.logChan {
+			// Skip empty paths - write to stdout as fallback
+			if entry.Path == "" {
+				fmt.Print(string(entry.Data))
+				continue
+			}
+
 			f, ok := files[entry.Path]
 			if !ok {
-				fmt.Printf("DEBUG: Opening log file: %s\n", entry.Path)
+				// Ensure parent directory exists, create if needed
+				dir := filepath.Dir(entry.Path)
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: Failed to create log directory %s: %v\n", dir, err)
+					continue
+				}
+
 				var err error
-				// Open file with append mode, create if not exists
+				// Open/create file with append mode (creates file if not exists)
 				f, err = os.OpenFile(entry.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 				if err != nil {
-					// In a real system, we might log this to stderr or a fallback
-					fmt.Fprintf(os.Stderr, "Failed to open log file %s: %v\n", entry.Path, err)
+					fmt.Fprintf(os.Stderr, "ERROR: Failed to open/create log file %s: %v\n", entry.Path, err)
 					continue
 				}
 				files[entry.Path] = f
 			}
 
 			if _, err := f.Write(entry.Data); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to write to log file %s: %v\n", entry.Path, err)
-				// If write fails, maybe close and remove from map to retry open next time
+				fmt.Fprintf(os.Stderr, "ERROR: Failed to write to log file %s: %v\n", entry.Path, err)
+				// Close and remove from map to retry open next time
 				_ = f.Close()
 				delete(files, entry.Path)
 			}
-			// We rely on OS buffering for performance, but could add explicit Flush logic here
 		}
 	}()
 }

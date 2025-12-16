@@ -183,7 +183,8 @@ func BenchmarkZapLogger_Error(b *testing.B) {
 
 // BenchmarkZapCore_NoOp benchmarks the overhead of a no-op logger
 func BenchmarkZapCore_NoOp(b *testing.B) {
-	logger := &ZapLogger{zap: zap.NewNop()}
+	nop := zap.NewNop()
+	logger := &ZapLogger{base: nop, sugar: nop.Sugar()}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -202,7 +203,8 @@ func BenchmarkZapCore_Discard(b *testing.B) {
 		zapcore.AddSync(io.Discard),
 		zapcore.InfoLevel,
 	)
-	logger := &ZapLogger{zap: zap.New(core)}
+	baseLogger := zap.New(core)
+	logger := &ZapLogger{base: baseLogger, sugar: baseLogger.Sugar()}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -214,8 +216,8 @@ func BenchmarkZapCore_Discard(b *testing.B) {
 	}
 }
 
-// BenchmarkConvertFields benchmarks field conversion overhead
-func BenchmarkConvertFields(b *testing.B) {
+// BenchmarkFieldsToArgs benchmarks field conversion overhead
+func BenchmarkFieldsToArgs(b *testing.B) {
 	fields := []Field{
 		{Key: "entity_id", Value: uint64(123)},
 		{Key: "status", Value: "success"},
@@ -227,7 +229,7 @@ func BenchmarkConvertFields(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		_ = convertFields(fields)
+		_ = fieldsToArgs(fields)
 	}
 }
 

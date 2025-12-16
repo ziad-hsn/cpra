@@ -82,7 +82,7 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 		// Note: If entity is not in CodePending state, it means another system already
 		// processed or cancelled this job. This is expected behavior in concurrent systems.
 		if (state.Flags & components.StateCodePending) == 0 {
-			s.logger.Debug("Entity received stale CodeResult (state already changed)", "entity_id", ent.ID(), "flags", state.Flags)
+			s.logger.Debugw("Entity received stale CodeResult (state already changed)", "entity_id", ent.ID(), "flags", state.Flags)
 			continue
 		}
 
@@ -92,22 +92,22 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 		// Extract color from the result payload.
 		colorPayload, ok := result.Payload["color"]
 		if !ok {
-			s.logger.Warn("Entity has CodeResult with no color in payload", "entity_id", ent.ID())
+			s.logger.Warnw("Entity has CodeResult with no color in payload", "entity_id", ent.ID())
 			continue
 		}
 		color, ok := colorPayload.(string)
 		if !ok {
-			s.logger.Warn("Entity has CodeResult with invalid color payload type", "entity_id", ent.ID())
+			s.logger.Warnw("Entity has CodeResult with invalid color payload type", "entity_id", ent.ID())
 			continue
 		}
 
 		if err := result.Error(); err != nil {
-			s.logger.Error("Monitor alert failed to send", "monitor_name", state.Name, "color", color, "error", err)
+			s.logger.Errorw("Monitor alert failed to send", "monitor_name", state.Name, "color", color, "error", err)
 			// On failure, re-flag for retry: clear Pending and set Needed.
 			state.Flags &^= components.StateCodePending
 			state.Flags |= components.StateCodeNeeded
 		} else {
-			s.logger.Info("Monitor alert sent successfully", "monitor_name", state.Name, "color", color)
+			s.logger.Infow("Monitor alert sent successfully", "monitor_name", state.Name, "color", color)
 			// On success, clear Pending and PendingColor.
 			state.Flags &^= components.StateCodePending
 			state.PendingColor = components.ColorNone
@@ -116,7 +116,9 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 	}
 
 	if processedCount > 0 {
-		s.logger.LogSystemPerformance("BatchCodeResultSystem", time.Since(startTime), processedCount)
+		dur := time.Since(startTime)
+		s.logger.Debugf("Performance: BatchCodeResultSystem processed %d entities in %v (%.1f/sec)",
+			processedCount, dur, float64(processedCount)/dur.Seconds())
 	}
 }
 

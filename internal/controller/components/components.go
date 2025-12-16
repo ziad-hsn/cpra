@@ -21,6 +21,15 @@ import (
 	"cpra/internal/loader/schema"
 )
 
+// DefaultShardSlots defines the baseline number of time-partition slots used to spread work across ticks.
+// Each monitor is assigned to a shard [0, shardSlots), and only one shard is processed per tick.
+const DefaultShardSlots = 100
+
+// Shard is a lightweight component that stores the shard assignment for a monitor.
+type Shard struct {
+	ID uint8
+}
+
 // Disabled is a zero-size tag component marking an entity as disabled.
 // Using a tag allows filters to exclude disabled entities efficiently at the archetype level.
 type Disabled struct{}
@@ -28,7 +37,8 @@ type Disabled struct{}
 // MonitorState consolidates all monitor state into a single component.
 // This approach dramatically reduces archetype fragmentation and improves cache locality.
 type MonitorState struct {
-	LastCheckTime        time.Time
+	LastPulseCheckTime   time.Time
+	LastEventTime        time.Time
 	LastSuccessTime      time.Time
 	NextCheckTime        time.Time
 	LastError            error
@@ -263,7 +273,7 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 // This single component replaces separate map-based configurations, enabling value semantics.
 type CodeConfig struct {
 	// Fixed array configuration - Value Type, Zero Allocation
-	Configs [MaxColors]ColorCodeConfig
+	Configs [MaxColors]ConfigID
 }
 
 type ColorCodeConfig struct {
@@ -292,20 +302,15 @@ func (c *CodeConfig) Copy() *CodeConfig {
 	if c == nil {
 		return nil
 	}
-	// Value copy of the array handling deep copy of internals
-	cpy := &CodeConfig{}
-	for i := ColorCode(0); i < MaxColors; i++ {
-		cpy.Configs[i] = *c.Configs[i].Copy()
-	}
+	// Value copy of the ID array
+	cpy := &CodeConfig{Configs: c.Configs}
 	return cpy
 }
 
 // Get returns a pointer to the config for the given color, or nil if invalid.
 func (c *CodeConfig) Get(color ColorCode) *ColorCodeConfig {
-	if color >= MaxColors {
-		return nil
-	}
-	return &c.Configs[color]
+	// Deprecated: CodeConfig now stores ConfigIDs. Use Resolve with a registry instead.
+	return nil
 }
 
 // CodeStatus consolidates all code status using a fixed array.

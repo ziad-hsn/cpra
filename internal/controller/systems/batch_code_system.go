@@ -28,6 +28,7 @@ type BatchCodeSystem struct {
 	world       *ecs.World
 	filter      *ecs.Filter2[components.MonitorState, components.CodeConfig]
 	stateMapper *ecs.Map1[components.MonitorState]
+	registry    *components.ConfigRegistry
 	jobInfoPool *sync.Pool
 	batchSize   int
 }
@@ -39,6 +40,7 @@ func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger L
 		queue:       q,
 		logger:      logger,
 		stateLogger: stateLogger,
+		registry:    components.DefaultConfigRegistry(),
 		batchSize:   batchSize,
 		filter: ecs.NewFilter2[components.MonitorState, components.CodeConfig](world).
 			Without(ecs.C[components.Disabled]()),
@@ -62,7 +64,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 	startTime := time.Now()
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Code queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
+		s.logger.Debugw("Code queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 	}
 
 	query := s.filter.Query()
@@ -122,14 +124,14 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
-		cfg := &codeConfig.Configs[color]
-		if cfg.Notify == "" {
-			s.logger.Warn("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
+		cfg, ok := s.registry.Lookup(codeConfig.Configs[color])
+		if !ok || cfg.Notify == "" {
+			s.logger.Warnw("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
 		if !cfg.Dispatch {
-			s.logger.Info("Code dispatch disabled; clearing pending code", "entity_id", ent.ID(), "color", color)
+			s.logger.Infow("Code dispatch disabled; clearing pending code", "entity_id", ent.ID(), "color", color)
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
@@ -143,12 +145,12 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 
 		job, err := jobs.CreateCodeJob(state.Name, schemaCfg, ent, color.String())
 		if err != nil {
-			s.logger.Error("Failed to create code job", "error", err, "entity_id", ent.ID())
+			s.logger.Errorw("Failed to create code job", "error", err, "entity_id", ent.ID())
 			state.Flags &^= components.StateCodeNeeded
 			continue
 		}
 		if job == nil || isNilJob(job) {
-			s.logger.Warn("Entity needs code alert, but job creation returned nil", "entity_id", ent.ID(), "color", color)
+			s.logger.Warnw("Entity needs code alert, but job creation returned nil", "entity_id", ent.ID(), "color", color)
 			// Clear the flag if no job is found to prevent spinning.
 			state.Flags &^= components.StateCodeNeeded
 			continue
@@ -176,7 +178,9 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 	}
 
 	if processedCount > 0 {
-		s.logger.LogSystemPerformance("BatchCodeSystem", time.Since(startTime), processedCount)
+		dur := time.Since(startTime)
+		s.logger.Debugf("Performance: BatchCodeSystem processed %d entities in %v (%.1f/sec)",
+			processedCount, dur, float64(processedCount)/dur.Seconds())
 	}
 
 }
@@ -185,7 +189,7 @@ func (s *BatchCodeSystem) Update(_ *ecs.World) {
 func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 	stats := s.queue.Stats()
 	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debug("Code queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
+		s.logger.Debugw("Code queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
 		return
 	}
 
@@ -193,7 +197,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 	submitted := make([]jobInfo, 0, len(*jobsInfo))
 	for _, info := range *jobsInfo {
 		if isNilJob(info.Job) {
-			s.logger.Warn("Code job became nil before enqueue; skipping", "entity_id", info.Entity.ID())
+			s.logger.Warnw("Code job became nil before enqueue; skipping", "entity_id", info.Entity.ID())
 			continue
 		}
 		if !s.world.Alive(info.Entity) {
@@ -223,7 +227,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 
 	err := s.queue.EnqueueBatch(items)
 	if err != nil {
-		s.logger.Warn("Failed to enqueue code job batch, queue may be full", "error", err)
+		s.logger.Warnw("Failed to enqueue code job batch, queue may be full", "error", err)
 		// Revert state transitions since dispatch failed.
 		for _, info := range submitted {
 			if !s.world.Alive(info.Entity) {
@@ -249,7 +253,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		}
 
 		s.stateLogger.LogTransition(info.Entity, info.OldState, *state)
-		s.logger.Info("Code dispatched", "monitor_name", state.Name, "color", info.Color)
+		s.logger.Infow("Code dispatched", "monitor_name", state.Name, "color", info.Color)
 	}
 }
 

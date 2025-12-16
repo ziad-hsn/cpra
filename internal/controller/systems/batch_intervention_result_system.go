@@ -19,6 +19,7 @@ type BatchInterventionResultSystem struct {
 	stateMapper       *ecs.Map[components.MonitorState]
 	codeConfigMapper  *ecs.Map1[components.CodeConfig]
 	pulseConfigMapper *ecs.Map1[components.PulseConfig]
+	registry          *components.ConfigRegistry
 	ResultChan        <-chan []jobs.Result
 }
 
@@ -31,6 +32,7 @@ func NewBatchInterventionResultSystem(world *ecs.World, results <-chan []jobs.Re
 		stateMapper:       ecs.NewMap[components.MonitorState](world),
 		codeConfigMapper:  ecs.NewMap1[components.CodeConfig](world),
 		pulseConfigMapper: ecs.NewMap1[components.PulseConfig](world),
+		registry:          components.DefaultConfigRegistry(),
 		ResultChan:        results,
 	}
 }
@@ -85,34 +87,35 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 		flags := state.Flags
 		// Ensure we are processing a pending intervention
 		if (flags & components.StateInterventionPending) == 0 {
-			s.logger.Warn("Entity received InterventionResult but was not in InterventionPending state", "entity_id", ent.ID())
+			s.logger.Warnw("Entity received InterventionResult but was not in InterventionPending state", "entity_id", ent.ID())
 			continue
 		}
 
 		processedCount++
 		oldState := *state
-		state.LastCheckTime = time.Now()
+		eventTime := time.Now()
+		state.LastEventTime = eventTime
 
 		if result.Error() != nil {
 			// --- FAILURE ---
 			state.InterventionFailures++
 			state.LastError = result.Error()
-			s.logger.Error("Monitor intervention failed", "monitor_name", state.Name, "error", state.LastError)
+			s.logger.Errorw("Monitor intervention failed", "monitor_name", state.Name, "error", state.LastError)
 
 			// Only trigger red alert if incident is NOT already open
 			if (flags & components.StateIncidentOpen) == 0 {
 				s.triggerCode(ent, state, components.ColorRed)
 				state.Flags |= components.StateIncidentOpen
-				s.logger.Info("RED ALERT: incident opened", "monitor_name", state.Name)
+				s.logger.Infow("RED ALERT: incident opened", "monitor_name", state.Name)
 			} else {
-				s.logger.Debug("Intervention failed but incident already open, no duplicate red alert", "monitor_name", state.Name)
+				s.logger.Debugw("Intervention failed but incident already open, no duplicate red alert", "monitor_name", state.Name)
 			}
 		} else {
 			// --- SUCCESS ---
-			s.logger.Info("Monitor intervention succeeded", "monitor_name", state.Name)
+			s.logger.Infow("Monitor intervention succeeded", "monitor_name", state.Name)
 			state.ConsecutiveFailures = 0
 			state.LastError = nil
-			state.LastSuccessTime = state.LastCheckTime
+			state.LastSuccessTime = eventTime
 			// Begin verification window (Phase 2)
 			// Use pulse HealthyThreshold as verification count if available, else default
 			pulseCfg := s.pulseConfigMapper.Get(ent)
@@ -131,7 +134,9 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 	}
 
 	if processedCount > 0 {
-		s.logger.LogSystemPerformance("BatchInterventionResultSystem", time.Since(startTime), processedCount)
+		dur := time.Since(startTime)
+		s.logger.Debugf("Performance: BatchInterventionResultSystem processed %d entities in %v (%.1f/sec)",
+			processedCount, dur, float64(processedCount)/dur.Seconds())
 	}
 }
 
@@ -143,34 +148,34 @@ func (s *BatchInterventionResultSystem) triggerCode(entity ecs.Entity, state *co
 	if color >= components.MaxColors {
 		return
 	}
-	cfg := &codeConfig.Configs[color]
-	if cfg.Notify == "" {
-		s.logger.Warn("Monitor has no code config; skipping alert flag", "monitor_name", state.Name, "color", color)
+	cfg, ok := s.registry.Lookup(codeConfig.Configs[color])
+	if !ok || cfg.Notify == "" {
+		s.logger.Warnw("Monitor has no code config; skipping alert flag", "monitor_name", state.Name, "color", color)
 		return
 	}
 	if !cfg.Dispatch {
-		s.logger.Info("Code dispatch disabled; not flagging", "monitor_name", state.Name, "color", color)
+		s.logger.Infow("Code dispatch disabled; not flagging", "monitor_name", state.Name, "color", color)
 		return
 	}
 
 	// FSM guard: If a code job is already in-flight (Pending), don't overwrite.
 	if (state.Flags & components.StateCodePending) != 0 {
-		s.logger.Debug("Monitor '%s' already has code in-flight; deferring %s trigger", state.Name, color)
+		s.logger.Debugf("Monitor '%s' already has code in-flight; deferring %s trigger", state.Name, color)
 		return
 	}
 
 	// If CodeNeeded is already set, use priority to decide.
 	if (state.Flags&components.StateCodeNeeded) != 0 && state.PendingColor != components.ColorNone {
 		if !color.HigherPriorityThan(state.PendingColor) {
-			s.logger.Debug("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingColor, color)
+			s.logger.Debugf("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingColor, color)
 			return
 		}
-		s.logger.Debug("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingColor, color)
+		s.logger.Debugf("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingColor, color)
 	}
 
 	state.PendingColor = color
 	state.Flags |= components.StateCodeNeeded
-	s.logger.Info("Flagging for alert code", "monitor_name", state.Name, "color", color)
+	s.logger.Infow("Flagging for alert code", "monitor_name", state.Name, "color", color)
 }
 
 // Finalize is a no-op for this system.

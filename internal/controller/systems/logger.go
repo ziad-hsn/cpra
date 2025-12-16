@@ -1,13 +1,8 @@
 package systems
 
-import "time"
+import "go.uber.org/zap"
 
-// Logger interface for structured logging that all optimized systems can use
-type Logger interface {
-	Info(format string, args ...interface{})
-	Debug(format string, args ...interface{})
-	Warn(format string, args ...interface{})
-	Error(format string, args ...interface{})
-	LogSystemPerformance(name string, duration time.Duration, count int)
-	LogComponentState(entityID uint32, component string, action string)
-}
+// Logger is the printf-style logger used by systems.
+// It is an alias for zap.SugaredLogger which provides methods like
+// Infof, Debugf, Warnf, Errorf, and Fatalf for formatted logging.
+type Logger = *zap.SugaredLogger

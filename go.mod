@@ -4,15 +4,17 @@ go 1.25
 
 require (
 	github.com/Workiva/go-datastructures v1.1.6
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/google/uuid v1.6.0
-	github.com/mlange-42/ark v0.4.3
-	github.com/mlange-42/ark-tools v0.1.5
+	github.com/mlange-42/ark v0.6.4
+	github.com/mlange-42/ark-tools v0.2.1
 	github.com/moby/moby/api v1.52.0-alpha.1
 	github.com/moby/moby/client v0.1.0-alpha.0
 	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/puzpuzpuz/xsync/v4 v4.2.0
 	go.uber.org/zap v1.26.0
+	golang.org/x/sync v0.18.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -37,6 +39,5 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 )

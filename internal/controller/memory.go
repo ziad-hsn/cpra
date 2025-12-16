@@ -32,7 +32,7 @@ func (m *MemoryManager) MonitorMemory() {
 
 	if usagePercent > m.alertThreshold {
 		if SystemLogger != nil {
-			SystemLogger.Warn("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
+			SystemLogger.Warnf("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
 				usagePercent*100,
 				currentUsage>>20,
 				m.maxMemory>>20)
@@ -58,7 +58,7 @@ func (m *MemoryManager) ForceGC() {
 
 	freed := before - after
 	if SystemLogger != nil {
-		SystemLogger.Info("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
+		SystemLogger.Infof("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
 			freed>>20, before>>20, after>>20)
 	}
 
@@ -75,7 +75,7 @@ func (m *MemoryManager) GetMemoryStats() runtime.MemStats {
 func (m *MemoryManager) SetMemoryLimit() {
 	debug.SetMemoryLimit(int64(m.maxMemory))
 	if SystemLogger != nil {
-		SystemLogger.Info("Memory limit set to: %d GB", m.maxMemory>>30)
+		SystemLogger.Infof("Memory limit set to: %d GB", m.maxMemory>>30)
 	}
 }
 
@@ -83,11 +83,11 @@ func (m *MemoryManager) SetMemoryLimit() {
 func (m *MemoryManager) LogMemoryStats() {
 	stats := m.GetMemoryStats()
 	if SystemLogger != nil {
-		SystemLogger.Info("Memory Stats:")
-		SystemLogger.Info("  Alloc: %d MB", stats.Alloc>>20)
-		SystemLogger.Info("  TotalAlloc: %d MB", stats.TotalAlloc>>20)
-		SystemLogger.Info("  Sys: %d MB", stats.Sys>>20)
-		SystemLogger.Info("  NumGC: %d", stats.NumGC)
-		SystemLogger.Info("  GCCPUFraction: %.4f", stats.GCCPUFraction)
+		SystemLogger.Infof("Memory Stats:")
+		SystemLogger.Infof("  Alloc: %d MB", stats.Alloc>>20)
+		SystemLogger.Infof("  TotalAlloc: %d MB", stats.TotalAlloc>>20)
+		SystemLogger.Infof("  Sys: %d MB", stats.Sys>>20)
+		SystemLogger.Infof("  NumGC: %d", stats.NumGC)
+		SystemLogger.Infof("  GCCPUFraction: %.4f", stats.GCCPUFraction)
 	}
 }

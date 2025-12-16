@@ -1,6 +1,6 @@
-// Package jobs provides job types and execution logic for CPRA monitor operations.
+// Package jobs provide job types and execution logic for CPRA monitor operations.
 //
-// The jobs package defines the Job interface and implements various job types
+// The job package defines the Job interface and implements various job types
 // for pulse checks, interventions, and code alerts. Jobs are executed by worker
 // pools and return Results that are processed by ECS systems.
 //
@@ -29,20 +29,20 @@
 //
 // # Concurrency
 //
-// Jobs must be safe for concurrent execution. PulseICMPJob uses a semaphore
+// Jobs must be safe for concurrent execution, PulseICMPJob uses a semaphore
 // to limit concurrent ICMP operations and pools pingers per host to reduce
 // resource usage.
 //
 // # Example
 //
-//	pulseSchema := schema.Pulse{
+//	pulseSchema: = schema.Pulse{
 //		Config: &schema.PulseHTTPConfig{Url: "https://example.com", Method: "GET"},
 //		Timeout: 5 * time.Second,
 //		Retries: 2,
 //	}
 //	job, err := jobs.CreatePulseJob(pulseSchema, entityID)
 //	if err != nil {
-//		return err
+//		return erring
 //	}
 //	result := job.Execute()
 //	if result.Err != nil {
@@ -60,7 +60,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -72,11 +71,10 @@ import (
 	"cpra/internal/loader/schema"
 )
 
-// Global ICMP pinger pool (Option B): host-keyed reusable pingers with bounded concurrency.
-var (
-	icmpPingerPool sync.Map                    // map[string]*pooledPinger
-	icmpPingerSem  = make(chan struct{}, 2048) // limit concurrent ICMP executions
-)
+// ICMP concurrency guard to limit concurrent ICMP executions.
+// Note: pro-bing Pinger has no Reset method and is not safe for reuse after Run().
+// Each execution creates a fresh Pinger to avoid a concurrent map written in the library.
+var icmpPingerSem = make(chan struct{}, 2048)
 
 // Predefined errors for job creation and execution
 var (
@@ -88,7 +86,7 @@ var (
 	ErrFailedToCreateHTTPRequest  = errors.New("failed to create http request")
 	ErrFailedToCreateDockerClient = errors.New("failed to create docker client")
 	ErrSemaphoreTimeout           = errors.New("ICMP semaphore acquire timeout")
-	// Predeclared errors for hot paths (memory optimization)
+	// ErrHTTPNon2xxStatus Predeclared errors for hot paths (memory optimization)
 	ErrHTTPNon2xxStatus   = errors.New("received non-2xx status code")
 	ErrHTTPCheckFailed    = errors.New("http check failed after retries")
 	ErrTCPCheckFailed     = errors.New("tcp check failed after retries")
@@ -96,34 +94,6 @@ var (
 	ErrDockerActionFailed = errors.New("docker intervention failed after retries")
 	ErrLogMarshalFailed   = errors.New("failed to marshal log entry")
 )
-
-type pooledPinger struct {
-	pr   *ping.Pinger
-	host string
-	mu   sync.Mutex
-}
-
-func getPooledPinger(host string) (*pooledPinger, error) {
-	if v, ok := icmpPingerPool.Load(host); ok {
-		return v.(*pooledPinger), nil
-	}
-	pr, err := ping.NewPinger(host)
-	if err != nil {
-		return nil, err
-	}
-	switch runtime.GOOS {
-	case "linux":
-		pr.SetPrivileged(false)
-	default:
-		pr.SetPrivileged(true)
-	}
-	pp := &pooledPinger{host: host, pr: pr}
-	actual, _ := icmpPingerPool.LoadOrStore(host, pp)
-	if actual != pp {
-		pp = actual.(*pooledPinger)
-	}
-	return pp, nil
-}
 
 // Job defines the interface for any executable task in the system.
 //
@@ -134,7 +104,7 @@ func getPooledPinger(host string) (*pooledPinger, error) {
 // Jobs should implement Copy() to allow safe reuse of job pools. The IsNil()
 // method allows checking for nil jobs without type assertions.
 type Job interface {
-	Execute() Result
+	Execute(ctx context.Context) Result
 	Copy() Job
 	GetEnqueueTime() time.Time
 	SetEnqueueTime(time.Time)
@@ -376,15 +346,13 @@ type PulseHTTPJob struct {
 	ID          uuid.UUID
 }
 
-func (p *PulseHTTPJob) Execute() Result {
+func (p *PulseHTTPJob) Execute(ctx context.Context) Result {
 	attempts := p.Retries + 1
-	payload := map[string]interface{}{
-		"type":   p.JobType,
-		"driver": p.Driver,
-	}
+	// Use pre-allocated payload to reduce allocations
+	payload := GetPulseHTTPPayload()
 
 	for i := 0; i < attempts; i++ {
-		req, err := http.NewRequest(p.Method, p.URL, nil)
+		req, err := http.NewRequestWithContext(ctx, p.Method, p.URL, nil)
 		if err != nil {
 			return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateHTTPRequest, err), Payload: payload}
 		}
@@ -393,7 +361,7 @@ func (p *PulseHTTPJob) Execute() Result {
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
-		// Close response body immediately after checking status
+		// Close the response body immediately after checking status
 		statusOk := resp.StatusCode >= 200 && resp.StatusCode < 300
 		_ = resp.Body.Close()
 		if statusOk {
@@ -425,22 +393,32 @@ type PulseTCPJob struct {
 	ID          uuid.UUID
 }
 
-func (p *PulseTCPJob) Execute() Result {
-	payload := map[string]interface{}{
-		"type":   p.JobType,
-		"driver": p.Driver,
-	}
+func (p *PulseTCPJob) Execute(ctx context.Context) Result {
+	// Use pre-allocated payload to reduce allocations
+	payload := GetPulseTCPPayload()
 	attempts := p.Retries + 1
 	if attempts < 1 {
 		attempts = 1
 	}
 
+	// Acquire TCP connection slot to limit concurrent dials
+	if !acquireTCPSlot(ctx, p.Timeout) {
+		return Result{
+			ID:      p.ID,
+			Ent:     p.Entity,
+			Err:     ErrSemaphoreTimeout,
+			Payload: payload,
+		}
+	}
+	defer releaseTCPSlot()
+
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 
 	for attempt := 0; attempt < attempts; attempt++ {
-		conn, err := net.DialTimeout("tcp", address, p.Timeout)
+		// Use an optimized dialer instead of a net.DialTimeout
+		conn, err := DialTCP(ctx, address, p.Timeout)
 		if err == nil {
-			_ = conn.SetDeadline(time.Now().Add(p.Timeout))
+			// Don't set a deadline, just close immediately for a health check
 			_ = conn.Close()
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
@@ -481,14 +459,18 @@ type PulseICMPJob struct {
 
 //var errICMPPrivilege = errors.New("icmp requires elevated privileges")
 
-func (p *PulseICMPJob) Execute() Result {
+func (p *PulseICMPJob) Execute(ctx context.Context) Result {
+	// Create fresh payload - cannot use pool because payload escapes in Result
+	// and its lifetime extends beyond this function (read by RouteResults later)
 	payload := map[string]interface{}{
-		"type":   p.JobType,
-		"driver": p.Driver,
+		"type":   "pulse",
+		"driver": "icmp",
 	}
 
 	// Concurrency bound to avoid socket pressure - with timeout to prevent deadlock
 	select {
+	case <-ctx.Done():
+		return Result{ID: p.ID, Ent: p.Entity, Err: ctx.Err(), Payload: payload}
 	case icmpPingerSem <- struct{}{}:
 		// Acquired semaphore
 	case <-time.After(10 * time.Second):
@@ -506,18 +488,29 @@ func (p *PulseICMPJob) Execute() Result {
 		count = 1
 	}
 
-	// Add count to the existing payload (declared above for timeout case)
+	// Add count to the existing payload (declared above for a timeout case)
 	payload["count"] = count
 
-	// Get pooled pinger for host
-	pp, err := getPooledPinger(p.Host)
-	if err != nil {
-		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
-	}
-
 	for attempt := 0; attempt < attempts; attempt++ {
-		pp.mu.Lock()
-		pr := pp.pr
+		select {
+		case <-ctx.Done():
+			return Result{ID: p.ID, Ent: p.Entity, Err: ctx.Err(), Payload: payload}
+		default:
+		}
+		// Create a fresh pinger each attempt - pro-bing Pinger is not safe for reuse
+		pr, err := ping.NewPinger(p.Host)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
+
+		// Default privilege: Linux unprivileged, others privileged
+		switch runtime.GOOS {
+		case "linux":
+			pr.SetPrivileged(false)
+		default:
+			pr.SetPrivileged(true)
+		}
+
 		pr.Count = count
 		if p.Timeout > 0 {
 			pr.Timeout = p.Timeout
@@ -527,7 +520,6 @@ func (p *PulseICMPJob) Execute() Result {
 
 		if err := pr.Run(); err == nil {
 			stats := pr.Statistics()
-			pp.mu.Unlock()
 			if stats != nil && stats.PacketsRecv > 0 {
 				return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 			}
@@ -538,20 +530,17 @@ func (p *PulseICMPJob) Execute() Result {
 				pr.SetPrivileged(true)
 				if err2 := pr.Run(); err2 == nil {
 					stats := pr.Statistics()
-					pp.mu.Unlock()
 					if stats != nil && stats.PacketsRecv > 0 {
 						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 					}
 					// No packets received, continue retry
 				} else {
-					pp.mu.Unlock()
 					if p.IgnorePrivilege && isPrivilegeError(err2) {
 						payload["privilege_ignored"] = true
 						return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 					}
 				}
 			} else {
-				pp.mu.Unlock()
 				if p.IgnorePrivilege && isPrivilegeError(err) {
 					payload["privilege_ignored"] = true
 					return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
@@ -605,12 +594,10 @@ type InterventionDockerJob struct {
 	ID          uuid.UUID
 }
 
-func (i *InterventionDockerJob) Execute() Result {
-	payload := map[string]interface{}{
-		"type":   i.JobType,
-		"driver": i.Driver,
-	}
-	// Use pooled client instead of creating a new one
+func (i *InterventionDockerJob) Execute(ctx context.Context) Result {
+	// Use pre-allocated payload to reduce allocations
+	payload := GetInterventionDockerPayload()
+	// Use a pooled client instead of creating a new one
 	cli, err := GetDockerClient(i.DockerHost)
 	if err != nil {
 		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
@@ -619,10 +606,10 @@ func (i *InterventionDockerJob) Execute() Result {
 
 	attempts := i.Retries + 1
 	for attempt := 0; attempt < attempts; attempt++ {
-		ctx, cancel := context.WithTimeout(context.Background(), i.Timeout)
+		attemptCtx, cancel := context.WithTimeout(ctx, i.Timeout)
 		timeout := int(i.Timeout.Seconds())
 		restartOptions := container.StopOptions{Timeout: &timeout}
-		err := cli.ContainerRestart(ctx, i.Container, restartOptions)
+		err := cli.ContainerRestart(attemptCtx, i.Container, restartOptions)
 		cancel() // Clean up context immediately after use
 		if err == nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: nil, Payload: payload}
@@ -655,7 +642,7 @@ type CodeLogJob struct {
 	ID          uuid.UUID
 }
 
-func (c *CodeLogJob) Execute() Result {
+func (c *CodeLogJob) Execute(_ context.Context) Result {
 	payload := map[string]interface{}{
 		"type":     "code",
 		"color":    c.Color,
@@ -734,7 +721,7 @@ type CodePagerDutyJob struct {
 	ID          uuid.UUID
 }
 
-func (c *CodePagerDutyJob) Execute() Result {
+func (c *CodePagerDutyJob) Execute(_ context.Context) Result {
 	// Mock implementation: does nothing and succeeds.
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: map[string]interface{}{"type": "code", "driver": "pagerduty", "color": c.Color}}
 }
@@ -757,7 +744,7 @@ type CodeSlackJob struct {
 	ID          uuid.UUID
 }
 
-func (c *CodeSlackJob) Execute() Result {
+func (c *CodeSlackJob) Execute(_ context.Context) Result {
 	// Mock implementation: does nothing and succeeds.
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: map[string]interface{}{"type": "code", "driver": "slack", "color": c.Color}}
 }
@@ -780,7 +767,7 @@ type CodeEmailJob struct {
 	ID          uuid.UUID
 }
 
-func (c *CodeEmailJob) Execute() Result {
+func (c *CodeEmailJob) Execute(_ context.Context) Result {
 	// Mock implementation: does nothing and succeeds.
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: map[string]interface{}{"type": "code", "driver": "email", "color": c.Color}}
 }
@@ -803,7 +790,7 @@ type CodeWebhookJob struct {
 	ID          uuid.UUID
 }
 
-func (c *CodeWebhookJob) Execute() Result {
+func (c *CodeWebhookJob) Execute(_ context.Context) Result {
 	// Mock implementation: does nothing and succeeds.
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: map[string]interface{}{"type": "code", "driver": "webhook", "color": c.Color}}
 }

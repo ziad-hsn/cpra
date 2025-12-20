@@ -1,12 +1,5 @@
 name: Deploy Documentation
 
-on:
-  push:
-    branches:
-      - v0.5
-      - main
-  workflow_dispatch:
-
 permissions:
   contents: write
 

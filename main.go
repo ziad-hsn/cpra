@@ -15,6 +15,12 @@ import (
 	"syscall"
 	"time"
 
+	// automaxprocs automatically sets GOMAXPROCS to match container CPU quota.
+	// This is critical for containerized deployments (Kubernetes, Docker) where
+	// the default GOMAXPROCS=NumCPU() can cause excessive context switching
+	// when CPU limits are lower than host cores.
+	_ "go.uber.org/automaxprocs"
+
 	"cpra/internal/controller"
 	"cpra/internal/jobs"
 )
@@ -129,6 +135,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start watchdog in separate goroutine with heartbeat monitoring
+	watchdogHeartbeat := make(chan struct{}, 1)
+	wdConfig := controller.DefaultWatchdogConfig()
+	if wdConfig.Enabled {
+		wd := controller.NewWatchdog(oc, wdConfig, watchdogHeartbeat, controller.WatchdogLogger)
+		go func() {
+			if err := wd.Run(ctx); err != nil {
+				controller.SystemLogger.Errorf("Watchdog error: %v", err)
+			}
+		}()
+
+		// Monitor watchdog health from main
+		go monitorWatchdogHealth(ctx, watchdogHeartbeat, wdConfig.CheckInterval*3)
+	}
+
 	// Wait for a shutdown signal
 	<-ctx.Done()
 
@@ -211,4 +232,19 @@ func PrintMemUsage() {
 	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
 	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
 	fmt.Printf("\tNumGC = %v\n", m.NumGC)
+}
+
+// monitorWatchdogHealth monitors the watchdog goroutine health via heartbeat.
+// If no heartbeat is received within the timeout, logs a warning.
+func monitorWatchdogHealth(ctx context.Context, heartbeat <-chan struct{}, timeout time.Duration) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-heartbeat:
+			// Watchdog is alive
+		case <-time.After(timeout):
+			controller.SystemLogger.Warnf("Watchdog heartbeat missed for %v", timeout)
+		}
+	}
 }

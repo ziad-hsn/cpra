@@ -302,8 +302,11 @@ type InterventionTarget interface {
 }
 
 type InterventionTargetDocker struct {
-	Type       string        `yaml:"type" json:"type"`
-	Container  string        `yaml:"container" json:"container"`
+	Type       string        `yaml:"type" json:"type"`                               // restart, stop, start, kill, pause, unpause, scale
+	Container  string        `yaml:"container,omitempty" json:"container,omitempty"` // For container ops
+	Service    string        `yaml:"service,omitempty" json:"service,omitempty"`     // For swarm scale
+	Replicas   uint64        `yaml:"replicas,omitempty" json:"replicas,omitempty"`   // For swarm scale
+	Signal     string        `yaml:"signal,omitempty" json:"signal,omitempty"`       // For kill (default: SIGKILL)
 	DockerHost string        `yaml:"docker_host,omitempty" json:"docker_host,omitempty"`
 	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
 }
@@ -312,6 +315,9 @@ func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
 		Type:       strings.Clone(i.Type),
 		Container:  strings.Clone(i.Container),
+		Service:    strings.Clone(i.Service),
+		Replicas:   i.Replicas,
+		Signal:     strings.Clone(i.Signal),
 		DockerHost: strings.Clone(i.DockerHost),
 	}
 }

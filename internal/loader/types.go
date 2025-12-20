@@ -19,6 +19,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ProgressCallback is called periodically during loading to report progress.
+type ProgressCallback func(progress LoadProgress)
+
+// LoadProgress holds progress information during file loading.
+type LoadProgress struct {
+	BytesRead      int64         // Bytes read from file so far
+	TotalBytes     int64         // Total file size (0 if unknown, e.g., gzip)
+	MonitorsParsed int64         // Number of monitors parsed so far
+	Elapsed        time.Duration // Time elapsed since start
+	Stage          string        // Current stage: "reading", "validating", "creating"
+}
+
 // PipelineConfig holds configuration for the concurrent loading pipeline.
 type PipelineConfig struct {
 	// Workers is the number of concurrent workers for parse+validate stage.
@@ -49,6 +61,14 @@ type PipelineConfig struct {
 
 	// ProgressInterval is the interval for progress reporting.
 	ProgressInterval time.Duration
+
+	// ProgressCallback is called periodically to report loading progress.
+	// If nil, no progress is reported.
+	ProgressCallback ProgressCallback
+
+	// StreamingMode enables line-by-line streaming to reduce memory usage.
+	// Required for files with 1M+ monitors to avoid OOM.
+	StreamingMode bool
 }
 
 // DefaultPipelineConfig returns optimized default configuration.
@@ -62,14 +82,18 @@ func DefaultPipelineConfig() PipelineConfig {
 		BatchChannelSize:     100,
 		StrictUnknownFields:  false,
 		FailFast:             false,
-		ProgressInterval:     time.Second,
+		ProgressInterval:     250 * time.Millisecond,
+		StreamingMode:        true, // Enable streaming by default to handle 1M+ monitors
 	}
 }
 
-// RawMonitor holds a raw YAML node for a monitor before parsing.
+// RawMonitor holds either a raw YAML node or raw bytes for a monitor before parsing.
+// For streaming mode, RawBytes is set and Node is nil.
+// For traditional mode, Node is set and RawBytes is nil.
 type RawMonitor struct {
-	Node *yaml.Node
-	Line int
+	Node     *yaml.Node
+	RawBytes []byte // For streaming mode: raw YAML bytes for this monitor
+	Line     int
 }
 
 // ValidatedMonitor holds a parsed and validated monitor.

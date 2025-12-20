@@ -21,6 +21,7 @@ var (
 	ResultLogger     *zap.SugaredLogger
 	WorkerPoolLogger *zap.SugaredLogger
 	EntityLogger     *zap.SugaredLogger
+	WatchdogLogger   *zap.SugaredLogger
 )
 
 // InitializeLoggers sets up all component loggers with zap SugaredLogger.
@@ -59,11 +60,16 @@ func InitializeLoggers(debugMode bool) {
 	WorkerPoolLogger, err = logger.NewSugaredLoggerWithComponent("WORKER", cfg)
 	if err != nil {
 		panic("failed to create WorkerPoolLogger: " + err.Error())
-}
+	}
 
 	EntityLogger, err = logger.NewSugaredLoggerWithComponent("ENTITY", cfg)
 	if err != nil {
 		panic("failed to create EntityLogger: " + err.Error())
+	}
+
+	WatchdogLogger, err = logger.NewSugaredLoggerWithComponent("WATCHDOG", cfg)
+	if err != nil {
+		panic("failed to create WatchdogLogger: " + err.Error())
 	}
 }
 
@@ -72,7 +78,7 @@ func InitializeLoggers(debugMode bool) {
 func CloseLoggers() {
 	loggers := []*zap.SugaredLogger{
 		SystemLogger, SchedulerLogger, DispatchLogger,
-		ResultLogger, WorkerPoolLogger, EntityLogger,
+		ResultLogger, WorkerPoolLogger, EntityLogger, WatchdogLogger,
 	}
 
 	for _, l := range loggers {

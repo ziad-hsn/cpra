@@ -420,8 +420,23 @@ func NewController(config Config) (*Controller, error) {
 //
 // Returns an error if file parsing or entity creation fails.
 func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
-	pipeline := loader.NewPipeline(c.world, c.mapper, c.config.PipelineConfig)
+	// Get file size for progress reporting
+	var totalBytes int64
+	if stat, err := os.Stat(filename); err == nil {
+		totalBytes = stat.Size()
+	}
+
+	// Set up progress reporting to stderr
+	pipelineConfig := c.config.PipelineConfig
+	progressCallback, progressComplete := loader.DefaultProgressCallback(os.Stderr, totalBytes)
+	pipelineConfig.ProgressCallback = progressCallback
+
+	pipeline := loader.NewPipeline(c.world, c.mapper, pipelineConfig)
 	stats, err := pipeline.Load(ctx, filename)
+
+	// Complete the progress bar
+	progressComplete()
+
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
 	}

@@ -2,6 +2,7 @@ package loader
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -21,23 +22,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// stringBuilderPool reduces allocations by reusing strings.Builder instances.
-// Each builder is pre-allocated with capacity for a typical monitor (~1KB).
-var stringBuilderPool = sync.Pool{
+// pooledBytes holds a reusable byte slice (ownership can be transferred).
+// It is used to avoid per-monitor allocations when streaming large YAML files.
+type pooledBytes struct {
+	b []byte
+}
+
+// pooledBytesPool reduces allocations by reusing byte buffers.
+// Each buffer is pre-allocated with capacity for a typical monitor (~1KB).
+var pooledBytesPool = sync.Pool{
 	New: func() interface{} {
-		b := &strings.Builder{}
-		b.Grow(1024) // Pre-allocate for typical monitor size
-		return b
+		return &pooledBytes{b: make([]byte, 0, 1024)}
 	},
 }
 
-func getStringBuilder() *strings.Builder {
-	return stringBuilderPool.Get().(*strings.Builder)
+func getPooledBytes() *pooledBytes {
+	return pooledBytesPool.Get().(*pooledBytes)
 }
 
-func putStringBuilder(b *strings.Builder) {
-	b.Reset()
-	stringBuilderPool.Put(b)
+func putPooledBytes(p *pooledBytes) {
+	if p == nil {
+		return
+	}
+	p.b = p.b[:0]
+	pooledBytesPool.Put(p)
 }
 
 // Pipeline orchestrates concurrent loading of monitor configurations.
@@ -227,7 +235,7 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 	scanner.Buffer(make([]byte, bufSize), bufSize)
 
 	var (
-		currentMonitor = getStringBuilder() // Use pooled builder
+		currentMonitor *pooledBytes // Owned by this goroutine unless sent to workers
 		inMonitors     bool                 // True after seeing "monitors:" line
 		inMonitor      bool                 // True when accumulating a monitor
 		lineNum        int
@@ -236,7 +244,11 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 		progressEvery  = p.config.ProgressInterval
 		gcCounter      int // Counter for periodic GC hints
 	)
-	defer putStringBuilder(currentMonitor)
+	currentMonitor = getPooledBytes()
+	defer func() {
+		// Only return the buffer still owned by this goroutine.
+		putPooledBytes(currentMonitor)
+	}()
 
 	if progressEvery <= 0 {
 		progressEvery = 250 * time.Millisecond
@@ -244,7 +256,7 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 
 	for scanner.Scan() {
 		lineNum++
-		line := scanner.Text()
+		lineBytes := scanner.Bytes()
 
 		// Check for context cancellation and report progress periodically
 		if lineNum%10000 == 0 {
@@ -267,11 +279,11 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 			}
 		}
 
-		trimmed := strings.TrimSpace(line)
+		trimmed := bytes.TrimSpace(lineBytes)
 
 		// Look for "monitors:" to start parsing
 		if !inMonitors {
-			if trimmed == "monitors:" || strings.HasPrefix(trimmed, "monitors:") {
+			if bytes.Equal(trimmed, []byte("monitors:")) || bytes.HasPrefix(trimmed, []byte("monitors:")) {
 				inMonitors = true
 			}
 			continue
@@ -279,27 +291,30 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 
 		// Detect start of a new monitor (line starting with "- " at proper indent)
 		// A monitor entry starts with "  - " (2 space indent + dash)
-		if len(line) >= 2 && line[0] == ' ' && line[1] == ' ' {
-			restTrimmed := strings.TrimLeft(line[2:], " ")
-			if strings.HasPrefix(restTrimmed, "- ") || restTrimmed == "-" {
+		if len(lineBytes) >= 2 && lineBytes[0] == ' ' && lineBytes[1] == ' ' {
+			rest := bytes.TrimLeft(lineBytes[2:], " ")
+			if bytes.HasPrefix(rest, []byte("- ")) || bytes.Equal(rest, []byte("-")) {
 				// Flush previous monitor
-				if inMonitor && currentMonitor.Len() > 0 {
+				if inMonitor && len(currentMonitor.b) > 0 {
+					sent := currentMonitor
+					currentMonitor = getPooledBytes()
 					raw := RawMonitor{
-						RawBytes: []byte(currentMonitor.String()),
+						RawBytes: sent.b,
 						Line:     monitorLine,
+						pooled:   sent,
 					}
 					select {
 					case p.rawChan <- raw:
 						atomic.AddInt64(&p.rawParsed, 1)
 						gcCounter++
-						// Hint GC every 50k monitors to reclaim memory
-						if gcCounter%50000 == 0 {
+						// Optional GC hint (disabled by default; can hurt load times).
+						if p.config.ForceGCInterval > 0 && gcCounter%p.config.ForceGCInterval == 0 {
 							runtime.GC()
 						}
 					case <-ctx.Done():
+						putPooledBytes(sent)
 						return ctx.Err()
 					}
-					currentMonitor.Reset()
 				}
 				inMonitor = true
 				monitorLine = lineNum
@@ -308,8 +323,8 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 
 		// Accumulate lines for current monitor
 		if inMonitor {
-			currentMonitor.WriteString(line)
-			currentMonitor.WriteByte('\n')
+			currentMonitor.b = append(currentMonitor.b, lineBytes...)
+			currentMonitor.b = append(currentMonitor.b, '\n')
 		}
 	}
 
@@ -318,15 +333,19 @@ func (p *Pipeline) readYAMLStreaming(ctx context.Context, r io.Reader, totalSize
 	}
 
 	// Flush last monitor
-	if inMonitor && currentMonitor.Len() > 0 {
+	if inMonitor && len(currentMonitor.b) > 0 {
+		sent := currentMonitor
+		currentMonitor = nil // ownership transferred (or returned below on failure)
 		raw := RawMonitor{
-			RawBytes: []byte(currentMonitor.String()),
+			RawBytes: sent.b,
 			Line:     monitorLine,
+			pooled:   sent,
 		}
 		select {
 		case p.rawChan <- raw:
 			atomic.AddInt64(&p.rawParsed, 1)
 		case <-ctx.Done():
+			putPooledBytes(sent)
 			return ctx.Err()
 		}
 	}
@@ -385,23 +404,35 @@ func (p *Pipeline) worker(ctx context.Context) {
 				err = raw.Node.Decode(&monitor)
 			} else {
 				atomic.AddInt64(&p.skipped, 1)
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 				continue
 			}
 
 			if err != nil {
 				atomic.AddInt64(&p.skipped, 1)
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 				continue
 			}
 
 			// Skip empty or malformed entries
 			if monitor.Name == "" && monitor.Pulse.Type == "" {
 				atomic.AddInt64(&p.skipped, 1)
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 				continue
 			}
 
 			// Validate
 			if err := p.validator.Validate(&monitor); err != nil {
 				atomic.AddInt64(&p.skipped, 1)
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 				if p.config.FailFast {
 					return
 				}
@@ -413,7 +444,13 @@ func (p *Pipeline) worker(ctx context.Context) {
 			// Send to batch collector
 			select {
 			case p.validatedChan <- ValidatedMonitor{Monitor: monitor, Line: raw.Line}:
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 			case <-ctx.Done():
+				if raw.pooled != nil {
+					putPooledBytes(raw.pooled)
+				}
 				return
 			}
 		}
@@ -430,52 +467,71 @@ func (p *Pipeline) worker(ctx context.Context) {
 //
 // We convert it to a proper YAML document for parsing.
 func (p *Pipeline) parseMonitorFromBytes(rawBytes []byte, monitor *schema.Monitor) error {
-	// The raw bytes contain a list item starting with "  - "
-	// We need to convert it to a standalone YAML document
-	// by stripping the leading "  - " and reducing indentation
+	normalized := getPooledBytes()
+	defer putPooledBytes(normalized)
 
-	lines := strings.Split(string(rawBytes), "\n")
-	if len(lines) == 0 {
+	normalized.b = normalizeMonitorYAML(normalized.b[:0], rawBytes)
+	if len(normalized.b) == 0 {
 		return fmt.Errorf("empty monitor bytes")
 	}
+	return yaml.Unmarshal(normalized.b, monitor)
+}
 
-	var normalized strings.Builder
-	normalized.Grow(len(rawBytes))
+// normalizeMonitorYAML converts a YAML list item (e.g. "  - name: foo") into a standalone mapping YAML
+// (e.g. "name: foo") by removing the list marker and normalizing indentation.
+//
+// It is intentionally allocation-light to keep streaming load times low for very large configs.
+func normalizeMonitorYAML(dst, src []byte) []byte {
+	// Iterate lines without allocating (no strings.Split / string conversions).
+	first := true
+	for len(src) > 0 {
+		// Take next line.
+		line := src
+		if i := bytes.IndexByte(src, '\n'); i >= 0 {
+			line = src[:i]
+			src = src[i+1:]
+		} else {
+			src = nil
+		}
 
-	for i, line := range lines {
+		// Drop trailing CR for CRLF files.
+		if n := len(line); n > 0 && line[n-1] == '\r' {
+			line = line[:n-1]
+		}
 		if len(line) == 0 {
 			continue
 		}
 
-		if i == 0 {
-			// First line: strip the leading spaces and "- " or just "-"
-			trimmed := strings.TrimLeft(line, " ")
-			if strings.HasPrefix(trimmed, "- ") {
-				// "- name: foo" -> "name: foo"
-				normalized.WriteString(trimmed[2:])
-				normalized.WriteByte('\n')
-			} else if trimmed == "-" {
-				// Just "-", next lines have the content
+		if first {
+			first = false
+			trimmed := bytes.TrimLeft(line, " ")
+			// "- name: foo" -> "name: foo"
+			if bytes.HasPrefix(trimmed, []byte("- ")) {
+				dst = append(dst, trimmed[2:]...)
+				dst = append(dst, '\n')
 				continue
-			} else {
-				normalized.WriteString(trimmed)
-				normalized.WriteByte('\n')
 			}
-		} else {
-			// Subsequent lines: remove 4 spaces of indentation (list item indent)
-			if len(line) >= 4 && line[:4] == "    " {
-				normalized.WriteString(line[4:])
-			} else if len(line) >= 2 && line[:2] == "  " {
-				// Sometimes only 2 space indent after the "- "
-				normalized.WriteString(line[2:])
-			} else {
-				normalized.WriteString(strings.TrimLeft(line, " "))
+			// Just "-" means content begins on following lines.
+			if bytes.Equal(trimmed, []byte("-")) {
+				continue
 			}
-			normalized.WriteByte('\n')
+			dst = append(dst, trimmed...)
+			dst = append(dst, '\n')
+			continue
 		}
-	}
 
-	return yaml.Unmarshal([]byte(normalized.String()), monitor)
+		// Subsequent lines: remove list indentation and normalize.
+		switch {
+		case len(line) >= 4 && bytes.Equal(line[:4], []byte("    ")):
+			dst = append(dst, line[4:]...)
+		case len(line) >= 2 && bytes.Equal(line[:2], []byte("  ")):
+			dst = append(dst, line[2:]...)
+		default:
+			dst = append(dst, bytes.TrimLeft(line, " ")...)
+		}
+		dst = append(dst, '\n')
+	}
+	return dst
 }
 
 // batchCollector collects validated monitors and sends batches for entity creation.
@@ -508,13 +564,11 @@ func (p *Pipeline) batchCollector(ctx context.Context) error {
 			batch = append(batch, vm.Monitor)
 
 			if len(batch) >= p.config.BatchSize {
-				// Send batch copy to avoid race
-				batchCopy := make([]schema.Monitor, len(batch))
-				copy(batchCopy, batch)
-				p.batchChan <- MonitorBatch{Monitors: batchCopy, BatchID: batchID}
+				// Transfer ownership of the slice to avoid per-batch copying.
+				p.batchChan <- MonitorBatch{Monitors: batch, BatchID: batchID}
 				atomic.AddInt64(&p.batched, int64(len(batch)))
 				batchID++
-				batch = batch[:0]
+				batch = make([]schema.Monitor, 0, p.config.BatchSize)
 			}
 		}
 	}

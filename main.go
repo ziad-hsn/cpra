@@ -2,12 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"expvar"
 	"flag"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -28,6 +25,11 @@ import (
 // ShutdownTimeout is the maximum time allowed for graceful shutdown
 const ShutdownTimeout = 30 * time.Second
 
+// shutdowner is the minimal interface we need for graceful shutdown of optional servers.
+type shutdowner interface {
+	Shutdown(ctx context.Context) error
+}
+
 func main() {
 
 	// Command line flags
@@ -35,7 +37,7 @@ func main() {
 		configFile  = flag.String("config", "", "Configuration file path")
 		yamlFile    = flag.String("yaml", "internal/loader/replicated_test.yaml", "YAML file with monitors")
 		debug       = flag.Bool("debug", false, "Enable debug logging")
-		pprofEnable = flag.Bool("pprof", true, "Enable pprof web server")
+		pprofEnable = flag.Bool("pprof", defaultPprofEnabled, "Enable pprof web server (disabled with build tag 'noprofile')")
 		pprofAddr   = flag.String("pprof.addr", "localhost:6060", "pprof listen address (host:port)")
 	)
 	flag.Parse()
@@ -45,28 +47,8 @@ func main() {
 
 	controller.SystemLogger.Infof("Starting CPRA Optimized Controller for 1M Monitors")
 
-	// Setup pprof server with graceful shutdown capability
-	var pprofServer *http.Server
-	if *pprofEnable {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-		pprofServer = &http.Server{
-			Addr:    *pprofAddr,
-			Handler: mux,
-		}
-
-		go func() {
-			controller.SystemLogger.Infof("Profiling server listening at https://%s/debug/pprof/", *pprofAddr)
-			if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				controller.SystemLogger.Warnf("Profiling server error: %v", err)
-			}
-		}()
-	}
+	// Optional pprof server with graceful shutdown (compiled in via build tag).
+	pprofServer := setupPprof(*pprofEnable, *pprofAddr)
 	controller.SystemLogger.Infof("Input file: %s", *yamlFile)
 
 	// Create an optimized configuration
@@ -237,14 +219,25 @@ func PrintMemUsage() {
 // monitorWatchdogHealth monitors the watchdog goroutine health via heartbeat.
 // If no heartbeat is received within the timeout, logs a warning.
 func monitorWatchdogHealth(ctx context.Context, heartbeat <-chan struct{}, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-heartbeat:
-			// Watchdog is alive
-		case <-time.After(timeout):
+			// Watchdog is alive: reset timeout without allocating a new timer.
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(timeout)
+		case <-timer.C:
 			controller.SystemLogger.Warnf("Watchdog heartbeat missed for %v", timeout)
+			timer.Reset(timeout)
 		}
 	}
 }

@@ -11,13 +11,6 @@ import (
 func newPulseHTTPJob() any                 { return &PulseHTTPJob{} }
 func newPulseTCPJob() any                  { return &PulseTCPJob{} }
 func newPulseICMPJob() any                 { return &PulseICMPJob{} }
-func newInterventionDockerJob() any        { return &InterventionDockerJob{} }
-func newInterventionDockerStopJob() any    { return &InterventionDockerStopJob{} }
-func newInterventionDockerStartJob() any   { return &InterventionDockerStartJob{} }
-func newInterventionDockerKillJob() any    { return &InterventionDockerKillJob{} }
-func newInterventionDockerPauseJob() any   { return &InterventionDockerPauseJob{} }
-func newInterventionDockerUnpauseJob() any { return &InterventionDockerUnpauseJob{} }
-func newInterventionDockerScaleJob() any   { return &InterventionDockerScaleJob{} }
 func newCodeLogJob() any                   { return &CodeLogJob{} }
 func newCodePagerDutyJob() any             { return &CodePagerDutyJob{} }
 func newCodeSlackJob() any                 { return &CodeSlackJob{} }
@@ -29,14 +22,6 @@ var (
 	pulseTCPJobPool  = sync.Pool{New: newPulseTCPJob}
 	pulseICMPJobPool = sync.Pool{New: newPulseICMPJob}
 
-	interventionDockerJobPool        = sync.Pool{New: newInterventionDockerJob}
-	interventionDockerStopJobPool    = sync.Pool{New: newInterventionDockerStopJob}
-	interventionDockerStartJobPool   = sync.Pool{New: newInterventionDockerStartJob}
-	interventionDockerKillJobPool    = sync.Pool{New: newInterventionDockerKillJob}
-	interventionDockerPauseJobPool   = sync.Pool{New: newInterventionDockerPauseJob}
-	interventionDockerUnpauseJobPool = sync.Pool{New: newInterventionDockerUnpauseJob}
-	interventionDockerScaleJobPool   = sync.Pool{New: newInterventionDockerScaleJob}
-
 	codeLogJobPool       = sync.Pool{New: newCodeLogJob}
 	codePagerDutyJobPool = sync.Pool{New: newCodePagerDutyJob}
 	codeSlackJobPool     = sync.Pool{New: newCodeSlackJob}
@@ -47,28 +32,6 @@ var (
 func getPulseHTTPJob() *PulseHTTPJob { return pulseHTTPJobPool.Get().(*PulseHTTPJob) }
 func getPulseTCPJob() *PulseTCPJob   { return pulseTCPJobPool.Get().(*PulseTCPJob) }
 func getPulseICMPJob() *PulseICMPJob { return pulseICMPJobPool.Get().(*PulseICMPJob) }
-
-func getInterventionDockerJob() *InterventionDockerJob {
-	return interventionDockerJobPool.Get().(*InterventionDockerJob)
-}
-func getInterventionDockerStopJob() *InterventionDockerStopJob {
-	return interventionDockerStopJobPool.Get().(*InterventionDockerStopJob)
-}
-func getInterventionDockerStartJob() *InterventionDockerStartJob {
-	return interventionDockerStartJobPool.Get().(*InterventionDockerStartJob)
-}
-func getInterventionDockerKillJob() *InterventionDockerKillJob {
-	return interventionDockerKillJobPool.Get().(*InterventionDockerKillJob)
-}
-func getInterventionDockerPauseJob() *InterventionDockerPauseJob {
-	return interventionDockerPauseJobPool.Get().(*InterventionDockerPauseJob)
-}
-func getInterventionDockerUnpauseJob() *InterventionDockerUnpauseJob {
-	return interventionDockerUnpauseJobPool.Get().(*InterventionDockerUnpauseJob)
-}
-func getInterventionDockerScaleJob() *InterventionDockerScaleJob {
-	return interventionDockerScaleJobPool.Get().(*InterventionDockerScaleJob)
-}
 
 func getCodeLogJob() *CodeLogJob             { return codeLogJobPool.Get().(*CodeLogJob) }
 func getCodePagerDutyJob() *CodePagerDutyJob { return codePagerDutyJobPool.Get().(*CodePagerDutyJob) }
@@ -93,29 +56,7 @@ func ReleasePulseJob(job Job) {
 
 // ReleaseInterventionJob returns an intervention job back to its pool.
 func ReleaseInterventionJob(job Job) {
-	switch j := job.(type) {
-	case *InterventionDockerJob:
-		resetInterventionDockerJob(j)
-		interventionDockerJobPool.Put(j)
-	case *InterventionDockerStopJob:
-		resetInterventionDockerStopJob(j)
-		interventionDockerStopJobPool.Put(j)
-	case *InterventionDockerStartJob:
-		resetInterventionDockerStartJob(j)
-		interventionDockerStartJobPool.Put(j)
-	case *InterventionDockerKillJob:
-		resetInterventionDockerKillJob(j)
-		interventionDockerKillJobPool.Put(j)
-	case *InterventionDockerPauseJob:
-		resetInterventionDockerPauseJob(j)
-		interventionDockerPauseJobPool.Put(j)
-	case *InterventionDockerUnpauseJob:
-		resetInterventionDockerUnpauseJob(j)
-		interventionDockerUnpauseJobPool.Put(j)
-	case *InterventionDockerScaleJob:
-		resetInterventionDockerScaleJob(j)
-		interventionDockerScaleJobPool.Put(j)
-	}
+	releaseInterventionJob(job)
 }
 
 // ReleaseCodeJob returns a code job back to its pool.
@@ -182,97 +123,6 @@ func resetPulseICMPJob(job *PulseICMPJob) {
 	job.Entity = ecs.Entity{}
 	job.IgnorePrivilege = false
 	// JobType and Driver are set on creation, don't clear
-}
-
-func resetInterventionDockerJob(job *InterventionDockerJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Timeout = 0
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-	// JobType and Driver are set on creation, don't clear
-}
-
-func resetInterventionDockerStopJob(job *InterventionDockerStopJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Timeout = 0
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-}
-
-func resetInterventionDockerStartJob(job *InterventionDockerStartJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Timeout = 0
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-}
-
-func resetInterventionDockerKillJob(job *InterventionDockerKillJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Signal = ""
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-}
-
-func resetInterventionDockerPauseJob(job *InterventionDockerPauseJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-}
-
-func resetInterventionDockerUnpauseJob(job *InterventionDockerUnpauseJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Container = ""
-	job.DockerHost = ""
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
-}
-
-func resetInterventionDockerScaleJob(job *InterventionDockerScaleJob) {
-	if job == nil {
-		return
-	}
-	job.EnqueueTime = time.Time{}
-	job.StartTime = time.Time{}
-	job.Service = ""
-	job.DockerHost = ""
-	job.Replicas = 0
-	job.Timeout = 0
-	job.Retries = 0
-	job.Entity = ecs.Entity{}
 }
 
 func resetCodeLogJob(job *CodeLogJob) {

@@ -32,11 +32,6 @@ func TestIsNilInterface(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:    "nil *InterventionDockerJob",
-			job:     (*InterventionDockerJob)(nil),
-			wantNil: true,
-		},
-		{
 			name:    "nil *CodeLogJob",
 			job:     (*CodeLogJob)(nil),
 			wantNil: true,

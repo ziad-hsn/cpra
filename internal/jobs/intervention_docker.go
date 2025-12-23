@@ -1,3 +1,5 @@
+//go:build !nodocker
+
 package jobs
 
 import (

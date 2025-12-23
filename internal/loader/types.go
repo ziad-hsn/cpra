@@ -69,6 +69,13 @@ type PipelineConfig struct {
 	// StreamingMode enables line-by-line streaming to reduce memory usage.
 	// Required for files with 1M+ monitors to avoid OOM.
 	StreamingMode bool
+
+	// ForceGCInterval controls an optional "hint" GC cadence during streaming reads.
+	// If <= 0, no forced GC is performed.
+	//
+	// This is mainly useful when parsing creates lots of short-lived garbage; it is
+	// disabled by default because forced GC can significantly hurt load times.
+	ForceGCInterval int
 }
 
 // DefaultPipelineConfig returns optimized default configuration.
@@ -84,6 +91,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		FailFast:             false,
 		ProgressInterval:     250 * time.Millisecond,
 		StreamingMode:        true, // Enable streaming by default to handle 1M+ monitors
+		ForceGCInterval:      0,
 	}
 }
 
@@ -94,6 +102,10 @@ type RawMonitor struct {
 	Node     *yaml.Node
 	RawBytes []byte // For streaming mode: raw YAML bytes for this monitor
 	Line     int
+
+	// pooled holds an optional buffer owner that must be returned to the pool
+	// once the worker is done parsing this monitor.
+	pooled *pooledBytes
 }
 
 // ValidatedMonitor holds a parsed and validated monitor.

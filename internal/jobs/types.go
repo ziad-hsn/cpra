@@ -52,6 +52,7 @@ var (
 	// Factory errors
 	ErrUnknownPulseConfig        = errors.New("unknown pulse config type")
 	ErrDockerMissingTarget       = errors.New("docker intervention missing target configuration")
+	ErrDockerSupportDisabled     = errors.New("docker support disabled (build with default tags or remove 'nodocker')")
 	ErrUnknownInterventionAction = errors.New("unknown intervention action")
 	ErrUnknownCodeNotification   = errors.New("unknown code notification type")
 

@@ -186,6 +186,17 @@ Monitor loading completed in 1.2s
    go build .
    ```
 
+   **Smaller binary builds (optional):**
+   ```bash
+   # Slim build: disables docker support + pprof endpoints
+   make buildslim
+   ```
+
+   Or with `go build` directly:
+   ```bash
+   go build -trimpath -ldflags="-s -w" -tags "ark_tiny,nodocker,noprofile" .
+   ```
+
 4. **Verify installation:**
    ```bash
    ./cpra --help

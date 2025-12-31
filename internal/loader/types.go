@@ -16,6 +16,7 @@ import (
 
 	"cpra/internal/loader/schema"
 
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -69,6 +70,17 @@ type PipelineConfig struct {
 	// StreamingMode enables line-by-line streaming to reduce memory usage.
 	// Required for files with 1M+ monitors to avoid OOM.
 	StreamingMode bool
+
+	// LogValidationErrors enables logging of individual validation errors.
+	// When true and Logger is set, validation errors are logged with monitor context.
+	LogValidationErrors bool
+
+	// Logger is used for logging validation errors when LogValidationErrors is true.
+	Logger *zap.SugaredLogger
+
+	// MaxDeduplicationEntries is the maximum number of entries in the deduplication map.
+	// When exceeded, oldest entries are evicted (FIFO). Default: 0 (unbounded).
+	MaxDeduplicationEntries int
 }
 
 // DefaultPipelineConfig returns optimized default configuration.

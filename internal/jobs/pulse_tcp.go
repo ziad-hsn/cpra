@@ -31,52 +31,32 @@ type PulseTCPJob struct {
 
 // Execute performs the TCP connection check with retries.
 func (p *PulseTCPJob) Execute(ctx context.Context) Result {
-	// Use pre-allocated payload to reduce allocations
 	payload := GetPulseTCPPayload()
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
 
 	// Acquire TCP connection slot to limit concurrent dials
 	if !acquireTCPSlot(ctx, p.Timeout) {
-		return Result{
-			Ent:     p.Entity,
-			Err:     ErrSemaphoreTimeout,
-			Payload: payload,
-		}
+		return Result{Ent: p.Entity, Err: ErrSemaphoreTimeout, Payload: payload}
 	}
 	defer releaseTCPSlot()
 
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 
-	for attempt := 0; attempt < attempts; attempt++ {
-		// Check context before each attempt
-		select {
-		case <-ctx.Done():
-			return Result{Ent: p.Entity, Err: ctx.Err(), Payload: payload}
-		default:
+	err := RetryWithBackoff(ctx, p.Retries+1, 50*time.Millisecond, func() error {
+		conn, dialErr := DialTCP(ctx, address, p.Timeout)
+		if dialErr != nil {
+			return dialErr
 		}
+		_ = conn.Close()
+		return nil
+	})
 
-		// Use an optimized dialer instead of net.DialTimeout
-		conn, err := DialTCP(ctx, address, p.Timeout)
-		if err == nil {
-			// Don't set a deadline, just close immediately for a health check
-			_ = conn.Close()
-			return Result{Ent: p.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: p.Entity, Err: err, Payload: payload}
 		}
-
-		// Brief pause before retry (don't block on last attempt)
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: p.Entity, Err: ErrTCPCheckFailed, Payload: payload}
 	}
-
-	return Result{
-		Ent:     p.Entity,
-		Err:     ErrTCPCheckFailed,
-		Payload: payload,
-	}
+	return Result{Ent: p.Entity, Err: nil, Payload: payload}
 }
 
 // Copy returns a shallow copy of the job for safe pool reuse.

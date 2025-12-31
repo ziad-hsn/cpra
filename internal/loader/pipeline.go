@@ -82,6 +82,7 @@ func NewPipeline(world *ecs.World, entityManager *entities.EntityManager, config
 
 // Load runs the complete pipeline to load monitors from a file.
 // Uses errgroup for clean error propagation - first error cancels all stages.
+// All goroutines are tracked to prevent leaks (per "Concurrency in Go" p. 90).
 func (p *Pipeline) Load(ctx context.Context, filename string) (*PipelineStats, error) {
 	p.startTime = time.Now()
 
@@ -95,20 +96,24 @@ func (p *Pipeline) Load(ctx context.Context, filename string) (*PipelineStats, e
 	})
 
 	// Stage 2: Fan-out to workers (CPU bound parse + validate)
+	// Workers are tracked via errgroup to prevent leaks on context cancellation.
 	var workerWg sync.WaitGroup
 	for i := 0; i < p.config.Workers; i++ {
 		workerWg.Add(1)
-		go func() {
+		g.Go(func() error {
 			defer workerWg.Done()
 			p.worker(ctx)
-		}()
+			return nil
+		})
 	}
 
-	// Close validated channel when all workers are done
-	go func() {
+	// Close validated channel when all workers are done.
+	// This is tracked via errgroup to ensure clean shutdown.
+	g.Go(func() error {
 		workerWg.Wait()
 		close(p.validatedChan)
-	}()
+		return nil
+	})
 
 	// Stage 3: Fan-in and batch collection
 	g.Go(func() error {
@@ -399,14 +404,19 @@ func (p *Pipeline) worker(ctx context.Context) {
 				continue
 			}
 
-			// Validate
-			if err := p.validator.Validate(&monitor); err != nil {
-				atomic.AddInt64(&p.skipped, 1)
-				if p.config.FailFast {
-					return
-				}
-				continue
+		// Validate
+		if err := p.validator.Validate(&monitor); err != nil {
+			atomic.AddInt64(&p.skipped, 1)
+			// Log validation errors when enabled for debugging bad configs
+			if p.config.LogValidationErrors && p.config.Logger != nil {
+				p.config.Logger.Warnf("Validation failed for monitor %q (line %d): %v",
+					monitor.Name, raw.Line, err)
 			}
+			if p.config.FailFast {
+				return
+			}
+			continue
+		}
 
 			atomic.AddInt64(&p.validated, 1)
 
@@ -479,10 +489,18 @@ func (p *Pipeline) parseMonitorFromBytes(rawBytes []byte, monitor *schema.Monito
 }
 
 // batchCollector collects validated monitors and sends batches for entity creation.
+// Uses bounded deduplication to prevent OOM with large monitor counts.
 func (p *Pipeline) batchCollector(ctx context.Context) error {
 	batch := make([]schema.Monitor, 0, p.config.BatchSize)
 	seen := make(map[string]struct{})
 	batchID := 0
+
+	// Bounded deduplication: track insertion order for FIFO eviction
+	maxDedup := p.config.MaxDeduplicationEntries
+	var seenOrder []string
+	if maxDedup > 0 {
+		seenOrder = make([]string, 0, maxDedup)
+	}
 
 	for {
 		select {
@@ -503,7 +521,24 @@ func (p *Pipeline) batchCollector(ctx context.Context) error {
 				atomic.AddInt64(&p.duplicates, 1)
 				continue
 			}
+
+			// Bounded deduplication: evict oldest entries when at capacity
+			if maxDedup > 0 && len(seen) >= maxDedup {
+				// Remove oldest 10% to amortize eviction cost
+				evictCount := maxDedup / 10
+				if evictCount < 1 {
+					evictCount = 1
+				}
+				for i := 0; i < evictCount && len(seenOrder) > 0; i++ {
+					delete(seen, seenOrder[0])
+					seenOrder = seenOrder[1:]
+				}
+			}
+
 			seen[vm.Monitor.Name] = struct{}{}
+			if maxDedup > 0 {
+				seenOrder = append(seenOrder, vm.Monitor.Name)
+			}
 
 			batch = append(batch, vm.Monitor)
 

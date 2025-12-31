@@ -39,6 +39,7 @@ CPRA leverages proven Go libraries for its ECS implementation:
 | **[github.com/mlange-42/ark](https://github.com/mlange-42/ark)** | High-performance ECS framework | v0.6.4 |
 | **[github.com/mlange-42/ark-tools](https://github.com/mlange-42/ark-tools)** | ECS application utilities | v0.2.1 |
 | **[github.com/panjf2000/ants/v2](https://github.com/panjf2000/ants)** | Goroutine pool for workers | v2.11.3 |
+| **[github.com/valyala/fasthttp](https://github.com/valyala/fasthttp)** | High-performance HTTP client | v1.68.0 |
 | **[github.com/Workiva/go-datastructures](https://github.com/Workiva/go-datastructures)** | Lock-free ring buffer queue | v1.1.6 |
 | **[github.com/puzpuzpuz/xsync/v4](https://github.com/puzpuzpuz/xsync)** | Concurrent data structures | v4.2.0 |
 

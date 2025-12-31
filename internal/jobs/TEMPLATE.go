@@ -8,16 +8,24 @@ package jobs
 //
 //  1. Call GetDialLimiter().Acquire(ctx) before network I/O
 //  2. defer GetDialLimiter().Release() immediately after acquire
-//  3. Check ctx.Done() before each retry attempt
+//  3. Use RetryWithBackoff for context-aware retries (see helpers.go)
 //  4. Use predeclared errors in types.go (avoid allocations)
 //  5. Add sync.Pool in pool.go (see existing patterns)
 //  6. Add factory case in factory.go
 //  7. Return Result{Ent, Err, Payload} in all paths
 //
 // FILE NAMING:
-//   pulse_<driver>.go        (e.g., pulse_dns.go)
-//   intervention_<action>.go (e.g., intervention_k8s.go)
-//   code_<channel>.go        (e.g., code_teams.go)
+//
+//	pulse_<driver>.go        (e.g., pulse_dns.go)
+//	intervention_<action>.go (e.g., intervention_k8s.go)
+//	code_<channel>.go        (e.g., code_teams.go)
+//
+// CONCURRENCY HELPERS (see helpers.go):
+//
+//	RetryWithBackoff - Context-aware retry with exponential backoff
+//	Or               - Combine multiple done channels
+//	OrDone           - Wrap channel reads with cancellation
+//	Tee              - Duplicate channel streams for fan-out
 
 /*
 EXAMPLE - Network Job:
@@ -40,23 +48,19 @@ func (j *PulseDNSJob) Execute(ctx context.Context) Result {
 	}
 	defer GetDialLimiter().Release()
 
-	attempts := j.Retries + 1
-	for i := 0; i < attempts; i++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	// Use RetryWithBackoff for context-aware retries with exponential backoff.
+	// This replaces manual for-loops with time.Sleep (see "Concurrency in Go" p. 5-6).
+	err := RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
+		return j.doDNSLookup(ctx)
+	})
 
-		if err := j.doDNSLookup(ctx); err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if i < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDNSCheckFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDNSCheckFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 // Required interface methods

@@ -54,12 +54,36 @@ func (b *BaseJob) CheckContext(ctx context.Context) error {
 }
 
 // SleepBetweenRetries pauses briefly between retry attempts.
-// Skips the sleep on the last attempt to avoid unnecessary delay.
-// Default sleep is 50ms - tune based on your use case.
+//
+// Deprecated: Use RetryWithBackoff from helpers.go instead. This method uses
+// time.Sleep which is not context-aware and can't be interrupted on shutdown.
+// See "Concurrency in Go" p. 5-6 for why this is problematic.
 func (b *BaseJob) SleepBetweenRetries(attempt, maxAttempts int) {
 	if attempt < maxAttempts-1 {
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// Retry executes fn with exponential backoff using the job's configured retry count.
+// This is a convenience wrapper around RetryWithBackoff that uses job settings.
+//
+// Example:
+//
+//	func (j *MyJob) Execute(ctx context.Context) Result {
+//	    var conn net.Conn
+//	    err := j.Retry(ctx, func() error {
+//	        var dialErr error
+//	        conn, dialErr = net.DialTimeout("tcp", j.Host, j.Timeout)
+//	        return dialErr
+//	    })
+//	    if err != nil {
+//	        return Result{Ent: j.Entity, Err: err}
+//	    }
+//	    defer conn.Close()
+//	    // ... use conn ...
+//	}
+func (b *BaseJob) Retry(ctx context.Context, fn func() error) error {
+	return RetryWithBackoff(ctx, b.GetAttempts(), 50*time.Millisecond, fn)
 }
 
 // GetAttempts returns the total number of attempts (retries + 1).

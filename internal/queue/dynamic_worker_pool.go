@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"math"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,6 +280,32 @@ func (r *ResultRouter) Close() {
 	close(r.CodeResultChan)
 }
 
+// TapPulseResults creates a tee of the pulse results channel for non-intrusive fan-out.
+// Returns two channels: primary (for main consumer) and tap (for metrics/tracing).
+// Both channels close when done closes or the source channel is exhausted.
+//
+// Example:
+//
+//	done := jobs.Or(ctx.Done(), stopCh)
+//	pulseMain, pulseMetrics := router.TapPulseResults(done)
+//	go consumeResults(pulseMain)      // existing consumer
+//	go sampleMetrics(pulseMetrics)    // lightweight observer
+func (r *ResultRouter) TapPulseResults(done <-chan struct{}) (<-chan []jobs.Result, <-chan []jobs.Result) {
+	return jobs.Tee(done, r.PulseResultChan)
+}
+
+// TapInterventionResults creates a tee of the intervention results channel.
+// See TapPulseResults for usage.
+func (r *ResultRouter) TapInterventionResults(done <-chan struct{}) (<-chan []jobs.Result, <-chan []jobs.Result) {
+	return jobs.Tee(done, r.InterventionResultChan)
+}
+
+// TapCodeResults creates a tee of the code results channel.
+// See TapPulseResults for usage.
+func (r *ResultRouter) TapCodeResults(done <-chan struct{}) (<-chan []jobs.Result, <-chan []jobs.Result) {
+	return jobs.Tee(done, r.CodeResultChan)
+}
+
 // DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
 // It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
@@ -341,10 +368,21 @@ type WorkerPoolConfig struct {
 }
 
 // DefaultWorkerPoolConfig returns a default configuration for the worker pool.
+// MaxWorkers is capped based on GOMAXPROCS to prevent over-scheduling in containers.
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
+	// Cap MaxWorkers based on available CPU (respects automaxprocs in containers)
+	cpuCount := runtime.GOMAXPROCS(0)
+	maxWorkers := cpuCount * 256 // 256 workers per core max for I/O-bound workloads
+	if maxWorkers > 8192 {
+		maxWorkers = 8192 // Hard cap for memory safety
+	}
+	if maxWorkers < 64 {
+		maxWorkers = 64 // Minimum for burst handling
+	}
+
 	return WorkerPoolConfig{
 		MinWorkers:         5,
-		MaxWorkers:         8192,
+		MaxWorkers:         maxWorkers,
 		AdjustmentInterval: 5 * time.Second,
 		ResultBatchSize:    512,
 		ResultBatchTimeout: 10 * time.Millisecond,
@@ -658,7 +696,10 @@ func (p *DynamicWorkerPool) dispatcher() {
 		// 2. Try to dequeue
 		batch, err := p.queue.DequeueBatch(batchTarget)
 		if err != nil {
-			if !errors.Is(err, ErrQueueClosed) {
+			if errors.Is(err, ErrQueueClosed) {
+				return
+			}
+			if p.logger != nil {
 				p.logger.Printf("Error dequeuing job batch: %v", err)
 			}
 			// On error, wait a bit to avoid tight loop
@@ -809,35 +850,50 @@ func (p *DynamicWorkerPool) deliverResult(result jobs.Result) {
 	if backoff <= 0 {
 		backoff = 10 * time.Millisecond
 	}
+
 	attempts := 0
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+
 	for {
 		if p.resultsClosed.Load() {
 			p.tasksCompleted.Add(1)
 			return
 		}
+
 		select {
 		case p.resultChan <- result:
 			return
 		default:
 		}
 
+		// Wait with reusable timer to avoid per-loop allocations
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(backoff)
+
 		select {
 		case p.resultChan <- result:
 			return
 		case <-p.stopCh:
-			// Rate-limited logging: only log every 1000th drop to avoid spam
+			// Rate-limited logging: only log the first drop to avoid spam
 			dropped := p.droppedResults.Add(1)
 			if p.logger != nil && dropped == 1 {
 				p.logger.Printf("Dropping results during shutdown (result channel stalled)")
 			}
 			p.tasksCompleted.Add(1)
 			return
-		case <-time.After(backoff):
+		case <-timer.C:
 			if p.stopping.Load() == 0 {
 				continue
 			}
 			attempts++
 		}
+
 		if attempts >= 5 {
 			// Rate-limited logging for timeout drops
 			dropped := p.droppedResults.Add(1)

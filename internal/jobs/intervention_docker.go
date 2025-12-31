@@ -1,3 +1,5 @@
+//go:build !nodocker
+
 package jobs
 
 import (
@@ -31,10 +33,8 @@ type InterventionDockerJob struct {
 
 // Execute restarts the Docker container with retries.
 func (i *InterventionDockerJob) Execute(ctx context.Context) Result {
-	// Use pre-allocated payload to reduce allocations
 	payload := GetInterventionDockerPayload()
 
-	// Use a pooled client instead of creating a new one
 	cli, err := GetDockerClient(i.DockerHost)
 	if err != nil {
 		return Result{
@@ -43,34 +43,23 @@ func (i *InterventionDockerJob) Execute(ctx context.Context) Result {
 			Payload: payload,
 		}
 	}
-	// Do not close pooled client
 
-	attempts := i.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		// Check context before each attempt
-		select {
-		case <-ctx.Done():
-			return Result{Ent: i.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	timeout := int(i.Timeout.Seconds())
+	restartOptions := container.StopOptions{Timeout: &timeout}
 
-		// Create scoped context with timeout for this attempt
+	err = RetryWithBackoff(ctx, i.Retries+1, 50*time.Millisecond, func() error {
 		attemptCtx, cancel := context.WithTimeout(ctx, i.Timeout)
-		timeout := int(i.Timeout.Seconds())
-		restartOptions := container.StopOptions{Timeout: &timeout}
-		err := cli.ContainerRestart(attemptCtx, i.Container, restartOptions)
-		cancel() // Clean up context immediately after use
+		defer cancel()
+		return cli.ContainerRestart(attemptCtx, i.Container, restartOptions)
+	})
 
-		if err == nil {
-			return Result{Ent: i.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: i.Entity, Err: err, Payload: payload}
 		}
-
-		// Brief pause before retry (don't block on last attempt)
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: i.Entity, Err: ErrDockerActionFailed, Payload: payload}
 	}
-	return Result{Ent: i.Entity, Err: ErrDockerActionFailed, Payload: payload}
+	return Result{Ent: i.Entity, Err: nil, Payload: payload}
 }
 
 // Copy returns a shallow copy of the job for safe pool reuse.
@@ -115,28 +104,22 @@ func (j *InterventionDockerStopJob) Execute(ctx context.Context) Result {
 		return Result{Ent: j.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	timeout := int(j.Timeout.Seconds())
+	stopOptions := container.StopOptions{Timeout: &timeout}
 
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
 		attemptCtx, cancel := context.WithTimeout(ctx, j.Timeout)
-		timeout := int(j.Timeout.Seconds())
-		err := cli.ContainerStop(attemptCtx, j.Container, container.StopOptions{Timeout: &timeout})
-		cancel()
+		defer cancel()
+		return cli.ContainerStop(attemptCtx, j.Container, stopOptions)
+	})
 
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDockerStopFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerStopFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerStopJob) Copy() Job                  { job := *j; return &job }
@@ -170,27 +153,19 @@ func (j *InterventionDockerStartJob) Execute(ctx context.Context) Result {
 		return Result{Ent: j.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
-
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
 		attemptCtx, cancel := context.WithTimeout(ctx, j.Timeout)
-		err := cli.ContainerStart(attemptCtx, j.Container, container.StartOptions{})
-		cancel()
+		defer cancel()
+		return cli.ContainerStart(attemptCtx, j.Container, container.StartOptions{})
+	})
 
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDockerStartFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerStartFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerStartJob) Copy() Job                  { job := *j; return &job }
@@ -229,24 +204,17 @@ func (j *InterventionDockerKillJob) Execute(ctx context.Context) Result {
 		signal = "SIGKILL"
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
+		return cli.ContainerKill(ctx, j.Container, signal)
+	})
 
-		err := cli.ContainerKill(ctx, j.Container, signal)
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDockerKillFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerKillFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerKillJob) Copy() Job                  { job := *j; return &job }
@@ -279,24 +247,17 @@ func (j *InterventionDockerPauseJob) Execute(ctx context.Context) Result {
 		return Result{Ent: j.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
+		return cli.ContainerPause(ctx, j.Container)
+	})
 
-		err := cli.ContainerPause(ctx, j.Container)
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDockerPauseFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerPauseFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerPauseJob) Copy() Job                  { job := *j; return &job }
@@ -329,24 +290,17 @@ func (j *InterventionDockerUnpauseJob) Execute(ctx context.Context) Result {
 		return Result{Ent: j.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
+		return cli.ContainerUnpause(ctx, j.Container)
+	})
 
-		err := cli.ContainerUnpause(ctx, j.Container)
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
-		}
+		return Result{Ent: j.Entity, Err: ErrDockerUnpauseFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerUnpauseFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerUnpauseJob) Copy() Job                  { job := *j; return &job }
@@ -381,30 +335,21 @@ func (j *InterventionDockerScaleJob) Execute(ctx context.Context) Result {
 		return Result{Ent: j.Entity, Err: fmt.Errorf("%w: %w", ErrFailedToCreateDockerClient, err), Payload: payload}
 	}
 
-	attempts := j.Retries + 1
-	for attempt := 0; attempt < attempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return Result{Ent: j.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
-
+	var notReplicated bool
+	err = RetryWithBackoff(ctx, j.Retries+1, 50*time.Millisecond, func() error {
 		attemptCtx, cancel := context.WithTimeout(ctx, j.Timeout)
+		defer cancel()
 
 		// Inspect service to get current spec and version
-		svc, _, err := cli.ServiceInspectWithRaw(attemptCtx, j.Service, swarm.ServiceInspectOptions{})
-		if err != nil {
-			cancel()
-			if attempt < attempts-1 {
-				time.Sleep(50 * time.Millisecond)
-			}
-			continue
+		svc, _, inspectErr := cli.ServiceInspectWithRaw(attemptCtx, j.Service, swarm.ServiceInspectOptions{})
+		if inspectErr != nil {
+			return inspectErr
 		}
 
-		// Verify service is in replicated mode
+		// Verify service is in replicated mode (non-retryable)
 		if svc.Spec.Mode.Replicated == nil {
-			cancel()
-			return Result{Ent: j.Entity, Err: ErrNotReplicatedService, Payload: payload}
+			notReplicated = true
+			return ErrNotReplicatedService
 		}
 
 		// Update replicas
@@ -412,18 +357,20 @@ func (j *InterventionDockerScaleJob) Execute(ctx context.Context) Result {
 		svc.Spec.Mode.Replicated.Replicas = &replicas
 
 		// Apply update
-		_, err = cli.ServiceUpdate(attemptCtx, svc.ID, svc.Version, svc.Spec, swarm.ServiceUpdateOptions{})
-		cancel()
+		_, updateErr := cli.ServiceUpdate(attemptCtx, svc.ID, svc.Version, svc.Spec, swarm.ServiceUpdateOptions{})
+		return updateErr
+	})
 
-		if err == nil {
-			return Result{Ent: j.Entity, Err: nil, Payload: payload}
+	if err != nil {
+		if notReplicated {
+			return Result{Ent: j.Entity, Err: ErrNotReplicatedService, Payload: payload}
 		}
-
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: j.Entity, Err: err, Payload: payload}
 		}
+		return Result{Ent: j.Entity, Err: ErrDockerScaleFailed, Payload: payload}
 	}
-	return Result{Ent: j.Entity, Err: ErrDockerScaleFailed, Payload: payload}
+	return Result{Ent: j.Entity, Err: nil, Payload: payload}
 }
 
 func (j *InterventionDockerScaleJob) Copy() Job                  { job := *j; return &job }

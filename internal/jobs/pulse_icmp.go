@@ -37,7 +37,6 @@ type PulseICMPJob struct {
 // Execute performs the ICMP ping check with retries.
 func (p *PulseICMPJob) Execute(ctx context.Context) Result {
 	// Create fresh payload - cannot use pool because payload escapes in Result
-	// and its lifetime extends beyond this function (read by RouteResults later)
 	payload := map[string]interface{}{
 		"type":   "pulse",
 		"driver": "icmp",
@@ -49,89 +48,79 @@ func (p *PulseICMPJob) Execute(ctx context.Context) Result {
 	}
 	defer GetDialLimiter().Release()
 
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
-
 	count := p.Count
 	if count <= 0 {
 		count = 1
 	}
-
-	// Add count to the payload
 	payload["count"] = count
 
-	for attempt := 0; attempt < attempts; attempt++ {
-		// Check context before each attempt
-		select {
-		case <-ctx.Done():
-			return Result{Ent: p.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
+	timeout := p.Timeout
+	if timeout <= 0 {
+		timeout = time.Duration(count)*time.Second + 500*time.Millisecond
+	}
 
+	var privilegeIgnored bool
+
+	err := RetryWithBackoff(ctx, p.Retries+1, 50*time.Millisecond, func() error {
 		// Create a fresh pinger each attempt - pro-bing Pinger is not safe for reuse
-		pr, err := ping.NewPinger(p.Host)
-		if err != nil {
-			return Result{Ent: p.Entity, Err: err, Payload: payload}
+		pr, pingerErr := ping.NewPinger(p.Host)
+		if pingerErr != nil {
+			return pingerErr
 		}
 
 		// Default privilege: Linux unprivileged, others privileged
-		switch runtime.GOOS {
-		case "linux":
+		if runtime.GOOS == "linux" {
 			pr.SetPrivileged(false)
-		default:
+		} else {
 			pr.SetPrivileged(true)
 		}
 
 		pr.Count = count
-		if p.Timeout > 0 {
-			pr.Timeout = p.Timeout
-		} else {
-			pr.Timeout = time.Duration(count)*time.Second + 500*time.Millisecond
+		pr.Timeout = timeout
+
+		runErr := pr.Run()
+		if runErr == nil {
+			if stats := pr.Statistics(); stats != nil && stats.PacketsRecv > 0 {
+				return nil // Success
+			}
+			return ErrICMPCheckFailed // No packets received
 		}
 
-		if err := pr.Run(); err == nil {
-			stats := pr.Statistics()
-			if stats != nil && stats.PacketsRecv > 0 {
-				return Result{Ent: p.Entity, Err: nil, Payload: payload}
-			}
-			// No packets received, continue retry
-		} else {
-			// Privilege fallback for Linux
-			if !pr.Privileged() && isPrivilegeError(err) {
-				pr.SetPrivileged(true)
-				if err2 := pr.Run(); err2 == nil {
-					stats := pr.Statistics()
-					if stats != nil && stats.PacketsRecv > 0 {
-						return Result{Ent: p.Entity, Err: nil, Payload: payload}
-					}
-					// No packets received, continue retry
-				} else {
-					if p.IgnorePrivilege && isPrivilegeError(err2) {
-						payload["privilege_ignored"] = true
-						return Result{Ent: p.Entity, Err: nil, Payload: payload}
-					}
+		// Privilege fallback for Linux
+		if !pr.Privileged() && isPrivilegeError(runErr) {
+			pr.SetPrivileged(true)
+			privilegedErr := pr.Run()
+			if privilegedErr == nil {
+				if stats := pr.Statistics(); stats != nil && stats.PacketsRecv > 0 {
+					return nil // Success with elevated privilege
 				}
-			} else {
-				if p.IgnorePrivilege && isPrivilegeError(err) {
-					payload["privilege_ignored"] = true
-					return Result{Ent: p.Entity, Err: nil, Payload: payload}
-				}
+				return ErrICMPCheckFailed // No packets received
 			}
+			if p.IgnorePrivilege && isPrivilegeError(privilegedErr) {
+				privilegeIgnored = true
+				return nil // Ignore privilege error
+			}
+			return privilegedErr
 		}
 
-		// Brief pause before retry (don't block on last attempt)
-		if attempt < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
+		if p.IgnorePrivilege && isPrivilegeError(runErr) {
+			privilegeIgnored = true
+			return nil // Ignore privilege error
 		}
+		return runErr
+	})
+
+	if privilegeIgnored {
+		payload["privilege_ignored"] = true
 	}
 
-	return Result{
-		Ent:     p.Entity,
-		Err:     ErrICMPCheckFailed,
-		Payload: payload,
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: p.Entity, Err: err, Payload: payload}
+		}
+		return Result{Ent: p.Entity, Err: ErrICMPCheckFailed, Payload: payload}
 	}
+	return Result{Ent: p.Entity, Err: nil, Payload: payload}
 }
 
 // isPrivilegeError checks common privilege-related error strings from pinger.

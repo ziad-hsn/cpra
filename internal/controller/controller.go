@@ -105,6 +105,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -112,7 +113,6 @@ import (
 	"cpra/internal/controller/entities"
 
 	"github.com/mlange-42/ark-tools/app"
-	"github.com/mlange-42/ark-tools/resource"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/mlange-42/ark/ecs/stats"
 	"go.uber.org/zap"
@@ -192,12 +192,17 @@ func createWorkerPool(name string, q queue.Queue, config queue.WorkerPoolConfig)
 	return pool, nil
 }
 
-// createQueue creates a named hybrid queue with the specified drop policy.
-func createQueue(name string, dropPolicy queue.DropPolicy) (queue.Queue, error) {
+// createQueue creates a named hybrid queue with the specified drop policy and capacity.
+func createQueue(name string, dropPolicy queue.DropPolicy, capacity uint64) (queue.Queue, error) {
 	cfg := queue.DefaultQueueConfig()
 	cfg.Name = name
 	cfg.HybridConfig.Name = name
 	cfg.HybridConfig.DropPolicy = dropPolicy
+	// Wire the capacity from controller config to queue config
+	if capacity > 0 {
+		cfg.Capacity = int(capacity)
+		cfg.HybridConfig.RingCapacity = int(capacity)
+	}
 	q, err := queue.NewQueue(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s HybridQueue: %w", name, err)
@@ -221,6 +226,7 @@ type Controller struct {
 	mapper            *entities.EntityManager
 	logger            *zap.SugaredLogger
 	stateLogger       *systems.StateLogger
+	terminationSys    *systems.TerminationSystem // System to handle graceful shutdown
 	pulsePool         *queue.DynamicWorkerPool
 	interventionPool  *queue.DynamicWorkerPool
 	codePool          *queue.DynamicWorkerPool
@@ -231,6 +237,7 @@ type Controller struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	config            Config
+	mu                sync.Mutex // Protects state transitions during Start/Stop
 	running           atomic.Bool
 }
 
@@ -327,16 +334,16 @@ func NewController(config Config) (*Controller, error) {
 	mapper := entities.NewEntityManager(world)
 	mapper.SetShardSlots(shardSlots)
 
-	// Default to Hybrid queues per queue class
-	pulseQueue, err := createQueue("pulse", queue.DropPolicyDropNewest)
+	// Default to Hybrid queues per queue class, using configured capacity
+	pulseQueue, err := createQueue("pulse", queue.DropPolicyDropNewest, config.QueueCapacity)
 	if err != nil {
 		return nil, err
 	}
-	interventionQueue, err := createQueue("intervention", queue.DropPolicyDropOldest)
+	interventionQueue, err := createQueue("intervention", queue.DropPolicyDropOldest, config.QueueCapacity)
 	if err != nil {
 		return nil, err
 	}
-	codeQueue, err := createQueue("code", queue.DropPolicyDropNewest)
+	codeQueue, err := createQueue("code", queue.DropPolicyDropNewest, config.QueueCapacity)
 	if err != nil {
 		return nil, err
 	}
@@ -384,6 +391,11 @@ func NewController(config Config) (*Controller, error) {
 	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, config.BatchSize, ctrlLogger, stateLogger)
 	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, ctrlLogger, stateLogger)
 
+	// TerminationSystem monitors the context and signals termination from within the ECS loop
+	// This avoids race conditions with external writers to the Termination resource
+	terminationSystem := systems.NewTerminationSystem(nil) // Context set in Start()
+
+	arkApp.AddSystem(terminationSystem) // Add first so it runs early in the tick
 	arkApp.AddSystem(pulseSystem)
 	arkApp.AddSystem(interventionSystem)
 	arkApp.AddSystem(codeSystem)
@@ -395,6 +407,7 @@ func NewController(config Config) (*Controller, error) {
 		app:               arkApp,
 		world:             world,
 		mapper:            mapper,
+		terminationSys:    terminationSystem,
 		pulseQueue:        pulseQueue,
 		interventionQueue: interventionQueue,
 		codeQueue:         codeQueue,
@@ -586,14 +599,22 @@ func computePulseLambda(world *ecs.World) float64 {
 //
 // Returns an error if the controller is already running or if startup fails.
 func (c *Controller) Start(ctx context.Context) error {
-	if c.running.Swap(true) {
+	if !c.running.CompareAndSwap(false, true) {
 		return fmt.Errorf("controller already running")
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.runDone = make(chan struct{})
+
+	// Set context on termination system - it will signal termination from within the ECS loop
+	c.terminationSys.SetContext(c.ctx)
+
 	c.pulsePool.SetContext(c.ctx)
 	c.interventionPool.SetContext(c.ctx)
 	c.codePool.SetContext(c.ctx)
@@ -611,7 +632,7 @@ func (c *Controller) Start(ctx context.Context) error {
 // Stop gracefully shuts down the controller.
 //
 // Stop performs a graceful shutdown sequence:
-//   - Finalizes the ark-tools app (stops all systems)
+//   - Signals termination and waits for the ECS app goroutine to exit
 //   - Drains and stops all worker pools
 //   - Closes all queues
 //   - Logs shutdown metrics
@@ -623,34 +644,39 @@ func (c *Controller) Stop() {
 	if !c.running.Swap(false) {
 		return
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.logger.Infof("Stopping controller...")
+
+	// Step 1: Cancel context (signals worker pools and TerminationSystem)
+	// The TerminationSystem will set Termination.Terminate from within the ECS loop,
+	// avoiding a data race with the app's read of that flag.
 	if c.cancel != nil {
 		c.cancel()
 	}
 
-	// Signal ark app to terminate and wait for the run loop to exit
-	termination := ecs.GetResource[resource.Termination](c.world)
-	termination.Terminate = true
-
+	// Step 2: Wait for the app.Run() goroutine to exit
+	// This ensures no concurrent access to ECS resources after this point
 	runFinalized := false
 	if done := c.runDone; done != nil {
 		select {
 		case <-done:
 			runFinalized = true
+			c.logger.Infof("  [1/4] ECS app exited cleanly")
 		case <-time.After(shutdownTimeout):
-			c.logger.Warnf("Run goroutine did not exit within timeout")
+			c.logger.Warnf("  [1/4] ECS app did not exit within timeout, forcing finalize")
 		}
 	}
 
-	// Step 1: Stop ECS systems (stops scheduling new work) if not already finalized
+	// Step 3: Finalize ECS systems if app didn't exit cleanly
+	// Now safe to call - app goroutine is either done or we timed out
 	if !runFinalized {
-		c.logger.Infof("  [1/4] Finalizing ECS systems...")
 		c.app.Finalize()
-	} else {
-		c.logger.Infof("  [1/4] ECS systems already finalized")
 	}
 
-	// Step 2: Drain worker pools (wait for in-flight jobs to complete)
+	// Step 4: Drain worker pools (wait for in-flight jobs to complete)
 	// Order: pulse -> intervention -> code (follows dependency chain)
 	c.logger.Infof("  [2/4] Draining worker pools...")
 	c.logger.Infof("    - Draining pulse pool...")
@@ -660,13 +686,23 @@ func (c *Controller) Stop() {
 	c.logger.Infof("    - Draining code pool...")
 	c.codePool.DrainAndStop()
 
-	// Step 3: Close queues (no more enqueue/dequeue operations)
+	// Step 4.5: Log pending jobs that will be dropped on close
+	pulseStats := c.pulseQueue.Stats()
+	intStats := c.interventionQueue.Stats()
+	codeStats := c.codeQueue.Stats()
+	totalPending := pulseStats.QueueDepth + intStats.QueueDepth + codeStats.QueueDepth
+	if totalPending > 0 {
+		c.logger.Warnf("Shutdown: dropping %d pending jobs (pulse=%d, intervention=%d, code=%d)",
+			totalPending, pulseStats.QueueDepth, intStats.QueueDepth, codeStats.QueueDepth)
+	}
+
+	// Step 5: Close queues (no more enqueue/dequeue operations)
 	c.logger.Infof("  [3/4] Closing queues...")
 	c.pulseQueue.Close()
 	c.interventionQueue.Close()
 	c.codeQueue.Close()
 
-	// Step 4: Print final metrics (after everything is stopped for accurate stats)
+	// Step 6: Print final metrics (after everything is stopped for accurate stats)
 	c.logger.Infof("  [4/4] Collecting final metrics...")
 	c.PrintShutdownMetrics()
 

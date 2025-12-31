@@ -5,228 +5,417 @@ parent: Reference
 
 # Monitor Configuration Schema
 
-The CPRA system is configured via a single YAML file that defines a list of monitors. This document provides a complete reference for the `Monitor` object schema.
+CPRA monitors are defined in a YAML file. Each monitor specifies health checks, automated recovery actions, and alerting rules.
 
-## Top-Level Monitor Object
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `name` | `string` | Yes | A unique, human-readable name for the monitor. |
-| `enabled` | `boolean` | No | If `false`, the monitor is loaded but never scheduled. Defaults to `true`. |
-| `pulse_check` | `PulseConfig` | Yes | Configuration for the health check pipeline. |
-| `intervention` | `InterventionConfig` | No | Configuration for the automated remediation pipeline. |
-| `codes` | `map[string]CodeConfig` | No | Configuration for the alerting pipeline, mapped by alert "color" (e.g., red, yellow). |
-
-## PulseConfig (Health Check)
-
-Defines the parameters for the health check.
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `type` | `string` | Yes | The type of check: `http`, `tcp`, or `icmp`. |
-| `interval` | `duration` | Yes | How often the check should run (e.g., `30s`, `5m`). |
-| `timeout` | `duration` | Yes | Maximum time to wait for the check to complete (e.g., `5s`). |
-| `unhealthy_threshold` | `integer` | No | Number of consecutive failures before the monitor is considered unhealthy and triggers Intervention. Defaults to `1`. |
-| `healthy_threshold` | `integer` | No | Number of consecutive successes required to transition from unhealthy to healthy. Defaults to `1`. |
-| `config` | `map[string]any` | Yes | Type-specific configuration (e.g., `http` details). |
-
-### `config` Examples
-
-**HTTP Check:**
-```yaml
-config:
-  method: GET
-  url: https://api.example.com/health
-  headers:
-    - "Authorization: Bearer token"
-  expected_status: 200
-```
-
-**TCP Check:**
-```yaml
-config:
-  host: database.internal
-  port: 5432
-```
-
-**ICMP Check:**
-```yaml
-config:
-  host: server.internal
-  count: 3
-```
-
-## InterventionConfig (Remediation)
-
-Defines the automated action to take when the `unhealthy_threshold` is met.
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `action` | `string` | Yes | The action to perform: `docker`. |
-| `max_failures` | `integer` | No | Maximum number of times to attempt the intervention before giving up and triggering the Code pipeline. Defaults to `1`. |
-| `config` | `map[string]any` | Yes | Action-specific configuration. |
-
-### `config` Example (Docker Action)
+## Quick Reference
 
 ```yaml
-config:
-  container: my-api-container
-  action: restart
-```
-
-## CodeConfig (Alerting)
-
-Defines the alerting policy. The map key (e.g., `red`) is the name of the alert "color" or severity.
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `dispatch` | `boolean` | Yes | If `true`, dispatch the alert when the condition is met. |
-| `notify` | `string` | Yes | The notification method: `log`, `slack`, or `pagerduty`. |
-| `config` | `map[string]any` | Yes | Notification-specific configuration. |
-
-### `config` Example (PagerDuty Notification)
-
-```yaml
-config:
-  url: https://events.pagerduty.com/v2/enqueue
-```
-
-### `config` Example (Slack Notification)
-
-```yaml
-config:
-  hook: https://hooks.slack.com/services/T00000000/B00000000/XXX
-```
-
-### `config` Example (Log Notification)
-
-```yaml
-config:
-  file: /var/log/cpra-alerts.log
+monitors:
+  - name: my-api                    # Required: Unique monitor name
+    enabled: true                   # Optional: Enable/disable (default: true)
+    
+    pulse_check:                    # Required: Health check configuration
+      type: http                    # http | tcp | icmp
+      interval: 30s                 # How often to check
+      timeout: 5s                   # Max wait time per check
+      config:                       # Type-specific settings
+        url: https://api.example.com/health
+    
+    intervention:                   # Optional: Auto-recovery
+      action: docker
+      target:
+        type: restart               # restart | stop | start | kill | pause | unpause | scale
+        container: my-api
+    
+    codes:                          # Optional: Alerting
+      red:
+        dispatch: true
+        notify: slack
 ```
 
 ---
 
-## Controller Configuration (Go API)
+## Monitor
 
-The controller can be configured programmatically using the `Config` struct:
+The top-level monitor object.
 
-```go
-type Config struct {
-    Logger            *Logger
-    WorkerConfig      queue.WorkerPoolConfig
-    PipelineConfig    loader.PipelineConfig
-    QueueCapacity     uint64        // Default: 8192 (power of 2)
-    BatchSize         int           // Default: 1000
-    UpdateInterval    time.Duration // System update interval
-    SizingServiceTime time.Duration // Expected job execution time (τ)
-    SizingSLO         time.Duration // Maximum acceptable latency (W)
-    SizingHeadroomPct float64       // Safety margin percentage
-    Debug             bool          // Enable debug logging
-}
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | Yes | — | Unique identifier for this monitor |
+| `enabled` | bool | No | `true` | Set `false` to load but never schedule |
+| `pulse_check` | object | Yes | — | Health check configuration |
+| `intervention` | object | No | — | Auto-recovery when unhealthy |
+| `codes` | map | No | — | Alert rules by severity color |
+
+### Example: Minimal Monitor
+
+```yaml
+- name: my-api
+  pulse_check:
+    type: http
+    interval: 30s
+    timeout: 5s
+    config:
+      url: https://api.example.com/health
 ```
 
-### Default Configuration
+### Example: Full Monitor
 
-```go
-config := controller.DefaultConfig()
-// QueueCapacity:  8192
-// BatchSize:      1000
-// WorkerConfig:   queue.DefaultWorkerPoolConfig()
+```yaml
+- name: production-api
+  enabled: true
+  
+  pulse_check:
+    type: http
+    interval: 30s
+    timeout: 5s
+    unhealthy_threshold: 3        # 3 failures → unhealthy
+    healthy_threshold: 2          # 2 successes → healthy again
+    config:
+      method: GET
+      url: https://api.example.com/health
+      retries: 2
+  
+  intervention:
+    action: docker
+    retries: 2
+    target:
+      type: restart
+      container: api-container
+      timeout: 30s
+  
+  codes:
+    red:
+      dispatch: true
+      notify: pagerduty
+      config:
+        url: https://events.pagerduty.com/v2/enqueue
+    yellow:
+      dispatch: true
+      notify: slack
+      config:
+        hook: https://hooks.slack.com/services/XXX
 ```
 
-### Environment Variables
+---
 
-Worker sizing parameters can be overridden via environment variables:
+## pulse_check
+
+Health check configuration. Runs at `interval`, fails after `timeout`.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `type` | string | Yes | — | Check type: `http`, `tcp`, or `icmp` |
+| `interval` | duration | Yes | — | How often to run (e.g., `30s`, `5m`) |
+| `timeout` | duration | Yes | — | Max time per check (e.g., `5s`) |
+| `unhealthy_threshold` | int | No | `1` | Consecutive failures to become unhealthy |
+| `healthy_threshold` | int | No | `1` | Consecutive successes to recover |
+| `config` | object | Yes | — | Type-specific configuration |
+
+### HTTP Check (`type: http`)
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `url` | string | Yes | — | Full URL to check |
+| `method` | string | No | `GET` | HTTP method |
+| `headers` | list | No | — | Headers as `"Name: Value"` strings |
+| `retries` | int | No | `0` | Retry attempts on failure |
+
+```yaml
+pulse_check:
+  type: http
+  interval: 30s
+  timeout: 5s
+  config:
+    method: GET
+    url: https://api.example.com/health
+    headers:
+      - "Authorization: Bearer token"
+    retries: 2
+```
+
+### TCP Check (`type: tcp`)
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `host` | string | Yes | — | Hostname or IP |
+| `port` | int | Yes | — | Port number |
+| `retries` | int | No | `0` | Retry attempts |
+
+```yaml
+pulse_check:
+  type: tcp
+  interval: 30s
+  timeout: 5s
+  config:
+    host: database.internal
+    port: 5432
+    retries: 1
+```
+
+### ICMP Check (`type: icmp`)
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `host` | string | Yes | — | Hostname or IP to ping |
+| `count` | int | No | `1` | Number of ping packets |
+| `retries` | int | No | `0` | Retry attempts |
+
+```yaml
+pulse_check:
+  type: icmp
+  interval: 60s
+  timeout: 10s
+  config:
+    host: gateway.internal
+    count: 3
+```
+
+---
+
+## intervention
+
+Automated recovery action triggered when `unhealthy_threshold` is reached.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `action` | string | Yes | — | Action type: `docker` |
+| `retries` | int | No | `0` | Retry attempts per intervention |
+| `max_failures` | int | No | `1` | Failures before triggering alerts |
+| `target` | object | Yes | — | Action-specific configuration |
+
+### Docker Actions (`action: docker`)
+
+| `target.type` | Description | Required Fields |
+|---------------|-------------|-----------------|
+| `restart` | Stop + start container (default) | `container` |
+| `stop` | Graceful shutdown (SIGTERM) | `container` |
+| `start` | Start stopped container | `container` |
+| `kill` | Force stop (SIGKILL) | `container` |
+| `pause` | Freeze processes | `container` |
+| `unpause` | Resume processes | `container` |
+| `scale` | Change Swarm replicas | `service`, `replicas` |
+
+#### Docker Target Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `type` | string | No | `restart` | Action type (see table above) |
+| `container` | string | Conditional | — | Container name/ID (for container ops) |
+| `service` | string | Conditional | — | Swarm service name (for `scale`) |
+| `replicas` | int | Conditional | — | Target replica count (for `scale`) |
+| `signal` | string | No | `SIGKILL` | Signal for `kill` action |
+| `docker_host` | string | No | env | Docker daemon address |
+| `timeout` | duration | No | — | Operation timeout |
+
+#### Example: Restart (default)
+
+```yaml
+intervention:
+  action: docker
+  retries: 2
+  target:
+    type: restart               # Can omit, restart is default
+    container: my-api
+    timeout: 30s
+```
+
+#### Example: Graceful Stop
+
+```yaml
+intervention:
+  action: docker
+  target:
+    type: stop
+    container: my-api
+    timeout: 10s                # Time before SIGKILL
+```
+
+#### Example: Force Kill
+
+```yaml
+intervention:
+  action: docker
+  target:
+    type: kill
+    container: my-api
+    signal: SIGTERM             # Optional, default: SIGKILL
+```
+
+#### Example: Pause/Unpause
+
+```yaml
+# Pause
+intervention:
+  action: docker
+  target:
+    type: pause
+    container: my-api
+
+# Unpause
+intervention:
+  action: docker
+  target:
+    type: unpause
+    container: my-api
+```
+
+#### Example: Scale Swarm Service
+
+```yaml
+intervention:
+  action: docker
+  target:
+    type: scale
+    service: web-frontend       # Swarm service name
+    replicas: 5                 # Target count
+    timeout: 60s
+```
+
+---
+
+## codes
+
+Alert rules mapped by severity "color". Triggered after `max_failures` interventions fail.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `dispatch` | bool | Yes | — | Enable this alert |
+| `notify` | string | Yes | — | Channel: `log`, `slack`, `pagerduty`, `email`, `webhook` |
+| `config` | object | Yes | — | Channel-specific configuration |
+
+### Log (`notify: log`)
+
+```yaml
+codes:
+  red:
+    dispatch: true
+    notify: log
+    config:
+      file: /var/log/cpra-alerts.log
+```
+
+### Slack (`notify: slack`)
+
+```yaml
+codes:
+  yellow:
+    dispatch: true
+    notify: slack
+    config:
+      hook: https://hooks.slack.com/services/T00/B00/XXX
+```
+
+### PagerDuty (`notify: pagerduty`)
+
+```yaml
+codes:
+  red:
+    dispatch: true
+    notify: pagerduty
+    config:
+      url: https://events.pagerduty.com/v2/enqueue
+```
+
+---
+
+## Duration Format
+
+Durations use Go syntax:
+
+| Example | Meaning |
+|---------|---------|
+| `5s` | 5 seconds |
+| `30s` | 30 seconds |
+| `5m` | 5 minutes |
+| `1h` | 1 hour |
+| `1m30s` | 1 minute 30 seconds |
+
+---
+
+## Environment Variables
+
+Runtime configuration via environment:
 
 | Variable | Description | Default |
-| :--- | :--- | :--- |
-| `CPRA_SIZING_TAU_MS` | Expected service time in milliseconds | Auto-calculated |
-| `CPRA_SIZING_SLO_MS` | Target SLO in milliseconds | Auto-calculated |
-| `CPRA_SIZING_HEADROOM_PCT` | Safety margin percentage | 15% |
+|----------|-------------|---------|
+| `CPRA_ENV` | Environment mode (`production` reduces logging) | — |
+| `CPRA_SIZING_TAU_MS` | Expected job execution time (ms) | Auto |
+| `CPRA_SIZING_SLO_MS` | Target latency SLO (ms) | Auto |
+| `CPRA_SIZING_HEADROOM_PCT` | Worker pool safety margin | `15` |
+| `GOGC` | GC frequency (higher = less frequent) | `100` |
+| `GOMEMLIMIT` | Soft memory limit (Go 1.19+) | — |
 
----
-
-## Worker Pool Configuration
-
-The `WorkerPoolConfig` struct controls dynamic worker scaling using M/M/c queueing theory:
-
-```go
-type WorkerPoolConfig struct {
-    // Core scaling parameters
-    MinWorkers         int           // Minimum workers (never scale below)
-    MaxWorkers         int           // Maximum workers (never scale above)
-    AdjustmentInterval time.Duration // How often to check for scaling
-    TargetQueueLatency time.Duration // Target queue wait time (SLO)
-
-    // Result processing
-    ResultBatchSize    int           // Batch size for result processing
-    ResultBatchTimeout time.Duration // Timeout for result batching
-    ResultChannelDepth int           // Buffer size for result channels
-
-    // M/M/c scaling parameters (asymmetric cooldowns)
-    ScaleUpCooldown    time.Duration // Min time between scale-ups (default 30s)
-    ScaleDownCooldown  time.Duration // Min time between scale-downs (default 120s)
-
-    // Hysteresis thresholds to prevent oscillation
-    ScaleUpThreshold   float64       // Ratio above current to trigger up (default 1.10)
-    ScaleDownThreshold float64       // Ratio below current to trigger down (default 0.80)
-
-    // Warm-up period during which no scaling occurs
-    WarmupDuration     time.Duration // Default 60s - system stabilization
-
-    // Ants goroutine pool options
-    PreAlloc           bool          // Pre-allocate worker pool
-    NonBlocking        bool          // Non-blocking task submission
-    MaxBlockingTasks   int           // Max tasks waiting for workers
-    ExpiryDuration     time.Duration // Idle worker expiry time
-}
-```
-
-### Default Worker Pool Configuration
-
-```go
-queue.DefaultWorkerPoolConfig()
-// MinWorkers:         5
-// MaxWorkers:         8192
-// AdjustmentInterval: 5s
-// TargetQueueLatency: 100ms
-// ScaleUpCooldown:    30s   (react quickly to load)
-// ScaleDownCooldown:  120s  (conservative reduction)
-// ScaleUpThreshold:   1.10  (10% above current)
-// ScaleDownThreshold: 0.80  (20% below current)
-// WarmupDuration:     60s   (no scaling first minute)
-```
-
-### Worker Pool Statistics
-
-Runtime metrics exposed by `WorkerPoolStats`:
-
-| Metric | Description |
-| :--- | :--- |
-| `CurrentCapacity` | Current number of allocated workers |
-| `RunningWorkers` | Workers actively processing jobs |
-| `WaitingTasks` | Tasks queued waiting for workers |
-| `TasksSubmitted` | Total tasks submitted to pool |
-| `TasksCompleted` | Total tasks completed |
-| `ScalingEvents` | Number of scale up/down events |
-| `PendingResults` | Results awaiting processing |
-
----
-
-## Production Environment Tuning
-
-Source the production environment script before starting CPRA:
+### Production Setup
 
 ```bash
 source scripts/production-env.sh
 ./cpra -yaml monitors.yaml
 ```
 
-This configures Go runtime parameters:
+---
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `GOGC` | Garbage collection frequency (higher = less frequent) | 150 |
-| `GOMEMLIMIT` | Soft memory cap (Go 1.19+) | 12GiB |
-| `GOMAXPROCS` | Number of OS threads | CPU count |
+## Complete Example
+
+```yaml
+monitors:
+  # HTTP API with full recovery pipeline
+  - name: production-api
+    pulse_check:
+      type: http
+      interval: 30s
+      timeout: 5s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      config:
+        method: GET
+        url: https://api.example.com/health
+        retries: 2
+    
+    intervention:
+      action: docker
+      retries: 2
+      max_failures: 3
+      target:
+        type: restart
+        container: api-container
+        timeout: 30s
+    
+    codes:
+      red:
+        dispatch: true
+        notify: pagerduty
+        config:
+          url: https://events.pagerduty.com/v2/enqueue
+      yellow:
+        dispatch: true
+        notify: slack
+        config:
+          hook: https://hooks.slack.com/services/XXX
+
+  # Database TCP check
+  - name: postgres-primary
+    pulse_check:
+      type: tcp
+      interval: 15s
+      timeout: 3s
+      config:
+        host: db.internal
+        port: 5432
+    codes:
+      red:
+        dispatch: true
+        notify: log
+        config:
+          file: /var/log/cpra-db-alerts.log
+
+  # Network gateway ping
+  - name: gateway-ping
+    pulse_check:
+      type: icmp
+      interval: 60s
+      timeout: 10s
+      unhealthy_threshold: 5
+      config:
+        host: 10.0.0.1
+        count: 3

@@ -45,10 +45,18 @@ type Tracer struct {
 	enabled   bool
 }
 
-// NewTracer creates a new tracer instance
-func NewTracer(component string, enabled bool) *Tracer {
-	// Create a simple logger for tracing
-	cfg := logger.DevelopmentConfig()
+// NewTracer creates a new tracer instance.
+// When productionMode is true, uses JSON logger at info level (less verbose).
+// When false, uses console logger at debug level for development.
+func NewTracer(component string, enabled bool, productionMode bool) *Tracer {
+	// Select logger config based on production mode
+	var cfg logger.Config
+	if productionMode {
+		cfg = logger.DefaultConfig() // JSON format, info level
+	} else {
+		cfg = logger.DevelopmentConfig() // Console format, debug level
+	}
+
 	traceLogger, err := logger.NewSugaredLoggerWithComponent(fmt.Sprintf("TRACE:%s", component), cfg)
 	if err != nil {
 		// Fallback to a nop logger if creation fails (should not happen)
@@ -297,14 +305,15 @@ var (
 	EntityTracer     *Tracer
 )
 
-// InitializeTracers sets up all component tracers
-func InitializeTracers(enabled bool) {
-	SystemTracer = NewTracer("SYSTEM", enabled)
-	SchedulerTracer = NewTracer("SCHEDULER", enabled)
-	DispatchTracer = NewTracer("DISPATCH", enabled)
-	ResultTracer = NewTracer("RESULT", enabled)
-	WorkerPoolTracer = NewTracer("WORKER", enabled)
-	EntityTracer = NewTracer("ENTITY", enabled)
+// InitializeTracers sets up all component tracers.
+// When productionMode is true, tracers use JSON logging at info level.
+func InitializeTracers(enabled bool, productionMode bool) {
+	SystemTracer = NewTracer("SYSTEM", enabled, productionMode)
+	SchedulerTracer = NewTracer("SCHEDULER", enabled, productionMode)
+	DispatchTracer = NewTracer("DISPATCH", enabled, productionMode)
+	ResultTracer = NewTracer("RESULT", enabled, productionMode)
+	WorkerPoolTracer = NewTracer("WORKER", enabled, productionMode)
+	EntityTracer = NewTracer("ENTITY", enabled, productionMode)
 }
 
 // StartPeriodicCleanup starts a goroutine that periodically cleans up old traces.

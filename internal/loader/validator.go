@@ -152,6 +152,11 @@ func (r *IntervalTimeoutRule) Validate(monitor *schema.Monitor) error {
 	if monitor.Pulse.Timeout <= 0 {
 		return ErrInvalidTimeout
 	}
+	// CRITICAL: Enforce timeout <= interval to prevent overlapping jobs
+	if monitor.Pulse.Timeout > monitor.Pulse.Interval {
+		return fmt.Errorf("%w: timeout=%v, interval=%v",
+			ErrTimeoutExceedsInterval, monitor.Pulse.Timeout, monitor.Pulse.Interval)
+	}
 	return nil
 }
 

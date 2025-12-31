@@ -33,18 +33,11 @@ type PulseHTTPJob struct {
 
 // Execute performs the HTTP health check with retries.
 func (p *PulseHTTPJob) Execute(ctx context.Context) Result {
-	attempts := p.Retries + 1
-	// Use pre-allocated payload to reduce allocations
 	payload := GetPulseHTTPPayload()
 
 	// Acquire global dial slot to prevent CPU spikes during network outages.
-	// This is critical when 100k+ monitors become unreachable simultaneously.
 	if !AcquireHTTPDialSlot(ctx) {
-		return Result{
-			Ent:     p.Entity,
-			Err:     ErrDialLimiterTimeout,
-			Payload: payload,
-		}
+		return Result{Ent: p.Entity, Err: ErrDialLimiterTimeout, Payload: payload}
 	}
 	defer ReleaseHTTPDialSlot()
 
@@ -61,32 +54,24 @@ func (p *PulseHTTPJob) Execute(ctx context.Context) Result {
 	req.SetRequestURI(p.URL)
 	req.Header.SetMethod(p.Method)
 
-	for i := 0; i < attempts; i++ {
-		// Check context before each attempt
-		select {
-		case <-ctx.Done():
-			return Result{Ent: p.Entity, Err: ctx.Err(), Payload: payload}
-		default:
-		}
-
-		// Reset response for reuse
+	err := RetryWithBackoff(ctx, p.Retries+1, 50*time.Millisecond, func() error {
 		resp.Reset()
-
-		err := client.DoTimeout(req, resp, p.Timeout)
-		if err == nil {
-			statusCode := resp.StatusCode()
-			if statusCode >= 200 && statusCode < 300 {
-				return Result{Ent: p.Entity, Err: nil, Payload: payload}
-			}
-			// Non-2xx status code: continue to next retry
+		if httpErr := client.DoTimeout(req, resp, p.Timeout); httpErr != nil {
+			return httpErr
 		}
-
-		// Brief pause before retry (don't block on last attempt)
-		if i < attempts-1 {
-			time.Sleep(50 * time.Millisecond)
+		if statusCode := resp.StatusCode(); statusCode < 200 || statusCode >= 300 {
+			return ErrHTTPCheckFailed // Non-2xx triggers retry
 		}
+		return nil
+	})
+
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			return Result{Ent: p.Entity, Err: err, Payload: payload}
+		}
+		return Result{Ent: p.Entity, Err: ErrHTTPCheckFailed, Payload: payload}
 	}
-	return Result{Ent: p.Entity, Err: ErrHTTPCheckFailed, Payload: payload}
+	return Result{Ent: p.Entity, Err: nil, Payload: payload}
 }
 
 // Copy returns a shallow copy of the job for safe pool reuse.

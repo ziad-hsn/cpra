@@ -14,6 +14,7 @@ nav:
   - Guides:
       - Overview: how-to/index.md
       - Common Tasks: how-to/common-tasks.md
+      - Adding Jobs: how-to/adding-new-jobs.md
       - Performance: how-to/performance-tuning.md
       - Production: how-to/deploy-to-production.md
   - Concepts:
@@ -22,10 +23,12 @@ nav:
       - Queueing Theory: explanation/queueing-theory.md
   - Reference:
       - Overview: reference/index.md
-      - API Documentation: reference/api-documentation.md
-      - API Reference: reference/api-reference.md
-      - Types: reference/types-reference.md
       - Config Schema: reference/config-schema.md
+      - Jobs: reference/jobs-reference.md
+      - Types: reference/types-reference.md
+      - API Reference: reference/api-reference.md
+      - API Documentation: reference/api-documentation.md
+      - Zap Logger: zap-reference.md
   - Legal:
       - Disclaimer: legal/disclaimer.md
 

@@ -399,7 +399,7 @@ func (c *CodeStatus) Copy() *CodeStatus {
 // Get returns a pointer to the status for the given color, or nil if invalid.
 func (c *CodeStatus) Get(color string) *ColorCodeStatus {
 	idx := ColorToIndex(color)
-	if idx < 0 {
+	if idx >= MaxColors {
 		return nil
 	}
 	return &c.Status[idx]

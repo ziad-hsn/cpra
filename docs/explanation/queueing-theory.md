@@ -31,11 +31,54 @@ CPRA uses the M/M/c model to calculate the optimal worker count based on the fol
 2.  **Service Rate ($\mu$):** Estimated from historical job execution times.
 3.  **Service Level Objective (SLO):** The maximum acceptable latency (e.g., 100ms P95).
 
+### Sizing Functions
+
+The `internal/queue/sizing.go` package provides several functions for capacity planning:
+
+| Function | Purpose |
+|----------|---------|
+| `FindCForSLO(λ, τ, W_target, Ca, Cs, c_max)` | Binary search for minimum workers to meet SLO |
+| `GetQueueMetrics(λ, μ, c)` | Returns comprehensive metrics (ρ, Pw, P0, Wq, W) |
+| `ApproxWorkersForQueueProb(λ, μ, targetProb)` | Square root staffing approximation (fast) |
+| `MinWorkersForStability(λ, τ)` | Absolute minimum for queue stability |
+| `WorkersForUtilization(λ, τ, targetUtil)` | Workers for target utilization (e.g., 80%) |
+| `IsStable(λ, τ, c)` | Check if queue is stable (ρ < 1) |
+
+### Key Metrics Exposed
+
+The `QueueMetrics` struct provides observability into queue behavior:
+
+```go
+type QueueMetrics struct {
+    Utilization  float64 // ρ = λ/(c*μ) - worker busy fraction
+    QueueProb    float64 // Pw - probability of waiting in queue
+    IdleProb     float64 // P0 - probability all workers idle
+    AvgWaitQueue float64 // Wq - average queue wait time (seconds)
+    AvgWaitTotal float64 // W = Wq + 1/μ - total system time
+    AvgWaitGiven float64 // Wq/Pw - tail latency (wait IF queued)
+    Stable       bool    // True if ρ < 1
+}
+```
+
 ### The Allen-Cunneen Approximation
 
 Real-world monitoring tasks often do not perfectly fit the "Markovian" (exponential) service time assumption. To account for the variability in real-world workloads (e.g., network jitter, slow APIs), CPRA uses the **Allen-Cunneen approximation** (also known as the $M/G/c$ model approximation).
 
 This approximation introduces the **Coefficient of Variation ($C_s$)** for service time, allowing the model to handle more general service time distributions. This makes the dynamic scaling far more robust and accurate in a production environment.
+
+### Stability and Utilization Guidelines
+
+**Stability Requirement:** A queue is stable when $\lambda \cdot \tau < c$ (arrival rate × service time < workers). If this condition is violated, the queue grows unbounded.
+
+**Utilization Targets:**
+
+| Target ρ | Use Case |
+|----------|----------|
+| 80% | Standard - queue times start growing beyond this |
+| 60% | Emergency services - proactive capacity headroom |
+| 50% | Conservative - handles traffic spikes gracefully |
+
+The `MinWorkersForStability(λ, τ)` function returns `ceil(λ*τ) + 1` — the absolute minimum workers. In practice, use `WorkersForUtilization()` with an 80% target for production systems.
 
 ## Dynamic Scaling in Practice
 

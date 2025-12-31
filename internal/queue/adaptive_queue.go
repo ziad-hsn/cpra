@@ -13,7 +13,7 @@ import (
 // It implements the Queue interface.
 type AdaptiveQueue struct {
 	signal              chan struct{}
-	buffer              []jobs.Job
+	buffer              []atomic.Value // Each slot stores jobs.Job atomically
 	dequeuedCount       atomic.Int64
 	tail                atomic.Uint64
 	enqueuedCount       atomic.Int64
@@ -34,7 +34,7 @@ func NewAdaptiveQueue(capacity uint64) (*AdaptiveQueue, error) {
 		return nil, errors.New("capacity must be a power of 2")
 	}
 	queue := &AdaptiveQueue{
-		buffer: make([]jobs.Job, capacity),
+		buffer: make([]atomic.Value, capacity),
 		signal: make(chan struct{}, 1),
 	}
 	queue.startUnixNano.Store(time.Now().UnixNano())
@@ -68,7 +68,7 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 			if !isNilJob(job) {
 				job.SetEnqueueTime(now)
 			}
-			q.buffer[tail&(capacity-1)] = job
+			q.buffer[tail&(capacity-1)].Store(job)
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
 			q.notify()
@@ -134,7 +134,7 @@ func (q *AdaptiveQueue) EnqueueBatch(jobsInterface []interface{}) error {
 				if !isNilJob(job) {
 					job.SetEnqueueTime(now)
 				}
-				q.buffer[(tail+i)&mask] = job
+				q.buffer[(tail+i)&mask].Store(job)
 			}
 			q.enqueuedCount.Add(int64(n))
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
@@ -197,27 +197,30 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 			return nil, nil // Queue is empty
 		}
 		idx := head & (capacity - 1)
-		job := q.buffer[idx]
-		if job == nil || job.IsNil() {
+		jobVal := q.buffer[idx].Load()
+		if jobVal == nil {
+			runtime.Gosched()
+			continue
+		}
+		job := jobVal.(jobs.Job)
+		if job.IsNil() {
 			runtime.Gosched()
 			continue
 		}
 		newHead := head + 1
 		if q.head.CompareAndSwap(head, newHead) {
 			now := time.Now()
-			if job != nil && !job.IsNil() {
-				enqueueTime := job.GetEnqueueTime()
-				if !enqueueTime.IsZero() {
-					wait := now.Sub(enqueueTime)
-					q.totalQueueWaitNanos.Add(int64(wait))
-					for {
-						currentMax := q.maxQueueWaitNanos.Load()
-						if int64(wait) <= currentMax {
-							break
-						}
-						if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
-							break
-						}
+			enqueueTime := job.GetEnqueueTime()
+			if !enqueueTime.IsZero() {
+				wait := now.Sub(enqueueTime)
+				q.totalQueueWaitNanos.Add(int64(wait))
+				for {
+					currentMax := q.maxQueueWaitNanos.Load()
+					if int64(wait) <= currentMax {
+						break
+					}
+					if q.maxQueueWaitNanos.CompareAndSwap(currentMax, int64(wait)) {
+						break
 					}
 				}
 			}

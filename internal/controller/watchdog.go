@@ -146,7 +146,12 @@ func (w *Watchdog) checkAllComponents() {
 // checkController verifies the controller is running.
 func (w *Watchdog) checkController() {
 	running := w.controller.running.Load()
-	ctxActive := w.controller.ctx != nil && w.controller.ctx.Err() == nil
+
+	// Safe nil check for ctx - may be nil during start/stop transitions
+	var ctxActive bool
+	if ctx := w.controller.ctx; ctx != nil {
+		ctxActive = ctx.Err() == nil
+	}
 
 	var status ComponentStatus
 	if running && ctxActive {
@@ -171,6 +176,11 @@ func (w *Watchdog) checkController() {
 
 // checkApp monitors ark-tools app tick progress.
 func (w *Watchdog) checkApp() {
+	// Don't check if controller is not running - avoids race during shutdown
+	if !w.controller.running.Load() {
+		return
+	}
+
 	// Get current tick from resource
 	tick := ecs.GetResource[resource.Tick](w.controller.world)
 	if tick == nil {

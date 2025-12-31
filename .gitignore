@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-
+*.zip
 # Test binary, built with `go test -c`
 *.test
 
@@ -23,3 +23,10 @@ go.work.sum
 
 # env file
 .env
+
+.cursor
+.gemini
+.idea
+
+docs/research/
+docs/zap-reference.md

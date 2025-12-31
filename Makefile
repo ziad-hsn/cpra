@@ -63,6 +63,12 @@ test:
 	@echo "Running tests..."
 	$(GO_CMD) test $(GO_TEST_FLAGS) ./...
 
+# Slim test target
+# Runs tests using the same slim build tags as `buildslim` (no Docker interventions, no pprof).
+testslim:
+	@echo "Running tests (slim: no docker, no pprof)..."
+	$(GO_CMD) test -v -race -tags $(GO_TAGS_SLIM) -coverprofile=coverage.out ./...
+
 # Tidy target
 # Cleans up unused dependencies and adds missing ones.
 tidy:

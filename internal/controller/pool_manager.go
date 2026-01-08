@@ -72,15 +72,15 @@ func (m *PoolManager) StartAll() {
 // DrainAll drains all managed worker pools.
 // This waits for in-flight jobs to complete before returning.
 // Order: pulse -> intervention -> code (follows dependency chain).
-func (m *PoolManager) DrainAll() {
+func (m *PoolManager) DrainAll(ctx context.Context) {
 	if m.pulse != nil {
-		m.pulse.DrainAndStop()
+		m.pulse.DrainAndStop(ctx)
 	}
 	if m.intervention != nil {
-		m.intervention.DrainAndStop()
+		m.intervention.DrainAndStop(ctx)
 	}
 	if m.code != nil {
-		m.code.DrainAndStop()
+		m.code.DrainAndStop(ctx)
 	}
 }
 

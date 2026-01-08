@@ -106,7 +106,7 @@ func TestDynamicWorkerPool_ScalesAndCompletes(t *testing.T) {
 
 	processed := atomic.Int64{}
 	pool := newTestPool(t, q, cfg)
-	defer pool.DrainAndStop()
+	defer pool.DrainAndStop(context.Background())
 
 	const total = 30
 	for i := 0; i < total; i++ {
@@ -155,7 +155,7 @@ func TestDynamicWorkerPool_BackpressureWhenFull(t *testing.T) {
 	}
 
 	pool := newTestPool(t, q, cfg)
-	defer pool.DrainAndStop()
+	defer pool.DrainAndStop(context.Background())
 
 	if err := q.Enqueue(&testPoolJob{id: 0, processed: nil, blockCh: blockCh}); err != nil {
 		t.Fatalf("enqueue first job failed: %v", err)
@@ -205,7 +205,7 @@ func TestDynamicWorkerPool_DrainAndStopFlushesResults(t *testing.T) {
 		}
 	}
 
-	pool.DrainAndStop()
+	pool.DrainAndStop(context.Background())
 
 	if processed.Load() != int64(total) {
 		t.Fatalf("processed = %d, want %d", processed.Load(), total)

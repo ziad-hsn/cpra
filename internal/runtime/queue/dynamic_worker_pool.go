@@ -229,7 +229,7 @@ func (p *DynamicWorkerPool) GetRouter() *ResultRouter {
 }
 
 // DrainAndStop waits for outstanding tasks to finish before stopping the worker pool.
-func (p *DynamicWorkerPool) DrainAndStop() {
+func (p *DynamicWorkerPool) DrainAndStop(ctx context.Context) {
 	startTime := time.Now()
 
 	// Phase 1: Wait for queue to drain (dispatcher to invoke all jobs)
@@ -238,12 +238,21 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	if drainDeadline.Sub(startTime) < 2*time.Second {
 		drainDeadline = startTime.Add(2 * time.Second)
 	}
+
+	// Check queue drain with context awareness
+	drainTicker := time.NewTicker(10 * time.Millisecond)
+	defer drainTicker.Stop()
+drainLoop:
 	for time.Now().Before(drainDeadline) {
-		queueDepth := p.queue.Stats().QueueDepth
-		if queueDepth == 0 {
-			break
+		select {
+		case <-ctx.Done():
+			break drainLoop
+		case <-drainTicker.C:
+			queueDepth := p.queue.Stats().QueueDepth
+			if queueDepth == 0 {
+				break drainLoop
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Phase 2: Now set stopping flag (dispatcher will exit after current batch)
@@ -270,7 +279,7 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	if drainWindow < 2*time.Second {
 		drainWindow = 2 * time.Second
 	}
-	p.waitForResultsUntil(time.Now().Add(drainWindow))
+	p.waitForResultsUntil(ctx, time.Now().Add(drainWindow))
 
 	// Wait for goroutines to exit
 	done := make(chan struct{})
@@ -289,6 +298,11 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 		if p.logger != nil {
 			finalPending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
 			p.logger.Printf("Goroutines exited cleanly (remaining_pending=%d)", finalPending)
+		}
+	case <-ctx.Done():
+		if p.logger != nil {
+			finalPending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+			p.logger.Printf("Draining aborted by context (dropping %d pending results)", finalPending)
 		}
 	case <-time.After(waitTimeout):
 		if p.logger != nil {
@@ -317,15 +331,23 @@ func (p *DynamicWorkerPool) DrainAndStop() {
 	}
 }
 
-func (p *DynamicWorkerPool) waitForResultsUntil(deadline time.Time) {
+func (p *DynamicWorkerPool) waitForResultsUntil(ctx context.Context, deadline time.Time) {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
 	for time.Now().Before(deadline) {
-		pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
-		if pending <= 0 && len(p.resultChan) == 0 {
-			break
+		select {
+		case <-ctx.Done():
+			goto Done
+		case <-ticker.C:
+			pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load()
+			if pending <= 0 && len(p.resultChan) == 0 {
+				goto Done
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
+Done:
 	p.resultsCloseOnce.Do(func() {
 		p.resultsClosed.Store(true)
 		if pending := p.tasksSubmitted.Load() - p.tasksCompleted.Load(); pending > 0 && p.logger != nil {

@@ -378,7 +378,7 @@ func (c *Controller) Start(ctx context.Context) error {
 // This method is idempotent - calling Stop() multiple times is safe.
 // After Stop() completes, the controller cannot be restarted; create a new
 // controller instance if needed.
-func (c *Controller) Stop() {
+func (c *Controller) Stop(ctx context.Context) {
 	if !c.running.Swap(false) {
 		return
 	}
@@ -403,7 +403,7 @@ func (c *Controller) Stop() {
 		case <-done:
 			runFinalized = true
 			c.logger.Infof("  [1/5] ECS app exited cleanly")
-		case <-time.After(shutdownTimeout):
+		case <-ctx.Done():
 			c.logger.Warnf("  [1/5] ECS app did not exit within timeout, forcing finalize")
 		}
 	}
@@ -417,7 +417,7 @@ func (c *Controller) Stop() {
 	// Step 4: Drain worker pools (wait for in-flight jobs to complete)
 	// Order: pulse -> intervention -> code (follows dependency chain)
 	c.logger.Infof("  [2/5] Draining worker pools...")
-	c.pools.DrainAll()
+	c.pools.DrainAll(ctx)
 
 	// Step 4.5: Log pending jobs that will be dropped on close
 	queueStats := c.queues.Stats()

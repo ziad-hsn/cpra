@@ -325,7 +325,7 @@ func performGracefulShutdown(ctx context.Context, log logger.Logger, oc *control
 	log.Info("Stopping controller and draining worker pools...", logger.Field{Key: "step", Value: "1/5"})
 	controllerDone := make(chan struct{})
 	go func() {
-		oc.Stop()
+		oc.Stop(shutdownCtx)
 		close(controllerDone)
 	}()
 

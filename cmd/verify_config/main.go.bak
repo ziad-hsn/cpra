@@ -1,0 +1,29 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"cpra/internal/loader/schema"
+
+	"gopkg.in/yaml.v3"
+)
+
+func main() {
+	data, err := os.ReadFile("examples/monitors_demo.yaml")
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	var manifest schema.Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		fmt.Printf("Error unmarshalling YAML: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Successfully parsed %d monitors!\n", len(manifest.Monitors))
+	for i, m := range manifest.Monitors {
+		fmt.Printf("[%d] %s (Type: %s, Enabled: %v)\n", i+1, m.Name, m.Pulse.Type, m.Enabled)
+	}
+}

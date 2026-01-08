@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"cpra/internal/controller/components"
-	"cpra/internal/loader/schema"
+	"cpra/internal/platform/loader/schema"
 
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"
@@ -298,6 +298,9 @@ func TestNewEntityManager(t *testing.T) {
 	}
 	if em.Shard == nil {
 		t.Error("Shard mapper not initialized")
+	}
+	if em.PendingUpdate == nil {
+		t.Error("PendingUpdate mapper not initialized")
 	}
 	if em.Disabled == nil {
 		t.Error("Disabled mapper not initialized")

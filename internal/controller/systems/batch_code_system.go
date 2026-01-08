@@ -2,9 +2,9 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"cpra/internal/queue"
+	"cpra/internal/runtime/jobs"
+	"cpra/internal/platform/loader/schema"
+	"cpra/internal/runtime/queue"
 	"sync"
 	"time"
 
@@ -216,6 +216,7 @@ func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
 		info.OldState = *state
 		state.Flags &^= components.StateCodeNeeded
 		state.Flags |= components.StateCodePending
+		state.CodeRunVersion = state.ConfigVersion
 
 		items = append(items, info.Job)
 		submitted = append(submitted, info)

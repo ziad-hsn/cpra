@@ -2,7 +2,7 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/queue"
+	"cpra/internal/runtime/queue"
 	"sync"
 	"time"
 
@@ -171,6 +171,7 @@ func (s *BatchInterventionSystem) processBatch(jobs *[]interface{}, entities *[]
 			oldState := *state
 			state.Flags &^= components.StateInterventionNeeded
 			state.Flags |= components.StateInterventionPending
+			state.InterventionRunVersion = state.ConfigVersion
 			s.stateLogger.LogTransition(ent, oldState, *state)
 			s.logger.Infow("Intervention dispatched", "monitor_name", state.Name)
 		}

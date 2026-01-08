@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/mlange-42/ark/ecs"
 )
 
@@ -69,10 +70,10 @@ func (mes *MemoryEfficientSystem) Update() {
 		mes.allocsAfter = m.Alloc
 		mes.gcCount++
 
-		fmt.Printf("Forced GC: Memory %d MB -> %d MB (freed %d MB)\n",
-			mes.allocsBefore/1024/1024,
-			m.Alloc/1024/1024,
-			(mes.allocsBefore-m.Alloc)/1024/1024)
+		fmt.Printf("Forced GC: Memory %s -> %s (freed %s)\n",
+			humanize.IBytes(mes.allocsBefore),
+			humanize.IBytes(m.Alloc),
+			humanize.IBytes(mes.allocsBefore-m.Alloc))
 	}
 
 	mes.lastGC = now
@@ -113,10 +114,10 @@ func (mes *MemoryEfficientSystem) ForceGC() {
 	mes.gcCount++
 	mes.lastGC = time.Now()
 
-	fmt.Printf("Manual GC: Memory %d MB -> %d MB (freed %d MB)\n",
-		mes.allocsBefore/1024/1024,
-		m.Alloc/1024/1024,
-		(mes.allocsBefore-m.Alloc)/1024/1024)
+	fmt.Printf("Manual GC: Memory %s -> %s (freed %s)\n",
+		humanize.IBytes(mes.allocsBefore),
+		humanize.IBytes(m.Alloc),
+		humanize.IBytes(mes.allocsBefore-m.Alloc))
 }
 
 // SetMemoryThreshold updates the memory threshold for automatic GC

@@ -34,6 +34,7 @@ package interning
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 	// internedStrings maintains a global pool of interned string instances.
@@ -41,6 +42,11 @@ import (
 	// Strings are never removed from this map, so it should only be used
 	// for low-cardinality data.
 var internedStrings sync.Map // map[string]string
+
+var (
+	maxInternedStrings = 10000 // Limit to prevent unbounded growth
+	internedCount      int64
+)
 
 // Intern returns a deduplicated string instance, reducing duplicated allocations
 // for low-cardinality data such as monitor names or HTTP methods.
@@ -81,13 +87,27 @@ func Intern(s string) string {
 		return v.(string)
 	}
 
-	// Slow path: intern the string
-	// Clone to ensure we own the backing array (input may be a slice of larger string)
-	clone := strings.Clone(s)
+	// Enforce upper bound to prevent unbounded growth
+	if atomic.LoadInt64(&internedCount) >= int64(maxInternedStrings) {
+		return strings.Clone(s)
+	}
 
-	// LoadOrStore handles the race condition atomically:
-	// - If another goroutine stored first, we get their value
-	// - Otherwise, we store ours and get it back
-	actual, _ := internedStrings.LoadOrStore(clone, clone)
+	// Slow path: intern the string
+	clone := strings.Clone(s)
+	actual, loaded := internedStrings.LoadOrStore(clone, clone)
+	if !loaded {
+		atomic.AddInt64(&internedCount, 1)
+	}
 	return actual.(string)
+}
+
+// GetInternedCount returns the current number of interned strings.
+func GetInternedCount() int64 {
+	return atomic.LoadInt64(&internedCount)
+}
+
+// ClearInterned clears all interned strings (for testing only).
+func ClearInterned() {
+	internedStrings = sync.Map{}
+	atomic.StoreInt64(&internedCount, 0)
 }

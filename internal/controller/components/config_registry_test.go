@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"cpra/internal/loader/schema"
+	"cpra/internal/platform/loader/schema"
 )
 
 func TestConfigRegistry_GetOrAdd(t *testing.T) {

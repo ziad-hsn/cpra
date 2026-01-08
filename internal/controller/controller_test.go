@@ -44,25 +44,33 @@ func TestNewController(t *testing.T) {
 		t.Error("World() returned nil")
 	}
 
-	// Check queues are initialized
-	if ctrl.pulseQueue == nil {
+	// Check managers are initialized
+	if ctrl.queues == nil {
+		t.Error("queues manager is nil")
+	}
+	if ctrl.pools == nil {
+		t.Error("pools manager is nil")
+	}
+
+	// Check queues via manager
+	if ctrl.queues.Pulse() == nil {
 		t.Error("pulseQueue is nil")
 	}
-	if ctrl.interventionQueue == nil {
+	if ctrl.queues.Intervention() == nil {
 		t.Error("interventionQueue is nil")
 	}
-	if ctrl.codeQueue == nil {
+	if ctrl.queues.Code() == nil {
 		t.Error("codeQueue is nil")
 	}
 
-	// Check worker pools are initialized
-	if ctrl.pulsePool == nil {
+	// Check worker pools via manager
+	if ctrl.pools.Pulse() == nil {
 		t.Error("pulsePool is nil")
 	}
-	if ctrl.interventionPool == nil {
+	if ctrl.pools.Intervention() == nil {
 		t.Error("interventionPool is nil")
 	}
-	if ctrl.codePool == nil {
+	if ctrl.pools.Code() == nil {
 		t.Error("codePool is nil")
 	}
 }
@@ -172,12 +180,12 @@ func TestController_DoubleStart(t *testing.T) {
 	defer ctrl.Stop()
 
 	// First start should succeed
-	if err := ctrl.Start(nil); err != nil {
+	if err := ctrl.Start(context.Background()); err != nil {
 		t.Fatalf("First Start failed: %v", err)
 	}
 
 	// Second start should fail
-	if err := ctrl.Start(nil); err == nil {
+	if err := ctrl.Start(context.Background()); err == nil {
 		t.Error("Expected error on double-start, got nil")
 	}
 }
@@ -304,6 +312,75 @@ func TestController_Stats_WorkerStats(t *testing.T) {
 	}
 }
 
+func TestController_FullCycle(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.QueueCapacity = 64
+	cfg.WorkerConfig.MinWorkers = 1
+	cfg.WorkerConfig.MaxWorkers = 2
+	cfg.WorkerConfig.ResultBatchSize = 8
+	cfg.WorkerConfig.ResultBatchTimeout = 20 * time.Millisecond
+
+	ctrl, err := NewController(cfg)
+	if err != nil {
+		t.Fatalf("NewController failed: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := ctrl.LoadMonitors(ctx, "testdata/test_monitors.yaml"); err != nil {
+		t.Fatalf("LoadMonitors failed: %v", err)
+	}
+
+	if err := ctrl.Start(ctx); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	ctrl.Stop()
+
+	stats := ctrl.Stats()
+	if stats.PulseQueue.QueueDepth != 0 || stats.InterventionQueue.QueueDepth != 0 || stats.CodeQueue.QueueDepth != 0 {
+		t.Fatalf("expected empty queues, got pulse=%d intervention=%d code=%d",
+			stats.PulseQueue.QueueDepth, stats.InterventionQueue.QueueDepth, stats.CodeQueue.QueueDepth)
+	}
+}
+
+func TestController_GracefulShutdownDuringWork(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.QueueCapacity = 32
+	cfg.WorkerConfig.MinWorkers = 1
+	cfg.WorkerConfig.MaxWorkers = 1
+	cfg.WorkerConfig.ResultBatchSize = 4
+	cfg.WorkerConfig.ResultBatchTimeout = 20 * time.Millisecond
+
+	ctrl, err := NewController(cfg)
+	if err != nil {
+		t.Fatalf("NewController failed: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := ctrl.LoadMonitors(ctx, "testdata/test_monitors.yaml"); err != nil {
+		t.Fatalf("LoadMonitors failed: %v", err)
+	}
+
+	if err := ctrl.Start(ctx); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	ctrl.Stop()
+
+	if ctrl.running.Load() {
+		t.Fatal("controller should not be running after Stop")
+	}
+}
+
 // TestCalculateShardSlots_MaxSlots tests shard slot clamping
 func TestCalculateShardSlots_MaxSlots(t *testing.T) {
 	t.Parallel()
@@ -372,14 +449,14 @@ func TestController_QueueTypes(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	// All queues should be non-nil
-	if ctrl.pulseQueue == nil {
+	// All queues should be non-nil via manager
+	if ctrl.queues.Pulse() == nil {
 		t.Error("pulseQueue is nil")
 	}
-	if ctrl.interventionQueue == nil {
+	if ctrl.queues.Intervention() == nil {
 		t.Error("interventionQueue is nil")
 	}
-	if ctrl.codeQueue == nil {
+	if ctrl.queues.Code() == nil {
 		t.Error("codeQueue is nil")
 	}
 }
@@ -393,14 +470,14 @@ func TestController_PoolConfigs(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	// Check pulse pool is initialized
-	if ctrl.pulsePool == nil {
+	// Check pools via manager
+	if ctrl.pools.Pulse() == nil {
 		t.Error("PulsePool is nil")
 	}
-	if ctrl.interventionPool == nil {
+	if ctrl.pools.Intervention() == nil {
 		t.Error("InterventionPool is nil")
 	}
-	if ctrl.codePool == nil {
+	if ctrl.pools.Code() == nil {
 		t.Error("CodePool is nil")
 	}
 }

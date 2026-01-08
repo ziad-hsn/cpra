@@ -63,10 +63,8 @@ func TestNewWatchdog(t *testing.T) {
 	}
 
 	// Create test logger
-	testLogger, err := logger.NewSugaredLoggerWithComponent("WATCHDOG-TEST", logger.DefaultConfig())
-	if err != nil {
-		t.Fatalf("Failed to create logger: %v", err)
-	}
+	// Create test logger
+	testLogger := createTestLogger(t, "WATCHDOG-TEST")
 
 	heartbeat := make(chan struct{}, 1)
 	watchdogCfg := DefaultWatchdogConfig()
@@ -96,7 +94,7 @@ func TestWatchdog_Stop(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	testLogger, _ := logger.NewSugaredLoggerWithComponent("WATCHDOG-TEST", logger.DefaultConfig())
+	testLogger := createTestLogger(t, "WATCHDOG-TEST")
 	heartbeat := make(chan struct{}, 1)
 
 	wd := NewWatchdog(ctrl, DefaultWatchdogConfig(), heartbeat, testLogger)
@@ -115,7 +113,7 @@ func TestWatchdog_RunContextCancel(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	testLogger, _ := logger.NewSugaredLoggerWithComponent("WATCHDOG-TEST", logger.DefaultConfig())
+	testLogger := createTestLogger(t, "WATCHDOG-TEST")
 	heartbeat := make(chan struct{}, 10)
 
 	watchdogCfg := DefaultWatchdogConfig()
@@ -159,7 +157,7 @@ func TestWatchdog_Heartbeat(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	testLogger, _ := logger.NewSugaredLoggerWithComponent("WATCHDOG-TEST", logger.DefaultConfig())
+	testLogger := createTestLogger(t, "WATCHDOG-TEST")
 	heartbeat := make(chan struct{}, 10)
 
 	watchdogCfg := DefaultWatchdogConfig()
@@ -190,7 +188,7 @@ func TestWatchdog_DoubleRun(t *testing.T) {
 		t.Fatalf("NewController failed: %v", err)
 	}
 
-	testLogger, _ := logger.NewSugaredLoggerWithComponent("WATCHDOG-TEST", logger.DefaultConfig())
+	testLogger := createTestLogger(t, "WATCHDOG-TEST")
 	heartbeat := make(chan struct{}, 10)
 
 	watchdogCfg := DefaultWatchdogConfig()
@@ -243,4 +241,12 @@ func TestPoolState(t *testing.T) {
 	if state.lastStatus != StatusHealthy {
 		t.Error("lastStatus should be StatusHealthy initially (zero value)")
 	}
+}
+
+func createTestLogger(t *testing.T, component string) logger.Logger {
+	l, err := logger.NewZapLogger(logger.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+	return l.With(logger.Field{Key: "component", Value: component})
 }

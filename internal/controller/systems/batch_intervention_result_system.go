@@ -2,7 +2,7 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
+	"cpra/internal/runtime/jobs"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -91,8 +91,15 @@ func (s *BatchInterventionResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
-		processedCount++
 		oldState := *state
+		if state.InterventionRunVersion != state.ConfigVersion {
+			state.Flags &^= components.StateInterventionPending
+			s.stateLogger.LogTransition(ent, oldState, *state)
+			s.logger.Debugw("Dropping stale InterventionResult", "entity_id", ent.ID(), "run_version", state.InterventionRunVersion, "current_version", state.ConfigVersion)
+			continue
+		}
+
+		processedCount++
 		eventTime := time.Now()
 		state.LastEventTime = eventTime
 

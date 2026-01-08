@@ -2,7 +2,7 @@ package entities_test
 
 import (
 	"cpra/internal/controller/entities"
-	"cpra/internal/loader/schema"
+	"cpra/internal/platform/loader/schema"
 	"testing"
 	"time"
 

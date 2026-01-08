@@ -2,8 +2,10 @@ package controller
 
 import (
 	"context"
+	"cpra/internal/config"
 	"cpra/internal/logger"
 	"fmt"
+	"maps"
 	"runtime"
 	"sync"
 	"time"
@@ -46,18 +48,9 @@ type Tracer struct {
 }
 
 // NewTracer creates a new tracer instance.
-// When productionMode is true, uses JSON logger at info level (less verbose).
-// When false, uses console logger at debug level for development.
-func NewTracer(component string, enabled bool, productionMode bool) *Tracer {
-	// Select logger config based on production mode
-	var cfg logger.Config
-	if productionMode {
-		cfg = logger.DefaultConfig() // JSON format, info level
-	} else {
-		cfg = logger.DevelopmentConfig() // Console format, debug level
-	}
-
-	traceLogger, err := logger.NewSugaredLoggerWithComponent(fmt.Sprintf("TRACE:%s", component), cfg)
+// Uses the centralized environment configuration for logging settings.
+func NewTracer(component string, enabled bool, envCfg *config.EnvConfig) *Tracer {
+	traceLogger, err := logger.NewSugaredLoggerWithComponentFromConfig(envCfg, fmt.Sprintf("TRACE:%s", component))
 	if err != nil {
 		// Fallback to a nop logger if creation fails (should not happen)
 		traceLogger = zap.NewNop().Sugar()
@@ -269,15 +262,16 @@ func (t *Tracer) Cleanup(maxAge time.Duration) {
 	var removedSpans, removedTraces int
 
 	// Remove old spans
-	for spanID, span := range t.spans {
+	maps.DeleteFunc(t.spans, func(id string, span *TraceSpan) bool {
 		if span.EndTime.Before(cutoff) || (span.EndTime.IsZero() && span.StartTime.Before(cutoff)) {
-			delete(t.spans, spanID)
 			removedSpans++
+			return true
 		}
-	}
+		return false
+	})
 
 	// Remove empty traces
-	for traceID, spans := range t.traces {
+	maps.DeleteFunc(t.traces, func(id string, spans []*TraceSpan) bool {
 		activeSpans := 0
 		for _, span := range spans {
 			if _, exists := t.spans[span.ID]; exists {
@@ -285,10 +279,11 @@ func (t *Tracer) Cleanup(maxAge time.Duration) {
 			}
 		}
 		if activeSpans == 0 {
-			delete(t.traces, traceID)
 			removedTraces++
+			return true
 		}
-	}
+		return false
+	})
 
 	if removedSpans > 0 || removedTraces > 0 {
 		t.logger.Debugf("Cleaned up %d spans and %d traces", removedSpans, removedTraces)
@@ -306,14 +301,14 @@ var (
 )
 
 // InitializeTracers sets up all component tracers.
-// When productionMode is true, tracers use JSON logging at info level.
-func InitializeTracers(enabled bool, productionMode bool) {
-	SystemTracer = NewTracer("SYSTEM", enabled, productionMode)
-	SchedulerTracer = NewTracer("SCHEDULER", enabled, productionMode)
-	DispatchTracer = NewTracer("DISPATCH", enabled, productionMode)
-	ResultTracer = NewTracer("RESULT", enabled, productionMode)
-	WorkerPoolTracer = NewTracer("WORKER", enabled, productionMode)
-	EntityTracer = NewTracer("ENTITY", enabled, productionMode)
+// Uses the centralized environment configuration for logging settings.
+func InitializeTracers(enabled bool, envCfg *config.EnvConfig) {
+	SystemTracer = NewTracer("SYSTEM", enabled, envCfg)
+	SchedulerTracer = NewTracer("SCHEDULER", enabled, envCfg)
+	DispatchTracer = NewTracer("DISPATCH", enabled, envCfg)
+	ResultTracer = NewTracer("RESULT", enabled, envCfg)
+	WorkerPoolTracer = NewTracer("WORKER", enabled, envCfg)
+	EntityTracer = NewTracer("ENTITY", enabled, envCfg)
 }
 
 // StartPeriodicCleanup starts a goroutine that periodically cleans up old traces.

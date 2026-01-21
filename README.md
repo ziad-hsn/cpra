@@ -36,11 +36,6 @@ CPRA is a high-performance infrastructure monitoring system designed for platfor
 - Achieve sub-100ms P95 latency from detection to alerting
 - Minimize memory footprint (~100 bytes per monitor)
 
-**CPRA vs. Traditional Monitoring:**
-- **Prometheus**: CPRA focuses on active health checking and remediation, not metrics collection
-- **Nagios/Icinga**: CPRA scales to 10-100x more monitors with better performance
-- **Custom Solutions**: CPRA provides production-ready worker pool management and queueing theory-based scaling out of the box
-
 ---
 
 ## Key Features

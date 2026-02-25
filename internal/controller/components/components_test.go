@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"cpra/internal/platform/loader/schema"
 )
 
 func TestColorCode_Priority(t *testing.T) {
@@ -374,6 +374,7 @@ func TestPulseConfig_Copy(t *testing.T) {
 	t.Run("WithConfig", func(t *testing.T) {
 		c := &PulseConfig{
 			Type:               "http",
+			Groups:             []string{"prod"},
 			Timeout:            5 * time.Second,
 			Interval:           30 * time.Second,
 			Retries:            3,
@@ -388,6 +389,9 @@ func TestPulseConfig_Copy(t *testing.T) {
 		}
 		if cpy.Type != c.Type {
 			t.Error("Type not copied")
+		}
+		if len(cpy.Groups) != 1 || cpy.Groups[0] != "prod" {
+			t.Error("Groups not copied")
 		}
 		if cpy.Timeout != c.Timeout {
 			t.Error("Timeout not copied")
@@ -419,6 +423,7 @@ func TestInterventionConfig_Copy(t *testing.T) {
 	t.Run("WithTarget", func(t *testing.T) {
 		c := &InterventionConfig{
 			Action:      "restart",
+			Retries:     2,
 			MaxFailures: 5,
 			Target:      &schema.InterventionTargetDocker{Container: "abc123", Type: "restart"},
 		}
@@ -429,6 +434,9 @@ func TestInterventionConfig_Copy(t *testing.T) {
 		}
 		if cpy.Action != c.Action {
 			t.Error("Action not copied")
+		}
+		if cpy.Retries != c.Retries {
+			t.Error("Retries not copied")
 		}
 		if cpy.MaxFailures != c.MaxFailures {
 			t.Error("MaxFailures not copied")

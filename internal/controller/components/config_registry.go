@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"sync"
 
-	"cpra/internal/loader/schema"
+	"cpra/internal/platform/loader/schema"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -36,9 +36,9 @@ type ConfigRegistry struct {
 }
 
 var (
-	defaultRegistry     *ConfigRegistry
-	defaultRegistryOnce sync.Once
-	preInitCapacity     int // Set before first access to DefaultConfigRegistry
+	defaultRegistry    *ConfigRegistry
+	defaultRegistryMu  sync.RWMutex
+	preInitCapacity    int // Set before first access to DefaultConfigRegistry
 )
 
 // InitDefaultConfigRegistry pre-sizes the default registry with a custom capacity.
@@ -46,21 +46,66 @@ var (
 // initialization, this is a no-op. Typical usage: call with estimated unique
 // config count (e.g., monitorCount / 20 for 5% estimate) before loading monitors.
 func InitDefaultConfigRegistry(capacity int) {
-	if capacity > 0 {
+	defaultRegistryMu.Lock()
+	defer defaultRegistryMu.Unlock()
+	if capacity > 0 && defaultRegistry == nil {
 		preInitCapacity = capacity
 	}
 }
 
-// DefaultConfigRegistry returns the process-wide registry for ColorCodeConfig flyweights.
-func DefaultConfigRegistry() *ConfigRegistry {
-	defaultRegistryOnce.Do(func() {
+// initDefaultRegistry initializes the default registry with configured capacity.
+// Thread-safe and idempotent.
+func initDefaultRegistry() *ConfigRegistry {
+	defaultRegistryMu.Lock()
+	defer defaultRegistryMu.Unlock()
+	if defaultRegistry == nil {
 		cap := preInitCapacity
 		if cap <= 0 {
 			cap = 64 // Default capacity
 		}
 		defaultRegistry = NewConfigRegistry(cap)
-	})
+	}
 	return defaultRegistry
+}
+
+// DefaultConfigRegistry returns the process-wide registry for ColorCodeConfig flyweights.
+// For new code, prefer injecting a ConfigRegistry instance directly.
+func DefaultConfigRegistry() *ConfigRegistry {
+	defaultRegistryMu.RLock()
+	reg := defaultRegistry
+	defaultRegistryMu.RUnlock()
+	if reg != nil {
+		return reg
+	}
+	return initDefaultRegistry()
+}
+
+// SetDefaultConfigRegistry replaces the default config registry.
+// This is primarily for testing and dependency injection.
+// Call this at startup before any configuration operations begin.
+//
+// Example usage in tests:
+//
+//	func TestMySystem(t *testing.T) {
+//	    reg := NewConfigRegistry(100)
+//	    SetDefaultConfigRegistry(reg)
+//	    defer SetDefaultConfigRegistry(nil)
+//	    // ... run tests
+//	}
+func SetDefaultConfigRegistry(reg *ConfigRegistry) {
+	defaultRegistryMu.Lock()
+	defer defaultRegistryMu.Unlock()
+	defaultRegistry = reg
+}
+
+// ResetDefaultConfigRegistry resets the default config registry to nil.
+// This forces re-initialization on next DefaultConfigRegistry() call.
+// Primarily for testing.
+func ResetDefaultConfigRegistry() {
+	defaultRegistryMu.Lock()
+	defer defaultRegistryMu.Unlock()
+	defaultRegistry = nil
+	preInitCapacity = 0
 }
 
 // NewConfigRegistry creates a registry with an optional initial capacity.

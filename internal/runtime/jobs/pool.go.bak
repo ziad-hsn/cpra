@@ -1,0 +1,319 @@
+package jobs
+
+import (
+	"sync"
+	"time"
+
+	"github.com/mlange-42/ark/ecs"
+)
+
+// BaseJob provides common fields and methods for all jobs.
+// Embed this in specific job structs to reduce duplication.
+type BaseJob struct {
+	EnqueueTime time.Time
+	StartTime   time.Time
+	Entity      ecs.Entity
+}
+
+// ResetBase clears common fields.
+func (b *BaseJob) ResetBase() {
+	b.EnqueueTime = time.Time{}
+	b.StartTime = time.Time{}
+	b.Entity = ecs.Entity{}
+}
+
+// Resettable interface for jobs that can be reset.
+type Resettable interface {
+	Reset()
+}
+
+// Top-level factory functions for sync.Pool - eliminates closure allocations at init
+func newPulseHTTPJob() any                 { return &PulseHTTPJob{} }
+func newPulseTCPJob() any                  { return &PulseTCPJob{} }
+func newPulseICMPJob() any                 { return &PulseICMPJob{} }
+func newInterventionDockerJob() any        { return &InterventionDockerJob{} }
+func newInterventionDockerStopJob() any    { return &InterventionDockerStopJob{} }
+func newInterventionDockerStartJob() any   { return &InterventionDockerStartJob{} }
+func newInterventionDockerKillJob() any    { return &InterventionDockerKillJob{} }
+func newInterventionDockerPauseJob() any   { return &InterventionDockerPauseJob{} }
+func newInterventionDockerUnpauseJob() any { return &InterventionDockerUnpauseJob{} }
+func newInterventionDockerScaleJob() any   { return &InterventionDockerScaleJob{} }
+func newCodeLogJob() any                   { return &CodeLogJob{} }
+func newCodePagerDutyJob() any             { return &CodePagerDutyJob{} }
+func newCodeSlackJob() any                 { return &CodeSlackJob{} }
+func newCodeEmailJob() any                 { return &CodeEmailJob{} }
+func newCodeWebhookJob() any               { return &CodeWebhookJob{} }
+
+var (
+	pulseHTTPJobPool = sync.Pool{New: newPulseHTTPJob}
+	pulseTCPJobPool  = sync.Pool{New: newPulseTCPJob}
+	pulseICMPJobPool = sync.Pool{New: newPulseICMPJob}
+
+	interventionDockerJobPool        = sync.Pool{New: newInterventionDockerJob}
+	interventionDockerStopJobPool    = sync.Pool{New: newInterventionDockerStopJob}
+	interventionDockerStartJobPool   = sync.Pool{New: newInterventionDockerStartJob}
+	interventionDockerKillJobPool    = sync.Pool{New: newInterventionDockerKillJob}
+	interventionDockerPauseJobPool   = sync.Pool{New: newInterventionDockerPauseJob}
+	interventionDockerUnpauseJobPool = sync.Pool{New: newInterventionDockerUnpauseJob}
+	interventionDockerScaleJobPool   = sync.Pool{New: newInterventionDockerScaleJob}
+
+	codeLogJobPool       = sync.Pool{New: newCodeLogJob}
+	codePagerDutyJobPool = sync.Pool{New: newCodePagerDutyJob}
+	codeSlackJobPool     = sync.Pool{New: newCodeSlackJob}
+	codeEmailJobPool     = sync.Pool{New: newCodeEmailJob}
+	codeWebhookJobPool   = sync.Pool{New: newCodeWebhookJob}
+)
+
+func getPulseHTTPJob() *PulseHTTPJob { return pulseHTTPJobPool.Get().(*PulseHTTPJob) }
+func getPulseTCPJob() *PulseTCPJob   { return pulseTCPJobPool.Get().(*PulseTCPJob) }
+func getPulseICMPJob() *PulseICMPJob { return pulseICMPJobPool.Get().(*PulseICMPJob) }
+
+func getInterventionDockerJob() *InterventionDockerJob {
+	return interventionDockerJobPool.Get().(*InterventionDockerJob)
+}
+func getInterventionDockerStopJob() *InterventionDockerStopJob {
+	return interventionDockerStopJobPool.Get().(*InterventionDockerStopJob)
+}
+func getInterventionDockerStartJob() *InterventionDockerStartJob {
+	return interventionDockerStartJobPool.Get().(*InterventionDockerStartJob)
+}
+func getInterventionDockerKillJob() *InterventionDockerKillJob {
+	return interventionDockerKillJobPool.Get().(*InterventionDockerKillJob)
+}
+func getInterventionDockerPauseJob() *InterventionDockerPauseJob {
+	return interventionDockerPauseJobPool.Get().(*InterventionDockerPauseJob)
+}
+func getInterventionDockerUnpauseJob() *InterventionDockerUnpauseJob {
+	return interventionDockerUnpauseJobPool.Get().(*InterventionDockerUnpauseJob)
+}
+func getInterventionDockerScaleJob() *InterventionDockerScaleJob {
+	return interventionDockerScaleJobPool.Get().(*InterventionDockerScaleJob)
+}
+
+func getCodeLogJob() *CodeLogJob             { return codeLogJobPool.Get().(*CodeLogJob) }
+func getCodePagerDutyJob() *CodePagerDutyJob { return codePagerDutyJobPool.Get().(*CodePagerDutyJob) }
+func getCodeSlackJob() *CodeSlackJob         { return codeSlackJobPool.Get().(*CodeSlackJob) }
+func getCodeEmailJob() *CodeEmailJob         { return codeEmailJobPool.Get().(*CodeEmailJob) }
+func getCodeWebhookJob() *CodeWebhookJob     { return codeWebhookJobPool.Get().(*CodeWebhookJob) }
+
+// ReleasePulseJob returns a pulse job back to its pool.
+func ReleasePulseJob(job Job) {
+	if resettable, ok := job.(Resettable); ok {
+		resettable.Reset()
+	}
+	switch j := job.(type) {
+	case *PulseHTTPJob:
+		pulseHTTPJobPool.Put(j)
+	case *PulseTCPJob:
+		pulseTCPJobPool.Put(j)
+	case *PulseICMPJob:
+		pulseICMPJobPool.Put(j)
+	}
+}
+
+// ReleaseInterventionJob returns an intervention job back to its pool.
+func ReleaseInterventionJob(job Job) {
+	if resettable, ok := job.(Resettable); ok {
+		resettable.Reset()
+	}
+	switch j := job.(type) {
+	case *InterventionDockerJob:
+		interventionDockerJobPool.Put(j)
+	case *InterventionDockerStopJob:
+		interventionDockerStopJobPool.Put(j)
+	case *InterventionDockerStartJob:
+		interventionDockerStartJobPool.Put(j)
+	case *InterventionDockerKillJob:
+		interventionDockerKillJobPool.Put(j)
+	case *InterventionDockerPauseJob:
+		interventionDockerPauseJobPool.Put(j)
+	case *InterventionDockerUnpauseJob:
+		interventionDockerUnpauseJobPool.Put(j)
+	case *InterventionDockerScaleJob:
+		interventionDockerScaleJobPool.Put(j)
+	}
+}
+
+// ReleaseCodeJob returns a code job back to its pool.
+func ReleaseCodeJob(job Job) {
+	if resettable, ok := job.(Resettable); ok {
+		resettable.Reset()
+	}
+	switch j := job.(type) {
+	case *CodeLogJob:
+		codeLogJobPool.Put(j)
+	case *CodePagerDutyJob:
+		codePagerDutyJobPool.Put(j)
+	case *CodeSlackJob:
+		codeSlackJobPool.Put(j)
+	case *CodeEmailJob:
+		codeEmailJobPool.Put(j)
+	case *CodeWebhookJob:
+		codeWebhookJobPool.Put(j)
+	}
+}
+
+// PulseHTTPJob Reset implementation
+func (j *PulseHTTPJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.URL = ""
+	j.Method = ""
+	j.Host = ""
+	j.IsTLS = false
+	j.Timeout = 0
+	j.Retries = 0
+	// JobType and Driver are set on creation, don't clear
+}
+
+func (j *PulseTCPJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Host = ""
+	j.Port = 0
+	j.Timeout = 0
+	j.Retries = 0
+}
+
+func (j *PulseICMPJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Host = ""
+	j.Timeout = 0
+	j.Count = 0
+	j.Retries = 0
+	j.IgnorePrivilege = false
+}
+
+func (j *InterventionDockerJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.DockerHost = ""
+	j.Timeout = 0
+	j.Retries = 0
+}
+
+func (j *InterventionDockerStopJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.Timeout = 0
+	j.Retries = 0
+}
+
+func (j *InterventionDockerStartJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.Timeout = 0
+	j.Retries = 0
+}
+
+func (j *InterventionDockerKillJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.Signal = ""
+	j.Retries = 0
+}
+
+func (j *InterventionDockerPauseJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.Retries = 0
+}
+
+func (j *InterventionDockerUnpauseJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Container = ""
+	j.Retries = 0
+}
+
+func (j *InterventionDockerScaleJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Service = ""
+	j.Replicas = 0
+	j.Retries = 0
+}
+
+func (j *CodeLogJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.Message = ""
+	j.Level = ""
+	j.Payload = nil
+}
+
+func (j *CodePagerDutyJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.RoutingKey = ""
+	j.Summary = ""
+	j.Severity = ""
+	j.Source = ""
+	j.DedupKey = ""
+	j.Payload = nil
+}
+
+func (j *CodeSlackJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.WebhookURL = ""
+	j.Message = ""
+	j.Channel = ""
+	j.Payload = nil
+}
+
+func (j *CodeEmailJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.To = nil
+	j.Subject = ""
+	j.Body = ""
+	j.Payload = nil
+}
+
+func (j *CodeWebhookJob) Reset() {
+	if j == nil {
+		return
+	}
+	j.ResetBase()
+	j.URL = ""
+	j.Method = ""
+	j.Headers = nil
+	j.Body = ""
+	j.Timeout = 0
+	j.Payload = nil
+}

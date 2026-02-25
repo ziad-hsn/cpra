@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cpra/internal/queue"
+	"cpra/internal/logger"
+	"cpra/internal/runtime/queue"
 
 	"github.com/mlange-42/ark-tools/resource"
 	"github.com/mlange-42/ark/ecs"
-	"go.uber.org/zap"
 )
 
 // ComponentStatus represents the health state of a monitored component.
@@ -57,7 +57,7 @@ type poolState struct {
 // Watchdog monitors all CPRA system components for health.
 type Watchdog struct {
 	controller *Controller
-	logger     *zap.SugaredLogger
+	logger     logger.Logger
 	config     WatchdogConfig
 	heartbeat  chan<- struct{}
 
@@ -76,10 +76,10 @@ type Watchdog struct {
 }
 
 // NewWatchdog creates a new watchdog for the given controller.
-func NewWatchdog(ctrl *Controller, config WatchdogConfig, heartbeat chan<- struct{}, logger *zap.SugaredLogger) *Watchdog {
+func NewWatchdog(ctrl *Controller, config WatchdogConfig, heartbeat chan<- struct{}, log logger.Logger) *Watchdog {
 	return &Watchdog{
 		controller: ctrl,
-		logger:     logger,
+		logger:     log,
 		config:     config,
 		heartbeat:  heartbeat,
 		poolStates: map[string]*poolState{
@@ -101,12 +101,12 @@ func (w *Watchdog) Run(ctx context.Context) error {
 	ticker := time.NewTicker(w.config.CheckInterval)
 	defer ticker.Stop()
 
-	w.logger.Infof("Watchdog started (interval=%v)", w.config.CheckInterval)
+	w.logger.Info("Watchdog started", logger.Field{Key: "interval", Value: w.config.CheckInterval})
 
 	for {
 		select {
 		case <-w.ctx.Done():
-			w.logger.Infof("Watchdog stopped")
+			w.logger.Info("Watchdog stopped")
 			return nil
 		case <-ticker.C:
 			w.checkAllComponents()
@@ -135,12 +135,12 @@ func (w *Watchdog) sendHeartbeat() {
 func (w *Watchdog) checkAllComponents() {
 	w.checkController()
 	w.checkApp()
-	w.checkPool("pulse", w.controller.pulsePool)
-	w.checkPool("intervention", w.controller.interventionPool)
-	w.checkPool("code", w.controller.codePool)
-	w.checkQueue("pulse", w.controller.pulseQueue)
-	w.checkQueue("intervention", w.controller.interventionQueue)
-	w.checkQueue("code", w.controller.codeQueue)
+	w.checkPool("pulse", w.controller.pools.Pulse())
+	w.checkPool("intervention", w.controller.pools.Intervention())
+	w.checkPool("code", w.controller.pools.Code())
+	w.checkQueue("pulse", w.controller.queues.Pulse())
+	w.checkQueue("intervention", w.controller.queues.Intervention())
+	w.checkQueue("code", w.controller.queues.Code())
 }
 
 // checkController verifies the controller is running.
@@ -166,9 +166,9 @@ func (w *Watchdog) checkController() {
 	// Log only on status change
 	if status != w.lastControllerStatus {
 		if status == StatusUnhealthy {
-			w.logger.Warnw("Controller unhealthy", "running", running, "ctx_active", ctxActive)
+			w.logger.Warn("Controller unhealthy", logger.Field{Key: "running", Value: running}, logger.Field{Key: "ctx_active", Value: ctxActive})
 		} else if w.lastControllerStatus == StatusUnhealthy {
-			w.logger.Infow("Controller recovered", "running", running)
+			w.logger.Info("Controller recovered", logger.Field{Key: "running", Value: running})
 		}
 		w.lastControllerStatus = status
 	}
@@ -192,14 +192,14 @@ func (w *Watchdog) checkApp() {
 	if w.lastAppTick == currentTick && w.controller.running.Load() {
 		w.tickStallCount++
 		if w.tickStallCount == w.config.TickStallThreshold {
-			w.logger.Warnw("App tick stalled",
-				"tick", currentTick,
-				"stall_count", w.tickStallCount,
-				"threshold", w.config.TickStallThreshold)
+			w.logger.Warn("App tick stalled",
+				logger.Field{Key: "tick", Value: currentTick},
+				logger.Field{Key: "stall_count", Value: w.tickStallCount},
+				logger.Field{Key: "threshold", Value: w.config.TickStallThreshold})
 		}
 	} else {
 		if w.tickStallCount >= w.config.TickStallThreshold {
-			w.logger.Infow("App tick resumed", "tick", currentTick)
+			w.logger.Info("App tick resumed", logger.Field{Key: "tick", Value: currentTick})
 		}
 		w.tickStallCount = 0
 		w.lastAppTick = currentTick
@@ -247,19 +247,19 @@ func (w *Watchdog) checkPool(name string, pool *queue.DynamicWorkerPool) {
 	if status != state.lastStatus {
 		switch status {
 		case StatusUnhealthy:
-			w.logger.Warnw("Pool unhealthy",
-				"pool", name,
-				"running_workers", stats.RunningWorkers,
-				"pending", stats.TasksSubmitted-stats.TasksCompleted,
-				"stall_count", state.stallCount)
+			w.logger.Warn("Pool unhealthy",
+				logger.Field{Key: "pool", Value: name},
+				logger.Field{Key: "running_workers", Value: stats.RunningWorkers},
+				logger.Field{Key: "pending", Value: stats.TasksSubmitted - stats.TasksCompleted},
+				logger.Field{Key: "stall_count", Value: state.stallCount})
 		case StatusDegraded:
-			w.logger.Warnw("Pool degraded",
-				"pool", name,
-				"pending", stats.TasksSubmitted-stats.TasksCompleted,
-				"stall_count", state.stallCount)
+			w.logger.Warn("Pool degraded",
+				logger.Field{Key: "pool", Value: name},
+				logger.Field{Key: "pending", Value: stats.TasksSubmitted - stats.TasksCompleted},
+				logger.Field{Key: "stall_count", Value: state.stallCount})
 		case StatusHealthy:
 			if state.lastStatus != StatusHealthy {
-				w.logger.Infow("Pool recovered", "pool", name)
+				w.logger.Info("Pool recovered", logger.Field{Key: "pool", Value: name})
 			}
 		}
 		state.lastStatus = status
@@ -283,10 +283,10 @@ func (w *Watchdog) checkQueue(name string, q queue.Queue) {
 
 	// Log only when approaching capacity (>90%)
 	if utilization > 0.9 {
-		w.logger.Warnw("Queue near capacity",
-			"queue", name,
-			"depth", stats.QueueDepth,
-			"capacity", stats.Capacity,
-			"utilization", utilization)
+		w.logger.Warn("Queue near capacity",
+			logger.Field{Key: "queue", Value: name},
+			logger.Field{Key: "depth", Value: stats.QueueDepth},
+			logger.Field{Key: "capacity", Value: stats.Capacity},
+			logger.Field{Key: "utilization", Value: utilization})
 	}
 }

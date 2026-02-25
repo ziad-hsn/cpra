@@ -1,0 +1,67 @@
+# CPRA (Concurrent Pulse-Remediation-Alerting) - Production Docker Image
+# Simplified single-stage build using pre-built binary
+#
+# Build (local): go build -tags=ark_tiny -o bin/cpra ./cmd/cpra
+# Build (Docker): docker build -f Dockerfile.binary -t cpra:latest .
+# Run: docker run --rm -p 8080:8080 --name cpra cpra:latest
+#
+# Created: 2025-02-16
+# Version: v2025.0.0
+# Phase: Phase 2 Complete - K8s Native
+
+FROM alpine:3.20
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    wget \
+    tini
+
+# Create non-root user for security (Alpine uses adduser, not useradd)
+RUN addgroup -g 65535 cpra && \
+    adduser -u 65535 -D -G cpra cpra && \
+    mkdir -p /var/log/cpra && \
+    chown -R cpra:cpra /var/log/cpra && \
+    chmod 755 /var/log/cpra
+
+# Copy pre-built CPRA binary
+COPY --chown=cpra:cpra bin/cpra /bin/cpra
+
+# Verify binary was copied successfully
+RUN test -f /bin/cpra && chmod +x /bin/cpra || (echo "Binary copy failed" && exit 1)
+
+# Set minimal PATH
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Expose ports
+# Health check API
+EXPOSE 8080
+# Pprof server
+EXPOSE 6060
+
+# Environment variables
+ENV CPRA_ENV=production
+ENV CPRA_DEBUG=false
+ENV CPRA_LOG_LEVEL=info
+
+# Health check for Kubernetes readiness
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --retries=3 --timeout=2s -O- http://localhost:8080/health || exit 1
+
+# Run CPRA as non-root user
+USER cpra
+
+# Security: run as non-root, no unnecessary privileges
+ENTRYPOINT ["/sbin/tini", "--", "/bin/cpra"]
+
+# Metadata for observability and scanning
+LABEL org.opencontainers.image.title="CPRA Monitoring" \
+      org.opencontainers.image.description="Concurrent Pulse-Remediation-Alerting for 1M+ monitors" \
+      org.opencontainers.image.version="v2025.0.0" \
+      org.opencontainers.image.vendor="CPRA Project" \
+      org.opencontainers.image.created="2025-02-16" \
+      org.opencontainers.image.revision="4" \
+      org.opencontainers.image.source="https://github.com/project/cpra" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.authors="ziad" \
+      org.opencontainers.image.documentation="https://github.com/project/cpra/blob/main/README.md"

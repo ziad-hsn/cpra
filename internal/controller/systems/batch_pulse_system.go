@@ -36,7 +36,7 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/queue"
+	"cpra/internal/runtime/queue"
 	"sync"
 	"time"
 
@@ -255,6 +255,7 @@ func (s *BatchPulseSystem) processBatch(jobs *[]interface{}, scheduled *[]schedu
 		state.Flags &^= components.StatePulseFirstCheck
 		state.Flags &^= components.StatePulseNeeded
 		state.Flags |= components.StatePulsePending
+		state.PulseRunVersion = state.ConfigVersion
 		state.LastPulseCheckTime = now
 		state.LastEventTime = now
 		state.NextCheckTime = now.Add(item.interval)

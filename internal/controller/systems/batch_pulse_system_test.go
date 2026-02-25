@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/queue"
+	"cpra/internal/runtime/jobs"
+	"cpra/internal/runtime/queue"
 
 	"github.com/mlange-42/ark/ecs"
 	"go.uber.org/zap"
@@ -179,12 +179,13 @@ func TestNewBatchPulseSystem(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	logger := zap.NewNop().Sugar()
 	stateLogger := newNoopStateLogger()
 
-	system := NewBatchPulseSystem(&world, mockQ, 100, logger, stateLogger, 10)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, logger, stateLogger, 10)
 
 	if system == nil {
 		t.Fatal("NewBatchPulseSystem returned nil")
@@ -202,19 +203,20 @@ func TestNewBatchPulseSystem_DefaultShardSlots(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	logger := zap.NewNop().Sugar()
 	stateLogger := newNoopStateLogger()
 
 	// shardSlots <= 0 should use default
-	system := NewBatchPulseSystem(world, mockQ, 100, logger, stateLogger, 0)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, logger, stateLogger, 0)
 
 	if system.shardSlots != components.DefaultShardSlots {
 		t.Errorf("shardSlots = %d, want %d", system.shardSlots, components.DefaultShardSlots)
 	}
 
-	system2 := NewBatchPulseSystem(world, mockQ, 100, logger, stateLogger, -5)
+	system2 := NewBatchPulseSystem(worldPtr, mockQ, 100, logger, stateLogger, -5)
 	if system2.shardSlots != components.DefaultShardSlots {
 		t.Errorf("shardSlots = %d, want %d", system2.shardSlots, components.DefaultShardSlots)
 	}
@@ -225,15 +227,16 @@ func TestBatchPulseSystem_Initialize(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	logger := zap.NewNop().Sugar()
 	stateLogger := newNoopStateLogger()
 
-	system := NewBatchPulseSystem(world, mockQ, 100, logger, stateLogger, 10)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, logger, stateLogger, 10)
 
 	// Should not panic
-	system.Initialize(world)
+	system.Initialize(worldPtr)
 }
 
 func TestBatchPulseSystem_SetMaxDispatch(t *testing.T) {
@@ -243,7 +246,7 @@ func TestBatchPulseSystem_SetMaxDispatch(t *testing.T) {
 	defer world.Reset()
 
 	mockQ := newMockQueue(1000)
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
 
 	system.SetMaxDispatch(50)
 	if system.maxDispatch != 50 {
@@ -258,10 +261,10 @@ func TestBatchPulseSystem_Finalize(t *testing.T) {
 	defer world.Reset()
 
 	mockQ := newMockQueue(1000)
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
 
 	// Should not panic
-	system.Finalize(world)
+	system.Finalize(&world)
 }
 
 func TestBatchPulseSystem_Update_NoEntities(t *testing.T) {
@@ -271,11 +274,11 @@ func TestBatchPulseSystem_Update_NoEntities(t *testing.T) {
 	defer world.Reset()
 
 	mockQ := newMockQueue(1000)
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), newNoopStateLogger(), 10)
+	system.Initialize(&world)
 
 	// Update with no entities should not panic
-	system.Update(world)
+	system.Update(&world)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 0 {
@@ -291,11 +294,11 @@ func TestBatchPulseSystem_Update_ProcessesEntities(t *testing.T) {
 
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(&world)
 
 	// Create mapper for entities
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](&world)
 
 	// Create entities with first check flag set
 	for i := 0; i < 10; i++ {
@@ -316,7 +319,7 @@ func TestBatchPulseSystem_Update_ProcessesEntities(t *testing.T) {
 	}
 
 	// Update should process entities
-	system.Update(world)
+	system.Update(&world)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 10 {
@@ -333,10 +336,10 @@ func TestBatchPulseSystem_Update_ShardFiltering(t *testing.T) {
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
 	shardSlots := 10
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, shardSlots)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, shardSlots)
+	system.Initialize(&world)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](&world)
 
 	// Create 100 entities distributed across 10 shards
 	for i := 0; i < 100; i++ {
@@ -357,7 +360,7 @@ func TestBatchPulseSystem_Update_ShardFiltering(t *testing.T) {
 	}
 
 	// First update should process only 1 shard (10 entities)
-	system.Update(world)
+	system.Update(&world)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 10 {
@@ -373,10 +376,10 @@ func TestBatchPulseSystem_Update_SkipsPendingEntities(t *testing.T) {
 
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(&world)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](&world)
 
 	// Create entity with already pending flag
 	mapper.NewEntity(
@@ -392,7 +395,7 @@ func TestBatchPulseSystem_Update_SkipsPendingEntities(t *testing.T) {
 		&components.Shard{ID: 0},
 	)
 
-	system.Update(world)
+	system.Update(&world)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 0 {
@@ -408,10 +411,10 @@ func TestBatchPulseSystem_Update_SkipsNilJobs(t *testing.T) {
 
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(&world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(&world)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](&world)
 
 	// Entity with nil job
 	mapper.NewEntity(
@@ -441,7 +444,7 @@ func TestBatchPulseSystem_Update_SkipsNilJobs(t *testing.T) {
 		&components.Shard{ID: 0},
 	)
 
-	system.Update(world)
+	system.Update(&world)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 0 {
@@ -454,14 +457,15 @@ func TestBatchPulseSystem_Update_QueueSaturated(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(100)
 	mockQ.setDepth(90) // 90% full
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	for i := 0; i < 10; i++ {
 		mapper.NewEntity(
@@ -478,7 +482,7 @@ func TestBatchPulseSystem_Update_QueueSaturated(t *testing.T) {
 		)
 	}
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	// Should still process but with reduced tokens due to capacity limits
 	enqueued := mockQ.getEnqueued()
@@ -491,15 +495,15 @@ func TestBatchPulseSystem_Update_QueueFull(t *testing.T) {
 	t.Parallel()
 
 	world := ecs.NewWorld()
-	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(100)
 	mockQ.setDepth(100) // Full
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	mapper.NewEntity(
 		&components.MonitorState{
@@ -514,7 +518,7 @@ func TestBatchPulseSystem_Update_QueueFull(t *testing.T) {
 		&components.Shard{ID: 0},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 0 {
@@ -527,14 +531,15 @@ func TestBatchPulseSystem_Update_UnboundedQueue(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
-	// Capacity <= 0 signals unbounded queue
-	mockQ := newMockQueue(0)
+	// Use a very large capacity to simulate unbounded queue
+	mockQ := newMockQueue(100000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	for i := 0; i < 50; i++ {
 		mapper.NewEntity(
@@ -551,7 +556,7 @@ func TestBatchPulseSystem_Update_UnboundedQueue(t *testing.T) {
 		)
 	}
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 50 {
@@ -564,14 +569,15 @@ func TestBatchPulseSystem_Update_MaxDispatchLimit(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
 	system.SetMaxDispatch(5)
-	system.Initialize(world)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	for i := 0; i < 20; i++ {
 		mapper.NewEntity(
@@ -588,7 +594,7 @@ func TestBatchPulseSystem_Update_MaxDispatchLimit(t *testing.T) {
 		)
 	}
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	enqueued := mockQ.getEnqueued()
 	if len(enqueued) != 5 {
@@ -601,13 +607,14 @@ func TestBatchPulseSystem_Update_TransitionsState(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -622,10 +629,10 @@ func TestBatchPulseSystem_Update_TransitionsState(t *testing.T) {
 		&components.Shard{ID: 0},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	// Verify state transition
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulseFirstCheck != 0 {
@@ -650,16 +657,17 @@ func TestBatchPulseSystem_Update_EnqueueBatchError(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	mockQ := newMockQueue(1000)
 	mockQ.enqueueBatch = func(jobs []interface{}) error {
 		return errors.New("simulated enqueue error")
 	}
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseSystem(world, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
-	system.Initialize(world)
+	system := NewBatchPulseSystem(worldPtr, mockQ, 100, zap.NewNop().Sugar(), stateLogger, 1)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+	mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -674,10 +682,10 @@ func TestBatchPulseSystem_Update_EnqueueBatchError(t *testing.T) {
 		&components.Shard{ID: 0},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	// State should NOT transition on error
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulsePending != 0 {
@@ -757,11 +765,12 @@ func TestNewBatchPulseScheduleSystem(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	logger := zap.NewNop().Sugar()
 	stateLogger := newNoopStateLogger()
 
-	system := NewBatchPulseScheduleSystem(world, logger, stateLogger)
+	system := NewBatchPulseScheduleSystem(worldPtr, logger, stateLogger)
 
 	if system == nil {
 		t.Fatal("NewBatchPulseScheduleSystem returned nil")
@@ -776,8 +785,9 @@ func TestBatchPulseScheduleSystem_SetMaxSchedulePerTick(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), newNoopStateLogger())
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), newNoopStateLogger())
 
 	system.SetMaxSchedulePerTick(500)
 	if system.maxSchedulePerTick != 500 {
@@ -801,11 +811,12 @@ func TestBatchPulseScheduleSystem_Initialize(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), newNoopStateLogger())
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), newNoopStateLogger())
 
 	// Should not panic
-	system.Initialize(world)
+	system.Initialize(worldPtr)
 }
 
 func TestBatchPulseScheduleSystem_Finalize(t *testing.T) {
@@ -813,11 +824,12 @@ func TestBatchPulseScheduleSystem_Finalize(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), newNoopStateLogger())
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), newNoopStateLogger())
 
 	// Should not panic
-	system.Finalize(world)
+	system.Finalize(worldPtr)
 }
 
 func TestBatchPulseScheduleSystem_Update_NoEntities(t *testing.T) {
@@ -825,12 +837,13 @@ func TestBatchPulseScheduleSystem_Update_NoEntities(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), newNoopStateLogger())
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), newNoopStateLogger())
+	system.Initialize(worldPtr)
 
 	// Should not panic with no entities
-	system.Update(world)
+	system.Update(worldPtr)
 }
 
 func TestBatchPulseScheduleSystem_Update_SchedulesFirstCheck(t *testing.T) {
@@ -838,12 +851,13 @@ func TestBatchPulseScheduleSystem_Update_SchedulesFirstCheck(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -854,9 +868,9 @@ func TestBatchPulseScheduleSystem_Update_SchedulesFirstCheck(t *testing.T) {
 		},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulseNeeded == 0 {
@@ -872,12 +886,13 @@ func TestBatchPulseScheduleSystem_Update_SchedulesDueEntities(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -889,9 +904,9 @@ func TestBatchPulseScheduleSystem_Update_SchedulesDueEntities(t *testing.T) {
 		},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulseNeeded == 0 {
@@ -904,12 +919,13 @@ func TestBatchPulseScheduleSystem_Update_SkipsNotDue(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -921,9 +937,9 @@ func TestBatchPulseScheduleSystem_Update_SkipsNotDue(t *testing.T) {
 		},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulseNeeded != 0 {
@@ -936,12 +952,13 @@ func TestBatchPulseScheduleSystem_Update_SkipsAlreadyNeeded(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	mapper.NewEntity(
 		&components.MonitorState{
@@ -953,7 +970,7 @@ func TestBatchPulseScheduleSystem_Update_SkipsAlreadyNeeded(t *testing.T) {
 	)
 
 	// System should not duplicate the flag or cause issues
-	system.Update(world)
+	system.Update(worldPtr)
 }
 
 func TestBatchPulseScheduleSystem_Update_SkipsPending(t *testing.T) {
@@ -961,12 +978,13 @@ func TestBatchPulseScheduleSystem_Update_SkipsPending(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-	system.Initialize(world)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	ent := mapper.NewEntity(
 		&components.MonitorState{
@@ -978,9 +996,9 @@ func TestBatchPulseScheduleSystem_Update_SkipsPending(t *testing.T) {
 		},
 	)
 
-	system.Update(world)
+	system.Update(worldPtr)
 
-	stateMapper := ecs.NewMap[components.MonitorState](world)
+	stateMapper := ecs.NewMap[components.MonitorState](worldPtr)
 	state := stateMapper.Get(ent)
 
 	if state.Flags&components.StatePulseNeeded != 0 {
@@ -993,13 +1011,14 @@ func TestBatchPulseScheduleSystem_Update_MaxScheduleLimit(t *testing.T) {
 
 	world := ecs.NewWorld()
 	defer world.Reset()
+	worldPtr := &world
 
 	stateLogger := newNoopStateLogger()
-	system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
+	system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
 	system.SetMaxSchedulePerTick(5)
-	system.Initialize(world)
+	system.Initialize(worldPtr)
 
-	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+	mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 	for i := 0; i < 20; i++ {
 		mapper.NewEntity(
@@ -1012,10 +1031,10 @@ func TestBatchPulseScheduleSystem_Update_MaxScheduleLimit(t *testing.T) {
 		)
 	}
 
-	system.Update(world)
+	system.Update(worldPtr)
 
 	// Count how many have StatePulseNeeded set
-	filter := ecs.NewFilter1[components.MonitorState](world)
+	filter := ecs.NewFilter1[components.MonitorState](worldPtr)
 	query := filter.Query()
 	scheduledCount := 0
 	for query.Next() {
@@ -1041,6 +1060,7 @@ func BenchmarkBatchPulseSystem_Update(b *testing.B) {
 		b.Run(fmt.Sprintf("entities_%d", size), func(b *testing.B) {
 			world := ecs.NewWorld()
 			defer world.Reset()
+			worldPtr := &world
 
 			mockQ := newMockQueue(size * 2)
 			stateLogger := newNoopStateLogger()
@@ -1048,10 +1068,10 @@ func BenchmarkBatchPulseSystem_Update(b *testing.B) {
 			if shardSlots < 1 {
 				shardSlots = 1
 			}
-			system := NewBatchPulseSystem(world, mockQ, 1000, zap.NewNop().Sugar(), stateLogger, shardSlots)
-			system.Initialize(world)
+			system := NewBatchPulseSystem(worldPtr, mockQ, 1000, zap.NewNop().Sugar(), stateLogger, shardSlots)
+			system.Initialize(worldPtr)
 
-			mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](world)
+			mapper := ecs.NewMap4[components.MonitorState, components.JobStorage, components.PulseConfig, components.Shard](worldPtr)
 
 			for i := 0; i < size; i++ {
 				mapper.NewEntity(
@@ -1074,7 +1094,7 @@ func BenchmarkBatchPulseSystem_Update(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				system.Update(world)
+				system.Update(worldPtr)
 			}
 		})
 	}
@@ -1087,12 +1107,13 @@ func BenchmarkBatchPulseScheduleSystem_Update(b *testing.B) {
 		b.Run(fmt.Sprintf("entities_%d", size), func(b *testing.B) {
 			world := ecs.NewWorld()
 			defer world.Reset()
+			worldPtr := &world
 
 			stateLogger := newNoopStateLogger()
-			system := NewBatchPulseScheduleSystem(world, zap.NewNop().Sugar(), stateLogger)
-			system.Initialize(world)
+			system := NewBatchPulseScheduleSystem(worldPtr, zap.NewNop().Sugar(), stateLogger)
+			system.Initialize(worldPtr)
 
-			mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](world)
+			mapper := ecs.NewMap2[components.MonitorState, components.PulseConfig](worldPtr)
 
 			for i := 0; i < size; i++ {
 				mapper.NewEntity(
@@ -1109,7 +1130,7 @@ func BenchmarkBatchPulseScheduleSystem_Update(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				system.Update(world)
+				system.Update(worldPtr)
 			}
 		})
 	}

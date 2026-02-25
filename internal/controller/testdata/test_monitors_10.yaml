@@ -1,0 +1,36 @@
+monitors:
+  - &base
+    name: test-monitor-01
+    enabled: true
+    pulse_check:
+      type: http
+      interval: 5s
+      timeout: 2s
+      retries: 1
+      config:
+        url: http://localhost:18080/health
+        method: GET
+    codes:
+      red:
+        notify: log
+        config:
+          file: ""
+
+  - <<: *base
+    name: test-monitor-02
+  - <<: *base
+    name: test-monitor-03
+  - <<: *base
+    name: test-monitor-04
+  - <<: *base
+    name: test-monitor-05
+  - <<: *base
+    name: test-monitor-06
+  - <<: *base
+    name: test-monitor-07
+  - <<: *base
+    name: test-monitor-08
+  - <<: *base
+    name: test-monitor-09
+  - <<: *base
+    name: test-monitor-10

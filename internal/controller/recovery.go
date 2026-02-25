@@ -2,6 +2,7 @@ package controller
 
 import (
 	"cpra/internal/controller/entities"
+	"cpra/internal/logger"
 	"runtime/debug"
 	"time"
 
@@ -15,12 +16,14 @@ type RecoverySystem struct {
 	ErrorCount  int
 	MaxErrors   int
 	ResetWindow time.Duration
+	Logger      logger.Logger
 }
 
-func NewRecoverySystem(maxErrors int, resetWindow time.Duration) *RecoverySystem {
+func NewRecoverySystem(log logger.Logger, maxErrors int, resetWindow time.Duration) *RecoverySystem {
 	return &RecoverySystem{
 		MaxErrors:   maxErrors,
 		ResetWindow: resetWindow,
+		Logger:      log,
 	}
 }
 
@@ -31,16 +34,16 @@ func (r *RecoverySystem) SafeSystemUpdate(systemName string, updateFunc func() e
 			r.ErrorCount++
 			r.LastError = time.Now()
 
-			if SystemLogger != nil {
-				SystemLogger.Errorf("PANIC in system %s: %v", systemName, recovered)
-				SystemLogger.Errorf("Stack trace: %s", debug.Stack())
-			}
+			r.Logger.Error("PANIC in system",
+				logger.Field{Key: "system", Value: systemName},
+				logger.Field{Key: "error", Value: recovered},
+				logger.Field{Key: "stack", Value: string(debug.Stack())})
 
 			// Circuit breaker logic
 			if r.ErrorCount >= r.MaxErrors {
-				if SystemLogger != nil {
-					SystemLogger.Errorf("System %s exceeded max errors (%d), entering degraded mode", systemName, r.MaxErrors)
-				}
+				r.Logger.Error("System exceeded max errors, entering degraded mode",
+					logger.Field{Key: "system", Value: systemName},
+					logger.Field{Key: "max_errors", Value: r.MaxErrors})
 			}
 		}
 	}()
@@ -68,15 +71,11 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 	if r.Mapper != nil {
 		state := r.Mapper.GetMonitorState(entity)
 		if state == nil {
-			if SystemLogger != nil {
-				SystemLogger.Warnf("Entity %v missing MonitorState component", entity)
-			}
+			r.Logger.Warn("Entity missing MonitorState component", logger.Field{Key: "entity", Value: entity})
 			return false
 		}
 		if state.Name == "" {
-			if SystemLogger != nil {
-				SystemLogger.Warnf("Entity %v missing Name component", entity)
-			}
+			r.Logger.Warn("Entity missing Name component", logger.Field{Key: "entity", Value: entity})
 			return false
 		}
 	}
@@ -88,7 +87,5 @@ func (r *RecoverySystem) ValidateEntityHealth(w *ecs.World, entity ecs.Entity) b
 func (r *RecoverySystem) CleanupOrphanedComponents(w *ecs.World) {
 	// This would need specific implementation based on component tracking
 	// For now, log the cleanup intent
-	if SystemLogger != nil {
-		SystemLogger.Infof("Cleanup cycle: %d entities active", w.Stats().Entities.Used)
-	}
+	r.Logger.Info("Cleanup cycle", logger.Field{Key: "active_entities", Value: w.Stats().Entities.Used})
 }

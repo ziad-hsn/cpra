@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
+	"cpra/internal/runtime/jobs"
 )
 
 var (

@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
+	"cpra/internal/runtime/jobs"
+	"cpra/internal/platform/loader/schema"
 )
 
 // DefaultShardSlots defines the baseline number of time-partition slots used to spread work across ticks.
@@ -37,19 +37,26 @@ type Disabled struct{}
 // MonitorState consolidates all monitor state into a single component.
 // This approach dramatically reduces archetype fragmentation and improves cache locality.
 type MonitorState struct {
-	LastPulseCheckTime   time.Time
-	LastEventTime        time.Time
-	LastSuccessTime      time.Time
-	NextCheckTime        time.Time
-	LastError            error
-	Name                 string
-	ConsecutiveFailures  int
-	PulseFailures        int
-	InterventionFailures int
-	RecoveryStreak       int
-	VerifyRemaining      int
-	Flags                uint32
-	PendingColor         ColorCode
+	LastPulseCheckTime     time.Time
+	LastEventTime          time.Time
+	LastSuccessTime        time.Time
+	NextCheckTime          time.Time
+	LastError              error
+	ID                     string
+	Name                   string
+	Slug                   string
+	Metadata               any
+	ConsecutiveFailures    int
+	PulseFailures          int
+	InterventionFailures   int
+	RecoveryStreak         int
+	VerifyRemaining        int
+	ConfigVersion          uint64
+	PulseRunVersion        uint64
+	InterventionRunVersion uint64
+	CodeRunVersion         uint64
+	Flags                  uint32
+	PendingColor           ColorCode
 }
 
 // StatePulseNeeded is a state flag constant; additional related flags follow in this block.
@@ -221,6 +228,7 @@ func (m *MonitorState) SetCodePending(pending bool) {
 type PulseConfig struct {
 	Config             schema.PulseConfig
 	Type               string
+	Groups             []string
 	Timeout            time.Duration
 	Interval           time.Duration
 	Retries            int
@@ -234,6 +242,7 @@ func (c *PulseConfig) Copy() *PulseConfig {
 	}
 	cpy := &PulseConfig{
 		Type:               strings.Clone(c.Type),
+		Groups:             append([]string(nil), c.Groups...),
 		Timeout:            c.Timeout,
 		Interval:           c.Interval,
 		Retries:            c.Retries,
@@ -251,6 +260,7 @@ func (c *PulseConfig) Copy() *PulseConfig {
 type InterventionConfig struct {
 	Target      schema.InterventionTarget
 	Action      string
+	Retries     int
 	MaxFailures int
 }
 
@@ -260,6 +270,7 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 	}
 	cpy := &InterventionConfig{
 		Action:      strings.Clone(c.Action),
+		Retries:     c.Retries,
 		MaxFailures: c.MaxFailures,
 	}
 
@@ -439,4 +450,10 @@ type InterventionResult struct {
 
 type CodeResult struct {
 	Result jobs.Result
+}
+
+// PendingUpdate stores a deferred monitor update to apply once it is safe.
+type PendingUpdate struct {
+	Spec        *schema.Monitor
+	RequestedAt time.Time
 }

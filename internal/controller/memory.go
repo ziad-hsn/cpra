@@ -4,6 +4,10 @@ import (
 	"runtime"
 	"runtime/debug"
 	"time"
+
+	"github.com/dustin/go-humanize"
+
+	"cpra/internal/logger"
 )
 
 // MemoryManager handles memory optimization and monitoring
@@ -13,13 +17,15 @@ type MemoryManager struct {
 	maxMemory      uint64
 	gcInterval     time.Duration
 	alertThreshold float64
+	logger         logger.Logger
 }
 
-func NewMemoryManager(maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager {
+func NewMemoryManager(log logger.Logger, maxMemoryGB uint64, gcIntervalSeconds int) *MemoryManager {
 	return &MemoryManager{
 		maxMemory:      maxMemoryGB << 30, // Convert GB to bytes
 		gcInterval:     time.Duration(gcIntervalSeconds) * time.Second,
 		alertThreshold: 0.8, // Alert at 80% memory usage
+		logger:         log,
 	}
 }
 
@@ -31,12 +37,10 @@ func (m *MemoryManager) MonitorMemory() {
 	usagePercent := float64(currentUsage) / float64(m.maxMemory)
 
 	if usagePercent > m.alertThreshold {
-		if SystemLogger != nil {
-			SystemLogger.Warnf("HIGH MEMORY USAGE: %.2f%% (%d MB / %d MB)",
-				usagePercent*100,
-				currentUsage>>20,
-				m.maxMemory>>20)
-		}
+		m.logger.Warn("HIGH MEMORY USAGE",
+			logger.Field{Key: "percent", Value: usagePercent * 100},
+			logger.Field{Key: "used", Value: humanize.IBytes(currentUsage)},
+			logger.Field{Key: "max", Value: humanize.IBytes(m.maxMemory)})
 
 		// Force garbage collection
 		m.ForceGC()
@@ -57,10 +61,10 @@ func (m *MemoryManager) ForceGC() {
 	after := m.memoryStats.Alloc
 
 	freed := before - after
-	if SystemLogger != nil {
-		SystemLogger.Infof("Forced GC: freed %d MB (before: %d MB, after: %d MB)",
-			freed>>20, before>>20, after>>20)
-	}
+	m.logger.Info("Forced GC",
+		logger.Field{Key: "freed", Value: humanize.IBytes(freed)},
+		logger.Field{Key: "before", Value: humanize.IBytes(before)},
+		logger.Field{Key: "after", Value: humanize.IBytes(after)})
 
 	m.lastGC = time.Now()
 }
@@ -74,20 +78,16 @@ func (m *MemoryManager) GetMemoryStats() runtime.MemStats {
 // SetMemoryLimit configures runtime memory limits
 func (m *MemoryManager) SetMemoryLimit() {
 	debug.SetMemoryLimit(int64(m.maxMemory))
-	if SystemLogger != nil {
-		SystemLogger.Infof("Memory limit set to: %d GB", m.maxMemory>>30)
-	}
+	m.logger.Info("Memory limit set", logger.Field{Key: "gb", Value: m.maxMemory >> 30})
 }
 
 // LogMemoryStats provides detailed memory information
 func (m *MemoryManager) LogMemoryStats() {
 	stats := m.GetMemoryStats()
-	if SystemLogger != nil {
-		SystemLogger.Infof("Memory Stats:")
-		SystemLogger.Infof("  Alloc: %d MB", stats.Alloc>>20)
-		SystemLogger.Infof("  TotalAlloc: %d MB", stats.TotalAlloc>>20)
-		SystemLogger.Infof("  Sys: %d MB", stats.Sys>>20)
-		SystemLogger.Infof("  NumGC: %d", stats.NumGC)
-		SystemLogger.Infof("  GCCPUFraction: %.4f", stats.GCCPUFraction)
-	}
+	m.logger.Info("Memory Stats",
+		logger.Field{Key: "alloc", Value: humanize.IBytes(stats.Alloc)},
+		logger.Field{Key: "total_alloc", Value: humanize.IBytes(stats.TotalAlloc)},
+		logger.Field{Key: "sys", Value: humanize.IBytes(stats.Sys)},
+		logger.Field{Key: "num_gc", Value: stats.NumGC},
+		logger.Field{Key: "gc_cpu_fraction", Value: stats.GCCPUFraction})
 }

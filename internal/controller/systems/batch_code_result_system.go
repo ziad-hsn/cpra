@@ -2,7 +2,7 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
+	"cpra/internal/runtime/jobs"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -86,8 +86,16 @@ func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
-		processedCount++
 		oldState := *state
+		if state.CodeRunVersion != state.ConfigVersion {
+			state.Flags &^= components.StateCodePending
+			state.PendingColor = components.ColorNone
+			s.stateLogger.LogTransition(ent, oldState, *state)
+			s.logger.Debugw("Dropping stale CodeResult", "entity_id", ent.ID(), "run_version", state.CodeRunVersion, "current_version", state.ConfigVersion)
+			continue
+		}
+
+		processedCount++
 
 		// Extract color from the result payload.
 		colorPayload, ok := result.Payload["color"]

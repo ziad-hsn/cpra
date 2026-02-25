@@ -1,0 +1,1501 @@
+monitors:
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-001
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-002
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-003
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-004
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-005
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-006
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-007
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-008
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-009
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-010
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-011
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-012
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-013
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-014
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-015
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-016
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-017
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-018
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-019
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-020
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-021
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-022
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-023
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-024
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-025
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-026
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-027
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-028
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-029
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-030
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-031
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-032
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-033
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-034
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-035
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-036
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-037
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-038
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-039
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-040
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-041
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-042
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-043
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-044
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-045
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-046
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-047
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-048
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-049
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-050
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-051
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-052
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-053
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-054
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-055
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-056
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-057
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-058
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-059
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-060
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-061
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-062
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-063
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-064
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-065
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-066
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-067
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-068
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-069
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-070
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-071
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-072
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-073
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-074
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-075
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-076
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-077
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-078
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-079
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-080
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-081
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-082
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-083
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-084
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-085
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-086
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-087
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-088
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-089
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-090
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-091
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-092
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-093
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-094
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-095
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-096
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-097
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-098
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-099
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http
+    - codes:
+        red:
+            config:
+                file: ""
+            notify: log
+      enabled: true
+      name: test-monitor-100
+      pulse_check:
+        config:
+            method: GET
+            url: http://localhost:18080/health
+        interval: 5s
+        retries: 1
+        timeout: 2s
+        type: http

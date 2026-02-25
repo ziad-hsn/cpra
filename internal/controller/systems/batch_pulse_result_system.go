@@ -2,7 +2,7 @@ package systems
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
+	"cpra/internal/runtime/jobs"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -83,6 +83,9 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 
 		state := s.stateMapper.Get(ent)
 		config := s.configMapper.Get(ent)
+		if state == nil || config == nil {
+			continue
+		}
 
 		flags := state.Flags
 		if (flags & components.StatePulsePending) == 0 {
@@ -90,8 +93,16 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			continue
 		}
 
-		processedCount++
 		oldState := *state
+		if state.PulseRunVersion != state.ConfigVersion {
+			state.Flags &^= components.StatePulsePending
+			state.SetPulseFirstCheck(true)
+			s.stateLogger.LogTransition(ent, oldState, *state)
+			s.logger.Debugf("Dropping stale PulseResult for entity %d (run=%d, current=%d)", ent.ID(), state.PulseRunVersion, state.ConfigVersion)
+			continue
+		}
+
+		processedCount++
 		eventTime := time.Now()
 		state.LastEventTime = eventTime
 
@@ -122,7 +133,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 					unhealthy = 1
 				}
 				if state.PulseFailures >= unhealthy {
-					if s.interventionConfigMapper.Get(ent) != nil {
+					if s.interventionConfigMapper.HasAll(ent) {
 						// FSM guard: Only trigger intervention if not already pending/needed
 						if (state.Flags&components.StateInterventionNeeded) == 0 && (state.Flags&components.StateInterventionPending) == 0 {
 							s.logger.Warnf("Monitor '%s' reached max failures, triggering intervention.", state.Name)

@@ -1,0 +1,84 @@
+# Dockerignore for CPRA
+# Excludes unnecessary files from Docker build context
+# Patterns are compatible with .dockerignore specification
+
+# Source control
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+LICENSE
+*.md
+*.txt
+CHANGELOG
+
+# Build artifacts (exclude most, but keep cpra binary for Dockerfile.binary)
+bin/*.o
+bin/*.a
+bin/*.so
+bin/*.dylib
+bin/*.exe
+bin/*.dll
+bin/*.sys
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.dll
+*.sys
+
+# Test files
+*_test.go
+tests/
+coverage.out
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment and config files
+.env
+.env.*
+!.env.example
+.env.local
+.env.production
+.env.test
+
+# IDE specific
+*.iml
+tags
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+
+# OS files
+.DS_Store
+.DS_Store (4096)
+Thumbs.db
+*.log
+
+# Node modules (not used)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Kubernetes files (mounted or applied separately)
+k8s/
+*.kubeconfig
+*.k8s.*.yaml
+*.pem
+
+# CPRA specific
+monitors*.yaml
+monitors-local.yaml
+cpra-logs/

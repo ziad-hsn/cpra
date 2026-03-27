@@ -32,9 +32,6 @@ const (
 	// codePoolRatio references the centralized constant for code worker ratio.
 	codePoolRatio = constants.CodePoolRatio
 
-	// shutdownTimeout is the maximum wait time for a graceful shutdown.
-	shutdownTimeout = 5 * time.Second
-
 	// shrinkBudget is the time budget per incremental memory shrink pass.
 	shrinkBudget = 10 * time.Millisecond
 )
@@ -46,7 +43,6 @@ var (
 	_ = defaultHeadroom
 	_ = interventionPoolRatio
 	_ = codePoolRatio
-	_ = shutdownTimeout
 )
 
 // Config holds all configuration for the controller.

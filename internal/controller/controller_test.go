@@ -162,7 +162,7 @@ func TestController_StartStop(t *testing.T) {
 	}
 
 	// Stop should be safe to call before start (idempotent)
-	ctrl.Stop()
+	ctrl.Stop(context.Background())
 
 	// After stop (even if never started), should remain stopped
 	if ctrl.running.Load() {
@@ -177,7 +177,7 @@ func TestController_DoubleStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewController failed: %v", err)
 	}
-	defer ctrl.Stop()
+	defer ctrl.Stop(context.Background())
 
 	// First start should succeed
 	if err := ctrl.Start(context.Background()); err != nil {
@@ -337,7 +337,7 @@ func TestController_FullCycle(t *testing.T) {
 	}
 
 	time.Sleep(200 * time.Millisecond)
-	ctrl.Stop()
+	ctrl.Stop(context.Background())
 
 	stats := ctrl.Stats()
 	if stats.PulseQueue.QueueDepth != 0 || stats.InterventionQueue.QueueDepth != 0 || stats.CodeQueue.QueueDepth != 0 {
@@ -374,7 +374,7 @@ func TestController_GracefulShutdownDuringWork(t *testing.T) {
 	cancel()
 	time.Sleep(100 * time.Millisecond)
 
-	ctrl.Stop()
+	ctrl.Stop(context.Background())
 
 	if ctrl.running.Load() {
 		t.Fatal("controller should not be running after Stop")
@@ -416,7 +416,7 @@ func TestController_StartStop_WithContext(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Stop
-	ctrl.Stop()
+	ctrl.Stop(context.Background())
 
 	// Should not be running after stop
 	if ctrl.running.Load() {

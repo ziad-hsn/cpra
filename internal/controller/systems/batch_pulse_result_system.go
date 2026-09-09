@@ -1,8 +1,10 @@
 package systems
 
 import (
+	"cpra/internal/alerts"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
+	"cpra/internal/loader/schema"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -14,27 +16,37 @@ type BatchPulseResultSystem struct {
 	world       *ecs.World
 	logger      Logger
 	stateLogger *StateLogger
+	alertMgr    *alerts.Manager
+	sched       *PulseScheduler
+
+	// interventionReady receives entities that need an intervention (set by
+	// this system on pulse failure) for the intervention dispatch system.
+	interventionReady *ReadyQueue
+	// codeSched receives code alerts (immediate -> ready queue, deferred -> heap).
+	codeSched *CodeScheduler
 
 	// Mappers are used for efficient component access
 	stateMapper              *ecs.Map1[components.MonitorState]
 	configMapper             *ecs.Map1[components.PulseConfig]
 	codeConfigMapper         *ecs.Map1[components.CodeConfig]
 	interventionConfigMapper *ecs.Map1[components.InterventionConfig]
-	registry                 *components.ConfigRegistry
 	ResultChan               <-chan []jobs.Result
 }
 
 // NewBatchPulseResultSystem creates a new BatchPulseResultSystem.
-func NewBatchPulseResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger, stateLogger *StateLogger) *BatchPulseResultSystem {
+func NewBatchPulseResultSystem(world *ecs.World, results <-chan []jobs.Result, sched *PulseScheduler, interventionReady *ReadyQueue, codeSched *CodeScheduler, logger Logger, stateLogger *StateLogger, alertMgr *alerts.Manager) *BatchPulseResultSystem {
 	return &BatchPulseResultSystem{
 		world:                    world,
 		logger:                   logger,
 		stateLogger:              stateLogger,
+		alertMgr:                 alertMgr,
+		sched:                    sched,
+		interventionReady:        interventionReady,
+		codeSched:                codeSched,
 		stateMapper:              ecs.NewMap1[components.MonitorState](world),
 		configMapper:             ecs.NewMap1[components.PulseConfig](world),
 		codeConfigMapper:         ecs.NewMap1[components.CodeConfig](world),
 		interventionConfigMapper: ecs.NewMap1[components.InterventionConfig](world),
-		registry:                 components.DefaultConfigRegistry(),
 		ResultChan:               results,
 	}
 }
@@ -69,11 +81,11 @@ loop:
 // ProcessBatch processes a batch of pulse results.
 func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 	startTime := time.Now()
+	now := startTime
 	processedCount := 0
 
 	// Thresholds now come from PulseConfig; fall back to defaults if unset
 	const defaultK = 2
-	const defaultM = 3
 
 	for _, result := range results {
 		ent := result.Entity()
@@ -83,64 +95,78 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 
 		state := s.stateMapper.Get(ent)
 		config := s.configMapper.Get(ent)
-
-		flags := state.Flags
-		if (flags & components.StatePulsePending) == 0 {
-			s.logger.Warnf("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
+		if state == nil || config == nil {
+			s.logger.Warn("Entity[%d] received a PulseResult but is missing MonitorState/PulseConfig.", ent.ID())
 			continue
 		}
 
+		flags := state.Flags
+		if (flags&components.StatePulsePending) == 0 || result.Generation != state.PulseGeneration {
+			s.logger.Warn("Entity[%d] received a PulseResult but was not in a PulsePending state.", ent.ID())
+			continue
+		}
+
+		if flags&components.StateVerifying != 0 && result.Generation <= state.VerificationAfter {
+			state.SetPulsePending(false)
+			state.NextCheckTime = now.Add(config.Interval)
+			s.sched.Schedule(ent, state.NextCheckTime)
+			continue
+		}
 		processedCount++
-		oldState := *state
-		eventTime := time.Now()
-		state.LastEventTime = eventTime
+		oldFlags := state.Flags
+		state.LastCheckTime = now
+		previousWarning := state.PulseWarning
+		state.PulseWarning = result.Warning
 
 		if result.Error() != nil {
 			// --- FAILURE ---
+			state.ConsecutiveFailures++
+			state.PulseWarning = ""
+			state.RecoveryStreak = 0
+			state.Recovering = true
 			state.LastError = result.Error()
 			// If we are in verification window, escalate to RED and close verification
-			if flags&components.StateVerifying != 0 {
-				s.logger.Warnf("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
+			if flags&components.StateVerifying != 0 && result.Generation > state.VerificationAfter {
+				s.logger.Warn("Monitor '%s' verification failed during post-intervention window: %v", state.Name, state.LastError)
 				// Only trigger red if incident not already open (defensive)
 				if (flags & components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, components.ColorRed)
+					s.triggerCode(ent, state, "red")
 					state.Flags |= components.StateIncidentOpen
-					s.logger.Infof("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
+					s.logger.Info("Monitor '%s' - RED ALERT: verification failed, incident opened", state.Name)
 				}
 				state.Flags &^= components.StateVerifying
 				state.VerifyRemaining = 0
 				state.RecoveryStreak = 0
 			} else {
 				state.PulseFailures++
-				s.logger.Warnf("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
+				s.logger.Warn("Monitor '%s' pulse failed (%d/%d): %v", state.Name, state.PulseFailures, config.UnhealthyThreshold, state.LastError)
 				// First failure: only send yellow if no incident is open
 				if state.PulseFailures == 1 && (flags&components.StateIncidentOpen) == 0 {
-					s.triggerCode(ent, state, components.ColorYellow)
+					s.triggerCode(ent, state, "yellow")
 				}
 				unhealthy := config.UnhealthyThreshold
 				if unhealthy <= 0 {
 					unhealthy = 1
 				}
-				if state.PulseFailures >= unhealthy {
-					if s.interventionConfigMapper.Get(ent) != nil {
-						// FSM guard: Only trigger intervention if not already pending/needed
-						if (state.Flags&components.StateInterventionNeeded) == 0 && (state.Flags&components.StateInterventionPending) == 0 {
-							s.logger.Warnf("Monitor '%s' reached max failures, triggering intervention.", state.Name)
-							state.Flags |= components.StateInterventionNeeded
-							state.PulseFailures = 0
-							state.RecoveryStreak = 0
-						} else {
-							s.logger.Debugf("Monitor '%s' - max failures reached but intervention already in progress", state.Name)
+				if state.PulseFailures >= unhealthy && !schema.InMaintenance(state.Maintenance, now) {
+					if s.interventionConfigMapper.Get(ent) != nil && !state.InterventionAttempted && !state.IsInterventionNeeded() && !state.IsInterventionPending() {
+						state.InterventionAttempted = true
+						s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)
+						state.Flags |= components.StateInterventionNeeded
+						if s.interventionReady != nil {
+							s.interventionReady.Enqueue([]ecs.Entity{ent})
 						}
-					} else {
+						state.PulseFailures = 0
+						state.RecoveryStreak = 0
+					} else if !state.IsInterventionPending() && !state.IsInterventionNeeded() {
 						// No intervention configured - trigger RED alert once
 						if (flags & components.StateIncidentOpen) == 0 {
-							s.logger.Warnf("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
-							s.triggerCode(ent, state, components.ColorRed)
+							s.logger.Warn("Monitor '%s' reached max failures; no intervention configured, triggering RED alert.", state.Name)
+							s.triggerCode(ent, state, "red")
 							state.Flags |= components.StateIncidentOpen
-							s.logger.Infof("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
+							s.logger.Info("Monitor '%s' - RED ALERT: incident opened (no intervention)", state.Name)
 						} else {
-							s.logger.Debugf("Monitor '%s' - max failures reached but incident already open, no duplicate red alert", state.Name)
+							s.logger.Debug("Monitor '%s' - max failures reached but incident already open, no duplicate red alert", state.Name)
 						}
 						state.PulseFailures = 0
 						state.RecoveryStreak = 0
@@ -149,40 +175,51 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 			}
 		} else {
 			// --- SUCCESS ---
+			state.ConsecutiveFailures = 0
 			state.LastError = nil
-			state.LastSuccessTime = eventTime
-			if flags&components.StateVerifying != 0 {
+			state.LastSuccessTime = state.LastCheckTime
+			if state.PulseWarning != "" && previousWarning == "" {
+				s.triggerCode(ent, state, "yellow")
+			} else if previousWarning != "" && state.PulseWarning == "" && !state.Recovering && !state.IsInterventionPending() && flags&(components.StateIncidentOpen|components.StateVerifying) == 0 {
+				s.triggerCode(ent, state, "green")
+			}
+			if flags&components.StateVerifying != 0 && result.Generation > state.VerificationAfter {
 				if state.VerifyRemaining <= 0 {
 					// safety: conclude verification immediately
 					state.Flags &^= components.StateVerifying
-					s.triggerCode(ent, state, components.ColorGreen)
+					s.triggerCode(ent, state, "green")
 					state.Flags &^= components.StateIncidentOpen
+					state.Recovering = false
+					state.InterventionAttempted = false
 					state.RecoveryStreak = 0
 				} else {
 					state.VerifyRemaining--
 					if state.VerifyRemaining <= 0 {
 						state.Flags &^= components.StateVerifying
-						s.triggerCode(ent, state, components.ColorGreen)
+						s.triggerCode(ent, state, "green")
 						state.Flags &^= components.StateIncidentOpen
+						state.Recovering = false
+						state.InterventionAttempted = false
 						state.RecoveryStreak = 0
 					}
 				}
 			} else {
 				// Normal recovery path
-				if state.PulseFailures > 0 || (flags&components.StateIncidentOpen) != 0 {
+				if flags&components.StateVerifying == 0 && !state.IsInterventionPending() && (state.Recovering || state.PulseFailures > 0 || (flags&components.StateIncidentOpen) != 0) {
 					state.RecoveryStreak++
 					k := config.HealthyThreshold
 					if k <= 0 {
 						k = defaultK
 					}
 					if state.RecoveryStreak >= k {
-						s.logger.Infof("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
-						s.triggerCode(ent, state, components.ColorGreen)
+						s.logger.Info("Monitor '%s' pulse recovered (K=%d).", state.Name, k)
+						s.triggerCode(ent, state, "green")
 						state.Flags &^= components.StateIncidentOpen
+						state.Recovering = false
+						state.SetInterventionNeeded(false)
+						state.InterventionAttempted = false
 						state.RecoveryStreak = 0
 					}
-				} else {
-					// steady state success, nothing to do
 				}
 			}
 			state.PulseFailures = 0
@@ -190,52 +227,35 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 
 		// Unset the pending flag, regardless of outcome.
 		state.Flags &^= components.StatePulsePending
-		s.stateLogger.LogTransition(ent, oldState, *state)
+
+		// Re-schedule the next check with a fixed-rate recurrence anchored
+		// on the due time that triggered this check, not on when the result was
+		// applied. Anchoring on LastCheckTime folds pipeline latency (ready-
+		// queue wait + worker + result drain) into every cycle, stretching each
+		// monitor's cadence to interval+latency and capping fleet throughput at
+		// N/(interval+latency). Anchoring on NextCheckTime keeps the cadence
+		// exact; the fell-behind guard re-anchors from now instead of firing a
+		// catch-up burst of stale checks after an overload or stall.
+		next := state.NextCheckTime.Add(config.Interval)
+		if next.Before(now) {
+			next = now.Add(config.Interval)
+		}
+		state.NextCheckTime = next
+		s.sched.Schedule(ent, next)
+
+		s.stateLogger.LogTransition(ent, oldFlags, state)
 	}
 
 	if processedCount > 0 {
-		dur := time.Since(startTime)
-		s.logger.Debugf("Performance: BatchPulseResultSystem processed %d entities in %v (%.1f/sec)",
-			processedCount, dur, float64(processedCount)/dur.Seconds())
+		s.logger.LogSystemPerformance("BatchPulseResultSystem", time.Since(startTime), processedCount)
 	}
 }
 
-func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color components.ColorCode) {
-	codeConfig := s.codeConfigMapper.Get(entity)
-	if codeConfig == nil {
+func (s *BatchPulseResultSystem) triggerCode(entity ecs.Entity, state *components.MonitorState, color string) {
+	if color == "green" && state.PulseWarning != "" {
 		return
 	}
-	if color >= components.MaxColors {
-		return
-	}
-	cfg, ok := s.registry.Lookup(codeConfig.Configs[color])
-	if !ok || cfg.Notify == "" {
-		s.logger.Warnf("Monitor '%s' has no '%s' code config; skipping alert trigger", state.Name, color)
-		return
-	}
-	if !cfg.Dispatch {
-		s.logger.Infof("Monitor '%s' '%s' code dispatch disabled; not triggering", state.Name, color)
-		return
-	}
-
-	// FSM guard: If a code job is already in-flight (Pending), don't overwrite.
-	if (state.Flags & components.StateCodePending) != 0 {
-		s.logger.Debugf("Monitor '%s' already has code in-flight; deferring %s trigger", state.Name, color)
-		return
-	}
-
-	// If CodeNeeded is already set, use priority to decide.
-	if (state.Flags&components.StateCodeNeeded) != 0 && state.PendingColor != components.ColorNone {
-		if !color.HigherPriorityThan(state.PendingColor) {
-			s.logger.Debugf("Monitor '%s' already has %s pending; %s has lower priority, skipping", state.Name, state.PendingColor, color)
-			return
-		}
-		s.logger.Debugf("Monitor '%s' upgrading pending code from %s to %s", state.Name, state.PendingColor, color)
-	}
-
-	state.PendingColor = color
-	state.Flags |= components.StateCodeNeeded
-	s.logger.Infof("Monitor '%s' - triggering %s alert code", state.Name, color)
+	requestCode(entity, state, color, s.codeConfigMapper.Get(entity), s.codeSched, s.alertMgr)
 }
 
 // Finalize is a no-op for this system.

@@ -1,0 +1,131 @@
+/**
+ * CPRA Design Tokens — "Pulse" identity.
+ * A monitoring control plane: deep blue-black surfaces, a teal/cyan heartbeat
+ * accent, and luminous status colors. Dark is default; light overrides.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  /* Brand / pulse accent */
+  --accent: #2dd4bf;
+  --accent-bright: #5eead4;
+  --accent-dim: #14b8a6;
+  --accent-soft: rgba(45, 212, 191, 0.14);
+  --accent-glow: rgba(45, 212, 191, 0.35);
+  --accent-contrast: #04211d;
+
+  /* Status colors — luminous on dark */
+  --status-critical: #ff5470;
+  --status-degraded: #ffcc4d;
+  --status-operational: #34d399;
+  --status-info: #38bdf8;
+  --status-disabled: #64748b;
+  --status-unknown: #94a3b8;
+
+  /* Status tints (bg fills + borders) */
+  --status-bg-critical: rgba(255, 84, 112, 0.10);
+  --status-bg-degraded: rgba(255, 204, 77, 0.10);
+  --status-bg-operational: rgba(52, 211, 153, 0.10);
+  --status-bg-info: rgba(56, 189, 248, 0.10);
+  --status-bg-disabled: rgba(100, 116, 139, 0.10);
+
+  --status-border-critical: rgba(255, 84, 112, 0.35);
+  --status-border-degraded: rgba(255, 204, 77, 0.35);
+  --status-border-operational: rgba(52, 211, 153, 0.35);
+  --status-border-info: rgba(56, 189, 248, 0.35);
+  --status-border-disabled: rgba(100, 116, 139, 0.35);
+
+  /* Surfaces — deep blue-black with subtle elevation */
+  --surface-0: #070a12;
+  --surface-1: #0d111c;
+  --surface-2: #141a28;
+  --surface-3: #1c2435;
+  --surface-raised: #18203020;
+
+  /* Gradients for depth */
+  --gradient-shell: radial-gradient(1200px 600px at 80% -10%, rgba(45,212,191,0.06), transparent 60%), linear-gradient(180deg, #0a0e18 0%, #070a12 100%);
+  --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(255,255,255,0) 40%);
+  --gradient-rail: linear-gradient(180deg, var(--accent-bright), var(--accent-dim));
+
+  /* Text */
+  --text-primary: #e8eef7;
+  --text-secondary: #9fb0c5;
+  --text-muted: #5d6f85;
+  --text-inverse: #070a12;
+
+  /* Borders */
+  --border-default: #1f293a;
+  --border-strong: #2c3a52;
+  --border-subtle: #161d2c;
+
+  /* Elevation */
+  --elevation-1: 0 1px 2px rgba(0,0,0,0.5);
+  --elevation-2: 0 4px 14px rgba(0,0,0,0.5);
+  --elevation-3: 0 16px 40px rgba(0,0,0,0.6);
+  --ring-glow: 0 0 0 1px var(--accent-soft), 0 0 24px var(--accent-glow);
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 360ms;
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --accent: #0d9488;
+  --accent-bright: #14b8a6;
+  --accent-dim: #0f766e;
+  --accent-soft: rgba(13, 148, 136, 0.12);
+  --accent-glow: rgba(13, 148, 136, 0.25);
+  --accent-contrast: #ffffff;
+
+  --status-critical: #e11d48;
+  --status-degraded: #d97706;
+  --status-operational: #059669;
+  --status-info: #0284c7;
+  --status-disabled: #64748b;
+  --status-unknown: #64748b;
+
+  --status-bg-critical: rgba(225, 29, 72, 0.08);
+  --status-bg-degraded: rgba(217, 119, 6, 0.08);
+  --status-bg-operational: rgba(5, 150, 105, 0.08);
+  --status-bg-info: rgba(2, 132, 199, 0.08);
+  --status-bg-disabled: rgba(100, 116, 139, 0.08);
+
+  --status-border-critical: rgba(225, 29, 72, 0.30);
+  --status-border-degraded: rgba(217, 119, 6, 0.30);
+  --status-border-operational: rgba(5, 150, 105, 0.30);
+  --status-border-info: rgba(2, 132, 199, 0.30);
+  --status-border-disabled: rgba(100, 116, 139, 0.30);
+
+  --surface-0: #eef2f7;
+  --surface-1: #ffffff;
+  --surface-2: #f4f7fb;
+  --surface-3: #e9eef5;
+  --surface-raised: #ffffff80;
+
+  --gradient-shell: radial-gradient(1200px 600px at 80% -10%, rgba(13,148,136,0.06), transparent 60%), linear-gradient(180deg, #f6f9fc 0%, #eef2f7 100%);
+  --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 40%);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --border-default: #dde4ee;
+  --border-strong: #c4cddc;
+  --border-subtle: #e9eef5;
+
+  --elevation-1: 0 1px 2px rgba(15,23,42,0.08);
+  --elevation-2: 0 4px 14px rgba(15,23,42,0.10);
+  --elevation-3: 0 16px 40px rgba(15,23,42,0.14);
+  --ring-glow: 0 0 0 1px var(--accent-soft), 0 0 24px var(--accent-glow);
+
+  color-scheme: light;
+}

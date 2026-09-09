@@ -47,13 +47,13 @@ func configFromEnv() LoggerConfig {
 	}
 
 	if initial := os.Getenv("CPRA_LOG_SAMPLE_INITIAL"); initial != "" {
-		if val, err := strconv.Atoi(initial); err == nil {
+		if val, err := strconv.Atoi(initial); err == nil && val > 0 {
 			cfg.SampleInitial = val
 		}
 	}
 
 	if thereafter := os.Getenv("CPRA_LOG_SAMPLE_THEREAFTER"); thereafter != "" {
-		if val, err := strconv.Atoi(thereafter); err == nil {
+		if val, err := strconv.Atoi(thereafter); err == nil && val > 0 {
 			cfg.SampleThereafter = val
 		}
 	}

@@ -37,7 +37,7 @@ func NewStateLogger(debugMode bool) *StateLogger {
 }
 
 // LogTransition logs a state transition for a monitor.
-func (l *StateLogger) LogTransition(entity ecs.Entity, oldState, newState components.MonitorState) {
+func (l *StateLogger) LogTransition(entity ecs.Entity, oldFlags uint32, newState *components.MonitorState) {
 	if !l.debugMode {
 		return
 	}
@@ -47,7 +47,7 @@ func (l *StateLogger) LogTransition(entity ecs.Entity, oldState, newState compon
 	l.logger.Info("state transition",
 		"entity_id", entity.ID(),
 		"monitor_name", newState.Name,
-		"old_state", formatState(oldState.Flags),
+		"old_state", formatState(oldFlags),
 		"new_state", formatState(newState.Flags),
 	)
 }

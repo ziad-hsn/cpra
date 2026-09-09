@@ -13,8 +13,8 @@ const (
 type QueueConfig struct {
 	Name         string
 	Type         QueueType
-	HybridConfig HybridQueueConfig
 	Capacity     int
+	HybridConfig HybridQueueConfig
 }
 
 // NewQueue creates a new queue based on the provided configuration

@@ -23,6 +23,5 @@ func FromContext(ctx context.Context) Logger {
 		return logger
 	}
 	// Return a no-op logger if none found
-	nop := zap.NewNop()
-	return &ZapLogger{base: nop, sugar: nop.Sugar()}
+	return &ZapLogger{zap: zap.NewNop()}
 }

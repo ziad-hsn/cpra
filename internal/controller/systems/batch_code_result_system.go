@@ -1,126 +1,131 @@
 package systems
 
 import (
+	"cpra/internal/alerts"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
-	"time"
-
+	"errors"
+	"fmt"
 	"github.com/mlange-42/ark/ecs"
+	"time"
 )
 
-// BatchCodeResultSystem processes the results of dispatched code alerts.
-// It processes batches of results passed directly from the result router.
+const codeResultTTL = 5 * time.Minute
+const maxAlertAttempts = 3
+
 type BatchCodeResultSystem struct {
 	world       *ecs.World
 	logger      Logger
 	stateLogger *StateLogger
-
-	// Mappers for efficient component access
+	alertMgr    *alerts.Manager
+	codeSched   *CodeScheduler
 	stateMapper *ecs.Map[components.MonitorState]
 	ResultChan  <-chan []jobs.Result
 }
 
-// NewBatchCodeResultSystem creates a new BatchCodeResultSystem.
-func NewBatchCodeResultSystem(world *ecs.World, results <-chan []jobs.Result, logger Logger, stateLogger *StateLogger) *BatchCodeResultSystem {
-	return &BatchCodeResultSystem{
-		world:       world,
-		logger:      logger,
-		stateLogger: stateLogger,
-		stateMapper: ecs.NewMap[components.MonitorState](world),
-		ResultChan:  results,
-	}
+func NewBatchCodeResultSystem(w *ecs.World, ch <-chan []jobs.Result, sched *CodeScheduler, logger Logger, sl *StateLogger, mgr *alerts.Manager) *BatchCodeResultSystem {
+	return &BatchCodeResultSystem{w, logger, sl, mgr, sched, ecs.NewMap[components.MonitorState](w), ch}
 }
-
-func (s *BatchCodeResultSystem) Initialize(_ *ecs.World) {
-}
-
-func (s *BatchCodeResultSystem) Update(_ *ecs.World) {
-	if s.ResultChan == nil {
-		return
-	}
-
-	resultsBatches := make([][]jobs.Result, 0)
+func (s *BatchCodeResultSystem) Initialize(*ecs.World) {}
+func (s *BatchCodeResultSystem) Finalize(*ecs.World)   {}
+func (s *BatchCodeResultSystem) Update(*ecs.World) {
+	closed := false
 loop:
-	for {
+	for s.ResultChan != nil {
 		select {
-		case res, ok := <-s.ResultChan:
+		case batch, ok := <-s.ResultChan:
 			if !ok {
 				s.ResultChan = nil
+				closed = true
 				break loop
 			}
-			if len(res) == 0 {
-				continue
-			}
-			resultsBatches = append(resultsBatches, res)
+			s.ProcessBatch(batch)
 		default:
 			break loop
 		}
 	}
-
-	for _, res := range resultsBatches {
-		s.ProcessBatch(res)
+	now := time.Now()
+	for ent := range s.codeSched.active {
+		if !s.world.Alive(ent) {
+			delete(s.codeSched.active, ent)
+			continue
+		}
+		state := s.stateMapper.Get(ent)
+		for color, d := range state.Deliveries {
+			if closed || !now.Before(d.Deadline) {
+				waiting := state.PendingAlerts[:0]
+				for _, r := range state.PendingAlerts {
+					if r.Color != color {
+						waiting = append(waiting, r)
+					}
+				}
+				state.PendingAlerts = waiting
+				state.PendingCode = ""
+				if len(waiting) > 0 {
+					state.PendingCode = waiting[0].Color
+				}
+				state.SetCodeNeeded(len(waiting) > 0)
+				s.finish(ent, state, color, d, fmt.Errorf("alert delivery incomplete; outcome unknown"), false, now)
+			}
+		}
 	}
 }
-
-// ProcessBatch processes a batch of code alert results.
-func (s *BatchCodeResultSystem) ProcessBatch(results []jobs.Result) {
-	startTime := time.Now()
-	processedCount := 0
-
-	for _, result := range results {
+func (s *BatchCodeResultSystem) ProcessBatch(batch []jobs.Result) {
+	for _, result := range batch {
 		ent := result.Entity()
 		if !s.world.Alive(ent) {
 			continue
 		}
-
 		state := s.stateMapper.Get(ent)
 		if state == nil {
 			continue
 		}
-
-		// Ensure we are processing a pending code alert.
-		// Note: If entity is not in CodePending state, it means another system already
-		// processed or cancelled this job. This is expected behavior in concurrent systems.
-		if (state.Flags & components.StateCodePending) == 0 {
-			s.logger.Debugw("Entity received stale CodeResult (state already changed)", "entity_id", ent.ID(), "flags", state.Flags)
+		color := result.Color
+		if color == "" {
+			color, _ = result.Payload["color"].(string)
+		}
+		d := state.Deliveries[color]
+		if d == nil || d.Generation != result.Generation || result.Endpoint < 0 || result.Endpoint >= d.Next || d.Completed[result.Endpoint] {
 			continue
 		}
-
-		processedCount++
-		oldState := *state
-
-		// Extract color from the result payload.
-		colorPayload, ok := result.Payload["color"]
-		if !ok {
-			s.logger.Warnw("Entity has CodeResult with no color in payload", "entity_id", ent.ID())
+		d.Completed[result.Endpoint] = true
+		d.Seen++
+		if result.Error() != nil {
+			d.Failed++
+			var failure *jobs.DeliveryError
+			if !errors.As(result.Error(), &failure) || !failure.Retryable {
+				d.Retryable = false
+			}
+		}
+		if d.Seen < len(d.Completed) {
 			continue
 		}
-		color, ok := colorPayload.(string)
-		if !ok {
-			s.logger.Warnw("Entity has CodeResult with invalid color payload type", "entity_id", ent.ID())
-			continue
+		var err error
+		if d.Failed == len(d.Completed) {
+			err = fmt.Errorf("all %d notification endpoints failed", d.Failed)
 		}
-
-		if err := result.Error(); err != nil {
-			s.logger.Errorw("Monitor alert failed to send", "monitor_name", state.Name, "color", color, "error", err)
-			// On failure, re-flag for retry: clear Pending and set Needed.
-			state.Flags &^= components.StateCodePending
-			state.Flags |= components.StateCodeNeeded
-		} else {
-			s.logger.Infow("Monitor alert sent successfully", "monitor_name", state.Name, "color", color)
-			// On success, clear Pending and PendingColor.
-			state.Flags &^= components.StateCodePending
-			state.PendingColor = components.ColorNone
-		}
-		s.stateLogger.LogTransition(ent, oldState, *state)
-	}
-
-	if processedCount > 0 {
-		dur := time.Since(startTime)
-		s.logger.Debugf("Performance: BatchCodeResultSystem processed %d entities in %v (%.1f/sec)",
-			processedCount, dur, float64(processedCount)/dur.Seconds())
+		s.finish(ent, state, color, d, err, d.Retryable, time.Now())
 	}
 }
-
-// Finalize is a no-op for this system.
-func (s *BatchCodeResultSystem) Finalize(_ *ecs.World) {}
+func (s *BatchCodeResultSystem) finish(ent ecs.Entity, state *components.MonitorState, color string, d *components.CodeDelivery, err error, retryable bool, now time.Time) {
+	delete(state.Deliveries, color)
+	state.SetCodePending(len(state.Deliveries) > 0)
+	if len(state.Deliveries) == 0 {
+		delete(s.codeSched.active, ent)
+	}
+	if s.alertMgr != nil {
+		s.alertMgr.OnResult(ent, color, err, now)
+	}
+	if err != nil {
+		s.logger.Error("Monitor '%s' %s alert failed: %v", state.Name, color, err)
+		if retryable && d.Attempts < maxAlertAttempts {
+			due := now.Add(time.Second * time.Duration(1<<d.Attempts))
+			state.PendingAlerts = append(state.PendingAlerts, components.AlertRequest{Color: color, NotBefore: due, Attempts: d.Attempts})
+			state.SetCodeNeeded(true)
+			state.PendingCode = state.PendingAlerts[0].Color
+			s.codeSched.ScheduleDeferred(ent, due)
+		}
+	} else {
+		s.logger.Info("Monitor '%s' %s alert delivered to %d endpoint(s)", state.Name, color, len(d.Completed)-d.Failed)
+	}
+}

@@ -7,15 +7,15 @@ import (
 
 // SystemMetrics holds performance metrics for a specific system
 type SystemMetrics struct {
-	LastUpdateTime         time.Time
-	StartTime              time.Time
-	SystemName             string
-	TotalUpdates           int64
-	TotalEntitiesProcessed int64
-	TotalBatchesCreated    int64
-	TotalDuration          time.Duration
-	MaxUpdateDuration      time.Duration
-	MinUpdateDuration      time.Duration
+	LastUpdateTime         time.Time     `json:"last_update_time"`
+	StartTime              time.Time     `json:"start_time"`
+	SystemName             string        `json:"system_name"`
+	TotalUpdates           int64         `json:"total_updates"`
+	TotalEntitiesProcessed int64         `json:"total_entities_processed"`
+	TotalBatchesCreated    int64         `json:"total_batches_created"`
+	TotalDuration          time.Duration `json:"total_duration"`
+	MaxUpdateDuration      time.Duration `json:"max_update_duration"`
+	MinUpdateDuration      time.Duration `json:"min_update_duration"`
 }
 
 // MetricsAggregator collects and aggregates metrics from all systems
@@ -148,17 +148,17 @@ func (ma *MetricsAggregator) GetAggregateMetrics() AggregateMetrics {
 
 // AggregateMetrics holds aggregate performance metrics across all systems
 type AggregateMetrics struct {
-	StartTime              time.Time
-	MinUpdateDuration      time.Duration
-	TotalEntitiesProcessed int64
-	TotalBatchesCreated    int64
-	TotalDuration          time.Duration
-	MaxUpdateDuration      time.Duration
-	SystemCount            int
-	AvgUpdateDuration      time.Duration
-	AvgEntitiesPerUpdate   float64
-	AvgBatchesPerUpdate    float64
-	EntitiesPerSecond      float64
-	UpdatesPerSecond       float64
-	TotalUpdates           int64
+	StartTime              time.Time     `json:"start_time"`
+	MinUpdateDuration      time.Duration `json:"min_update_duration"`
+	TotalEntitiesProcessed int64         `json:"total_entities_processed"`
+	TotalBatchesCreated    int64         `json:"total_batches_created"`
+	TotalDuration          time.Duration `json:"total_duration"`
+	MaxUpdateDuration      time.Duration `json:"max_update_duration"`
+	SystemCount            int           `json:"system_count"`
+	AvgUpdateDuration      time.Duration `json:"avg_update_duration"`
+	AvgEntitiesPerUpdate   float64       `json:"avg_entities_per_update"`
+	AvgBatchesPerUpdate    float64       `json:"avg_batches_per_update"`
+	EntitiesPerSecond      float64       `json:"entities_per_second"`
+	UpdatesPerSecond       float64       `json:"updates_per_second"`
+	TotalUpdates           int64         `json:"total_updates"`
 }

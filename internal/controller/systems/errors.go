@@ -5,9 +5,7 @@ import (
 	"time"
 )
 
-type ErrNoPulseJob struct {
-	pulseType string
-}
+type ErrNoPulseJob struct{}
 
 type ErrPulseJobTimeout struct {
 	Err       error

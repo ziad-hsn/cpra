@@ -1,263 +1,122 @@
 package systems
 
 import (
+	"cpra/internal/alerts"
 	"cpra/internal/controller/components"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"cpra/internal/queue"
-	"sync"
-	"time"
-
 	"github.com/mlange-42/ark/ecs"
+	"time"
 )
 
-// jobInfo is a helper struct to associate a job with its entity and color for batch processing.
-type jobInfo struct {
-	Job      jobs.Job
-	Color    string
-	OldState components.MonitorState
-	Entity   ecs.Entity
-}
-
-// BatchCodeSystem processes entities that need a code alert dispatched.
-// It determines the correct color based on the entity's state and enqueues the job.
 type BatchCodeSystem struct {
-	queue       queue.Queue
-	logger      Logger
-	stateLogger *StateLogger
-	world       *ecs.World
-	filter      *ecs.Filter2[components.MonitorState, components.CodeConfig]
-	stateMapper *ecs.Map1[components.MonitorState]
-	registry    *components.ConfigRegistry
-	jobInfoPool *sync.Pool
-	batchSize   int
+	queue            queue.Queue
+	logger           Logger
+	stateLogger      *StateLogger
+	world            *ecs.World
+	alertMgr         *alerts.Manager
+	codeSched        *CodeScheduler
+	stateMapper      *ecs.Map1[components.MonitorState]
+	codeConfigMapper *ecs.Map1[components.CodeConfig]
+	jobStorageMapper *ecs.Map1[components.JobStorage]
+	batchSize        int
 }
 
-// NewBatchCodeSystem creates a new BatchCodeSystem.
-func NewBatchCodeSystem(world *ecs.World, q queue.Queue, batchSize int, logger Logger, stateLogger *StateLogger) *BatchCodeSystem {
-	return &BatchCodeSystem{
-		world:       world,
-		queue:       q,
-		logger:      logger,
-		stateLogger: stateLogger,
-		registry:    components.DefaultConfigRegistry(),
-		batchSize:   batchSize,
-		filter: ecs.NewFilter2[components.MonitorState, components.CodeConfig](world).
-			Without(ecs.C[components.Disabled]()),
-		stateMapper: ecs.NewMap1[components.MonitorState](world),
-		jobInfoPool: &sync.Pool{
-			New: func() interface{} {
-				s := make([]jobInfo, 0, batchSize)
-				return &s
-			},
-		},
-	}
+func NewBatchCodeSystem(w *ecs.World, q queue.Queue, sched *CodeScheduler, batch int, logger Logger, sl *StateLogger, mgr *alerts.Manager) *BatchCodeSystem {
+	return &BatchCodeSystem{q, logger, sl, w, mgr, sched, ecs.NewMap1[components.MonitorState](w), ecs.NewMap1[components.CodeConfig](w), ecs.NewMap1[components.JobStorage](w), batch}
 }
-func (s *BatchCodeSystem) Initialize(_ *ecs.World) {
-	if s.filter != nil {
-		s.filter.Register()
+func (s *BatchCodeSystem) Initialize(*ecs.World) {}
+func (s *BatchCodeSystem) Finalize(*ecs.World)   {}
+func (s *BatchCodeSystem) Update(*ecs.World) {
+	now := time.Now()
+	budget := s.batchSize
+	if budget <= 0 {
+		budget = 1000
 	}
-}
-
-// Update finds and processes all monitors that need a code alert.
-func (s *BatchCodeSystem) Update(_ *ecs.World) {
-	startTime := time.Now()
-	stats := s.queue.Stats()
-	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debugw("Code queue saturated", "depth", stats.QueueDepth, "capacity", stats.Capacity)
-	}
-
-	query := s.filter.Query()
-
-	var tokens int
-	if stats.Capacity <= 0 {
-		tokens = s.batchSize
-		if tokens <= 0 {
-			tokens = 1
-		}
-	} else {
-		free := stats.Capacity - stats.QueueDepth
-		if free <= 0 {
-			return
-		}
-		tokens = int(float64(free) * 0.8)
-		if tokens <= 0 {
-			tokens = free
-		}
-	}
-
-	earlyExit := false
-
-	jobInfoPtr := s.jobInfoPool.Get().(*[]jobInfo)
-	jobsToProcess := (*jobInfoPtr)[:0]
-	processedCount := 0
-
-	defer func() {
-		s.jobInfoPool.Put(jobInfoPtr)
-	}()
-
-	for query.Next() {
-		ent := query.Entity()
-		state, codeConfig := query.Get()
-
-		// Process only entities that need a code alert.
-		if (state.Flags & components.StateCodeNeeded) == 0 {
+	for _, ent := range s.codeSched.ConsumeReady(budget) {
+		if !s.world.Alive(ent) {
 			continue
 		}
-
-		// Skip if a code job is already in flight to prevent race conditions.
-		// Per FSM pattern: only one job of a type should be in-flight per entity.
-		// The current job will complete, then the next color (if any) will be processed.
-		if (state.Flags & components.StateCodePending) != 0 {
+		state, storage, cfg := s.stateMapper.Get(ent), s.jobStorageMapper.Get(ent), s.codeConfigMapper.Get(ent)
+		if state == nil || storage == nil || cfg == nil {
 			continue
 		}
-
-		color := state.PendingColor
-		if color == components.ColorNone {
-			// This should not happen if StateCodeNeeded is set, but as a safeguard:
-			state.Flags &^= components.StateCodeNeeded
-			continue
+		// Compatibility with callers that explicitly set a single pending color.
+		if len(state.PendingAlerts) == 0 && state.IsCodeNeeded() && state.PendingCode != "" {
+			state.PendingAlerts = append(state.PendingAlerts, components.AlertRequest{Color: state.PendingCode})
 		}
-
-		// Honor dispatch flag and presence of color config before enqueuing
-		if color >= components.MaxColors {
-			state.Flags &^= components.StateCodeNeeded
-			continue
-		}
-		cfg, ok := s.registry.Lookup(codeConfig.Configs[color])
-		if !ok || cfg.Notify == "" {
-			s.logger.Warnw("Entity missing code config; clearing pending code", "entity_id", ent.ID(), "color", color)
-			state.Flags &^= components.StateCodeNeeded
-			continue
-		}
-		if !cfg.Dispatch {
-			s.logger.Infow("Code dispatch disabled; clearing pending code", "entity_id", ent.ID(), "color", color)
-			state.Flags &^= components.StateCodeNeeded
-			continue
-		}
-
-		// Construct schema.CodeConfig from component to create job JIT.
-		schemaCfg := schema.CodeConfig{
-			Dispatch: cfg.Dispatch,
-			Notify:   cfg.Notify,
-			Config:   cfg.Config, // This is already the correct schema type (CodeNotification interface)
-		}
-
-		job, err := jobs.CreateCodeJob(state.Name, schemaCfg, ent, color.String())
-		if err != nil {
-			s.logger.Errorw("Failed to create code job", "error", err, "entity_id", ent.ID())
-			state.Flags &^= components.StateCodeNeeded
-			continue
-		}
-		if job == nil || isNilJob(job) {
-			s.logger.Warnw("Entity needs code alert, but job creation returned nil", "entity_id", ent.ID(), "color", color)
-			// Clear the flag if no job is found to prevent spinning.
-			state.Flags &^= components.StateCodeNeeded
-			continue
-		}
-
-		jobsToProcess = append(jobsToProcess, jobInfo{Entity: ent, Job: job, Color: color.String()})
-
-		if len(jobsToProcess) >= tokens {
-			s.processBatch(&jobsToProcess)
-			processedCount += len(jobsToProcess)
-			jobsToProcess = jobsToProcess[:0]
-			earlyExit = true
-			break
-		}
-	}
-
-	// Process any remaining entities
-	if earlyExit {
-		query.Close()
-	}
-
-	if len(jobsToProcess) > 0 {
-		s.processBatch(&jobsToProcess)
-		processedCount += len(jobsToProcess)
-	}
-
-	if processedCount > 0 {
-		dur := time.Since(startTime)
-		s.logger.Debugf("Performance: BatchCodeSystem processed %d entities in %v (%.1f/sec)",
-			processedCount, dur, float64(processedCount)/dur.Seconds())
-	}
-
-}
-
-// processBatch attempts to enqueue a batch of jobs and updates entity states on success.
-func (s *BatchCodeSystem) processBatch(jobsInfo *[]jobInfo) {
-	stats := s.queue.Stats()
-	if stats.Capacity > 0 && stats.QueueDepth >= int(float64(stats.Capacity)*0.9) {
-		s.logger.Debugw("Code queue near capacity; skipping enqueue", "depth", stats.QueueDepth, "capacity", stats.Capacity)
-		return
-	}
-
-	items := make([]interface{}, 0, len(*jobsInfo))
-	submitted := make([]jobInfo, 0, len(*jobsInfo))
-	for _, info := range *jobsInfo {
-		if isNilJob(info.Job) {
-			s.logger.Warnw("Code job became nil before enqueue; skipping", "entity_id", info.Entity.ID())
-			continue
-		}
-		if !s.world.Alive(info.Entity) {
-			continue
-		}
-		state := s.stateMapper.Get(info.Entity)
-		if state == nil {
-			continue
-		}
-
-		// State might have already been updated if another system intervened; double-check guard.
-		if state.Flags&components.StateCodeNeeded == 0 {
-			continue
-		}
-
-		info.OldState = *state
-		state.Flags &^= components.StateCodeNeeded
-		state.Flags |= components.StateCodePending
-
-		items = append(items, info.Job)
-		submitted = append(submitted, info)
-	}
-
-	if len(items) == 0 {
-		return
-	}
-
-	err := s.queue.EnqueueBatch(items)
-	if err != nil {
-		s.logger.Warnw("Failed to enqueue code job batch, queue may be full", "error", err)
-		// Revert state transitions since dispatch failed.
-		for _, info := range submitted {
-			if !s.world.Alive(info.Entity) {
+		waiting := state.PendingAlerts[:0]
+		nextDue := time.Time{}
+		retryAdmission := false
+		for _, request := range state.PendingAlerts {
+			color := request.Color
+			prototypes := storage.CodeJobs[color]
+			if cfg.Configs[color] == nil || !cfg.Configs[color].Dispatch || len(prototypes) == 0 {
 				continue
 			}
-			state := s.stateMapper.Get(info.Entity)
-			if state == nil {
+			if schema.InMaintenance(state.Maintenance, now) {
 				continue
 			}
-			state.Flags &^= components.StateCodePending
-			state.Flags |= components.StateCodeNeeded
+			if request.NotBefore.After(now) || (state.Deliveries[color] != nil && state.Deliveries[color].Next == len(prototypes)) {
+				waiting = append(waiting, request)
+				due := request.NotBefore
+				if !due.After(now) {
+					due = now.Add(time.Second)
+				}
+				if nextDue.IsZero() || due.Before(nextDue) {
+					nextDue = due
+				}
+				continue
+			}
+			if state.Deliveries == nil {
+				state.Deliveries = make(map[string]*components.CodeDelivery)
+			}
+			delivery := state.Deliveries[color]
+			if delivery == nil {
+				state.CodeSequence++
+				delivery = &components.CodeDelivery{Generation: state.CodeSequence, Completed: make([]bool, len(prototypes)), Attempts: request.Attempts + 1, Retryable: true, Deadline: now.Add(codeResultTTL)}
+				state.Deliveries[color] = delivery
+				s.codeSched.active[ent] = struct{}{}
+			}
+			for delivery.Next < len(prototypes) && budget > 0 {
+				n := delivery.Next
+				if isNilJob(prototypes[n]) {
+					delivery.Completed[n] = true
+					delivery.Next++
+					delivery.Seen++
+					delivery.Failed++
+					delivery.Retryable = false
+					continue
+				}
+				job := jobs.NewDispatch(prototypes[n], ent, "code", color, delivery.Generation, n)
+				job.Deadline = delivery.Deadline
+				if err := s.queue.Enqueue(job); err != nil {
+					break
+				}
+				if delivery.Next == 0 && s.alertMgr != nil {
+					s.alertMgr.OnEnqueued(ent, color, now)
+				}
+				delivery.Next++
+				budget--
+			}
+			if delivery.Next < len(prototypes) {
+				waiting = append(waiting, request)
+				retryAdmission = true
+			}
 		}
-		return
-	}
-
-	for _, info := range submitted {
-		if !s.world.Alive(info.Entity) {
-			continue
+		state.PendingAlerts = waiting
+		state.PendingCode = ""
+		if len(waiting) > 0 {
+			state.PendingCode = waiting[0].Color
 		}
-		state := s.stateMapper.Get(info.Entity)
-		if state == nil {
-			continue
+		state.SetCodeNeeded(len(waiting) > 0)
+		state.SetCodePending(len(state.Deliveries) > 0)
+		if retryAdmission {
+			s.codeSched.Requeue([]ecs.Entity{ent})
+		} else if !nextDue.IsZero() {
+			s.codeSched.ScheduleDeferred(ent, nextDue)
 		}
-
-		s.stateLogger.LogTransition(info.Entity, info.OldState, *state)
-		s.logger.Infow("Code dispatched", "monitor_name", state.Name, "color", info.Color)
 	}
 }
-
-// Finalize is a no-op for this system.
-func (s *BatchCodeSystem) Finalize(_ *ecs.World) {}
-
-func isNilJob(job jobs.Job) bool { return job == nil || job.IsNil() }
+func isNilJob(j jobs.Job) bool { return j == nil || j.IsNil() }

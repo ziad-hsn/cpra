@@ -1,0 +1,14 @@
+.git
+.github
+bin
+dist
+dashboard/dist
+**/node_modules
+**/__pycache__
+**/*.log
+**/*.out
+**/*.jsonl
+.env
+.env.*
+monitors.yaml
+cpra-token

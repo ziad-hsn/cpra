@@ -13,10 +13,8 @@ import (
 func TestZapLogger_BasicLogging(t *testing.T) {
 	// Create test logger with observer to capture logs
 	core, recorded := observer.New(zapcore.DebugLevel)
-	baseLogger := zap.New(core)
 	logger := &ZapLogger{
-		base:  baseLogger,
-		sugar: baseLogger.Sugar(),
+		zap: zap.New(core),
 	}
 
 	// Test different log levels
@@ -48,10 +46,8 @@ func TestZapLogger_BasicLogging(t *testing.T) {
 
 func TestZapLogger_StructuredFields(t *testing.T) {
 	core, recorded := observer.New(zapcore.InfoLevel)
-	baseLogger := zap.New(core)
 	logger := &ZapLogger{
-		base:  baseLogger,
-		sugar: baseLogger.Sugar(),
+		zap: zap.New(core),
 	}
 
 	// Test various field types
@@ -88,10 +84,8 @@ func TestZapLogger_StructuredFields(t *testing.T) {
 
 func TestZapLogger_With(t *testing.T) {
 	core, recorded := observer.New(zapcore.InfoLevel)
-	baseLogger := zap.New(core)
 	logger := &ZapLogger{
-		base:  baseLogger,
-		sugar: baseLogger.Sugar(),
+		zap: zap.New(core),
 	}
 
 	// Create child logger with context
@@ -133,7 +127,7 @@ func TestZapLogger_Sampling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	// Generate many debug logs to test sampling
 	// Note: With sampling config above, we expect:
@@ -152,10 +146,8 @@ func TestZapLogger_Sampling(t *testing.T) {
 
 func TestContext_WithLogger(t *testing.T) {
 	core, recorded := observer.New(zapcore.InfoLevel)
-	baseLogger := zap.New(core)
 	logger := &ZapLogger{
-		base:  baseLogger,
-		sugar: baseLogger.Sugar(),
+		zap: zap.New(core),
 	}
 
 	// Add logger to context
@@ -218,7 +210,7 @@ func TestLoggerConfig_Development(t *testing.T) {
 	}
 }
 
-func TestFieldsToArgs_AllTypes(t *testing.T) {
+func TestConvertFields_AllTypes(t *testing.T) {
 	fields := []Field{
 		{Key: "string", Value: "test"},
 		{Key: "int", Value: 42},
@@ -229,23 +221,16 @@ func TestFieldsToArgs_AllTypes(t *testing.T) {
 		{Key: "duration", Value: time.Second},
 	}
 
-	args := fieldsToArgs(fields)
+	zapFields := convertFields(fields)
 
-	// Each field becomes 2 args (key, value)
-	expectedLen := len(fields) * 2
-	if len(args) != expectedLen {
-		t.Errorf("Expected %d args, got %d", expectedLen, len(args))
+	if len(zapFields) != len(fields) {
+		t.Errorf("Expected %d zap fields, got %d", len(fields), len(zapFields))
 	}
 
-	// Verify each field was converted to key-value pairs
-	for i, field := range fields {
-		keyIdx := i * 2
-		valIdx := keyIdx + 1
-		if args[keyIdx] != field.Key {
-			t.Errorf("Field %d: expected key '%s', got '%s'", i, field.Key, args[keyIdx])
-		}
-		if args[valIdx] != field.Value {
-			t.Errorf("Field %d: expected value '%v', got '%v'", i, field.Value, args[valIdx])
+	// Verify each field was converted
+	for i, zf := range zapFields {
+		if zf.Key != fields[i].Key {
+			t.Errorf("Field %d: expected key '%s', got '%s'", i, fields[i].Key, zf.Key)
 		}
 	}
 }

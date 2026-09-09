@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,22 +14,22 @@ import (
 )
 
 type testHybridJob struct {
+	id          int
 	enqueueTime time.Time
 	startTime   time.Time
-	id          int
 }
 
 func newTestHybridJob(id int) *testHybridJob {
 	return &testHybridJob{id: id}
 }
 
-func (j *testHybridJob) Execute(_ context.Context) jobs.Result { return jobs.Result{} }
-func (j *testHybridJob) Copy() jobs.Job                        { copy := *j; return &copy }
-func (j *testHybridJob) GetEnqueueTime() time.Time             { return j.enqueueTime }
-func (j *testHybridJob) SetEnqueueTime(t time.Time)            { j.enqueueTime = t }
-func (j *testHybridJob) GetStartTime() time.Time               { return j.startTime }
-func (j *testHybridJob) SetStartTime(t time.Time)              { j.startTime = t }
-func (j *testHybridJob) IsNil() bool                           { return false }
+func (j *testHybridJob) Execute() jobs.Result       { return jobs.Result{} }
+func (j *testHybridJob) Copy() jobs.Job             { copy := *j; return &copy }
+func (j *testHybridJob) GetEnqueueTime() time.Time  { return j.enqueueTime }
+func (j *testHybridJob) SetEnqueueTime(t time.Time) { j.enqueueTime = t }
+func (j *testHybridJob) GetStartTime() time.Time    { return j.startTime }
+func (j *testHybridJob) SetStartTime(t time.Time)   { j.startTime = t }
+func (j *testHybridJob) IsNil() bool                { return false }
 
 func TestHybridQueueFastPath(t *testing.T) {
 	cfg := HybridQueueConfig{
@@ -70,7 +70,7 @@ func TestHybridQueueFastPath(t *testing.T) {
 	}
 }
 
-func TestHybridQueueOverflowDrainOrder(t *testing.T) {
+func TestHybridQueueFairDrainOrder(t *testing.T) {
 	cfg := HybridQueueConfig{
 		Name:             "overflow",
 		RingCapacity:     2,
@@ -90,7 +90,7 @@ func TestHybridQueueOverflowDrainOrder(t *testing.T) {
 		}
 	}
 
-	expected := []int{2, 3, 4, 5, 0, 1}
+	expected := []int{2, 0, 3, 1, 4, 5}
 	for idx, want := range expected {
 		job, err := queue.Dequeue()
 		if err != nil {
@@ -108,10 +108,10 @@ func TestHybridQueueOverflowDrainOrder(t *testing.T) {
 func TestHybridQueueDropPolicies(t *testing.T) {
 	tests := []struct {
 		name          string
-		expectedFront []int
 		policy        DropPolicy
-		expectedDrop  int64
 		expectErr     bool
+		expectedFront []int
+		expectedDrop  int64
 	}{
 		{
 			name:          "reject",
@@ -245,6 +245,11 @@ func TestHybridQueueConcurrentAccess(t *testing.T) {
 		retryBackoff = 50 * time.Microsecond
 	)
 
+	// errCh collects errors from producer/consumer goroutines so they can be
+	// reported from the test goroutine (t.Fatalf must not be called from a
+	// non-test goroutine).
+	errCh := make(chan error, producers+consumers)
+
 	var produced atomic.Int64
 	var produceWG sync.WaitGroup
 	produceWG.Add(producers)
@@ -262,7 +267,8 @@ func TestHybridQueueConcurrentAccess(t *testing.T) {
 						if errors.Is(err, ErrQueueClosed) {
 							return
 						}
-						t.Fatalf("unexpected enqueue error: %v", err)
+						errCh <- fmt.Errorf("unexpected enqueue error: %v", err)
+						return
 					}
 					produced.Add(1)
 					break
@@ -286,7 +292,8 @@ func TestHybridQueueConcurrentAccess(t *testing.T) {
 					if errors.Is(err, ErrQueueClosed) {
 						return
 					}
-					t.Fatalf("unexpected dequeue error: %v", err)
+					errCh <- fmt.Errorf("unexpected dequeue error: %v", err)
+					return
 				}
 				if job == nil {
 					time.Sleep(retryBackoff)
@@ -315,6 +322,12 @@ func TestHybridQueueConcurrentAccess(t *testing.T) {
 
 	queue.Close()
 	consumeWG.Wait()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("%v", err)
+	default:
+	}
 
 	if produced.Load() != int64(total) {
 		t.Fatalf("expected produced %d, got %d", total, produced.Load())

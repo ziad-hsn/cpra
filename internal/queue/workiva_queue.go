@@ -3,11 +3,10 @@ package queue
 import (
 	"cpra/internal/jobs"
 	"errors"
-	"runtime"
+	wqueue "github.com/Workiva/go-datastructures/queue"
+	"sync"
 	"sync/atomic"
 	"time"
-
-	wqueue "github.com/Workiva/go-datastructures/queue"
 )
 
 // Wrapper built on Workiva's lock-free RingBuffer, with capacity expansion.
@@ -18,17 +17,22 @@ var (
 )
 
 type rbSeg struct {
+	mu   sync.Mutex // Serializes publication and seals the segment when next is set.
 	rb   *wqueue.RingBuffer
 	next atomic.Pointer[rbSeg]
 	cap  uint64
 }
 
-// WorkivaQueue is a lock-free, capacity-expanding MPMC queue using Workiva RBs.
+// WorkivaQueue is a capacity-expanding MPMC queue using Workiva ring buffers.
+// Producers serialize per segment so retired segments cannot receive new jobs.
 type WorkivaQueue struct {
-	head                atomic.Pointer[rbSeg]
-	tail                atomic.Pointer[rbSeg]
-	signal              chan struct{}
-	capacity            atomic.Uint64
+	head atomic.Pointer[rbSeg]
+	tail atomic.Pointer[rbSeg]
+
+	closed atomic.Int32
+
+	// metrics
+	capacity            atomic.Uint64 // cumulative capacity across segments
 	enqueuedCount       atomic.Int64
 	dequeuedCount       atomic.Int64
 	totalQueueWaitNanos atomic.Int64
@@ -36,19 +40,16 @@ type WorkivaQueue struct {
 	startUnixNano       atomic.Int64
 	lastEnqueueUnixNano atomic.Int64
 	lastDequeueUnixNano atomic.Int64
-	closed              atomic.Int32
 }
 
 // NewWorkivaQueue creates a new expanding queue backed by Workiva RingBuffers.
 func NewWorkivaQueue(capacity int) Queue {
-	if capacity < 1 {
-		capacity = 1
+	if capacity < 2 {
+		capacity = 2
 	}
 	rb := wqueue.NewRingBuffer(uint64(capacity))
 	seg := &rbSeg{rb: rb, cap: rb.Cap()}
-	q := &WorkivaQueue{
-		signal: make(chan struct{}, 1),
-	}
+	q := &WorkivaQueue{}
 	q.head.Store(seg)
 	q.tail.Store(seg)
 	q.capacity.Store(seg.cap)
@@ -65,86 +66,53 @@ func (q *WorkivaQueue) Enqueue(job jobs.Job) error {
 	if !isNilJob(job) {
 		job.SetEnqueueTime(now)
 	}
-
 	for {
 		if q.closed.Load() == 1 {
 			return ErrQueueClosed
 		}
 		tail := q.tail.Load()
-		if ok, err := tail.rb.Offer(job); err != nil {
+		tail.mu.Lock()
+		// Once linked to a successor, this segment is sealed even if a consumer
+		// freed space. A producer retaining an old tail must follow the successor.
+		if next := tail.next.Load(); next != nil {
+			tail.mu.Unlock()
+			q.tail.CompareAndSwap(tail, next)
+			continue
+		}
+		ok, err := tail.rb.Offer(job)
+		if err != nil {
+			tail.mu.Unlock()
 			return err
-		} else if ok {
+		}
+		if ok {
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
-			q.notify()
+			tail.mu.Unlock()
 			return nil
 		}
-		// Full: attempt to expand by linking a larger segment
-		if next := tail.next.Load(); next == nil {
-			newRB := wqueue.NewRingBuffer(tail.cap << 1)
-			newSeg := &rbSeg{rb: newRB, cap: newRB.Cap()}
-			if tail.next.CompareAndSwap(nil, newSeg) {
-				q.capacity.Add(newSeg.cap)
-				q.tail.CompareAndSwap(tail, newSeg)
-			}
-		} else {
-			q.tail.CompareAndSwap(tail, next)
-		}
-		runtime.Gosched()
+		rb := wqueue.NewRingBuffer(tail.cap << 1)
+		next := &rbSeg{rb: rb, cap: rb.Cap()}
+		q.capacity.Add(next.cap)
+		tail.next.Store(next)
+		q.tail.CompareAndSwap(tail, next)
+		tail.mu.Unlock()
 	}
 }
 
-// EnqueueBatch enqueues a slice of jobs, expanding as needed.
+// EnqueueBatch validates the item types before admitting jobs one at a time.
 func (q *WorkivaQueue) EnqueueBatch(items []interface{}) error {
-	if len(items) == 0 {
-		return nil
-	}
-	if q.closed.Load() == 1 {
-		return ErrQueueClosed
-	}
-	now := time.Now()
 	batch := make([]jobs.Job, len(items))
-	for i, it := range items {
-		j, ok := it.(jobs.Job)
+	for n, it := range items {
+		job, ok := it.(jobs.Job)
 		if !ok {
 			return errNilJobType
 		}
-		if !isNilJob(j) {
-			j.SetEnqueueTime(now)
-		}
-		batch[i] = j
+		batch[n] = job
 	}
-
-	enq := int64(0)
-	for i := range batch {
-		for {
-			if q.closed.Load() == 1 {
-				return ErrQueueClosed
-			}
-			tail := q.tail.Load()
-			if ok, err := tail.rb.Offer(batch[i]); err != nil {
-				return err
-			} else if ok {
-				enq++
-				break
-			}
-			if next := tail.next.Load(); next == nil {
-				newRB := wqueue.NewRingBuffer(tail.cap << 1)
-				newSeg := &rbSeg{rb: newRB, cap: newRB.Cap()}
-				if tail.next.CompareAndSwap(nil, newSeg) {
-					q.capacity.Add(newSeg.cap)
-					q.tail.CompareAndSwap(tail, newSeg)
-				}
-			} else {
-				q.tail.CompareAndSwap(tail, next)
-			}
-			runtime.Gosched()
+	for _, job := range batch {
+		if err := q.Enqueue(job); err != nil {
+			return err
 		}
-	}
-	if enq > 0 {
-		q.enqueuedCount.Add(enq)
-		q.lastEnqueueUnixNano.Store(now.UnixNano())
-		q.notify()
 	}
 	return nil
 }
@@ -183,11 +151,7 @@ func (q *WorkivaQueue) Dequeue() (jobs.Job, error) {
 		}
 		// Try to advance to next segment if drained
 		if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
-			if q.head.CompareAndSwap(head, next) {
-				if head.rb != nil {
-					head.rb.Dispose()
-				}
-			}
+			q.head.CompareAndSwap(head, next)
 			continue
 		}
 		return nil, nil // observed empty
@@ -214,11 +178,7 @@ func (q *WorkivaQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 			return nil, err
 		}
 		if next := head.next.Load(); next != nil && head.rb.Len() == 0 {
-			if q.head.CompareAndSwap(head, next) {
-				if head.rb != nil {
-					head.rb.Dispose()
-				}
-			}
+			q.head.CompareAndSwap(head, next)
 			continue
 		}
 		break
@@ -298,16 +258,5 @@ func (q *WorkivaQueue) Stats() Stats {
 		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
 		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
-	}
-}
-
-func (q *WorkivaQueue) Notify() <-chan struct{} {
-	return q.signal
-}
-
-func (q *WorkivaQueue) notify() {
-	select {
-	case q.signal <- struct{}{}:
-	default:
 	}
 }

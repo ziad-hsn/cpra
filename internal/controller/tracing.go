@@ -2,14 +2,12 @@ package controller
 
 import (
 	"context"
-	"cpra/internal/logger"
 	"fmt"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 // TraceSpan represents a single trace span
@@ -39,28 +37,23 @@ type TraceContext struct {
 type Tracer struct {
 	spans     map[string]*TraceSpan
 	traces    map[string][]*TraceSpan
-	logger    *zap.SugaredLogger
+	logger    *Logger
 	component string
 	mu        sync.RWMutex
 	enabled   bool
 }
 
-// NewTracer creates a new tracer instance.
-// When productionMode is true, uses JSON logger at info level (less verbose).
-// When false, uses console logger at debug level for development.
-func NewTracer(component string, enabled bool, productionMode bool) *Tracer {
-	// Select logger config based on production mode
-	var cfg logger.Config
-	if productionMode {
-		cfg = logger.DefaultConfig() // JSON format, info level
-	} else {
-		cfg = logger.DevelopmentConfig() // Console format, debug level
-	}
-
-	traceLogger, err := logger.NewSugaredLoggerWithComponent(fmt.Sprintf("TRACE:%s", component), cfg)
-	if err != nil {
-		// Fallback to a nop logger if creation fails (should not happen)
-		traceLogger = zap.NewNop().Sugar()
+// NewTracer creates a new tracer instance
+func NewTracer(component string, enabled bool) *Tracer {
+	// Create a simple logger without tracing to avoid circular dependency
+	simpleLogger := &Logger{
+		level:       LogLevelDebug,
+		component:   fmt.Sprintf("TRACE:%s", component),
+		enableColor: false,
+		debugMode:   true,
+		prodMode:    false,
+		timezone:    time.Local,
+		tracer:      nil, // No tracer to avoid recursion
 	}
 
 	return &Tracer{
@@ -68,7 +61,7 @@ func NewTracer(component string, enabled bool, productionMode bool) *Tracer {
 		traces:    make(map[string][]*TraceSpan),
 		enabled:   enabled,
 		component: component,
-		logger:    traceLogger,
+		logger:    simpleLogger,
 	}
 }
 
@@ -81,7 +74,7 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 	var traceID, parentSpanID string
 
 	// Check if there's an existing trace context
-	if traceCtx, ok := ctx.Value("traceContext").(*TraceContext); ok {
+	if traceCtx, ok := ctx.Value(traceContextKey{}).(*TraceContext); ok {
 		traceID = traceCtx.TraceID
 		parentSpanID = traceCtx.SpanID
 	} else {
@@ -119,9 +112,9 @@ func (t *Tracer) StartSpan(ctx context.Context, operation string) (context.Conte
 		Baggage: make(map[string]string),
 	}
 
-	newCtx := context.WithValue(ctx, "traceContext", newTraceCtx)
+	newCtx := context.WithValue(ctx, traceContextKey{}, newTraceCtx)
 
-	t.logger.Debugf("Started span %s for operation %s (trace: %s, parent: %s)",
+	t.logger.Debug("Started span %s for operation %s (trace: %s, parent: %s)",
 		spanID, operation, traceID, parentSpanID)
 
 	return newCtx, span
@@ -149,11 +142,11 @@ func (t *Tracer) FinishSpan(span *TraceSpan, err error) {
 		status = "ERROR"
 	}
 
-	t.logger.Debugf("Finished span %s (%s) in %v [%s]",
+	t.logger.Debug("Finished span %s (%s) in %v [%s]",
 		span.ID, span.Operation, span.Duration, status)
 
 	if err != nil {
-		t.logger.Debugf("Span %s error: %v", span.ID, err)
+		t.logger.Debug("Span %s error: %v", span.ID, err)
 	}
 }
 
@@ -291,7 +284,7 @@ func (t *Tracer) Cleanup(maxAge time.Duration) {
 	}
 
 	if removedSpans > 0 || removedTraces > 0 {
-		t.logger.Debugf("Cleaned up %d spans and %d traces", removedSpans, removedTraces)
+		t.logger.Debug("Cleaned up %d spans and %d traces", removedSpans, removedTraces)
 	}
 }
 
@@ -305,20 +298,18 @@ var (
 	EntityTracer     *Tracer
 )
 
-// InitializeTracers sets up all component tracers.
-// When productionMode is true, tracers use JSON logging at info level.
-func InitializeTracers(enabled bool, productionMode bool) {
-	SystemTracer = NewTracer("SYSTEM", enabled, productionMode)
-	SchedulerTracer = NewTracer("SCHEDULER", enabled, productionMode)
-	DispatchTracer = NewTracer("DISPATCH", enabled, productionMode)
-	ResultTracer = NewTracer("RESULT", enabled, productionMode)
-	WorkerPoolTracer = NewTracer("WORKER", enabled, productionMode)
-	EntityTracer = NewTracer("ENTITY", enabled, productionMode)
+// InitializeTracers sets up all component tracers
+func InitializeTracers(enabled bool) {
+	SystemTracer = NewTracer("SYSTEM", enabled)
+	SchedulerTracer = NewTracer("SCHEDULER", enabled)
+	DispatchTracer = NewTracer("DISPATCH", enabled)
+	ResultTracer = NewTracer("RESULT", enabled)
+	WorkerPoolTracer = NewTracer("WORKER", enabled)
+	EntityTracer = NewTracer("ENTITY", enabled)
 }
 
-// StartPeriodicCleanup starts a goroutine that periodically cleans up old traces.
-// The goroutine exits when the context is cancelled.
-func StartPeriodicCleanup(ctx context.Context, interval, maxAge time.Duration) {
+// StartPeriodicCleanup starts a goroutine that periodically cleans up old traces
+func StartPeriodicCleanup(interval, maxAge time.Duration) {
 	tracers := []*Tracer{
 		SystemTracer, SchedulerTracer, DispatchTracer,
 		ResultTracer, WorkerPoolTracer, EntityTracer,
@@ -328,17 +319,14 @@ func StartPeriodicCleanup(ctx context.Context, interval, maxAge time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				for _, tracer := range tracers {
-					if tracer != nil {
-						tracer.Cleanup(maxAge)
-					}
+		for range ticker.C {
+			for _, tracer := range tracers {
+				if tracer != nil {
+					tracer.Cleanup(maxAge)
 				}
 			}
 		}
 	}()
 }
+
+type traceContextKey struct{}

@@ -1,0 +1,21 @@
+# Replace this local example address with your own service health endpoint.
+monitors:
+  - name: example-service
+    enabled: true
+    pulse_check:
+      type: http
+      interval: 30s
+      timeout: 5s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      config:
+        url: http://127.0.0.1:8080/health
+    codes:
+      red:
+        dispatch: true
+        notify: log
+        config: {file: alerts.jsonl}
+      green:
+        dispatch: true
+        notify: log
+        config: {file: alerts.jsonl}

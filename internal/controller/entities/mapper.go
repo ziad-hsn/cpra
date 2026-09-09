@@ -2,7 +2,6 @@ package entities
 
 import (
 	"cpra/internal/controller/components"
-	"cpra/internal/interning"
 	"cpra/internal/jobs"
 	"cpra/internal/loader/schema"
 	"fmt"
@@ -12,7 +11,7 @@ import (
 )
 
 // EntityManager uses the new consolidated component design.
-// This dramatically reduces the number of archetypes and improves performance.
+// State changes use flags without adding or removing component types.
 type EntityManager struct {
 	// Core consolidated components - only a few archetypes instead of dozens.
 	MonitorState       *ecs.Map1[components.MonitorState]
@@ -21,17 +20,15 @@ type EntityManager struct {
 	CodeConfig         *ecs.Map1[components.CodeConfig]
 	CodeStatus         *ecs.Map1[components.CodeStatus]
 	JobStorage         *ecs.Map1[components.JobStorage]
-	Shard              *ecs.Map1[components.Shard]
 
 	// Grouped mappers to minimize archetype moves during creation
-	baseMapper *ecs.Map4[components.MonitorState, components.PulseConfig, components.JobStorage, components.Shard]
+	baseMapper *ecs.Map3[components.MonitorState, components.PulseConfig, components.JobStorage]
 	codePair   *ecs.Map2[components.CodeConfig, components.CodeStatus]
 	Disabled   *ecs.Map1[components.Disabled]
 
-	// nextShard tracks round-robin shard assignment across entity creations.
-	nextShard uint32
-	// shardSlots determines the modulus for shard assignment.
-	shardSlots uint32
+	// Notification context for resolving notify_group references to endpoints.
+	Endpoints          map[string]schema.Endpoint
+	NotificationGroups schema.NotificationGroups
 }
 
 // NewEntityManager creates a new consolidated entity manager.
@@ -43,22 +40,10 @@ func NewEntityManager(world *ecs.World) *EntityManager {
 		CodeConfig:         ecs.NewMap1[components.CodeConfig](world),
 		CodeStatus:         ecs.NewMap1[components.CodeStatus](world),
 		JobStorage:         ecs.NewMap1[components.JobStorage](world),
-		Shard:              ecs.NewMap1[components.Shard](world),
-		baseMapper:         ecs.NewMap4[components.MonitorState, components.PulseConfig, components.JobStorage, components.Shard](world),
+		baseMapper:         ecs.NewMap3[components.MonitorState, components.PulseConfig, components.JobStorage](world),
 		codePair:           ecs.NewMap2[components.CodeConfig, components.CodeStatus](world),
 		Disabled:           ecs.NewMap1[components.Disabled](world),
-		shardSlots:         components.DefaultShardSlots,
 	}
-}
-
-// SetShardSlots allows the controller to configure the number of shard slots dynamically.
-// Values less than 1 fall back to DefaultShardSlots.
-func (e *EntityManager) SetShardSlots(slots int) {
-	if slots <= 0 {
-		e.shardSlots = components.DefaultShardSlots
-		return
-	}
-	e.shardSlots = uint32(slots)
 }
 
 // CreateEntityFromMonitor creates an entity using the consolidated design.
@@ -78,19 +63,23 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		return fmt.Errorf("monitor name cannot be empty")
 	}
 
+	windows, err := schema.CompileMaintenance(monitor.Maintenance)
+	if err != nil {
+		return err
+	}
+
 	// Single time snapshot reused to avoid multiple now() calls
 	now := time.Now()
-	reg := components.DefaultConfigRegistry()
 
 	// Create consolidated MonitorState component
-	monitorName := interning.Intern(monitor.Name)
-	monitorState := GetMonitorState()
-	*monitorState = components.MonitorState{}
-	monitorState.Name = monitorName
-	monitorState.LastPulseCheckTime = now
-	monitorState.LastEventTime = now
-	monitorState.LastSuccessTime = now
-	monitorState.NextCheckTime = now
+	monitorName := monitor.Name
+	monitorState := &components.MonitorState{
+		Name:            monitorName,
+		Maintenance:     windows,
+		LastCheckTime:   time.Time{},
+		LastSuccessTime: time.Time{},
+		NextCheckTime:   now,
+	}
 
 	// Set initial state flags or Disabled tag
 	if monitor.Enabled {
@@ -99,42 +88,29 @@ func (e *EntityManager) CreateEntityFromMonitor(
 
 	// Prepare pulse configuration (added during entity creation)
 	// Map thresholds: prefer explicit unhealthy_threshold; loader maps legacy max_failures into it
-	pulseConfig := GetPulseConfig()
-	*pulseConfig = components.PulseConfig{}
-	pulseConfig.Type = interning.Intern(monitor.Pulse.Type)
-	pulseConfig.UnhealthyThreshold = monitor.Pulse.UnhealthyThreshold
-	pulseConfig.HealthyThreshold = monitor.Pulse.HealthyThreshold
-	pulseConfig.Timeout = monitor.Pulse.Timeout
-	pulseConfig.Interval = monitor.Pulse.Interval
-	// Assign schema config directly; ownership is at an ECS component.
-	// Future updates should replace the component (copy-on-write), not mutate in place.
-	pulseConfig.Config = monitor.Pulse.Config
+	unhealthy := monitor.Pulse.UnhealthyThreshold
+	pulseConfig := &components.PulseConfig{
+		Type:               monitor.Pulse.Type,
+		UnhealthyThreshold: unhealthy,
+		HealthyThreshold:   monitor.Pulse.HealthyThreshold,
+		Timeout:            monitor.Pulse.Timeout,
+		Interval:           monitor.Pulse.Interval,
+		// Assign schema config directly; ownership is at ECS component.
+		// Future updates should replace the component (copy-on-write), not mutate in place.
+		Config: monitor.Pulse.Config,
+	}
 	// Create consolidated job storage (empty at first; jobs filled after we have the entity ID)
 	// Pre-size maps based on number of codes to minimize rehashing/resizes
 	codeCount := len(monitor.Codes)
-	jobStorage := GetJobStorage()
+	jobStorage := &components.JobStorage{CodeJobs: make(map[string][]jobs.Job, codeCount)}
 
-	// Assign shard in round-robin fashion to spread workload across ticks.
-	shardID := e.nextShard % e.shardSlots
-	e.nextShard = (e.nextShard + 1) % e.shardSlots
-
-	// Create an entity with base components in a single archetype transition
-	shard := &components.Shard{ID: uint8(shardID)}
-	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage, shard)
+	// Create entity with base components in a single archetype transition
+	entity := e.baseMapper.NewEntity(monitorState, pulseConfig, jobStorage)
 	if !world.Alive(entity) {
-		// Return pooled components on error
-		PutMonitorState(monitorState)
-		PutPulseConfig(pulseConfig)
-		PutJobStorage(jobStorage)
 		return fmt.Errorf("failed to create valid entity")
 	}
 
-	// Return base components to pools immediately after Ark copies the values
-	PutMonitorState(monitorState)
-	PutPulseConfig(pulseConfig)
-	PutJobStorage(jobStorage)
-
-	// Add a pulse job to existing JobStorage
+	// Add pulse job to existing JobStorage
 	pulseJob, err := jobs.CreatePulseJob(monitor.Pulse, entity)
 	if err != nil {
 		return err
@@ -144,24 +120,21 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add intervention if configured
-	var interventionConfig *components.InterventionConfig
 	if monitor.Intervention.Action != "" {
 		maxFailures := 1
 		if monitor.Intervention.MaxFailures > 0 {
 			maxFailures = monitor.Intervention.MaxFailures
 		}
 
-		interventionConfig = GetInterventionConfig()
-		*interventionConfig = components.InterventionConfig{}
-		interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-		// Assign a schema target directly; updates should replace the component (COW).
-		interventionConfig.Target = monitor.Intervention.Target
-		interventionConfig.MaxFailures = maxFailures
+		interventionConfig := &components.InterventionConfig{
+			Action: monitor.Intervention.Action,
+			// Assign schema target directly; updates should replace the component (COW).
+			Target:      monitor.Intervention.Target,
+			MaxFailures: maxFailures,
+		}
 		e.InterventionConfig.Add(entity, interventionConfig)
-		// Return to the pool after Ark copies the value
-		PutInterventionConfig(interventionConfig)
 
-		// Add an intervention job
+		// Add intervention job
 		interventionJob, err := jobs.CreateInterventionJob(monitor.Intervention, entity)
 		if err != nil {
 			return err
@@ -172,41 +145,38 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	}
 
 	// Add consolidated code configuration instead of separate color components
-	var codeConfig *components.CodeConfig
-	var codeStatus *components.CodeStatus
 	if codeCount > 0 {
-		codeConfig = GetCodeConfig(codeCount)
-		codeStatus = GetCodeStatus(codeCount)
+		codeConfig := &components.CodeConfig{Configs: make(map[string]*components.ColorCodeConfig, codeCount)}
+		codeStatus := &components.CodeStatus{Status: make(map[string]*components.ColorCodeStatus, codeCount)}
 
 		for color, config := range monitor.Codes {
-			colorKey := interning.Intern(color)
-			idx := components.ColorToIndex(colorKey)
-			if idx == components.ColorNone {
-				continue
-			}
-
-			// Value type assignment
-			cc := components.ColorCodeConfig{
+			// Single consolidated entry instead of separate components
+			codeConfig.Configs[color] = &components.ColorCodeConfig{
 				Dispatch: config.Dispatch,
-				Notify:   interning.Intern(config.Notify),
-				Config:   config.Config, // Copy interface/pointer
+				Notify:   config.Notify,
+				// Assign schema notification config directly; updates should replace (COW).
+				Config: config.Config,
 			}
-			codeConfig.Configs[idx] = reg.GetOrAdd(cc)
 
-			cs := components.ColorCodeStatus{
-				LastAlertTime: now.Unix(),
+			codeStatus.Status[color] = &components.ColorCodeStatus{
+				LastAlertTime: now,
 			}
-			codeStatus.Status[idx] = cs
+
+			// Add code jobs to consolidated storage (one per delivery endpoint)
+			codeJobs, err := jobs.CreateCodeJobs(monitorName, config, entity, color, e.Endpoints, e.NotificationGroups)
+			if err != nil {
+				return err
+			}
+			if js := e.JobStorage.Get(entity); js != nil {
+				js.CodeJobs[color] = codeJobs
+			}
 		}
 
-		// Add both code components in a single step
+		// Add both code components in a single step to reduce archetype moves
 		e.codePair.Add(entity, codeConfig, codeStatus)
-		// Pooling disabled, Put calls are no-ops but harmless
-		PutCodeConfig(codeConfig)
-		PutCodeStatus(codeStatus)
 	}
 
-	// Apply the Disabled tag after base creation if the monitor is disabled
+	// Apply Disabled tag after base creation if monitor is disabled
 	if !monitor.Enabled {
 		e.Disabled.Add(entity, &components.Disabled{})
 	}
@@ -214,201 +184,26 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	return nil
 }
 
-// pendingExtra holds components to be added after batch creation
-type pendingExtra struct {
-	InterventionConfig *components.InterventionConfig
-	CodeConfig         *components.CodeConfig
-	CodeStatus         *components.CodeStatus
-	Entity             ecs.Entity
-	Disabled           bool
-}
-
-// CreateEntitiesFromMonitors creates entities in a batch using Ark's Map3.NewBatchFn to minimize
-// archetype transitions and reduce per-entity overhead. It mirrors CreateEntityFromMonitor logic
-// for each monitor without changing behavior. Job creation error is recorded and returned
-// after the batch completes; entities created before an error remain valid, identical to
-// one-by-one creation semantics.
+// CreateEntitiesFromMonitors creates monitors sequentially. Ark holds a world
+// lock inside batch initializers, which cannot add optional component types.
 func (e *EntityManager) CreateEntitiesFromMonitors(world *ecs.World, monitors []schema.Monitor) error {
-	// Validation
 	if world == nil {
 		return fmt.Errorf("world cannot be nil")
 	}
 	if e == nil {
 		return fmt.Errorf("EntityManager cannot be nil")
 	}
-	if len(monitors) == 0 {
-		return nil
-	}
-
-	// Single time snapshot reused to avoid multiple now() calls across the batch
-	now := time.Now()
-	reg := components.DefaultConfigRegistry()
-
-	// Capture extras to add AFTER batch creation to avoid "locked world" panic
-	pending := make([]pendingExtra, 0, min(len(monitors)/4, 4096))
-
-	// We use a captured index to provide per-monitor data to the batch callback.
-	i := 0
-	var firstErr error
-	shardCursor := e.nextShard
-
-	e.baseMapper.NewBatchFn(len(monitors), func(entity ecs.Entity, monitorState *components.MonitorState, pulseConfig *components.PulseConfig, jobStorage *components.JobStorage, shard *components.Shard) {
-		// If an error was already encountered, skip heavy work but still leave components initialized.
-		if firstErr != nil {
-			return
-		}
-
-		monitor := monitors[i]
-		i++
-
-		// Monitor name and times
-		monitorName := interning.Intern(monitor.Name)
-		monitorState.Name = monitorName
-		monitorState.LastPulseCheckTime = now
-		monitorState.LastEventTime = now
-		monitorState.LastSuccessTime = now
-		monitorState.NextCheckTime = now
-
-		// Assign shard in round-robin order
-		shardID := shardCursor % e.shardSlots
-		shardCursor = (shardCursor + 1) % e.shardSlots
-		if shard != nil {
-			shard.ID = uint8(shardID)
-		}
-
-		// Initial state flags or Disabled tag
-		if monitor.Enabled {
-			monitorState.SetPulseFirstCheck(true)
-		}
-
-		// Pulse configuration: prefer explicit unhealthy_threshold; loader fills from legacy max_failures if provided
-		pulseConfig.Type = interning.Intern(monitor.Pulse.Type)
-		pulseConfig.UnhealthyThreshold = monitor.Pulse.UnhealthyThreshold
-		pulseConfig.HealthyThreshold = monitor.Pulse.HealthyThreshold
-		pulseConfig.Timeout = monitor.Pulse.Timeout
-		pulseConfig.Interval = monitor.Pulse.Interval
-		if monitor.Pulse.Config != nil {
-			// Assign schema config directly; future changes should replace component (COW).
-			pulseConfig.Config = monitor.Pulse.Config
-		} else {
-			pulseConfig.Config = nil
-		}
-
-		// Job storage: pre-size code jobs map based on the number of configured colors
-		jobStorage.PulseJob = nil
-		jobStorage.InterventionJob = nil
-
-		// Create a pulse job and attach to JobStorage
-		if pj, err := jobs.CreatePulseJob(monitor.Pulse, entity); err != nil {
-			firstErr = err
-			return
-		} else {
-			jobStorage.PulseJob = pj
-		}
-
-		// Prepare pending extra data
-		extra := pendingExtra{Entity: entity}
-		hasExtra := false
-
-		// Intervention configuration (optional)
-		if monitor.Intervention.Action != "" {
-			maxFailures := 1
-			if monitor.Intervention.MaxFailures > 0 {
-				maxFailures = monitor.Intervention.MaxFailures
-			}
-			interventionConfig := GetInterventionConfig()
-			*interventionConfig = components.InterventionConfig{}
-			interventionConfig.Action = interning.Intern(monitor.Intervention.Action)
-			// Assign a schema target directly; future changes should replace component (COW).
-			interventionConfig.Target = monitor.Intervention.Target
-			interventionConfig.MaxFailures = maxFailures
-
-			extra.InterventionConfig = interventionConfig
-			hasExtra = true
-
-			// Create an intervention job and attach
-			if ij, err := jobs.CreateInterventionJob(monitor.Intervention, entity); err != nil {
-				firstErr = err
-				// Note: we still might add intervention config if we don't return here,
-				// but strict error handling says we should abort.
-				// However, if we abort, we leak the pooled component from GetInterventionConfig above?
-				// No, we haven't added it to a pending list yet. We should Put it back if we fail.
-				PutInterventionConfig(interventionConfig)
-				return
-			} else {
-				jobStorage.InterventionJob = ij
-			}
-		}
-
-		// Consolidated code configuration & status
-		codeCount := len(monitor.Codes)
-		if codeCount > 0 {
-			codeConfig := GetCodeConfig(codeCount)
-			codeStatus := GetCodeStatus(codeCount)
-
-			for color, cfg := range monitor.Codes {
-				colorKey := interning.Intern(color)
-				idx := components.ColorToIndex(colorKey)
-				if idx == components.ColorNone {
-					continue
-				}
-
-				// Per-color config
-				cc := components.ColorCodeConfig{
-					Dispatch: cfg.Dispatch,
-					Notify:   interning.Intern(cfg.Notify),
-					Config:   cfg.Config,
-				}
-				codeConfig.Configs[idx] = reg.GetOrAdd(cc)
-
-				// Per-color status
-				cs := components.ColorCodeStatus{
-					LastAlertTime: now.Unix(),
-				}
-				codeStatus.Status[idx] = cs
-			}
-
-			extra.CodeConfig = codeConfig
-			extra.CodeStatus = codeStatus
-			hasExtra = true
-		}
-
-		// Apply the Disabled tag after base creation if the monitor is disabled
-		if !monitor.Enabled {
-			extra.Disabled = true
-			hasExtra = true
-		}
-
-		if hasExtra {
-			pending = append(pending, extra)
-		}
-	})
-
-	// Apply pending components after batch creation is done (world unlocked)
-	for _, p := range pending {
-		if p.InterventionConfig != nil {
-			e.InterventionConfig.Add(p.Entity, p.InterventionConfig)
-			PutInterventionConfig(p.InterventionConfig)
-		}
-		if p.CodeConfig != nil && p.CodeStatus != nil {
-			e.codePair.Add(p.Entity, p.CodeConfig, p.CodeStatus)
-			PutCodeConfig(p.CodeConfig)
-			PutCodeStatus(p.CodeStatus)
-		}
-		if p.Disabled {
-			e.Disabled.Add(p.Entity, &components.Disabled{})
+	for i := range monitors {
+		if err := e.CreateEntityFromMonitor(&monitors[i], world); err != nil {
+			return err
 		}
 	}
-
-	// Persist shard cursor for later batches
-	e.nextShard = shardCursor
-
-	return firstErr
+	return nil
 }
 
 // EnableMonitor enables a monitor using consolidated state flags
 func (e *EntityManager) EnableMonitor(entity ecs.Entity) {
-	// Remove the Disabled tag if present and schedule the first check
+	// Remove Disabled tag if present and schedule first check
 	e.Disabled.Remove(entity)
 	if state := e.MonitorState.Get(entity); state != nil {
 		state.SetPulseFirstCheck(true)

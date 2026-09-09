@@ -1,84 +1,3260 @@
-<!doctype html><html lang=en class=no-js> <head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><link href=https://ziad-hsn.github.io/cpra/reference/jobs-reference/ rel=canonical><link href=../config-schema/ rel=prev><link href=../types-reference/ rel=next><link rel=icon href=../../images/cpra-icon.svg><meta name=generator content="mkdocs-1.5.3, mkdocs-material-9.4.0"><title>Jobs - CPRA Documentation</title><link rel=stylesheet href=../../assets/stylesheets/main.9f615399.min.css><link rel=stylesheet href=../../assets/stylesheets/palette.649f08f9.min.css><link rel=preconnect href=https://fonts.gstatic.com crossorigin><link rel=stylesheet href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback"><style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style><link rel=stylesheet href=../../assets/stylesheets/extra.css><script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script><style>
-    :root {
-      --md-text-font: "Inter", sans-serif;
-      --md-code-font: "JetBrains Mono", monospace;
-    }
-  </style></head> <body dir=ltr data-md-color-scheme=default data-md-color-primary=custom data-md-color-accent=custom> <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script> <input class=md-toggle data-md-toggle=drawer type=checkbox id=__drawer autocomplete=off> <input class=md-toggle data-md-toggle=search type=checkbox id=__search autocomplete=off> <label class=md-overlay for=__drawer></label> <div data-md-component=skip> <a href=#jobs-reference class=md-skip> Skip to content </a> </div> <div data-md-component=announce> </div> <header class="md-header md-header--shadow md-header--lifted" data-md-component=header> <nav class="md-header__inner md-grid" aria-label=Header> <a href=../.. title="CPRA Documentation" class="md-header__button md-logo" aria-label="CPRA Documentation" data-md-component=logo> <img src=../../images/cpra-icon.svg alt=logo> </a> <label class="md-header__button md-icon" for=__drawer> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg> </label> <div class=md-header__title data-md-component=header-title> <div class=md-header__ellipsis> <div class=md-header__topic> <span class=md-ellipsis> CPRA Documentation </span> </div> <div class=md-header__topic data-md-component=header-topic> <span class=md-ellipsis> Jobs </span> </div> </div> </div> <form class=md-header__option data-md-component=palette> <input class=md-option data-md-color-media data-md-color-scheme=default data-md-color-primary=custom data-md-color-accent=custom aria-label="Switch to dusk mode" type=radio name=__palette id=__palette_1> <label class="md-header__button md-icon" title="Switch to dusk mode" for=__palette_2 hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg> </label> <input class=md-option data-md-color-media data-md-color-scheme=slate data-md-color-primary=custom data-md-color-accent=custom aria-label="Switch to light mode" type=radio name=__palette id=__palette_2> <label class="md-header__button md-icon" title="Switch to light mode" for=__palette_1 hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12c0-2.42-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg> </label> </form> <label class="md-header__button md-icon" for=__search> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg> </label> <div class=md-search data-md-component=search role=dialog> <label class=md-search__overlay for=__search></label> <div class=md-search__inner role=search> <form class=md-search__form name=search> <input type=text class=md-search__input name=query aria-label=Search placeholder=Search autocapitalize=off autocorrect=off autocomplete=off spellcheck=false data-md-component=search-query required> <label class="md-search__icon md-icon" for=__search> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg> </label> <nav class=md-search__options aria-label=Search> <a href=javascript:void(0) class="md-search__icon md-icon" title=Share aria-label=Share data-clipboard data-clipboard-text data-md-component=search-share tabindex=-1> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg> </a> <button type=reset class="md-search__icon md-icon" title=Clear aria-label=Clear tabindex=-1> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg> </button> </nav> <div class=md-search__suggest data-md-component=search-suggest></div> </form> <div class=md-search__output> <div class=md-search__scrollwrap data-md-scrollfix> <div class=md-search-result data-md-component=search-result> <div class=md-search-result__meta> Initializing search </div> <ol class=md-search-result__list role=presentation></ol> </div> </div> </div> </div> </div> <div class=md-header__source> <a href=https://github.com/ziad-hsn/cpra title="Go to repository" class=md-source data-md-component=source> <div class="md-source__icon md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 496 512"><!-- Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg> </div> <div class=md-source__repository> ziad-hsn/cpra </div> </a> </div> </nav> <nav class=md-tabs aria-label=Tabs data-md-component=tabs> <div class=md-grid> <ul class=md-tabs__list> <li class=md-tabs__item> <a href=../.. class=md-tabs__link> Home </a> </li> <li class=md-tabs__item> <a href=../../tutorials/ class=md-tabs__link> Get Started </a> </li> <li class=md-tabs__item> <a href=../../how-to/ class=md-tabs__link> Guides </a> </li> <li class=md-tabs__item> <a href=../../explanation/ class=md-tabs__link> Concepts </a> </li> <li class=md-tabs__item> <a href=../../architecture/ class=md-tabs__link> Architecture </a> </li> <li class=md-tabs__item> <a href=../../packages/ class=md-tabs__link> Packages </a> </li> <li class="md-tabs__item md-tabs__item--active"> <a href=../ class=md-tabs__link> Reference </a> </li> <li class=md-tabs__item> <a href=../../legal/disclaimer/ class=md-tabs__link> Legal </a> </li> </ul> </div> </nav> </header> <div class=md-container data-md-component=container> <main class=md-main data-md-component=main> <div class="md-main__inner md-grid"> <div class="md-sidebar md-sidebar--primary" data-md-component=sidebar data-md-type=navigation> <div class=md-sidebar__scrollwrap> <div class=md-sidebar__inner> <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label=Navigation data-md-level=0> <label class=md-nav__title for=__drawer> <a href=../.. title="CPRA Documentation" class="md-nav__button md-logo" aria-label="CPRA Documentation" data-md-component=logo> <img src=../../images/cpra-icon.svg alt=logo> </a> CPRA Documentation </label> <div class=md-nav__source> <a href=https://github.com/ziad-hsn/cpra title="Go to repository" class=md-source data-md-component=source> <div class="md-source__icon md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 496 512"><!-- Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg> </div> <div class=md-source__repository> ziad-hsn/cpra </div> </a> </div> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../.. class=md-nav__link> <span class=md-ellipsis> Home </span> </a> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_2> <label class=md-nav__link for=__nav_2 id=__nav_2_label tabindex=0> <span class=md-ellipsis> Get Started </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_2_label aria-expanded=false> <label class=md-nav__title for=__nav_2> <span class="md-nav__icon md-icon"></span> Get Started </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../tutorials/ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../../tutorials/getting-started/ class=md-nav__link> <span class=md-ellipsis> Getting Started </span> </a> </li> <li class=md-nav__item> <a href=../../tutorials/quickstart/ class=md-nav__link> <span class=md-ellipsis> Quickstart </span> </a> </li> <li class=md-nav__item> <a href=../../tutorials/your-first-monitor/ class=md-nav__link> <span class=md-ellipsis> First Monitor </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_3> <label class=md-nav__link for=__nav_3 id=__nav_3_label tabindex=0> <span class=md-ellipsis> Guides </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_3_label aria-expanded=false> <label class=md-nav__title for=__nav_3> <span class="md-nav__icon md-icon"></span> Guides </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../how-to/ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../../how-to/common-tasks/ class=md-nav__link> <span class=md-ellipsis> Common Tasks </span> </a> </li> <li class=md-nav__item> <a href=../../how-to/adding-new-jobs/ class=md-nav__link> <span class=md-ellipsis> Adding Jobs </span> </a> </li> <li class=md-nav__item> <a href=../../how-to/performance-tuning/ class=md-nav__link> <span class=md-ellipsis> Performance </span> </a> </li> <li class=md-nav__item> <a href=../../how-to/deploy-to-production/ class=md-nav__link> <span class=md-ellipsis> Production </span> </a> </li> <li class=md-nav__item> <a href=../../developer-guide/ class=md-nav__link> <span class=md-ellipsis> Developer Guide </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_4> <label class=md-nav__link for=__nav_4 id=__nav_4_label tabindex=0> <span class=md-ellipsis> Concepts </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_4_label aria-expanded=false> <label class=md-nav__title for=__nav_4> <span class="md-nav__icon md-icon"></span> Concepts </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../explanation/ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../../explanation/architecture-overview/ class=md-nav__link> <span class=md-ellipsis> Architecture </span> </a> </li> <li class=md-nav__item> <a href=../../explanation/queueing-theory/ class=md-nav__link> <span class=md-ellipsis> Queueing Theory </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_5> <label class=md-nav__link for=__nav_5 id=__nav_5_label tabindex=0> <span class=md-ellipsis> Architecture </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_5_label aria-expanded=false> <label class=md-nav__title for=__nav_5> <span class="md-nav__icon md-icon"></span> Architecture </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../architecture/ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../../architecture/ARCHITECTURE/ class=md-nav__link> <span class=md-ellipsis> System Design </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_6> <label class=md-nav__link for=__nav_6 id=__nav_6_label tabindex=0> <span class=md-ellipsis> Packages </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_6_label aria-expanded=false> <label class=md-nav__title for=__nav_6> <span class="md-nav__icon md-icon"></span> Packages </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../packages/ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../../packages/controller/ class=md-nav__link> <span class=md-ellipsis> Controller </span> </a> </li> <li class=md-nav__item> <a href=../../packages/jobs/ class=md-nav__link> <span class=md-ellipsis> Jobs </span> </a> </li> <li class=md-nav__item> <a href=../../packages/queue/ class=md-nav__link> <span class=md-ellipsis> Queue </span> </a> </li> <li class=md-nav__item> <a href=../../packages/loader/ class=md-nav__link> <span class=md-ellipsis> Loader </span> </a> </li> <li class=md-nav__item> <a href=../../packages/logger/ class=md-nav__link> <span class=md-ellipsis> Logger </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--active md-nav__item--nested"> <input class="md-nav__toggle md-toggle " type=checkbox id=__nav_7 checked> <label class=md-nav__link for=__nav_7 id=__nav_7_label tabindex=0> <span class=md-ellipsis> Reference </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_7_label aria-expanded=true> <label class=md-nav__title for=__nav_7> <span class="md-nav__icon md-icon"></span> Reference </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../ class=md-nav__link> <span class=md-ellipsis> Overview </span> </a> </li> <li class=md-nav__item> <a href=../config-schema/ class=md-nav__link> <span class=md-ellipsis> Config Schema </span> </a> </li> <li class="md-nav__item md-nav__item--active"> <input class="md-nav__toggle md-toggle" type=checkbox id=__toc> <label class="md-nav__link md-nav__link--active" for=__toc> <span class=md-ellipsis> Jobs </span> <span class="md-nav__icon md-icon"></span> </label> <a href=./ class="md-nav__link md-nav__link--active"> <span class=md-ellipsis> Jobs </span> </a> <nav class="md-nav md-nav--secondary" aria-label="Table of contents"> <label class=md-nav__title for=__toc> <span class="md-nav__icon md-icon"></span> Table of contents </label> <ul class=md-nav__list data-md-component=toc data-md-scrollfix> <li class=md-nav__item> <a href=#job-interface class=md-nav__link> Job Interface </a> </li> <li class=md-nav__item> <a href=#result-structure class=md-nav__link> Result Structure </a> </li> <li class=md-nav__item> <a href=#base-job-types class=md-nav__link> Base Job Types </a> <nav class=md-nav aria-label="Base Job Types"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#basejob class=md-nav__link> BaseJob </a> </li> <li class=md-nav__item> <a href=#basenetworkjob class=md-nav__link> BaseNetworkJob </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#pulse-jobs class=md-nav__link> Pulse Jobs </a> <nav class=md-nav aria-label="Pulse Jobs"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#pulsehttpjob class=md-nav__link> PulseHTTPJob </a> </li> <li class=md-nav__item> <a href=#pulsetcpjob class=md-nav__link> PulseTCPJob </a> </li> <li class=md-nav__item> <a href=#pulseicmpjob class=md-nav__link> PulseICMPJob </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#intervention-jobs class=md-nav__link> Intervention Jobs </a> <nav class=md-nav aria-label="Intervention Jobs"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#interventiondockerjob-restart class=md-nav__link> InterventionDockerJob (Restart) </a> </li> <li class=md-nav__item> <a href=#interventiondockerstopjob class=md-nav__link> InterventionDockerStopJob </a> </li> <li class=md-nav__item> <a href=#interventiondockerstartjob class=md-nav__link> InterventionDockerStartJob </a> </li> <li class=md-nav__item> <a href=#interventiondockerkilljob class=md-nav__link> InterventionDockerKillJob </a> </li> <li class=md-nav__item> <a href=#interventiondockerpausejob class=md-nav__link> InterventionDockerPauseJob </a> </li> <li class=md-nav__item> <a href=#interventiondockerunpausejob class=md-nav__link> InterventionDockerUnpauseJob </a> </li> <li class=md-nav__item> <a href=#interventiondockerscalejob class=md-nav__link> InterventionDockerScaleJob </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#code-alert-jobs class=md-nav__link> Code Alert Jobs </a> <nav class=md-nav aria-label="Code Alert Jobs"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#codelogjob class=md-nav__link> CodeLogJob </a> </li> <li class=md-nav__item> <a href=#codepagerdutyjob-placeholder class=md-nav__link> CodePagerDutyJob (Placeholder) </a> </li> <li class=md-nav__item> <a href=#codeslackjob-placeholder class=md-nav__link> CodeSlackJob (Placeholder) </a> </li> <li class=md-nav__item> <a href=#codeemailjob-placeholder class=md-nav__link> CodeEmailJob (Placeholder) </a> </li> <li class=md-nav__item> <a href=#codewebhookjob-placeholder class=md-nav__link> CodeWebhookJob (Placeholder) </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#dial-limiter class=md-nav__link> Dial Limiter </a> <nav class=md-nav aria-label="Dial Limiter"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#configuration class=md-nav__link> Configuration </a> </li> <li class=md-nav__item> <a href=#tuning-guidelines class=md-nav__link> Tuning Guidelines </a> </li> <li class=md-nav__item> <a href=#stats class=md-nav__link> Stats </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#predeclared-errors class=md-nav__link> Predeclared Errors </a> </li> <li class=md-nav__item> <a href=#factory-functions class=md-nav__link> Factory Functions </a> <nav class=md-nav aria-label="Factory Functions"> <ul class=md-nav__list> <li class=md-nav__item> <a href=#createpulsejob class=md-nav__link> CreatePulseJob </a> </li> <li class=md-nav__item> <a href=#createinterventionjob class=md-nav__link> CreateInterventionJob </a> </li> <li class=md-nav__item> <a href=#createcodejob class=md-nav__link> CreateCodeJob </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=#file-organization class=md-nav__link> File Organization </a> </li> </ul> </nav> </li> <li class=md-nav__item> <a href=../types-reference/ class=md-nav__link> <span class=md-ellipsis> Types </span> </a> </li> <li class=md-nav__item> <a href=../api-reference/ class=md-nav__link> <span class=md-ellipsis> API Reference </span> </a> </li> <li class=md-nav__item> <a href=../api-documentation/ class=md-nav__link> <span class=md-ellipsis> API Documentation </span> </a> </li> <li class=md-nav__item> <a href=../../zap-reference/ class=md-nav__link> <span class=md-ellipsis> Zap Logger </span> </a> </li> </ul> </nav> </li> <li class="md-nav__item md-nav__item--nested"> <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type=checkbox id=__nav_8> <label class=md-nav__link for=__nav_8 id=__nav_8_label tabindex=0> <span class=md-ellipsis> Legal </span> <span class="md-nav__icon md-icon"></span> </label> <nav class=md-nav data-md-level=1 aria-labelledby=__nav_8_label aria-expanded=false> <label class=md-nav__title for=__nav_8> <span class="md-nav__icon md-icon"></span> Legal </label> <ul class=md-nav__list data-md-scrollfix> <li class=md-nav__item> <a href=../../legal/disclaimer/ class=md-nav__link> <span class=md-ellipsis> Disclaimer </span> </a> </li> </ul> </nav> </li> </ul> </nav> </div> </div> </div> <div class=md-content data-md-component=content> <article class="md-content__inner md-typeset"> <h1 id=jobs-reference>Jobs Reference<a class=headerlink href=#jobs-reference title="Anchor link to this section">&para;</a></h1> <p>This document provides a reference for all job types in CPRA's <code>internal/jobs</code> package.</p> <h2 id=job-interface>Job Interface<a class=headerlink href=#job-interface title="Anchor link to this section">&para;</a></h2> <p>All jobs implement the <code>Job</code> interface:</p> <div class="language-go highlight"><pre><span></span><code><span id=__span-0-1><a id=__codelineno-0-1 name=__codelineno-0-1 href=#__codelineno-0-1></a><span class=kd>type</span><span class=w> </span><span class=nx>Job</span><span class=w> </span><span class=kd>interface</span><span class=w> </span><span class=p>{</span>
-</span><span id=__span-0-2><a id=__codelineno-0-2 name=__codelineno-0-2 href=#__codelineno-0-2></a><span class=w>    </span><span class=nx>Execute</span><span class=p>(</span><span class=nx>ctx</span><span class=w> </span><span class=nx>context</span><span class=p>.</span><span class=nx>Context</span><span class=p>)</span><span class=w> </span><span class=nx>Result</span>
-</span><span id=__span-0-3><a id=__codelineno-0-3 name=__codelineno-0-3 href=#__codelineno-0-3></a><span class=w>    </span><span class=nx>Copy</span><span class=p>()</span><span class=w> </span><span class=nx>Job</span>
-</span><span id=__span-0-4><a id=__codelineno-0-4 name=__codelineno-0-4 href=#__codelineno-0-4></a><span class=w>    </span><span class=nx>GetEnqueueTime</span><span class=p>()</span><span class=w> </span><span class=nx>time</span><span class=p>.</span><span class=nx>Time</span>
-</span><span id=__span-0-5><a id=__codelineno-0-5 name=__codelineno-0-5 href=#__codelineno-0-5></a><span class=w>    </span><span class=nx>SetEnqueueTime</span><span class=p>(</span><span class=nx>time</span><span class=p>.</span><span class=nx>Time</span><span class=p>)</span>
-</span><span id=__span-0-6><a id=__codelineno-0-6 name=__codelineno-0-6 href=#__codelineno-0-6></a><span class=w>    </span><span class=nx>GetStartTime</span><span class=p>()</span><span class=w> </span><span class=nx>time</span><span class=p>.</span><span class=nx>Time</span>
-</span><span id=__span-0-7><a id=__codelineno-0-7 name=__codelineno-0-7 href=#__codelineno-0-7></a><span class=w>    </span><span class=nx>SetStartTime</span><span class=p>(</span><span class=nx>time</span><span class=p>.</span><span class=nx>Time</span><span class=p>)</span>
-</span><span id=__span-0-8><a id=__codelineno-0-8 name=__codelineno-0-8 href=#__codelineno-0-8></a><span class=w>    </span><span class=nx>IsNil</span><span class=p>()</span><span class=w> </span><span class=kt>bool</span>
-</span><span id=__span-0-9><a id=__codelineno-0-9 name=__codelineno-0-9 href=#__codelineno-0-9></a><span class=p>}</span>
-</span></code></pre></div> <h2 id=result-structure>Result Structure<a class=headerlink href=#result-structure title="Anchor link to this section">&para;</a></h2> <p>Jobs return a <code>Result</code> struct:</p> <div class="language-go highlight"><pre><span></span><code><span id=__span-1-1><a id=__codelineno-1-1 name=__codelineno-1-1 href=#__codelineno-1-1></a><span class=kd>type</span><span class=w> </span><span class=nx>Result</span><span class=w> </span><span class=kd>struct</span><span class=w> </span><span class=p>{</span>
-</span><span id=__span-1-2><a id=__codelineno-1-2 name=__codelineno-1-2 href=#__codelineno-1-2></a><span class=w>    </span><span class=nx>Err</span><span class=w>     </span><span class=kt>error</span>
-</span><span id=__span-1-3><a id=__codelineno-1-3 name=__codelineno-1-3 href=#__codelineno-1-3></a><span class=w>    </span><span class=nx>Payload</span><span class=w> </span><span class=kd>map</span><span class=p>[</span><span class=kt>string</span><span class=p>]</span><span class=kd>interface</span><span class=p>{}</span>
-</span><span id=__span-1-4><a id=__codelineno-1-4 name=__codelineno-1-4 href=#__codelineno-1-4></a><span class=w>    </span><span class=nx>Ent</span><span class=w>     </span><span class=nx>ecs</span><span class=p>.</span><span class=nx>Entity</span>
-</span><span id=__span-1-5><a id=__codelineno-1-5 name=__codelineno-1-5 href=#__codelineno-1-5></a><span class=p>}</span>
-</span></code></pre></div> <h2 id=base-job-types>Base Job Types<a class=headerlink href=#base-job-types title="Anchor link to this section">&para;</a></h2> <h3 id=basejob>BaseJob<a class=headerlink href=#basejob title="Anchor link to this section">&para;</a></h3> <p>Common fields for all jobs:</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>EnqueueTime</code></td> <td><code>time.Time</code></td> <td>When the job was added to the queue</td> </tr> <tr> <td><code>StartTime</code></td> <td><code>time.Time</code></td> <td>When execution began</td> </tr> <tr> <td><code>Entity</code></td> <td><code>ecs.Entity</code></td> <td>Associated ECS entity</td> </tr> <tr> <td><code>JobType</code></td> <td><code>string</code></td> <td>Category: "pulse", "intervention", "code"</td> </tr> <tr> <td><code>Driver</code></td> <td><code>string</code></td> <td>Specific type: "http", "tcp", "docker", etc.</td> </tr> <tr> <td><code>Timeout</code></td> <td><code>time.Duration</code></td> <td>Operation timeout</td> </tr> <tr> <td><code>Retries</code></td> <td><code>int</code></td> <td>Number of retry attempts</td> </tr> </tbody> </table> <h3 id=basenetworkjob>BaseNetworkJob<a class=headerlink href=#basenetworkjob title="Anchor link to this section">&para;</a></h3> <p>Extends <code>BaseJob</code> with dial limiter integration. Use for any job performing network I/O.</p> <p><strong>Methods:</strong></p> <ul> <li><code>AcquireDialSlot(ctx) bool</code> - Acquire permission to dial</li> <li><code>ReleaseDialSlot()</code> - Release the dial slot</li> <li><code>TryAcquireDialSlot() bool</code> - Non-blocking acquire attempt</li> </ul> <h2 id=pulse-jobs>Pulse Jobs<a class=headerlink href=#pulse-jobs title="Anchor link to this section">&para;</a></h2> <p>Health check jobs that verify service availability.</p> <h3 id=pulsehttpjob>PulseHTTPJob<a class=headerlink href=#pulsehttpjob title="Anchor link to this section">&para;</a></h3> <p>HTTP health checks using fasthttp.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>URL</code></td> <td><code>string</code></td> <td>Target URL</td> </tr> <tr> <td><code>Method</code></td> <td><code>string</code></td> <td>HTTP method (GET, POST, etc.)</td> </tr> <tr> <td><code>Host</code></td> <td><code>string</code></td> <td>Extracted host for client pooling</td> </tr> <tr> <td><code>IsTLS</code></td> <td><code>bool</code></td> <td>Whether to use HTTPS</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> HTTP 2xx status code</p> <h3 id=pulsetcpjob>PulseTCPJob<a class=headerlink href=#pulsetcpjob title="Anchor link to this section">&para;</a></h3> <p>TCP connection health checks.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Host</code></td> <td><code>string</code></td> <td>Target hostname</td> </tr> <tr> <td><code>Port</code></td> <td><code>int</code></td> <td>Target port</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> TCP connection established</p> <h3 id=pulseicmpjob>PulseICMPJob<a class=headerlink href=#pulseicmpjob title="Anchor link to this section">&para;</a></h3> <p>ICMP ping health checks using pro-bing library.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Host</code></td> <td><code>string</code></td> <td>Target hostname or IP</td> </tr> <tr> <td><code>Count</code></td> <td><code>int</code></td> <td>Number of ping packets</td> </tr> <tr> <td><code>IgnorePrivilege</code></td> <td><code>bool</code></td> <td>Ignore privilege errors</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> At least one packet received</p> <h2 id=intervention-jobs>Intervention Jobs<a class=headerlink href=#intervention-jobs title="Anchor link to this section">&para;</a></h2> <p>Automated recovery actions for Docker containers and Swarm services.</p> <h3 id=interventiondockerjob-restart>InterventionDockerJob (Restart)<a class=headerlink href=#interventiondockerjob-restart title="Anchor link to this section">&para;</a></h3> <p>Restarts Docker containers (stop + start).</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> <tr> <td><code>Timeout</code></td> <td><code>time.Duration</code></td> <td>Stop timeout before force kill</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container restarted without error</p> <h3 id=interventiondockerstopjob>InterventionDockerStopJob<a class=headerlink href=#interventiondockerstopjob title="Anchor link to this section">&para;</a></h3> <p>Gracefully stops containers with SIGTERM.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> <tr> <td><code>Timeout</code></td> <td><code>time.Duration</code></td> <td>Time to wait before force kill</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container stopped</p> <h3 id=interventiondockerstartjob>InterventionDockerStartJob<a class=headerlink href=#interventiondockerstartjob title="Anchor link to this section">&para;</a></h3> <p>Starts a stopped container.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> <tr> <td><code>Timeout</code></td> <td><code>time.Duration</code></td> <td>Operation timeout</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container started</p> <h3 id=interventiondockerkilljob>InterventionDockerKillJob<a class=headerlink href=#interventiondockerkilljob title="Anchor link to this section">&para;</a></h3> <p>Force kills a container with SIGKILL (or custom signal).</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> <tr> <td><code>Signal</code></td> <td><code>string</code></td> <td>Kill signal (default: SIGKILL)</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container killed</p> <h3 id=interventiondockerpausejob>InterventionDockerPauseJob<a class=headerlink href=#interventiondockerpausejob title="Anchor link to this section">&para;</a></h3> <p>Pauses (freezes) container processes.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container paused</p> <h3 id=interventiondockerunpausejob>InterventionDockerUnpauseJob<a class=headerlink href=#interventiondockerunpausejob title="Anchor link to this section">&para;</a></h3> <p>Unpauses (resumes) container processes.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Container</code></td> <td><code>string</code></td> <td>Container name or ID</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Container unpaused</p> <h3 id=interventiondockerscalejob>InterventionDockerScaleJob<a class=headerlink href=#interventiondockerscalejob title="Anchor link to this section">&para;</a></h3> <p>Scales a Docker Swarm service's replica count.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Service</code></td> <td><code>string</code></td> <td>Swarm service name</td> </tr> <tr> <td><code>DockerHost</code></td> <td><code>string</code></td> <td>Docker daemon address</td> </tr> <tr> <td><code>Replicas</code></td> <td><code>uint64</code></td> <td>Target replica count</td> </tr> <tr> <td><code>Timeout</code></td> <td><code>time.Duration</code></td> <td>Operation timeout</td> </tr> </tbody> </table> <p><strong>Success criteria:</strong> Service updated with new replica count</p> <p><strong>Note:</strong> Requires Docker Swarm mode. Returns <code>ErrNotReplicatedService</code> if the service is not in replicated mode.</p> <h2 id=code-alert-jobs>Code Alert Jobs<a class=headerlink href=#code-alert-jobs title="Anchor link to this section">&para;</a></h2> <p>Notification jobs for alerting.</p> <h3 id=codelogjob>CodeLogJob<a class=headerlink href=#codelogjob title="Anchor link to this section">&para;</a></h3> <p>Writes alerts to JSON log files.</p> <table> <thead> <tr> <th>Field</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code>Monitor</code></td> <td><code>string</code></td> <td>Monitor name</td> </tr> <tr> <td><code>Color</code></td> <td><code>string</code></td> <td>Alert color (red, yellow, green, cyan, gray)</td> </tr> <tr> <td><code>Status</code></td> <td><code>string</code></td> <td>Status message</td> </tr> <tr> <td><code>Severity</code></td> <td><code>string</code></td> <td>Alert severity</td> </tr> <tr> <td><code>Summary</code></td> <td><code>string</code></td> <td>Alert summary</td> </tr> <tr> <td><code>Action</code></td> <td><code>string</code></td> <td>Recommended action</td> </tr> <tr> <td><code>NextSteps</code></td> <td><code>string</code></td> <td>Follow-up steps</td> </tr> <tr> <td><code>File</code></td> <td><code>string</code></td> <td>Output file path</td> </tr> </tbody> </table> <h3 id=codepagerdutyjob-placeholder>CodePagerDutyJob (Placeholder)<a class=headerlink href=#codepagerdutyjob-placeholder title="Anchor link to this section">&para;</a></h3> <p>PagerDuty integration via Events API v2.</p> <h3 id=codeslackjob-placeholder>CodeSlackJob (Placeholder)<a class=headerlink href=#codeslackjob-placeholder title="Anchor link to this section">&para;</a></h3> <p>Slack notifications via webhook or API.</p> <h3 id=codeemailjob-placeholder>CodeEmailJob (Placeholder)<a class=headerlink href=#codeemailjob-placeholder title="Anchor link to this section">&para;</a></h3> <p>Email notifications via SMTP.</p> <h3 id=codewebhookjob-placeholder>CodeWebhookJob (Placeholder)<a class=headerlink href=#codewebhookjob-placeholder title="Anchor link to this section">&para;</a></h3> <p>Generic webhook POST notifications.</p> <h2 id=dial-limiter>Dial Limiter<a class=headerlink href=#dial-limiter title="Anchor link to this section">&para;</a></h2> <p>Global rate and concurrency limiter for network operations.</p> <h3 id=configuration>Configuration<a class=headerlink href=#configuration title="Anchor link to this section">&para;</a></h3> <div class="language-go highlight"><pre><span></span><code><span id=__span-2-1><a id=__codelineno-2-1 name=__codelineno-2-1 href=#__codelineno-2-1></a><span class=kd>type</span><span class=w> </span><span class=nx>DialLimiterConfig</span><span class=w> </span><span class=kd>struct</span><span class=w> </span><span class=p>{</span>
-</span><span id=__span-2-2><a id=__codelineno-2-2 name=__codelineno-2-2 href=#__codelineno-2-2></a><span class=w>    </span><span class=nx>MaxConcurrentDials</span><span class=w> </span><span class=kt>int</span><span class=w>           </span><span class=c1>// Max in-flight dials (default: 2048)</span>
-</span><span id=__span-2-3><a id=__codelineno-2-3 name=__codelineno-2-3 href=#__codelineno-2-3></a><span class=w>    </span><span class=nx>DialsPerSecond</span><span class=w>     </span><span class=kt>int</span><span class=w>           </span><span class=c1>// Max rate (default: 10000)</span>
-</span><span id=__span-2-4><a id=__codelineno-2-4 name=__codelineno-2-4 href=#__codelineno-2-4></a><span class=w>    </span><span class=nx>BurstSize</span><span class=w>          </span><span class=kt>int</span><span class=w>           </span><span class=c1>// Token bucket burst (default: 500)</span>
-</span><span id=__span-2-5><a id=__codelineno-2-5 name=__codelineno-2-5 href=#__codelineno-2-5></a><span class=w>    </span><span class=nx>AcquireTimeout</span><span class=w>     </span><span class=nx>time</span><span class=p>.</span><span class=nx>Duration</span><span class=w> </span><span class=c1>// Max wait time (default: 5s)</span>
-</span><span id=__span-2-6><a id=__codelineno-2-6 name=__codelineno-2-6 href=#__codelineno-2-6></a><span class=p>}</span>
-</span></code></pre></div> <h3 id=tuning-guidelines>Tuning Guidelines<a class=headerlink href=#tuning-guidelines title="Anchor link to this section">&para;</a></h3> <table> <thead> <tr> <th>Monitor Count</th> <th>MaxConcurrentDials</th> <th>DialsPerSecond</th> <th>BurstSize</th> </tr> </thead> <tbody> <tr> <td>10k</td> <td>512</td> <td>5000</td> <td>250</td> </tr> <tr> <td>100k</td> <td>2048</td> <td>10000</td> <td>500</td> </tr> <tr> <td>1M</td> <td>4096</td> <td>20000</td> <td>1000</td> </tr> </tbody> </table> <h3 id=stats>Stats<a class=headerlink href=#stats title="Anchor link to this section">&para;</a></h3> <div class="language-go highlight"><pre><span></span><code><span id=__span-3-1><a id=__codelineno-3-1 name=__codelineno-3-1 href=#__codelineno-3-1></a><span class=nx>stats</span><span class=w> </span><span class=o>:=</span><span class=w> </span><span class=nx>jobs</span><span class=p>.</span><span class=nx>GetDialLimiter</span><span class=p>().</span><span class=nx>Stats</span><span class=p>()</span>
-</span><span id=__span-3-2><a id=__codelineno-3-2 name=__codelineno-3-2 href=#__codelineno-3-2></a><span class=c1>// Returns: InFlightDials, MaxConcurrentDials, TokensAvailable, DialsPerSecond</span>
-</span></code></pre></div> <h2 id=predeclared-errors>Predeclared Errors<a class=headerlink href=#predeclared-errors title="Anchor link to this section">&para;</a></h2> <p>Errors are predeclared to avoid allocations in hot paths:</p> <div class="language-go highlight"><pre><span></span><code><span id=__span-4-1><a id=__codelineno-4-1 name=__codelineno-4-1 href=#__codelineno-4-1></a><span class=c1>// Factory errors</span>
-</span><span id=__span-4-2><a id=__codelineno-4-2 name=__codelineno-4-2 href=#__codelineno-4-2></a><span class=nx>ErrUnknownPulseConfig</span>
-</span><span id=__span-4-3><a id=__codelineno-4-3 name=__codelineno-4-3 href=#__codelineno-4-3></a><span class=nx>ErrDockerMissingTarget</span>
-</span><span id=__span-4-4><a id=__codelineno-4-4 name=__codelineno-4-4 href=#__codelineno-4-4></a><span class=nx>ErrUnknownInterventionAction</span>
-</span><span id=__span-4-5><a id=__codelineno-4-5 name=__codelineno-4-5 href=#__codelineno-4-5></a><span class=nx>ErrUnknownDockerAction</span>
-</span><span id=__span-4-6><a id=__codelineno-4-6 name=__codelineno-4-6 href=#__codelineno-4-6></a><span class=nx>ErrUnknownCodeNotification</span>
-</span><span id=__span-4-7><a id=__codelineno-4-7 name=__codelineno-4-7 href=#__codelineno-4-7></a>
-</span><span id=__span-4-8><a id=__codelineno-4-8 name=__codelineno-4-8 href=#__codelineno-4-8></a><span class=c1>// Execution errors - Pulse jobs</span>
-</span><span id=__span-4-9><a id=__codelineno-4-9 name=__codelineno-4-9 href=#__codelineno-4-9></a><span class=nx>ErrHTTPCheckFailed</span>
-</span><span id=__span-4-10><a id=__codelineno-4-10 name=__codelineno-4-10 href=#__codelineno-4-10></a><span class=nx>ErrTCPCheckFailed</span>
-</span><span id=__span-4-11><a id=__codelineno-4-11 name=__codelineno-4-11 href=#__codelineno-4-11></a><span class=nx>ErrICMPCheckFailed</span>
-</span><span id=__span-4-12><a id=__codelineno-4-12 name=__codelineno-4-12 href=#__codelineno-4-12></a>
-</span><span id=__span-4-13><a id=__codelineno-4-13 name=__codelineno-4-13 href=#__codelineno-4-13></a><span class=c1>// Execution errors - Docker intervention jobs</span>
-</span><span id=__span-4-14><a id=__codelineno-4-14 name=__codelineno-4-14 href=#__codelineno-4-14></a><span class=nx>ErrDockerActionFailed</span><span class=w>      </span><span class=c1>// Restart failed</span>
-</span><span id=__span-4-15><a id=__codelineno-4-15 name=__codelineno-4-15 href=#__codelineno-4-15></a><span class=nx>ErrDockerStopFailed</span><span class=w>        </span><span class=c1>// Stop failed</span>
-</span><span id=__span-4-16><a id=__codelineno-4-16 name=__codelineno-4-16 href=#__codelineno-4-16></a><span class=nx>ErrDockerStartFailed</span><span class=w>       </span><span class=c1>// Start failed</span>
-</span><span id=__span-4-17><a id=__codelineno-4-17 name=__codelineno-4-17 href=#__codelineno-4-17></a><span class=nx>ErrDockerKillFailed</span><span class=w>        </span><span class=c1>// Kill failed</span>
-</span><span id=__span-4-18><a id=__codelineno-4-18 name=__codelineno-4-18 href=#__codelineno-4-18></a><span class=nx>ErrDockerPauseFailed</span><span class=w>       </span><span class=c1>// Pause failed</span>
-</span><span id=__span-4-19><a id=__codelineno-4-19 name=__codelineno-4-19 href=#__codelineno-4-19></a><span class=nx>ErrDockerUnpauseFailed</span><span class=w>     </span><span class=c1>// Unpause failed</span>
-</span><span id=__span-4-20><a id=__codelineno-4-20 name=__codelineno-4-20 href=#__codelineno-4-20></a><span class=nx>ErrDockerScaleFailed</span><span class=w>       </span><span class=c1>// Scale failed</span>
-</span><span id=__span-4-21><a id=__codelineno-4-21 name=__codelineno-4-21 href=#__codelineno-4-21></a><span class=nx>ErrNotReplicatedService</span><span class=w>    </span><span class=c1>// Service not in replicated mode</span>
-</span><span id=__span-4-22><a id=__codelineno-4-22 name=__codelineno-4-22 href=#__codelineno-4-22></a>
-</span><span id=__span-4-23><a id=__codelineno-4-23 name=__codelineno-4-23 href=#__codelineno-4-23></a><span class=c1>// Execution errors - Code jobs</span>
-</span><span id=__span-4-24><a id=__codelineno-4-24 name=__codelineno-4-24 href=#__codelineno-4-24></a><span class=nx>ErrLogMarshalFailed</span>
-</span><span id=__span-4-25><a id=__codelineno-4-25 name=__codelineno-4-25 href=#__codelineno-4-25></a>
-</span><span id=__span-4-26><a id=__codelineno-4-26 name=__codelineno-4-26 href=#__codelineno-4-26></a><span class=c1>// Resource errors</span>
-</span><span id=__span-4-27><a id=__codelineno-4-27 name=__codelineno-4-27 href=#__codelineno-4-27></a><span class=nx>ErrSemaphoreTimeout</span>
-</span><span id=__span-4-28><a id=__codelineno-4-28 name=__codelineno-4-28 href=#__codelineno-4-28></a><span class=nx>ErrDialLimiterTimeout</span>
-</span></code></pre></div> <h2 id=factory-functions>Factory Functions<a class=headerlink href=#factory-functions title="Anchor link to this section">&para;</a></h2> <h3 id=createpulsejob>CreatePulseJob<a class=headerlink href=#createpulsejob title="Anchor link to this section">&para;</a></h3> <div class="language-go highlight"><pre><span></span><code><span id=__span-5-1><a id=__codelineno-5-1 name=__codelineno-5-1 href=#__codelineno-5-1></a><span class=kd>func</span><span class=w> </span><span class=nx>CreatePulseJob</span><span class=p>(</span><span class=nx>pulseSchema</span><span class=w> </span><span class=nx>schema</span><span class=p>.</span><span class=nx>Pulse</span><span class=p>,</span><span class=w> </span><span class=nx>jobID</span><span class=w> </span><span class=nx>ecs</span><span class=p>.</span><span class=nx>Entity</span><span class=p>)</span><span class=w> </span><span class=p>(</span><span class=nx>Job</span><span class=p>,</span><span class=w> </span><span class=kt>error</span><span class=p>)</span>
-</span></code></pre></div> <p>Creates HTTP, TCP, or ICMP pulse jobs based on schema config type.</p> <h3 id=createinterventionjob>CreateInterventionJob<a class=headerlink href=#createinterventionjob title="Anchor link to this section">&para;</a></h3> <div class="language-go highlight"><pre><span></span><code><span id=__span-6-1><a id=__codelineno-6-1 name=__codelineno-6-1 href=#__codelineno-6-1></a><span class=kd>func</span><span class=w> </span><span class=nx>CreateInterventionJob</span><span class=p>(</span><span class=nx>interventionSchema</span><span class=w> </span><span class=nx>schema</span><span class=p>.</span><span class=nx>Intervention</span><span class=p>,</span><span class=w> </span><span class=nx>jobID</span><span class=w> </span><span class=nx>ecs</span><span class=p>.</span><span class=nx>Entity</span><span class=p>)</span><span class=w> </span><span class=p>(</span><span class=nx>Job</span><span class=p>,</span><span class=w> </span><span class=kt>error</span><span class=p>)</span>
-</span></code></pre></div> <p>Creates intervention jobs based on <code>target.type</code>:</p> <table> <thead> <tr> <th>Type</th> <th>Job Created</th> </tr> </thead> <tbody> <tr> <td><code>restart</code> (default)</td> <td><code>InterventionDockerJob</code></td> </tr> <tr> <td><code>stop</code></td> <td><code>InterventionDockerStopJob</code></td> </tr> <tr> <td><code>start</code></td> <td><code>InterventionDockerStartJob</code></td> </tr> <tr> <td><code>kill</code></td> <td><code>InterventionDockerKillJob</code></td> </tr> <tr> <td><code>pause</code></td> <td><code>InterventionDockerPauseJob</code></td> </tr> <tr> <td><code>unpause</code></td> <td><code>InterventionDockerUnpauseJob</code></td> </tr> <tr> <td><code>scale</code></td> <td><code>InterventionDockerScaleJob</code></td> </tr> </tbody> </table> <h3 id=createcodejob>CreateCodeJob<a class=headerlink href=#createcodejob title="Anchor link to this section">&para;</a></h3> <div class="language-go highlight"><pre><span></span><code><span id=__span-7-1><a id=__codelineno-7-1 name=__codelineno-7-1 href=#__codelineno-7-1></a><span class=kd>func</span><span class=w> </span><span class=nx>CreateCodeJob</span><span class=p>(</span><span class=nx>monitor</span><span class=w> </span><span class=kt>string</span><span class=p>,</span><span class=w> </span><span class=nx>config</span><span class=w> </span><span class=nx>schema</span><span class=p>.</span><span class=nx>CodeConfig</span><span class=p>,</span><span class=w> </span><span class=nx>jobID</span><span class=w> </span><span class=nx>ecs</span><span class=p>.</span><span class=nx>Entity</span><span class=p>,</span><span class=w> </span><span class=nx>color</span><span class=w> </span><span class=kt>string</span><span class=p>)</span><span class=w> </span><span class=p>(</span><span class=nx>Job</span><span class=p>,</span><span class=w> </span><span class=kt>error</span><span class=p>)</span>
-</span></code></pre></div> <p>Creates code alert jobs based on notification type.</p> <h2 id=file-organization>File Organization<a class=headerlink href=#file-organization title="Anchor link to this section">&para;</a></h2> <div class="language-text highlight"><pre><span></span><code><span id=__span-8-1><a id=__codelineno-8-1 name=__codelineno-8-1 href=#__codelineno-8-1></a>internal/jobs/
-</span><span id=__span-8-2><a id=__codelineno-8-2 name=__codelineno-8-2 href=#__codelineno-8-2></a>├── README.md            # Package overview
-</span><span id=__span-8-3><a id=__codelineno-8-3 name=__codelineno-8-3 href=#__codelineno-8-3></a>├── TEMPLATE.go          # Template for new jobs
-</span><span id=__span-8-4><a id=__codelineno-8-4 name=__codelineno-8-4 href=#__codelineno-8-4></a>├── base.go              # BaseJob, BaseNetworkJob
-</span><span id=__span-8-5><a id=__codelineno-8-5 name=__codelineno-8-5 href=#__codelineno-8-5></a>├── types.go             # Job interface, Result, errors
-</span><span id=__span-8-6><a id=__codelineno-8-6 name=__codelineno-8-6 href=#__codelineno-8-6></a>├── factory.go           # Factory functions
-</span><span id=__span-8-7><a id=__codelineno-8-7 name=__codelineno-8-7 href=#__codelineno-8-7></a>├── pool.go              # sync.Pool definitions
-</span><span id=__span-8-8><a id=__codelineno-8-8 name=__codelineno-8-8 href=#__codelineno-8-8></a>├── dial_limiter.go      # Rate/concurrency limiting
-</span><span id=__span-8-9><a id=__codelineno-8-9 name=__codelineno-8-9 href=#__codelineno-8-9></a>│
-</span><span id=__span-8-10><a id=__codelineno-8-10 name=__codelineno-8-10 href=#__codelineno-8-10></a>├── pulse_http.go        # HTTP checks
-</span><span id=__span-8-11><a id=__codelineno-8-11 name=__codelineno-8-11 href=#__codelineno-8-11></a>├── pulse_tcp.go         # TCP checks
-</span><span id=__span-8-12><a id=__codelineno-8-12 name=__codelineno-8-12 href=#__codelineno-8-12></a>├── pulse_icmp.go        # ICMP checks
-</span><span id=__span-8-13><a id=__codelineno-8-13 name=__codelineno-8-13 href=#__codelineno-8-13></a>│
-</span><span id=__span-8-14><a id=__codelineno-8-14 name=__codelineno-8-14 href=#__codelineno-8-14></a>├── intervention_docker.go  # Docker: restart, stop, start, kill, pause, unpause, scale
-</span><span id=__span-8-15><a id=__codelineno-8-15 name=__codelineno-8-15 href=#__codelineno-8-15></a>│
-</span><span id=__span-8-16><a id=__codelineno-8-16 name=__codelineno-8-16 href=#__codelineno-8-16></a>├── code_log.go
-</span><span id=__span-8-17><a id=__codelineno-8-17 name=__codelineno-8-17 href=#__codelineno-8-17></a>├── code_slack.go
-</span><span id=__span-8-18><a id=__codelineno-8-18 name=__codelineno-8-18 href=#__codelineno-8-18></a>├── code_pagerduty.go
-</span><span id=__span-8-19><a id=__codelineno-8-19 name=__codelineno-8-19 href=#__codelineno-8-19></a>├── code_email.go
-</span><span id=__span-8-20><a id=__codelineno-8-20 name=__codelineno-8-20 href=#__codelineno-8-20></a>├── code_webhook.go
-</span><span id=__span-8-21><a id=__codelineno-8-21 name=__codelineno-8-21 href=#__codelineno-8-21></a>│
-</span><span id=__span-8-22><a id=__codelineno-8-22 name=__codelineno-8-22 href=#__codelineno-8-22></a>├── pool_http.go         # fasthttp clients
-</span><span id=__span-8-23><a id=__codelineno-8-23 name=__codelineno-8-23 href=#__codelineno-8-23></a>├── pool_tcp.go          # TCP dialer
-</span><span id=__span-8-24><a id=__codelineno-8-24 name=__codelineno-8-24 href=#__codelineno-8-24></a>├── pool_docker.go       # Docker clients
-</span><span id=__span-8-25><a id=__codelineno-8-25 name=__codelineno-8-25 href=#__codelineno-8-25></a>└── log_writer.go        # Async logging
-</span></code></pre></div> </article> </div> <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script> </div> <button type=button class="md-top md-icon" data-md-component=top hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg> Back to top </button> </main> <footer class=md-footer> <nav class="md-footer__inner md-grid" aria-label=Footer> <a href=../config-schema/ class="md-footer__link md-footer__link--prev" aria-label="Previous: Config Schema" rel=prev> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg> </div> <div class=md-footer__title> <span class=md-footer__direction> Previous </span> <div class=md-ellipsis> Config Schema </div> </div> </a> <a href=../types-reference/ class="md-footer__link md-footer__link--next" aria-label="Next: Types" rel=next> <div class=md-footer__title> <span class=md-footer__direction> Next </span> <div class=md-ellipsis> Types </div> </div> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg> </div> </a> </nav> <div class="md-footer-meta md-typeset"> <div class="md-footer-meta__inner md-grid"> <div class=md-copyright> </div> <div class=md-social> <a href=https://github.com/ziad-hsn/cpra target=_blank rel=noopener title="CPRA on GitHub" class=md-social__link> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 496 512"><!-- Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg> </a> </div> </div> </div> </footer> <div class=cpra-disclaimer> CPRA is infrastructure monitoring software. Not intended for medical use. </div> </div> <div class=md-dialog data-md-component=dialog> <div class="md-dialog__inner md-typeset"></div> </div> <script id=__config type=application/json>{"base": "../..", "features": ["navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.code.annotate", "content.tooltips", "toc.follow", "toc.integrate"], "search": "../../assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script> <script src=../../assets/javascripts/bundle.4e0fa4ba.min.js></script> </body> </html>
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Current CPRa driver availability and YAML configuration fields for health checks, recovery actions and notification destinations.">
+      
+      
+        <meta name="author" content="Ziad Hassan">
+      
+      
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/reference/jobs-reference/">
+      
+      
+        <link rel="prev" href="../config-schema/">
+      
+      
+        <link rel="next" href="../api-reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../images/cpra-icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Checks, recovery and notifications - CPRa Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#checks-recovery-and-notifications" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      
+  <img src="../../images/cpra-icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRa Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Checks, recovery and notifications
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../config-schema/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../developer-guide/" class="md-tabs__link">
+          
+  
+  
+  Contribute
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      
+  <img src="../../images/cpra-icon.svg" alt="logo">
+
+    </a>
+    CPRa Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity and diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitor configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers and fields
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers and fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        http
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tcp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#icmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        icmp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        udp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        grpc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        postgres
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mysql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mysql
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mongo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rabbitmq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rabbitmq
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kafka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kafka
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recovery-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recovery actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kubernetes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aws
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#systemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        systemd
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        slack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pagerduty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pagerduty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        email
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telegram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        discord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opsgenie" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        opsgenie
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mattermost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mattermost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#victorops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        victorops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pushover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pushover
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datadog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        datadog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#teams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        teams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#twilio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        twilio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP API and dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contribute
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintain the docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        http
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tcp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#icmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        icmp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#udp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        udp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        grpc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgres" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        postgres
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mysql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mysql
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mongo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rabbitmq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rabbitmq
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kafka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kafka
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recovery-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recovery actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kubernetes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kubernetes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aws
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#systemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        systemd
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        slack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pagerduty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pagerduty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        email
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telegram
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        discord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opsgenie" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        opsgenie
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mattermost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mattermost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#victorops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        victorops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pushover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pushover
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datadog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        datadog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#teams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        teams
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#twilio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        twilio
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/reference/jobs-reference.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="checks-recovery-and-notifications">Checks, recovery and notifications<a class="headerlink" href="#checks-recovery-and-notifications" title="Permanent link">&para;</a></h1>
+<p>Default integrations are included in a normal build. Optional integrations require the build tag shown below:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span><span class="nv">BUILD_TAGS</span><span class="o">=</span><span class="s1">'redis postgres kubernetes'</span>
+</code></pre></div>
+<p>The field tables list the YAML configuration names from the current schema. A listed field is not necessarily required. Validate your target and credentials against the implementation; provider accounts and external service permissions are outside the configuration parser.</p>
+<h2 id="checks">Checks<a class="headerlink" href="#checks" title="Permanent link">&para;</a></h2>
+<p>Set <code>pulse_check.type</code> and put driver-specific fields under <code>pulse_check.config</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Operation</th>
+<th>Build tag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>http</code></td>
+<td>HTTP request and status check</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>tcp</code></td>
+<td>TCP connection</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>icmp</code></td>
+<td>ICMP reachability; OS privileges may be needed</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>dns</code></td>
+<td>DNS resolution</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>udp</code></td>
+<td>Send a payload and await a reply</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>grpc</code></td>
+<td>TCP port reachability only</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>docker</code></td>
+<td>Inspect whether a container is running</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>tls</code></td>
+<td>TLS handshake and certificate-expiry thresholds</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>redis</code></td>
+<td>RESP PING, with optional authentication/database selection</td>
+<td><code>redis</code></td>
+</tr>
+<tr>
+<td><code>postgres</code></td>
+<td>PostgreSQL connection and ping</td>
+<td><code>postgres</code></td>
+</tr>
+<tr>
+<td><code>mysql</code></td>
+<td>MySQL connection and ping</td>
+<td><code>mysql</code></td>
+</tr>
+<tr>
+<td><code>mongo</code></td>
+<td>MongoDB ping using a direct URI</td>
+<td><code>mongo</code></td>
+</tr>
+<tr>
+<td><code>rabbitmq</code></td>
+<td>AMQP connection/channel</td>
+<td><code>rabbitmq</code></td>
+</tr>
+<tr>
+<td><code>kafka</code></td>
+<td>Broker connection and metadata request</td>
+<td><code>kafka</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>grpc</code> check does not call the gRPC health service; the <code>service</code> field does not add that behavior. UDP needs a payload and response. MongoDB requires <code>mongodb://</code>; SRV discovery with <code>mongodb+srv://</code> is rejected because its initial discovery cannot be bounded by the check deadline.</p>
+<p>TLS <code>warn_days</code> produces a yellow warning and degraded state without recovery. <code>critical_days</code> fails the check and follows the configured incident policy. Leave certificate verification enabled for normal use.</p>
+<h3 id="http">http<a class="headerlink" href="#http" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>string map</td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>expected_status</code></td>
+<td>list of integers</td>
+</tr>
+<tr>
+<td><code>insecure_skip_verify</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tcp">tcp<a class="headerlink" href="#tcp" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="icmp">icmp<a class="headerlink" href="#icmp" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>ignore_privilege</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>count</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dns">dns<a class="headerlink" href="#dns" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>server</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="udp">udp<a class="headerlink" href="#udp" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="grpc">grpc<a class="headerlink" href="#grpc" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>service</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="docker">docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tls">tls<a class="headerlink" href="#tls" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>server_name</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>warn_days</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>critical_days</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>insecure_skip_verify</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="redis">redis<a class="headerlink" href="#redis" title="Permanent link">&para;</a></h3>
+<p>Build: <code>redis</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>addr</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>username</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>db</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="postgres">postgres<a class="headerlink" href="#postgres" title="Permanent link">&para;</a></h3>
+<p>Build: <code>postgres</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dsn</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>sslmode</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mysql">mysql<a class="headerlink" href="#mysql" title="Permanent link">&para;</a></h3>
+<p>Build: <code>mysql</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dsn</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>host</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mongo">mongo<a class="headerlink" href="#mongo" title="Permanent link">&para;</a></h3>
+<p>Build: <code>mongo</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uri</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rabbitmq">rabbitmq<a class="headerlink" href="#rabbitmq" title="Permanent link">&para;</a></h3>
+<p>Build: <code>rabbitmq</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="kafka">kafka<a class="headerlink" href="#kafka" title="Permanent link">&para;</a></h3>
+<p>Build: <code>kafka</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>brokers</code></td>
+<td>list of strings</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>integer</td>
+</tr>
+</tbody>
+</table>
+<h2 id="recovery-actions">Recovery actions<a class="headerlink" href="#recovery-actions" title="Permanent link">&para;</a></h2>
+<p>Set <code>intervention.action</code> and put fields under <code>intervention.target</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Operation</th>
+<th>Build tag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker</code></td>
+<td>Restart a container</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>webhook</code></td>
+<td>HTTP request to an external recovery system</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>kubernetes</code></td>
+<td>Restart or scale a Deployment, StatefulSet, or ReplicaSet</td>
+<td><code>kubernetes</code></td>
+</tr>
+<tr>
+<td><code>aws</code></td>
+<td>EC2 instance reboot</td>
+<td><code>aws</code></td>
+</tr>
+<tr>
+<td><code>systemd</code></td>
+<td>Restart a local systemd unit</td>
+<td><code>systemd</code></td>
+</tr>
+</tbody>
+</table>
+<p>Docker recovery always restarts the container; the schema's <code>type</code> field does not select start or stop operations. Omitting Docker <code>timeout</code> preserves the daemon's stop grace. For Kubernetes, use <code>kind</code> values <code>deployment</code>, <code>statefulset</code>, or <code>replicaset</code>. Omitting <code>replicas</code> requests a rollout restart; setting it requests scaling. Token, certificate, and in-cluster credentials are supported. Kubeconfig exec credential plugins are rejected.</p>
+<p>AWS supports <code>operation: reboot-instance</code>. Use the process's configured AWS credential chain. Systemd needs access to the host's system bus and permission for the unit operation.</p>
+<p>The controller admits one recovery operation per incident. A response timeout can leave the external outcome uncertain; see the <a href="../../explanation/incident-lifecycle/">incident lifecycle</a>.</p>
+<h3 id="docker_1">docker<a class="headerlink" href="#docker_1" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>container</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>duration, such as 10s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="webhook">webhook<a class="headerlink" href="#webhook" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>string map</td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>duration, such as 10s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="kubernetes">kubernetes<a class="headerlink" href="#kubernetes" title="Permanent link">&para;</a></h3>
+<p>Build: <code>kubernetes</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>kubeconfig_path</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>namespace</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>replicas</code></td>
+<td>optional integer</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>duration, such as 10s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aws">aws<a class="headerlink" href="#aws" title="Permanent link">&para;</a></h3>
+<p>Build: <code>aws</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>operation</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>instance_id</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>duration, such as 10s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="systemd">systemd<a class="headerlink" href="#systemd" title="Permanent link">&para;</a></h3>
+<p>Build: <code>systemd</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>duration, such as 10s</td>
+</tr>
+</tbody>
+</table>
+<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
+<p>A rule uses <code>notify</code> plus <code>config</code>, or references a reusable <code>notify_group</code>. Endpoint objects use <code>type</code> plus <code>config</code>. See the <a href="../config-schema/#alert-destinations-and-groups">group example</a>.</p>
+<p>All listed notifications are included by default except <code>teams</code> and <code>twilio</code>, which require their respective tags.</p>
+<ul>
+<li>PagerDuty needs an Events API v2 routing key.</li>
+<li>Email uses an SMTP relay with STARTTLS. Username/password SMTP authentication is not implemented.</li>
+<li>Teams uses a Workflow incoming webhook.</li>
+<li>Pushover emergency priority needs <code>retry</code> and <code>expire</code> in seconds, defaulting to 60 and 1800.</li>
+<li>HTTP notification retries classify 429 and server errors as retryable. Acceptance does not confirm a human received the alert.</li>
+</ul>
+<h3 id="log">log<a class="headerlink" href="#log" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="slack">slack<a class="headerlink" href="#slack" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hook</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pagerduty">pagerduty<a class="headerlink" href="#pagerduty" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>routing_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="email">email<a class="headerlink" href="#email" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/groups.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allow_insecure</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>to</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>server</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="webhook_1">webhook<a class="headerlink" href="#webhook_1" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/groups.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>string map</td>
+</tr>
+</tbody>
+</table>
+<h3 id="telegram">telegram<a class="headerlink" href="#telegram" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bot_token</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>chat_id</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="discord">discord<a class="headerlink" href="#discord" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>webhook_url</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="opsgenie">opsgenie<a class="headerlink" href="#opsgenie" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mattermost">mattermost<a class="headerlink" href="#mattermost" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>webhook_url</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>channel</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>username</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="victorops">victorops<a class="headerlink" href="#victorops" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rest_endpoint_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>routing_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>message_type</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>entity_id</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pushover">pushover<a class="headerlink" href="#pushover" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app_token</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>user_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>retry</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>expire</code></td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>sound</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="datadog">datadog<a class="headerlink" href="#datadog" title="Permanent link">&para;</a></h3>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>app_key</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>site</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>list of strings</td>
+</tr>
+</tbody>
+</table>
+<h3 id="teams">teams<a class="headerlink" href="#teams" title="Permanent link">&para;</a></h3>
+<p>Build: <code>teams</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>webhook_url</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<h3 id="twilio">twilio<a class="headerlink" href="#twilio" title="Permanent link">&para;</a></h3>
+<p>Build: <code>twilio</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<table>
+<thead>
+<tr>
+<th>YAML field</th>
+<th>Value type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_sid</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>auth_token</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>to</code></td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../config-schema/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Monitor configuration">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Monitor configuration
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../api-reference/" class="md-footer__link md-footer__link--next" aria-label="Next: HTTP API and dashboard">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                HTTP API and dashboard
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025–2026 Ziad Hassan · MIT license
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

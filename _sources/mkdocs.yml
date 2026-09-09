@@ -1,0 +1,110 @@
+site_name: CPRa Documentation
+site_url: https://ziad-hsn.github.io/cpra/
+site_description: Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.
+site_author: Ziad Hassan
+repo_url: https://github.com/ziad-hsn/cpra
+repo_name: ziad-hsn/cpra
+edit_uri: edit/gh-pages/_sources/docs/
+docs_dir: docs
+site_dir: ../.site-build
+copyright: Copyright &copy; 2025–2026 Ziad Hassan · MIT license
+theme:
+  name: material
+  custom_dir: overrides
+  font: false
+  logo: images/cpra-icon.svg
+  favicon: images/cpra-icon.svg
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+nav:
+  - Home: index.md
+  - Get started:
+      - Quickstart: tutorials/quickstart.md
+      - Installation: tutorials/getting-started.md
+      - Current changes: release-notes.md
+  - Guides:
+      - Deployment: how-to/deploy-to-production.md
+      - Troubleshooting: how-to/common-tasks.md
+      - Capacity and diagnostics: how-to/performance-tuning.md
+  - Concepts:
+      - Architecture: explanation/architecture-overview.md
+      - Incident lifecycle: explanation/incident-lifecycle.md
+      - Worker sizing: explanation/queueing-theory.md
+  - Reference:
+      - Monitor configuration: reference/config-schema.md
+      - Drivers and fields: reference/jobs-reference.md
+      - HTTP API and dashboard: reference/api-reference.md
+      - CLI: reference/cli.md
+  - Contribute:
+      - Development: developer-guide.md
+      - Add a driver: how-to/adding-new-jobs.md
+      - Maintain the docs: maintaining-docs.md
+      - License and scope: legal/disclaimer.md
+extra:
+  generator: false
+  source_commit: a370969b041b399c0778318d8915ce059fd74294
+  source_date: 9 September 2026
+extra_css:
+  - assets/stylesheets/extra.css
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        tutorials/index.md: tutorials/quickstart.md
+        tutorials/your-first-monitor.md: tutorials/quickstart.md
+        how-to/index.md: how-to/common-tasks.md
+        explanation/index.md: explanation/architecture-overview.md
+        reference/index.md: reference/config-schema.md
+        reference/api-documentation.md: reference/api-reference.md
+        reference/types-reference.md: developer-guide.md
+        zap-reference.md: developer-guide.md
+        architecture/index.md: explanation/architecture-overview.md
+        architecture/ARCHITECTURE.md: explanation/architecture-overview.md
+        packages/index.md: developer-guide.md
+        packages/controller.md: explanation/architecture-overview.md
+        packages/jobs.md: reference/jobs-reference.md
+        packages/loader.md: reference/config-schema.md
+        packages/logger.md: developer-guide.md
+        packages/queue.md: explanation/queueing-theory.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn

@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block announce %}
+  Documentation for <a href="{{ config.repo_url }}/commit/{{ config.extra.source_commit }}">main · {{ config.extra.source_commit[:7] }}</a> · {{ config.extra.source_date }}
+{% endblock %}

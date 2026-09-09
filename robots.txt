@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ziad-hsn.github.io/cpra/sitemap.xml

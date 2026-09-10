@@ -21,3 +21,6 @@ Thumbs.db
 .gomodcache*/
 .gotmp/
 .pnpm-store/
+
+/cpra-data/
+/evidence/local/

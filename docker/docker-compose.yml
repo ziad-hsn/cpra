@@ -4,14 +4,19 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     # Edit the manifest for destinations reachable from the container.
-    command: ["-yaml", "/etc/cpra/monitors.yaml", "-web=false"]
+    command: ["-yaml", "/etc/cpra/monitors.yaml", "-runtime-config", "/etc/cpra/runtime.yaml", "-web=false"]
     environment:
       GOMEMLIMIT: ${GOMEMLIMIT:-768MiB}
       GOGC: ${GOGC:-100}
     volumes:
       - ../examples/monitors.yaml:/etc/cpra/monitors.yaml:ro
+      - ./runtime.yaml:/etc/cpra/runtime.yaml:ro
+      - cpra-data:/var/lib/cpra
     deploy:
       resources:
         limits:
           memory: 1G
     restart: unless-stopped
+
+volumes:
+  cpra-data:

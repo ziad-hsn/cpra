@@ -33,9 +33,11 @@ WORKDIR /app
 COPY --from=builder /out/cpra /out/cpractl /usr/local/bin/
 COPY LICENSE /usr/share/licenses/cpra/LICENSE
 COPY --from=builder /out/licenses/ /usr/share/licenses/cpra/
-RUN chown cpra:cpra /app
+RUN mkdir -p /var/lib/cpra && chown cpra:cpra /app /var/lib/cpra
+VOLUME ["/var/lib/cpra"]
+COPY docker/runtime.yaml /etc/cpra/runtime.yaml
 USER cpra
 ENV GOMEMLIMIT=768MiB
 EXPOSE 8060
 ENTRYPOINT ["cpra"]
-CMD ["-yaml", "/etc/cpra/monitors.yaml"]
+CMD ["-yaml", "/etc/cpra/monitors.yaml", "-runtime-config", "/etc/cpra/runtime.yaml"]

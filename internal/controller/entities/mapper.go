@@ -13,6 +13,7 @@ import (
 // EntityManager uses the new consolidated component design.
 // State changes use flags without adding or removing component types.
 type EntityManager struct {
+	identities map[string]struct{}
 	// Core consolidated components - only a few archetypes instead of dozens.
 	MonitorState       *ecs.Map1[components.MonitorState]
 	PulseConfig        *ecs.Map1[components.PulseConfig]
@@ -34,6 +35,7 @@ type EntityManager struct {
 // NewEntityManager creates a new consolidated entity manager.
 func NewEntityManager(world *ecs.World) *EntityManager {
 	return &EntityManager{
+		identities:         make(map[string]struct{}),
 		MonitorState:       ecs.NewMap1[components.MonitorState](world),
 		PulseConfig:        ecs.NewMap1[components.PulseConfig](world),
 		InterventionConfig: ecs.NewMap1[components.InterventionConfig](world),
@@ -59,8 +61,21 @@ func (e *EntityManager) CreateEntityFromMonitor(
 		return fmt.Errorf("EntityManager cannot be nil")
 	}
 	if monitor.Name == "" {
-		fmt.Println(monitor, "name cannot be empty")
+
 		return fmt.Errorf("monitor name cannot be empty")
+	}
+
+	id, err := monitor.EffectiveID()
+	if err != nil {
+		return err
+	}
+	if _, exists := e.identities[id]; exists {
+		return fmt.Errorf("duplicate effective monitor id %q", id)
+	}
+	e.identities[id] = struct{}{}
+	revision, err := schema.ConfigurationRevision(*monitor, e.Endpoints, e.NotificationGroups)
+	if err != nil {
+		return err
 	}
 
 	windows, err := schema.CompileMaintenance(monitor.Maintenance)
@@ -75,6 +90,8 @@ func (e *EntityManager) CreateEntityFromMonitor(
 	monitorName := monitor.Name
 	monitorState := &components.MonitorState{
 		Name:            monitorName,
+		MonitorID:       id,
+		Revision:        revision,
 		Maintenance:     windows,
 		LastCheckTime:   time.Time{},
 		LastSuccessTime: time.Time{},

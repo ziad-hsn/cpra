@@ -58,3 +58,16 @@ release: dashboard-build
 
 clean:
 	rm -rf bin dist dashboard/dist
+
+.PHONY: build-verification verify-local benchmark-preflight
+build-verification:
+	@mkdir -p $(BUILD_DIR)
+	$(GO) build -trimpath -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpra-verify ./cmd/cpra-verify
+	$(GO) build -trimpath -o $(BUILD_DIR)/cpra-target ./cmd/cpra-target
+
+verify-local: build-verification
+	@mkdir -p evidence/local
+	$(PYTHON) -B scripts/verification/local.py --binary $(BUILD_DIR)/cpra-verify --out evidence/local/providers.json
+
+benchmark-preflight:
+	$(PYTHON) -B scripts/benchmark/campaign.py --mode preflight --out evidence/local/preflight

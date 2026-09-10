@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"cpra/internal/controller"
+	"cpra/internal/durable"
 	"cpra/internal/jobs"
+	"cpra/internal/runtimeconfig"
 	"cpra/internal/version"
 	"cpra/internal/web/server"
 )
@@ -24,6 +26,7 @@ import (
 func main() {
 	// Command line flags
 	var (
+		runtimeFile = flag.String("runtime-config", "", "Runtime storage, history and SLO configuration")
 		configFile  = flag.String("config", "", "Alias for -yaml (monitor manifest)")
 		yamlFile    = flag.String("yaml", "monitors.yaml", "YAML or JSON monitor manifest")
 		debug       = flag.Bool("debug", false, "Enable debug logging")
@@ -102,6 +105,19 @@ func main() {
 		}
 	}
 
+	runtimeSettings, err := runtimeconfig.Load(*runtimeFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Runtime configuration:", err)
+		os.Exit(1)
+	}
+	store, err := durable.Open(context.Background(), runtimeSettings)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Durable startup:", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+	config.Store, config.Runtime = store, runtimeSettings
+
 	// Create the new controller
 	oc := controller.NewController(config)
 
@@ -144,6 +160,7 @@ func main() {
 		}
 		webSrv = server.New(server.ServerConfig{
 			Addr:             *webAddr,
+			Store:            store,
 			CORSAllowOrigins: splitCSV(*webCors),
 			AuthToken:        *webAuth,
 		}, oc.SnapshotHolder(), oc.Metrics(),

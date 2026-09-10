@@ -1,4 +1,5 @@
 import type {
+  DurableStateResponse, HistoryResponse, SLOResponse,
   ConfigResponse,
   HealthResponse,
   IncidentsResponse,
@@ -52,6 +53,9 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const api = {
+  getState: (monitorID?: string) => request<DurableStateResponse>("/api/v1/state" + buildQuery({monitor_id: monitorID})),
+  getHistory: (monitorID: string, cursor = "") => request<HistoryResponse>("/api/v1/history" + buildQuery({monitor_id: monitorID, cursor, limit: 100})),
+  getSLO: () => request<SLOResponse>("/api/v1/slo"),
   getOverview: () => request<OverviewResponse>('/api/v1/overview'),
 
   getMonitors: (params: MonitorsFilters & { page?: number; size?: number; sort?: string } = {}) =>

@@ -284,6 +284,9 @@ func subtleTimeCompare(a, b string) bool {
 // ---------- routing ----------
 
 func (s *Server) registerAPI(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/history", s.handleHistory)
+	mux.HandleFunc("GET /api/v1/slo", s.handleSLO)
+	mux.HandleFunc("GET /api/v1/state", s.handleState)
 	mux.HandleFunc("/api/v1/overview", s.handleOverview)
 	mux.HandleFunc("/api/v1/monitors", s.handleMonitorsList)
 	mux.HandleFunc("/api/v1/monitors/", s.handleMonitorDetail)
@@ -338,7 +341,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	snap := s.holder.Get()
-	if snap == nil || snap.Total == 0 || time.Since(snap.Generated) > 30*time.Second {
+	if (s.cfg.Store != nil && !s.cfg.Store.Status().Ready) || snap == nil || snap.Total == 0 || time.Since(snap.Generated) > 30*time.Second {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
 		return
 	}
@@ -369,11 +372,15 @@ func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
 		ByPulseType: snap.ByPulseType,
 		ByCode:      snap.ByCode,
 		UpPercent:   upPct,
-		IndexCapped: snap.Monitors == nil && snap.Total > 0,
+		IndexCapped: s.holder.Index() == nil && snap.Monitors == nil && snap.Total > 0,
 	})
 }
 
 func (s *Server) handleMonitorsList(w http.ResponseWriter, r *http.Request) {
+	if index := s.holder.Index(); index != nil {
+		s.handleIndexedMonitors(w, r, index)
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || (snap.Total > 0 && snap.Monitors == nil) {
 		writeErr(w, http.StatusServiceUnavailable, "monitor details unavailable; consult overview aggregates")
@@ -469,6 +476,15 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid monitor id")
 		return
 	}
+	if index := s.holder.Index(); index != nil {
+		m, ok := index.Get(id)
+		if !ok {
+			writeErr(w, 404, "monitor not found")
+			return
+		}
+		writeJSON(w, 200, m)
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || snap.ByID == nil {
 		writeErr(w, http.StatusNotFound, "monitor not found (snapshot unavailable)")
@@ -486,7 +502,26 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, snap.Monitors[idx])
 }
 
-func (s *Server) handleIncidents(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
+	if index := s.holder.Index(); index != nil {
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		if size <= 0 {
+			size = 100
+		}
+		size = min(size, 500)
+		total := index.Overview().Total
+		offset := total
+		if page-1 <= total/size {
+			offset = (page - 1) * size
+		}
+		rows, count := index.Page(offset, size, func(m snapshot.MonitorSummary) bool { return m.Incident })
+		writeJSON(w, 200, incidentsResp{Generated: index.Overview().Generated, Count: count, Incidents: rows})
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || (snap.Total > 0 && snap.Monitors == nil) {
 		writeErr(w, http.StatusServiceUnavailable, "incident details unavailable; consult overview aggregates")

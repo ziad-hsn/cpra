@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/">
       
       
-        <link rel="prev" href="../../release-notes/">
+        <link rel="prev" href="../../validation/">
       
       
         <link rel="next" href="../common-tasks/">
@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/5995427cb0e2ef7276f74747afd639da1f03f84c">main · 5995427</a> · 10 September 2026
 
           </div>
           
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -618,6 +618,90 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -729,6 +813,17 @@
     <span class="md-ellipsis">
       
         Health and shutdown
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistent-volume-and-complete-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent volume and complete backup
       
     </span>
   </a>
@@ -1373,6 +1468,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#persistent-volume-and-complete-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent volume and complete backup
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1416,7 +1522,7 @@
 <p><code>monitor.example.com</code> is a placeholder for your protected endpoint. A token file overrides <code>CPRA_AUTH_TOKEN</code>. Liveness, readiness, and metrics requests also need the token when authentication is enabled.</p>
 <h2 id="observe-before-enabling-recovery">Observe before enabling recovery<a class="headerlink" href="#observe-before-enabling-recovery" title="Permanent link">&para;</a></h2>
 <p>Confirm that checks classify your target correctly and notifications reach a test destination. Then add the intended recovery action and verify its effect.</p>
-<p>Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restarting CPRa resets in-memory incident state and can change what is admitted next.</p>
+<p>Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restart restores committed incident state and holds interrupted started actions as unknown. Mount the persistent data directory and retain complete backups.</p>
 <h2 id="containers">Containers<a class="headerlink" href="#containers" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>docker/Dockerfile<span class="w"> </span>-t<span class="w"> </span>cpra:local<span class="w"> </span>.
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>--build
@@ -1426,12 +1532,23 @@
 <h2 id="health-and-shutdown">Health and shutdown<a class="headerlink" href="#health-and-shutdown" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>/api/v1/healthz</code> reports process liveness.</li>
-<li><code>/api/v1/readyz</code> requires a recent nonempty snapshot.</li>
+<li><code>/api/v1/readyz</code> requires a recent nonempty projection and available durable storage.</li>
 <li><code>/metrics</code> exposes runtime and pipeline metrics.</li>
 <li>SIGINT or SIGTERM starts graceful shutdown; the web server stops before the controller.</li>
 </ul>
 <p>Choose service-manager stop timeouts with enough room for your configured operation deadlines. Use an external supervisor to restart a failed process and an external observer for CPRa itself.</p>
 <p><a href="../../release-notes/#current-boundaries">Current limits</a> · <a href="../common-tasks/">Troubleshooting</a></p>
+<h2 id="persistent-volume-and-complete-backup">Persistent volume and complete backup<a class="headerlink" href="#persistent-volume-and-complete-backup" title="Permanent link">&para;</a></h2>
+<p>Mount a private volume at <code>/var/lib/cpra</code> for the packaged container; the shipped
+runtime configuration selects that directory. For a native process, set
+<code>storage.directory</code> to an absolute persistent path. Avoid sharing the data
+directory between processes. There is one voter and no automatic failover.</p>
+<p>Stop CPRa before taking a file-level backup. Copy <code>identity.json</code>, <code>raft.db</code>,
+<code>snapshots/</code>, and the entire retained <code>history/</code> catalog and segment set together.
+Restore all files into an empty private directory and start with the compatible
+binary and monitor configuration. Retain credentials separately. A storage
+failure stops new admission and makes readiness unavailable; CPRa never silently
+switches to memory. See <a href="../../durability/">complete recovery procedures</a>.</p>
 
 
 
@@ -1470,7 +1587,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../release-notes/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Current changes">
+          <a href="../../validation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Verification campaigns">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1480,7 +1597,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Current changes
+                Verification campaigns
               </div>
             </div>
           </a>

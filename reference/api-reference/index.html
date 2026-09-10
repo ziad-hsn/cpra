@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/5995427cb0e2ef7276f74747afd639da1f03f84c">main · 5995427</a> · 10 September 2026
 
           </div>
           
@@ -271,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -608,6 +608,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1077,6 +1161,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-state-history-and-slos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable state, history and SLOs
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1373,6 +1468,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-state-history-and-slos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable state, history and SLOs
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1436,7 +1542,7 @@
 <tr>
 <td>GET</td>
 <td><code>/api/v1/monitors/{id}</code></td>
-<td>One monitor from the detailed snapshot.</td>
+<td>One monitor by numeric ID, with additive stable <code>monitor_id</code>.</td>
 </tr>
 <tr>
 <td>GET</td>
@@ -1520,13 +1626,45 @@
 </tbody>
 </table>
 <h2 id="readiness-and-unavailable-data">Readiness and unavailable data<a class="headerlink" href="#readiness-and-unavailable-data" title="Permanent link">&para;</a></h2>
-<p>Liveness returns process health, not target health. Readiness requires a nonempty snapshot no more than 30 seconds old; it does not require all monitors to be healthy.</p>
-<p>The detailed snapshot index is capped at 1,000,000 entries. Above that cap, monitor and incident list requests return HTTP 503. Overview aggregates remain available. This cap is an implementation bound, not a supported-capacity benchmark.</p>
+<p>Liveness returns process health, not target health. Readiness requires available durable storage and a nonempty projection no more than 30 seconds old; it does not require all monitors to be healthy.</p>
+<p>The durable runtime maintains an incremental monitor index. Monitor and incident responses are paginated and capped at 500 rows; filtering runs on the HTTP goroutine. This does not constitute a million-monitor performance claim.</p>
 <p>A fresh process may also lack a snapshot. Treat unavailable responses as unavailable data, not as an empty healthy fleet.</p>
 <h2 id="dashboard-semantics">Dashboard semantics<a class="headerlink" href="#dashboard-semantics" title="Permanent link">&para;</a></h2>
-<p>The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor detail views. Fleet snapshots refresh every five seconds by default.</p>
-<p>The healthy-sample percentage is based on snapshots observed during the current process run. It is not an external SLA measurement. Per-monitor historical results are not retained. Pool and queue histories are separate, bounded, in-memory series.</p>
-<p><a href="../cli/">CLI reference</a> · <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/web/server/types.go">Response types in source</a></p>
+<p>The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor detail views. Views refresh periodically from the incremental index.</p>
+<p>The healthy-sample percentage uses committed cumulative check counters. It is not an external SLA measurement. Incident, recovery and notification events are retained for 30 days; raw check records are not retained. Pool and queue histories are separate, bounded, in-memory series.</p>
+<p><a href="../cli/">CLI reference</a> · <a href="https://github.com/ziad-hsn/cpra/blob/5995427cb0e2ef7276f74747afd639da1f03f84c/internal/web/server/types.go">Response types in source</a></p>
+<h2 id="durable-state-history-and-slos">Durable state, history and SLOs<a class="headerlink" href="#durable-state-history-and-slos" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/state</code></td>
+<td>Redacted storage health, process and storage usage. Optional <code>monitor_id</code> returns its revision and action states.</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/history?monitor_id=ID&amp;limit=100&amp;cursor=TOKEN</code></td>
+<td>Stable monitor event ordering, 100 default and 500 maximum events, 30-day retention and opaque next cursor.</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/v1/slo</code></td>
+<td>Five-minute p50/p95/p99, exact threshold attainment, timeouts, missed/pending/overdue checks and recovery coverage.</td>
+</tr>
+</tbody>
+</table>
+<p>These routes use the existing bearer/Basic authentication and reject mutations.
+Unavailable history returns 503. Numeric monitor routes remain compatible;
+<code>monitor_id</code> is the stable identity used by history and recovery state.
+History cursors preserve the initial upper committed position during pagination.
+See <a href="../../durability/">durability</a> and <a href="../../slo/">SLO definitions</a>.</p>
 
 
 

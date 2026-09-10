@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/5995427cb0e2ef7276f74747afd639da1f03f84c">main · 5995427</a> · 10 September 2026
 
           </div>
           
@@ -271,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -608,6 +608,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1032,6 +1116,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#separate-runtime-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate runtime configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1395,6 +1490,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#separate-runtime-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate runtime configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1453,6 +1559,10 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>id</code></td>
+<td>Optional stable ID; otherwise a deterministic hash of <code>name</code>. Duplicate effective IDs are rejected.</td>
+</tr>
 <tr>
 <td><code>name</code></td>
 <td>Required monitor name; use a descriptive name you can search for.</td>
@@ -1553,6 +1663,13 @@
 <p>YAML monitors must be a block sequence. Each monitor entry and metadata section has a 1 MiB limit. JSON is decoded incrementally. Both paths have a decompressed-input budget; streaming does not make memory use independent of monitor count.</p>
 <p>Missing, malformed, and semantically invalid manifests fail startup. An empty manifest requires <code>-allow-empty</code>. The programmatic streaming loader has an optional strict unknown-field mode; the server does not expose a <code>--strict</code> flag.</p>
 <p>Treat configuration as trusted input: it authorizes outbound requests, notifications, and actions with the process account's permissions. Keep credentials in private manifests and token files.</p>
+<h2 id="separate-runtime-configuration">Separate runtime configuration<a class="headerlink" href="#separate-runtime-configuration" title="Permanent link">&para;</a></h2>
+<p><code>-runtime-config PATH</code> selects storage, history and SLO settings without changing
+<code>-yaml</code> or the <code>-config</code> manifest alias. Default storage is single-node Raft in
+<code>./cpra-data</code>. Explicit <code>storage: {mode: memory}</code> selects disposable state.
+See <a href="../../durability/">runtime settings and complete backups</a> and
+<a href="../../slo/">latency targets</a>. Changing targets updates the configuration revision
+and cancels old unsent work; unknown outcomes and retained history survive.</p>
 
 
 

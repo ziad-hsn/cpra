@@ -6,37 +6,37 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Extend CPRa through schema, execution and verification while respecting contexts and incident ownership.">
+        <meta name="description" content="Measured health-check latency windows, percentile estimates and bounded worker feedback.">
       
       
         <meta name="author" content="Ziad Hassan">
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/adding-new-jobs/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/slo/">
       
       
-        <link rel="prev" href="../../developer-guide/">
+        <link rel="prev" href="../durability/">
       
       
-        <link rel="next" href="../../maintaining-docs/">
+        <link rel="next" href="../validation/">
       
       
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../images/cpra-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Add a check or action - CPRa Documentation</title>
+        <title>Measured latency - CPRa Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../assets/stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#add-a-check-or-action" class="md-skip">
+        <a href="#measured-latency-targets" class="md-skip">
           Skip to content
         </a>
       
@@ -100,9 +100,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Add a check or action
+              Measured latency
             
           </span>
         </div>
@@ -230,7 +230,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -251,7 +251,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+        <a href="../tutorials/quickstart/" class="md-tabs__link">
           
   
   
@@ -267,11 +267,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../durability/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../durability/" class="md-tabs__link">
           
   
   
@@ -291,7 +293,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+        <a href="../explanation/architecture-overview/" class="md-tabs__link">
           
   
   
@@ -311,7 +313,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/config-schema/" class="md-tabs__link">
+        <a href="../reference/config-schema/" class="md-tabs__link">
           
   
   
@@ -327,13 +329,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../developer-guide/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../developer-guide/" class="md-tabs__link">
           
   
   
@@ -367,9 +367,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -394,7 +394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/quickstart/" class="md-nav__link">
+      <a href="../tutorials/quickstart/" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/getting-started/" class="md-nav__link">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release-notes/" class="md-nav__link">
+      <a href="../release-notes/" class="md-nav__link">
         
   
   
@@ -561,26 +561,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -598,7 +603,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -616,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../durability/" class="md-nav__link">
+      <a href="../durability/" class="md-nav__link">
         
   
   
@@ -641,10 +646,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../slo/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -660,6 +674,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -672,7 +687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../validation/" class="md-nav__link">
+      <a href="../validation/" class="md-nav__link">
         
   
   
@@ -700,7 +715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deploy-to-production/" class="md-nav__link">
+      <a href="../how-to/deploy-to-production/" class="md-nav__link">
         
   
   
@@ -728,7 +743,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../common-tasks/" class="md-nav__link">
+      <a href="../how-to/common-tasks/" class="md-nav__link">
         
   
   
@@ -756,7 +771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../performance-tuning/" class="md-nav__link">
+      <a href="../how-to/performance-tuning/" class="md-nav__link">
         
   
   
@@ -843,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+      <a href="../explanation/architecture-overview/" class="md-nav__link">
         
   
   
@@ -871,7 +886,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+      <a href="../explanation/incident-lifecycle/" class="md-nav__link">
         
   
   
@@ -899,7 +914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+      <a href="../explanation/queueing-theory/" class="md-nav__link">
         
   
   
@@ -986,7 +1001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/config-schema/" class="md-nav__link">
+      <a href="../reference/config-schema/" class="md-nav__link">
         
   
   
@@ -1014,7 +1029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jobs-reference/" class="md-nav__link">
+      <a href="../reference/jobs-reference/" class="md-nav__link">
         
   
   
@@ -1042,7 +1057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-reference/" class="md-nav__link">
+      <a href="../reference/api-reference/" class="md-nav__link">
         
   
   
@@ -1070,7 +1085,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../reference/cli/" class="md-nav__link">
         
   
   
@@ -1102,31 +1117,26 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1144,7 +1154,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1162,7 +1172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer-guide/" class="md-nav__link">
+      <a href="../developer-guide/" class="md-nav__link">
         
   
   
@@ -1187,37 +1197,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Add a driver
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../how-to/adding-new-jobs/" class="md-nav__link">
         
   
   
@@ -1233,70 +1216,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Checks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-actions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery actions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#notifications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notifications
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verification-scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verification scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1309,7 +1228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../maintaining-docs/" class="md-nav__link">
+      <a href="../maintaining-docs/" class="md-nav__link">
         
   
   
@@ -1337,7 +1256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../legal/disclaimer/" class="md-nav__link">
+      <a href="../legal/disclaimer/" class="md-nav__link">
         
   
   
@@ -1385,58 +1304,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Checks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-actions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery actions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#notifications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notifications
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verification-scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verification scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1452,7 +1319,7 @@
 
 
   
-    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/how-to/adding-new-jobs.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/slo.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1460,25 +1327,46 @@
   
 
 
-<h1 id="add-a-check-or-action">Add a check or action<a class="headerlink" href="#add-a-check-or-action" title="Permanent link">&para;</a></h1>
-<p>Start with an existing integration whose protocol and lifecycle are similar. The integration contract spans configuration, execution, and result handling.</p>
-<ol>
-<li>Add the concrete configuration fields and copy behavior in <code>internal/loader/schema</code>.</li>
-<li>Register YAML and JSON decoding and semantic validation. Exercise strict unknown-field behavior for polymorphic configuration.</li>
-<li>Implement execution in <code>internal/jobs</code> and connect the dispatch path.</li>
-<li>For optional SDK dependencies, add a build-tagged implementation and an explicit unavailable stub.</li>
-<li>Verify result classification, deadline and cancellation behavior, and resource cleanup.</li>
-<li>Update the driver documentation and add a focused regression or protocol fixture.</li>
-</ol>
-<h2 id="checks">Checks<a class="headerlink" href="#checks" title="Permanent link">&para;</a></h2>
-<p>Return the target result to the controller. Keep driver I/O bounded by the check context and close owned connections. A warning that does not mean a failed check must preserve that distinction through the result path.</p>
-<h2 id="recovery-actions">Recovery actions<a class="headerlink" href="#recovery-actions" title="Permanent link">&para;</a></h2>
-<p>The controller owns admission and verification. Do not create an independent retry loop that silently duplicates side effects. A deadline or lost response can leave the external action outcome uncertain.</p>
-<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
-<p>Test provider-required fields and response classification. Distinguish retryable HTTP rejection from accepted delivery. Do not equate an HTTP acceptance with a human acknowledging the alert.</p>
-<h2 id="verification-scope">Verification scope<a class="headerlink" href="#verification-scope" title="Permanent link">&para;</a></h2>
-<p>Run the affected tests and <code>make test-all-drivers</code> for tagged code. Positive fixtures matter as well as timeout cases: rejecting every input is not a valid fix for a deadline bug.</p>
-<p>Use the <a href="../../developer-guide/">source layout</a> to locate current interfaces. Older template files and archived documentation may describe contracts that are no longer present.</p>
+<h1 id="measured-latency-targets">Measured latency targets<a class="headerlink" href="#measured-latency-targets" title="Permanent link">&para;</a></h1>
+<p>The health-check targets are p99 scheduling-plus-queue delay at most 250 ms and
+scheduled-to-committed-result latency at most five seconds, reported over a
+rolling five-minute window. A separate execution distribution distinguishes
+worker delay from a slow target and delayed result application.</p>
+<p><code>GET /api/v1/slo</code>, <code>cpractl get slo</code>, and the dashboard System Health page expose
+p50, p95, p99, sample counts, exact threshold counts, timeouts, missed cadence
+slots and coverage. Histograms use bounded fixed storage by driver, not by
+monitor, and five-second time buckets. Report boundaries consequently have
+five-second resolution. A histogram percentile is an upper bucket estimate;
+threshold attainment is counted directly. Unavailable percentile samples are
+null rather than zero. The last per-monitor latency is execution duration and
+has a separate <code>latency_available</code> flag.</p>
+<p>Timeouts and skipped cadence slots remain in the attainment denominator. During
+startup, low sample counts or recovery coverage gaps, CPRa cannot declare that
+the full window met its targets. Aggregate window state is committed every five
+seconds; the interval after its last persisted watermark is identified as a
+recovery gap. It is not reconstructed by inventing observations. Per-monitor
+historical percentiles and raw successful check records are not retained.</p>
+<p>Erlang C with the Allen–Cunneen variability adjustment remains the initial worker
+capacity recommendation. Feedback uses a 30-second window evaluated every five
+seconds, at least 1,000 observations, and real queued work before reacting to a
+queue-delay breach. Growth remains bounded by worker limits and twofold per
+adjustment. Shrinking requires 60 healthy seconds, is limited to 10% per
+adjustment and cannot cross below the model recommendation. Slow execution and
+controller-limited conditions are reported instead of repeatedly increasing
+workers in response to delay they cannot remedy.</p>
+<p>These are observed operating targets, not a contractual SLA or an unconditional
+capacity guarantee. A one-million-monitor or 24-hour claim requires the
+corresponding completed campaign evidence described in <a href="../validation/">validation</a>.</p>
+<p>Scheduled obligations are recorded before queue admission. Checks still missing a
+committed result become overdue once their five-second bucket and five-second
+result deadline have elapsed; this introduces at most ten seconds of accounting
+lag. Overdue checks count against attainment even if no result ever arrives.
+Completed samples stay in the bucket of their scheduled time. A late result
+replaces its existing obligation rather than adding a second denominator entry.
+Missed cadence slots are counted when the scheduler advances, including while a
+previous check is queued or running. The scheduler never dispatches a catch-up
+burst of old checks. <code>pending</code> identifies obligations still within the accounting
+grace; <code>overdue</code> identifies unfinished obligations already counted as failures.</p>
 
 
 
@@ -1517,7 +1405,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../developer-guide/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Development">
+          <a href="../durability/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Persistence and recovery">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1527,20 +1415,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Development
+                Persistence and recovery
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../maintaining-docs/" class="md-footer__link md-footer__link--next" aria-label="Next: Maintain the docs">
+          <a href="../validation/" class="md-footer__link md-footer__link--next" aria-label="Next: Verification campaigns">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Maintain the docs
+                Verification campaigns
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1576,10 +1464,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

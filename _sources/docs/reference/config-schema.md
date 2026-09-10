@@ -36,6 +36,7 @@ monitors:
 
 | Field | Meaning |
 | --- | --- |
+| `id` | Optional stable ID; otherwise a deterministic hash of `name`. Duplicate effective IDs are rejected. |
 | `name` | Required monitor name; use a descriptive name you can search for. |
 | `enabled` | Whether the monitor runs; defaults to true when omitted. |
 | `tags` | Optional list of labels attached to the monitor. |
@@ -118,3 +119,12 @@ YAML monitors must be a block sequence. Each monitor entry and metadata section 
 Missing, malformed, and semantically invalid manifests fail startup. An empty manifest requires `-allow-empty`. The programmatic streaming loader has an optional strict unknown-field mode; the server does not expose a `--strict` flag.
 
 Treat configuration as trusted input: it authorizes outbound requests, notifications, and actions with the process account's permissions. Keep credentials in private manifests and token files.
+
+## Separate runtime configuration
+
+`-runtime-config PATH` selects storage, history and SLO settings without changing
+`-yaml` or the `-config` manifest alias. Default storage is single-node Raft in
+`./cpra-data`. Explicit `storage: {mode: memory}` selects disposable state.
+See [runtime settings and complete backups](../durability.md) and
+[latency targets](../slo.md). Changing targets updates the configuration revision
+and cancels old unsent work; unknown outcomes and retained history survive.

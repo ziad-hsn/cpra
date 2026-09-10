@@ -21,7 +21,7 @@ For remote requests, use an HTTPS reverse proxy and `cpractl --token-file` where
 | GET | `/api/v1/readyz` | Snapshot readiness. |
 | GET | `/api/v1/overview` | Fleet counts, status breakdown, and index-cap indicator. |
 | GET | `/api/v1/monitors` | Filtered, paginated active-monitor details. |
-| GET | `/api/v1/monitors/{id}` | One monitor from the detailed snapshot. |
+| GET | `/api/v1/monitors/{id}` | One monitor by numeric ID, with additive stable `monitor_id`. |
 | GET | `/api/v1/incidents` | Current incident information. |
 | GET | `/api/v1/systems` | Controller-system telemetry. |
 | GET | `/api/v1/queues` | Current queue telemetry. |
@@ -51,16 +51,30 @@ These examples assume the default local listener without token authentication.
 
 ## Readiness and unavailable data
 
-Liveness returns process health, not target health. Readiness requires a nonempty snapshot no more than 30 seconds old; it does not require all monitors to be healthy.
+Liveness returns process health, not target health. Readiness requires available durable storage and a nonempty projection no more than 30 seconds old; it does not require all monitors to be healthy.
 
-The detailed snapshot index is capped at 1,000,000 entries. Above that cap, monitor and incident list requests return HTTP 503. Overview aggregates remain available. This cap is an implementation bound, not a supported-capacity benchmark.
+The durable runtime maintains an incremental monitor index. Monitor and incident responses are paginated and capped at 500 rows; filtering runs on the HTTP goroutine. This does not constitute a million-monitor performance claim.
 
 A fresh process may also lack a snapshot. Treat unavailable responses as unavailable data, not as an empty healthy fleet.
 
 ## Dashboard semantics
 
-The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor detail views. Fleet snapshots refresh every five seconds by default.
+The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor detail views. Views refresh periodically from the incremental index.
 
-The healthy-sample percentage is based on snapshots observed during the current process run. It is not an external SLA measurement. Per-monitor historical results are not retained. Pool and queue histories are separate, bounded, in-memory series.
+The healthy-sample percentage uses committed cumulative check counters. It is not an external SLA measurement. Incident, recovery and notification events are retained for 30 days; raw check records are not retained. Pool and queue histories are separate, bounded, in-memory series.
 
-[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/web/server/types.go)
+[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/5995427cb0e2ef7276f74747afd639da1f03f84c/internal/web/server/types.go)
+
+## Durable state, history and SLOs
+
+| Method | Route | Contract |
+| --- | --- | --- |
+| GET | `/api/v1/state` | Redacted storage health, process and storage usage. Optional `monitor_id` returns its revision and action states. |
+| GET | `/api/v1/history?monitor_id=ID&limit=100&cursor=TOKEN` | Stable monitor event ordering, 100 default and 500 maximum events, 30-day retention and opaque next cursor. |
+| GET | `/api/v1/slo` | Five-minute p50/p95/p99, exact threshold attainment, timeouts, missed/pending/overdue checks and recovery coverage. |
+
+These routes use the existing bearer/Basic authentication and reject mutations.
+Unavailable history returns 503. Numeric monitor routes remain compatible;
+`monitor_id` is the stable identity used by history and recovery state.
+History cursors preserve the initial upper committed position during pagination.
+See [durability](../durability.md) and [SLO definitions](../slo.md).

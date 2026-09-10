@@ -1,4 +1,41 @@
 {% extends "base.html" %}
+{% block extrahead %}
+  {% set page_title = page.meta.title if page.meta and page.meta.title else page.title %}
+  {% set page_desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_desc }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ config.site_url }}{{ config.extra.social_image }}">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_desc }}">
+  <meta name="twitter:image" content="{{ config.site_url }}{{ config.extra.social_image }}">
+  {% if page.is_homepage %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "CPRa",
+    "alternateName": "Continuous Pulse and Recovery Agent",
+    "description": "{{ config.site_description }}",
+    "url": "{{ config.site_url }}",
+    "codeRepository": "{{ config.repo_url }}",
+    "programmingLanguage": "Go",
+    "runtimePlatform": "Linux",
+    "license": "https://opensource.org/license/mit",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux",
+    "author": { "@type": "Person", "name": "{{ config.site_author }}" },
+    "image": "{{ config.site_url }}{{ config.extra.social_image }}"
+  }
+  </script>
+  {% endif %}
+{% endblock %}
 {% block announce %}
   Documentation for <a href="{{ config.repo_url }}/commit/{{ config.extra.source_commit }}">main · {{ config.extra.source_commit[:7] }}</a> · {{ config.extra.source_date }}
 {% endblock %}

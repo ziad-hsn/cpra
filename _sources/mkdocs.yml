@@ -12,8 +12,8 @@ theme:
   name: material
   custom_dir: overrides
   font: false
-  logo: images/cpra-icon.svg
-  favicon: images/cpra-icon.svg
+  logo: images/cpra-mark-dark.svg
+  favicon: images/icon.svg
   features:
     - navigation.tabs
     - navigation.sections
@@ -55,6 +55,7 @@ nav:
       - Drivers and fields: reference/jobs-reference.md
       - HTTP API and dashboard: reference/api-reference.md
       - CLI: reference/cli.md
+  - FAQ: faq.md
   - Contribute:
       - Development: developer-guide.md
       - Add a driver: how-to/adding-new-jobs.md
@@ -62,6 +63,7 @@ nav:
       - License and scope: legal/disclaimer.md
 extra:
   generator: false
+  social_image: images/social-preview.png
   source_commit: a370969b041b399c0778318d8915ce059fd74294
   source_date: 9 September 2026
 extra_css:

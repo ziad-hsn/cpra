@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="images/cpra-icon.svg">
+      <link rel="icon" href="images/icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -55,6 +55,42 @@
 
     
     
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="CPRa documentation">
+  <meta property="og:description" content="Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CPRa documentation">
+  <meta name="twitter:description" content="Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "CPRa",
+    "alternateName": "Continuous Pulse and Recovery Agent",
+    "description": "Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.",
+    "url": "https://ziad-hsn.github.io/cpra/",
+    "codeRepository": "https://github.com/ziad-hsn/cpra",
+    "programmingLanguage": "Go",
+    "runtimePlatform": "Linux",
+    "license": "https://opensource.org/license/mit",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux",
+    "author": { "@type": "Person", "name": "Ziad Hassan" },
+    "image": "https://ziad-hsn.github.io/cpra/images/social-preview.png"
+  }
+  </script>
+  
+
   </head>
   
   
@@ -100,7 +136,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="images/cpra-icon.svg" alt="logo">
+  <img src="images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -328,6 +364,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -367,7 +422,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="images/cpra-icon.svg" alt="logo">
+  <img src="images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -1087,6 +1142,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
     
@@ -1101,10 +1183,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1122,8 +1204,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1325,8 +1407,14 @@
   
 
 
+<div class="cpra-hero">
+<p><img alt="" aria-hidden="true" src="images/cpra-mark-color.svg#only-light" />
+<img alt="" aria-hidden="true" src="images/cpra-mark-dark.svg#only-dark" /></p>
+<div>
 <h1 id="check-services-understand-failures-recover-deliberately">Check services. Understand failures. Recover deliberately.<a class="headerlink" href="#check-services-understand-failures-recover-deliberately" title="Permanent link">&para;</a></h1>
-<p>CPRa (Continuous Pulse and Recovery Agent) checks your services, sends incident notifications, and runs the recovery actions you configure. It is free, self-hosted software under the MIT license.</p>
+</div>
+</div>
+<p>CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.</p>
 <p>The current application includes a read-only dashboard, an HTTP API, and the <code>cpractl</code> command-line client. These guides describe the source published to <code>main</code> on <strong>9 September 2026</strong>.</p>
 <p><a class="md-button md-button--primary" href="tutorials/quickstart/">Run your first monitor</a>
 <a class="md-button" href="reference/config-schema/">Explore the configuration</a></p>
@@ -1358,7 +1446,7 @@
 <h2 id="start-with-a-small-deployment">Start with a small deployment<a class="headerlink" href="#start-with-a-small-deployment" title="Permanent link">&para;</a></h2>
 <p>Run one process for each monitor configuration. Incident state lives in memory and resets when the process restarts. Separate CPRa instances do not coordinate ownership.</p>
 <p>Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.</p>
-<p><a href="how-to/deploy-to-production/">Deployment guide</a> · <a href="explanation/queueing-theory/">Queueing model</a> · <a href="release-notes/">Current changes</a></p>
+<p><a href="how-to/deploy-to-production/">Deployment guide</a> · <a href="explanation/queueing-theory/">Queueing model</a> · <a href="release-notes/">Current changes</a> · <a href="faq/">FAQ</a></p>
 
 
 

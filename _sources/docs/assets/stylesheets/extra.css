@@ -1,29 +1,48 @@
-/* CPRa's established warm gold identity, with readable light and dark modes. */
+/* CPRa identity: ink on paper, gold restart loop. Light and dark schemes. */
 :root {
-  --md-primary-fg-color: #725218;
-  --md-primary-fg-color--light: #d4a84b;
-  --md-primary-fg-color--dark: #513909;
+  --cpra-paper: #fbf3df;
+  --cpra-ink: #1a262e;
+  --cpra-sun: #e5a51f;
+  --cpra-sun-text: #875f10;
+  --md-primary-fg-color: #1a262e;
+  --md-primary-fg-color--light: #2b3a44;
+  --md-primary-fg-color--dark: #0f171d;
+  --md-primary-bg-color: #f4f2ee;
   --md-accent-fg-color: #875f10;
+  --md-default-bg-color: #fbf3df;
+  --md-default-fg-color: #1a262e;
+  --md-code-bg-color: #f3e8cb;
+  --md-typeset-a-color: #875f10;
   --md-text-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --md-code-font: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #302a20;
+  --md-primary-fg-color: #15161a;
+  --md-primary-fg-color--light: #23252c;
+  --md-primary-fg-color--dark: #0b0c0f;
   --md-accent-fg-color: #e6bc61;
-  --md-default-bg-color: #191a20;
+  --md-default-bg-color: #15161a;
+  --md-default-fg-color: #f4f2ee;
+  --md-code-bg-color: #1e2026;
   --md-typeset-a-color: #e6bc61;
 }
+.md-header, .md-tabs { box-shadow: 0 1px 0 rgba(229, 165, 31, 0.45); }
 .md-banner { background: #292a31; color: #f7f3e9; }
 .md-banner a { color: #f0cd83; text-decoration: underline; }
-.md-header__button.md-logo img { width: 1.65rem; height: 1.65rem; }
+.md-header__button.md-logo img { width: 1.9rem; height: 1.9rem; }
 .md-typeset h1 { font-weight: 700; letter-spacing: -.035em; color: var(--md-default-fg-color); }
 .md-typeset h2 { font-weight: 650; letter-spacing: -.015em; }
 .md-typeset .md-button { border-radius: .3rem; margin: .25rem .25rem .5rem 0; }
+.md-typeset .md-button--primary { background: var(--cpra-ink); border-color: var(--cpra-ink); color: #fbf3df; }
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary { background: var(--cpra-sun); border-color: var(--cpra-sun); color: #15161a; }
 .md-typeset .grid.cards > ul > li { border-radius: .45rem; }
 .md-typeset table:not([class]) { font-size: .72rem; }
 .md-typeset pre > code { font-size: .7rem; }
 .md-typeset a { text-underline-offset: .16em; }
 .md-typeset a:focus-visible, .md-button:focus-visible { outline: 3px solid var(--md-accent-fg-color); outline-offset: 3px; }
+.cpra-hero { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
+.cpra-hero > p { margin: 0; flex: none; }
+.cpra-hero img { width: 4.5rem; height: 4.5rem; display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }

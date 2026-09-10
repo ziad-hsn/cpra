@@ -4,7 +4,10 @@ import (
 	"context"
 	"cpra/internal/alerts"
 	"cpra/internal/controller/systems"
+	"cpra/internal/durable"
+	"cpra/internal/jobs"
 	"cpra/internal/queue"
+	"cpra/internal/runtimeconfig"
 	"errors"
 	"fmt"
 	"log"
@@ -58,6 +61,7 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 
 // Controller manages the ECS world and its systems using ark-tools.
 type Controller struct {
+	durableSystem        *systems.DurableSystem
 	stateLogger          *systems.StateLogger
 	pulseQueue           queue.Queue
 	codeQueue            queue.Queue
@@ -85,6 +89,8 @@ type Controller struct {
 
 // Config holds all configuration for the controller.
 type Config struct {
+	Store           *durable.Store
+	Runtime         runtimeconfig.Config
 	Debug           bool
 	StreamingConfig streaming.StreamingConfig
 	QueueCapacity   uint64
@@ -119,6 +125,7 @@ type Config struct {
 // DefaultConfig returns a default configuration.
 func DefaultConfig() Config {
 	return Config{
+		Runtime:           runtimeconfig.Default(),
 		StreamingConfig:   streaming.DefaultStreamingConfig(),
 		QueueCapacity:     65536, // Must be a power of 2
 		WorkerConfig:      queue.DefaultWorkerPoolConfig(),
@@ -187,6 +194,10 @@ func NewController(config Config) *Controller {
 		log.Fatalf("Failed to create code worker pool: %v", err)
 	}
 
+	if config.Store != nil {
+		pulsePool.SetSLOFeedback(config.Store.SLO(), config.Runtime.SLO)
+	}
+
 	pulseQueue = pulsePool.Queue()
 	interventionQueue = interventionPool.Queue()
 	codeQueue = codePool.Queue()
@@ -225,14 +236,20 @@ func NewController(config Config) *Controller {
 	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, codeSched, config.BatchSize, logger, stateLogger, alertMgr)
 	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, codeSched, logger, stateLogger, alertMgr)
 
-	arkApp.AddSystem(pulseScheduleSystem)
-	arkApp.AddSystem(pulseSystem)
-	arkApp.AddSystem(interventionSystem)
-	arkApp.AddSystem(codeScheduleSystem)
-	arkApp.AddSystem(codeSystem)
-	arkApp.AddSystem(pulseResultSystem)
-	arkApp.AddSystem(interventionResultSystem)
-	arkApp.AddSystem(codeResultSystem)
+	var durableSystem *systems.DurableSystem
+	if config.Store != nil {
+		durableSystem = systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
+		arkApp.AddSystem(durableSystem)
+	} else {
+		arkApp.AddSystem(pulseScheduleSystem)
+		arkApp.AddSystem(pulseSystem)
+		arkApp.AddSystem(interventionSystem)
+		arkApp.AddSystem(codeScheduleSystem)
+		arkApp.AddSystem(codeSystem)
+		arkApp.AddSystem(pulseResultSystem)
+		arkApp.AddSystem(interventionResultSystem)
+		arkApp.AddSystem(codeResultSystem)
+	}
 
 	// Snapshot system publishes a read-only fleet projection for the web
 	// server. It reads the world only inside its tick, throttled to
@@ -243,16 +260,25 @@ func NewController(config Config) *Controller {
 		snapshotInterval = 5 * time.Second
 	}
 	statsSnapshotSystem := systems.NewBatchStatsSnapshotSystem(world, logger, snapshotHolder, snapshotInterval, 1_000_000)
-	arkApp.AddSystem(statsSnapshotSystem)
+	if durableSystem == nil {
+		arkApp.AddSystem(statsSnapshotSystem)
+	}
 
 	// Drain pulse results a second time at the END of the tick. The result
 	// system runs once per tick by default, so a result is applied on the NEXT
 	// tick (~1 tick of round-trip latency). Draining again here applies the
 	// results that arrived since the first drain in the SAME tick, shrinking
 	// the round-trip below one tick.
-	arkApp.AddSystem(pulseResultSystem)
+	if durableSystem == nil {
+		arkApp.AddSystem(pulseResultSystem)
+	}
+	resultSystems := []app.System{pulseResultSystem, interventionResultSystem, codeResultSystem, statsSnapshotSystem}
+	if durableSystem != nil {
+		resultSystems = []app.System{durableSystem}
+	}
 
 	return &Controller{
+		durableSystem:        durableSystem,
 		app:                  arkApp,
 		world:                world,
 		mapper:               mapper,
@@ -267,7 +293,7 @@ func NewController(config Config) *Controller {
 		stateLogger:          stateLogger,
 		metricsAgg:           metricsAgg,
 		snapshotHolder:       snapshotHolder,
-		resultSystems:        []app.System{pulseResultSystem, interventionResultSystem, codeResultSystem, statsSnapshotSystem},
+		resultSystems:        resultSystems,
 	}
 }
 
@@ -285,6 +311,12 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	}
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
+
+	if c.durableSystem != nil {
+		if err := c.durableSystem.Load(ctx); err != nil {
+			return fmt.Errorf("reconcile durable monitors: %w", err)
+		}
+	}
 
 	// Check if we need to switch to AdaptiveQueue due to high entity count
 	c.CheckEntityCountAndSwitchQueue()
@@ -444,6 +476,9 @@ func (c *Controller) run() {
 	for {
 		select {
 		case <-c.stopCh:
+			if c.durableSystem != nil {
+				c.durableSystem.StopAdmission()
+			}
 			// Stop admitting new operations. Continue applying accepted results while
 			// all pools drain, so backpressure cannot deadlock shutdown.
 			drained := make(chan struct{})

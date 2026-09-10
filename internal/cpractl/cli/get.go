@@ -114,6 +114,7 @@ func newGetCommand(o *options) *cobra.Command {
 	}
 
 	get.AddCommand(monitors, incidents, queues, pools, systems, config, overview)
+	addDurableCommands(get, o)
 	return get
 }
 

@@ -12,3 +12,6 @@ dashboard/dist
 .env.*
 monitors.yaml
 cpra-token
+
+cpra-data
+evidence/local

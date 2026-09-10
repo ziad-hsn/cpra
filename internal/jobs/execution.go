@@ -32,8 +32,11 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
-	Deadline time.Time
-	parent   context.Context
+	Scheduled                             time.Time
+	MonitorID, Revision, ActionID, Driver string
+	Before                                func(context.Context) error
+	Deadline                              time.Time
+	parent                                context.Context
 	Job
 	Ent         ecs.Entity
 	Kind, Color string
@@ -47,10 +50,13 @@ func NewDispatch(job Job, ent ecs.Entity, kind, color string, generation uint64,
 }
 func (d *Dispatch) SetContext(ctx context.Context) { d.parent = ctx }
 func (d *Dispatch) Execute() (r Result) {
+	var started time.Time
 	defer func() {
 		if recover() != nil {
 			r.Err = fmt.Errorf("%s job panicked", d.Kind)
 		}
+		r.Scheduled, r.ExecutionStart, r.ExecutionEnd = d.Scheduled, started, time.Now()
+		r.MonitorID, r.Revision, r.ActionID, r.Driver = d.MonitorID, d.Revision, d.ActionID, d.Driver
 		r.Ent, r.Type, r.ID = d.Ent, d.Kind, d.ID
 		r.Generation, r.Endpoint, r.Color = d.Generation, d.Endpoint, d.Color
 	}()
@@ -66,6 +72,12 @@ func (d *Dispatch) Execute() (r Result) {
 	if err := ctx.Err(); err != nil {
 		return Result{Err: err}
 	}
+	if d.Before != nil {
+		if err := d.Before(ctx); err != nil {
+			return Result{Err: err}
+		}
+	}
+	started = time.Now()
 	if j, ok := d.Job.(interface{ SetContext(context.Context) }); ok {
 		j.SetContext(ctx)
 	}

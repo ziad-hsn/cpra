@@ -1,1 +1,0 @@
-import{j as t}from"./index-iNZAikzA.js";import{C as o}from"./StatusChip-ymYGJwV5.js";function m({code:s,label:e}){const a=e??o[s];return t.jsxs("span",{className:"code-badge "+s,role:"status","aria-label":a,children:[t.jsx("span",{className:"status-dot"}),a]})}export{m as C};

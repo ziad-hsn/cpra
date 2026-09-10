@@ -30,6 +30,10 @@ type CodeDelivery struct {
 }
 
 type MonitorState struct {
+	MonitorID         string
+	Revision          string
+	LastLatency       time.Duration
+	LatencyAvailable  bool
 	Maintenance       []schema.CompiledWindow
 	PendingAlerts     []AlertRequest
 	Deliveries        map[string]*CodeDelivery

@@ -513,8 +513,9 @@ type Intervention struct {
 	MaxFailures int                `yaml:"max_failures" json:"max_failures"`
 }
 type rawIntervention struct {
-	Action  string `yaml:"action"`
-	Retries int    `yaml:"retries"`
+	MaxFailures int    `yaml:"max_failures"`
+	Action      string `yaml:"action"`
+	Retries     int    `yaml:"retries"`
 }
 
 func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
@@ -526,8 +527,9 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 	*i = Intervention{
-		Action:  temp.Action,
-		Retries: temp.Retries,
+		Action:      temp.Action,
+		Retries:     temp.Retries,
+		MaxFailures: temp.MaxFailures,
 	}
 	switch temp.Action {
 	case "docker":
@@ -569,9 +571,10 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 // UnmarshalJSON handles JSON unmarshaling for Intervention (needed for JSON parser)
 func (i *Intervention) UnmarshalJSON(data []byte) error {
 	var temp struct {
-		Action  string          `json:"action"`
-		Target  json.RawMessage `json:"target"`
-		Retries int             `json:"retries"`
+		Action      string          `json:"action"`
+		MaxFailures int             `json:"max_failures"`
+		Target      json.RawMessage `json:"target"`
+		Retries     int             `json:"retries"`
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
@@ -579,8 +582,9 @@ func (i *Intervention) UnmarshalJSON(data []byte) error {
 	}
 
 	*i = Intervention{
-		Action:  temp.Action,
-		Retries: temp.Retries,
+		Action:      temp.Action,
+		Retries:     temp.Retries,
+		MaxFailures: temp.MaxFailures,
 	}
 
 	switch temp.Action {
@@ -663,6 +667,7 @@ func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
 		Type:      strings.Clone(i.Type),
 		Container: strings.Clone(i.Container),
+		Timeout:   i.Timeout,
 	}
 }
 
@@ -855,6 +860,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 }
 
 type Monitor struct {
+	ID           string              `yaml:"id,omitempty" json:"id,omitempty"`
 	Pulse        Pulse               `yaml:"pulse_check" json:"pulse_check"`
 	Codes        Codes               `yaml:"codes" json:"codes"`
 	Intervention Intervention        `yaml:"intervention,omitempty" json:"intervention,omitempty"`
@@ -868,6 +874,7 @@ type Monitor struct {
 func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	// Create a temporary struct with a pointer to a bool for 'Enabled'
 	type TmpMonitor struct {
+		ID           string              `yaml:"id" json:"id"`
 		Pulse        Pulse               `yaml:"pulse_check"`
 		Enabled      *bool               `yaml:"enabled"`
 		Codes        Codes               `yaml:"codes"`
@@ -883,6 +890,7 @@ func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Assign fields to the actual monitor struct
+	m.ID = tmp.ID
 	m.Name = tmp.Name
 	m.Pulse = tmp.Pulse
 	m.Intervention = tmp.Intervention
@@ -905,6 +913,7 @@ func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 // monitor with no "enabled" key was silently disabled).
 func (m *Monitor) UnmarshalJSON(data []byte) error {
 	type TmpMonitor struct {
+		ID           string              `yaml:"id" json:"id"`
 		Pulse        Pulse               `json:"pulse_check"`
 		Enabled      *bool               `json:"enabled"`
 		Codes        Codes               `json:"codes"`
@@ -919,6 +928,7 @@ func (m *Monitor) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	m.ID = tmp.ID
 	m.Name = tmp.Name
 	m.Pulse = tmp.Pulse
 	m.Intervention = tmp.Intervention

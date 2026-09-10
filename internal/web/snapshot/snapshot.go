@@ -16,6 +16,9 @@ import (
 // (see systems.BatchStatsSnapshotSystem) and never mutated after publication,
 // so it is safe to read concurrently from HTTP handler goroutines.
 type MonitorSummary struct {
+	MonitorID           string    `json:"monitor_id" yaml:"monitor_id"`
+	LatencyAvailable    bool      `json:"latency_available"`
+	UnknownActions      int       `json:"unknown_actions"`
 	Warning             string    `json:"warning,omitempty"`
 	ID                  uint32    `json:"id" yaml:"id"`
 	Name                string    `json:"name" yaml:"name"`
@@ -62,8 +65,9 @@ type StatsSnapshot struct {
 // Holder is a thread-safe container for the latest StatsSnapshot. Systems
 // publish via Set; HTTP handlers read via Get.
 type Holder struct {
-	mu   sync.RWMutex
-	snap *StatsSnapshot
+	mu    sync.RWMutex
+	snap  *StatsSnapshot
+	index *Index
 }
 
 // NewHolder returns an empty Holder.
@@ -74,6 +78,9 @@ func NewHolder() *Holder { return &Holder{} }
 func (h *Holder) Get() *StatsSnapshot {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	if h.index != nil {
+		return h.index.Overview()
+	}
 	return h.snap
 }
 
@@ -83,3 +90,6 @@ func (h *Holder) Set(s *StatsSnapshot) {
 	h.snap = s
 	h.mu.Unlock()
 }
+
+func (h *Holder) SetIndex(index *Index) { h.mu.Lock(); h.index = index; h.mu.Unlock() }
+func (h *Holder) Index() *Index         { h.mu.RLock(); defer h.mu.RUnlock(); return h.index }

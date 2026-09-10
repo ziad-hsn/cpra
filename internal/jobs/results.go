@@ -3,15 +3,18 @@ package jobs
 import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
+	"time"
 )
 
 // Result is a generic structure for returning the outcome of a job.
 // It includes the entity it belongs to, any error that occurred, and a flexible payload.
 type Result struct {
-	Generation uint64
-	Endpoint   int
-	Color      string
-	Err        error
+	Scheduled, ExecutionStart, ExecutionEnd time.Time
+	MonitorID, Revision, ActionID, Driver   string
+	Generation                              uint64
+	Endpoint                                int
+	Color                                   string
+	Err                                     error
 	// Warning describes a successful check that needs attention without recovery.
 	Warning string
 	Payload map[string]interface{}

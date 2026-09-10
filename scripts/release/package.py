@@ -102,22 +102,22 @@ def dashboard_inventory():
 def source_files():
     files = set()
     for name in ['LICENSE', 'README.md', 'LICENSES/dashboard.txt', 'go.mod', 'go.sum',
-                 'main.go', 'Makefile', '.dockerignore', '.gitignore', '.github/workflows/ci.yml',
+                 'main.go', 'Makefile', '.dockerignore', '.gitignore', '.github/workflows/ci.yml', '.github/workflows/live-verification.yml',
                  'dashboard/.prettierrc']:
         path = ROOT / name
         if not path.is_file():
             raise RuntimeError(f'Missing release input: {name}')
         files.add(path)
-    for name in ['internal', 'cmd/cpractl', 'examples', 'scripts/release', 'docker']:
+    for name in ['internal', 'cmd', 'examples', 'scripts/release', 'scripts/benchmark', 'scripts/verification', 'docs', 'docker']:
         for path in (ROOT / name).rglob('*'):
-            if path.is_file() and path.suffix in {'.go', '.json', '.yaml', '.yml', '.py', '.sh', '.md', '.html', '.js', '.css', '.svg'}:
+            if path.is_file() and path.suffix in {'.go', '.json', '.yaml', '.yml', '.py', '.sh', '.md', '.html', '.js', '.css', '.svg', '.service'}:
                 files.add(path)
     files.add(ROOT / 'docker/Dockerfile')
     for directory, children, names in os.walk(ROOT / 'dashboard'):
         children[:] = [name for name in children if name not in {'node_modules', 'dist', '.git', 'coverage'}]
         for name in names:
             path = Path(directory) / name
-            if path.suffix in {'.json', '.yaml', '.ts', '.tsx', '.js', '.html', '.css', '.svg'}:
+            if path.suffix in {'.json', '.yaml', '.ts', '.tsx', '.js', '.html', '.css', '.svg', '.service'}:
                 files.add(path)
     return sorted(files)
 
@@ -167,7 +167,10 @@ def main():
         entries = dict(common)
         for name in ['cpra', 'cpractl']:
             entries[name] = ((ROOT / args.bin_dir / f'{name}-linux-{arch}').read_bytes(), True)
-        entries['examples/monitors.yaml'] = ((ROOT / 'examples/monitors.yaml').read_bytes(), False)
+        for example in ['monitors.yaml','runtime.yaml','runtime-memory.yaml']:
+            entries['examples/' + example] = ((ROOT / 'examples' / example).read_bytes(), False)
+        for document in ['durability.md','slo.md','validation.md']:
+            entries['docs/' + document] = ((ROOT / 'docs' / document).read_bytes(), False)
         target = output / f'cpra-{args.version}-linux-{arch}.tar.gz'
         archive(target, entries, epoch)
         artifacts.append(target)

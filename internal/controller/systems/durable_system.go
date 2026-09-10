@@ -36,6 +36,7 @@ type DurableSystem struct {
 	actionDue      map[ecs.Entity]time.Time
 	queues         map[string]queue.Queue
 	results        []<-chan []jobs.Result
+	resultCursor   int
 	entities       map[string]ecs.Entity
 	admitted       map[string]bool
 	pending        map[string]bool
@@ -184,7 +185,13 @@ func (s *DurableSystem) persistSLO(now time.Time) {
 
 func (s *DurableSystem) drain() {
 	var batch []jobs.Result
-	for n, ch := range s.results {
+	// Rotate the first pipeline so sustained check load cannot indefinitely
+	// postpone committed intervention or notification results.
+	first := s.resultCursor
+	s.resultCursor = (s.resultCursor + 1) % len(s.results)
+	for i := range s.results {
+		n := (first + i) % len(s.results)
+		ch := s.results[n]
 	loop:
 		for ch != nil && len(batch) < s.config.Storage.BatchSize {
 			select {

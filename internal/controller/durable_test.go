@@ -75,6 +75,9 @@ func TestDurableControllerUsesCommittedStateAndResumesChecks(t *testing.T) {
 		t.Fatal("controller did not reach expected committed state")
 	}
 	wait(func() bool { m, ok := s.Get("durable-monitor"); return ok && m.Generation >= 3 && alerts.Load() == 1 })
+	if metrics, ok := c.Metrics().GetSystemMetrics("DurableSystem"); !ok || metrics.TotalEntitiesProcessed == 0 || metrics.TotalUpdates == 0 {
+		t.Fatal("durable runtime lost the existing system telemetry")
+	}
 	c.Stop()
 	if err := s.Snapshot(); err != nil {
 		t.Fatal(err)

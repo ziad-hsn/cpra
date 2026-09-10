@@ -37,6 +37,7 @@ type DurableSystem struct {
 	queues         map[string]queue.Queue
 	results        []<-chan []jobs.Result
 	resultCursor   int
+	processed      int
 	entities       map[string]ecs.Entity
 	admitted       map[string]bool
 	pending        map[string]bool
@@ -146,6 +147,9 @@ func (s *DurableSystem) StopAdmission()      { s.stopping = true }
 func (s *DurableSystem) Finalize(*ecs.World) { s.persistSLO(time.Now()) }
 
 func (s *DurableSystem) Update(*ecs.World) {
+	started := time.Now()
+	s.processed = 0
+	defer func() { s.logger.LogSystemPerformance("DurableSystem", time.Since(started), s.processed) }()
 	if s.lastError != nil || !s.store.Status().Ready {
 		s.discardResults()
 		return
@@ -260,6 +264,7 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) {
 		s.fail(err)
 		return
 	}
+	s.processed += len(results)
 	committed := time.Now()
 	for n, r := range results {
 		job := accepted[n]

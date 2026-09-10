@@ -51,6 +51,7 @@ def main():
                 except OSError:pass
                 if time.monotonic()>deadline:raise RuntimeError('browser fixture did not become ready')
                 time.sleep(.1)
+            assert api('/api/v1/systems')['aggregate']['system_count'] > 0, 'running controller has no system telemetry'
             ident=api('/api/v1/monitors')['monitors'][0]['id']
             history=api('/api/v1/history?monitor_id=browser-fixture')
             with sync_playwright() as browser_tools:

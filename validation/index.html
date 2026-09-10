@@ -6,37 +6,37 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Diagnose startup, authentication, unavailable snapshots, missing optional drivers, notifications and recovery behavior.">
+        <meta name="description" content="Reproducible provider, performance and endurance verification with explicit evidence gates.">
       
       
         <meta name="author" content="Ziad Hassan">
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/common-tasks/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/validation/">
       
       
-        <link rel="prev" href="../deploy-to-production/">
+        <link rel="prev" href="../slo/">
       
       
-        <link rel="next" href="../performance-tuning/">
+        <link rel="next" href="../how-to/deploy-to-production/">
       
       
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../images/cpra-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Troubleshooting - CPRa Documentation</title>
+        <title>Verification campaigns - CPRa Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../assets/stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#troubleshooting" class="md-skip">
+        <a href="#release-evidence-and-live-verification" class="md-skip">
           Skip to content
         </a>
       
@@ -100,9 +100,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting
+              Verification campaigns
             
           </span>
         </div>
@@ -230,7 +230,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -251,7 +251,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+        <a href="../tutorials/quickstart/" class="md-tabs__link">
           
   
   
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../durability/" class="md-tabs__link">
+        <a href="../durability/" class="md-tabs__link">
           
   
   
@@ -293,7 +293,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+        <a href="../explanation/architecture-overview/" class="md-tabs__link">
           
   
   
@@ -313,7 +313,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/config-schema/" class="md-tabs__link">
+        <a href="../reference/config-schema/" class="md-tabs__link">
           
   
   
@@ -333,7 +333,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../developer-guide/" class="md-tabs__link">
+        <a href="../developer-guide/" class="md-tabs__link">
           
   
   
@@ -367,9 +367,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -394,7 +394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/quickstart/" class="md-nav__link">
+      <a href="../tutorials/quickstart/" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/getting-started/" class="md-nav__link">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release-notes/" class="md-nav__link">
+      <a href="../release-notes/" class="md-nav__link">
         
   
   
@@ -621,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../durability/" class="md-nav__link">
+      <a href="../durability/" class="md-nav__link">
         
   
   
@@ -649,7 +649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../slo/" class="md-nav__link">
+      <a href="../slo/" class="md-nav__link">
         
   
   
@@ -657,62 +657,6 @@
     
   
     Measured latency
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../validation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Verification campaigns
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-to-production/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deployment
   
 
     
@@ -749,7 +693,7 @@
   <span class="md-ellipsis">
     
   
-    Troubleshooting
+    Verification campaigns
   
 
     
@@ -767,7 +711,7 @@
   <span class="md-ellipsis">
     
   
-    Troubleshooting
+    Verification campaigns
   
 
     
@@ -793,10 +737,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#startup-stops-immediately" class="md-nav__link">
+  <a href="#configured-providers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Startup stops immediately
+        Configured providers
       
     </span>
   </a>
@@ -804,10 +748,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-listener-refuses-a-remote-address" class="md-nav__link">
+  <a href="#scale-campaign" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The listener refuses a remote address
+        Scale campaign
       
     </span>
   </a>
@@ -815,65 +759,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" class="md-nav__link">
+  <a href="#additional-local-and-account-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A monitor remains unknown or the dashboard looks stale
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lists-return-503" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lists return 503
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-optional-integration-is-unavailable" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An optional integration is unavailable
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-did-not-run-again" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery did not run again
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-notification-was-not-received" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A notification was not received
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workers-grow-or-latency-rises" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workers grow or latency rises
+        Additional local and account scenarios
       
     </span>
   </a>
@@ -896,7 +785,63 @@
   
   
     <li class="md-nav__item">
-      <a href="../performance-tuning/" class="md-nav__link">
+      <a href="../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/performance-tuning/" class="md-nav__link">
         
   
   
@@ -983,7 +928,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+      <a href="../explanation/architecture-overview/" class="md-nav__link">
         
   
   
@@ -1011,7 +956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+      <a href="../explanation/incident-lifecycle/" class="md-nav__link">
         
   
   
@@ -1039,7 +984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+      <a href="../explanation/queueing-theory/" class="md-nav__link">
         
   
   
@@ -1126,7 +1071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/config-schema/" class="md-nav__link">
+      <a href="../reference/config-schema/" class="md-nav__link">
         
   
   
@@ -1154,7 +1099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jobs-reference/" class="md-nav__link">
+      <a href="../reference/jobs-reference/" class="md-nav__link">
         
   
   
@@ -1182,7 +1127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-reference/" class="md-nav__link">
+      <a href="../reference/api-reference/" class="md-nav__link">
         
   
   
@@ -1210,7 +1155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../reference/cli/" class="md-nav__link">
         
   
   
@@ -1297,7 +1242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer-guide/" class="md-nav__link">
+      <a href="../developer-guide/" class="md-nav__link">
         
   
   
@@ -1325,7 +1270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adding-new-jobs/" class="md-nav__link">
+      <a href="../how-to/adding-new-jobs/" class="md-nav__link">
         
   
   
@@ -1353,7 +1298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../maintaining-docs/" class="md-nav__link">
+      <a href="../maintaining-docs/" class="md-nav__link">
         
   
   
@@ -1381,7 +1326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../legal/disclaimer/" class="md-nav__link">
+      <a href="../legal/disclaimer/" class="md-nav__link">
         
   
   
@@ -1436,10 +1381,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#startup-stops-immediately" class="md-nav__link">
+  <a href="#configured-providers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Startup stops immediately
+        Configured providers
       
     </span>
   </a>
@@ -1447,10 +1392,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-listener-refuses-a-remote-address" class="md-nav__link">
+  <a href="#scale-campaign" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The listener refuses a remote address
+        Scale campaign
       
     </span>
   </a>
@@ -1458,65 +1403,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" class="md-nav__link">
+  <a href="#additional-local-and-account-scenarios" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A monitor remains unknown or the dashboard looks stale
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lists-return-503" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lists return 503
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-optional-integration-is-unavailable" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An optional integration is unavailable
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-did-not-run-again" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery did not run again
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-notification-was-not-received" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A notification was not received
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workers-grow-or-latency-rises" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workers grow or latency rises
+        Additional local and account scenarios
       
     </span>
   </a>
@@ -1540,7 +1430,7 @@
 
 
   
-    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/how-to/common-tasks.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/validation.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1548,32 +1438,260 @@
   
 
 
-<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
-<h2 id="startup-stops-immediately">Startup stops immediately<a class="headerlink" href="#startup-stops-immediately" title="Permanent link">&para;</a></h2>
-<p>Check that the manifest exists, is readable, and contains a <code>monitors</code> block sequence. Missing or malformed configuration is an error. Intentional empty instances require <code>-allow-empty</code> and are not ready until a nonempty snapshot exists.</p>
-<p>Use <code>cpra -help</code> for flags. <code>-config</code> and <code>-yaml</code> both identify the monitor manifest.</p>
-<h2 id="the-listener-refuses-a-remote-address">The listener refuses a remote address<a class="headerlink" href="#the-listener-refuses-a-remote-address" title="Permanent link">&para;</a></h2>
-<p>A non-loopback bind requires <code>-web.auth-file</code> or an authentication token. An empty or unreadable token file fails startup. Place remote access behind HTTPS.</p>
-<p>If the browser asks for credentials, use username <code>cpra</code> and your configured token. The CLI token file is specified with <code>--token-file</code>.</p>
-<h2 id="a-monitor-remains-unknown-or-the-dashboard-looks-stale">A monitor remains unknown or the dashboard looks stale<a class="headerlink" href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" title="Permanent link">&para;</a></h2>
-<p>Allow the first check interval and the next snapshot refresh. Snapshots update every five seconds by default. Inspect <code>cpractl get monitors -o json</code> and the target's logs.</p>
-<p>Readiness checks snapshot freshness, not whether every target is healthy. A failed current health request should be treated as a connection problem even if the browser still has older data.</p>
-<h2 id="lists-return-503">Lists return 503<a class="headerlink" href="#lists-return-503" title="Permanent link">&para;</a></h2>
-<p>A snapshot may not be ready, or the detailed index may be capped. Check <code>/api/v1/overview</code> for aggregate counts and <code>index_capped</code>. Do not turn an unavailable response into a successful empty list.</p>
-<h2 id="an-optional-integration-is-unavailable">An optional integration is unavailable<a class="headerlink" href="#an-optional-integration-is-unavailable" title="Permanent link">&para;</a></h2>
-<p>Build its tag and run the resulting binary:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span><span class="nv">BUILD_TAGS</span><span class="o">=</span><span class="s1">'redis postgres'</span>
+<h1 id="release-evidence-and-live-verification">Release evidence and live verification<a class="headerlink" href="#release-evidence-and-live-verification" title="Permanent link">&para;</a></h1>
+<p>Implementation tests, local provider operations, account-backed verification,
+comparative performance and uninterrupted endurance are separate evidence gates.
+An HTTP acceptance response is not proof of delivered notification or completed
+recovery. Local fixtures do not certify a cloud production account.</p>
+<h2 id="configured-providers">Configured providers<a class="headerlink" href="#configured-providers" title="Permanent link">&para;</a></h2>
+<p>Build the runner using the same optional tags as the candidate:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>go<span class="w"> </span>build<span class="w"> </span>-tags<span class="w"> </span><span class="s1">'redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio'</span><span class="w"> </span>-o<span class="w"> </span>bin/cpra-verify<span class="w"> </span>./cmd/cpra-verify
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>./bin/cpra-verify<span class="w"> </span>-config<span class="w"> </span>/path/to/user/live.yaml<span class="w"> </span>-live<span class="w"> </span>-out<span class="w"> </span>provider-report.json
 </code></pre></div>
-<p>MongoDB requires a direct <code>mongodb://</code> URI; <code>mongodb+srv://</code> is rejected. Kubernetes exec credential plugins are unsupported; use token, certificate, or in-cluster credentials.</p>
-<h2 id="recovery-did-not-run-again">Recovery did not run again<a class="headerlink" href="#recovery-did-not-run-again" title="Permanent link">&para;</a></h2>
-<p>CPRa admits one recovery operation per incident. More failures do not continuously replay the action. Maintenance can suppress new admission. A successful action still needs consecutive healthy checks.</p>
-<p>Inspect the target before manually repeating an action or restarting CPRa, especially after a timeout.</p>
-<h2 id="a-notification-was-not-received">A notification was not received<a class="headerlink" href="#a-notification-was-not-received" title="Permanent link">&para;</a></h2>
-<p>Check the rule's <code>dispatch</code> setting, group references, maintenance windows, and destination credentials. A group succeeds when at least one destination accepts the notification; this does not prove that all recipients received it.</p>
-<p>SMTP authentication is not implemented; use an appropriate relay. PagerDuty needs an Events API v2 routing key. Pushover emergency notifications need valid retry and expiry values.</p>
-<h2 id="workers-grow-or-latency-rises">Workers grow or latency rises<a class="headerlink" href="#workers-grow-or-latency-rises" title="Permanent link">&para;</a></h2>
-<p>Inspect <code>cpractl get queues</code> and <code>cpractl get pools -o json</code>. Check target latency, queued work, current capacity, observation counts, and sizing model before increasing limits. <a href="../performance-tuning/">Sizing and performance</a></p>
-<p>For a bug report, include your source commit, build tags, a redacted manifest, expected behavior, and relevant logs. Never paste access tokens or private target credentials into a public issue.</p>
+<p>Copy <code>examples/verification/live.yaml</code> into a private location. It contains the
+existing monitor/endpoint schema and one case for each of 14 checks, five
+recoveries and 14 notifications. Enable a case only after configuring its
+designated resource and independent observer. Credentials belong in this user
+configuration or the provider's existing credential files/environment, never
+in the published evidence. AWS uses the SDK credential chain, including
+<code>AWS_PROFILE</code>, shared configuration and credential files, or workload roles.
+Kubernetes accepts supported token/certificate kubeconfig or in-cluster
+configuration; executable credential plugins remain unsupported. SMTP uses the
+existing relay configuration, without an added SMTP password mode.</p>
+<p>Observers are executable argument arrays, not shell strings. Each is invoked
+with <code>CPRA_VERIFY_RUN_ID</code> and <code>CPRA_VERIFY_PHASE=before|after</code>. The after invocation
+receives the before JSON on standard input and must return JSON with
+<code>observed: true</code> only when the independently queried resource or destination
+establishes the requested effect. Use a unique receipt or state transition and
+the run ID where the provider supports it. A static successful observer is not
+valid evidence. The runner creates a private <code>&lt;report&gt;.evidence/</code> directory, retaining numeric
+and boolean evidence and resource fingerprints. Each record includes an evidence
+filename and SHA-256 digest. Arbitrary observer text, credentials, URLs and
+provider errors are excluded. Keep original provider records privately for review;
+the retained source hashes allow comparison with those originals.</p>
+<table>
+<thead>
+<tr>
+<th>Driver</th>
+<th>Concrete independent observation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HTTP</td>
+<td>Isolated target request counter and expected HTTP response</td>
+</tr>
+<tr>
+<td>TCP</td>
+<td>Connection accepted by the designated listener</td>
+</tr>
+<tr>
+<td>ICMP</td>
+<td>Echo request/reply capture or designated target packet accounting</td>
+</tr>
+<tr>
+<td>DNS</td>
+<td>Actual resolver query and expected answer for the test record</td>
+</tr>
+<tr>
+<td>UDP</td>
+<td>Echo server receipt and reply of the configured datagram</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td>TCP listener acceptance; this driver verifies port reachability</td>
+</tr>
+<tr>
+<td>Docker check</td>
+<td>Real daemon inspection of the isolated running container</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td>Real handshake and expected certificate/expiry at the designated endpoint</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td>Real Redis PING and isolated command-statistics increment</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>Real database connection/ping and database-side session/query evidence</td>
+</tr>
+<tr>
+<td>MySQL</td>
+<td>Real COM_PING and server-side command/session evidence</td>
+</tr>
+<tr>
+<td>MongoDB</td>
+<td>Real ping command and isolated server command evidence</td>
+</tr>
+<tr>
+<td>RabbitMQ</td>
+<td>Real AMQP connection/channel observed by the broker</td>
+</tr>
+<tr>
+<td>Kafka</td>
+<td>Real broker metadata request and broker-side request evidence</td>
+</tr>
+<tr>
+<td>Docker recovery</td>
+<td>Changed container start time/process identity on the real daemon</td>
+</tr>
+<tr>
+<td>Webhook recovery</td>
+<td>Independent target state change recorded by the receiver</td>
+</tr>
+<tr>
+<td>Kubernetes recovery</td>
+<td>Changed workload revision and completed isolated rollout/scale</td>
+</tr>
+<tr>
+<td>AWS recovery</td>
+<td>Designated EC2 reboot operation plus changed guest boot identity</td>
+</tr>
+<tr>
+<td>systemd recovery</td>
+<td>Changed invocation/process identity of a dedicated test unit</td>
+</tr>
+<tr>
+<td>Log</td>
+<td>One new JSON event with the verification monitor/run ID</td>
+</tr>
+<tr>
+<td>Slack</td>
+<td>Message retrieved from the designated test channel</td>
+</tr>
+<tr>
+<td>PagerDuty</td>
+<td>Incident/event visible in the designated integration/account</td>
+</tr>
+<tr>
+<td>Email</td>
+<td>Message observed in the designated recipient mailbox</td>
+</tr>
+<tr>
+<td>Webhook notification</td>
+<td>Payload received by the designated receiver</td>
+</tr>
+<tr>
+<td>Telegram</td>
+<td>Message received in the configured test chat</td>
+</tr>
+<tr>
+<td>Discord</td>
+<td>Message retrieved from the designated test channel</td>
+</tr>
+<tr>
+<td>Opsgenie</td>
+<td>Alert visible in the designated account/integration</td>
+</tr>
+<tr>
+<td>Mattermost</td>
+<td>Message retrieved from the configured test channel</td>
+</tr>
+<tr>
+<td>VictorOps</td>
+<td>Event visible in the designated routing destination</td>
+</tr>
+<tr>
+<td>Pushover</td>
+<td>Notification/receipt observed for the configured user/device</td>
+</tr>
+<tr>
+<td>Datadog</td>
+<td>Event queried from the configured account</td>
+</tr>
+<tr>
+<td>Teams</td>
+<td>Workflow completes and message appears in the designated channel</td>
+</tr>
+<tr>
+<td>Twilio</td>
+<td>Provider delivery status plus receipt at the designated test number</td>
+</tr>
+</tbody>
+</table>
+<p>Unconfigured cases report <code>not_configured</code>; a configured operation without
+independent completion proof fails verification. Exit code 2 means the inventory
+is incomplete, not a full pass. Ordinary CI never needs provider credentials.</p>
+<p><code>scripts/verification/local.py --binary bin/cpra-verify --out provider-report.json</code>
+runs isolated HTTP, webhook recovery, webhook notification and file-log cases
+using the production jobs. It cannot verify the other provider accounts.</p>
+<h2 id="scale-campaign">Scale campaign<a class="headerlink" href="#scale-campaign" title="Permanent link">&para;</a></h2>
+<p>The agreed host is the current Ubuntu WSL installation. Its virtual disk is on
+C:. The campaign checks physical host free space and requires at least 30 GiB
+plus the selected fixture allowance (default 5 GiB), independently of apparent
+free space inside the guest. Disk cleanup and additional infrastructure are
+external prerequisites. The harness does not substitute a smaller monitor count
+or another machine when the prerequisite fails.</p>
+<p>Build the baseline commit <code>a370969b041b399c0778318d8915ce059fd74294</code> and the candidate
+with identical Go version, build tags and optimized build flags. The preparation
+script checks the baseline revision and records compiler settings and binary
+hashes. Large campaigns reject an uncommitted candidate or mismatched binaries.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>scripts/benchmark/prepare.py<span class="w"> </span>--go<span class="w"> </span>/path/to/go1.25/bin/go<span class="w"> </span>--out<span class="w"> </span>/path/to/prepared-builds
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>scripts/benchmark/campaign.py<span class="w"> </span>--mode<span class="w"> </span>preflight<span class="w"> </span>--out<span class="w"> </span>evidence/local/preflight
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python3<span class="w"> </span>scripts/benchmark/campaign.py<span class="w"> </span>--mode<span class="w"> </span>compare<span class="w"> </span>--builds<span class="w"> </span>/path/to/prepared-builds/builds.json<span class="w"> </span>--candidate<span class="w"> </span>/path/to/candidate<span class="w"> </span>--baseline<span class="w"> </span>/path/to/baseline<span class="w"> </span>--target<span class="w"> </span>bin/cpra-target<span class="w"> </span>--out<span class="w"> </span>evidence/local/comparison
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>python3<span class="w"> </span>scripts/benchmark/campaign.py<span class="w"> </span>--mode<span class="w"> </span>soak<span class="w"> </span>--builds<span class="w"> </span>/path/to/prepared-builds/builds.json<span class="w"> </span>--candidate<span class="w"> </span>/path/to/candidate<span class="w"> </span>--target<span class="w"> </span>bin/cpra-target<span class="w"> </span>--out<span class="w"> </span>evidence/local/soak
+</code></pre></div>
+<p>Comparison uses 10,000, 100,000 and 1,000,000 distinct monitor configurations,
+60-second cadence, five-minute warmup, fifteen-minute measurement and three
+repetitions of each build. Baseline internal percentiles remain unavailable.
+The soak uses one million monitors and 24 hours of actual measurement following
+warmup. The target performs real network I/O with per-monitor bounded counters
+and digests. Samples record rate, CPU, RSS, descriptors, worker/queue statistics,
+SLOs, persistence timing and bounded dashboard reads. Logs rotate; individual
+check histories are not retained. Sleep, process interruption and missing fleet
+rows produce an incomplete result.</p>
+<p><code>--mode smoke</code> is a ten-monitor harness check and is explicitly excluded from
+release evidence. Campaign output remains <code>measured_pending_review</code> until
+resource stability, faults, operation reconciliation and all required evidence
+have been reviewed. It never promotes a smoke run to scale or endurance proof.
+The release gate must not pass while provider or full-duration evidence is
+missing. Source and documentation publication must identify the same reviewed
+candidate commit.</p>
+<h2 id="additional-local-and-account-scenarios">Additional local and account scenarios<a class="headerlink" href="#additional-local-and-account-scenarios" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>docker_local.py --binary bin/cpra-verify --out docker-report.json</code> creates one
+  uniquely named, disposable container from an already installed image. The
+  independent observer checks its daemon state and changed start timestamp.
+  The fixture uses an init process so its workload receives shutdown signals.</li>
+<li><code>database_local.py --binary bin/cpra-verify --driver redis --out redis-report.json</code>
+  starts one actual server profile from <code>examples/verification/fixtures.compose.yaml</code>.
+  Repeat with postgres, mysql, mongo, rabbitmq and kafka. Images are not pulled
+  unless <code>--pull</code> is explicitly supplied. The physical-space gate runs before
+  startup or downloads. A separate TCP relay forwards real protocol bytes to
+  the real server and records fresh connections and bidirectional traffic.</li>
+<li>Apply <code>examples/verification/kubernetes.yaml</code> to the operator-designated test
+  context, then configure the Kubernetes case and use <code>observe_effect.py
+  kubernetes deployment/cpra-verification --namespace cpra-verification --context
+  YOUR_CONTEXT</code>. It compares workload generation and waits for availability.</li>
+<li>Install <code>examples/verification/cpra-verification.service</code> as a dedicated test
+  unit; configure the systemd case and <code>observe_effect.py systemd
+  cpra-verification.service</code>. It requires a changed invocation and active state.</li>
+<li>For AWS, designate an expendable EC2 instance in the manifest and an SSH alias
+  in existing user SSH configuration. <code>observe_effect.py boot-id YOUR_SSH_ALIAS</code>
+  requires the guest kernel boot ID to change and the guest to become reachable.
+  An EC2 API acknowledgement alone cannot pass this observation.</li>
+<li>Notifications can use <code>observe_receipt.py DRIVER /private/receipts.jsonl</code> with
+  a user-configured account/mailbox/device reader. The reader must retrieve the
+  actual destination message and append the run ID, driver, provider message ID,
+  receive time and <code>delivered: true</code>. CPRa acceptance responses are insufficient.
+  This adapter does not provision or invent account-specific receipt readers.</li>
+</ul>
+<p>Fixtures requiring unavailable accounts, permissions, images or disk space remain
+not verified. The manual <code>live-verification.yml</code> workflow requires a dedicated
+self-hosted runner and an operator-owned argument file; pull-request CI cannot
+trigger it. The repository's normal workflow runs only isolated local HTTP/file
+operations. Live results are not automatically published.</p>
+<p><code>--mode faults</code> runs burst release, slow targets, outage, recovery traffic and
+process-kill/restart campaigns. The soak introduces a 100-monitor outage cohort
+for 125 seconds approximately hourly, recording those windows and their recovery
+periods. Healthy SLO assertions exclude these declared fault windows; all samples
+remain in the evidence. The target tracks repeated intervention per incident
+phase; retained history is reconciled against target-side effects. Heap,
+goroutines, disk/history/snapshot sizes and target saturation are recorded in
+addition to process and controller measurements.</p>
 
 
 
@@ -1612,7 +1730,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../deploy-to-production/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deployment">
+          <a href="../slo/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Measured latency">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1622,20 +1740,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Deployment
+                Measured latency
               </div>
             </div>
           </a>
         
         
           
-          <a href="../performance-tuning/" class="md-footer__link md-footer__link--next" aria-label="Next: Capacity and diagnostics">
+          <a href="../how-to/deploy-to-production/" class="md-footer__link md-footer__link--next" aria-label="Next: Deployment">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Capacity and diagnostics
+                Deployment
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1671,10 +1789,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

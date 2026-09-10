@@ -43,6 +43,9 @@ nav:
       - Installation: tutorials/getting-started.md
       - Current changes: release-notes.md
   - Guides:
+      - Persistence and recovery: durability.md
+      - Measured latency: slo.md
+      - Verification campaigns: validation.md
       - Deployment: how-to/deploy-to-production.md
       - Troubleshooting: how-to/common-tasks.md
       - Capacity and diagnostics: how-to/performance-tuning.md
@@ -62,8 +65,8 @@ nav:
       - License and scope: legal/disclaimer.md
 extra:
   generator: false
-  source_commit: a370969b041b399c0778318d8915ce059fd74294
-  source_date: 9 September 2026
+  source_commit: 370a60b22dcbea3b7552de987ca6a2c5bfaaf671
+  source_date: 10 September 2026
 extra_css:
   - assets/stylesheets/extra.css
 plugins:

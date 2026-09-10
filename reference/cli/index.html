@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/370a60b22dcbea3b7552de987ca6a2c5bfaaf671">main · 370a60b</a> · 10 September 2026
 
           </div>
           
@@ -271,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -608,6 +608,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1072,6 +1156,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-operator-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable operator queries
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1307,6 +1402,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-operator-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable operator queries
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1457,6 +1563,15 @@
 </table>
 <p>The client also reads <code>CPRA_AUTH_TOKEN</code>. <code>health</code> checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.</p>
 <p><a href="../api-reference/">API semantics</a></p>
+<h2 id="durable-operator-queries">Durable operator queries<a class="headerlink" href="#durable-operator-queries" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cpractl<span class="w"> </span>get<span class="w"> </span>state
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>cpractl<span class="w"> </span>get<span class="w"> </span>state<span class="w"> </span>YOUR_STABLE_MONITOR_ID
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>cpractl<span class="w"> </span>get<span class="w"> </span><span class="nb">history</span><span class="w"> </span>YOUR_STABLE_MONITOR_ID<span class="w"> </span>--limit<span class="w"> </span><span class="m">100</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>cpractl<span class="w"> </span>get<span class="w"> </span><span class="nb">history</span><span class="w"> </span>YOUR_STABLE_MONITOR_ID<span class="w"> </span>--cursor<span class="w"> </span>PREVIOUS_NEXT_CURSOR
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>cpractl<span class="w"> </span>get<span class="w"> </span>slo<span class="w"> </span>-o<span class="w"> </span>json
+</code></pre></div>
+<p>Use the existing server and token-file/environment configuration. These commands
+are read-only; unknown actions cannot be replayed through the CLI or dashboard.</p>
 
 
 

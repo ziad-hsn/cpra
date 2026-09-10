@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/370a60b22dcbea3b7552de987ca6a2c5bfaaf671">main · 370a60b</a> · 10 September 2026
 
           </div>
           
@@ -271,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -608,6 +608,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1411,13 +1495,13 @@
 </tr>
 </tbody>
 </table>
-<p>Each pipeline has a queue and a worker pool. Separating work prevents slow target I/O from becoming controller state mutation inside each network call. Result application remains coordinated by the controller.</p>
+<p>Each pipeline has a queue and a worker pool. Separating work prevents slow target I/O from becoming controller state mutation inside each network call. Results are committed through the deterministic Raft state machine; the controller owner loop applies the committed projection to its ECS world.</p>
 <h2 id="scheduling-and-state">Scheduling and state<a class="headerlink" href="#scheduling-and-state" title="Permanent link">&para;</a></h2>
 <p>The loader validates YAML or JSON and creates monitor entities and their components. Schedulers identify work that is due; result systems update health, incident, and notification state.</p>
 <p>Configuration is loaded before startup. Live reload and runtime queue migration are unsupported. A startup entity-count threshold can select the queue type before workers begin.</p>
 <h2 id="read-only-inspection">Read-only inspection<a class="headerlink" href="#read-only-inspection" title="Permanent link">&para;</a></h2>
-<p>A snapshot system publishes an immutable fleet projection every five seconds by default. The API and dashboard read this projection rather than changing the ECS world. Queue and pool telemetry expose worker demand, capacity, observations, and model state.</p>
-<p>Snapshot generation scans the fleet. Above the detailed-index limit, aggregate counts remain available, but detailed monitor and incident lists return unavailable. The index limit is not an independently verified fleet-capacity claim.</p>
+<p>An incremental index publishes immutable rows as committed monitor state changes. API filtering and serialization run outside the controller owner loop. Queue and pool telemetry expose worker demand, capacity, observations, and model state.</p>
+<p>Normal monitor pages construct only the requested rows; filtered searches scan the index on the request goroutine. Page responses are capped at 500 monitors. This architecture does not itself establish a measured fleet-capacity claim.</p>
 <h2 id="concurrency-and-lifecycle">Concurrency and lifecycle<a class="headerlink" href="#concurrency-and-lifecycle" title="Permanent link">&para;</a></h2>
 <p>Go contexts and deadlines bound supported operations. Shutdown stops the web server before draining the controller. Queues and workers have explicit ownership of completion and cancellation.</p>
 <p>CPRa coordinates within one process. It does not provide leader election, cross-instance locks, a persistent incident database, or multi-tenant hosted operation.</p>

@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/370a60b22dcbea3b7552de987ca6a2c5bfaaf671">main · 370a60b</a> · 10 September 2026
 
           </div>
           
@@ -271,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -608,6 +608,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1439,7 +1523,7 @@
 <p>Read the state together with the most recent check and pending notification. An empty incident list alone does not establish that every monitor is healthy.</p>
 <h2 id="recovery-is-admitted-once-per-incident">Recovery is admitted once per incident<a class="headerlink" href="#recovery-is-admitted-once-per-incident" title="Permanent link">&para;</a></h2>
 <p>When configured and eligible, one recovery operation is admitted. More failed checks during that incident do not continuously replay it. A successful action response is followed by the configured number of consecutive healthy checks before recovery is confirmed.</p>
-<p>A lost response or deadline expiry can leave the action's external outcome unknown. Inspect the target before manually repeating the action or restarting CPRa. This is not durable, cross-process exactly-once execution.</p>
+<p>A lost response or deadline expiry can leave the action's external outcome unknown. Restart holds interrupted started actions as unknown; inspect the provider before deciding how to resolve them. This conservative policy does not establish provider-independent exactly-once execution.</p>
 <h2 id="warnings-and-maintenance">Warnings and maintenance<a class="headerlink" href="#warnings-and-maintenance" title="Permanent link">&para;</a></h2>
 <p>TLS <code>warn_days</code> raises a yellow warning and degraded state without starting recovery. <code>critical_days</code> fails the check and follows the normal failure policy.</p>
 <p>Maintenance windows keep checks running while suppressing notifications and new recovery admissions. They do not roll back actions already running at the target.</p>
@@ -1447,7 +1531,7 @@
 <p>Red, yellow, green, cyan, and gray notification rules are configuration keys. Configure only the transitions and transports you intend to use. A group counts as delivered when at least one destination accepts it.</p>
 <p>Retryable HTTP rejections can receive up to three delivery attempts. Transport acceptance does not confirm that a human read the alert. The default alert cooldown is five minutes; confirmed green recovery notifications can bypass it.</p>
 <h2 id="restart-and-ownership">Restart and ownership<a class="headerlink" href="#restart-and-ownership" title="Permanent link">&para;</a></h2>
-<p>Incident, cooldown, and delivery state is in memory. Restarting CPRa resets this state. Independent instances do not share monitor ownership or coordinate actions; use one owner for a monitor configuration.</p>
+<p>Incident, cooldown, verification and per-endpoint delivery state are committed in local Raft storage by default. Restart rebuilds runtime jobs from current configuration and resumes safe queued work. Independent instances do not share monitor ownership or coordinate actions; use one owner for a monitor configuration.</p>
 
 
 

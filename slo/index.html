@@ -6,37 +6,37 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Diagnose startup, authentication, unavailable snapshots, missing optional drivers, notifications and recovery behavior.">
+        <meta name="description" content="Measured health-check latency windows, percentile estimates and bounded worker feedback.">
       
       
         <meta name="author" content="Ziad Hassan">
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/common-tasks/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/slo/">
       
       
-        <link rel="prev" href="../deploy-to-production/">
+        <link rel="prev" href="../durability/">
       
       
-        <link rel="next" href="../performance-tuning/">
+        <link rel="next" href="../validation/">
       
       
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../images/cpra-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Troubleshooting - CPRa Documentation</title>
+        <title>Measured latency - CPRa Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../assets/stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#troubleshooting" class="md-skip">
+        <a href="#measured-latency-targets" class="md-skip">
           Skip to content
         </a>
       
@@ -100,9 +100,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting
+              Measured latency
             
           </span>
         </div>
@@ -230,7 +230,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -251,7 +251,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+        <a href="../tutorials/quickstart/" class="md-tabs__link">
           
   
   
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../durability/" class="md-tabs__link">
+        <a href="../durability/" class="md-tabs__link">
           
   
   
@@ -293,7 +293,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+        <a href="../explanation/architecture-overview/" class="md-tabs__link">
           
   
   
@@ -313,7 +313,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/config-schema/" class="md-tabs__link">
+        <a href="../reference/config-schema/" class="md-tabs__link">
           
   
   
@@ -333,7 +333,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../developer-guide/" class="md-tabs__link">
+        <a href="../developer-guide/" class="md-tabs__link">
           
   
   
@@ -367,9 +367,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-icon.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -394,7 +394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/quickstart/" class="md-nav__link">
+      <a href="../tutorials/quickstart/" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/getting-started/" class="md-nav__link">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release-notes/" class="md-nav__link">
+      <a href="../release-notes/" class="md-nav__link">
         
   
   
@@ -621,7 +621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../durability/" class="md-nav__link">
+      <a href="../durability/" class="md-nav__link">
         
   
   
@@ -629,90 +629,6 @@
     
   
     Persistence and recovery
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../slo/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measured latency
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../validation/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Verification campaigns
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../deploy-to-production/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deployment
   
 
     
@@ -742,14 +658,14 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
   
   
   <span class="md-ellipsis">
     
   
-    Troubleshooting
+    Measured latency
   
 
     
@@ -757,10 +673,77 @@
   
   
 
-          <span class="md-nav__icon md-icon"></span>
-        </label>
+      </a>
       
-      <a href="./" class="md-nav__link md-nav__link--active">
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/common-tasks/" class="md-nav__link">
         
   
   
@@ -776,114 +759,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#startup-stops-immediately" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Startup stops immediately
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-listener-refuses-a-remote-address" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The listener refuses a remote address
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A monitor remains unknown or the dashboard looks stale
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lists-return-503" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lists return 503
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-optional-integration-is-unavailable" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An optional integration is unavailable
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-did-not-run-again" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery did not run again
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-notification-was-not-received" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A notification was not received
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workers-grow-or-latency-rises" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workers grow or latency rises
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -896,7 +771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../performance-tuning/" class="md-nav__link">
+      <a href="../how-to/performance-tuning/" class="md-nav__link">
         
   
   
@@ -983,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+      <a href="../explanation/architecture-overview/" class="md-nav__link">
         
   
   
@@ -1011,7 +886,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+      <a href="../explanation/incident-lifecycle/" class="md-nav__link">
         
   
   
@@ -1039,7 +914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+      <a href="../explanation/queueing-theory/" class="md-nav__link">
         
   
   
@@ -1126,7 +1001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/config-schema/" class="md-nav__link">
+      <a href="../reference/config-schema/" class="md-nav__link">
         
   
   
@@ -1154,7 +1029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jobs-reference/" class="md-nav__link">
+      <a href="../reference/jobs-reference/" class="md-nav__link">
         
   
   
@@ -1182,7 +1057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-reference/" class="md-nav__link">
+      <a href="../reference/api-reference/" class="md-nav__link">
         
   
   
@@ -1210,7 +1085,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../reference/cli/" class="md-nav__link">
         
   
   
@@ -1297,7 +1172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer-guide/" class="md-nav__link">
+      <a href="../developer-guide/" class="md-nav__link">
         
   
   
@@ -1325,7 +1200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adding-new-jobs/" class="md-nav__link">
+      <a href="../how-to/adding-new-jobs/" class="md-nav__link">
         
   
   
@@ -1353,7 +1228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../maintaining-docs/" class="md-nav__link">
+      <a href="../maintaining-docs/" class="md-nav__link">
         
   
   
@@ -1381,7 +1256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../legal/disclaimer/" class="md-nav__link">
+      <a href="../legal/disclaimer/" class="md-nav__link">
         
   
   
@@ -1429,102 +1304,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#startup-stops-immediately" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Startup stops immediately
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-listener-refuses-a-remote-address" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The listener refuses a remote address
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A monitor remains unknown or the dashboard looks stale
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lists-return-503" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lists return 503
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-optional-integration-is-unavailable" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An optional integration is unavailable
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recovery-did-not-run-again" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recovery did not run again
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-notification-was-not-received" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A notification was not received
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workers-grow-or-latency-rises" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workers grow or latency rises
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1540,7 +1319,7 @@
 
 
   
-    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/how-to/common-tasks.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/slo.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1548,32 +1327,46 @@
   
 
 
-<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
-<h2 id="startup-stops-immediately">Startup stops immediately<a class="headerlink" href="#startup-stops-immediately" title="Permanent link">&para;</a></h2>
-<p>Check that the manifest exists, is readable, and contains a <code>monitors</code> block sequence. Missing or malformed configuration is an error. Intentional empty instances require <code>-allow-empty</code> and are not ready until a nonempty snapshot exists.</p>
-<p>Use <code>cpra -help</code> for flags. <code>-config</code> and <code>-yaml</code> both identify the monitor manifest.</p>
-<h2 id="the-listener-refuses-a-remote-address">The listener refuses a remote address<a class="headerlink" href="#the-listener-refuses-a-remote-address" title="Permanent link">&para;</a></h2>
-<p>A non-loopback bind requires <code>-web.auth-file</code> or an authentication token. An empty or unreadable token file fails startup. Place remote access behind HTTPS.</p>
-<p>If the browser asks for credentials, use username <code>cpra</code> and your configured token. The CLI token file is specified with <code>--token-file</code>.</p>
-<h2 id="a-monitor-remains-unknown-or-the-dashboard-looks-stale">A monitor remains unknown or the dashboard looks stale<a class="headerlink" href="#a-monitor-remains-unknown-or-the-dashboard-looks-stale" title="Permanent link">&para;</a></h2>
-<p>Allow the first check interval and the next snapshot refresh. Snapshots update every five seconds by default. Inspect <code>cpractl get monitors -o json</code> and the target's logs.</p>
-<p>Readiness checks snapshot freshness, not whether every target is healthy. A failed current health request should be treated as a connection problem even if the browser still has older data.</p>
-<h2 id="lists-return-503">Lists return 503<a class="headerlink" href="#lists-return-503" title="Permanent link">&para;</a></h2>
-<p>A snapshot may not be ready, or the detailed index may be capped. Check <code>/api/v1/overview</code> for aggregate counts and <code>index_capped</code>. Do not turn an unavailable response into a successful empty list.</p>
-<h2 id="an-optional-integration-is-unavailable">An optional integration is unavailable<a class="headerlink" href="#an-optional-integration-is-unavailable" title="Permanent link">&para;</a></h2>
-<p>Build its tag and run the resulting binary:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span><span class="nv">BUILD_TAGS</span><span class="o">=</span><span class="s1">'redis postgres'</span>
-</code></pre></div>
-<p>MongoDB requires a direct <code>mongodb://</code> URI; <code>mongodb+srv://</code> is rejected. Kubernetes exec credential plugins are unsupported; use token, certificate, or in-cluster credentials.</p>
-<h2 id="recovery-did-not-run-again">Recovery did not run again<a class="headerlink" href="#recovery-did-not-run-again" title="Permanent link">&para;</a></h2>
-<p>CPRa admits one recovery operation per incident. More failures do not continuously replay the action. Maintenance can suppress new admission. A successful action still needs consecutive healthy checks.</p>
-<p>Inspect the target before manually repeating an action or restarting CPRa, especially after a timeout.</p>
-<h2 id="a-notification-was-not-received">A notification was not received<a class="headerlink" href="#a-notification-was-not-received" title="Permanent link">&para;</a></h2>
-<p>Check the rule's <code>dispatch</code> setting, group references, maintenance windows, and destination credentials. A group succeeds when at least one destination accepts the notification; this does not prove that all recipients received it.</p>
-<p>SMTP authentication is not implemented; use an appropriate relay. PagerDuty needs an Events API v2 routing key. Pushover emergency notifications need valid retry and expiry values.</p>
-<h2 id="workers-grow-or-latency-rises">Workers grow or latency rises<a class="headerlink" href="#workers-grow-or-latency-rises" title="Permanent link">&para;</a></h2>
-<p>Inspect <code>cpractl get queues</code> and <code>cpractl get pools -o json</code>. Check target latency, queued work, current capacity, observation counts, and sizing model before increasing limits. <a href="../performance-tuning/">Sizing and performance</a></p>
-<p>For a bug report, include your source commit, build tags, a redacted manifest, expected behavior, and relevant logs. Never paste access tokens or private target credentials into a public issue.</p>
+<h1 id="measured-latency-targets">Measured latency targets<a class="headerlink" href="#measured-latency-targets" title="Permanent link">&para;</a></h1>
+<p>The health-check targets are p99 scheduling-plus-queue delay at most 250 ms and
+scheduled-to-committed-result latency at most five seconds, reported over a
+rolling five-minute window. A separate execution distribution distinguishes
+worker delay from a slow target and delayed result application.</p>
+<p><code>GET /api/v1/slo</code>, <code>cpractl get slo</code>, and the dashboard System Health page expose
+p50, p95, p99, sample counts, exact threshold counts, timeouts, missed cadence
+slots and coverage. Histograms use bounded fixed storage by driver, not by
+monitor, and five-second time buckets. Report boundaries consequently have
+five-second resolution. A histogram percentile is an upper bucket estimate;
+threshold attainment is counted directly. Unavailable percentile samples are
+null rather than zero. The last per-monitor latency is execution duration and
+has a separate <code>latency_available</code> flag.</p>
+<p>Timeouts and skipped cadence slots remain in the attainment denominator. During
+startup, low sample counts or recovery coverage gaps, CPRa cannot declare that
+the full window met its targets. Aggregate window state is committed every five
+seconds; the interval after its last persisted watermark is identified as a
+recovery gap. It is not reconstructed by inventing observations. Per-monitor
+historical percentiles and raw successful check records are not retained.</p>
+<p>Erlang C with the Allen–Cunneen variability adjustment remains the initial worker
+capacity recommendation. Feedback uses a 30-second window evaluated every five
+seconds, at least 1,000 observations, and real queued work before reacting to a
+queue-delay breach. Growth remains bounded by worker limits and twofold per
+adjustment. Shrinking requires 60 healthy seconds, is limited to 10% per
+adjustment and cannot cross below the model recommendation. Slow execution and
+controller-limited conditions are reported instead of repeatedly increasing
+workers in response to delay they cannot remedy.</p>
+<p>These are observed operating targets, not a contractual SLA or an unconditional
+capacity guarantee. A one-million-monitor or 24-hour claim requires the
+corresponding completed campaign evidence described in <a href="../validation/">validation</a>.</p>
+<p>Scheduled obligations are recorded before queue admission. Checks still missing a
+committed result become overdue once their five-second bucket and five-second
+result deadline have elapsed; this introduces at most ten seconds of accounting
+lag. Overdue checks count against attainment even if no result ever arrives.
+Completed samples stay in the bucket of their scheduled time. A late result
+replaces its existing obligation rather than adding a second denominator entry.
+Missed cadence slots are counted when the scheduler advances, including while a
+previous check is queued or running. The scheduler never dispatches a catch-up
+burst of old checks. <code>pending</code> identifies obligations still within the accounting
+grace; <code>overdue</code> identifies unfinished obligations already counted as failures.</p>
 
 
 
@@ -1612,7 +1405,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../deploy-to-production/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deployment">
+          <a href="../durability/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Persistence and recovery">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1622,20 +1415,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Deployment
+                Persistence and recovery
               </div>
             </div>
           </a>
         
         
           
-          <a href="../performance-tuning/" class="md-footer__link md-footer__link--next" aria-label="Next: Capacity and diagnostics">
+          <a href="../validation/" class="md-footer__link md-footer__link--next" aria-label="Next: Verification campaigns">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Capacity and diagnostics
+                Verification campaigns
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1671,10 +1464,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

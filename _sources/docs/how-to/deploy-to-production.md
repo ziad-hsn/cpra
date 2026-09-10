@@ -36,7 +36,7 @@ Put an HTTPS reverse proxy in front of this HTTP listener. Browser login is user
 
 Confirm that checks classify your target correctly and notifications reach a test destination. Then add the intended recovery action and verify its effect.
 
-Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restarting CPRa resets in-memory incident state and can change what is admitted next.
+Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restart restores committed incident state and holds interrupted started actions as unknown. Mount the persistent data directory and retain complete backups.
 
 ## Containers
 
@@ -52,10 +52,24 @@ The image runs as UID 1001 and expects `/etc/cpra/monitors.yaml`. Mount configur
 ## Health and shutdown
 
 - `/api/v1/healthz` reports process liveness.
-- `/api/v1/readyz` requires a recent nonempty snapshot.
+- `/api/v1/readyz` requires a recent nonempty projection and available durable storage.
 - `/metrics` exposes runtime and pipeline metrics.
 - SIGINT or SIGTERM starts graceful shutdown; the web server stops before the controller.
 
 Choose service-manager stop timeouts with enough room for your configured operation deadlines. Use an external supervisor to restart a failed process and an external observer for CPRa itself.
 
 [Current limits](../release-notes.md#current-boundaries) · [Troubleshooting](common-tasks.md)
+
+## Persistent volume and complete backup
+
+Mount a private volume at `/var/lib/cpra` for the packaged container; the shipped
+runtime configuration selects that directory. For a native process, set
+`storage.directory` to an absolute persistent path. Avoid sharing the data
+directory between processes. There is one voter and no automatic failover.
+
+Stop CPRa before taking a file-level backup. Copy `identity.json`, `raft.db`,
+`snapshots/`, and the entire retained `history/` catalog and segment set together.
+Restore all files into an empty private directory and start with the compatible
+binary and monitor configuration. Retain credentials separately. A storage
+failure stops new admission and makes readiness unavailable; CPRa never silently
+switches to memory. See [complete recovery procedures](../durability.md).

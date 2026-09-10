@@ -59,4 +59,4 @@ This is a mean-latency approximation, not a p95 or p99 guarantee. Network failur
 
 The current release review observed the model in a running process. It did not establish a million-monitor capacity benchmark or a long-duration production soak result.
 
-[Runtime implementation](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/queue/dynamic_worker_pool.go) · [Sizing mathematics](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/queue/sizing.go)
+[Runtime implementation](https://github.com/ziad-hsn/cpra/blob/370a60b22dcbea3b7552de987ca6a2c5bfaaf671/internal/queue/dynamic_worker_pool.go) · [Sizing mathematics](https://github.com/ziad-hsn/cpra/blob/370a60b22dcbea3b7552de987ca6a2c5bfaaf671/internal/queue/sizing.go)

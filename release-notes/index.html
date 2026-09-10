@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Changes and verification for the CPRa source snapshot published on 9 September 2026.">
+        <meta name="description" content="Implemented durability and operator interfaces, completed checks, and outstanding release evidence.">
       
       
         <meta name="author" content="Ziad Hassan">
@@ -18,7 +18,7 @@
         <link rel="prev" href="../tutorials/getting-started/">
       
       
-        <link rel="next" href="../how-to/deploy-to-production/">
+        <link rel="next" href="../durability/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Current release notes - CPRa Documentation</title>
+        <title>Durable CPRa candidate - CPRa Documentation</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#current-release-notes" class="md-skip">
+        <a href="#durable-cpra-candidate" class="md-skip">
           Skip to content
         </a>
       
@@ -87,7 +87,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/370a60b22dcbea3b7552de987ca6a2c5bfaaf671">main · 370a60b</a> · 10 September 2026
 
           </div>
           
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Current release notes
+              Durable CPRa candidate
             
           </span>
         </div>
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../durability/" class="md-tabs__link">
           
   
   
@@ -594,10 +594,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-changed" class="md-nav__link">
+  <a href="#implemented-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What changed
+        Implemented behavior
       
     </span>
   </a>
@@ -605,10 +605,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verification" class="md-nav__link">
+  <a href="#completed-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verification
+        Completed verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outstanding-release-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outstanding release gates
       
     </span>
   </a>
@@ -619,7 +630,7 @@
   <a href="#current-boundaries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current boundaries
+        Operational boundaries
       
     </span>
   </a>
@@ -693,6 +704,90 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1297,10 +1392,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-changed" class="md-nav__link">
+  <a href="#implemented-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What changed
+        Implemented behavior
       
     </span>
   </a>
@@ -1308,10 +1403,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verification" class="md-nav__link">
+  <a href="#completed-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verification
+        Completed verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outstanding-release-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outstanding release gates
       
     </span>
   </a>
@@ -1322,7 +1428,7 @@
   <a href="#current-boundaries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current boundaries
+        Operational boundaries
       
     </span>
   </a>
@@ -1354,33 +1460,70 @@
   
 
 
-<h1 id="current-release-notes">Current release notes<a class="headerlink" href="#current-release-notes" title="Permanent link">&para;</a></h1>
-<p>These documentation pages describe source commit <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">a370969</a>, published to <code>main</code> on <strong>9 September 2026</strong>. This is an OSS preview source snapshot, not a claim that a versioned binary release has been published.</p>
-<h2 id="what-changed">What changed<a class="headerlink" href="#what-changed" title="Permanent link">&para;</a></h2>
+<h1 id="durable-cpra-candidate">Durable CPRa candidate<a class="headerlink" href="#durable-cpra-candidate" title="Permanent link">&para;</a></h1>
+<p>This documentation describes the <code>codex/durable-cpra</code> implementation candidate.
+The source revision appears in the page footer and <code>site-version.json</code>.
+Publication to <code>main</code> and the public documentation site is gated on review and
+agreed release evidence. The previous published baseline is
+<a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">a370969</a>.</p>
+<h2 id="implemented-behavior">Implemented behavior<a class="headerlink" href="#implemented-behavior" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Runtime worker sizing again calls Erlang C and Allen–Cunneen with measured arrival and service variability.</li>
-<li>Queue segment transitions and overflow handling preserve accepted work and progress.</li>
-<li>Recovery admission, incident accounting, maintenance, and healthy-check verification were corrected.</li>
-<li>Driver deadlines, configuration compatibility, HTTP delivery responses, and required provider fields were tightened.</li>
-<li>TLS certificate warnings propagate into degraded status and yellow notifications without starting recovery.</li>
-<li>Dashboard, API, and CLI distinguish unavailable data, current health errors, and future check times.</li>
-<li>Metrics families, container packaging, dependency notices, and release verification were updated.</li>
+<li>Single-node Raft storage is enabled by default in <code>./cpra-data</code>, with explicit
+  memory-only configuration for disposable processes.</li>
+<li>Incident transitions and action intent are committed before external work.
+  Restart resumes health checks and queued work, while holding interrupted
+  started actions as unknown. Successful endpoints are not repeated to complete
+  another endpoint.</li>
+<li>Stable monitor IDs and configuration revisions prevent old queued work from
+  being redirected to a changed target. Removing a monitor cancels unsent work.</li>
+<li>Incident, intervention and notification events are retained for 30 days in
+  daily local segments. Raw check history and hourly aggregates are not retained.</li>
+<li>Five-minute distributions and exact threshold counters measure queue delay,
+  execution duration and scheduled-to-committed-result latency. Missed work,
+  timeouts, unfinished checks and recovery coverage gaps remain visible.</li>
+<li>Erlang C and Allen–Cunneen remain the initial sizing model. Bounded observed
+  latency feedback augments that recommendation.</li>
+<li>Authenticated read-only history, SLO and persistence APIs, matching CLI commands
+  and dashboard views expose this state with bounded monitor/history pages.</li>
+<li>Configured live-provider and external benchmark harnesses record actual results
+  and distinguish unconfigured cases from passing evidence.</li>
 </ul>
-<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
-<p>The source snapshot passed Go 1.25 and Go 1.27 formatting, vet, default race tests, and race tests with every optional driver tag. Dashboard build, type checks, lint, 13 tests, and dependency audit passed. The <a href="https://github.com/ziad-hsn/cpra/actions/runs/34334452067">GitHub verification run</a> also completed successfully.</p>
-<p>The release review included real process scenarios, authenticated browser checks, a running queueing-model experiment, container execution, and archive consistency checks. ARM64 binaries were cross-compiled and inspected, not executed.</p>
-<p>Go scans found no affected reachable symbols or imported packages. Four advisories were present only in the required <code>golang.org/x/crypto</code> module's unused packages; this is not a claim that every module is advisory-free.</p>
-<h2 id="current-boundaries">Current boundaries<a class="headerlink" href="#current-boundaries" title="Permanent link">&para;</a></h2>
+<h2 id="completed-verification">Completed verification<a class="headerlink" href="#completed-verification" title="Permanent link">&para;</a></h2>
+<p>Go 1.25 compatibility checks, default and all-driver race tests, formatting and
+vet checks have passed during implementation. Dashboard build, type checks, lint
+and 15 component tests passed. Go vulnerability scans found no affected reachable
+symbols or imported packages; four advisories remain only in unused packages of
+required modules.</p>
+<p>Real subprocess tests cover forced termination before admission, after intent,
+after the started marker, after external webhook success and after result commit.
+The observed recovery behavior matches the conservative unknown-outcome policy.
+Local production-driver runs have passed HTTP checks, Docker checks, webhook and
+Docker recovery, webhook notification and file-log delivery. Provider acceptance
+is recorded separately from independently observed effects. Failed fixture runs
+remain in local evidence; they are not converted into passes.</p>
+<h2 id="outstanding-release-gates">Outstanding release gates<a class="headerlink" href="#outstanding-release-gates" title="Permanent link">&para;</a></h2>
 <ul>
-<li>One process owns a monitor configuration; there is no cross-instance coordination.</li>
-<li>Incident and delivery state is in memory and resets on restart.</li>
-<li>Per-monitor history is not retained.</li>
-<li>MongoDB SRV discovery and Kubernetes exec credentials are unsupported.</li>
-<li>Local provider fixtures do not establish production-account certification.</li>
-<li>No comparative performance benchmark or long-duration soak test was performed.</li>
-<li>The queueing model estimates mean latency, not a percentile or SLA guarantee.</li>
+<li>Full-account verification of all 33 driver types remains incomplete. User-owned
+  accounts, credentials, designated targets and independent receipt observers
+  are required. Local fixtures cannot certify cloud production accounts.</li>
+<li>The physical C: free-space prerequisite has failed (approximately 4 GB free
+  during this implementation, below 30 GiB plus fixture headroom). Database
+  fixture downloads and large performance campaigns were not started.</li>
+<li>Matched 10k/100k/1m comparisons and the uninterrupted 24-hour million-monitor
+  campaign have not completed. A ten-monitor harness smoke run is explicitly
+  excluded from scale and endurance evidence.</li>
+<li>Independent review and the final publication gates remain open.</li>
 </ul>
-<p><a href="../tutorials/quickstart/">Start a local instance</a> · <a href="../how-to/deploy-to-production/">Deploy with these limits</a></p>
+<h2 id="current-boundaries">Operational boundaries<a class="headerlink" href="#current-boundaries" title="Permanent link">&para;</a></h2>
+<p>This is one process and one voter with local persistence. It provides no
+multi-node failover. The configured health-check targets are p99 queue delay
+at most 250 ms and scheduled-to-committed result at most five seconds; measured
+attainment is conditional on the observed workload and complete window coverage.
+It is not an unconditional SLA. Unknown external actions require operator
+investigation and are never automatically replayed. MongoDB SRV discovery and
+Kubernetes exec credential plugins remain unsupported.</p>
+<p><a href="../durability/">Recovery and backups</a> · <a href="../slo/">Latency accounting</a> ·
+<a href="../validation/">Verification requirements</a></p>
 
 
 
@@ -1436,13 +1579,13 @@
         
         
           
-          <a href="../how-to/deploy-to-production/" class="md-footer__link md-footer__link--next" aria-label="Next: Deployment">
+          <a href="../durability/" class="md-footer__link md-footer__link--next" aria-label="Next: Persistence and recovery">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Deployment
+                Persistence and recovery
               </div>
             </div>
             <div class="md-footer__button md-icon">

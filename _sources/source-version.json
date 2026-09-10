@@ -1,6 +1,7 @@
 {
-  "source_commit": "a370969b041b399c0778318d8915ce059fd74294",
-  "source_branch": "main",
-  "updated": "2026-09-09",
-  "repository": "https://github.com/ziad-hsn/cpra"
+  "source_commit": "370a60b22dcbea3b7552de987ca6a2c5bfaaf671",
+  "source_branch": "codex/durable-cpra",
+  "updated": "2026-09-10",
+  "repository": "https://github.com/ziad-hsn/cpra",
+  "release_status": "candidate; provider, endurance and independent review gates open"
 }

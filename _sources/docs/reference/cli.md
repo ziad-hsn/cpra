@@ -59,3 +59,16 @@ Replace example ID `2` with an ID returned by your instance.
 The client also reads `CPRA_AUTH_TOKEN`. `health` checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.
 
 [API semantics](api-reference.md)
+
+## Durable operator queries
+
+```sh
+cpractl get state
+cpractl get state YOUR_STABLE_MONITOR_ID
+cpractl get history YOUR_STABLE_MONITOR_ID --limit 100
+cpractl get history YOUR_STABLE_MONITOR_ID --cursor PREVIOUS_NEXT_CURSOR
+cpractl get slo -o json
+```
+
+Use the existing server and token-file/environment configuration. These commands
+are read-only; unknown actions cannot be replayed through the CLI or dashboard.

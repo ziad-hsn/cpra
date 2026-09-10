@@ -47,6 +47,7 @@ assets/stylesheets/main.ec1eaa64.min.css.map
 assets/stylesheets/palette.ab4e12ef.min.css
 assets/stylesheets/palette.ab4e12ef.min.css.map
 developer-guide/index.html
+durability/index.html
 examples/monitors.yaml
 explanation/architecture-overview/index.html
 explanation/incident-lifecycle/index.html
@@ -80,8 +81,10 @@ search/search_index.json
 site-version.json
 sitemap.xml
 sitemap.xml.gz
+slo/index.html
 tutorials/getting-started/index.html
 tutorials/index.html
 tutorials/quickstart/index.html
 tutorials/your-first-monitor/index.html
+validation/index.html
 zap-reference/index.html

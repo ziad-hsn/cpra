@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" aria-labelledby="cpra-title-small" role="img" viewBox="0 0 64 64">
+  <title id="cpra-title-small">CPRa</title>
+  <path fill="none" stroke="#e5a51f" stroke-linecap="round" stroke-width="9" d="M44.05 50.2A21 21 0 0 1 11 33a21 21 0 0 1 39.54-9.86"/>
+  <path fill="#e5a51f" stroke="#e5a51f" stroke-linejoin="round" stroke-width="3" d="m57.58 36.39.38-20.59-17.66 9.39Z"/>
+  <path fill="none" stroke="#1a262e" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.5" d="M15 34h6l6-13 6 26 5-13h8"/>
+</svg>

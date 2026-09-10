@@ -1,10 +1,38 @@
-# CPRa
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/dist/svg/cpra-horizontal-dark.svg">
+    <img src="brand/dist/svg/cpra-horizontal-color.svg" alt="CPRa" width="360">
+  </picture>
+</p>
 
-CPRa (Continuous Pulse and Recovery Agent) checks services, sends alerts, and runs configured recovery actions. It includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client.
+<p align="center"><strong>Continuous Pulse and Recovery Agent</strong><br>
+Checks services, sends alerts, and runs the recovery actions you configure.</p>
 
-## Build and run
+<p align="center">
+  <a href="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml"><img src="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a262e" alt="MIT license"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25%2B-1a262e" alt="Go 1.25+"></a>
+  <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-e5a51f" alt="Documentation"></a>
+</p>
 
-Build with Go 1.25 or later and Make. The source includes the dashboard assets.
+CPRa is a self-hosted monitoring and recovery agent written in Go. It runs
+health checks against your services on a schedule, opens and closes incidents
+against configurable thresholds, sends notifications, and executes a recovery
+action — restart a container, call a webhook, restart or scale a Kubernetes
+workload, reboot an EC2 instance, restart a systemd unit — when a service
+fails. It ships as a single static binary with an embedded read-only dashboard,
+an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
+
+**Documentation:** [ziad-hsn.github.io/cpra](https://ziad-hsn.github.io/cpra/) —
+[quickstart](https://ziad-hsn.github.io/cpra/tutorials/quickstart/) ·
+[monitor configuration](https://ziad-hsn.github.io/cpra/reference/config-schema/) ·
+[drivers](https://ziad-hsn.github.io/cpra/reference/jobs-reference/) ·
+[HTTP API](https://ziad-hsn.github.io/cpra/reference/api-reference/) ·
+[deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/)
+
+## Quick start
+
+Requires Go 1.25 or later and Make. The repository already contains the built dashboard assets, so a Go toolchain is enough.
 
 ```sh
 make
@@ -78,5 +106,6 @@ make release VERSION=0.1.0
 Build a container with `docker build -f docker/Dockerfile -t cpra:local .`. It runs as UID 1001 and expects a manifest at `/etc/cpra/monitors.yaml`. Mount the manifest read-only and give the process write access to configured log destinations. `docker compose -f docker/docker-compose.yml up --build` runs the example with its HTTP listener disabled; service addresses must be reachable from inside the container.
 
 ## License
-
 CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
+
+The CPRa name and mark are not covered by the MIT licence. Brand assets, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).

@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"errors"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"math"
 	"sync"
 	"sync/atomic"

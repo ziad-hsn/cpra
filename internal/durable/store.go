@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
-	"github.com/ziad-hsn/cpra/internal/slo"
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	raftbolt "github.com/hashicorp/raft-boltdb/v2"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	bolt "go.etcd.io/bbolt"
 )
 

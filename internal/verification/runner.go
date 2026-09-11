@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"github.com/ziad-hsn/cpra/internal/version"
-	"github.com/google/uuid"
-	"github.com/mlange-42/ark/ecs"
 	"gopkg.in/yaml.v3"
 )
 

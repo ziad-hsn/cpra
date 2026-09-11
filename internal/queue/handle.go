@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"fmt"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"sync"
 )
 

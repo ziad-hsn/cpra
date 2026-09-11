@@ -1,12 +1,12 @@
 package systems
 
 import (
-	"github.com/ziad-hsn/cpra/internal/alerts"
-	"github.com/ziad-hsn/cpra/internal/controller/components"
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"errors"
 	"fmt"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/alerts"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"time"
 )
 

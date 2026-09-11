@@ -36,7 +36,7 @@ dashboard-check:
 	cd dashboard && $(PNPM) test
 
 fmt-check:
-	@test -z "$$(gofmt -l $$(find internal cmd -name '*.go') $$(find . -maxdepth 1 -name '*.go'))"
+	@unformatted="$$(gofmt -l internal cmd *.go)" || exit $$?; if [ -n "$$unformatted" ]; then printf '%s\n' "$$unformatted"; exit 1; fi
 
 vet:
 	$(GO) vet ./...

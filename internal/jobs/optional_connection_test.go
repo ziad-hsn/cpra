@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 func TestPostgresDiscreteCredentials(t *testing.T) {

@@ -1,10 +1,10 @@
 package entities
 
 import (
+	"fmt"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/loader/schema"
-	"fmt"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"

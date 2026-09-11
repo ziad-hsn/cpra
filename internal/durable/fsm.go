@@ -1,9 +1,9 @@
 package durable
 
 import (
-	"github.com/ziad-hsn/cpra/internal/slo"
 	"encoding/json"
 	"fmt"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	"io"
 	"slices"
 	"sync"

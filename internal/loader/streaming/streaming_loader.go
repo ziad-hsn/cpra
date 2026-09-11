@@ -2,8 +2,8 @@ package streaming
 
 import (
 	"context"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"fmt"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"runtime"
 	"strings"
 	"time"

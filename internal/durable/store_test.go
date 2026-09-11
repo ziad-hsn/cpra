@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
 func testConfig(t *testing.T) runtimeconfig.Config {

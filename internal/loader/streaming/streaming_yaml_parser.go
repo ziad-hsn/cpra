@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"gopkg.in/yaml.v3"
 )
 

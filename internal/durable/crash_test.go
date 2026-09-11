@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/mlange-42/ark/ecs"
 )
 

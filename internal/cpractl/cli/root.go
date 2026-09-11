@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cpra/internal/client"
-	"cpra/internal/version"
+	"github.com/ziad-hsn/cpra/internal/client"
+	"github.com/ziad-hsn/cpra/internal/version"
 )
 
 // Output format identifiers for the --output (-o) flag.

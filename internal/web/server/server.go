@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"cpra/internal/controller"
-	"cpra/internal/queue"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 //go:embed all:assets

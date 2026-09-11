@@ -9,7 +9,7 @@ VERSION ?= $(shell if test -e .git; then git describe --tags --always --dirty 2>
 COMMIT ?= $(shell if test -e .git; then git rev-parse --short HEAD 2>/dev/null || echo unknown; else echo unknown; fi)
 BUILD_VCS = $(shell if test -e .git; then echo true; else echo false; fi)
 DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-VERSION_FLAGS = -X cpra/internal/version.Version=$(VERSION) -X cpra/internal/version.Commit=$(COMMIT) -X cpra/internal/version.Date=$(DATE)
+VERSION_FLAGS = -X github.com/ziad-hsn/cpra/internal/version.Version=$(VERSION) -X github.com/ziad-hsn/cpra/internal/version.Commit=$(COMMIT) -X github.com/ziad-hsn/cpra/internal/version.Date=$(DATE)
 
 .DEFAULT_GOAL := all
 .PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean

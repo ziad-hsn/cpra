@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // This is a local runner contract test of Twilio's no-send evidence boundary,

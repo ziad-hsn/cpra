@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"github.com/jackc/pgx/v5"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/dns"
 )

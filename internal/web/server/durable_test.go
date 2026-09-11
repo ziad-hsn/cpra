@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/durable"
-	"cpra/internal/runtimeconfig"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 func TestDurableAPIsAuthenticateAndRemainReadOnly(t *testing.T) {

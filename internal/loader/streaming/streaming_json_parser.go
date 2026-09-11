@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // StreamingJsonParser handles true streaming parsing of a JSON file.

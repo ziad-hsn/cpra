@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cpra/internal/client"
+	"github.com/ziad-hsn/cpra/internal/client"
 )
 
 // monitorFlags holds the list-filter flags for "get monitors".

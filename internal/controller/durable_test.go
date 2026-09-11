@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/durable"
-	"cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
 func TestDurableControllerUsesCommittedStateAndResumesChecks(t *testing.T) {

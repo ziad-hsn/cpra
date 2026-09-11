@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"cpra/internal/verification"
+	"github.com/ziad-hsn/cpra/internal/verification"
 )
 
 func TestExitPolicyDoesNotPromoteConfiguredSuiteToCertification(t *testing.T) {

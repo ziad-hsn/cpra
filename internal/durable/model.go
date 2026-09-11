@@ -3,7 +3,7 @@
 package durable
 
 import (
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"

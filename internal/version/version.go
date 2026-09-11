@@ -1,5 +1,5 @@
 // Package version holds build-time version metadata injected by the
-// Makefile via -ldflags "-X cpra/internal/version.Version=...". The defaults
+// Makefile via -ldflags "-X github.com/ziad-hsn/cpra/internal/version.Version=...". The defaults
 // below apply to plain "go build"/"go run" invocations that bypass the
 // Makefile, so binaries are always identifiable.
 package version

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"cpra/internal/verification"
+	"github.com/ziad-hsn/cpra/internal/verification"
 )
 
 func main() {

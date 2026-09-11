@@ -1,4 +1,4 @@
-module cpra
+module github.com/ziad-hsn/cpra
 
 go 1.25.0
 

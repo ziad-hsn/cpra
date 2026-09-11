@@ -1,9 +1,9 @@
 package entities
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"fmt"
 	"time"
 

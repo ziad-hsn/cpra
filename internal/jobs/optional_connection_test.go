@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5"
 )

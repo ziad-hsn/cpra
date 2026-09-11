@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/loader/schema"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 
 	"github.com/mlange-42/ark/ecs"
 )

@@ -2,7 +2,7 @@ package queue
 
 import (
 	"context"
-	"cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"errors"
 	"log"
 	"math"

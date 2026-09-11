@@ -2,12 +2,12 @@ package controller
 
 import (
 	"context"
-	"cpra/internal/alerts"
-	"cpra/internal/controller/systems"
-	"cpra/internal/durable"
-	"cpra/internal/jobs"
-	"cpra/internal/queue"
-	"cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/alerts"
+	"github.com/ziad-hsn/cpra/internal/controller/systems"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"errors"
 	"fmt"
 	"log"
@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/loader/streaming"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
+	"github.com/ziad-hsn/cpra/internal/loader/streaming"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"

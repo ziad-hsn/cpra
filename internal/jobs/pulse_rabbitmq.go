@@ -11,7 +11,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // PulseRabbitMQJob checks a RabbitMQ broker by opening an AMQP connection and

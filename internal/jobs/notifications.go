@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 func sendJSON(ctx context.Context, method, target string, headers map[string]string, data interface{}) error {

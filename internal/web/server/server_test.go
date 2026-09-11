@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 func mkHolder() *snapshot.Holder {

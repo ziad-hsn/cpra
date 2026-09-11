@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	applogger "cpra/internal/logger"
+	applogger "github.com/ziad-hsn/cpra/internal/logger"
 	"fmt"
 	"log"
 	"os"

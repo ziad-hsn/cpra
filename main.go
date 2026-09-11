@@ -15,12 +15,12 @@ import (
 	"syscall"
 	"time"
 
-	"cpra/internal/controller"
-	"cpra/internal/durable"
-	"cpra/internal/jobs"
-	"cpra/internal/runtimeconfig"
-	"cpra/internal/version"
-	"cpra/internal/web/server"
+	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/version"
+	"github.com/ziad-hsn/cpra/internal/web/server"
 )
 
 func main() {

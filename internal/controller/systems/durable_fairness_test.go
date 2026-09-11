@@ -1,8 +1,8 @@
 package systems
 
 import (
-	"cpra/internal/jobs"
-	"cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/mlange-42/ark/ecs"
 	"testing"
 )

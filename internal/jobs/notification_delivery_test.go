@@ -3,7 +3,7 @@ package jobs
 import (
 	"bufio"
 	"context"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"encoding/json"
 	"github.com/mlange-42/ark/ecs"
 	"io"

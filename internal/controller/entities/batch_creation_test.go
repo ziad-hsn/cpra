@@ -1,7 +1,7 @@
 package entities
 
 import (
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"github.com/mlange-42/ark/ecs"
 	"testing"
 	"time"

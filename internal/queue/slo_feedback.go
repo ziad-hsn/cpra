@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cpra/internal/runtimeconfig"
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/slo"
 )
 
 // feedback is owned by the pool's autoscaling goroutine. Only the public

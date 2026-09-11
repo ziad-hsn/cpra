@@ -20,7 +20,7 @@ import (
 	"github.com/moby/moby/client"
 	ping "github.com/prometheus-community/pro-bing"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 var icmpPingerSem = make(chan struct{}, 2048)

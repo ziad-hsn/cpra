@@ -2,7 +2,7 @@ package cli
 
 import (
 	"bytes"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 	"strings"
 	"testing"
 	"time"

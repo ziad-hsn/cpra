@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"cpra/internal/version"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/version"
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"gopkg.in/yaml.v3"

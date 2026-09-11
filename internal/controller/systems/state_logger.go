@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
 
 	"github.com/mlange-42/ark/ecs"
 )

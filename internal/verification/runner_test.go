@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 func TestUnconfiguredInventoryNeverPasses(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/runtimeconfig"
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/slo"
 )
 
 func TestPercentileFeedbackBoundsAndHealthyHold(t *testing.T) {

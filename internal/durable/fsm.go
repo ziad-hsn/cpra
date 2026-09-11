@@ -1,7 +1,7 @@
 package durable
 
 import (
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	"encoding/json"
 	"fmt"
 	"io"

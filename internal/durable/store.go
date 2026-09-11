@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"cpra/internal/runtimeconfig"
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	raftbolt "github.com/hashicorp/raft-boltdb/v2"

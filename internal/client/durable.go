@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"cpra/internal/durable"
-	"cpra/internal/slo"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/slo"
 )
 
 type State struct {

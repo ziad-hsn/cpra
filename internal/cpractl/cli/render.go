@@ -5,8 +5,8 @@ import (
 	"io"
 	"sort"
 
-	"cpra/internal/client"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/client"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 // ---------- monitors ----------

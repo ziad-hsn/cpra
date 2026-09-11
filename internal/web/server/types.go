@@ -3,10 +3,10 @@ package server
 import (
 	"time"
 
-	"cpra/internal/controller"
-	"cpra/internal/durable"
-	"cpra/internal/queue"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 // ServerConfig configures the web server.

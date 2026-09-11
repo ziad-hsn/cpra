@@ -1,9 +1,9 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 	"net"
 	"net/http"
 	"net/http/httptest"

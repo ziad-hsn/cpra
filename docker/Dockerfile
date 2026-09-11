@@ -24,8 +24,8 @@ ARG VERSION="dev"
 ARG COMMIT="unknown"
 ARG BUILD_DATE="unknown"
 RUN python3 scripts/release/package.py --version container --tags "$BUILD_TAGS" --notices-only --out /out/licenses
-RUN CGO_ENABLED=0 go build -trimpath -tags "$BUILD_TAGS" -ldflags="-s -w -X cpra/internal/version.Version=$VERSION -X cpra/internal/version.Commit=$COMMIT -X cpra/internal/version.Date=$BUILD_DATE" -o /out/cpra . && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X cpra/internal/version.Version=$VERSION -X cpra/internal/version.Commit=$COMMIT -X cpra/internal/version.Date=$BUILD_DATE" -o /out/cpractl ./cmd/cpractl
+RUN CGO_ENABLED=0 go build -trimpath -tags "$BUILD_TAGS" -ldflags="-s -w -X github.com/ziad-hsn/cpra/internal/version.Version=$VERSION -X github.com/ziad-hsn/cpra/internal/version.Commit=$COMMIT -X github.com/ziad-hsn/cpra/internal/version.Date=$BUILD_DATE" -o /out/cpra . && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/ziad-hsn/cpra/internal/version.Version=$VERSION -X github.com/ziad-hsn/cpra/internal/version.Commit=$COMMIT -X github.com/ziad-hsn/cpra/internal/version.Date=$BUILD_DATE" -o /out/cpractl ./cmd/cpractl
 
 FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 RUN apk add --no-cache ca-certificates && addgroup -g 1001 -S cpra && adduser -u 1001 -S cpra -G cpra

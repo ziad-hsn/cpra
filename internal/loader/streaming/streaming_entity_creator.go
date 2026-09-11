@@ -2,7 +2,7 @@ package streaming
 
 import (
 	"context"
-	"cpra/internal/controller/entities"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"fmt"
 	"sync"
 	"time"

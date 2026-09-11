@@ -59,7 +59,7 @@ release: dashboard-build
 clean:
 	rm -rf bin dist dashboard/dist
 
-.PHONY: build-verification verify-local benchmark-preflight
+.PHONY: build-verification verify-local verify-contracts verify-protocols benchmark-preflight
 build-verification:
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build -trimpath -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpra-verify ./cmd/cpra-verify
@@ -68,6 +68,16 @@ build-verification:
 verify-local: build-verification
 	@mkdir -p evidence/local
 	$(PYTHON) -B scripts/verification/local.py --binary $(BUILD_DIR)/cpra-verify --out evidence/local/providers.json
+
+# Socket-level fixtures require no accounts or Docker. Include optional HTTP
+# notification drivers in contract builds with BUILD_TAGS="teams twilio".
+verify-contracts: build-verification
+	@mkdir -p evidence/local
+	$(PYTHON) -B scripts/verification/contracts.py --binary $(BUILD_DIR)/cpra-verify --out evidence/local/contracts.json
+
+verify-protocols: build-verification
+	@mkdir -p evidence/local
+	$(PYTHON) -B scripts/verification/protocol_local.py --binary $(BUILD_DIR)/cpra-verify --out evidence/local/protocols.json
 
 benchmark-preflight:
 	$(PYTHON) -B scripts/benchmark/campaign.py --mode preflight --out evidence/local/preflight

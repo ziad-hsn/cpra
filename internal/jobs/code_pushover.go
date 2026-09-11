@@ -17,6 +17,7 @@ import (
 // notification API. Pure stdlib (form-encoded POST), always compiled.
 type CodePushoverJob struct {
 	Execution
+	URL         string
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Monitor     string
@@ -34,6 +35,12 @@ type CodePushoverJob struct {
 }
 
 func newCodePushoverJob(cfg *schema.CodeNotificationPushover, monitor, color, message string, entity ecs.Entity) (Job, error) {
+	if cfg.URL != "" {
+		if err := validateTargetURL(cfg.URL); err != nil {
+			return nil, err
+		}
+	}
+
 	if cfg.Priority < -2 || cfg.Priority > 2 {
 		return nil, fmt.Errorf("pushover priority must be between -2 and 2")
 	}
@@ -50,6 +57,7 @@ func newCodePushoverJob(cfg *schema.CodeNotificationPushover, monitor, color, me
 		}
 	}
 	return &CodePushoverJob{
+		URL:      cfg.URL,
 		ID:       uuid.New(),
 		Entity:   entity,
 		Monitor:  monitor,
@@ -88,7 +96,11 @@ func (c *CodePushoverJob) Execute() (result Result) {
 	if c.Sound != "" {
 		form.Set("sound", c.Sound)
 	}
-	resp, err := postNotification(ctx, "https://api.pushover.net/1/messages.json", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	target, err := notificationURL(c.URL, "https://api.pushover.net/1/messages.json")
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
+	resp, err := postNotification(ctx, target, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

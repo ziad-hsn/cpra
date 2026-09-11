@@ -29,7 +29,7 @@ def main():
             # A separate daemon inspector checks health, and a changed StartedAt
             # plus running state confirms the actual recovery effect.
             health = str(pathlib.Path(__file__).with_name('observe_docker_health.py').resolve())
-            cases = [{'kind': kind, 'driver': 'docker', 'configured': True, 'monitor_id': monitor['id'],
+            cases = [{'kind': kind, 'driver': 'docker', 'configured': True, 'evidence_type': 'local_integration', 'monitor_id': monitor['id'],
                       'observer': [sys.executable, health, name] if kind == 'pulse' else [sys.executable, observer, 'docker', name]}
                      for kind in ['pulse', 'intervention']]
             config = pathlib.Path(directory) / 'config.yaml'

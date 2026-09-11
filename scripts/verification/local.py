@@ -68,7 +68,7 @@ def main():
                 if kind == 'intervention':
                     monitor['intervention'] = {'action': 'webhook', 'target': {'type': 'webhook', 'url': url + '/recover', 'timeout': '5s'}}
                 monitors.append(monitor)
-                cases.append({'kind': kind, 'driver': driver, 'configured': True, 'monitor_id': ident, 'color': 'red', 'observer': [sys.executable, observer, observation, log if observation == 'log' else url]})
+                cases.append({'kind': kind, 'driver': driver, 'configured': True, 'evidence_type': 'local_integration', 'monitor_id': ident, 'color': 'red', 'observer': [sys.executable, observer, observation, log if observation == 'log' else url]})
             config = pathlib.Path(directory) / 'live.yaml'
             config.write_text(json.dumps({'manifest': {'monitors': monitors}, 'cases': cases}))
             result = subprocess.run([str(pathlib.Path(args.binary).resolve()), '-live', '-config', str(config), '-out', str(pathlib.Path(args.out).resolve())])

@@ -1,0 +1,127 @@
+# Provider-supported testing options. Copy to a private file before supplying
+# credentials and setting configured: true. Values are literal YAML; this file
+# does not expand environment variables. No sandbox account has been verified
+# merely because this example exists.
+#
+# Build with the teams and twilio tags to enable their optional drivers:
+#   go run -tags 'teams twilio' ./cmd/cpra-verify -config /private/sandboxes.yaml \
+#     -live -require-configured-pass -out /private/sandbox-report.json
+# -require-configured-pass accepts a nonempty passing configured subset only.
+# all_providers_verified remains false for sandbox results.
+#
+# The observer executable receives CPRA_VERIFY_RUN_ID and CPRA_VERIFY_PHASE
+# (before/after); the previous JSON observation is on stdin for the after call.
+# It must independently confirm the designated message, then emit redacted JSON
+# such as {"observed":true,"count":1}. It must exit nonzero on failure.
+manifest:
+  monitors:
+    # https://www.twilio.com/docs/iam/test-credentials
+    # Obtain TEST Account SID + TEST Auth Token from the Twilio console.
+    # These magic numbers work only with test credentials. Twilio does not
+    # deliver an SMS or generate delivery callbacks in this mode.
+    - id: sandbox-twilio
+      name: sandbox-twilio
+      enabled: true
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config: {url: "http://127.0.0.1:18080/health"}
+      codes:
+        red:
+          dispatch: true
+          notify: twilio
+          config:
+            account_sid: REPLACE_WITH_TEST_ACCOUNT_SID
+            auth_token: REPLACE_WITH_TEST_AUTH_TOKEN
+            from: "+15005550006"
+            to: "+15005550006"
+    # https://core.telegram.org/bots/features#dedicated-test-environment
+    # Create a separate user and bot in Telegram's test environment. The
+    # driver constructs /bot<TOKEN>/test/sendMessage. Do not set url together
+    # with test_mode. The observer must read the actual test chat independently.
+    - id: sandbox-telegram
+      name: sandbox-telegram
+      enabled: true
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config: {url: "http://127.0.0.1:18080/health"}
+      codes:
+        red:
+          dispatch: true
+          notify: telegram
+          config:
+            bot_token: REPLACE_WITH_TEST_BOT_TOKEN
+            chat_id: REPLACE_WITH_TEST_CHAT_ID
+            test_mode: true
+    # https://docs.slack.dev/tools/developer-sandboxes/
+    # Requires a provisioned developer sandbox and its own app/webhook.
+    - id: sandbox-slack
+      name: sandbox-slack
+      enabled: true
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config: {url: "http://127.0.0.1:18080/health"}
+      codes:
+        red:
+          dispatch: true
+          notify: slack
+          config:
+            hook: https://hooks.slack.com/services/REPLACE_WITH_SANDBOX_WEBHOOK
+    # https://learn.microsoft.com/en-us/office/developer-program/microsoft-365-developer-program-get-started
+    # Requires an eligible Microsoft 365 developer tenant and a designated
+    # Workflows webhook. The observer must confirm the resulting channel post.
+    - id: sandbox-teams
+      name: sandbox-teams
+      enabled: true
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config: {url: "http://127.0.0.1:18080/health"}
+      codes:
+        red:
+          dispatch: true
+          notify: teams
+          config:
+            webhook_url: https://REPLACE_WITH_SANDBOX_WORKFLOWS_WEBHOOK
+cases:
+  - kind: code
+    driver: twilio
+    configured: false
+    monitor_id: sandbox-twilio
+    color: red
+    evidence_type: provider_sandbox
+    observation_boundary: api_acceptance
+    timeout: 30s
+  - kind: code
+    driver: telegram
+    configured: false
+    monitor_id: sandbox-telegram
+    color: red
+    evidence_type: provider_sandbox
+    observation_boundary: effect
+    observer: [REPLACE_WITH_TEST_CHAT_OBSERVER]
+    timeout: 2m
+  - kind: code
+    driver: slack
+    configured: false
+    monitor_id: sandbox-slack
+    color: red
+    evidence_type: provider_sandbox
+    observation_boundary: effect
+    observer: [REPLACE_WITH_SANDBOX_CHANNEL_OBSERVER]
+    timeout: 2m
+  - kind: code
+    driver: teams
+    configured: false
+    monitor_id: sandbox-teams
+    color: red
+    evidence_type: provider_sandbox
+    observation_boundary: effect
+    observer: [REPLACE_WITH_SANDBOX_CHANNEL_OBSERVER]
+    timeout: 2m

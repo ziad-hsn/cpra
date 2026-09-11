@@ -84,6 +84,10 @@ Build a container with `docker build -f docker/Dockerfile -t cpra:local .`. It r
 
 The durable implementation is a release candidate. Full-provider verification and the one-million-monitor 24-hour endurance gate require completed evidence before a full release-readiness claim. User-configured live verification covers 33 driver types and never passes a missing configuration. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
 
+[Provider test environments](docs/provider-testing.md) cover local services,
+notification contract mocks, the Moto EC2 emulator and optional provider sandboxes.
+Reports distinguish these results from real-account delivery and recovery.
+
 ## License
 
 CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.

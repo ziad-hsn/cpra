@@ -3,7 +3,10 @@
 Implementation tests, local provider operations, account-backed verification,
 comparative performance and uninterrupted endurance are separate evidence gates.
 An HTTP acceptance response is not proof of delivered notification or completed
-recovery. Local fixtures do not certify a cloud production account.
+recovery. Local fixtures do not certify a cloud production account. See
+[provider test environments](provider-testing.md) for supported socket fixtures,
+actual local services, Moto and optional sandbox configuration, with explicit
+evidence classification and reproducible commands.
 
 ## Configured providers
 
@@ -156,8 +159,9 @@ candidate commit.
 Fixtures requiring unavailable accounts, permissions, images or disk space remain
 not verified. The manual `live-verification.yml` workflow requires a dedicated
 self-hosted runner and an operator-owned argument file; pull-request CI cannot
-trigger it. The repository's normal workflow runs only isolated local HTTP/file
-operations. Live results are not automatically published.
+trigger it. The repository's normal workflow runs isolated HTTP/file, notification
+contract and local protocol operations without account credentials. Live results
+are not automatically published.
 
 `--mode faults` runs burst release, slow targets, outage, recovery traffic and
 process-kill/restart campaigns. The soak introduces a 100-monitor outage cohort

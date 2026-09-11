@@ -23,6 +23,7 @@ jobs:
           cache: true
       - run: make check
       - run: make verify-local
+      - run: make verify-contracts verify-protocols BUILD_TAGS="teams twilio"
       - run: python3 -m unittest discover -s scripts/benchmark -p "test_*.py"
       - run: python3 -m unittest discover -s scripts/verification -p "test_*.py"
       - run: make test-all-drivers

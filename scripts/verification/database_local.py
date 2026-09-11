@@ -23,6 +23,29 @@ import uuid
 PORTS={'redis':16379,'postgres':15432,'mysql':13306,'mongo':17017,'rabbitmq':15672,'kafka':19092}
 
 
+def mysql_ready(compose):
+    """Require the final TCP server, configured account/database, and log table.
+
+    Docker can publish its host socket while mysqld is still initializing. The
+    temporary initialization server also must not satisfy readiness: both CLI
+    checks explicitly use TCP, which that server disables.
+    """
+    cli=compose+['exec','-T','-e','MYSQL_PWD=cpra-disposable','mysql','mysql',
+                 '--protocol=TCP','--host=127.0.0.1','--port=3306',
+                 '--batch','--skip-column-names']
+    try:
+        user=subprocess.run(cli+['--user=cpra','--database=cpra','--execute','SELECT 1; SELECT DATABASE();'],
+                            timeout=5,capture_output=True,text=True)
+        if user.returncode!=0 or user.stdout.split()!=['1','cpra']:
+            return False
+        table=subprocess.run(cli+['--user=root','--execute',
+                                  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mysql' AND table_name='general_log';"],
+                             timeout=5,capture_output=True,text=True)
+        return table.returncode==0 and table.stdout.strip()=='1'
+    except subprocess.TimeoutExpired:
+        return False
+
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument('--binary',required=True)
@@ -83,9 +106,25 @@ def main():
             except OSError:
                 if time.monotonic()>=deadline:raise
                 time.sleep(1)
-        # Opening a port precedes some servers' readiness; initialization grace
-        # is real elapsed time and any subsequent failure remains a failure.
-        time.sleep(15)
+        if args.driver=='mysql':
+            attempts=0
+            while True:
+                attempts+=1
+                if mysql_ready(compose):break
+                if time.monotonic()>=deadline:
+                    raise RuntimeError('MySQL did not complete authenticated account/database/log-table readiness within 180 seconds')
+                time.sleep(1)
+            print(f'MySQL authenticated TCP SELECT 1, cpra database, and general_log table ready after {attempts} probe(s)',flush=True)
+            container_id=subprocess.check_output(compose+['ps','-q','mysql'],text=True).strip()
+            container=json.loads(subprocess.check_output(['docker','inspect',container_id]))[0]
+            image=json.loads(subprocess.check_output(['docker','image','inspect',container['Image']]))[0]
+            fixture={'driver':'mysql','image_id':image['Id'],'image_digests':image.get('RepoDigests',[]),
+                     'configured_user_select_1':True,'configured_database':'cpra','general_log_table_available':True,
+                     'readiness_probes':attempts,'binary_sha256':hashlib.sha256(pathlib.Path(args.binary).read_bytes()).hexdigest()}
+            pathlib.Path(args.out).with_suffix('.fixture.json').write_text(json.dumps(fixture,indent=2)+'\n')
+        else:
+            # Retain existing readiness behavior for the other fixture profiles.
+            time.sleep(15)
         base=json.loads('\n'.join((root/'examples/verification/live.yaml').read_text().splitlines()[1:]))
         monitor=next(m for m in base['manifest']['monitors'] if m['id']=='pulse-'+args.driver)
         config=monitor['pulse_check']['config'];port=relay.server_address[1]
@@ -94,7 +133,7 @@ def main():
         if 'port' in config:config['port']=port
         if args.driver=='kafka':config['brokers']=['127.0.0.1:'+str(port)]
         if args.driver=='rabbitmq':config['url']='amqp://cpra:cpra-disposable@127.0.0.1:'+str(port)+'/'
-        case={'kind':'pulse','driver':args.driver,'configured':True,'monitor_id':monitor['id'],
+        case={'kind':'pulse','driver':args.driver,'configured':True,'evidence_type':'local_integration','monitor_id':monitor['id'],
               'observer':[sys.executable,str(root/'scripts/verification/observe_relay.py'),'http://127.0.0.1:'+str(audit.server_port)]}
         with tempfile.TemporaryDirectory(prefix='cpra-database-') as directory:
             path=pathlib.Path(directory)/'config.yaml'

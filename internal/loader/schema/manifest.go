@@ -723,12 +723,16 @@ func (c *CodeNotificationSlack) IsCodeNotification() {
 
 // CodeNotificationTelegram delivers alerts to a Telegram chat via the Bot API.
 type CodeNotificationTelegram struct {
+	URL      string `yaml:"url,omitempty" json:"url,omitempty"`             // Optional complete operation URL.
+	TestMode bool   `yaml:"test_mode,omitempty" json:"test_mode,omitempty"` // Separate Telegram test environment; mutually exclusive with URL.
 	BotToken string `yaml:"bot_token" json:"bot_token"`
 	ChatID   string `yaml:"chat_id" json:"chat_id"`
 }
 
 func (c *CodeNotificationTelegram) Copy() CodeNotification {
 	return &CodeNotificationTelegram{
+		URL:      strings.Clone(c.URL),
+		TestMode: c.TestMode,
 		BotToken: strings.Clone(c.BotToken),
 		ChatID:   strings.Clone(c.ChatID),
 	}

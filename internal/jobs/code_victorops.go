@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 // generic REST endpoint. Pure stdlib, always compiled.
 type CodeVictorOpsJob struct {
 	Execution
+	URL             string
 	EnqueueTime     time.Time
 	StartTime       time.Time
 	Monitor         string
@@ -37,7 +37,10 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 	if messageType == "" {
 		messageType = "CRITICAL"
 	}
-	url := fmt.Sprintf("https://alert.victorops.com/integrations/generic/20131114/alert/%s/%s", c.RestEndpointKey, c.RoutingKey)
+	target, err := victorOpsURL(c.URL, c.RestEndpointKey, c.RoutingKey)
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
 	body, err := json.Marshal(map[string]string{
 		"message_type":  messageType,
 		"entity_id":     c.EntityID,
@@ -46,7 +49,7 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	resp, err := postNotification(ctx, url, "application/json", strings.NewReader(string(body)))
+	resp, err := postNotification(ctx, target, "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

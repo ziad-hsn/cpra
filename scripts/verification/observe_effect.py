@@ -17,6 +17,19 @@ def output(args):
     return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL, timeout=20).strip()
 
 
+def kubernetes_state(row):
+    status = row.get('status', {})
+    generation = row['metadata']['generation']
+    replicas = row['spec'].get('replicas', 1)
+    # Updated replicas and available replicas alone can describe a new unready
+    # pod alongside the old available pod. Require the rollout to converge.
+    ready = (status.get('observedGeneration', 0) >= generation and
+             all(status.get(key, 0) == replicas for key in
+                 ('replicas', 'updatedReplicas', 'readyReplicas', 'availableReplicas')) and
+             status.get('unavailableReplicas', 0) == 0)
+    return {'identity': row['metadata']['uid'], 'generation': generation, 'ready': ready}
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('kind', choices=['docker', 'kubernetes', 'systemd', 'boot-id'])
@@ -41,10 +54,7 @@ def main():
             return {'identity': args.target, 'generation': boot, 'ready': bool(boot)}
         command = ['kubectl'] + (['--context', args.context] if args.context else []) + ['-n', args.namespace]
         row = json.loads(output(command + ['get', args.target, '-o', 'json']))
-        status = row.get('status', {})
-        generation = row['metadata']['generation']
-        return {'identity': row['metadata']['uid'], 'generation': generation,
-                'ready': status.get('observedGeneration', 0) >= generation and status.get('updatedReplicas', 0) == row['spec'].get('replicas', 1) and status.get('availableReplicas', 0) == row['spec'].get('replicas', 1)}
+        return kubernetes_state(row)
 
     def sanitized(row):
         return {'resource_digest': hashlib.sha256(str(row['identity']).encode()).hexdigest(),

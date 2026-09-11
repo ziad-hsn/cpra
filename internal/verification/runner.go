@@ -1,4 +1,5 @@
-// Package verification runs explicitly configured live driver scenarios.
+// Package verification runs explicitly configured driver scenarios and records
+// the boundary of the evidence, from mock contracts to live account effects.
 package verification
 
 import (
@@ -7,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,38 +42,64 @@ func Inventory() []Driver {
 }
 
 type Case struct {
-	Kind       string        `yaml:"kind"`
-	Driver     string        `yaml:"driver"`
-	Configured bool          `yaml:"configured"`
-	MonitorID  string        `yaml:"monitor_id"`
-	Color      string        `yaml:"color"`
-	Endpoint   int           `yaml:"endpoint"`
-	Observer   []string      `yaml:"observer"`
-	Timeout    time.Duration `yaml:"timeout"`
+	Kind                string        `yaml:"kind"`
+	Driver              string        `yaml:"driver"`
+	Configured          bool          `yaml:"configured"`
+	MonitorID           string        `yaml:"monitor_id"`
+	Color               string        `yaml:"color"`
+	Endpoint            int           `yaml:"endpoint"`
+	Observer            []string      `yaml:"observer"`
+	Timeout             time.Duration `yaml:"timeout"`
+	EvidenceType        string        `yaml:"evidence_type"`
+	ObservationBoundary string        `yaml:"observation_boundary"`
 }
+
+const (
+	EvidenceLocalIntegration = "local_integration"
+	EvidenceMockContract     = "mock_contract"
+	EvidenceProviderSandbox  = "provider_sandbox"
+	EvidenceLiveAccount      = "live_account"
+	BoundaryEffect           = "effect"
+	BoundaryAPIAcceptance    = "api_acceptance"
+)
+
 type Config struct {
 	Manifest schema.Manifest `yaml:"manifest"`
 	Cases    []Case          `yaml:"cases"`
 }
 type Record struct {
 	Driver
-	Status         string    `json:"status"`
-	Operation      string    `json:"operation"`
-	Accepted       bool      `json:"accepted"`
-	Observed       bool      `json:"observed"`
-	Started        time.Time `json:"started,omitempty"`
-	DurationMS     float64   `json:"duration_ms"`
-	EvidenceRef    string    `json:"evidence_ref,omitempty"`
-	EvidenceSHA256 string    `json:"evidence_sha256,omitempty"`
-	Reason         string    `json:"reason,omitempty"`
+	Status              string    `json:"status"`
+	Operation           string    `json:"operation"`
+	Accepted            bool      `json:"accepted"`
+	Observed            bool      `json:"observed"`
+	Invoked             bool      `json:"operation_invoked"`
+	HTTPStatus          int       `json:"http_status,omitempty"` // Typed HTTP rejection only; zero for transport/setup failures.
+	Started             time.Time `json:"started,omitempty"`
+	DurationMS          float64   `json:"duration_ms"`
+	EvidenceRef         string    `json:"evidence_ref,omitempty"`
+	EvidenceSHA256      string    `json:"evidence_sha256,omitempty"`
+	Reason              string    `json:"reason,omitempty"`
+	Configured          bool      `json:"configured"`
+	EvidenceType        string    `json:"evidence_type"`
+	ObservationBoundary string    `json:"observation_boundary"`
 }
 type Report struct {
-	RunID     string    `json:"run_id"`
-	Version   string    `json:"version"`
-	GoVersion string    `json:"go_version"`
-	Generated time.Time `json:"generated"`
-	Complete  bool      `json:"all_providers_verified"`
-	Records   []Record  `json:"records"`
+	RunID                string         `json:"run_id"`
+	Version              string         `json:"version"`
+	GoVersion            string         `json:"go_version"`
+	Generated            time.Time      `json:"generated"`
+	Complete             bool           `json:"all_providers_verified"`
+	Records              []Record       `json:"records"`
+	AllConfiguredPassed  bool           `json:"all_configured_passed"`
+	AllDriversTested     bool           `json:"all_drivers_tested"`
+	AllDriversPassed     bool           `json:"all_drivers_passed"`
+	ConfiguredCases      int            `json:"configured_cases"`
+	ExecutedCases        int            `json:"executed_cases"`
+	PassedCases          int            `json:"passed_cases"`
+	FailedCases          int            `json:"failed_cases"`
+	NotConfiguredCases   int            `json:"not_configured_cases"`
+	PassedByEvidenceType map[string]int `json:"passed_by_evidence_type"`
 }
 
 func Load(path string) (Config, error) {
@@ -97,7 +125,7 @@ func Load(path string) (Config, error) {
 // configured executable, called before and after, with no shell expansion.
 // It must correlate the designated resource or destination and the run ID.
 func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
-	report := Report{RunID: uuid.NewString(), Version: version.Info(), GoVersion: runtime.Version(), Generated: time.Now().UTC(), Complete: true}
+	report := Report{RunID: uuid.NewString(), Version: version.Info(), GoVersion: runtime.Version(), Generated: time.Now().UTC()}
 	cases := map[string]Case{}
 	known := map[string]bool{}
 	for _, driver := range Inventory() {
@@ -110,6 +138,14 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 		}
 		if _, exists := cases[key]; exists {
 			return report, fmt.Errorf("duplicate verification case %q", key)
+		}
+		var err error
+		c, err = normalizeCase(c)
+		if err != nil {
+			return report, err
+		}
+		if c.Configured && !live {
+			return report, fmt.Errorf("configured verification operations require explicit -live invocation")
 		}
 		cases[key] = c
 	}
@@ -125,30 +161,131 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 		monitors[id] = m
 	}
 	for _, driver := range Inventory() {
-		record := Record{Driver: driver, Status: "not_configured", Operation: driver.Kind, Reason: "not verified: no enabled user configuration"}
+		record := Record{Driver: driver, Status: "not_configured", Operation: driver.Kind, EvidenceType: EvidenceLiveAccount, ObservationBoundary: BoundaryEffect, Reason: "not verified: no enabled user configuration"}
 		c, exists := cases[driver.Kind+"/"+driver.Name]
+		if exists {
+			record.Configured = c.Configured
+			record.EvidenceType = c.EvidenceType
+			record.ObservationBoundary = c.ObservationBoundary
+		}
 		if exists && c.Configured {
-			if !live {
-				return report, fmt.Errorf("configured live operations require explicit -live invocation")
-			}
 			m, ok := monitors[c.MonitorID]
-			raw, _ := json.Marshal(m)
-			if !ok || len(c.Observer) == 0 || bytes.Contains(raw, []byte("REPLACE_WITH")) || strings.Contains(strings.Join(c.Observer, " "), "REPLACE_WITH") {
-				record.Reason = "not verified: monitor or independent observer is not configured"
+			if !ok || !caseConfigured(c, m, cfg.Manifest) {
+				record.Reason = "not verified: selected target, test credentials, or independent observer is not configured"
 			} else {
 				record = runCase(ctx, report.RunID, driver, c, m, cfg.Manifest)
 			}
 		}
-		if record.Status != "pass" {
-			report.Complete = false
-		}
 		report.Records = append(report.Records, record)
 	}
+	report.summarize()
 	return report, nil
 }
 
+// Validate the entire evidence declaration before any observer or driver runs.
+// Existing configurations omit the classification and retain live-account semantics.
+func normalizeCase(c Case) (Case, error) {
+	if c.EvidenceType == "" {
+		c.EvidenceType = EvidenceLiveAccount
+	}
+	switch c.EvidenceType {
+	case EvidenceLocalIntegration, EvidenceMockContract, EvidenceProviderSandbox, EvidenceLiveAccount:
+	default:
+		return c, fmt.Errorf("invalid verification evidence_type")
+	}
+	if c.ObservationBoundary == "" {
+		c.ObservationBoundary = BoundaryEffect
+	}
+	switch c.ObservationBoundary {
+	case BoundaryEffect:
+	case BoundaryAPIAcceptance:
+		if c.EvidenceType != EvidenceProviderSandbox || c.Kind != "code" || c.Driver != "twilio" {
+			return c, fmt.Errorf("api_acceptance requires the Twilio provider_sandbox test-credentials scenario")
+		}
+	default:
+		return c, fmt.Errorf("invalid verification observation_boundary")
+	}
+	return c, nil
+}
+
+func caseConfigured(c Case, m schema.Monitor, manifest schema.Manifest) bool {
+	if c.ObservationBoundary != BoundaryAPIAcceptance && (len(c.Observer) == 0 || strings.TrimSpace(c.Observer[0]) == "") {
+		return false
+	}
+	if strings.Contains(strings.Join(c.Observer, " "), "REPLACE_WITH") {
+		return false
+	}
+	// Include referenced endpoint configuration in placeholder checks. Otherwise
+	// an enabled notification-group case can send literal example credentials.
+	var selected any
+	switch c.Kind {
+	case "pulse":
+		selected = m.Pulse
+	case "intervention":
+		selected = m.Intervention
+	case "code":
+		code, ok := m.Codes[c.Color]
+		if !ok {
+			return false
+		}
+		selected = code.Config
+		if code.NotifyGroup != "" {
+			names := manifest.NotificationGroups[code.NotifyGroup]
+			if c.Endpoint < 0 || c.Endpoint >= len(names) {
+				return false
+			}
+			endpoint, ok := manifest.Endpoints[names[c.Endpoint]]
+			if !ok {
+				return false
+			}
+			selected = endpoint.Config
+		}
+	}
+	if c.ObservationBoundary == BoundaryAPIAcceptance {
+		// The documented magic sender is deliberately unusable with live
+		// credentials. Require the success test vector before waiving an
+		// independent receipt observer for this no-send scenario.
+		twilio, ok := selected.(*schema.CodeNotificationTwilio)
+		if !ok || twilio == nil || twilio.From != "+15005550006" || strings.TrimSpace(twilio.AccountSID) == "" || strings.TrimSpace(twilio.AuthToken) == "" || strings.TrimSpace(twilio.To) == "" {
+			return false
+		}
+	}
+	raw, err := json.Marshal(selected)
+	return err == nil && !bytes.Contains(raw, []byte("REPLACE_WITH"))
+}
+
+func (r *Report) summarize() {
+	r.ConfiguredCases, r.ExecutedCases, r.PassedCases, r.FailedCases, r.NotConfiguredCases = 0, 0, 0, 0, 0
+	r.PassedByEvidenceType = map[string]int{}
+	liveEffects := 0
+	for _, row := range r.Records {
+		if row.Configured {
+			r.ConfiguredCases++
+		}
+		if row.Invoked {
+			r.ExecutedCases++
+		}
+		switch row.Status {
+		case "pass":
+			r.PassedCases++
+			r.PassedByEvidenceType[row.EvidenceType]++
+			if row.EvidenceType == EvidenceLiveAccount && row.ObservationBoundary == BoundaryEffect && row.Accepted && row.Observed {
+				liveEffects++
+			}
+		case "fail":
+			r.FailedCases++
+		case "not_configured":
+			r.NotConfiguredCases++
+		}
+	}
+	r.AllConfiguredPassed = r.ConfiguredCases > 0 && r.PassedCases == r.ConfiguredCases
+	r.AllDriversTested = len(r.Records) == len(Inventory()) && r.ExecutedCases == len(Inventory())
+	r.AllDriversPassed = len(r.Records) == len(Inventory()) && r.PassedCases == len(Inventory())
+	r.Complete = len(r.Records) == len(Inventory()) && liveEffects == len(Inventory())
+}
+
 func runCase(parent context.Context, runID string, driver Driver, c Case, m schema.Monitor, manifest schema.Manifest) (r Record) {
-	r = Record{Driver: driver, Status: "fail", Operation: driver.Kind, Started: time.Now().UTC()}
+	r = Record{Driver: driver, Status: "fail", Operation: driver.Kind, Configured: true, EvidenceType: c.EvidenceType, ObservationBoundary: c.ObservationBoundary, Started: time.Now().UTC()}
 	defer func() { r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond) }()
 	timeout := c.Timeout
 	if timeout <= 0 {
@@ -162,18 +299,34 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m sche
 		r.Reason = "driver or selected monitor configuration is unavailable in this build"
 		return r
 	}
-	before, err := observe(ctx, c.Observer, runID, "before", nil)
-	if err != nil {
-		r.Reason = "independent baseline observation failed; operation was not invoked"
-		return r
+	var before []byte
+	if c.ObservationBoundary != BoundaryAPIAcceptance {
+		before, err = observe(ctx, c.Observer, runID, "before", nil)
+		if err != nil {
+			r.Reason = "independent baseline observation failed; operation was not invoked"
+			return r
+		}
 	}
 	d := jobs.NewDispatch(job, ecs.Entity{}, driver.Kind, c.Color, 1, c.Endpoint)
 	d.SetContext(ctx)
+	r.Invoked = true
 	result := d.Execute()
 	r.Accepted = result.Err == nil
 	r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond)
 	if result.Err != nil {
+		var rejection *jobs.DeliveryError
+		if errors.As(result.Err, &rejection) {
+			r.HTTPStatus = rejection.Status
+		}
 		r.Reason = "production driver returned an error; inspect designated provider records"
+		return r
+	}
+	if c.ObservationBoundary == BoundaryAPIAcceptance {
+		// Twilio test credentials deliberately never send an SMS or emit a
+		// delivery callback. Passing here attests only to driver/API acceptance.
+		r.Status = "pass"
+		r.Reason = "test API accepted operation; delivery is not performed or observed"
+		retainEvidence(&r, runID, nil, nil)
 		return r
 	}
 	after, err := observe(ctx, c.Observer, runID, "after", before)
@@ -188,31 +341,44 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m sche
 		r.Reason = "provider acceptance does not establish observed completion or receipt"
 		return r
 	}
-	evidence, err := json.Marshal(map[string]any{"run_id": runID, "kind": driver.Kind, "driver": driver.Name, "before": redactedObservation(before), "after": redactedObservation(after)})
+	r.Observed = true
+	r.Status = "pass"
+	retainEvidence(&r, runID, before, after)
+	return r
+}
+
+func retainEvidence(r *Record, runID string, before, after []byte) {
+	row := map[string]any{"run_id": runID, "kind": r.Kind, "driver": r.Name, "evidence_type": r.EvidenceType, "observation_boundary": r.ObservationBoundary, "accepted": r.Accepted, "observed": r.Observed}
+	if before != nil {
+		row["before"] = redactedObservation(before)
+	}
+	if after != nil {
+		row["after"] = redactedObservation(after)
+	}
+	evidence, err := json.Marshal(row)
 	if err != nil {
+		r.Status = "fail"
 		r.Reason = "invalid observer evidence"
-		return r
+		return
 	}
 	digest := sha256.Sum256(evidence)
 	if dir := os.Getenv("CPRA_VERIFY_EVIDENCE_DIR"); dir != "" {
 		if err := os.MkdirAll(dir, 0700); err != nil {
+			r.Status = "fail"
 			r.Reason = "cannot retain independent evidence"
-			return r
+			return
 		}
-		name := runID + "-" + driver.Kind + "-" + driver.Name + ".jsonl"
+		name := runID + "-" + r.Kind + "-" + r.Name + ".jsonl"
 		// Observers are explicitly configured to emit redacted evidence. These
 		// private artifacts are never returned by the public CPRa API.
 		if err := os.WriteFile(filepath.Join(dir, name), evidence, 0600); err != nil {
+			r.Status = "fail"
 			r.Reason = "cannot retain independent evidence"
-			return r
+			return
 		}
 		r.EvidenceRef = name
 	}
 	r.EvidenceSHA256 = hex.EncodeToString(digest[:])
-	r.Observed = true
-	r.Status = "pass"
-	r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond)
-	return r
 }
 
 func configuredJob(driver Driver, c Case, m schema.Monitor, manifest schema.Manifest) (jobs.Job, error) {
@@ -295,6 +461,11 @@ func redactedObservation(data []byte) map[string]any {
 			safe[key] = v
 		case float64:
 			safe[key] = v
+		}
+	}
+	for _, key := range []string{"request_count", "reply_count"} {
+		if value, ok := row[key].(float64); ok {
+			safe[key] = value
 		}
 	}
 	for _, key := range []string{"resource_digest", "generation_digest", "previous_generation_digest"} {

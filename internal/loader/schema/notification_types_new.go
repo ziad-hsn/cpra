@@ -39,6 +39,7 @@ func (c *CodeNotificationMattermost) IsCodeNotification() {}
 // CodeNotificationPushover delivers alerts to a Pushover user/group via the
 // push notification API.
 type CodeNotificationPushover struct {
+	URL      string `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
 	AppToken string `yaml:"app_token" json:"app_token"`
 	UserKey  string `yaml:"user_key" json:"user_key"`
 	Title    string `yaml:"title" json:"title"`
@@ -50,6 +51,7 @@ type CodeNotificationPushover struct {
 
 func (c *CodeNotificationPushover) Copy() CodeNotification {
 	return &CodeNotificationPushover{
+		URL:      strings.Clone(c.URL),
 		AppToken: strings.Clone(c.AppToken),
 		UserKey:  strings.Clone(c.UserKey),
 		Title:    strings.Clone(c.Title),
@@ -64,6 +66,7 @@ func (c *CodeNotificationPushover) IsCodeNotification() {}
 
 // CodeNotificationTwilio delivers alerts as SMS via the Twilio API.
 type CodeNotificationTwilio struct {
+	URL        string `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
 	AccountSID string `yaml:"account_sid" json:"account_sid"`
 	AuthToken  string `yaml:"auth_token" json:"auth_token"`
 	From       string `yaml:"from" json:"from"`
@@ -72,6 +75,7 @@ type CodeNotificationTwilio struct {
 
 func (c *CodeNotificationTwilio) Copy() CodeNotification {
 	return &CodeNotificationTwilio{
+		URL:        strings.Clone(c.URL),
 		AccountSID: strings.Clone(c.AccountSID),
 		AuthToken:  strings.Clone(c.AuthToken),
 		From:       strings.Clone(c.From),
@@ -83,6 +87,7 @@ func (c *CodeNotificationTwilio) IsCodeNotification() {}
 
 // CodeNotificationDatadog posts events to the Datadog events API.
 type CodeNotificationDatadog struct {
+	URL    string   `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
 	APIKey string   `yaml:"api_key" json:"api_key"`
 	AppKey string   `yaml:"app_key" json:"app_key"`
 	Site   string   `yaml:"site" json:"site"` // datadoghq.com | datadoghq.eu | ...
@@ -91,6 +96,7 @@ type CodeNotificationDatadog struct {
 
 func (c *CodeNotificationDatadog) Copy() CodeNotification {
 	return &CodeNotificationDatadog{
+		URL:    strings.Clone(c.URL),
 		APIKey: strings.Clone(c.APIKey),
 		AppKey: strings.Clone(c.AppKey),
 		Site:   strings.Clone(c.Site),
@@ -103,6 +109,7 @@ func (c *CodeNotificationDatadog) IsCodeNotification() {}
 // CodeNotificationVictorOps delivers alerts to Splunk On-Call (VictorOps) via
 // the generic REST endpoint. Pure stdlib, always compiled.
 type CodeNotificationVictorOps struct {
+	URL             string `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
 	RestEndpointKey string `yaml:"rest_endpoint_key" json:"rest_endpoint_key"`
 	RoutingKey      string `yaml:"routing_key" json:"routing_key"`
 	MessageType     string `yaml:"message_type" json:"message_type"` // CRITICAL | ACKNOWLEDGEMENT | RECOVERY
@@ -111,6 +118,7 @@ type CodeNotificationVictorOps struct {
 
 func (c *CodeNotificationVictorOps) Copy() CodeNotification {
 	return &CodeNotificationVictorOps{
+		URL:             strings.Clone(c.URL),
 		RestEndpointKey: strings.Clone(c.RestEndpointKey),
 		RoutingKey:      strings.Clone(c.RoutingKey),
 		MessageType:     strings.Clone(c.MessageType),

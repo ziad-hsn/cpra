@@ -21,12 +21,5 @@ func atomicJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	if err = os.Rename(name, path); err != nil {
-		return err
-	}
-	d, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	return errors.Join(d.Sync(), d.Close())
+	return replaceDurableFile(name, path)
 }

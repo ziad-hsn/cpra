@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync/atomic"
 	"time"
 
+	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/durable"
 	"github.com/ziad-hsn/cpra/internal/jobs"
@@ -14,7 +16,6 @@ import (
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/web/snapshot"
-	"github.com/mlange-42/ark/ecs"
 )
 
 // DurableSystem owns the live projection and all scheduling. The Raft goroutine
@@ -46,7 +47,7 @@ type DurableSystem struct {
 	config         runtimeconfig.Config
 	cooldown       time.Duration
 	recoveryBypass bool
-	stopping       bool
+	stopping       atomic.Bool
 	lastSLO        time.Time
 	lastError      error
 	logger         Logger
@@ -143,8 +144,29 @@ func (s *DurableSystem) Initialize(*ecs.World) {
 	s.index = snapshot.NewIndex(rows)
 	s.holder.SetIndex(s.index)
 }
-func (s *DurableSystem) StopAdmission()      { s.stopping = true }
-func (s *DurableSystem) Finalize(*ecs.World) { s.persistSLO(time.Now()) }
+func (s *DurableSystem) StopAdmission() { s.stopping.Store(true) }
+
+// Finalize runs on the owner after all worker pools and result producers have
+// joined. Normal updates intentionally bound result admission, so one update
+// cannot flush an arbitrary buffered tail. Commit every available outcome
+// before recording the final SLO window and closing durable storage.
+func (s *DurableSystem) Finalize(*ecs.World) {
+	for {
+		buffered := 0
+		for _, ch := range s.results {
+			buffered += len(ch)
+		}
+		if buffered == 0 {
+			break
+		}
+		if s.lastError != nil || !s.store.Status().Ready {
+			s.discardResults()
+		} else {
+			s.drain()
+		}
+	}
+	s.persistSLO(time.Now())
+}
 
 func (s *DurableSystem) Update(*ecs.World) {
 	started := time.Now()
@@ -165,7 +187,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 	if s.index != nil {
 		s.index.Touch(now)
 	}
-	if s.stopping || s.lastError != nil {
+	if s.stopping.Load() || s.lastError != nil {
 		return
 	}
 	s.dispatchChecks(now)
@@ -175,7 +197,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 func (s *DurableSystem) fail(err error) {
 	s.store.MarkUnavailable(err)
 	s.lastError = err
-	s.stopping = true
+	s.stopping.Store(true)
 	s.logger.Error("Durable admission stopped: %v", err)
 }
 func (s *DurableSystem) persistSLO(now time.Time) {
@@ -295,6 +317,9 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) {
 
 func (s *DurableSystem) dispatchChecks(now time.Time) {
 	for _, ent := range s.scheduler.Due(now) {
+		if s.stopping.Load() {
+			return
+		}
 		slot := &s.checks[ent.ID()]
 		due := time.Unix(0, slot.next)
 		if due.After(now) {
@@ -322,6 +347,9 @@ func (s *DurableSystem) dispatchChecks(now time.Time) {
 		return
 	}
 	for _, ent := range s.scheduler.ConsumeReady(budget) {
+		if s.stopping.Load() {
+			return
+		}
 		state := s.states.Get(ent)
 		if state == nil || s.pending[state.MonitorID] {
 			continue
@@ -358,6 +386,9 @@ func (s *DurableSystem) scheduleActions(ent ecs.Entity, m durable.Monitor) {
 func (s *DurableSystem) dispatchActions(now time.Time) {
 	s.actions.EnqueueReady(s.actions.Due(now))
 	for _, ent := range s.actions.ConsumeReady(s.config.Storage.BatchSize) {
+		if s.stopping.Load() {
+			return
+		}
 		due, exists := s.actionDue[ent]
 		if !exists {
 			continue
@@ -382,6 +413,9 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		}
 		slices.Sort(ids)
 		for _, id := range ids {
+			if s.stopping.Load() {
+				return
+			}
 			a := m.Actions[id]
 			if a.State != durable.Queued || a.Revision != state.Revision || s.admitted[id] || a.NotBefore.After(now) {
 				continue

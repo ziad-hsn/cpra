@@ -3,8 +3,10 @@ package runtimeconfig
 
 import (
 	"fmt"
+	"github.com/ziad-hsn/cpra/internal/platformpath"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -41,7 +43,7 @@ type Config struct {
 
 func Default() Config {
 	return Config{
-		Storage: Storage{Mode: "raft", Directory: "./cpra-data", BatchDelay: 5 * time.Millisecond, BatchSize: 1000, SnapshotInterval: 5 * time.Minute, SnapshotRetain: 3},
+		Storage: Storage{Mode: "raft", BatchDelay: 5 * time.Millisecond, BatchSize: 1000, SnapshotInterval: 5 * time.Minute, SnapshotRetain: 3},
 		History: History{RetentionDays: 30},
 		SLO:     SLO{QueueTarget: 250 * time.Millisecond, ResultTarget: 5 * time.Second, Window: 5 * time.Minute, ControlWindow: 30 * time.Second, EvaluationInterval: 5 * time.Second, MinimumSamples: 1000, HealthyHold: 60 * time.Second},
 	}
@@ -74,9 +76,6 @@ func (c Config) Validate() error {
 	if s.Mode != "raft" && s.Mode != "memory" {
 		return fmt.Errorf("storage.mode must be raft or memory")
 	}
-	if s.Mode == "raft" && s.Directory == "" {
-		return fmt.Errorf("storage.directory is required in raft mode")
-	}
 	if s.BatchSize < 1 || s.BatchSize > 1000 || s.BatchDelay <= 0 || s.BatchDelay > 5*time.Millisecond {
 		return fmt.Errorf("storage batches require 1..1000 commands and a delay of at most 5ms")
 	}
@@ -90,5 +89,36 @@ func (c Config) Validate() error {
 	if p.QueueTarget <= 0 || p.ResultTarget <= p.QueueTarget || p.Window != 5*time.Minute || p.ControlWindow != 30*time.Second || p.EvaluationInterval != 5*time.Second || p.MinimumSamples < 1000 || p.HealthyHold < 60*time.Second {
 		return fmt.Errorf("invalid SLO settings: use a 5m report window, 30s control window, 5s evaluation, at least 1000 samples and 60s healthy hold")
 	}
+	return nil
+}
+
+// ResolveStorageDirectory applies explicit flag, explicit configuration, then the
+// platform user default. It does not create or open state. Services pass an
+// absolute configuration path and never infer their scope from an elevated UID.
+func (c *Config) ResolveStorageDirectory(override string) error {
+	if c.Storage.Mode != "raft" {
+		return nil
+	}
+	dir := override
+	if dir == "" {
+		dir = c.Storage.Directory
+	}
+	if dir == "" {
+		if _, err := os.Lstat("cpra-data"); err == nil {
+			return fmt.Errorf("legacy ./cpra-data exists: select it explicitly with -data-dir, or stop CPRa and migrate the complete store before using a new directory")
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("inspect legacy data directory: %w", err)
+		}
+		layout, err := platformpath.Resolve("user")
+		if err != nil {
+			return err
+		}
+		dir = layout.StateDir
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve storage directory: %w", err)
+	}
+	c.Storage.Directory = abs
 	return nil
 }

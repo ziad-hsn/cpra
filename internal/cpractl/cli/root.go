@@ -96,6 +96,8 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(
 		newGetCommand(o),
 		newHealthCommand(o),
+		newReadyCommand(o),
+		newLocalCommand(),
 		newMetricsCommand(o),
 	)
 	return root

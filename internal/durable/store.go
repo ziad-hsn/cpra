@@ -71,6 +71,9 @@ func Open(ctx context.Context, config runtimeconfig.Config) (_ *Store, err error
 	if err = config.Validate(); err != nil {
 		return nil, err
 	}
+	if config.Storage.Mode == "raft" && config.Storage.Directory == "" {
+		return nil, fmt.Errorf("storage.directory must be resolved before opening Raft storage")
+	}
 	s := &Store{config: config, requests: make(chan submission, 1024), stop: make(chan struct{}), done: make(chan struct{})}
 	historyDir := ""
 	if config.Storage.Mode == "raft" {

@@ -2,19 +2,20 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/systems"
 	"github.com/ziad-hsn/cpra/internal/durable"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
-	"errors"
-	"fmt"
 	"log"
 	"math"
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/controller/components"
@@ -80,6 +81,10 @@ type Controller struct {
 	stopCh               chan struct{}
 	doneCh               chan struct{}
 	resultSystems        []app.System
+	initialized          chan struct{}
+	initializedState     atomic.Bool
+	lastProgress         atomic.Int64
+	stoppingState        atomic.Bool
 	useAdaptiveQueue     bool
 
 	// Observability surfaces for the web server.
@@ -459,6 +464,7 @@ func (c *Controller) Start() error {
 	}
 	c.feedArrivalRate()
 	c.stopCh, c.doneCh = make(chan struct{}), make(chan struct{})
+	c.initialized = make(chan struct{})
 	c.running = true
 	c.pulsePool.Start()
 	c.interventionPool.Start()
@@ -471,6 +477,9 @@ func (c *Controller) Start() error {
 func (c *Controller) run() {
 	defer close(c.doneCh)
 	c.app.Initialize()
+	c.lastProgress.Store(time.Now().UnixNano())
+	c.initializedState.Store(true)
+	close(c.initialized)
 	ticker := time.NewTicker(time.Second / time.Duration(c.app.TPS))
 	defer ticker.Stop()
 	for {
@@ -511,11 +520,40 @@ func (c *Controller) run() {
 			}
 		case <-ticker.C:
 			c.app.Update()
+			c.lastProgress.Store(time.Now().UnixNano())
 		}
 	}
 }
 
-func (c *Controller) Stop() {
+// Ready reports process admission readiness without reading mutable ECS state.
+func (c *Controller) Ready() bool {
+	return c.initializedState.Load() && !c.stoppingState.Load() && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second && (c.config.Store == nil || c.config.Store.Status().Ready)
+}
+
+func (c *Controller) WaitReady(ctx context.Context) error {
+	c.lifecycleMu.Lock()
+	initialized := c.initialized
+	c.lifecycleMu.Unlock()
+	if initialized == nil {
+		return fmt.Errorf("controller has not started")
+	}
+	select {
+	case <-initialized:
+		if !c.Ready() {
+			return fmt.Errorf("controller unavailable after initialization")
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// BeginStop rejects admission immediately and asks the owner loop to drain.
+func (c *Controller) BeginStop() {
+	c.stoppingState.Store(true)
+	if c.durableSystem != nil {
+		c.durableSystem.StopAdmission()
+	}
 	c.lifecycleMu.Lock()
 	if c.doneCh == nil {
 		c.doneCh = make(chan struct{})
@@ -534,10 +572,33 @@ func (c *Controller) Stop() {
 		c.running = false
 		close(c.stopCh)
 	}
+	c.lifecycleMu.Unlock()
+}
+
+// StopContext bounds the caller's wait. On expiry it cancels cooperative jobs;
+// the controller still owns cleanup until Done closes. Callers must not close
+// its store or loggers early. The executable exits on an uncooperative timeout.
+func (c *Controller) StopContext(ctx context.Context) error {
+	c.BeginStop()
+	c.lifecycleMu.Lock()
 	done := c.doneCh
 	c.lifecycleMu.Unlock()
-	<-done
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		c.CancelWork()
+		return ctx.Err()
+	}
 }
+
+func (c *Controller) CancelWork() {
+	c.pulsePool.CancelWork()
+	c.interventionPool.CancelWork()
+	c.codePool.CancelWork()
+}
+
+func (c *Controller) Stop() { _ = c.StopContext(context.Background()) }
 
 // PrintShutdownMetrics logs queue, worker pool, and world statistics at shutdown.
 func (c *Controller) PrintShutdownMetrics() {

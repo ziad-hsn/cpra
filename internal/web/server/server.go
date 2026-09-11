@@ -142,17 +142,26 @@ func (s *Server) Start() error {
 // Stop gracefully shuts down the server, draining in-flight requests and
 // waiting for the serve and sampler goroutines to exit.
 func (s *Server) Stop() {
-	if s.srv == nil {
-		return
-	}
-	s.stopHistorySampler()
 	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.WriteTimeout)
 	defer cancel()
-	if err := s.srv.Shutdown(ctx); err != nil {
+	_ = s.StopContext(ctx)
+}
+
+// StopContext bounds HTTP draining. On timeout active connections are closed;
+// callers must still finish process shutdown and must not report readiness.
+func (s *Server) StopContext(ctx context.Context) error {
+	if s.srv == nil {
+		return nil
+	}
+	s.stopHistorySampler()
+	err := s.srv.Shutdown(ctx)
+	if err != nil {
+		_ = s.srv.Close()
 		controller.SystemLogger.Warn("Web server shutdown: %v", err)
 	}
 	s.wg.Wait()
 	controller.SystemLogger.Info("Web server stopped")
+	return err
 }
 
 // startHistorySampler launches a goroutine that periodically records queue and
@@ -339,13 +348,23 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	snap := s.holder.Get()
-	if (s.cfg.Store != nil && !s.cfg.Store.Status().Ready) || snap == nil || snap.Total == 0 || time.Since(snap.Generated) > 30*time.Second {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
-		return
+	projectionFresh := snap != nil && time.Since(snap.Generated) <= 30*time.Second
+	ready := projectionFresh && (s.cfg.AllowEmpty || snap.Total > 0)
+	if s.cfg.Ready != nil {
+		// Controller progress and storage are authoritative. Slow dashboard
+		// projection must not trigger a service restart or stop monitor admission.
+		ready = s.cfg.Ready()
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	if s.cfg.Store != nil && !s.cfg.Store.Status().Ready {
+		ready = false
+	}
+	status, code := "ready", http.StatusOK
+	if !ready {
+		status, code = "not ready", http.StatusServiceUnavailable
+	}
+	writeJSON(w, code, map[string]any{"status": status, "projection_fresh": projectionFresh})
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {

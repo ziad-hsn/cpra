@@ -1,4 +1,4 @@
-//go:build systemd
+//go:build linux && systemd
 
 package jobs
 

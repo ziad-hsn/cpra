@@ -2,231 +2,225 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	pprof "net/http/pprof"
 	"os"
-	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/durable"
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/preflight"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/version"
 	"github.com/ziad-hsn/cpra/internal/web/server"
 )
 
-func main() {
-	// Command line flags
-	var (
-		runtimeFile = flag.String("runtime-config", "", "Runtime storage, history and SLO configuration")
-		configFile  = flag.String("config", "", "Alias for -yaml (monitor manifest)")
-		yamlFile    = flag.String("yaml", "monitors.yaml", "YAML or JSON monitor manifest")
-		debug       = flag.Bool("debug", false, "Enable debug logging")
-		pprofEnable = flag.Bool("pprof", false, "Enable pprof web server (debug only; binds loopback)")
-		pprofAddr   = flag.String("pprof.addr", "localhost:6060", "pprof listen address (host:port)")
-		webEnable   = flag.Bool("web", true, "Enable the read-only web server (dashboard + API + /metrics)")
-		webAddr     = flag.String("web.addr", "localhost:8060", "Web server listen address (host:port)")
-		webCors     = flag.String("web.cors", "", "CORS allowed origins for the web API (comma-separated, or * for all; dev only)")
-		webAuth     = flag.String("web.auth", os.Getenv("CPRA_AUTH_TOKEN"), "Optional bearer token required for the web API (empty disables auth)")
-		ssrfProtect = flag.Bool("ssrf-protect", false, "Reject HTTP(S) targets resolving to private/loopback/link-local addresses (SSRF protection)")
-		webAuthFile = flag.String("web.auth-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "File containing the web authentication token")
-		allowEmpty  = flag.Bool("allow-empty", false, "Allow a manifest with no monitors")
-		versionFlag = flag.Bool("version", false, "Print version and exit")
-	)
-	flag.Parse()
+type runOptions struct {
+	runtimeFile, manifest, dataDir, webAddr, webCors, webAuth, webAuthFile, pprofAddr string
+	debug, pprof, web, ssrfProtect, allowEmpty, validate                              bool
+	shutdownTimeout                                                                   time.Duration
+}
+type shutdownLimitKey struct{}
 
+func main() {
+	var o runOptions
+	flag.StringVar(&o.runtimeFile, "runtime-config", "", "Runtime storage, history and SLO configuration")
+	alias := flag.String("config", "", "Alias for -yaml (monitor manifest)")
+	flag.StringVar(&o.manifest, "yaml", "monitors.yaml", "YAML or JSON monitor manifest")
+	flag.StringVar(&o.dataDir, "data-dir", "", "Override durable storage directory")
+	flag.BoolVar(&o.debug, "debug", false, "Enable debug logging")
+	flag.BoolVar(&o.pprof, "pprof", false, "Enable pprof web server on loopback")
+	flag.StringVar(&o.pprofAddr, "pprof.addr", "localhost:6060", "pprof listen address (loopback only)")
+	flag.BoolVar(&o.web, "web", true, "Enable read-only dashboard, API and metrics")
+	flag.StringVar(&o.webAddr, "web.addr", "localhost:8060", "Web server listen address")
+	flag.StringVar(&o.webCors, "web.cors", "", "Web API CORS allowlist")
+	flag.StringVar(&o.webAuth, "web.auth", os.Getenv("CPRA_AUTH_TOKEN"), "API bearer token (prefer -web.auth-file)")
+	flag.StringVar(&o.webAuthFile, "web.auth-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "File containing API authentication token")
+	flag.BoolVar(&o.ssrfProtect, "ssrf-protect", false, "Reject HTTP targets resolving to private addresses")
+	flag.BoolVar(&o.allowEmpty, "allow-empty", false, "Allow an intentionally empty manifest")
+	flag.BoolVar(&o.validate, "validate", false, "Validate configuration and compiled drivers without opening storage or providers")
+	flag.DurationVar(&o.shutdownTimeout, "shutdown-timeout", 45*time.Second, "Maximum shutdown time (Windows service capped at 15s)")
+	versionFlag := flag.Bool("version", false, "Print version and exit")
+	capabilitiesFlag := flag.Bool("capabilities", false, "Print compiled driver capabilities as JSON and exit")
+	flag.Parse()
 	if *versionFlag {
 		fmt.Println(version.Info())
 		return
 	}
-
-	if *configFile != "" {
-		*yamlFile = *configFile
+	if *capabilitiesFlag {
+		if err := json.NewEncoder(os.Stdout).Encode(jobs.Capabilities()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
 	}
-	if *webAuthFile != "" {
-		data, err := os.ReadFile(*webAuthFile)
+	if *alias != "" {
+		o.manifest = *alias
+	}
+	if err := runPlatform(func(ctx context.Context, ready func()) error { return runCPRa(ctx, o, ready) }); err != nil {
+		fmt.Fprintln(os.Stderr, "CPRa:", err)
+		os.Exit(1)
+	}
+}
+
+func loopbackAddress(address string) bool {
+	host, _, err := net.SplitHostPort(address)
+	return err == nil && (host == "localhost" || net.ParseIP(host).IsLoopback())
+}
+
+// runCPRa owns every runtime resource. On an uncooperative shutdown timeout,
+// main exits the process; it must not close storage underneath its live owner.
+func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) {
+	if o.shutdownTimeout <= 0 {
+		return errors.New("shutdown-timeout must be positive")
+	}
+	if limit, ok := ctx.Value(shutdownLimitKey{}).(time.Duration); ok && o.shutdownTimeout > limit {
+		o.shutdownTimeout = limit
+	}
+	if o.webAuthFile != "" {
+		data, err := os.ReadFile(o.webAuthFile)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Read web auth file:", err)
-			os.Exit(1)
+			return fmt.Errorf("read web auth file: %w", err)
 		}
-		*webAuth = strings.TrimSpace(string(data))
-		if *webAuth == "" {
-			fmt.Fprintln(os.Stderr, "Web auth file is empty")
-			os.Exit(1)
+		o.webAuth = strings.TrimSpace(string(data))
+		if o.webAuth == "" {
+			return errors.New("web auth file is empty")
 		}
 	}
-	if *webEnable && *webAuth == "" {
-		host, _, err := net.SplitHostPort(*webAddr)
-		ip := net.ParseIP(host)
-		if err != nil || (host != "localhost" && (ip == nil || !ip.IsLoopback())) {
-			fmt.Fprintln(os.Stderr, "A non-loopback web listener requires CPRA_AUTH_TOKEN or -web.auth-file")
-			os.Exit(1)
-		}
+	if o.web && o.webAuth == "" && !loopbackAddress(o.webAddr) {
+		return errors.New("a non-loopback web listener requires CPRA_AUTH_TOKEN or -web.auth-file")
 	}
-	// Enable SSRF protection when the monitor manifest is not a trusted input.
-	jobs.SSRFProtect = *ssrfProtect
-
-	// Initialize loggers first
-	controller.InitializeLoggers(*debug)
-
-	controller.SystemLogger.Info("Starting CPRA Controller")
-	if *pprofEnable {
-		go func(addr string) {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/debug/pprof/", pprof.Index)
-			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-			controller.SystemLogger.Info("Profiling server listening at http://%s/debug/pprof/", addr)
-			if err := http.ListenAndServe(addr, mux); err != nil {
-				controller.SystemLogger.Warn("Profiling server error: %v", err)
-			}
-		}(*pprofAddr)
+	if o.pprof && !loopbackAddress(o.pprofAddr) {
+		return errors.New("pprof.addr must be a loopback address")
 	}
-	controller.SystemLogger.Info("Input file: %s", *yamlFile)
-
-	// Create configuration
+	settings, err := runtimeconfig.Load(o.runtimeFile)
+	if err != nil {
+		return err
+	}
+	if err = settings.ResolveStorageDirectory(o.dataDir); err != nil {
+		return err
+	}
+	if err = preflight.Manifest(ctx, o.manifest, o.allowEmpty); err != nil {
+		return fmt.Errorf("manifest validation: %w", err)
+	}
+	if o.validate {
+		fmt.Println("configuration valid; provider access and storage were not tested")
+		return nil
+	}
+	jobs.SSRFProtect = o.ssrfProtect
+	controller.InitializeLoggers(o.debug)
+	store, err := durable.Open(ctx, settings)
+	if err != nil {
+		controller.CloseLoggers()
+		return fmt.Errorf("durable startup: %w", err)
+	}
 	config := controller.DefaultConfig()
-	config.Debug = *debug
-
-	// Optional entity-count threshold for queue selection before startup.
+	config.Debug, config.Store, config.Runtime = o.debug, store, settings
+	// Leave part of the process budget for publishing cancellation results and
+	// flushing storage. Each operation retains its own configured deadline.
+	config.WorkerConfig.DrainTimeout = o.shutdownTimeout * 2 / 3
 	if v := os.Getenv("CPRA_ENTITY_THRESHOLD"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+		if n, e := strconv.ParseInt(v, 10, 64); e == nil && n > 0 {
 			config.EntityCountThreshold = n
 		}
 	}
-
-	runtimeSettings, err := runtimeconfig.Load(*runtimeFile)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Runtime configuration:", err)
-		os.Exit(1)
-	}
-	store, err := durable.Open(context.Background(), runtimeSettings)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Durable startup:", err)
-		os.Exit(1)
-	}
-	defer store.Close()
-	config.Store, config.Runtime = store, runtimeSettings
-
-	// Create the new controller
 	oc := controller.NewController(config)
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	// Load monitors if YAML file exists
-	if _, err := os.Stat(*yamlFile); err == nil {
-		fmt.Println("Loading monitors from", *yamlFile, "...")
-		start := time.Now()
-
-		if err := oc.LoadMonitors(ctx, *yamlFile); err != nil {
-			fmt.Println("Error loading monitors:", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("Monitor loading completed in", time.Since(start))
-	} else {
-		fmt.Fprintln(os.Stderr, "Cannot open monitor manifest:", err)
-		os.Exit(1)
-	}
-
-	if !*allowEmpty && oc.GetWorld().Stats().Entities.Used == 0 {
-		fmt.Fprintln(os.Stderr, "Monitor manifest contains no monitors; use -allow-empty for an intentional empty instance")
-		os.Exit(1)
-	}
-
-	// Start the controller
-	if err := oc.Start(); err != nil {
-		fmt.Println("Error starting controller:", err)
-		os.Exit(1)
-	}
-
-	// Start the read-only web server (dashboard + REST API + Prometheus /metrics).
 	var webSrv *server.Server
-	if *webEnable {
+	var profiling *http.Server
+	var profileDone chan struct{}
+	defer func() {
+		oc.BeginStop()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), o.shutdownTimeout)
+		defer cancel()
+		// The process owns this goroutine until completion or process termination.
+		// Never report a successful shutdown or close loggers on deadline expiry.
+		finished := make(chan error, 1)
+		go func() {
+			oc.Stop()
+			var closeErr error
+			if !store.Status().Ready {
+				closeErr = errors.New("durable storage unavailable during shutdown; final outcomes may not have committed")
+			}
+			if webSrv != nil {
+				closeErr = errors.Join(closeErr, webSrv.StopContext(shutdownCtx))
+			}
+			if profiling != nil {
+				_ = profiling.Close()
+				<-profileDone
+			}
+			finished <- errors.Join(closeErr, store.Close())
+		}()
+		select {
+		case e := <-finished:
+			resultErr = errors.Join(resultErr, e)
+			controller.CloseLoggers()
+		case <-shutdownCtx.Done():
+			oc.CancelWork()
+			resultErr = errors.Join(resultErr, fmt.Errorf("shutdown deadline exceeded; interrupted actions will be held unknown on restart: %w", shutdownCtx.Err()))
+		}
+	}()
+	if err = oc.LoadMonitors(ctx, o.manifest); err != nil {
+		return err
+	}
+	if err = oc.Start(); err != nil {
+		return err
+	}
+	if o.web {
 		queueType := "hybrid"
 		if oc.UseAdaptiveQueue() {
 			queueType = "adaptive"
 		}
-		webSrv = server.New(server.ServerConfig{
-			Addr:             *webAddr,
-			Store:            store,
-			CORSAllowOrigins: splitCSV(*webCors),
-			AuthToken:        *webAuth,
-		}, oc.SnapshotHolder(), oc.Metrics(),
-			oc.PulseQueue(), oc.InterventionQueue(), oc.CodeQueue(),
-			oc.PulsePool(), oc.InterventionPool(), oc.CodePool(),
-			server.PublicConfig{
-				QueueCapacity:  uint64(oc.PulseQueue().Stats().Capacity),
-				BatchSize:      config.BatchSize,
-				AlertCooldown:  config.AlertCooldown,
-				RecoveryBypass: config.RecoveryBypass,
-				UseAdaptive:    oc.UseAdaptiveQueue(),
-				QueueType:      queueType,
-			})
-		if err := webSrv.Start(); err != nil {
-			fmt.Println("Error starting web server:", err)
-			oc.Stop()
-			controller.CloseLoggers()
-			os.Exit(1)
+		webSrv = server.New(server.ServerConfig{Addr: o.webAddr, Store: store, Ready: oc.Ready, AllowEmpty: o.allowEmpty, CORSAllowOrigins: splitCSV(o.webCors), AuthToken: o.webAuth},
+			oc.SnapshotHolder(), oc.Metrics(), oc.PulseQueue(), oc.InterventionQueue(), oc.CodeQueue(), oc.PulsePool(), oc.InterventionPool(), oc.CodePool(),
+			server.PublicConfig{QueueCapacity: uint64(oc.PulseQueue().Stats().Capacity), BatchSize: config.BatchSize, AlertCooldown: config.AlertCooldown, RecoveryBypass: config.RecoveryBypass, UseAdaptive: oc.UseAdaptiveQueue(), QueueType: queueType})
+		if err = webSrv.Start(); err != nil {
+			return err
 		}
 	}
-
-	// Wait for shutdown signal
-	<-ctx.Done()
-	fmt.Println("Shutting down...")
-
-	// Stop the web server first so in-flight requests drain before the controller.
-	if webSrv != nil {
-		webSrv.Stop()
+	if o.pprof {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		listener, e := net.Listen("tcp", o.pprofAddr)
+		if e != nil {
+			return e
+		}
+		profiling = &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		profileDone = make(chan struct{})
+		go func() { defer close(profileDone); _ = profiling.Serve(listener) }()
 	}
-
-	// Print memory Usage
-	PrintMemUsage()
-
-	// Stop the controller
-	oc.Stop()
-
-	// Close loggers after everything is done
-	controller.CloseLoggers()
-
-	fmt.Println("CPRA Controller stopped")
+	if err = oc.WaitReady(ctx); err != nil {
+		return err
+	}
+	ready()
+	<-ctx.Done()
+	return nil
 }
 
-// bToMb converts bytes to megabytes
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
-
-// splitCSV splits a comma-separated string into trimmed, non-empty fields.
 func splitCSV(s string) []string {
 	out := []string{}
 	for _, p := range strings.Split(s, ",") {
-		p = strings.TrimSpace(p)
-		if p != "" {
+		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
 		}
 	}
 	return out
 }
-
-// PrintMemUsage outputs the current, total, and system memory usage
+func bToMb(b uint64) uint64 { return b / 1024 / 1024 }
 func PrintMemUsage() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	fmt.Println("Memory usage on exit:")
-	fmt.Println("Alloc =", bToMb(m.Alloc), "MiB")
-	fmt.Println("TotalAlloc =", bToMb(m.TotalAlloc), "MiB")
-	fmt.Println("Sys =", bToMb(m.Sys), "MiB")
-	fmt.Println("NumGC =", m.NumGC)
+	fmt.Printf("Alloc=%d MiB Sys=%d MiB NumGC=%d\n", bToMb(m.Alloc), bToMb(m.Sys), m.NumGC)
 }

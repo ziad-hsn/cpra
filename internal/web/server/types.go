@@ -11,6 +11,8 @@ import (
 
 // ServerConfig configures the web server.
 type ServerConfig struct {
+	Ready            func() bool    `json:"-"`
+	AllowEmpty       bool           `json:"-"`
 	Store            *durable.Store `json:"-"`
 	Addr             string         `json:"addr"`
 	ReadTimeout      time.Duration  `json:"read_timeout"`

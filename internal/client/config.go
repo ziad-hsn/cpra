@@ -18,6 +18,11 @@ func (c *Client) Health(ctx context.Context) error {
 	return c.get(ctx, "/api/v1/healthz", nil, nil)
 }
 
+// Ready checks admission readiness, independently of process liveness.
+func (c *Client) Ready(ctx context.Context) error {
+	return c.get(ctx, "/api/v1/readyz", nil, nil)
+}
+
 // Metrics returns the raw Prometheus text from /metrics.
 func (c *Client) Metrics(ctx context.Context) (string, error) {
 	return c.getRaw(ctx, "/metrics", nil)

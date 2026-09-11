@@ -2,8 +2,8 @@ package queue
 
 import (
 	"context"
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"errors"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"log"
 	"math"
 	"runtime"
@@ -397,6 +397,10 @@ func (p *DynamicWorkerPool) GetRouter() *ResultRouter {
 }
 
 // DrainAndStop waits for outstanding tasks to finish before stopping the worker pool.
+// CancelWork cancels operation contexts without dropping buffered results.
+// The owner must still join DrainAndStop and consume result routes.
+func (p *DynamicWorkerPool) CancelWork() { p.workCancel() }
+
 func (p *DynamicWorkerPool) DrainAndStop() {
 	if !p.stopping.CompareAndSwap(0, 1) {
 		<-p.stopped

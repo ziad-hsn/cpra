@@ -1,9 +1,10 @@
-//go:build !systemd
+//go:build !linux || !systemd
 
 package jobs
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/mlange-42/ark/ecs"
 
@@ -11,5 +12,8 @@ import (
 )
 
 func newInterventionSystemdJob(t *schema.InterventionTargetSystemd, retries int, entity ecs.Entity) (Job, error) {
+	if runtime.GOOS != "linux" {
+		return nil, fmt.Errorf("systemd intervention is only supported on Linux")
+	}
 	return nil, fmt.Errorf("systemd intervention requires building with -tags=systemd")
 }

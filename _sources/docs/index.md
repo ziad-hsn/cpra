@@ -4,21 +4,26 @@ description: "Run CPRa to check services, send alerts and perform configured rec
 ---
 
 <div class="cpra-hero" markdown>
-![](images/cpra-mark-color.svg#only-light){ aria-hidden="true" }
-![](images/cpra-mark-dark.svg#only-dark){ aria-hidden="true" }
-<div markdown>
 
-# Check services. Understand failures. Recover deliberately.
+![CPRa](images/cpra-horizontal-color.svg#only-light){ width="464" height="128" }
+![CPRa](images/cpra-horizontal-dark.svg#only-dark){ width="464" height="128" }
 
-</div>
+# Continuous Pulse and Recovery Agent { #check-services-understand-failures-recover-deliberately }
+
+Checks services, sends alerts, and runs the recovery you configure.
+{ .cpra-hero__description }
+
+Go · MIT · self-hosted
+{ .cpra-hero__meta }
+
+[Run your first monitor](tutorials/quickstart.md){ .md-button .md-button--primary }
+[Explore the configuration](reference/config-schema.md){ .md-button }
+
 </div>
 
 CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.
 
 The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the source published to `main` on **9 September 2026**.
-
-[Run your first monitor](tutorials/quickstart.md){ .md-button .md-button--primary }
-[Explore the configuration](reference/config-schema.md){ .md-button }
 
 ## What you can do
 

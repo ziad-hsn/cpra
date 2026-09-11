@@ -13,7 +13,7 @@ theme:
   custom_dir: overrides
   font: false
   logo: images/cpra-mark-dark.svg
-  favicon: images/icon.svg
+  favicon: favicon.ico
   features:
     - navigation.tabs
     - navigation.sections

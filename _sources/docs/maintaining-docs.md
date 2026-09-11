@@ -21,6 +21,13 @@ python _sources/verify_site.py .
 
 Edit Markdown under `_sources/docs`. Navigation, redirects, page metadata, and theme settings live in `_sources/mkdocs.yml`. Update `_sources/source-version.json` when documenting a newer application commit, and check version links in the pages.
 
+Brand masters and usage terms live in `brand/` on `main`. Copy the published
+light and dark SVG lockups and marks to `_sources/docs/images`, and keep
+`images/social-preview.png` in sync with `brand/dist/png/social-preview.png`.
+The favicon set belongs directly under `_sources/docs`; its relative manifest
+paths and the theme's URL filter keep links working under `/cpra/` and on deep
+pages. The locally served heading font and its license live in `assets/fonts`.
+
 The rebuild command writes only generated paths recorded in `_sources/generated-files.txt`. It uses a temporary build directory, validates the build, then replaces the generated output. Keep sources and regenerated output in the same commit.
 
 ## Preview

@@ -1,38 +1,44 @@
 {% extends "base.html" %}
 {% block extrahead %}
-  {% set page_title = page.meta.title if page.meta and page.meta.title else page.title %}
-  {% set page_desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
+{{ super() }}
+{% set page_title = page.meta.title if page.meta and page.meta.title else page.title %}
+{% set page_desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
+{% set social_image = config.site_url ~ config.extra.social_image %}
+  <link rel="icon" href="{{ 'icon.svg' | url }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ 'apple-touch-icon.png' | url }}" sizes="180x180">
+  <link rel="manifest" href="{{ 'manifest.webmanifest' | url }}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="{{ config.site_name }}">
-  <meta property="og:title" content="{{ page_title }}">
-  <meta property="og:description" content="{{ page_desc }}">
-  <meta property="og:url" content="{{ page.canonical_url }}">
-  <meta property="og:image" content="{{ config.site_url }}{{ config.extra.social_image }}">
+  <meta property="og:site_name" content="{{ config.site_name | e }}">
+  <meta property="og:title" content="{{ page_title | e }}">
+  <meta property="og:description" content="{{ page_desc | e }}">
+  <meta property="og:url" content="{{ (page.canonical_url or config.site_url) | e }}">
+  <meta property="og:image" content="{{ social_image | e }}">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{{ page_title }}">
-  <meta name="twitter:description" content="{{ page_desc }}">
-  <meta name="twitter:image" content="{{ config.site_url }}{{ config.extra.social_image }}">
+  <meta name="twitter:title" content="{{ page_title | e }}">
+  <meta name="twitter:description" content="{{ page_desc | e }}">
+  <meta name="twitter:image" content="{{ social_image | e }}">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   {% if page.is_homepage %}
   <script type="application/ld+json">
-  {
+  {{ {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
     "name": "CPRa",
     "alternateName": "Continuous Pulse and Recovery Agent",
-    "description": "{{ config.site_description }}",
-    "url": "{{ config.site_url }}",
-    "codeRepository": "{{ config.repo_url }}",
+    "description": config.site_description,
+    "url": config.site_url,
+    "codeRepository": config.repo_url,
     "programmingLanguage": "Go",
     "runtimePlatform": "Linux",
     "license": "https://opensource.org/license/mit",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Linux",
-    "author": { "@type": "Person", "name": "{{ config.site_author }}" },
-    "image": "{{ config.site_url }}{{ config.extra.social_image }}"
-  }
+    "author": { "@type": "Person", "name": config.site_author },
+    "image": social_image
+  } | tojson(indent=2) }}
   </script>
   {% endif %}
 {% endblock %}

@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="images/icon.svg">
+      <link rel="icon" href="favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -55,8 +55,13 @@
 
     
     
-  
-  
+
+
+
+
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="manifest.webmanifest">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="CPRa Documentation">
   <meta property="og:title" content="CPRa documentation">
@@ -70,24 +75,28 @@
   <meta name="twitter:title" content="CPRa documentation">
   <meta name="twitter:description" content="Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI.">
   <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   
   <script type="application/ld+json">
   {
-    "@context": "https://schema.org",
-    "@type": "SoftwareSourceCode",
-    "name": "CPRa",
-    "alternateName": "Continuous Pulse and Recovery Agent",
-    "description": "Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.",
-    "url": "https://ziad-hsn.github.io/cpra/",
-    "codeRepository": "https://github.com/ziad-hsn/cpra",
-    "programmingLanguage": "Go",
-    "runtimePlatform": "Linux",
-    "license": "https://opensource.org/license/mit",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Linux",
-    "author": { "@type": "Person", "name": "Ziad Hassan" },
-    "image": "https://ziad-hsn.github.io/cpra/images/social-preview.png"
-  }
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "alternateName": "Continuous Pulse and Recovery Agent",
+  "applicationCategory": "DeveloperApplication",
+  "author": {
+    "@type": "Person",
+    "name": "Ziad Hassan"
+  },
+  "codeRepository": "https://github.com/ziad-hsn/cpra",
+  "description": "Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.",
+  "image": "https://ziad-hsn.github.io/cpra/images/social-preview.png",
+  "license": "https://opensource.org/license/mit",
+  "name": "CPRa",
+  "operatingSystem": "Linux",
+  "programmingLanguage": "Go",
+  "runtimePlatform": "Linux",
+  "url": "https://ziad-hsn.github.io/cpra/"
+}
   </script>
   
 
@@ -1408,16 +1417,16 @@
 
 
 <div class="cpra-hero">
-<p><img alt="" aria-hidden="true" src="images/cpra-mark-color.svg#only-light" />
-<img alt="" aria-hidden="true" src="images/cpra-mark-dark.svg#only-dark" /></p>
-<div>
-<h1 id="check-services-understand-failures-recover-deliberately">Check services. Understand failures. Recover deliberately.<a class="headerlink" href="#check-services-understand-failures-recover-deliberately" title="Permanent link">&para;</a></h1>
-</div>
+<p><img alt="CPRa" height="128" src="images/cpra-horizontal-color.svg#only-light" width="464" />
+<img alt="CPRa" height="128" src="images/cpra-horizontal-dark.svg#only-dark" width="464" /></p>
+<h1 id="check-services-understand-failures-recover-deliberately">Continuous Pulse and Recovery Agent<a class="headerlink" href="#check-services-understand-failures-recover-deliberately" title="Permanent link">&para;</a></h1>
+<p class="cpra-hero__description">Checks services, sends alerts, and runs the recovery you configure.</p>
+<p class="cpra-hero__meta">Go · MIT · self-hosted</p>
+<p><a class="md-button md-button--primary" href="tutorials/quickstart/">Run your first monitor</a>
+<a class="md-button" href="reference/config-schema/">Explore the configuration</a></p>
 </div>
 <p>CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.</p>
 <p>The current application includes a read-only dashboard, an HTTP API, and the <code>cpractl</code> command-line client. These guides describe the source published to <code>main</code> on <strong>9 September 2026</strong>.</p>
-<p><a class="md-button md-button--primary" href="tutorials/quickstart/">Run your first monitor</a>
-<a class="md-button" href="reference/config-schema/">Explore the configuration</a></p>
 <h2 id="what-you-can-do">What you can do<a class="headerlink" href="#what-you-can-do" title="Permanent link">&para;</a></h2>
 <div class="grid cards">
 <ul>

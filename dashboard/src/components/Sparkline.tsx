@@ -17,7 +17,7 @@ export function Sparkline({
 }: SparklineProps) {
   if (!data || data.length === 0) {
     return (
-      <svg width={width} height={height} role="img" aria-label={`${ariaLabel}: no data`}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${ariaLabel}: no data`}>
         <line
           x1={0}
           y1={height / 2}
@@ -45,7 +45,7 @@ export function Sparkline({
   const lastY = points[points.length - 1][1];
 
   return (
-    <svg width={width} height={height} role="img" aria-label={ariaLabel}>
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
       {fill && (
         <polygon points={area} fill={color} opacity={0.15} stroke="none" />
       )}

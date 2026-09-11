@@ -118,6 +118,10 @@ def exercise(args):
     install(late)
     if active():raise RuntimeError('prerelease ordering upgrade unexpectedly started service')
     call('systemctl','start','cpra.service');ready()
+    # The real unit allows three starts per 60 seconds. These independent
+    # upgrade scenarios can reach that bound even when every process is healthy.
+    # Let its window expire without weakening or resetting the supervisor policy.
+    time.sleep(61)
     install(final);ready()
     if not active():raise RuntimeError('prerelease-to-final upgrade did not restart a running service')
     call('systemctl','disable','--now','cpra.service')
@@ -148,6 +152,7 @@ def exercise(args):
             'semver-a.1-to-a-1','prerelease-to-final-running-upgrade','disabled-stopped-revision-upgrade','remove','reinstall',
             'purge-preserved-config' if args.format=='deb' else 'erase-rpmsave'],
         'fixture_versions':fixture_versions,
+        'supervisor_pacing_seconds':61,
         'fixture_boundary':'Version fixtures contain the same candidate executable; this tests package ordering and hooks, not cross-binary storage-format compatibility.',
         'source_candidate':manifest['candidate'],'source_dirty':manifest['dirty'],
         'package_sha256':sha(original),'binary_sha256':sha(args.out/('linux_'+args.arch)/'cpra'),'cli_sha256':sha(args.out/('linux_'+args.arch)/'cpractl'),

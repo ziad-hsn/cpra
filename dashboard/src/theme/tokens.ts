@@ -19,44 +19,44 @@ export interface ThemeTokens {
 
 export const darkTokens: ThemeTokens = {
   status: {
-    critical: '#ff4d4f',
-    degraded: '#fadb14',
-    operational: '#52c41a',
-    info: '#13c2c2',
-    disabled: '#8c8c8c',
+    critical: '#ff5470',
+    degraded: '#ffcc4d',
+    operational: '#34d399',
+    info: '#38bdf8',
+    disabled: '#a19d95',
   },
   statusBg: {
-    critical: '#3d1417',
-    degraded: '#3d3410',
-    operational: '#11260c',
-    info: '#0e2a2a',
-    disabled: '#1f1f1f',
+    critical: 'rgba(255, 84, 112, 0.10)',
+    degraded: 'rgba(255, 204, 77, 0.10)',
+    operational: 'rgba(52, 211, 153, 0.10)',
+    info: 'rgba(56, 189, 248, 0.10)',
+    disabled: 'rgba(100, 116, 139, 0.10)',
   },
-  surface: { '0': '#0b0e14', '1': '#111722', '2': '#1a212e', '3': '#222b3a' },
-  text: { primary: '#e6edf3', secondary: '#9aa7b8', muted: '#5c6b7a', inverse: '#0b0e14' },
-  border: { default: '#2a3342', strong: '#3a4658' },
-  action: { primary: '#2f81f7', primaryHover: '#4a96ff', primaryActive: '#1d6fe0' },
+  surface: { '0': '#15161a', '1': '#1c1d22', '2': '#24252b', '3': '#2e3037' },
+  text: { primary: '#f4f2ee', secondary: '#c3c0b9', muted: '#a19d95', inverse: '#15161a' },
+  border: { default: '#34353b', strong: '#51525a' },
+  action: { primary: '#e6bc61', primaryHover: '#f0cd83', primaryActive: '#d6a541' },
 };
 
 export const lightTokens: ThemeTokens = {
   status: {
-    critical: '#cf1322',
-    degraded: '#d48806',
-    operational: '#389e0d',
-    info: '#08979c',
-    disabled: '#8c8c8c',
+    critical: '#bd223c',
+    degraded: '#965b00',
+    operational: '#18704a',
+    info: '#156e96',
+    disabled: '#6d685f',
   },
   statusBg: {
-    critical: '#fff1f0',
-    degraded: '#fffbe6',
-    operational: '#f6ffed',
-    info: '#e6fffb',
-    disabled: '#f5f5f5',
+    critical: 'rgba(225, 29, 72, 0.08)',
+    degraded: 'rgba(217, 119, 6, 0.08)',
+    operational: 'rgba(5, 150, 105, 0.08)',
+    info: 'rgba(2, 132, 199, 0.08)',
+    disabled: 'rgba(100, 116, 139, 0.08)',
   },
-  surface: { '0': '#f0f2f5', '1': '#ffffff', '2': '#ffffff', '3': '#ffffff' },
-  text: { primary: '#1f2329', secondary: '#4e5969', muted: '#86909c', inverse: '#ffffff' },
-  border: { default: '#d9d9d9', strong: '#bfbfbf' },
-  action: { primary: '#2f81f7', primaryHover: '#1d6fe0', primaryActive: '#155bb5' },
+  surface: { '0': '#fbf3df', '1': '#fffaf0', '2': '#f3e8cb', '3': '#ebddba' },
+  text: { primary: '#1a262e', secondary: '#4a5560', muted: '#6d685f', inverse: '#fbf3df' },
+  border: { default: '#e0d3b2', strong: '#bcaa7d' },
+  action: { primary: '#875f10', primaryHover: '#6b490c', primaryActive: '#725218' },
 };
 
 /** CPRA code color → status label mapping (color always paired with text label). */
@@ -96,7 +96,8 @@ export const STATUS_LABELS: Record<MonitorStatus, string> = {
 /** Typography tokens (shared across themes). */
 export const typography = {
   fontFamily: {
-    sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    sans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    heading: '"Roboto Slab", Georgia, serif',
     mono: '"SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace',
   },
   fontSize: { xs: '12px', sm: '14px', md: '16px', lg: '20px', xl: '28px', display: '40px' },

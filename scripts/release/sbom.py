@@ -8,6 +8,25 @@ import subprocess
 from release import ROOT, RECIPE, encoded, checksums
 
 
+def append_frontend(document, dependencies):
+    """Include embedded packages and vendored assets using their observed identity."""
+    for dependency in dependencies:
+        ecosystem=dependency['ecosystem']
+        if ecosystem not in ('npm','font'):continue
+        identity=dependency['name']+'@'+dependency.get('version','')+'#'+dependency.get('sha256','')
+        spdx='SPDXRef-'+ecosystem+'-'+hashlib.sha256(identity.encode()).hexdigest()[:24]
+        package={'SPDXID':spdx,'name':dependency['name'],'downloadLocation':'NOASSERTION','filesAnalyzed':False,
+            'licenseConcluded':'NOASSERTION','licenseDeclared':dependency.get('declared_license','NOASSERTION'),
+            'copyrightText':dependency.get('copyright','NOASSERTION'),
+            'comment':'Embedded dashboard dependency; license texts are distributed in LICENSES/dashboard.txt.'}
+        if dependency.get('version'):package['versionInfo']=dependency['version']
+        if dependency.get('sha256'):
+            package['checksums']=[{'algorithm':'SHA256','checksumValue':dependency['sha256']}]
+            package['sourceInfo']='Vendored '+dependency['source_file']+'; embedded identity '+dependency['source_identity']
+        document.setdefault('packages',[]).append(package)
+        document.setdefault('relationships',[]).append({'spdxElementId':document['SPDXID'],'relationshipType':'DESCRIBES','relatedSpdxElement':spdx})
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out',type=Path,default=ROOT/'dist/release')
@@ -22,15 +41,7 @@ def main():
         document['creationInfo']['created']=manifest['source_date']
         document['documentNamespace']='https://github.com/ziad-hsn/cpra/spdx/'+manifest['commit']+'/'+target
         inventory=json.loads((directory/'DEPENDENCIES.json').read_text())
-        for dependency in inventory['dependencies']:
-            if dependency['ecosystem']!='npm':continue
-            identity=dependency['name']+'@'+dependency['version']
-            spdx='SPDXRef-npm-'+hashlib.sha256(identity.encode()).hexdigest()[:24]
-            document.setdefault('packages',[]).append({'SPDXID':spdx,'name':dependency['name'],
-                'versionInfo':dependency['version'],'downloadLocation':'NOASSERTION','filesAnalyzed':False,
-                'licenseConcluded':'NOASSERTION','licenseDeclared':dependency.get('declared_license','NOASSERTION'),
-                'copyrightText':'NOASSERTION','comment':'Embedded dashboard dependency; license texts are distributed in LICENSES/dashboard.txt.'})
-            document.setdefault('relationships',[]).append({'spdxElementId':document['SPDXID'],'relationshipType':'DESCRIBES','relatedSpdxElement':spdx})
+        append_frontend(document,inventory['dependencies'])
         destination.write_bytes(encoded(document))
     checksums(args.out)
 

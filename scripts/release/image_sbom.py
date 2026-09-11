@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Inventory tested container OS packages, Go programs and the embedded dashboard."""
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import subprocess
 from release import ROOT, checksums, encoded
+from sbom import append_frontend
 
 
 def main():
@@ -21,14 +21,7 @@ def main():
         document = json.loads(destination.read_text())
         document['creationInfo']['created'] = manifest['source_date']
         document['documentNamespace'] = 'https://github.com/ziad-hsn/cpra/spdx/'+manifest['commit']+'/image/linux-'+arch
-        for dependency in frontend:
-            identity = dependency['name']+'@'+dependency['version']
-            spdx = 'SPDXRef-npm-'+hashlib.sha256(identity.encode()).hexdigest()[:24]
-            document.setdefault('packages', []).append({'SPDXID': spdx, 'name': dependency['name'],
-                'versionInfo': dependency['version'], 'downloadLocation': 'NOASSERTION', 'filesAnalyzed': False,
-                'licenseConcluded': 'NOASSERTION', 'licenseDeclared': dependency.get('declared_license', 'NOASSERTION'),
-                'copyrightText': 'NOASSERTION', 'comment': 'Embedded dashboard; license texts accompany the image.'})
-            document.setdefault('relationships', []).append({'spdxElementId': document['SPDXID'], 'relationshipType': 'DESCRIBES', 'relatedSpdxElement': spdx})
+        append_frontend(document,frontend)
         destination.write_bytes(encoded(document))
     checksums(args.out)
 

@@ -15,6 +15,7 @@ import release
 import linux_packages
 import publish
 import registry
+import sbom
 
 
 class ReleaseTests(unittest.TestCase):
@@ -135,6 +136,22 @@ class ReleaseTests(unittest.TestCase):
             (root/'reproducibility.json').write_text(json.dumps({'status':'pass','commit':'b'*40}))
             with self.assertRaisesRegex(ValueError,'different source'):
                 publish.evidence(root, {'commit':'a'*40})
+
+    def test_vendored_font_identity_and_license_are_observed(self):
+        font=release.package.bundled_font_inventory()
+        self.assertEqual(font['name'],'Roboto Slab Bold')
+        self.assertEqual(font['version'],'2.002')
+        self.assertEqual(font['declared_license'],'Apache-2.0')
+        self.assertEqual(font['sha256'],release.sha(release.ROOT/font['source_file']))
+        document={'SPDXID':'SPDXRef-DOCUMENT'}
+        sbom.append_frontend(document,[font])
+        entry=document['packages'][0]
+        self.assertEqual(entry['checksums'][0]['checksumValue'],font['sha256'])
+        self.assertEqual(entry['versionInfo'],'2.002')
+        self.assertEqual(entry['licenseDeclared'],'Apache-2.0')
+        self.assertEqual(entry['downloadLocation'],'NOASSERTION')
+        self.assertNotIn('externalRefs',entry)
+        self.assertIn('2.002;GOOG;RobotoSlab-Bold',entry['sourceInfo'])
 
     def test_archive_evidence_binds_actual_program_bytes(self):
         with tempfile.TemporaryDirectory() as directory:

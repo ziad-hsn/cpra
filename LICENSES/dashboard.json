@@ -54,6 +54,20 @@
     ]
   },
   {
+    "ecosystem": "font",
+    "name": "Roboto Slab Bold",
+    "version": "2.002",
+    "declared_license": "Apache-2.0",
+    "license_files": [
+      "brand/fonts/LICENSE.txt"
+    ],
+    "copyright": "Copyright 2018 The Roboto Slab Project Authors (https://github.com/googlefonts/robotoslab)",
+    "source_identity": "2.002;GOOG;RobotoSlab-Bold",
+    "source_file": "brand/fonts/RobotoSlab-Bold.ttf",
+    "sha256": "f8dbdb3617fd43fdce94e990aa4f259e9e62a4f4462f60c21d76151e7c372c1b",
+    "license_url": "http://www.apache.org/licenses/LICENSE-2.0"
+  },
+  {
     "ecosystem": "npm",
     "name": "cookie",
     "version": "1.1.1",

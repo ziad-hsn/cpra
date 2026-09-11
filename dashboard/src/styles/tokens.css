@@ -1,25 +1,25 @@
 /**
- * CPRA Design Tokens — "Pulse" identity.
- * A monitoring control plane: deep blue-black surfaces, a teal/cyan heartbeat
- * accent, and luminous status colors. Dark is default; light overrides.
+ * CPRa identity: warm paper, dark ink, and the gold restart loop.
+ * Status colors retain their operational meanings in both themes.
  */
 
 :root,
 :root[data-theme='dark'] {
-  /* Brand / pulse accent */
-  --accent: #2dd4bf;
-  --accent-bright: #5eead4;
-  --accent-dim: #14b8a6;
-  --accent-soft: rgba(45, 212, 191, 0.14);
-  --accent-glow: rgba(45, 212, 191, 0.35);
-  --accent-contrast: #04211d;
+  /* Gold text is lighter on dark surfaces; the mark keeps its original gold. */
+  --brand-sun: #e5a51f;
+  --accent: #e6bc61;
+  --accent-bright: #f0cd83;
+  --accent-dim: #d6a541;
+  --accent-soft: rgba(229, 165, 31, 0.12);
+  --accent-glow: rgba(229, 165, 31, 0.16);
+  --accent-contrast: #15161a;
 
   /* Status colors — luminous on dark */
   --status-critical: #ff5470;
   --status-degraded: #ffcc4d;
   --status-operational: #34d399;
   --status-info: #38bdf8;
-  --status-disabled: #64748b;
+  --status-disabled: #a19d95;
   --status-unknown: #94a3b8;
 
   /* Status tints (bg fills + borders) */
@@ -35,28 +35,27 @@
   --status-border-info: rgba(56, 189, 248, 0.35);
   --status-border-disabled: rgba(100, 116, 139, 0.35);
 
-  /* Surfaces — deep blue-black with subtle elevation */
-  --surface-0: #070a12;
-  --surface-1: #0d111c;
-  --surface-2: #141a28;
-  --surface-3: #1c2435;
-  --surface-raised: #18203020;
+  /* Flat surfaces with a small change in tone for elevation. */
+  --surface-0: #15161a;
+  --surface-1: #1c1d22;
+  --surface-2: #24252b;
+  --surface-3: #2e3037;
+  --surface-raised: #24252b;
 
   /* Gradients for depth */
-  --gradient-shell: radial-gradient(1200px 600px at 80% -10%, rgba(45,212,191,0.06), transparent 60%), linear-gradient(180deg, #0a0e18 0%, #070a12 100%);
-  --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.022) 0%, rgba(255,255,255,0) 40%);
-  --gradient-rail: linear-gradient(180deg, var(--accent-bright), var(--accent-dim));
+  --gradient-shell: none;
+  --gradient-card: none;
 
   /* Text */
-  --text-primary: #e8eef7;
-  --text-secondary: #9fb0c5;
-  --text-muted: #5d6f85;
-  --text-inverse: #070a12;
+  --text-primary: #f4f2ee;
+  --text-secondary: #c3c0b9;
+  --text-muted: #a19d95;
+  --text-inverse: #15161a;
 
   /* Borders */
-  --border-default: #1f293a;
-  --border-strong: #2c3a52;
-  --border-subtle: #161d2c;
+  --border-default: #34353b;
+  --border-strong: #51525a;
+  --border-subtle: #2b2c32;
 
   /* Elevation */
   --elevation-1: 0 1px 2px rgba(0,0,0,0.5);
@@ -65,7 +64,8 @@
   --ring-glow: 0 0 0 1px var(--accent-soft), 0 0 24px var(--accent-glow);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Roboto Slab', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
 
   /* Motion */
@@ -78,19 +78,19 @@
 }
 
 :root[data-theme='light'] {
-  --accent: #0d9488;
-  --accent-bright: #14b8a6;
-  --accent-dim: #0f766e;
-  --accent-soft: rgba(13, 148, 136, 0.12);
-  --accent-glow: rgba(13, 148, 136, 0.25);
-  --accent-contrast: #ffffff;
+  --accent: #875f10;
+  --accent-bright: #6b490c;
+  --accent-dim: #725218;
+  --accent-soft: rgba(229, 165, 31, 0.14);
+  --accent-glow: rgba(229, 165, 31, 0.16);
+  --accent-contrast: #fbf3df;
 
-  --status-critical: #e11d48;
-  --status-degraded: #d97706;
-  --status-operational: #059669;
-  --status-info: #0284c7;
-  --status-disabled: #64748b;
-  --status-unknown: #64748b;
+  --status-critical: #bd223c;
+  --status-degraded: #965b00;
+  --status-operational: #18704a;
+  --status-info: #156e96;
+  --status-disabled: #6d685f;
+  --status-unknown: #6d685f;
 
   --status-bg-critical: rgba(225, 29, 72, 0.08);
   --status-bg-degraded: rgba(217, 119, 6, 0.08);
@@ -104,23 +104,20 @@
   --status-border-info: rgba(2, 132, 199, 0.30);
   --status-border-disabled: rgba(100, 116, 139, 0.30);
 
-  --surface-0: #eef2f7;
-  --surface-1: #ffffff;
-  --surface-2: #f4f7fb;
-  --surface-3: #e9eef5;
-  --surface-raised: #ffffff80;
+  --surface-0: #fbf3df;
+  --surface-1: #fffaf0;
+  --surface-2: #f3e8cb;
+  --surface-3: #ebddba;
+  --surface-raised: #fffaf0;
 
-  --gradient-shell: radial-gradient(1200px 600px at 80% -10%, rgba(13,148,136,0.06), transparent 60%), linear-gradient(180deg, #f6f9fc 0%, #eef2f7 100%);
-  --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 40%);
+  --text-primary: #1a262e;
+  --text-secondary: #4a5560;
+  --text-muted: #6d685f;
+  --text-inverse: #fbf3df;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-inverse: #ffffff;
-
-  --border-default: #dde4ee;
-  --border-strong: #c4cddc;
-  --border-subtle: #e9eef5;
+  --border-default: #e0d3b2;
+  --border-strong: #bcaa7d;
+  --border-subtle: #eee2c4;
 
   --elevation-1: 0 1px 2px rgba(15,23,42,0.08);
   --elevation-2: 0 4px 14px rgba(15,23,42,0.10);

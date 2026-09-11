@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
 import tarfile
 import time
 
@@ -76,6 +77,29 @@ def dependency_inventory(tags, binaries=None, go=None, env=None):
     notices['go-toolchain/LICENSE'] = (goroot / 'LICENSE').read_bytes()
     return sorted(inventory, key=lambda x: (x['ecosystem'], x['name'])), notices
 
+def bundled_font_inventory():
+    """Read identity from the actual vendored TTF, without guessing a package URL."""
+    path=ROOT/'brand/fonts/RobotoSlab-Bold.ttf';data=path.read_bytes();names={}
+    for index in range(struct.unpack_from('>H',data,4)[0]):
+        tag,_,offset,_=struct.unpack_from('>4sIII',data,12+16*index)
+        if tag!=b'name':continue
+        _,count,storage=struct.unpack_from('>HHH',data,offset)
+        for ordinal in range(count):
+            platform,_,_,identity,length,start=struct.unpack_from('>HHHHHH',data,offset+6+12*ordinal)
+            value=data[offset+storage+start:offset+storage+start+length]
+            names[identity]=value.decode('utf-16-be' if platform in (0,3) else 'mac_roman')
+        break
+    license_url=names.get(14,'')
+    if license_url not in ('http://www.apache.org/licenses/LICENSE-2.0','https://www.apache.org/licenses/LICENSE-2.0'):
+        raise ValueError('Vendored font license changed; review its distribution contract')
+    version=names.get(5,'')
+    if not version.startswith('Version '):raise ValueError('Vendored font has no explicit version identity')
+    return {'ecosystem':'font','name':names[1]+' '+names[2],'version':version.removeprefix('Version '),
+            'declared_license':'Apache-2.0','license_files':['brand/fonts/LICENSE.txt'],
+            'copyright':names.get(0,'NOASSERTION'),'source_identity':names[3],
+            'source_file':'brand/fonts/RobotoSlab-Bold.ttf','sha256':hashlib.sha256(data).hexdigest(),
+            'license_url':license_url}
+
 def dashboard_inventory():
     inventory, notices = [], {}
     # Resolve the installed production dependency graph using Node's parent
@@ -113,6 +137,8 @@ def dashboard_inventory():
         optional_names = package.get('optionalDependencies', {})
         for name in package.get('dependencies', {}) | optional_names:
             pending.append((directory, name, name in optional_names))
+    inventory.append(bundled_font_inventory())
+    notices['fonts/RobotoSlab/LICENSE.txt'] = (ROOT / 'brand/fonts/LICENSE.txt').read_bytes()
     return sorted(inventory, key=lambda x: x['name']), notices
 
 def archive(path, entries, epoch):

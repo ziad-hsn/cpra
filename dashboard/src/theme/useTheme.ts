@@ -12,18 +12,23 @@ const STORAGE_KEY = 'cpra-theme';
 
 function getInitialTheme(): ThemeMode {
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light') return stored;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === 'dark' || stored === 'light') return stored;
+    } catch { /* Storage may be unavailable in a restricted browser. */ }
   }
-  return 'dark'; // dark-first
+  return 'light';
 }
 
 function applyTheme(theme: ThemeMode): void {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#15161a' : '#fbf3df');
   }
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, theme);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch { /* The theme can still be changed for this session. */ }
   }
 }
 

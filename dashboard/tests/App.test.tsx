@@ -135,9 +135,10 @@ describe('App', () => {
     expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
   });
 
-  it('renders the layout shell with CPRA branding', () => {
+  it('renders the layout shell with CPRa branding', () => {
     renderApp('/');
-    expect(screen.getByText('CPRA')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'CPRa' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'CPRa overview' })).toHaveAttribute('href', '/');
   });
 
   it('renders the overview page and loads fleet KPIs from mocked API', async () => {

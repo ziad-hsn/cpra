@@ -3,8 +3,8 @@ package client
 import (
 	"time"
 
-	"cpra/internal/queue"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 // Overview is the /api/v1/overview payload.

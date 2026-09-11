@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 
 	"go.uber.org/zap"
 )

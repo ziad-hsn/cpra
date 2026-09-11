@@ -1,0 +1,3 @@
+# Intentionally empty. Add monitors, then validate with the installed binary.
+# Local initialization never copies provider credentials or enables recovery.
+monitors: []

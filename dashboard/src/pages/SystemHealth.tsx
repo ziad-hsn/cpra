@@ -1,3 +1,4 @@
+import { DurableStatus } from '../components/DurableStatus';
 import { useSystems, useQueues, usePools } from '../hooks/queries';
 import { KpiTile } from '../components/KpiTile';
 import { ErrorState } from '../components/ErrorState';
@@ -22,6 +23,8 @@ export default function SystemHealth() {
           <div className="lead">ECS system throughput, queue backpressure, and worker pool utilization</div>
         </div>
       </div>
+
+      <DurableStatus />
 
       {/* Engine KPIs */}
       <div className="grid-kpis">

@@ -2,7 +2,7 @@ package streaming
 
 import (
 	"context"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"os"
 	"path/filepath"
 	"testing"

@@ -1,17 +1,61 @@
+name: cpra
 services:
   cpra:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    # Edit the manifest for destinations reachable from the container.
-    command: ["-yaml", "/etc/cpra/monitors.yaml", "-web=false"]
+    image: ${CPRA_IMAGE:?Set CPRA_IMAGE to a published version or digest}
+    command:
+      - -yaml
+      - /etc/cpra/monitors.yaml
+      - -runtime-config
+      - /etc/cpra/runtime.yaml
+      - -web.addr=0.0.0.0:8060
+      - -web.auth-file=/run/secrets/cpra_api_token
+    user: "1001:1001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     environment:
-      GOMEMLIMIT: ${GOMEMLIMIT:-768MiB}
-      GOGC: ${GOGC:-100}
+      GOMEMLIMIT: ${GOMEMLIMIT:-512MiB}
+    ports:
+      - "127.0.0.1:${CPRA_PORT:-8060}:8060"
     volumes:
-      - ../examples/monitors.yaml:/etc/cpra/monitors.yaml:ro
-    deploy:
-      resources:
-        limits:
-          memory: 1G
+      - type: bind
+        source: ${CPRA_MANIFEST_FILE:?Set CPRA_MANIFEST_FILE to a readable monitor manifest}
+        target: /etc/cpra/monitors.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./runtime.yaml
+        target: /etc/cpra/runtime.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: cpra-data
+        target: /var/lib/cpra
+    secrets: [cpra_api_token]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=1001,gid=1001,mode=0700
+    mem_limit: ${CPRA_MEMORY_LIMIT:-1g}
+    stop_grace_period: 60s
     restart: unless-stopped
+    healthcheck:
+      test: [CMD, /usr/local/bin/cpractl, ready, --server, "http://127.0.0.1:8060", --token-file, /run/secrets/cpra_api_token, --request-timeout, 2s]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10m
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        mode: non-blocking
+        max-buffer-size: "1m"
+secrets:
+  cpra_api_token:
+    # Host file ownership/mode apply: Compose does not remap file-backed secrets.
+    file: ${CPRA_TOKEN_FILE:?Set CPRA_TOKEN_FILE to a UID-1001-readable API token file}
+volumes:
+  cpra-data:
+    name: ${CPRA_DATA_VOLUME:-cpra-data}

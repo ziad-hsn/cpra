@@ -3,9 +3,9 @@
 package jobs
 
 import (
-	"cpra/internal/loader/schema"
 	"errors"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 	"io"
 	"net/http"
 	"strings"

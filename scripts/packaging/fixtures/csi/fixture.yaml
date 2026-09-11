@@ -1,0 +1,294 @@
+# TEST CLUSTERS ONLY. Derived from kubernetes-csi/csi-driver-host-path
+# c7383ef90bae7803195ede035a7d85ab3c7cffc9 and external-provisioner v5.2.0.
+# Apache-2.0; see LICENSE and README.md. No snapshots, resizing or attach sidecars.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cpra-csi-fixture
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cpra-csi-fixture
+  namespace: cpra-csi-fixture
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cpra-csi-provisioner
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+- apiGroups:
+  - ''
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - volumeattachments
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cpra-csi-provisioner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cpra-csi-provisioner
+subjects:
+- kind: ServiceAccount
+  name: cpra-csi-fixture
+  namespace: cpra-csi-fixture
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: hostpath.csi.k8s.io
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: hostpath.csi.k8s.io
+    app.kubernetes.io/component: csi-driver
+spec:
+  volumeLifecycleModes:
+  - Persistent
+  - Ephemeral
+  podInfoOnMount: true
+  fsGroupPolicy: File
+  attachRequired: false
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpathplugin
+  namespace: cpra-csi-fixture
+  labels:
+    app.kubernetes.io/instance: hostpath.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-host-path
+    app.kubernetes.io/name: csi-hostpathplugin
+    app.kubernetes.io/component: plugin
+spec:
+  serviceName: csi-hostpathplugin
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: hostpath.csi.k8s.io
+      app.kubernetes.io/part-of: csi-driver-host-path
+      app.kubernetes.io/name: csi-hostpathplugin
+      app.kubernetes.io/component: plugin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: hostpath.csi.k8s.io
+        app.kubernetes.io/part-of: csi-driver-host-path
+        app.kubernetes.io/name: csi-hostpathplugin
+        app.kubernetes.io/component: plugin
+    spec:
+      serviceAccountName: cpra-csi-fixture
+      containers:
+      - name: hostpath
+        image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1@sha256:65192845eeac8e24a708f865911776a0d8490ab886e78dad17e80ae1870e7410
+        args:
+        - --drivername=hostpath.csi.k8s.io
+        - --v=5
+        - --endpoint=$(CSI_ENDPOINT)
+        - --nodeid=$(KUBE_NODE_NAME)
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:///csi/csi.sock
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        securityContext:
+          privileged: true
+        ports:
+        - containerPort: 9898
+          name: healthz
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 10
+          timeoutSeconds: 3
+          periodSeconds: 2
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+        - mountPath: /var/lib/kubelet/pods
+          mountPropagation: Bidirectional
+          name: mountpoint-dir
+        - mountPath: /var/lib/kubelet/plugins
+          mountPropagation: Bidirectional
+          name: plugins-dir
+        - mountPath: /csi-data-dir
+          name: csi-data-dir
+        - mountPath: /dev
+          name: dev-dir
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+      - name: node-driver-registrar
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0@sha256:d7138bcc3aa5f267403d45ad4292c95397e421ea17a0035888850f424c7de25d
+        args:
+        - --v=5
+        - --csi-address=/csi/csi.sock
+        - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock
+        securityContext:
+          privileged: true
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+        - mountPath: /registration
+          name: registration-dir
+        - mountPath: /csi-data-dir
+          name: csi-data-dir
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+      - name: liveness-probe
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+        image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0@sha256:2c5f9dc4ea5ac5509d93c664ae7982d4ecdec40ca7b0638c24e5b16243b8360f
+        args:
+        - --csi-address=/csi/csi.sock
+        - --health-port=9898
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+      - name: csi-provisioner
+        image: registry.k8s.io/sig-storage/csi-provisioner:v5.2.0@sha256:d5e46da8aff7d73d6f00c761dae94472bcda6e78f4f17b3802dc89d44de0111b
+        args:
+        - -v=5
+        - --csi-address=/csi/csi.sock
+        - --feature-gates=Topology=true
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /csi
+          name: socket-dir
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 256Mi
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/plugins/csi-hostpath
+          type: DirectoryOrCreate
+        name: socket-dir
+      - hostPath:
+          path: /var/lib/kubelet/pods
+          type: DirectoryOrCreate
+        name: mountpoint-dir
+      - hostPath:
+          path: /var/lib/kubelet/plugins_registry
+          type: Directory
+        name: registration-dir
+      - hostPath:
+          path: /var/lib/kubelet/plugins
+          type: Directory
+        name: plugins-dir
+      - hostPath:
+          path: /var/lib/csi-hostpath-data/
+          type: DirectoryOrCreate
+        name: csi-data-dir
+      - hostPath:
+          path: /dev
+          type: Directory
+        name: dev-dir
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cpra-csi-hostpath
+provisioner: hostpath.csi.k8s.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

@@ -10,7 +10,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/redis/go-redis/v9"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // PulseRedisJob checks a Redis server by issuing a RESP PING.

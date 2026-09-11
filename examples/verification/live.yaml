@@ -1,0 +1,1116 @@
+# User-owned configuration. Every case is disabled until its target and observer are configured.
+{
+  "manifest": {
+    "monitors": [
+      {
+        "id": "pulse-http",
+        "name": "pulse-http",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        }
+      },
+      {
+        "id": "pulse-tcp",
+        "name": "pulse-tcp",
+        "enabled": true,
+        "pulse_check": {
+          "type": "tcp",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 18081
+          }
+        }
+      },
+      {
+        "id": "pulse-icmp",
+        "name": "pulse-icmp",
+        "enabled": true,
+        "pulse_check": {
+          "type": "icmp",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "count": 1
+          }
+        }
+      },
+      {
+        "id": "pulse-dns",
+        "name": "pulse-dns",
+        "enabled": true,
+        "pulse_check": {
+          "type": "dns",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "cpra.test",
+            "server": "127.0.0.1:15353"
+          }
+        }
+      },
+      {
+        "id": "pulse-udp",
+        "name": "pulse-udp",
+        "enabled": true,
+        "pulse_check": {
+          "type": "udp",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 18082,
+            "payload": "cpra-verification"
+          }
+        }
+      },
+      {
+        "id": "pulse-grpc",
+        "name": "pulse-grpc",
+        "enabled": true,
+        "pulse_check": {
+          "type": "grpc",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 18083
+          }
+        }
+      },
+      {
+        "id": "pulse-docker",
+        "name": "pulse-docker",
+        "enabled": true,
+        "pulse_check": {
+          "type": "docker",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "container": "cpra-verification"
+          }
+        }
+      },
+      {
+        "id": "pulse-tls",
+        "name": "pulse-tls",
+        "enabled": true,
+        "pulse_check": {
+          "type": "tls",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 18443,
+            "server_name": "localhost",
+            "insecure_skip_verify": true,
+            "critical_days": 1
+          }
+        }
+      },
+      {
+        "id": "pulse-redis",
+        "name": "pulse-redis",
+        "enabled": true,
+        "pulse_check": {
+          "type": "redis",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "addr": "127.0.0.1:16379",
+            "password": "REPLACE_WITH_CONFIGURED_PASSWORD",
+            "db": 0
+          }
+        }
+      },
+      {
+        "id": "pulse-postgres",
+        "name": "pulse-postgres",
+        "enabled": true,
+        "pulse_check": {
+          "type": "postgres",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 15432,
+            "user": "cpra",
+            "password": "REPLACE_WITH_CONFIGURED_PASSWORD",
+            "database": "cpra",
+            "sslmode": "disable"
+          }
+        }
+      },
+      {
+        "id": "pulse-mysql",
+        "name": "pulse-mysql",
+        "enabled": true,
+        "pulse_check": {
+          "type": "mysql",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "host": "127.0.0.1",
+            "port": 13306,
+            "user": "cpra",
+            "password": "REPLACE_WITH_CONFIGURED_PASSWORD",
+            "database": "cpra"
+          }
+        }
+      },
+      {
+        "id": "pulse-mongo",
+        "name": "pulse-mongo",
+        "enabled": true,
+        "pulse_check": {
+          "type": "mongo",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "uri": "mongodb://127.0.0.1:17017/?directConnection=true"
+          }
+        }
+      },
+      {
+        "id": "pulse-rabbitmq",
+        "name": "pulse-rabbitmq",
+        "enabled": true,
+        "pulse_check": {
+          "type": "rabbitmq",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "amqp://cpra:REPLACE_WITH_CONFIGURED_PASSWORD@127.0.0.1:15672/"
+          }
+        }
+      },
+      {
+        "id": "pulse-kafka",
+        "name": "pulse-kafka",
+        "enabled": true,
+        "pulse_check": {
+          "type": "kafka",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "brokers": [
+              "127.0.0.1:19092"
+            ]
+          }
+        }
+      },
+      {
+        "id": "intervention-docker",
+        "name": "intervention-docker",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "intervention": {
+          "action": "docker",
+          "target": {
+            "type": "docker",
+            "container": "cpra-verification"
+          },
+          "max_failures": 1
+        }
+      },
+      {
+        "id": "intervention-webhook",
+        "name": "intervention-webhook",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "intervention": {
+          "action": "webhook",
+          "target": {
+            "type": "webhook",
+            "url": "http://127.0.0.1:18080/recover",
+            "method": "POST",
+            "timeout": "10s"
+          },
+          "max_failures": 1
+        }
+      },
+      {
+        "id": "intervention-kubernetes",
+        "name": "intervention-kubernetes",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "intervention": {
+          "action": "kubernetes",
+          "target": {
+            "type": "kubernetes",
+            "kubeconfig_path": "/path/to/designated-kubeconfig",
+            "namespace": "cpra-verification",
+            "kind": "deployment",
+            "name": "fixture",
+            "timeout": "30s"
+          },
+          "max_failures": 1
+        }
+      },
+      {
+        "id": "intervention-aws",
+        "name": "intervention-aws",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "intervention": {
+          "action": "aws",
+          "target": {
+            "type": "aws",
+            "region": "REPLACE_WITH_REGION",
+            "operation": "reboot-instance",
+            "instance_id": "REPLACE_WITH_DESIGNATED_INSTANCE",
+            "timeout": "30s"
+          },
+          "max_failures": 1
+        }
+      },
+      {
+        "id": "intervention-systemd",
+        "name": "intervention-systemd",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "intervention": {
+          "action": "systemd",
+          "target": {
+            "type": "systemd",
+            "unit": "cpra-verification.service",
+            "mode": "replace",
+            "timeout": "30s"
+          },
+          "max_failures": 1
+        }
+      },
+      {
+        "id": "code-log",
+        "name": "code-log",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "log",
+            "config": {
+              "file": "/tmp/cpra-verification-alerts.jsonl"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-slack",
+        "name": "code-slack",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "slack",
+            "config": {
+              "hook": "https://hooks.slack.com/services/REPLACE_WITH_DESIGNATED_WEBHOOK"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-pagerduty",
+        "name": "code-pagerduty",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "pagerduty",
+            "config": {
+              "routing_key": "REPLACE_WITH_ROUTING_KEY"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-email",
+        "name": "code-email",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "email",
+            "config": {
+              "server": "127.0.0.1:11025",
+              "from": "cpra@example.test",
+              "to": "recipient@example.test",
+              "allow_insecure": true
+            }
+          }
+        }
+      },
+      {
+        "id": "code-webhook",
+        "name": "code-webhook",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "webhook",
+            "config": {
+              "url": "http://127.0.0.1:18080/notify"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-telegram",
+        "name": "code-telegram",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "telegram",
+            "config": {
+              "bot_token": "REPLACE_WITH_BOT_TOKEN",
+              "chat_id": "REPLACE_WITH_CHAT_ID"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-discord",
+        "name": "code-discord",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "discord",
+            "config": {
+              "webhook_url": "https://discord.com/api/webhooks/REPLACE_WITH_DESIGNATED_WEBHOOK"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-opsgenie",
+        "name": "code-opsgenie",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "opsgenie",
+            "config": {
+              "api_key": "REPLACE_WITH_API_KEY"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-mattermost",
+        "name": "code-mattermost",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "mattermost",
+            "config": {
+              "webhook_url": "https://REPLACE_WITH_HOST/hooks/REPLACE_WITH_DESIGNATED_WEBHOOK"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-victorops",
+        "name": "code-victorops",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "victorops",
+            "config": {
+              "rest_endpoint_key": "REPLACE_WITH_ENDPOINT_KEY",
+              "routing_key": "REPLACE_WITH_ROUTING_KEY",
+              "entity_id": "cpra-verification"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-pushover",
+        "name": "code-pushover",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "pushover",
+            "config": {
+              "app_token": "REPLACE_WITH_APP_TOKEN",
+              "user_key": "REPLACE_WITH_USER_KEY",
+              "priority": 0
+            }
+          }
+        }
+      },
+      {
+        "id": "code-datadog",
+        "name": "code-datadog",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "datadog",
+            "config": {
+              "api_key": "REPLACE_WITH_API_KEY",
+              "app_key": "REPLACE_WITH_APP_KEY",
+              "site": "datadoghq.com",
+              "tags": [
+                "cpra-verification"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "code-teams",
+        "name": "code-teams",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "teams",
+            "config": {
+              "webhook_url": "https://REPLACE_WITH_WORKFLOW_WEBHOOK"
+            }
+          }
+        }
+      },
+      {
+        "id": "code-twilio",
+        "name": "code-twilio",
+        "enabled": true,
+        "pulse_check": {
+          "type": "http",
+          "interval": "60s",
+          "timeout": "5s",
+          "config": {
+            "url": "http://127.0.0.1:18080/health"
+          }
+        },
+        "codes": {
+          "red": {
+            "dispatch": true,
+            "notify": "twilio",
+            "config": {
+              "account_sid": "REPLACE_WITH_ACCOUNT_SID",
+              "auth_token": "REPLACE_WITH_AUTH_TOKEN",
+              "from": "REPLACE_WITH_FROM",
+              "to": "REPLACE_WITH_DESIGNATED_TO"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "kind": "pulse",
+      "driver": "http",
+      "configured": false,
+      "monitor_id": "pulse-http",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "http"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "tcp",
+      "configured": false,
+      "monitor_id": "pulse-tcp",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "tcp"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "icmp",
+      "configured": false,
+      "monitor_id": "pulse-icmp",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "icmp"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "dns",
+      "configured": false,
+      "monitor_id": "pulse-dns",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "dns"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "udp",
+      "configured": false,
+      "monitor_id": "pulse-udp",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "udp"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "grpc",
+      "configured": false,
+      "monitor_id": "pulse-grpc",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "grpc"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "docker",
+      "configured": false,
+      "monitor_id": "pulse-docker",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "docker"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "tls",
+      "configured": false,
+      "monitor_id": "pulse-tls",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "tls"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "redis",
+      "configured": false,
+      "monitor_id": "pulse-redis",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "redis"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "postgres",
+      "configured": false,
+      "monitor_id": "pulse-postgres",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "postgres"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "mysql",
+      "configured": false,
+      "monitor_id": "pulse-mysql",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "mysql"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "mongo",
+      "configured": false,
+      "monitor_id": "pulse-mongo",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "mongo"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "rabbitmq",
+      "configured": false,
+      "monitor_id": "pulse-rabbitmq",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "rabbitmq"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "pulse",
+      "driver": "kafka",
+      "configured": false,
+      "monitor_id": "pulse-kafka",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "pulse",
+        "kafka"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "intervention",
+      "driver": "docker",
+      "configured": false,
+      "monitor_id": "intervention-docker",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "intervention",
+        "docker"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "intervention",
+      "driver": "webhook",
+      "configured": false,
+      "monitor_id": "intervention-webhook",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "intervention",
+        "webhook"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "intervention",
+      "driver": "kubernetes",
+      "configured": false,
+      "monitor_id": "intervention-kubernetes",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "intervention",
+        "kubernetes"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "intervention",
+      "driver": "aws",
+      "configured": false,
+      "monitor_id": "intervention-aws",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "intervention",
+        "aws"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "intervention",
+      "driver": "systemd",
+      "configured": false,
+      "monitor_id": "intervention-systemd",
+      "color": "",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "intervention",
+        "systemd"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "log",
+      "configured": false,
+      "monitor_id": "code-log",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "log"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "slack",
+      "configured": false,
+      "monitor_id": "code-slack",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "slack"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "pagerduty",
+      "configured": false,
+      "monitor_id": "code-pagerduty",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "pagerduty"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "email",
+      "configured": false,
+      "monitor_id": "code-email",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "email"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "webhook",
+      "configured": false,
+      "monitor_id": "code-webhook",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "webhook"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "telegram",
+      "configured": false,
+      "monitor_id": "code-telegram",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "telegram"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "discord",
+      "configured": false,
+      "monitor_id": "code-discord",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "discord"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "opsgenie",
+      "configured": false,
+      "monitor_id": "code-opsgenie",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "opsgenie"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "mattermost",
+      "configured": false,
+      "monitor_id": "code-mattermost",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "mattermost"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "victorops",
+      "configured": false,
+      "monitor_id": "code-victorops",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "victorops"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "pushover",
+      "configured": false,
+      "monitor_id": "code-pushover",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "pushover"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "datadog",
+      "configured": false,
+      "monitor_id": "code-datadog",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "datadog"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "teams",
+      "configured": false,
+      "monitor_id": "code-teams",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "teams"
+      ],
+      "timeout": "2m"
+    },
+    {
+      "kind": "code",
+      "driver": "twilio",
+      "configured": false,
+      "monitor_id": "code-twilio",
+      "color": "red",
+      "endpoint": 0,
+      "observer": [
+        "/path/to/independent-observer",
+        "code",
+        "twilio"
+      ],
+      "timeout": "2m"
+    }
+  ]
+}

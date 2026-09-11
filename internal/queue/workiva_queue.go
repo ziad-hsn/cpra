@@ -1,9 +1,9 @@
 package queue
 
 import (
-	"cpra/internal/jobs"
 	"errors"
 	wqueue "github.com/Workiva/go-datastructures/queue"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"sync"
 	"sync/atomic"
 	"time"

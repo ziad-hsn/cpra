@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cpra/internal/client"
-	"cpra/internal/version"
+	"github.com/ziad-hsn/cpra/internal/client"
+	"github.com/ziad-hsn/cpra/internal/version"
 )
 
 // Output format identifiers for the --output (-o) flag.
@@ -96,6 +96,8 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(
 		newGetCommand(o),
 		newHealthCommand(o),
+		newReadyCommand(o),
+		newLocalCommand(),
 		newMetricsCommand(o),
 	)
 	return root

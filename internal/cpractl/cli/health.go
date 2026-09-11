@@ -27,6 +27,23 @@ func newHealthCommand(o *options) *cobra.Command {
 	}
 }
 
+// newReadyCommand checks controller admission and storage readiness.
+func newReadyCommand(o *options) *cobra.Command {
+	return &cobra.Command{Use: "ready", Short: "Check admission readiness (/api/v1/readyz)", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := o.mustClient()
+			if err != nil {
+				return err
+			}
+			if err = c.Ready(cmd.Context()); err != nil {
+				return fmt.Errorf("server not ready: %w", err)
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "ready %s\n", o.server)
+			return err
+		},
+	}
+}
+
 // newMetricsCommand builds the "metrics" command, which dumps the raw
 // Prometheus exposition from /metrics.
 func newMetricsCommand(o *options) *cobra.Command {

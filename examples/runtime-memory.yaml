@@ -1,0 +1,3 @@
+# Disposable runs only. The same incident transition rules apply, without disk.
+storage:
+  mode: memory

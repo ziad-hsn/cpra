@@ -1,7 +1,7 @@
 package queue
 
 import (
-	"cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"io"
 	"log"
 	"testing"

@@ -1,0 +1,18 @@
+{{- include "cpra.validate" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cpra.fullname" . }}-runtime
+  labels:
+    {{- include "cpra.labels" . | nindent 4 }}
+data:
+  runtime.yaml: |
+    storage:
+      mode: {{ .Values.storage.mode }}
+      directory: /var/lib/cpra
+      batch_delay: 5ms
+      batch_size: 1000
+      snapshot_interval: 5m
+      snapshot_retain: 3
+    history:
+      retention_days: 30

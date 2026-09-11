@@ -2,8 +2,8 @@ package queue
 
 import (
 	"context"
-	"cpra/internal/jobs"
 	"errors"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"log"
 	"math"
 	"runtime"
@@ -29,6 +29,7 @@ type ResultRouter struct {
 
 // WorkerPoolStats exposes runtime metrics for the dynamic worker pool.
 type WorkerPoolStats struct {
+	SLOCondition    string        `json:"slo_condition"`
 	ServiceTime     time.Duration `json:"service_time"`
 	ServiceCV       float64       `json:"service_cv"`
 	ServiceSamples  int           `json:"service_samples"`
@@ -137,6 +138,7 @@ func (r *ResultRouter) Close() {
 // DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
 // It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
+	feedback        *feedback
 	serviceMetrics  durationMetrics
 	sizingPolicy    atomic.Pointer[sizingPolicy]
 	sizingModel     atomic.Uint32
@@ -395,6 +397,10 @@ func (p *DynamicWorkerPool) GetRouter() *ResultRouter {
 }
 
 // DrainAndStop waits for outstanding tasks to finish before stopping the worker pool.
+// CancelWork cancels operation contexts without dropping buffered results.
+// The owner must still join DrainAndStop and consume result routes.
+func (p *DynamicWorkerPool) CancelWork() { p.workCancel() }
+
 func (p *DynamicWorkerPool) DrainAndStop() {
 	if !p.stopping.CompareAndSwap(0, 1) {
 		<-p.stopped
@@ -604,6 +610,9 @@ func (p *DynamicWorkerPool) autoScale() {
 			stats := q.Stats()
 			desired := p.desiredCapacity(stats)
 			current := p.antsPool.Cap()
+			if p.feedback != nil {
+				desired = p.feedback.adjust(current, desired, p.config.MaxWorkers, stats.QueueDepth, time.Now())
+			}
 			if desired != current {
 				p.antsPool.Tune(desired)
 				if p.logger != nil {
@@ -728,7 +737,8 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 	models := [...]string{"awaiting_observations", "erlang_c_allen_cunneen", "little_law_fallback", "slo_unattainable"}
 	pending := int(p.pendingResults.Load())
 	return WorkerPoolStats{
-		ServiceTime: time.Duration(mean * float64(time.Second)), ServiceCV: cv, ServiceSamples: samples, SizingModel: models[p.sizingModel.Load()],
+		SLOCondition: p.sloCondition(),
+		ServiceTime:  time.Duration(mean * float64(time.Second)), ServiceCV: cv, ServiceSamples: samples, SizingModel: models[p.sizingModel.Load()],
 		MinWorkers:      p.config.MinWorkers,
 		MaxWorkers:      p.config.MaxWorkers,
 		CurrentCapacity: p.antsPool.Cap(),

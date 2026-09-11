@@ -12,28 +12,65 @@ concurrency:
 jobs:
   go:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     strategy:
       matrix:
-        go: ['1.25.x', '1.27.x']
+        go: ['1.25.0', '1.27.1']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ matrix.go }}
           cache: true
+      - run: make release-check
       - run: make check
+      - run: make verify-local
+      - run: make verify-contracts verify-protocols BUILD_TAGS="teams twilio"
+      - run: python3 -m unittest discover -s scripts/benchmark -p "test_*.py"
+      - run: python3 -m unittest discover -s scripts/verification -p "test_*.py"
       - run: make test-all-drivers
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
-        if: matrix.go == '1.27.x'
+        if: matrix.go == '1.27.1'
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
-        if: matrix.go == '1.27.x'
+        if: matrix.go == '1.27.1'
   dashboard:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '24'
+          node-version: '24.21.0'
       - run: npm install --global pnpm@11.22.0
-      - run: make dashboard-build dashboard-check
+      - run: python3 -B scripts/release/dashboard_build.py --check
       - run: pnpm --dir dashboard audit
+
+  native-go:
+    name: Native correctness (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.1'
+      - name: Native platform, preflight, administration and persistence tests
+        run: go test ./internal/version ./internal/platformpath ./internal/preflight ./internal/localadmin ./internal/durable
+      - name: Compile all advertised drivers for native platform
+        run: go build -mod=readonly -tags="redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio" ./...
+
+  container-chart-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: |
+          python3 -m pip install -r scripts/packaging/requirements.txt
+          python3 scripts/release/install_tools.py helm3 helm4 actionlint
+          bin/release-tools/actionlint
+          HELM_BIN="$PWD/bin/release-tools/helm3" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
+          HELM_BIN="$PWD/bin/release-tools/helm4" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v

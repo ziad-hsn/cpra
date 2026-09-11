@@ -1,0 +1,28 @@
+[Unit]
+Description=CPRa monitor controller
+Documentation=https://ziad-hsn.github.io/cpra/
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=cpra
+Group=cpra
+WorkingDirectory=/var/lib/cpra
+StateDirectory=cpra
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/bin/cpra -yaml /etc/cpra/monitors.yaml -runtime-config /etc/cpra/runtime.yaml -data-dir /var/lib/cpra -web.addr 127.0.0.1:8060 -web.auth-file /etc/cpra/auth.token -allow-empty -shutdown-timeout 45s
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=600s
+TimeoutStopSec=60s
+KillMode=mixed
+KillSignal=SIGTERM
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

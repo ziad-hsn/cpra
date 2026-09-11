@@ -1,0 +1,7 @@
+# Use with docker-compose.yml and explicit manifest/token inputs.
+services:
+  cpra:
+    image: cpra:dev
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev

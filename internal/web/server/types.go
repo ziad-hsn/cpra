@@ -3,19 +3,23 @@ package server
 import (
 	"time"
 
-	"cpra/internal/controller"
-	"cpra/internal/queue"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 // ServerConfig configures the web server.
 type ServerConfig struct {
-	Addr             string        `json:"addr"`
-	ReadTimeout      time.Duration `json:"read_timeout"`
-	WriteTimeout     time.Duration `json:"write_timeout"`
-	CORSAllowOrigins []string      `json:"cors_allow_origins"`
-	HistoryInterval  time.Duration `json:"history_interval"`
-	HistoryCapacity  int           `json:"history_capacity"`
+	Ready            func() bool    `json:"-"`
+	AllowEmpty       bool           `json:"-"`
+	Store            *durable.Store `json:"-"`
+	Addr             string         `json:"addr"`
+	ReadTimeout      time.Duration  `json:"read_timeout"`
+	WriteTimeout     time.Duration  `json:"write_timeout"`
+	CORSAllowOrigins []string       `json:"cors_allow_origins"`
+	HistoryInterval  time.Duration  `json:"history_interval"`
+	HistoryCapacity  int            `json:"history_capacity"`
 	// AuthToken, when non-empty, requires an Authorization: Bearer <token>
 	// header on every request. Empty disables auth (the default).
 	AuthToken string `json:"-"`

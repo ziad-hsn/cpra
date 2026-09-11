@@ -1,4 +1,4 @@
-//go:build systemd
+//go:build linux && systemd
 
 package jobs
 
@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // InterventionSystemdJob restarts a systemd unit on the local host.

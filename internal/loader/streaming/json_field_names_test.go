@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 func TestStrictJSONPreservesDecodedFieldNames(t *testing.T) {

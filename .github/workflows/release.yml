@@ -1,0 +1,424 @@
+name: Build and publish verified releases
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version; stable tag is created only after verification
+        required: true
+        default: v0.1.0-rc.1
+      docs_ref:
+        description: Documentation ref whose source-version.json matches this candidate exactly
+        required: true
+        default: gh-pages
+      publish:
+        description: Publish from reviewed main after all gates and protected environment approval
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  GOTOOLCHAIN: local
+  RELEASE_VERSION: ${{ inputs.version }}
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Install checksum-pinned release compiler
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-go"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify generated assets and release inputs
+        run: |
+          npm install --global pnpm@11.22.0
+          python3 -B scripts/release/dashboard_build.py --check
+          git diff --exit-code -- internal/web/server/assets LICENSES dashboard/pnpm-lock.yaml
+          make release-check check test-all-drivers
+          go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
+          python3 scripts/release/install_tools.py
+          bin/release-tools/actionlint
+      - name: Require publication to come from reviewed published main
+        if: inputs.publish && github.ref == 'refs/heads/main'
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION"; then
+            echo "Version tag already exists; published versions cannot be replaced" >&2
+            exit 1
+          fi
+      - name: Build exact recorded recipe and package outputs
+        run: |
+          make release-prepare VERSION="$RELEASE_VERSION"
+          make release-build-goreleaser
+          make release-package
+          python3 scripts/release/sbom.py --syft bin/release-tools/syft
+          python3 scripts/release/release.py verify
+      - name: Rebuild from distributed source without Git
+        run: |
+          python3 scripts/release/source_rebuild.py --source "dist/release/cpra-$RELEASE_VERSION-source.tar.gz" --stage dist/release --go "$(command -v go)" --nfpm "$PWD/bin/release-tools/nfpm" --out dist/release/reproducibility.json
+          python3 scripts/release/release.py checksums
+      - name: Upload release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: |
+            dist/release/*.tar.gz
+            dist/release/*.zip
+            dist/release/*.deb
+            dist/release/*.rpm
+            dist/release/*.json
+            dist/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-linux_amd64
+          path: dist/release/linux_amd64
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-linux_arm64
+          path: dist/release/linux_arm64
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-darwin_amd64
+          path: dist/release/darwin_amd64
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-darwin_arm64
+          path: dist/release/darwin_arm64
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-windows_amd64
+          path: dist/release/windows_amd64
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage-windows_arm64
+          path: dist/release/windows_arm64
+          if-no-files-found: error
+          retention-days: 14
+
+  native:
+    needs: build
+    name: Native release smoke (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux_amd64}
+          - {runner: ubuntu-24.04-arm, target: linux_arm64}
+          - {runner: macos-15-intel, target: darwin_amd64}
+          - {runner: macos-15, target: darwin_arm64}
+          - {runner: windows-2025, target: windows_amd64}
+          - {runner: windows-11-arm, target: windows_arm64}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: stage-${{ matrix.target }}
+          path: stage
+      - name: Restore executable permissions
+        if: runner.os != 'Windows'
+        run: chmod +x stage/cpra stage/cpractl
+      - name: Install checksum-pinned native compiler
+        shell: bash
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-go"
+      - name: Native storage and platform correctness
+        run: go test -p=2 ./internal/platformpath ./internal/localadmin ./internal/durable
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: source-assets
+      - name: Versioned source installation outside a checkout
+        shell: bash
+        run: python3 scripts/release/go_install.py --source "source-assets/cpra-$RELEASE_VERSION-source.tar.gz" --go "$(command -v go)" --out "evidence/go-install-${{ matrix.target }}.json"
+      - name: Exercise the distributed native executables
+        run: python3 scripts/release/native_smoke.py --stage stage --out evidence/native-${{ matrix.target }}.json
+      - name: Native administrator-managed service lifecycle (Unix)
+        if: runner.os != 'Windows'
+        run: sudo env GITHUB_ACTIONS=true CI=true python3 scripts/native/service_lifecycle.py --stage "$PWD/stage" --scope system --allow-system-changes --out "$PWD/evidence/service-${{ matrix.target }}.json"
+      - name: Native SCM lifecycle (Windows)
+        if: runner.os == 'Windows'
+        run: python3 scripts/native/service_lifecycle.py --stage stage --scope system --allow-system-changes --out evidence/service-${{ matrix.target }}.json
+      - name: Native user service lifecycle
+        if: runner.os != 'Windows'
+        run: python3 scripts/native/service_lifecycle.py --stage "$PWD/stage" --scope user --allow-system-changes --out "$PWD/evidence/service-user-${{ matrix.target }}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-evidence-${{ matrix.target }}
+          path: |
+            evidence/*.json
+            evidence/*.log
+          if-no-files-found: error
+
+  packages:
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [deb, rpm]
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        include:
+          - {runner: ubuntu-24.04, arch: amd64}
+          - {runner: ubuntu-24.04-arm, arch: arm64}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: dist/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: stage-linux_${{ matrix.arch }}
+          path: dist/release/linux_${{ matrix.arch }}
+      - run: |
+          chmod +x dist/release/linux_${{ matrix.arch }}/cpra dist/release/linux_${{ matrix.arch }}/cpractl
+          python3 scripts/release/install_tools.py nfpm
+      - name: Real DEB/systemd lifecycle on isolated runner
+        if: matrix.format == 'deb'
+        run: sudo python3 scripts/release/package_lifecycle.py --isolated-ci --format deb --nfpm "$PWD/bin/release-tools/nfpm" --evidence "$PWD/evidence/package-deb-${{ matrix.arch }}.json"
+      - name: Real RPM/systemd lifecycle in isolated Fedora
+        if: matrix.format == 'rpm'
+        run: CPRA_PACKAGE_ARCH=${{ matrix.arch }} bash scripts/release/rpm_ci.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: package-evidence-${{ matrix.format }}-${{ matrix.arch }}
+          path: evidence/package-*.json
+          if-no-files-found: error
+
+  containers:
+    needs: [build, native]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: amd64}
+          - {runner: ubuntu-24.04-arm, arch: arm64}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: stage-linux_${{ matrix.arch }}
+          path: dist/release/linux_${{ matrix.arch }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build the native image from tested release binaries
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          chmod +x "dist/release/linux_$TARGET_ARCH/cpra" "dist/release/linux_$TARGET_ARCH/cpractl"
+          source_epoch=$(python3 -c 'import json,os; print(json.load(open("dist/release/linux_"+os.environ["TARGET_ARCH"]+"/RELEASE.json"))["source_date_epoch"])')
+          docker buildx build --output "type=docker,dest=tested-image-$TARGET_ARCH.tar,rewrite-timestamp=true" --platform "linux/$TARGET_ARCH" --build-context release=dist/release -f docker/Dockerfile --build-arg VERSION="$RELEASE_VERSION" --build-arg COMMIT="$GITHUB_SHA" --build-arg SOURCE_DATE_EPOCH="$source_epoch" -t "cpra:tested-$TARGET_ARCH" .
+          docker load -i "tested-image-$TARGET_ARCH.tar"
+          python3 -m pip install -r scripts/packaging/requirements.txt
+          python3 scripts/packaging/image_repro.py --release-dir dist/release --arch "$TARGET_ARCH" --reference-image "cpra:tested-$TARGET_ARCH" --out "evidence/image-repro-$TARGET_ARCH.json"
+          python3 scripts/packaging/live_compose.py --image "cpra:tested-$TARGET_ARCH" --release-dir "dist/release/linux_$TARGET_ARCH" --out "evidence/container-$TARGET_ARCH.json"
+          docker image inspect "cpra:tested-$TARGET_ARCH" > "evidence/image-$TARGET_ARCH.json"
+          sha256sum "tested-image-$TARGET_ARCH.tar" > "tested-image-$TARGET_ARCH.tar.sha256"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-${{ matrix.arch }}
+          path: tested-image-*.tar*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: container-evidence-${{ matrix.arch }}
+          path: |
+            evidence/*.json
+            evidence/*.log
+          if-no-files-found: error
+
+  publish:
+    needs: [build, compatibility, native, packages, containers, charts, documentation]
+    if: inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    # Repository administrators must configure required reviewers and tag
+    # restrictions on this environment before enabling publication.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: dist/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: '*-evidence-*'
+          merge-multiple: true
+          path: dist/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: images
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify assembled assets and record executed evidence
+        run: |
+          python3 scripts/release/release.py verify
+          python3 scripts/release/release.py checksums
+          python3 scripts/release/install_tools.py cosign helm4 syft
+      - name: Refuse existing application or chart version tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release/registry.py
+      - name: Publish the tested image bytes and multiarch manifest
+        id: image
+        run: |
+          cd images
+          sha256sum --check tested-image-amd64.tar.sha256
+          sha256sum --check tested-image-arm64.tar.sha256
+          cd ..
+          for arch in amd64 arm64; do
+            docker load -i "images/tested-image-$arch.tar"
+            docker tag "cpra:tested-$arch" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch"
+            docker push "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch"
+            docker buildx imagetools inspect "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch" --format '{{json .Manifest.Digest}}' > "images/$arch.digest.json"
+            platform_digest=$(python3 -c "import json; print(json.load(open('images/$arch.digest.json')))")
+            bin/release-tools/cosign sign --yes "ghcr.io/ziad-hsn/cpra@$platform_digest"
+            bin/release-tools/cosign verify --certificate-identity https://github.com/ziad-hsn/cpra/.github/workflows/release.yml@refs/heads/main --certificate-oidc-issuer https://token.actions.githubusercontent.com "ghcr.io/ziad-hsn/cpra@$platform_digest"
+          done
+          docker buildx imagetools create -t "ghcr.io/ziad-hsn/cpra:candidate-$RELEASE_VERSION-$GITHUB_SHA" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-amd64" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-arm64"
+          digest=$(docker buildx imagetools inspect "ghcr.io/ziad-hsn/cpra:candidate-$RELEASE_VERSION-$GITHUB_SHA" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          export CPRA_INDEX_DIGEST="$digest"
+          python3 -c 'import json,os; from pathlib import Path; data={"image":"ghcr.io/ziad-hsn/cpra","digest":os.environ["CPRA_INDEX_DIGEST"],"version":os.environ["RELEASE_VERSION"],"commit":os.environ["GITHUB_SHA"],"platforms":{arch:json.loads(Path("images",arch+".digest.json").read_text()) for arch in ("amd64","arm64")}}; Path("dist/release/OCI.json").write_text(json.dumps(data,indent=2)+"\n")'
+          python3 scripts/release/image_sbom.py --syft bin/release-tools/syft
+          bin/release-tools/cosign sign --yes "ghcr.io/ziad-hsn/cpra@$digest"
+          bin/release-tools/cosign verify --certificate-identity "https://github.com/ziad-hsn/cpra/.github/workflows/release.yml@refs/heads/main" --certificate-oidc-issuer https://token.actions.githubusercontent.com "ghcr.io/ziad-hsn/cpra@$digest"
+          python3 scripts/release/release.py checksums
+      - name: Attest published multiarch digest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ghcr.io/ziad-hsn/cpra
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Prepare the chart against the tested immutable image digest
+        run: |
+          python3 -m pip install -r scripts/packaging/requirements.txt
+          python3 scripts/release/chart.py --helm bin/release-tools/helm4 --image-digest "${{ steps.image.outputs.digest }}"
+          gh attestation trusted-root > dist/release/trusted_root.jsonl
+          python3 scripts/release/release.py checksums
+      - name: Attest checksummed release assets
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: dist/release/SHA256SUMS
+      - name: Sign, stage, download, verify and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          cp "$PROVENANCE_BUNDLE" dist/release/provenance.sigstore.json
+          bin/release-tools/cosign sign-blob --yes --bundle dist/release/SHA256SUMS.sigstore.json dist/release/SHA256SUMS
+          python3 scripts/release/publish.py --cosign "$PWD/bin/release-tools/cosign"
+          python3 scripts/release/registry.py
+          docker buildx imagetools create -t "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION" "ghcr.io/ziad-hsn/cpra@${{ steps.image.outputs.digest }}"
+          bin/release-tools/helm4 push "dist/release/cpra-chart-$(python3 -c 'import json; print(json.load(open("dist/release/RELEASE.json"))["chart_version"])').tgz" oci://ghcr.io/ziad-hsn/charts
+
+  compatibility:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [go1.25.0, go1.27.1]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 scripts/release/install_go.py --version "${{ matrix.compiler }}" --out "$RUNNER_TEMP/cpra-go"
+      - run: |
+          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race ./...
+          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
+
+  documentation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.docs_ref }}
+          path: docs-site
+      - name: Verify source identity, strict build and local links
+        run: |
+          python3 -c 'import json,os; assert json.load(open("docs-site/_sources/source-version.json"))["source_commit"] == os.environ["GITHUB_SHA"], "Documentation is not bound to this source candidate"'
+          python3 -m pip install -r docs-site/_sources/requirements.txt
+          python3 docs-site/_sources/rebuild.py --output "$RUNNER_TEMP/rendered-docs"
+          mkdir -p evidence
+          python3 -c 'import json,os,subprocess; print(json.dumps({"status":"pass","commit":os.environ["GITHUB_SHA"],"docs_commit":subprocess.check_output(["git","-C","docs-site","rev-parse","HEAD"],text=True).strip(),"scope":"strict site build, links, assets, source metadata"}))' > evidence/documentation.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: documentation-evidence-site
+          path: evidence/documentation.json
+          if-no-files-found: error
+
+  charts:
+    needs: [build, containers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-amd64
+          path: images
+      - name: Install reviewed chart and cluster tools
+        run: |
+          python3 scripts/release/install_tools.py helm3 helm4 kind kubectl
+          echo "$PWD/bin/release-tools" >> "$GITHUB_PATH"
+          python3 -m pip install -r scripts/packaging/requirements.txt
+      - name: Create isolated Kubernetes fixture
+        env:
+          KUBECONFIG: ${{ runner.temp }}/cpra-kubeconfig
+        run: |
+          cd images
+          sha256sum --check tested-image-amd64.tar.sha256
+          docker load -i tested-image-amd64.tar
+          cd ..
+          kind create cluster --name cpra-packaging-test --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0 --wait 180s
+          kind load docker-image cpra:tested-amd64 --name cpra-packaging-test
+          python3 scripts/packaging/install_csi_fixture.py --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test
+      - name: Native Helm 3 to 4 and Helm 4 operations with RWOP fencing
+        env:
+          KUBECONFIG: ${{ runner.temp }}/cpra-kubeconfig
+        run: |
+          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm3 --upgrade-helm bin/release-tools/helm4 --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm3-to-4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm3-to-4.json
+          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm4 --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm4.json
+      - name: Delete only the dedicated fixture cluster
+        if: always()
+        run: bin/release-tools/kind delete cluster --name cpra-packaging-test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: chart-evidence-operations
+          path: evidence/chart-*.json
+          if-no-files-found: error

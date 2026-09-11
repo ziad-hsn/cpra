@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // Disabled is a zero-size tag component marking an entity as disabled.
@@ -30,6 +30,10 @@ type CodeDelivery struct {
 }
 
 type MonitorState struct {
+	MonitorID         string
+	Revision          string
+	LastLatency       time.Duration
+	LatencyAvailable  bool
 	Maintenance       []schema.CompiledWindow
 	PendingAlerts     []AlertRequest
 	Deliveries        map[string]*CodeDelivery

@@ -20,7 +20,7 @@ import (
 	"github.com/moby/moby/client"
 	ping "github.com/prometheus-community/pro-bing"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 var icmpPingerSem = make(chan struct{}, 2048)
@@ -90,6 +90,11 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 		}, nil
 
 	case *schema.PulseDNSConfig:
+		if cfg.Server != "" {
+			if _, err := dnsServerAddress(cfg.Server); err != nil {
+				return nil, err
+			}
+		}
 		return &PulseDNSJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
@@ -342,7 +347,12 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'telegram' requires a telegram config")
 		}
+		if _, err := telegramURL(cfg.URL, cfg.BotToken, cfg.TestMode); err != nil {
+			return nil, err
+		}
 		return &CodeTelegramJob{
+			URL:      cfg.URL,
+			TestMode: cfg.TestMode,
 			ID:       uuid.New(),
 			Entity:   jobID,
 			Monitor:  monitorClone,
@@ -398,7 +408,11 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'victorops' requires a victorops config")
 		}
+		if _, err := victorOpsURL(cfg.URL, cfg.RestEndpointKey, cfg.RoutingKey); err != nil {
+			return nil, err
+		}
 		return &CodeVictorOpsJob{
+			URL:             cfg.URL,
 			ID:              uuid.New(),
 			Entity:          jobID,
 			Monitor:         monitorClone,
@@ -737,11 +751,15 @@ func (p *PulseDNSJob) Execute() (result Result) {
 
 	resolver := &net.Resolver{}
 	if p.Server != "" {
+		server, err := dnsServerAddress(p.Server)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
 		resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				d := net.Dialer{Timeout: p.Timeout}
-				return d.DialContext(ctx, network, net.JoinHostPort(p.Server, "53"))
+				return d.DialContext(ctx, network, server)
 			},
 		}
 	}
@@ -1234,6 +1252,8 @@ func (c *CodeWebhookJob) IsNil() bool                { return c == nil }
 // CodeTelegramJob delivers an alert to a Telegram chat via the Bot API.
 type CodeTelegramJob struct {
 	Execution
+	URL         string
+	TestMode    bool
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Monitor     string
@@ -1251,12 +1271,15 @@ func (c *CodeTelegramJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "telegram", "color": c.Color}
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.BotToken)
+	target, err := telegramURL(c.URL, c.BotToken, c.TestMode)
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
 	body, err := json.Marshal(map[string]string{"chat_id": c.ChatID, "text": c.Message})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	resp, err := postNotification(ctx, url, "application/json", strings.NewReader(string(body)))
+	resp, err := postNotification(ctx, target, "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 type notificationTestTransport func(*http.Request) (*http.Response, error)

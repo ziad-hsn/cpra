@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cpra/internal/client"
+	"github.com/ziad-hsn/cpra/internal/client"
 )
 
 // monitorFlags holds the list-filter flags for "get monitors".
@@ -114,6 +114,7 @@ func newGetCommand(o *options) *cobra.Command {
 	}
 
 	get.AddCommand(monitors, incidents, queues, pools, systems, config, overview)
+	addDurableCommands(get, o)
 	return get
 }
 

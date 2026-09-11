@@ -2,22 +2,26 @@ package controller
 
 import (
 	"context"
-	"cpra/internal/alerts"
-	"cpra/internal/controller/systems"
-	"cpra/internal/queue"
 	"errors"
 	"fmt"
+	"github.com/ziad-hsn/cpra/internal/alerts"
+	"github.com/ziad-hsn/cpra/internal/controller/systems"
+	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"log"
 	"math"
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/controller/entities"
-	"cpra/internal/loader/streaming"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
+	"github.com/ziad-hsn/cpra/internal/loader/streaming"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"
@@ -58,6 +62,7 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 
 // Controller manages the ECS world and its systems using ark-tools.
 type Controller struct {
+	durableSystem        *systems.DurableSystem
 	stateLogger          *systems.StateLogger
 	pulseQueue           queue.Queue
 	codeQueue            queue.Queue
@@ -76,6 +81,10 @@ type Controller struct {
 	stopCh               chan struct{}
 	doneCh               chan struct{}
 	resultSystems        []app.System
+	initialized          chan struct{}
+	initializedState     atomic.Bool
+	lastProgress         atomic.Int64
+	stoppingState        atomic.Bool
 	useAdaptiveQueue     bool
 
 	// Observability surfaces for the web server.
@@ -85,6 +94,8 @@ type Controller struct {
 
 // Config holds all configuration for the controller.
 type Config struct {
+	Store           *durable.Store
+	Runtime         runtimeconfig.Config
 	Debug           bool
 	StreamingConfig streaming.StreamingConfig
 	QueueCapacity   uint64
@@ -119,6 +130,7 @@ type Config struct {
 // DefaultConfig returns a default configuration.
 func DefaultConfig() Config {
 	return Config{
+		Runtime:           runtimeconfig.Default(),
 		StreamingConfig:   streaming.DefaultStreamingConfig(),
 		QueueCapacity:     65536, // Must be a power of 2
 		WorkerConfig:      queue.DefaultWorkerPoolConfig(),
@@ -187,6 +199,10 @@ func NewController(config Config) *Controller {
 		log.Fatalf("Failed to create code worker pool: %v", err)
 	}
 
+	if config.Store != nil {
+		pulsePool.SetSLOFeedback(config.Store.SLO(), config.Runtime.SLO)
+	}
+
 	pulseQueue = pulsePool.Queue()
 	interventionQueue = interventionPool.Queue()
 	codeQueue = codePool.Queue()
@@ -225,14 +241,20 @@ func NewController(config Config) *Controller {
 	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, codeSched, config.BatchSize, logger, stateLogger, alertMgr)
 	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, codeSched, logger, stateLogger, alertMgr)
 
-	arkApp.AddSystem(pulseScheduleSystem)
-	arkApp.AddSystem(pulseSystem)
-	arkApp.AddSystem(interventionSystem)
-	arkApp.AddSystem(codeScheduleSystem)
-	arkApp.AddSystem(codeSystem)
-	arkApp.AddSystem(pulseResultSystem)
-	arkApp.AddSystem(interventionResultSystem)
-	arkApp.AddSystem(codeResultSystem)
+	var durableSystem *systems.DurableSystem
+	if config.Store != nil {
+		durableSystem = systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
+		arkApp.AddSystem(durableSystem)
+	} else {
+		arkApp.AddSystem(pulseScheduleSystem)
+		arkApp.AddSystem(pulseSystem)
+		arkApp.AddSystem(interventionSystem)
+		arkApp.AddSystem(codeScheduleSystem)
+		arkApp.AddSystem(codeSystem)
+		arkApp.AddSystem(pulseResultSystem)
+		arkApp.AddSystem(interventionResultSystem)
+		arkApp.AddSystem(codeResultSystem)
+	}
 
 	// Snapshot system publishes a read-only fleet projection for the web
 	// server. It reads the world only inside its tick, throttled to
@@ -243,16 +265,25 @@ func NewController(config Config) *Controller {
 		snapshotInterval = 5 * time.Second
 	}
 	statsSnapshotSystem := systems.NewBatchStatsSnapshotSystem(world, logger, snapshotHolder, snapshotInterval, 1_000_000)
-	arkApp.AddSystem(statsSnapshotSystem)
+	if durableSystem == nil {
+		arkApp.AddSystem(statsSnapshotSystem)
+	}
 
 	// Drain pulse results a second time at the END of the tick. The result
 	// system runs once per tick by default, so a result is applied on the NEXT
 	// tick (~1 tick of round-trip latency). Draining again here applies the
 	// results that arrived since the first drain in the SAME tick, shrinking
 	// the round-trip below one tick.
-	arkApp.AddSystem(pulseResultSystem)
+	if durableSystem == nil {
+		arkApp.AddSystem(pulseResultSystem)
+	}
+	resultSystems := []app.System{pulseResultSystem, interventionResultSystem, codeResultSystem, statsSnapshotSystem}
+	if durableSystem != nil {
+		resultSystems = []app.System{durableSystem}
+	}
 
 	return &Controller{
+		durableSystem:        durableSystem,
 		app:                  arkApp,
 		world:                world,
 		mapper:               mapper,
@@ -267,7 +298,7 @@ func NewController(config Config) *Controller {
 		stateLogger:          stateLogger,
 		metricsAgg:           metricsAgg,
 		snapshotHolder:       snapshotHolder,
-		resultSystems:        []app.System{pulseResultSystem, interventionResultSystem, codeResultSystem, statsSnapshotSystem},
+		resultSystems:        resultSystems,
 	}
 }
 
@@ -285,6 +316,12 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	}
 	SystemLogger.Info("Successfully loaded %d monitors in %v (%.0f monitors/sec)",
 		stats.TotalEntities, stats.LoadingTime, stats.CreationRate)
+
+	if c.durableSystem != nil {
+		if err := c.durableSystem.Load(ctx); err != nil {
+			return fmt.Errorf("reconcile durable monitors: %w", err)
+		}
+	}
 
 	// Check if we need to switch to AdaptiveQueue due to high entity count
 	c.CheckEntityCountAndSwitchQueue()
@@ -427,6 +464,7 @@ func (c *Controller) Start() error {
 	}
 	c.feedArrivalRate()
 	c.stopCh, c.doneCh = make(chan struct{}), make(chan struct{})
+	c.initialized = make(chan struct{})
 	c.running = true
 	c.pulsePool.Start()
 	c.interventionPool.Start()
@@ -439,11 +477,17 @@ func (c *Controller) Start() error {
 func (c *Controller) run() {
 	defer close(c.doneCh)
 	c.app.Initialize()
+	c.lastProgress.Store(time.Now().UnixNano())
+	c.initializedState.Store(true)
+	close(c.initialized)
 	ticker := time.NewTicker(time.Second / time.Duration(c.app.TPS))
 	defer ticker.Stop()
 	for {
 		select {
 		case <-c.stopCh:
+			if c.durableSystem != nil {
+				c.durableSystem.StopAdmission()
+			}
 			// Stop admitting new operations. Continue applying accepted results while
 			// all pools drain, so backpressure cannot deadlock shutdown.
 			drained := make(chan struct{})
@@ -476,11 +520,40 @@ func (c *Controller) run() {
 			}
 		case <-ticker.C:
 			c.app.Update()
+			c.lastProgress.Store(time.Now().UnixNano())
 		}
 	}
 }
 
-func (c *Controller) Stop() {
+// Ready reports process admission readiness without reading mutable ECS state.
+func (c *Controller) Ready() bool {
+	return c.initializedState.Load() && !c.stoppingState.Load() && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second && (c.config.Store == nil || c.config.Store.Status().Ready)
+}
+
+func (c *Controller) WaitReady(ctx context.Context) error {
+	c.lifecycleMu.Lock()
+	initialized := c.initialized
+	c.lifecycleMu.Unlock()
+	if initialized == nil {
+		return fmt.Errorf("controller has not started")
+	}
+	select {
+	case <-initialized:
+		if !c.Ready() {
+			return fmt.Errorf("controller unavailable after initialization")
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// BeginStop rejects admission immediately and asks the owner loop to drain.
+func (c *Controller) BeginStop() {
+	c.stoppingState.Store(true)
+	if c.durableSystem != nil {
+		c.durableSystem.StopAdmission()
+	}
 	c.lifecycleMu.Lock()
 	if c.doneCh == nil {
 		c.doneCh = make(chan struct{})
@@ -499,10 +572,33 @@ func (c *Controller) Stop() {
 		c.running = false
 		close(c.stopCh)
 	}
+	c.lifecycleMu.Unlock()
+}
+
+// StopContext bounds the caller's wait. On expiry it cancels cooperative jobs;
+// the controller still owns cleanup until Done closes. Callers must not close
+// its store or loggers early. The executable exits on an uncooperative timeout.
+func (c *Controller) StopContext(ctx context.Context) error {
+	c.BeginStop()
+	c.lifecycleMu.Lock()
 	done := c.doneCh
 	c.lifecycleMu.Unlock()
-	<-done
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		c.CancelWork()
+		return ctx.Err()
+	}
 }
+
+func (c *Controller) CancelWork() {
+	c.pulsePool.CancelWork()
+	c.interventionPool.CancelWork()
+	c.codePool.CancelWork()
+}
+
+func (c *Controller) Stop() { _ = c.StopContext(context.Background()) }
 
 // PrintShutdownMetrics logs queue, worker pool, and world statistics at shutdown.
 func (c *Controller) PrintShutdownMetrics() {

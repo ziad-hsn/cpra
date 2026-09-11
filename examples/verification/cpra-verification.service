@@ -1,0 +1,8 @@
+[Unit]
+Description=Disposable CPRa recovery verification target
+[Service]
+Type=simple
+ExecStart=/usr/bin/sleep infinity
+Restart=no
+NoNewPrivileges=true
+PrivateTmp=true

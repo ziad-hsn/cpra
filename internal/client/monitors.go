@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 // MonitorListOptions filters and paginates the /api/v1/monitors request.

@@ -1,0 +1,4 @@
+auth:
+  existingSecret: cpra-api-v1
+manifest:
+  existingConfigMap: cpra-monitors-v1

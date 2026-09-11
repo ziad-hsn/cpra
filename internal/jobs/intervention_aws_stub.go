@@ -7,7 +7,7 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 func newInterventionAWSJob(t *schema.InterventionTargetAWS, retries int, entity ecs.Entity) (Job, error) {

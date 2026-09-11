@@ -10,7 +10,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // PulseKafkaJob checks a Kafka cluster by connecting to seed brokers and

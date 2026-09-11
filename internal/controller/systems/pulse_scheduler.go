@@ -3,7 +3,7 @@ package systems
 import (
 	"time"
 
-	"cpra/internal/scheduler"
+	"github.com/ziad-hsn/cpra/internal/scheduler"
 
 	"github.com/mlange-42/ark/ecs"
 )

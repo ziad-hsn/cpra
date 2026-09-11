@@ -1,0 +1,32 @@
+name: Explicit live verification
+on:
+  workflow_dispatch:
+    inputs:
+      campaign:
+        description: Operator-prepared verification campaign
+        type: choice
+        options: [providers, comparison, faults, soak]
+        required: true
+      configuration:
+        description: Absolute user-owned configuration or campaign argument file on the dedicated runner
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: cpra-live-host
+  cancel-in-progress: false
+jobs:
+  live:
+    # A designated machine with user-managed accounts and targets. Ordinary
+    # hosted CI and pull requests never invoke these operations.
+    runs-on: [self-hosted, cpra-verification]
+    timeout-minutes: 1800
+    environment: live-verification
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Execute configured campaign
+        env:
+          CPRA_LIVE_KIND: ${{ inputs.campaign }}
+          CPRA_LIVE_CONFIG: ${{ inputs.configuration }}
+        run: python3 scripts/verification/manual_campaign.py

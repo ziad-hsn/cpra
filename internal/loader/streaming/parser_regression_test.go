@@ -131,3 +131,35 @@ func stringMustJSON(t *testing.T, v interface{}) string {
 	}
 	return string(b)
 }
+
+func TestYAMLCommentOnlyMetadataNeedsNoDocument(t *testing.T) {
+	for _, test := range []struct {
+		name, input string
+		count       int
+		wantError   bool
+	}{
+		{"starter", "# Intentionally empty. Add monitors when ready.\n# No provider credentials are imported.\nmonitors: []\n", 0, false},
+		{"comments around monitors", "# Operator comment\n\nmonitors:\n  - name: example\n    pulse_check:\n      type: http\n      interval: 1m\n      timeout: 5s\n      config: {url: http://127.0.0.1}\n# Another comment\n", 1, false},
+		{"malformed metadata", "# Operator comment\nversion: [\nmonitors: []\n", 0, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "monitors.yaml")
+			if err := os.WriteFile(path, []byte(test.input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			parser, err := NewStreamingYamlParser(path, ParseConfig{StrictUnknownFields: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			batches, errs := parser.ParseBatches(context.Background(), nil)
+			count := 0
+			for batch := range batches {
+				count += len(batch.Monitors)
+			}
+			parseErr := <-errs
+			if (parseErr != nil) != test.wantError || count != test.count {
+				t.Fatalf("count=%d error=%v; want count=%d error=%v", count, parseErr, test.count, test.wantError)
+			}
+		})
+	}
+}

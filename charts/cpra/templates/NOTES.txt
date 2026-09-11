@@ -1,0 +1,10 @@
+CPRa has {{ ternary "zero owners (maintenance)" "one owner" .Values.maintenance }}. Single-node Raft provides restart recovery, not HA.
+{{ if .Values.api.enabled -}}
+The API requires the token in existing Secret {{ .Values.auth.existingSecret }}. Its value is never printed here.
+Use a versioned immutable token Secret; rotate by changing its name and performing an intentional upgrade.
+For local access: kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "cpra.fullname" . }} 8060:{{ .Values.service.port }}
+{{ else -}}
+The API is disabled. No API Service, credentials, probes or Helm test Job are installed.
+{{ end -}}
+State PVCs are retained after uninstall. Back up the whole state directory only after entering maintenance and waiting for the owner to exit.
+Keep release name, fullname, and storage claim identity stable. See docs/container-helm.md for backup, restore, upgrades and storage expansion.

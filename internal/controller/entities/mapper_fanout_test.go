@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 
 	"github.com/mlange-42/ark/ecs"
 )

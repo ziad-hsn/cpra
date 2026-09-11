@@ -1,23 +1,50 @@
-// Package version holds build-time version metadata injected by the
-// Makefile via -ldflags "-X cpra/internal/version.Version=...". The defaults
-// below apply to plain "go build"/"go run" invocations that bypass the
-// Makefile, so binaries are always identifiable.
+// Package version identifies official releases and ordinary go build invocations.
 package version
 
-import "fmt"
-
-// These are overridden at build time by the Makefile's LDFLAGS.
-var (
-	// Version is the semantic version or git describe string (e.g. "v1.2.3"
-	// or "abe5ac6-dirty").
-	Version = "dev"
-	// Commit is the short git commit hash the binary was built from.
-	Commit = "unknown"
-	// Date is the UTC build timestamp (RFC 3339).
-	Date = "unknown"
+import (
+	"fmt"
+	"runtime/debug"
 )
 
-// Info returns a single-line human-readable version string.
+// Official builds inject these fields from RELEASE.json. Date is the source
+// commit's UTC timestamp, not wall-clock compilation time.
+var (
+	Version = "dev"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
+
+// Info returns release identity, falling back to Go's module and VCS metadata
+// for builds made without the release tooling.
 func Info() string {
-	return fmt.Sprintf("%s (commit %s, built %s)", Version, Commit, Date)
+	info, _ := debug.ReadBuildInfo()
+	return format(Version, Commit, Date, info)
+}
+
+func format(version, commit, date string, info *debug.BuildInfo) string {
+	if info != nil {
+		if version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+		development := version == "dev"
+		modified := false
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				if commit == "unknown" {
+					commit = setting.Value
+				}
+			case "vcs.time":
+				if date == "unknown" {
+					date = setting.Value
+				}
+			case "vcs.modified":
+				modified = setting.Value == "true"
+			}
+		}
+		if modified && development {
+			version += "-dirty"
+		}
+	}
+	return fmt.Sprintf("%s (commit %s, source date %s)", version, commit, date)
 }

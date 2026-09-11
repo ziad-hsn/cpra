@@ -20,7 +20,7 @@ health checks against your services on a schedule, opens and closes incidents
 against configurable thresholds, sends notifications, and executes a recovery
 action — restart a container, call a webhook, restart or scale a Kubernetes
 workload, reboot an EC2 instance, restart a systemd unit — when a service
-fails. It ships as a single static binary with an embedded read-only dashboard,
+fails. It ships as a single server binary with an embedded read-only dashboard,
 an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 
 **Documentation:** [ziad-hsn.github.io/cpra](https://ziad-hsn.github.io/cpra/) —
@@ -41,6 +41,8 @@ cp examples/monitors.yaml monitors.yaml
 # Set the service address in monitors.yaml.
 ./bin/cpra -yaml monitors.yaml
 ```
+
+State is durable by default in the platform's user state directory (`cpractl local paths`); Linux system services explicitly use `/var/lib/cpra`. Keep that directory across restarts. An explicit `-data-dir` overrides runtime configuration and the platform default. A legacy `./cpra-data` requires an explicit path or a stopped migration. Use `-runtime-config examples/runtime-memory.yaml` for a disposable run. [Persistence and recovery](docs/durability.md) describes identities, unknown outcomes and complete backups.
 
 Open `http://localhost:8060` or run `./bin/cpractl get monitors`. Missing or malformed configuration stops startup. Empty configurations require `-allow-empty`.
 
@@ -79,13 +81,14 @@ Manifests authorize checks, notification destinations, and recovery actions with
 
 ## Behavior and limits
 
-- Run one process for a monitor configuration. Incident and delivery state is held in memory; it resets on restart, and separate processes do not coordinate ownership.
-- Each incident admits one recovery operation. A lost response leaves the target outcome uncertain. Inspect the target before manually repeating the action or restarting CPRa. Successful recovery must be followed by the configured consecutive successful checks.
-- An alert group succeeds when at least one destination accepts delivery. Retryable HTTP rejections allow up to three attempts. Transport acceptance does not confirm that a person received the message.
-- `/api/v1/healthz` reports process liveness. `/api/v1/readyz` requires a recent snapshot containing monitors. New monitors remain unknown until checked; readiness does not require all targets to be healthy.
-- Dashboard snapshots refresh every five seconds by default. Detailed listings cover active monitors. Above the snapshot index limit, only aggregate counts are available; monitor and incident list requests return an unavailable response. The healthy-sample percentage is based on observed snapshots during the current process run. Per-monitor history is not retained.
+- Single-node Raft commits incident state and action intent before dispatch. Started external actions with interrupted results are held as unknown after restart; health checks resume. This is one-node persistence, without distributed failover.
+- Each incident admits one recovery operation. Successful recovery must be followed by the configured consecutive successful checks. Inspect provider records for unknown actions; restarting does not automatically repeat them.
+- Notification endpoint outcomes are separate. A successful endpoint is not repeated because another endpoint failed. Confirmed retryable rejections allow at most three attempts per endpoint. Transport acceptance does not confirm delivery to a person.
+- `/api/v1/healthz` reports liveness. `/api/v1/readyz` requires initialized admission, controller progress and available storage; explicitly empty configurations can be ready. Dashboard projection freshness is reported separately. Provider outages do not make the process dead.
+- Fleet views update incrementally, retain numeric routes and add stable `monitor_id` values. Pages are bounded. `/api/v1/history` retains incident and action events for 30 days; `/api/v1/state` exposes persistence and unknown actions; `/api/v1/slo` exposes measured latency distributions. All remain read-only and use the existing authentication.
+- Raw health-check history is not retained. Current counters and the aggregate SLO window survive restart; gaps in measurement coverage are explicit. See [measured SLO definitions](docs/slo.md).
 - JSON is decoded incrementally. YAML requires a block sequence for monitors and limits each entry and the metadata to 1 MiB. Both formats have a decompressed-input budget. Memory use grows with monitor count; capacity depends on check intervals, targets, and host resources.
-- Worker scaling uses Erlang C with an Allen-Cunneen variability adjustment and 15% default headroom. Arrival intervals and execution times use the latest 256 observations. The model estimates mean latency; it does not guarantee a percentile or service level. Worker limits and a twofold growth limit per adjustment still apply.
+- Worker scaling uses Erlang C with an Allen-Cunneen variability adjustment and 15% default headroom. Arrival intervals and execution times use the latest 256 observations. The model estimates mean latency. Observed percentile feedback uses a 30-second control window, bounded growth and a healthy hold before reducing capacity. The five-minute health-check targets are p99 queue delay ≤250 ms and scheduled-to-committed-result ≤5 seconds. Worker limits remain; these are measured targets rather than an SLA guarantee.
 - Configuration is loaded before startup. Live reload and runtime queue migration are not supported.
 
 ## Check and package
@@ -95,16 +98,48 @@ make check
 make test-all-drivers
 ```
 
-Rebuilding the dashboard requires Node.js 24, pnpm 11.22.0, and Python 3:
+Rebuilding the dashboard requires Node.js 24.21.0, pnpm 11.22.0, and Python 3:
 
 ```sh
 make dashboard-build dashboard-check
-make release VERSION=0.1.0
+make release VERSION=v0.1.0
 ```
 
-`make release` creates Linux amd64 and arm64 server/CLI archives, a source archive, dependency notices, and SHA-256 checksums in `dist/release`. Set `VERSION` to the version being released. The command does not publish artifacts.
+The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned
+Go 1.27.1 compiler and explicit source identity. It produces unstripped,
+optimized server/client archives for Linux, macOS and Windows on amd64/arm64,
+Linux packages, a source archive and evidence inventories. Go 1.25 compatibility
+is a separate test. Native execution gates qualify each platform; a successful
+cross-build alone does not establish support.
 
-Build a container with `docker build -f docker/Dockerfile -t cpra:local .`. It runs as UID 1001 and expects a manifest at `/etc/cpra/monitors.yaml`. Mount the manifest read-only and give the process write access to configured log destinations. `docker compose -f docker/docker-compose.yml up --build` runs the example with its HTTP listener disabled; service addresses must be reachable from inside the container.
+Versioned installation needs only Go and the committed embedded assets:
+
+```sh
+go install github.com/ziad-hsn/cpra@VERSION
+go install github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
+cpractl local init
+cpra -capabilities
+```
+
+Replace `VERSION` with an actual published version. [Native installation](docs/native-installation.md)
+documents full-driver builds, standard paths, native supervisors, local ownership
+and stopped backup/restore. Initial configuration is deliberately empty.
+
+The production image consumes the same staged release executables; source builds
+use `docker/Dockerfile.dev`. Production Compose uses a stable named volume,
+read-only configuration, UID 1001, bounded logs and a loopback-published API.
+The Helm chart uses one StatefulSet owner and retained storage, supports large
+file-backed manifests, and distinguishes Helm 3 and 4 operations. Follow the
+[container and Helm guide](docs/container-helm.md) to prepare authentication and
+configuration before starting either route.
+
+## Release evidence
+
+The durable implementation is a release candidate. Full-provider verification and the one-million-monitor 24-hour endurance gate require completed evidence before a full release-readiness claim. User-configured live verification covers 33 driver types and never passes a missing configuration. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
+
+[Provider test environments](docs/provider-testing.md) cover local services,
+notification contract mocks, the Moto EC2 emulator and optional provider sandboxes.
+Reports distinguish these results from real-account delivery and recovery.
 
 ## License
 

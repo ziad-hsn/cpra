@@ -1,0 +1,169 @@
+[
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/query-core",
+    "version": "5.101.4",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/react-query",
+    "version": "5.101.4",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/react-table",
+    "version": "8.21.3",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/react-virtual",
+    "version": "3.14.9",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/table-core",
+    "version": "8.21.3",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@tanstack/virtual-core",
+    "version": "3.17.7",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "font",
+    "name": "Roboto Slab Bold",
+    "version": "2.002",
+    "declared_license": "Apache-2.0",
+    "license_files": [
+      "brand/fonts/LICENSE.txt"
+    ],
+    "copyright": "Copyright 2018 The Roboto Slab Project Authors (https://github.com/googlefonts/robotoslab)",
+    "source_identity": "2.002;GOOG;RobotoSlab-Bold",
+    "source_file": "brand/fonts/RobotoSlab-Bold.ttf",
+    "sha256": "f8dbdb3617fd43fdce94e990aa4f259e9e62a4f4462f60c21d76151e7c372c1b",
+    "license_url": "http://www.apache.org/licenses/LICENSE-2.0"
+  },
+  {
+    "ecosystem": "npm",
+    "name": "cookie",
+    "version": "1.1.1",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "js-tokens",
+    "version": "4.0.0",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "loose-envify",
+    "version": "1.4.0",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "react",
+    "version": "18.3.1",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "react-dom",
+    "version": "18.3.1",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "react-router",
+    "version": "7.18.3",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE.md"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "react-router-dom",
+    "version": "7.18.3",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE.md"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "scheduler",
+    "version": "0.23.2",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "set-cookie-parser",
+    "version": "2.7.2",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "use-sync-external-store",
+    "version": "1.6.0",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "zustand",
+    "version": "4.5.7",
+    "declared_license": "MIT",
+    "license_files": [
+      "LICENSE"
+    ]
+  }
+]

@@ -10,13 +10,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/loader/schema"
 )
 
 // CodeDatadogJob posts an event to the Datadog events API. Pure stdlib
 // (JSON POST with DD-API-KEY header), always compiled.
 type CodeDatadogJob struct {
 	Execution
+	URL         string
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Monitor     string
@@ -31,7 +32,14 @@ type CodeDatadogJob struct {
 }
 
 func newCodeDatadogJob(cfg *schema.CodeNotificationDatadog, monitor, color, message string, entity ecs.Entity) (Job, error) {
+	if cfg.URL != "" {
+		if err := validateTargetURL(cfg.URL); err != nil {
+			return nil, err
+		}
+	}
+
 	return &CodeDatadogJob{
+		URL:     cfg.URL,
 		ID:      uuid.New(),
 		Entity:  entity,
 		Monitor: monitor,
@@ -63,8 +71,11 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	url := fmt.Sprintf("https://api.%s/api/v1/events", site)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(body)))
+	target, err := notificationURL(c.URL, fmt.Sprintf("https://api.%s/api/v1/events", site))
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(string(body)))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

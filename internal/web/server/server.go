@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"cpra/internal/controller"
-	"cpra/internal/queue"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 )
 
 //go:embed all:assets
@@ -142,17 +142,26 @@ func (s *Server) Start() error {
 // Stop gracefully shuts down the server, draining in-flight requests and
 // waiting for the serve and sampler goroutines to exit.
 func (s *Server) Stop() {
-	if s.srv == nil {
-		return
-	}
-	s.stopHistorySampler()
 	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.WriteTimeout)
 	defer cancel()
-	if err := s.srv.Shutdown(ctx); err != nil {
+	_ = s.StopContext(ctx)
+}
+
+// StopContext bounds HTTP draining. On timeout active connections are closed;
+// callers must still finish process shutdown and must not report readiness.
+func (s *Server) StopContext(ctx context.Context) error {
+	if s.srv == nil {
+		return nil
+	}
+	s.stopHistorySampler()
+	err := s.srv.Shutdown(ctx)
+	if err != nil {
+		_ = s.srv.Close()
 		controller.SystemLogger.Warn("Web server shutdown: %v", err)
 	}
 	s.wg.Wait()
 	controller.SystemLogger.Info("Web server stopped")
+	return err
 }
 
 // startHistorySampler launches a goroutine that periodically records queue and
@@ -284,6 +293,9 @@ func subtleTimeCompare(a, b string) bool {
 // ---------- routing ----------
 
 func (s *Server) registerAPI(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/history", s.handleHistory)
+	mux.HandleFunc("GET /api/v1/slo", s.handleSLO)
+	mux.HandleFunc("GET /api/v1/state", s.handleState)
 	mux.HandleFunc("/api/v1/overview", s.handleOverview)
 	mux.HandleFunc("/api/v1/monitors", s.handleMonitorsList)
 	mux.HandleFunc("/api/v1/monitors/", s.handleMonitorDetail)
@@ -336,13 +348,23 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	snap := s.holder.Get()
-	if snap == nil || snap.Total == 0 || time.Since(snap.Generated) > 30*time.Second {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
-		return
+	projectionFresh := snap != nil && time.Since(snap.Generated) <= 30*time.Second
+	ready := projectionFresh && (s.cfg.AllowEmpty || snap.Total > 0)
+	if s.cfg.Ready != nil {
+		// Controller progress and storage are authoritative. Slow dashboard
+		// projection must not trigger a service restart or stop monitor admission.
+		ready = s.cfg.Ready()
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	if s.cfg.Store != nil && !s.cfg.Store.Status().Ready {
+		ready = false
+	}
+	status, code := "ready", http.StatusOK
+	if !ready {
+		status, code = "not ready", http.StatusServiceUnavailable
+	}
+	writeJSON(w, code, map[string]any{"status": status, "projection_fresh": projectionFresh})
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
@@ -369,11 +391,15 @@ func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
 		ByPulseType: snap.ByPulseType,
 		ByCode:      snap.ByCode,
 		UpPercent:   upPct,
-		IndexCapped: snap.Monitors == nil && snap.Total > 0,
+		IndexCapped: s.holder.Index() == nil && snap.Monitors == nil && snap.Total > 0,
 	})
 }
 
 func (s *Server) handleMonitorsList(w http.ResponseWriter, r *http.Request) {
+	if index := s.holder.Index(); index != nil {
+		s.handleIndexedMonitors(w, r, index)
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || (snap.Total > 0 && snap.Monitors == nil) {
 		writeErr(w, http.StatusServiceUnavailable, "monitor details unavailable; consult overview aggregates")
@@ -469,6 +495,15 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid monitor id")
 		return
 	}
+	if index := s.holder.Index(); index != nil {
+		m, ok := index.Get(id)
+		if !ok {
+			writeErr(w, 404, "monitor not found")
+			return
+		}
+		writeJSON(w, 200, m)
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || snap.ByID == nil {
 		writeErr(w, http.StatusNotFound, "monitor not found (snapshot unavailable)")
@@ -486,7 +521,26 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, snap.Monitors[idx])
 }
 
-func (s *Server) handleIncidents(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
+	if index := s.holder.Index(); index != nil {
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+		size, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		if size <= 0 {
+			size = 100
+		}
+		size = min(size, 500)
+		total := index.Overview().Total
+		offset := total
+		if page-1 <= total/size {
+			offset = (page - 1) * size
+		}
+		rows, count := index.Page(offset, size, func(m snapshot.MonitorSummary) bool { return m.Incident })
+		writeJSON(w, 200, incidentsResp{Generated: index.Overview().Generated, Count: count, Incidents: rows})
+		return
+	}
 	snap := s.holder.Get()
 	if snap == nil || (snap.Total > 0 && snap.Monitors == nil) {
 		writeErr(w, http.StatusServiceUnavailable, "incident details unavailable; consult overview aggregates")

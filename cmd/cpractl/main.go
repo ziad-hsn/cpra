@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"cpra/internal/cpractl/cli"
+	"github.com/ziad-hsn/cpra/internal/cpractl/cli"
 )
 
 func main() {

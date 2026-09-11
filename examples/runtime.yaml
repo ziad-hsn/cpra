@@ -1,0 +1,18 @@
+# Runtime settings are separate from the existing monitor manifest.
+storage:
+  mode: raft
+  directory: ./cpra-data
+  batch_delay: 5ms
+  batch_size: 1000
+  snapshot_interval: 5m
+  snapshot_retain: 3
+history:
+  retention_days: 30
+slo:
+  queue_target: 250ms
+  result_target: 5s
+  window: 5m
+  control_window: 30s
+  evaluation_interval: 5s
+  minimum_samples: 1000
+  healthy_hold: 60s

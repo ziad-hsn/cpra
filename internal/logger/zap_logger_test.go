@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"cpra/internal/logger"
+	"github.com/ziad-hsn/cpra/internal/logger"
 )
 
 // captureStderr runs fn with os.Stderr redirected to a pipe (zap's default

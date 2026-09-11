@@ -7,6 +7,9 @@ export type MonitorStatus = 'up' | 'down' | 'degraded' | 'verifying' | 'incident
 
 export interface MonitorSummary {
 	warning?: string;
+  monitor_id?: string;
+  latency_available?: boolean;
+  unknown_actions?: number;
   id: number;
   name: string;
   pulse_type: string;
@@ -148,4 +151,45 @@ export interface ConfigResponse {
 
 export interface HealthResponse {
   status: string;
+}
+
+export interface DurableAction {
+  id: string;
+  revision: string;
+  kind: string;
+  color?: string;
+  endpoint: number;
+  attempt: number;
+  state: 'queued' | 'started' | 'succeeded' | 'failed' | 'unknown' | 'cancelled';
+  outcome?: string;
+}
+export interface DurableStateResponse {
+  storage: { mode: 'raft' | 'memory'; ready: boolean; node_id?: string; committed_index: number; commit_latency_ms: number; snapshot_duration_ms: number; error?: string };
+  actions: DurableAction[];
+  monitor_id?: string;
+  revision?: string;
+}
+export interface MonitorEvent {
+  id: string;
+  monitor_id: string;
+  revision: string;
+  at: string;
+  type: string;
+  action_id?: string;
+  kind?: string;
+  color?: string;
+  endpoint?: number;
+  outcome?: string;
+}
+export interface HistoryResponse { events: MonitorEvent[]; next_cursor?: string; retention_days: number }
+export interface Percentiles { p50_ms: number | null; p95_ms: number | null; p99_ms: number | null }
+export interface SLOResponse {
+  generated: string;
+  window_seconds: number;
+  queue_target_ms: number;
+  result_target_ms: number;
+  coverage_complete: boolean;
+  gap_start?: string;
+  gap_end?: string;
+  reports: { driver: string; samples: number; expected: number; overdue?: number; pending?: number; timeouts: number; missed: number; scheduling_queue: Percentiles; execution: Percentiles; scheduled_result: Percentiles; queue_met: number; result_met: number; queue_attainment: number | null; result_attainment: number | null; condition: string }[];
 }

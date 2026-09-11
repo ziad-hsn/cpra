@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/queue"
 )
 
 func TestQueuesHistory(t *testing.T) {

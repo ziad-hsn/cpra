@@ -66,7 +66,7 @@ export default function Alerts() {
         />
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card table-scroll" style={{ padding: 0 }} role="region" aria-label="Incidents" tabIndex={0}>
         {isError ? (
           <div style={{ padding: 16 }}><ErrorState message="Failed to load incidents" onRetry={() => refetch()} /></div>
         ) : isLoading ? (

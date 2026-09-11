@@ -52,7 +52,7 @@ export function DonutChart({
 
   return (
     <div className='row' style={{ gap: 20, flexWrap: 'wrap' }}>
-      <svg width={size} height={size} role='img' aria-label={ariaLabel} style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))' }}>
+      <svg width={size} height={size} role='img' aria-label={ariaLabel}>
         <g transform={'rotate(-90 ' + cx + ' ' + cy + ')'}>
           {arcs.map((arc, i) => (
             <circle
@@ -66,7 +66,6 @@ export function DonutChart({
               strokeLinecap='round'
               strokeDasharray={arc.dash + ' ' + arc.gap}
               strokeDashoffset={arc.offset}
-              style={{ filter: 'drop-shadow(0 0 6px ' + arc.color + ')' }}
             />
           ))}
         </g>
@@ -84,7 +83,7 @@ export function DonutChart({
       <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6, margin: 0, padding: 0 }}>
         {segments.map((seg, i) => (
           <li key={i} className='row' style={{ gap: 8, fontSize: 12.5 }}>
-            <span className='status-dot' style={{ background: seg.color, boxShadow: '0 0 8px ' + seg.color }} />
+            <span className='status-dot' style={{ background: seg.color }} />
             <span className='muted'>{seg.label}</span>
             <span style={{ fontWeight: 600, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{seg.value}</span>
           </li>

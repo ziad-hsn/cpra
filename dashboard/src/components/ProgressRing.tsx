@@ -21,7 +21,7 @@ export function ProgressRing({ value, size = 96, thickness = 10, color = 'var(--
     <div style={{ position: 'relative', width: size, height: size }} role='img' aria-label={ariaLabel}>
       <svg width={size} height={size}>
         <circle cx={c} cy={c} r={r} fill='none' stroke={trackColor} strokeWidth={thickness} />
-        <circle cx={c} cy={c} r={r} fill='none' stroke={color} strokeWidth={thickness} strokeLinecap='round' strokeDasharray={dash + ' ' + circ} transform={'rotate(-90 ' + c + ' ' + c + ')'} style={{ filter: 'drop-shadow(0 0 5px ' + color + ')', transition: 'strokeDasharray var(--dur-slow) var(--ease)' }} />
+        <circle cx={c} cy={c} r={r} fill='none' stroke={color} strokeWidth={thickness} strokeLinecap='round' strokeDasharray={dash + ' ' + circ} transform={'rotate(-90 ' + c + ' ' + c + ')'} style={{ transition: 'strokeDasharray var(--dur-slow) var(--ease)' }} />
       </svg>
       {children && (
         <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>

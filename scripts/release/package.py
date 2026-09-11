@@ -97,6 +97,7 @@ def dashboard_inventory():
         optional_names = package.get('optionalDependencies', {})
         for name in package.get('dependencies', {}) | optional_names:
             pending.append((directory, name, name in optional_names))
+    notices['fonts/RobotoSlab/LICENSE.txt'] = (ROOT / 'brand/fonts/LICENSE.txt').read_bytes()
     return sorted(inventory, key=lambda x: x['name']), notices
 
 def source_files():
@@ -113,11 +114,15 @@ def source_files():
             if path.is_file() and path.suffix in {'.go', '.json', '.yaml', '.yml', '.py', '.sh', '.md', '.html', '.js', '.css', '.svg'}:
                 files.add(path)
     files.add(ROOT / 'docker/Dockerfile')
+    # Vite imports the canonical brand assets, and the Go embed includes binary
+    # fonts and icons as well as text files. Keep both sets in source archives.
+    for name in ['brand', 'internal/web/server/assets']:
+        files.update(path for path in (ROOT / name).rglob('*') if path.is_file())
     for directory, children, names in os.walk(ROOT / 'dashboard'):
         children[:] = [name for name in children if name not in {'node_modules', 'dist', '.git', 'coverage'}]
         for name in names:
             path = Path(directory) / name
-            if path.suffix in {'.json', '.yaml', '.ts', '.tsx', '.js', '.html', '.css', '.svg'}:
+            if path.suffix in {'.json', '.yaml', '.ts', '.tsx', '.js', '.html', '.css', '.svg', '.png', '.ico', '.webmanifest'}:
                 files.add(path)
     return sorted(files)
 

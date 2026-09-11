@@ -1,6 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { Icon, type IconName } from './Icon';
+import { useTheme } from '../theme/useTheme';
+import logoLight from '../../../brand/dist/svg/cpra-horizontal-color.svg';
+import logoDark from '../../../brand/dist/svg/cpra-horizontal-dark.svg';
+import markLight from '../../../brand/dist/svg/cpra-mark-color.svg';
+import markDark from '../../../brand/dist/svg/cpra-mark-dark.svg';
 
 const NAV_ITEMS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'Overview', icon: 'overview', end: true },
@@ -12,16 +17,18 @@ const NAV_ITEMS: { to: string; label: string; icon: IconName; end?: boolean }[] 
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const theme = useTheme((state) => state.theme);
+  const logo = theme === 'dark' ? logoDark : logoLight;
+  const mark = theme === 'dark' ? markDark : markLight;
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`} aria-label="Primary navigation">
       <div className="sidebar-head">
-        <div className="brand">
-          <span className="brand-mark"><Icon name="pulse" size={18} strokeWidth={2.2} /></span>
-          <span className="brand-text">
-            <span className="name">CPRA</span>
-            <span className="tag">Monitoring</span>
-          </span>
-        </div>
+        <NavLink className="brand" to="/" aria-label="CPRa overview">
+          <picture>
+            <source media="(max-width: 760px)" srcSet={mark} />
+            <img className="brand-logo" src={collapsed ? mark : logo} alt="CPRa" />
+          </picture>
+        </NavLink>
         <button
           className="sidebar-collapse"
           onClick={() => setCollapsed((c) => !c)}
@@ -40,6 +47,7 @@ export function Sidebar() {
             end={item.end}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
             title={item.label}
+            aria-label={item.label}
           >
             <Icon name={item.icon} size={18} className="nav-icon" />
             <span className="nav-label">{item.label}</span>

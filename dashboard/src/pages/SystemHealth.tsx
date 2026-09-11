@@ -68,33 +68,35 @@ export default function SystemHealth() {
         ) : Object.keys(systems).length === 0 ? (
           <div className="empty-state">No system metrics available yet.</div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>System</th>
-                <th style={{ textAlign: 'right' }}>Updates</th>
-                <th style={{ textAlign: 'right' }}>Entities</th>
-                <th style={{ textAlign: 'right' }}>Avg</th>
-                <th style={{ textAlign: 'right' }}>Max</th>
-                <th style={{ textAlign: 'right' }}>Min</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(systems).map(([name, m]) => {
-                const avg = m.total_updates > 0 ? m.total_duration / m.total_updates : 0;
-                return (
-                  <tr key={name}>
-                    <td className="mono">{name}</td>
-                    <td style={{ textAlign: 'right' }}>{formatNumber(m.total_updates)}</td>
-                    <td style={{ textAlign: 'right' }}>{formatNumber(m.total_entities_processed)}</td>
-                    <td style={{ textAlign: 'right' }}>{formatDurationNs(avg)}</td>
-                    <td style={{ textAlign: 'right', background: m.max_update_duration > 1e8 ? 'var(--status-bg-degraded)' : undefined }}>{formatDurationNs(m.max_update_duration)}</td>
-                    <td style={{ textAlign: 'right' }}>{formatDurationNs(m.min_update_duration)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll" role="region" aria-label="System metrics" tabIndex={0}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>System</th>
+                  <th style={{ textAlign: 'right' }}>Updates</th>
+                  <th style={{ textAlign: 'right' }}>Entities</th>
+                  <th style={{ textAlign: 'right' }}>Avg</th>
+                  <th style={{ textAlign: 'right' }}>Max</th>
+                  <th style={{ textAlign: 'right' }}>Min</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(systems).map(([name, m]) => {
+                  const avg = m.total_updates > 0 ? m.total_duration / m.total_updates : 0;
+                  return (
+                    <tr key={name}>
+                      <td className="mono">{name}</td>
+                      <td style={{ textAlign: 'right' }}>{formatNumber(m.total_updates)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatNumber(m.total_entities_processed)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatDurationNs(avg)}</td>
+                      <td style={{ textAlign: 'right', background: m.max_update_duration > 1e8 ? 'var(--status-bg-degraded)' : undefined }}>{formatDurationNs(m.max_update_duration)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatDurationNs(m.min_update_duration)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

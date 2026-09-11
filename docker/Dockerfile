@@ -4,6 +4,7 @@ RUN npm install --global pnpm@11.22.0
 COPY dashboard/package.json dashboard/pnpm-lock.yaml dashboard/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY dashboard/ ./
+COPY brand/ /src/brand/
 RUN pnpm build
 
 FROM golang:1.27-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS builder
@@ -19,6 +20,7 @@ COPY --from=dashboard /src/dashboard/dist/ ./internal/web/server/assets/
 COPY scripts/release/ ./scripts/release/
 COPY --from=dashboard /src/dashboard/package.json ./dashboard/package.json
 COPY --from=dashboard /src/dashboard/node_modules/ ./dashboard/node_modules/
+COPY --from=dashboard /src/brand/fonts/LICENSE.txt ./brand/fonts/LICENSE.txt
 ARG BUILD_TAGS=""
 ARG VERSION="dev"
 ARG COMMIT="unknown"

@@ -164,18 +164,20 @@ export default function Overview() {
           ) : incidentsLoading || isLoading ? <LoadingSkeleton width='90%' lines={4} /> : incidents.length === 0 ? (
             <div className='empty-state'><Icon name='check' size={22} style={{ color: 'var(--status-operational)' }} /><div>No active incidents</div></div>
           ) : (
-            <table className='data-table'>
-              <thead><tr><th>Monitor</th><th>Status</th><th>Last check</th></tr></thead>
-              <tbody>
-                {incidents.slice(0, 6).map((m: MonitorSummary) => (
-                  <tr key={m.id} className='clickable' onClick={() => navigate('/monitors/' + m.id)}>
-                    <td><div className='row'><span className='status-dot' style={{ background: 'var(--status-critical)' }} />{m.name}</div></td>
-                    <td><StatusChip status={m.status} /></td>
-                    <td className='muted'>{m.last_check ? timeAgo(m.last_check) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className='table-scroll' role='region' aria-label='Top incidents' tabIndex={0}>
+              <table className='data-table'>
+                <thead><tr><th>Monitor</th><th>Status</th><th>Last check</th></tr></thead>
+                <tbody>
+                  {incidents.slice(0, 6).map((m: MonitorSummary) => (
+                    <tr key={m.id} className='clickable' onClick={() => navigate('/monitors/' + m.id)}>
+                      <td><div className='row'><span className='status-dot' style={{ background: 'var(--status-critical)' }} />{m.name}</div></td>
+                      <td><StatusChip status={m.status} /></td>
+                      <td className='muted'>{m.last_check ? timeAgo(m.last_check) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

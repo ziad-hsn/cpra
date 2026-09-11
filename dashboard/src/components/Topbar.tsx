@@ -16,7 +16,7 @@ export function Topbar() {
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
 
-  const meta = TITLES[pathname] ?? { title: 'CPRA', crumb: 'Workspace' };
+  const meta = TITLES[pathname] ?? { title: 'CPRa', crumb: 'Workspace' };
 
   const incidentCount = overview?.by_status?.incident ?? 0;
   const downCount = overview?.by_status?.down ?? 0;

@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -79,6 +80,13 @@ def main():
                 shutil.copyfile(ROOT / 'docker/Dockerfile', root / 'context/docker/Dockerfile')
                 shutil.copyfile(ROOT / 'docker/runtime.yaml', root / 'context/docker/runtime.yaml')
                 shutil.copytree(args.release_dir / target, root / 'release' / target)
+                # BuildKit's timestamp rewriting alone is only an upper bound.
+                # Prove older and newer checkout/extraction timestamps both
+                # normalize to the actual tested payload, including directories.
+                input_mtime = max(0, int(metadata['source_date_epoch']) + (-86400 if number == 0 else 86400))
+                for tree in (root / 'context', root / 'release'):
+                    for path in [*tree.rglob('*'), tree]:
+                        os.utime(path, (input_mtime, input_mtime), follow_symlinks=False)
                 output = root / 'image.tar'
                 cmd = ['docker', 'buildx', 'build', '--no-cache', '--provenance=false',
                        '--platform', 'linux/' + args.arch, '--tag', 'cpra:reproducible-payload',
@@ -95,6 +103,7 @@ def main():
                 if configs != [reference_config]:
                     raise ValueError('rebuilt OCI config does not match the image used for runtime tests')
                 report['builds'].append({'oci_payload': files,
+                                         'input_mtime': input_mtime,
                                          'config_digests': configs,
                                          'payload_sha256': digest(json.dumps(files, sort_keys=True).encode())})
                 args.out.write_text(json.dumps(report, indent=2) + '\n')

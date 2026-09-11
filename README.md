@@ -12,7 +12,7 @@ Checks services, sends alerts, and runs the recovery actions you configure.</p>
   <a href="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml"><img src="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a262e" alt="MIT license"></a>
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25%2B-1a262e" alt="Go 1.25+"></a>
-  <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-e5a51f" alt="Documentation"></a>
+  <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-8A5A00" alt="Documentation"></a>
 </p>
 
 CPRa is a self-hosted monitoring and recovery agent written in Go. It runs
@@ -110,4 +110,4 @@ Build a container with `docker build -f docker/Dockerfile -t cpra:local .`. It r
 
 CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
 
-The CPRa name and mark are not covered by the MIT licence. Brand assets, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).
+The CPRa name and mark are not covered by the MIT licence. Brand assets, shared light/dark theme colors, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).

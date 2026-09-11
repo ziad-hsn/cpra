@@ -25,6 +25,7 @@ build-ctl:
 	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpractl ./cmd/cpractl
 
 dashboard-build:
+	$(PYTHON) -B scripts/brand/generate.py --check
 	cd dashboard && $(PNPM) install --frozen-lockfile
 	cd dashboard && $(PNPM) build
 	$(PYTHON) -B scripts/release/stage_dashboard.py

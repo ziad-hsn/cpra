@@ -1,0 +1,35 @@
+/* Generated from brand/palette.json by scripts/brand/generate.py. */
+:root, [data-theme="light"], [data-md-color-scheme="default"] {
+  --cpra-canvas: #F7F8FA;
+  --cpra-surface: #FFFFFF;
+  --cpra-inset: #F0F2F5;
+  --cpra-text: #1A262E;
+  --cpra-secondary: #53606C;
+  --cpra-muted: #606E7C;
+  --cpra-border: #DDE2E7;
+  --cpra-control: #7B8794;
+  --cpra-accent: #8A5A00;
+  --cpra-gold: #E5A51F;
+  --cpra-on-gold: #1A262E;
+  --cpra-success: #18704A;
+  --cpra-danger: #BD223C;
+  --cpra-warning: #965B00;
+  --cpra-info: #156E96;
+}
+[data-theme="dark"], [data-md-color-scheme="slate"] {
+  --cpra-canvas: #15181D;
+  --cpra-surface: #1D2229;
+  --cpra-inset: #252B33;
+  --cpra-text: #E7EBF0;
+  --cpra-secondary: #BAC3CE;
+  --cpra-muted: #9AA7B5;
+  --cpra-border: #343D48;
+  --cpra-control: #728091;
+  --cpra-accent: #E6BC61;
+  --cpra-gold: #E5A51F;
+  --cpra-on-gold: #1A262E;
+  --cpra-success: #6BC69C;
+  --cpra-danger: #FF8E9D;
+  --cpra-warning: #EFC46D;
+  --cpra-info: #84C7EF;
+}

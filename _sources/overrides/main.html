@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block extrahead %}
 {{ super() }}
+  <script src="{{ 'assets/javascripts/theme.js' | url }}"></script>
 {% set page_title = page.meta.title if page.meta and page.meta.title else page.title %}
 {% set page_desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
 {% set social_image = config.site_url ~ config.extra.social_image %}

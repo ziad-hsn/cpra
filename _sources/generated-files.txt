@@ -42,6 +42,7 @@ assets/javascripts/lunr/min/lunr.vi.min.js
 assets/javascripts/lunr/min/lunr.zh.min.js
 assets/javascripts/lunr/tinyseg.js
 assets/javascripts/lunr/wordcut.js
+assets/javascripts/theme.js
 assets/javascripts/workers/search.2c215733.min.js
 assets/javascripts/workers/search.2c215733.min.js.map
 assets/stylesheets/extra.css

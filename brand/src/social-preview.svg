@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="CPRa — Continuous Pulse and Recovery Agent">
   <rect width="1280" height="640" fill="#fbf3df"/>
   <g transform="translate(120 190) scale(2.6)">
-  
+
   <path fill="none" stroke="#e5a51f" stroke-linecap="round" stroke-width="7" d="M43.13 50.81A21 21 0 0 1 11 33a21 21 0 0 1 39.19-10.5"/>
   <path fill="#e5a51f" stroke="#e5a51f" stroke-linejoin="round" stroke-width="2.5" d="m56.69 33.76-.58-16.99-13.85 8Z"/>
   <path fill="none" stroke="#1a262e" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M4 34h18l4.5-11 6 22L37 34h10"/>

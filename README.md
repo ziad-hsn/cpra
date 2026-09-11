@@ -28,7 +28,8 @@ an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 [monitor configuration](https://ziad-hsn.github.io/cpra/reference/config-schema/) ·
 [drivers](https://ziad-hsn.github.io/cpra/reference/jobs-reference/) ·
 [HTTP API](https://ziad-hsn.github.io/cpra/reference/api-reference/) ·
-[deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/)
+[deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/) ·
+[FAQ](https://ziad-hsn.github.io/cpra/faq/)
 
 ## Quick start
 
@@ -106,6 +107,7 @@ make release VERSION=0.1.0
 Build a container with `docker build -f docker/Dockerfile -t cpra:local .`. It runs as UID 1001 and expects a manifest at `/etc/cpra/monitors.yaml`. Mount the manifest read-only and give the process write access to configured log destinations. `docker compose -f docker/docker-compose.yml up --build` runs the example with its HTTP listener disabled; service addresses must be reachable from inside the container.
 
 ## License
+
 CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
 
 The CPRa name and mark are not covered by the MIT licence. Brand assets, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).

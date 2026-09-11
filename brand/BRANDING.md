@@ -20,7 +20,7 @@ to link to or copy. Consumers should never reference `src/`.
 | `dist/png/cpra-mark-{128,256,512}.png` | Registries, package listings, avatars. Square source; keep the mark inside a centred circle for round crops. |
 | `dist/png/cpra-horizontal-1024.png` | Slides, places that cannot take SVG. |
 | `dist/png/social-preview.png` | GitHub social preview, 1280×640. Uploaded manually under Settings → General → Social preview; GitHub does not read it from the repository. |
-| `dist/favicon/` | The five-file favicon set plus `manifest.webmanifest`. See "Favicon" below. |
+| `dist/favicon/` | The favicon set and `manifest.webmanifest`. See "Favicon" below. |
 
 ## Clear space and minimum size
 
@@ -58,18 +58,22 @@ are outlined, so nothing downstream needs the font installed.
 
 ## Favicon
 
-`dist/favicon/` follows the five-files-and-a-manifest set: `favicon.ico`
+`dist/favicon/` contains `favicon.ico`
 (32 and 16 px entries, served from the site root), `icon.svg` (carries a
 `prefers-color-scheme` block), `apple-touch-icon.png` (180 px, opaque),
 `icon-192.png`, `icon-512.png`, and `icon-mask.png` (maskable, art inside the
-409 px safe circle). Link them as:
+409 px safe circle), plus `manifest.webmanifest`. For the documentation at
+`/cpra/`, copy the set to the generated site root and link them as:
 
 ```html
-<link rel="icon" href="/favicon.ico" sizes="32x32">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/cpra/favicon.ico" sizes="16x16 32x32">
+<link rel="icon" href="/cpra/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/cpra/apple-touch-icon.png">
+<link rel="manifest" href="/cpra/manifest.webmanifest">
 ```
+
+Use your deployment's base path for other sites. Manifest icon paths are
+relative to the manifest so they also work under a project prefix.
 
 ## Regenerating
 

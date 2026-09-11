@@ -64,6 +64,13 @@ def evidence(out, manifest):
         if name.startswith(('native-', 'go-install-', 'service-', 'package-')) or name in ('reproducibility.json', 'documentation.json', 'package-deb.json', 'package-rpm.json'):
             if report.get('commit') != manifest['commit']:
                 raise ValueError('Evidence belongs to a different source candidate: ' + name)
+        if name.startswith('package-'):
+            _, package_format, package_arch = name.removesuffix('.json').split('-')
+            payload = out/f"cpra-{manifest['version']}-linux-{package_arch}.{package_format}"
+            if report.get('format') != package_format or report.get('arch') != package_arch or report.get('package_sha256') != sha(payload):
+                raise ValueError('Tested Linux package differs from final downloaded payload: ' + name)
+            if report.get('source_candidate') is not False or report.get('source_dirty') is not False:
+                raise ValueError('Package evidence was not recorded from a clean official candidate: ' + name)
         if name.startswith(('native-', 'service-')):
             prefix = 'service-user-' if name.startswith('service-user-') else ('service-' if name.startswith('service-') else 'native-')
             target = name.removeprefix(prefix).removesuffix('.json')

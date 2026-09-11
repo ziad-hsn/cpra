@@ -201,6 +201,7 @@ jobs:
         if: matrix.format == 'rpm'
         run: CPRA_PACKAGE_ARCH=${{ matrix.arch }} bash scripts/release/rpm_ci.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: package-evidence-${{ matrix.format }}-${{ matrix.arch }}
           path: evidence/package-*.json

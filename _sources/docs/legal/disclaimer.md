@@ -5,9 +5,9 @@ description: "CPRa is free software under MIT, with dependency notices and a def
 
 # License and project scope
 
-CPRa is free software under the [MIT license](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/LICENSE). The repository license states its permissions, notice requirements, and warranty terms.
+CPRa is free software under the [MIT license](https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/LICENSE). The repository license states its permissions, notice requirements, and warranty terms.
 
-The embedded dashboard has [dependency notices](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/LICENSES/dashboard.txt). Packaged binaries include dependency notices for their selected build.
+The embedded dashboard has [dependency notices](https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/LICENSES/dashboard.txt). Packaged binaries include dependency notices for their selected build.
 
 The CPRa name and mark have separate [brand usage terms](https://github.com/ziad-hsn/cpra/blob/main/brand/BRANDING.md#licence-and-use-of-the-name). The artwork license is pending; the source-code MIT license does not cover the brand assets.
 

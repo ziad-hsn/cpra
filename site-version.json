@@ -1,6 +1,7 @@
 {
-  "source_commit": "a370969b041b399c0778318d8915ce059fd74294",
-  "source_branch": "main",
-  "updated": "2026-09-09",
-  "repository": "https://github.com/ziad-hsn/cpra"
+  "source_commit": "410fbfb0092d01277b3884cd04151c27443a4226",
+  "source_branch": "codex/release-engineering",
+  "updated": "2026-09-11",
+  "repository": "https://github.com/ziad-hsn/cpra",
+  "release_status": "candidate; native platform, publication, provider-account and endurance qualification gates remain open"
 }

@@ -130,7 +130,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226">source · 410fbfb</a> · 11 September 2026
 
           </div>
           
@@ -316,7 +316,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="durability/" class="md-tabs__link">
           
   
   
@@ -747,6 +747,90 @@
   
   
     <li class="md-nav__item">
+      <a href="durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="how-to/deploy-to-production/" class="md-nav__link">
         
   
@@ -755,6 +839,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1425,8 +1593,8 @@
 <p><a class="md-button md-button--primary" href="tutorials/quickstart/">Run your first monitor</a>
 <a class="md-button" href="reference/config-schema/">Explore the configuration</a></p>
 </div>
-<p>CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.</p>
-<p>The current application includes a read-only dashboard, an HTTP API, and the <code>cpractl</code> command-line client. These guides describe the source published to <code>main</code> on <strong>9 September 2026</strong>.</p>
+<p>CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single server binary.</p>
+<p>The current application includes a read-only dashboard, an HTTP API, and the <code>cpractl</code> command-line client. These guides describe the durable implementation candidate. See <a href="release-notes/">release notes</a> for its source revision and outstanding evidence gates.</p>
 <h2 id="what-you-can-do">What you can do<a class="headerlink" href="#what-you-can-do" title="Permanent link">&para;</a></h2>
 <div class="grid cards">
 <ul>
@@ -1453,8 +1621,8 @@
 </ul>
 </div>
 <h2 id="start-with-a-small-deployment">Start with a small deployment<a class="headerlink" href="#start-with-a-small-deployment" title="Permanent link">&para;</a></h2>
-<p>Run one process for each monitor configuration. Incident state lives in memory and resets when the process restarts. Separate CPRa instances do not coordinate ownership.</p>
-<p>Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.</p>
+<p>Run one process for each monitor configuration. Single-node Raft retains committed incident state by default. Separate CPRa instances do not coordinate ownership. Retain the complete data directory across restarts.</p>
+<p>Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency and is augmented by observed percentile feedback; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.</p>
 <p><a href="how-to/deploy-to-production/">Deployment guide</a> · <a href="explanation/queueing-theory/">Queueing model</a> · <a href="release-notes/">Current changes</a> · <a href="faq/">FAQ</a></p>
 
 

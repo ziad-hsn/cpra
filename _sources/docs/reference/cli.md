@@ -59,3 +59,42 @@ Replace example ID `2` with an ID returned by your instance.
 The client also reads `CPRA_AUTH_TOKEN`. `health` checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.
 
 [API semantics](api-reference.md)
+
+## Durable operator queries
+
+```sh
+cpractl get state
+cpractl get state YOUR_STABLE_MONITOR_ID
+cpractl get history YOUR_STABLE_MONITOR_ID --limit 100
+cpractl get history YOUR_STABLE_MONITOR_ID --cursor PREVIOUS_NEXT_CURSOR
+cpractl get slo -o json
+```
+
+Use the existing server and token-file/environment configuration. These commands
+are read-only; unknown actions cannot be replayed through the CLI or dashboard.
+
+## Local administration and probe commands
+
+`cpra -capabilities` reports compiled driver availability. `cpra -validate -yaml
+/path/monitors.yaml -runtime-config /path/runtime.yaml` validates configuration
+before opening storage or providers. Explicit `-data-dir` overrides configured
+storage and platform defaults; `-shutdown-timeout` bounds application shutdown.
+
+~~~sh
+cpractl --token-file /path/auth.token --request-timeout 2s ready
+cpractl local paths --scope user
+cpractl local init --scope user
+cpractl local service render --scope user
+cpractl local service install --scope user --binary /path/cpra
+cpractl local service update --scope user --binary /path/new-cpra
+cpractl local service uninstall --scope user
+cpractl local backup --data-dir /path/state --output /path/new-backup
+cpractl local restore --backup /path/new-backup --data-dir /path/new-state
+~~~
+
+`ready` and `health` make bounded API requests only; they never open Raft or
+invoke providers. Local commands operate on the local machine and do not use a
+remote API. Service operations preserve installer ownership and use explicit
+scope. Backup requires a stopped owner; restore requires an absent destination.
+See [native administration](../native-installation.md) for platform permissions,
+configuration preservation and credential handling.

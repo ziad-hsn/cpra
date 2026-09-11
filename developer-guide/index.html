@@ -110,7 +110,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226">source · 410fbfb</a> · 11 September 2026
 
           </div>
           
@@ -294,7 +294,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../durability/" class="md-tabs__link">
           
   
   
@@ -658,6 +658,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../how-to/deploy-to-production/" class="md-nav__link">
         
   
@@ -666,6 +750,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1424,7 +1592,7 @@
 
 
 <h1 id="development-guide">Development guide<a class="headerlink" href="#development-guide" title="Permanent link">&para;</a></h1>
-<p>Build the <code>main</code> branch with Go 1.25 or later. Linux is the target of the current packaged distributions. Keep a focused regression case for changes that affect concurrency, parsing, deadlines, or externally visible behavior.</p>
+<p>Build the <code>main</code> branch with Go 1.25 or later. The release matrix includes Linux, macOS and Windows, each conditional on native execution evidence. Keep a focused regression case for changes that affect concurrency, parsing, deadlines, or externally visible behavior.</p>
 <h2 id="source-layout">Source layout<a class="headerlink" href="#source-layout" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1491,11 +1659,12 @@
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>make<span class="w"> </span>dashboard-build<span class="w"> </span>dashboard-check
 </code></pre></div>
 <p><code>make check</code> runs formatting, vet, and default race tests. The all-driver target includes every optional integration tag. Dashboard verification includes its build, TypeScript, lint, and tests.</p>
-<p>The release workflow checks Go 1.25 and 1.27 and scans default and all-driver Go imports for reachable vulnerabilities. Local provider fixtures establish protocol behavior; they do not certify live customer accounts or production recovery permissions.</p>
+<p>The release workflow checks Go 1.25.0 and the pinned Go 1.27.1 release compiler and scans default and all-driver Go imports for reachable vulnerabilities. Local provider fixtures establish protocol behavior; they do not certify live customer accounts or production recovery permissions.</p>
 <h2 id="contributions">Contributions<a class="headerlink" href="#contributions" title="Permanent link">&para;</a></h2>
 <p>Report bugs with a source commit, build tags, reproducible steps, and a redacted manifest. For code changes, explain the behavior before and after and the evidence that the affected path works.</p>
 <p>CPRa remains free under MIT. Financial support is intended to be voluntary donations; it does not create a paid feature tier or a promised response-time commitment.</p>
 <p><a href="../how-to/adding-new-jobs/">Adding a driver</a> · <a href="../maintaining-docs/">Documentation maintenance</a></p>
+<p><a href="../release-engineering/">Recorded build and publication contract</a> · <a href="../native-installation/">Native operations</a> · <a href="../container-helm/">Container and Helm operations</a></p>
 
 
 

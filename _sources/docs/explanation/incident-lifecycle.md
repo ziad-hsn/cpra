@@ -26,7 +26,7 @@ Read the state together with the most recent check and pending notification. An 
 
 When configured and eligible, one recovery operation is admitted. More failed checks during that incident do not continuously replay it. A successful action response is followed by the configured number of consecutive healthy checks before recovery is confirmed.
 
-A lost response or deadline expiry can leave the action's external outcome unknown. Inspect the target before manually repeating the action or restarting CPRa. This is not durable, cross-process exactly-once execution.
+A lost response or deadline expiry can leave the action's external outcome unknown. Restart holds interrupted started actions as unknown; inspect the provider before deciding how to resolve them. This conservative policy does not establish provider-independent exactly-once execution.
 
 ## Warnings and maintenance
 
@@ -42,4 +42,4 @@ Retryable HTTP rejections can receive up to three delivery attempts. Transport a
 
 ## Restart and ownership
 
-Incident, cooldown, and delivery state is in memory. Restarting CPRa resets this state. Independent instances do not share monitor ownership or coordinate actions; use one owner for a monitor configuration.
+Incident, cooldown, verification and per-endpoint delivery state are committed in local Raft storage by default. Restart rebuilds runtime jobs from current configuration and resumes safe queued work. Independent instances do not share monitor ownership or coordinate actions; use one owner for a monitor configuration.

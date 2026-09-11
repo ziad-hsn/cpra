@@ -110,7 +110,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226">source · 410fbfb</a> · 11 September 2026
 
           </div>
           
@@ -294,7 +294,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -658,6 +658,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../how-to/deploy-to-production/" class="md-nav__link">
         
   
@@ -666,6 +750,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -2276,7 +2444,7 @@
 <p>The <code>grpc</code> check does not call the gRPC health service; the <code>service</code> field does not add that behavior. UDP needs a payload and response. MongoDB requires <code>mongodb://</code>; SRV discovery with <code>mongodb+srv://</code> is rejected because its initial discovery cannot be bounded by the check deadline.</p>
 <p>TLS <code>warn_days</code> produces a yellow warning and degraded state without recovery. <code>critical_days</code> fails the check and follows the configured incident policy. Leave certificate verification enabled for normal use.</p>
 <h3 id="http">http<a class="headerlink" href="#http" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2316,7 +2484,7 @@
 </tbody>
 </table>
 <h3 id="tcp">tcp<a class="headerlink" href="#tcp" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2340,7 +2508,7 @@
 </tbody>
 </table>
 <h3 id="icmp">icmp<a class="headerlink" href="#icmp" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2368,7 +2536,7 @@
 </tbody>
 </table>
 <h3 id="dns">dns<a class="headerlink" href="#dns" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2392,7 +2560,7 @@
 </tbody>
 </table>
 <h3 id="udp">udp<a class="headerlink" href="#udp" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2420,7 +2588,7 @@
 </tbody>
 </table>
 <h3 id="grpc">grpc<a class="headerlink" href="#grpc" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2448,7 +2616,7 @@
 </tbody>
 </table>
 <h3 id="docker">docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2468,7 +2636,7 @@
 </tbody>
 </table>
 <h3 id="tls">tls<a class="headerlink" href="#tls" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2508,7 +2676,7 @@
 </tbody>
 </table>
 <h3 id="redis">redis<a class="headerlink" href="#redis" title="Permanent link">&para;</a></h3>
-<p>Build: <code>redis</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>redis</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2540,7 +2708,7 @@
 </tbody>
 </table>
 <h3 id="postgres">postgres<a class="headerlink" href="#postgres" title="Permanent link">&para;</a></h3>
-<p>Build: <code>postgres</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>postgres</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2584,7 +2752,7 @@
 </tbody>
 </table>
 <h3 id="mysql">mysql<a class="headerlink" href="#mysql" title="Permanent link">&para;</a></h3>
-<p>Build: <code>mysql</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>mysql</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2624,7 +2792,7 @@
 </tbody>
 </table>
 <h3 id="mongo">mongo<a class="headerlink" href="#mongo" title="Permanent link">&para;</a></h3>
-<p>Build: <code>mongo</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>mongo</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2644,7 +2812,7 @@
 </tbody>
 </table>
 <h3 id="rabbitmq">rabbitmq<a class="headerlink" href="#rabbitmq" title="Permanent link">&para;</a></h3>
-<p>Build: <code>rabbitmq</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>rabbitmq</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2664,7 +2832,7 @@
 </tbody>
 </table>
 <h3 id="kafka">kafka<a class="headerlink" href="#kafka" title="Permanent link">&para;</a></h3>
-<p>Build: <code>kafka</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/pulse_types_new.go">Schema</a></p>
+<p>Build: <code>kafka</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2725,7 +2893,7 @@
 <p>AWS supports <code>operation: reboot-instance</code>. Use the process's configured AWS credential chain. Systemd needs access to the host's system bus and permission for the unit operation.</p>
 <p>The controller admits one recovery operation per incident. A response timeout can leave the external outcome uncertain; see the <a href="../../explanation/incident-lifecycle/">incident lifecycle</a>.</p>
 <h3 id="docker_1">docker<a class="headerlink" href="#docker_1" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2749,7 +2917,7 @@
 </tbody>
 </table>
 <h3 id="webhook">webhook<a class="headerlink" href="#webhook" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/intervention_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2785,7 +2953,7 @@
 </tbody>
 </table>
 <h3 id="kubernetes">kubernetes<a class="headerlink" href="#kubernetes" title="Permanent link">&para;</a></h3>
-<p>Build: <code>kubernetes</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<p>Build: <code>kubernetes</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/intervention_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2825,7 +2993,7 @@
 </tbody>
 </table>
 <h3 id="aws">aws<a class="headerlink" href="#aws" title="Permanent link">&para;</a></h3>
-<p>Build: <code>aws</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<p>Build: <code>aws</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/intervention_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2857,7 +3025,7 @@
 </tbody>
 </table>
 <h3 id="systemd">systemd<a class="headerlink" href="#systemd" title="Permanent link">&para;</a></h3>
-<p>Build: <code>systemd</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/intervention_types_new.go">Schema</a></p>
+<p>Build: <code>systemd</code>, Linux only. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/intervention_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2895,7 +3063,7 @@
 <li>HTTP notification retries classify 429 and server errors as retryable. Acceptance does not confirm a human received the alert.</li>
 </ul>
 <h3 id="log">log<a class="headerlink" href="#log" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2911,7 +3079,7 @@
 </tbody>
 </table>
 <h3 id="slack">slack<a class="headerlink" href="#slack" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2927,7 +3095,7 @@
 </tbody>
 </table>
 <h3 id="pagerduty">pagerduty<a class="headerlink" href="#pagerduty" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2947,7 +3115,7 @@
 </tbody>
 </table>
 <h3 id="email">email<a class="headerlink" href="#email" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/groups.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/groups.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -2979,7 +3147,7 @@
 </tbody>
 </table>
 <h3 id="webhook_1">webhook<a class="headerlink" href="#webhook_1" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/groups.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/groups.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3003,7 +3171,7 @@
 </tbody>
 </table>
 <h3 id="telegram">telegram<a class="headerlink" href="#telegram" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3023,7 +3191,7 @@
 </tbody>
 </table>
 <h3 id="discord">discord<a class="headerlink" href="#discord" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3039,7 +3207,7 @@
 </tbody>
 </table>
 <h3 id="opsgenie">opsgenie<a class="headerlink" href="#opsgenie" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/manifest.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/manifest.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3059,7 +3227,7 @@
 </tbody>
 </table>
 <h3 id="mattermost">mattermost<a class="headerlink" href="#mattermost" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3083,7 +3251,7 @@
 </tbody>
 </table>
 <h3 id="victorops">victorops<a class="headerlink" href="#victorops" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3111,7 +3279,7 @@
 </tbody>
 </table>
 <h3 id="pushover">pushover<a class="headerlink" href="#pushover" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3151,7 +3319,7 @@
 </tbody>
 </table>
 <h3 id="datadog">datadog<a class="headerlink" href="#datadog" title="Permanent link">&para;</a></h3>
-<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: default. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3179,7 +3347,7 @@
 </tbody>
 </table>
 <h3 id="teams">teams<a class="headerlink" href="#teams" title="Permanent link">&para;</a></h3>
-<p>Build: <code>teams</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: <code>teams</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>
@@ -3195,7 +3363,7 @@
 </tbody>
 </table>
 <h3 id="twilio">twilio<a class="headerlink" href="#twilio" title="Permanent link">&para;</a></h3>
-<p>Build: <code>twilio</code>. <a href="https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/loader/schema/notification_types_new.go">Schema</a></p>
+<p>Build: <code>twilio</code>. <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/notification_types_new.go">Schema</a></p>
 <table>
 <thead>
 <tr>

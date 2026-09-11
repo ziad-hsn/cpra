@@ -1,56 +1,73 @@
 ---
 title: "Installation and builds"
-description: "Build the CPRa server and CLI, select optional drivers, rebuild dashboard assets and package Linux distributions."
+description: "Install CPRa through Go, native archives, Linux packages, containers, or Helm with explicit persistence and verification."
 ---
 
 # Installation and builds
 
+These pages describe the release-engineering candidate. The exact source revision
+appears in the footer and `site-version.json`; use that revision when reproducing
+this documentation snapshot. Native execution gates qualify each distribution.
+
+## Install with Go
+
+Replace `VERSION` with an actual published version from a verified release:
+
+~~~sh
+go install github.com/ziad-hsn/cpra@VERSION
+go install github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
+cpractl local paths
+cpractl local init
+cpra -capabilities
+~~~
+
+Go 1.25 source compatibility remains separate from the supported compiler used
+for official binaries. Installation includes the committed dashboard and embedded
+starter files; no Node, pnpm, Git or generation step is needed. Initial local
+configuration is empty and does not enable provider operations.
+
+See [native installation](../native-installation.md) for all applicable driver
+build tags, platform paths, service identities and stopped backup/restore.
+Plain `go install` retains the default driver subset. The systemd recovery driver
+is Linux-only. `cpra -validate` explains missing compiled drivers before opening
+storage or constructing provider clients.
+
 ## Build from source
 
-Use Go 1.25 or later and Make. The published code is on the repository's `main` branch:
-
 ~~~sh
-git clone --branch main https://github.com/ziad-hsn/cpra.git
+git clone --branch codex/release-engineering https://github.com/ziad-hsn/cpra.git
 cd cpra
 make
+./bin/cpra -version
+./bin/cpractl --version
 ~~~
 
-`make` builds the server and CLI with embedded dashboard assets. Run `./bin/cpra -version` or `./bin/cpractl --version` to inspect the build.
+For a reproducible release, check out the approved full commit from the release
+metadata and follow the [recorded release recipe](../release-engineering.md).
+Official artifacts use Go 1.27.1, normal optimization, retained symbols/DWARF,
+trimmed source paths and explicit source identity. `make` remains a developer
+build using Go's module/VCS metadata.
 
-These docs correspond to [a370969](https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294). Check out that commit to reproduce this documentation snapshot.
+## Distribution routes
 
-## Include optional drivers
+| Route | Outputs |
+| --- | --- |
+| Native archives | Linux/macOS tar.gz and Windows zip, amd64 and arm64 |
+| Linux packages | DEB and RPM, amd64 and arm64 |
+| Containers | Linux amd64/arm64 OCI image from the same staged executables |
+| Deployment | Production Compose and separately versioned OCI Helm chart |
+| Source and evidence | Complete source archive, checksums, notices, SBOMs and provenance |
 
-~~~sh
-make BUILD_TAGS='redis postgres kubernetes'
-~~~
+A cross-build alone does not qualify an OS or architecture. Follow the release's
+native verification report. Version placeholders do not imply an existing tag
+or GitHub Release, and Sigstore signing does not imply Authenticode/notarization.
 
-Optional checks: `redis postgres mysql mongo rabbitmq kafka`. Optional recovery: `kubernetes aws systemd`. Optional alerts: `teams twilio`.
+## Dashboard and images
 
-A configuration can name an optional driver even when its implementation is absent from the binary. Build the required tags before trying that integration. [Driver reference](../reference/jobs-reference.md)
+The [release guide](../release-engineering.md) records the pinned Node/pnpm
+versions and clean dashboard comparison. Provider credentials and developer
+`.env` files are not frontend build inputs.
 
-## Rebuild the dashboard
-
-Use Node.js 24, pnpm 11.22.0, and Python 3:
-
-~~~sh
-make dashboard-build dashboard-check
-~~~
-
-The build installs dependencies from the lockfile, builds the frontend, and stages its assets for Go embedding. Dashboard checks run TypeScript, lint, and tests.
-
-## Create distribution archives
-
-~~~sh
-make release VERSION=0.1.0
-~~~
-
-Choose a version for your own build. The example does not imply that a `0.1.0` GitHub Release exists. Packaging creates Linux amd64 and arm64 server/CLI archives, a source archive, dependency notices, and SHA-256 checksums under `dist/release`. It does not upload them.
-
-## Build a container
-
-~~~sh
-docker build -f docker/Dockerfile -t cpra:local .
-~~~
-
-The container runs as UID 1001. It needs a readable manifest and write access to configured log destinations. See [deployment](../how-to/deploy-to-production.md#containers) before mounting host or Docker access.
+The production Dockerfile consumes staged release binaries. Source development
+uses `docker/Dockerfile.dev`. Prepare persistent storage and authentication using
+[Compose and Helm operations](../container-helm.md) before starting an instance.

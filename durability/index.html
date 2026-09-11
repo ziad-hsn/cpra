@@ -6,37 +6,37 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Measure CPRa queue demand, service time, worker limits and target saturation without assuming unverified throughput guarantees.">
+        <meta name="description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
       
       
         <meta name="author" content="Ziad Hassan">
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/how-to/performance-tuning/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/durability/">
       
       
-        <link rel="prev" href="../common-tasks/">
+        <link rel="prev" href="../release-notes/">
       
       
-        <link rel="next" href="../../explanation/architecture-overview/">
+        <link rel="next" href="../slo/">
       
       
         
       
       
-      <link rel="icon" href="../../favicon.ico">
+      <link rel="icon" href="../favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Capacity and diagnostics - CPRa Documentation</title>
+        <title>Persistence and recovery - CPRa Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,9 +49,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../assets/stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -61,21 +61,21 @@
 
 
 
-  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
-  <link rel="manifest" href="../../manifest.webmanifest">
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../manifest.webmanifest">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="CPRa Documentation">
-  <meta property="og:title" content="Capacity and diagnostics">
-  <meta property="og:description" content="Measure CPRa queue demand, service time, worker limits and target saturation without assuming unverified throughput guarantees.">
-  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/how-to/performance-tuning/">
+  <meta property="og:title" content="Persistence and recovery">
+  <meta property="og:description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/durability/">
   <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Capacity and diagnostics">
-  <meta name="twitter:description" content="Measure CPRa queue demand, service time, worker limits and target saturation without assuming unverified throughput guarantees.">
+  <meta name="twitter:title" content="Persistence and recovery">
+  <meta name="twitter:description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
   <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
   <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#capacity-and-diagnostics" class="md-skip">
+        <a href="#persistence-and-restart-recovery" class="md-skip">
           Skip to content
         </a>
       
@@ -123,9 +123,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-mark-dark.svg" alt="logo">
+  <img src="../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -142,7 +142,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Capacity and diagnostics
+              Persistence and recovery
             
           </span>
         </div>
@@ -253,7 +253,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -274,7 +274,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+        <a href="../tutorials/quickstart/" class="md-tabs__link">
           
   
   
@@ -296,7 +296,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../durability/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -316,7 +316,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../explanation/architecture-overview/" class="md-tabs__link">
+        <a href="../explanation/architecture-overview/" class="md-tabs__link">
           
   
   
@@ -336,7 +336,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../reference/config-schema/" class="md-tabs__link">
+        <a href="../reference/config-schema/" class="md-tabs__link">
           
   
   
@@ -354,7 +354,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../faq/" class="md-tabs__link">
+      <a href="../faq/" class="md-tabs__link">
         
   
   
@@ -375,7 +375,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../developer-guide/" class="md-tabs__link">
+        <a href="../developer-guide/" class="md-tabs__link">
           
   
   
@@ -409,9 +409,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+    <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-mark-dark.svg" alt="logo">
+  <img src="../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -436,7 +436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -515,7 +515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/quickstart/" class="md-nav__link">
+      <a href="../tutorials/quickstart/" class="md-nav__link">
         
   
   
@@ -543,7 +543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/getting-started/" class="md-nav__link">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
         
   
   
@@ -571,7 +571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release-notes/" class="md-nav__link">
+      <a href="../release-notes/" class="md-nav__link">
         
   
   
@@ -660,10 +660,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../durability/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -679,6 +706,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#monitor-identity-and-configuration-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitor identity and configuration changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-action-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External action outcomes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retained-events-and-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retained events and backup
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -691,7 +771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../slo/" class="md-nav__link">
+      <a href="../slo/" class="md-nav__link">
         
   
   
@@ -719,7 +799,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../validation/" class="md-nav__link">
+      <a href="../validation/" class="md-nav__link">
         
   
   
@@ -747,7 +827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deploy-to-production/" class="md-nav__link">
+      <a href="../how-to/deploy-to-production/" class="md-nav__link">
         
   
   
@@ -775,7 +855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../native-installation/" class="md-nav__link">
+      <a href="../native-installation/" class="md-nav__link">
         
   
   
@@ -803,7 +883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../container-helm/" class="md-nav__link">
+      <a href="../container-helm/" class="md-nav__link">
         
   
   
@@ -831,7 +911,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../release-engineering/" class="md-nav__link">
+      <a href="../release-engineering/" class="md-nav__link">
         
   
   
@@ -859,7 +939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../common-tasks/" class="md-nav__link">
+      <a href="../how-to/common-tasks/" class="md-nav__link">
         
   
   
@@ -884,37 +964,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity and diagnostics
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../how-to/performance-tuning/" class="md-nav__link">
         
   
   
@@ -930,70 +983,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#start-with-the-workload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start with the workload
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpret-sizing-telemetry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpret sizing telemetry
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#know-where-configuration-lives" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Know where configuration lives
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profile-a-controlled-instance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Profile a controlled instance
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1065,7 +1054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+      <a href="../explanation/architecture-overview/" class="md-nav__link">
         
   
   
@@ -1093,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+      <a href="../explanation/incident-lifecycle/" class="md-nav__link">
         
   
   
@@ -1121,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+      <a href="../explanation/queueing-theory/" class="md-nav__link">
         
   
   
@@ -1208,7 +1197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/config-schema/" class="md-nav__link">
+      <a href="../reference/config-schema/" class="md-nav__link">
         
   
   
@@ -1236,7 +1225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jobs-reference/" class="md-nav__link">
+      <a href="../reference/jobs-reference/" class="md-nav__link">
         
   
   
@@ -1264,7 +1253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/api-reference/" class="md-nav__link">
+      <a href="../reference/api-reference/" class="md-nav__link">
         
   
   
@@ -1292,7 +1281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../reference/cli/" class="md-nav__link">
         
   
   
@@ -1327,7 +1316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../faq/" class="md-nav__link">
+      <a href="../faq/" class="md-nav__link">
         
   
   
@@ -1406,7 +1395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer-guide/" class="md-nav__link">
+      <a href="../developer-guide/" class="md-nav__link">
         
   
   
@@ -1434,7 +1423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adding-new-jobs/" class="md-nav__link">
+      <a href="../how-to/adding-new-jobs/" class="md-nav__link">
         
   
   
@@ -1462,7 +1451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../maintaining-docs/" class="md-nav__link">
+      <a href="../maintaining-docs/" class="md-nav__link">
         
   
   
@@ -1490,7 +1479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../legal/disclaimer/" class="md-nav__link">
+      <a href="../legal/disclaimer/" class="md-nav__link">
         
   
   
@@ -1545,10 +1534,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#start-with-the-workload" class="md-nav__link">
+  <a href="#monitor-identity-and-configuration-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start with the workload
+        Monitor identity and configuration changes
       
     </span>
   </a>
@@ -1556,10 +1545,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interpret-sizing-telemetry" class="md-nav__link">
+  <a href="#external-action-outcomes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interpret sizing telemetry
+        External action outcomes
       
     </span>
   </a>
@@ -1567,21 +1556,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#know-where-configuration-lives" class="md-nav__link">
+  <a href="#retained-events-and-backup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Know where configuration lives
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profile-a-controlled-instance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Profile a controlled instance
+        Retained events and backup
       
     </span>
   </a>
@@ -1605,7 +1583,7 @@
 
 
   
-    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/how-to/performance-tuning.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/durability.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1613,38 +1591,106 @@
   
 
 
-<h1 id="capacity-and-diagnostics">Capacity and diagnostics<a class="headerlink" href="#capacity-and-diagnostics" title="Permanent link">&para;</a></h1>
-<p>Size CPRa from measurements of your workload. There is no verified universal monitor count, memory-per-monitor figure, or throughput guarantee for this preview.</p>
-<h2 id="start-with-the-workload">Start with the workload<a class="headerlink" href="#start-with-the-workload" title="Permanent link">&para;</a></h2>
-<p>Record monitor count, check intervals, target response times, failure rates, notification traffic, and any recovery actions. Check rate is influenced by the sum of monitor frequencies, not only the number of monitors.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./bin/cpractl<span class="w"> </span>get<span class="w"> </span>queues<span class="w"> </span>-o<span class="w"> </span>json
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>./bin/cpractl<span class="w"> </span>get<span class="w"> </span>pools<span class="w"> </span>-o<span class="w"> </span>json
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>./bin/cpractl<span class="w"> </span>get<span class="w"> </span>systems<span class="w"> </span>-o<span class="w"> </span>json
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>./bin/cpractl<span class="w"> </span>metrics
+<h1 id="persistence-and-restart-recovery">Persistence and restart recovery<a class="headerlink" href="#persistence-and-restart-recovery" title="Permanent link">&para;</a></h1>
+<p>The executable defaults to single-node HashiCorp Raft storage in the platform's
+user state directory. <code>cpractl local paths</code> reports that location; Linux system
+services explicitly use <code>/var/lib/cpra</code>. Explicit <code>-data-dir</code> overrides an
+explicit runtime <code>storage.directory</code>, which overrides the platform default.
+A legacy <code>./cpra-data</code> requires an explicit path or a stopped migration, so an
+upgrade does not silently start a fresh store. Use <code>-runtime-config
+examples/runtime.yaml</code> to select storage and runtime settings. <code>-yaml</code> and its <code>-config</code> alias still select the monitor
+manifest. <code>examples/runtime-memory.yaml</code> explicitly selects disposable memory
+storage; it uses the same durable-state transition path without writing files.</p>
+<p>Raft uses synchronous bbolt log/stable writes and local file snapshots. There is
+one voter and no network membership interface. This provides restart recovery on
+one machine; it does not provide distributed failover or protection against loss
+of the disk. A persisted node identity and exclusive database lock prevent an
+ordinary restart from bootstrapping a replacement node or two processes from
+opening the same directory. Startup errors never select memory automatically.</p>
+<p>Submissions are grouped for at most 5 milliseconds or 1,000 commands. Snapshots
+are requested every five minutes and three completed snapshots are retained.
+The state is copied before background serialization, so subsequent applications
+cannot mutate a snapshot being written. The versioned representation contains
+plain durable records, independent of Ark's live entity numbering; Ark remains
+at v0.4.3. Jobs, credentials, clients, channels and contexts are rebuilt from the
+manifest and excluded from the Raft state. Configuration fingerprints contain
+hashes, not copies of provider configuration.</p>
+<h2 id="monitor-identity-and-configuration-changes">Monitor identity and configuration changes<a class="headerlink" href="#monitor-identity-and-configuration-changes" title="Permanent link">&para;</a></h2>
+<p>An optional <code>id</code> is the durable identity:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">monitors</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders-api</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Orders API</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">pulse_check</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60s</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://orders.example.com/health</span>
 </code></pre></div>
-<p>Compare queue growth with service time, worker capacity, CPU, memory, and target-side rate limits.</p>
-<h2 id="interpret-sizing-telemetry">Interpret sizing telemetry<a class="headerlink" href="#interpret-sizing-telemetry" title="Permanent link">&para;</a></h2>
-<p>The runtime uses the <a href="../../explanation/queueing-theory/">queueing model</a>, measured variability, default headroom, and worker bounds. <code>slo_unattainable</code> means the requested mean-latency or worker-capacity bound cannot currently be met.</p>
-<p>A twofold per-adjustment growth limit means capacity changes are not instantaneous. Adding workers can increase pressure on a slow or overloaded target; measure that target before raising limits.</p>
-<h2 id="know-where-configuration-lives">Know where configuration lives<a class="headerlink" href="#know-where-configuration-lives" title="Permanent link">&para;</a></h2>
-<p>Worker limits, queue capacity, snapshot interval, and sizing policy are programmatic controller or worker-pool settings. They are not arbitrary fields in the monitor YAML. The server exposes only the <a href="../../reference/cli/">documented flags</a>.</p>
-<p><code>CPRA_ENTITY_THRESHOLD</code> is a startup queue-selection input. Live queue migration is unsupported. Dynamic worker pools reject eager worker preallocation because it conflicts with resizing.</p>
-<h2 id="profile-a-controlled-instance">Profile a controlled instance<a class="headerlink" href="#profile-a-controlled-instance" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>./bin/cpra<span class="w"> </span>-yaml<span class="w"> </span>monitors.yaml<span class="w"> </span>-pprof<span class="w"> </span>-pprof.addr<span class="w"> </span>localhost:6060
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>go<span class="w"> </span>tool<span class="w"> </span>pprof<span class="w"> </span>http://localhost:6060/debug/pprof/profile
-</code></pre></div>
-<p>Keep the profiling listener on loopback. Profiling is disabled by default. Use captured evidence to distinguish target I/O, queueing, snapshot scans, and controller work.</p>
-<p>Hybrid queues provide overflow handling; the segmented Workiva implementation serializes producers while publishing or sealing a segment. It should not be described as wholly lock-free.</p>
-<p>The release review covered correctness and process behavior. It did not include a comparative performance benchmark or a long-duration soak test.</p>
+<p>Keep the ID when renaming a monitor. Without an explicit ID, CPRa derives a
+deterministic ID from the name, so a rename creates a different durable identity.
+Duplicate effective IDs are rejected. Existing numeric API IDs remain available
+as process-local identifiers; new <code>monitor_id</code> fields identify records across
+restarts. Provider targets and referenced endpoint groups contribute to the
+configuration revision. Changed revisions cancel unsent actions, preserve
+history and retain uncertain outcomes; old work cannot run against a new target.
+Configuration is loaded before startup; there is no live reload endpoint.</p>
+<h2 id="external-action-outcomes">External action outcomes<a class="headerlink" href="#external-action-outcomes" title="Permanent link">&para;</a></h2>
+<p>An intervention or notification endpoint moves through <code>queued</code>, <code>started</code>, and
+<code>succeeded</code>, <code>failed</code>, or <code>unknown</code>. Configuration changes can also produce
+<code>cancelled</code>. Intent is committed before admission and the started marker is
+committed before invoking the external driver. Confirmed successful endpoints
+are not repeated when another endpoint is unfinished. Confirmed retryable
+notification rejections have at most three attempts per endpoint.</p>
+<p>After an interruption, a committed started action becomes unknown. This includes
+the narrow interval after its started marker but before a provider call. CPRa
+continues health checks and holds those actions. Snapshot restoration and log
+replay do not invoke providers. A reported success means the driver's operation
+was accepted; delivery to a person or completion of a recovery requires separate
+provider evidence. An uncertain action is never automatically retried.</p>
+<p>Use <code>cpractl get state MONITOR_ID</code> and <code>cpractl get history MONITOR_ID</code> to inspect
+the operation identity and endpoint. Reconcile it against the designated target
+or provider records. The current read-only interfaces deliberately have no
+replay or resolution command. Preserve the record when carrying out any manual
+recovery outside CPRa; deleting the data directory is not a recovery procedure.</p>
+<p>Storage failure stops new admission and makes readiness unavailable. The process
+can remain alive for diagnostics. Runtime result channels are drained during
+shutdown; uncommitted external outcomes remain conservatively recoverable as
+unknown from the last committed started markers.</p>
+<h2 id="retained-events-and-backup">Retained events and backup<a class="headerlink" href="#retained-events-and-backup" title="Permanent link">&para;</a></h2>
+<p>Daily bbolt segments retain incident opening/closure, intervention and endpoint
+action states, unknown outcomes and configuration cancellations for 30 days.
+Successful raw health checks are not added to the timeline. Event IDs combine
+the committed log position and event ordinal, making replay idempotent.
+History writes and its progress catalog are synced before the corresponding
+state is eligible for snapshot compaction. Expiration filters old events and
+reclaims complete expired daily files; a partial boundary day can remain on disk
+until all its events expire. A missing or unreadable segment is unavailable,
+not an empty successful history query.</p>
+<p>For a consistent backup, stop CPRa cleanly and copy the <strong>entire data directory</strong>,
+including <code>identity.json</code>, <code>raft.db</code>, <code>snapshots/</code>, and <code>history/</code> (catalog and all
+retained segments). Preserve permissions. Keep the matching monitor manifest,
+runtime configuration, credential configuration and binary version separately.
+Credentials should remain in their existing secret-management arrangement.
+A Raft snapshot by itself is not a complete history backup.</p>
+<p><code>cpractl local backup --data-dir /path/state --output /path/new-backup</code> performs
+this stopped operation with exclusive locking and a verified file inventory.
+<code>cpractl local restore --backup /path/new-backup --data-dir /path/new-state</code>
+requires a new destination and validates the complete inventory before publishing
+it. See <a href="../native-installation/">native operations</a> for ownership and upgrade details.</p>
+<p>To restore, stop the process, restore the complete backup into a new directory
+owned by the service account, set <code>storage.directory</code> to it, supply the matching
+configuration and start CPRa. Check readiness, event history and unknown actions
+before treating the instance as recovered. Missing identity, incompatible
+formats, corrupt snapshots and incomplete history backups cause explicit
+errors; do not fix them by deleting state files. Copying a live bbolt file with
+ordinary file-copy tools is not a consistent backup method.</p>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -1674,7 +1720,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../common-tasks/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Troubleshooting">
+          <a href="../release-notes/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Current changes">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1684,20 +1730,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Troubleshooting
+                Current changes
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../explanation/architecture-overview/" class="md-footer__link md-footer__link--next" aria-label="Next: Architecture">
+          <a href="../slo/" class="md-footer__link md-footer__link--next" aria-label="Next: Measured latency">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Architecture
+                Measured latency
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1733,10 +1779,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

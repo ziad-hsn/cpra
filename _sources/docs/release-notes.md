@@ -1,38 +1,86 @@
 ---
-title: "Current release notes"
-description: "Changes and verification for the CPRa source snapshot published on 9 September 2026."
+title: "Durable CPRa candidate"
+description: "Implemented durability and operator interfaces, completed checks, and outstanding release evidence."
 ---
 
-# Current release notes
+# Durable CPRa candidate
 
-These documentation pages describe source commit [a370969](https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294), published to `main` on **9 September 2026**. This is an OSS preview source snapshot, not a claim that a versioned binary release has been published.
+This documentation describes the `codex/release-engineering` implementation candidate.
+The source revision appears in the page footer and `site-version.json`.
+Publication to `main` and the public documentation site is gated on review and
+agreed release evidence. The previous published baseline is
+[a370969](https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294).
 
-## What changed
+## Implemented behavior
 
-- Runtime worker sizing again calls Erlang C and Allen–Cunneen with measured arrival and service variability.
-- Queue segment transitions and overflow handling preserve accepted work and progress.
-- Recovery admission, incident accounting, maintenance, and healthy-check verification were corrected.
-- Driver deadlines, configuration compatibility, HTTP delivery responses, and required provider fields were tightened.
-- TLS certificate warnings propagate into degraded status and yellow notifications without starting recovery.
-- Dashboard, API, and CLI distinguish unavailable data, current health errors, and future check times.
-- Metrics families, container packaging, dependency notices, and release verification were updated.
+- Single-node Raft storage defaults to the platform user state directory; system
+  services use explicit native paths. Legacy `./cpra-data` requires an explicit
+  selection or stopped migration. Memory-only mode remains explicit.
+- Incident transitions and action intent are committed before external work.
+  Restart resumes health checks and queued work, while holding interrupted
+  started actions as unknown. Successful endpoints are not repeated to complete
+  another endpoint.
+- Stable monitor IDs and configuration revisions prevent old queued work from
+  being redirected to a changed target. Removing a monitor cancels unsent work.
+- Incident, intervention and notification events are retained for 30 days in
+  daily local segments. Raw check history and hourly aggregates are not retained.
+- Five-minute distributions and exact threshold counters measure queue delay,
+  execution duration and scheduled-to-committed-result latency. Missed work,
+  timeouts, unfinished checks and recovery coverage gaps remain visible.
+- Erlang C and Allen–Cunneen remain the initial sizing model. Bounded observed
+  latency feedback augments that recommendation.
+- Authenticated read-only history, SLO and persistence APIs, matching CLI commands
+  and dashboard views expose this state with bounded monitor/history pages.
+- Configured live-provider and external benchmark harnesses record actual results
+  and distinguish unconfigured cases from passing evidence.
 
-## Verification
+## Release engineering changes
 
-The source snapshot passed Go 1.25 and Go 1.27 formatting, vet, default race tests, and race tests with every optional driver tag. Dashboard build, type checks, lint, 13 tests, and dependency audit passed. The [GitHub verification run](https://github.com/ziad-hsn/cpra/actions/runs/34334452067) also completed successfully.
+The candidate adds canonical Go installation, recorded unstripped release builds,
+standard platform paths, native supervisor integration, stopped backup/restore,
+format-specific DEB/RPM lifecycle handling, exact-binary OCI images, production
+Compose and a validated single-owner Helm chart. The release workflow must pass
+its gates before exposing a stable Git tag to Go installation.
 
-The release review included real process scenarios, authenticated browser checks, a running queueing-model experiment, container execution, and archive consistency checks. ARM64 binaries were cross-compiled and inspected, not executed.
+See [native operations](native-installation.md), [container and Helm operations](container-helm.md),
+and [release engineering](release-engineering.md) for the implemented contracts.
 
-Go scans found no affected reachable symbols or imported packages. Four advisories were present only in the required `golang.org/x/crypto` module's unused packages; this is not a claim that every module is advisory-free.
+## Verification status
 
-## Current boundaries
+Implementation tests and candidate evidence are recorded separately from final
+release qualification. Default Go 1.27.1 tests and dashboard type/lint/component
+checks passed during this work. Native Windows tests exercise metadata replacement,
+real process-crash boundaries, history, locking and stopped backup/restore; native
+SCM installation is a separate gate. Full final-source reports must identify the
+exact source and artifact digest before a released platform is claimed.
 
-- One process owns a monitor configuration; there is no cross-instance coordination.
-- Incident and delivery state is in memory and resets on restart.
-- Per-monitor history is not retained.
-- MongoDB SRV discovery and Kubernetes exec credentials are unsupported.
-- Local provider fixtures do not establish production-account certification.
-- No comparative performance benchmark or long-duration soak test was performed.
-- The queueing model estimates mean latency, not a percentile or SLA guarantee.
+Historical provider fixtures and prior candidate checks do not automatically
+qualify a new artifact. The final release record must include reproducibility,
+native platform/service/package lifecycle, image/chart operations, vulnerability
+scans and documentation checks.
 
-[Start a local instance](tutorials/quickstart.md) · [Deploy with these limits](how-to/deploy-to-production.md)
+## Outstanding release gates
+
+- Full-account verification of all 33 driver types remains incomplete. User-owned
+  accounts, credentials, designated targets and independent receipt observers
+  are required. Local fixtures cannot certify cloud production accounts.
+- The large campaign must recheck physical C: free space before starting: at
+  least 30 GiB plus measured fixture headroom. The earlier low-disk result is
+  historical, and freeing space does not itself complete a campaign.
+- Matched 10k/100k/1m comparisons and the uninterrupted 24-hour million-monitor
+  campaign have not completed. A ten-monitor harness smoke run is explicitly
+  excluded from scale and endurance evidence.
+- Independent review and the final publication gates remain open.
+
+## Operational boundaries {#current-boundaries}
+
+This is one process and one voter with local persistence. It provides no
+multi-node failover. The configured health-check targets are p99 queue delay
+at most 250 ms and scheduled-to-committed result at most five seconds; measured
+attainment is conditional on the observed workload and complete window coverage.
+It is not an unconditional SLA. Unknown external actions require operator
+investigation and are never automatically replayed. MongoDB SRV discovery and
+Kubernetes exec credential plugins remain unsupported.
+
+[Recovery and backups](durability.md) · [Latency accounting](slo.md) ·
+[Verification requirements](validation.md)

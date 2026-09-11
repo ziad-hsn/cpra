@@ -5,7 +5,7 @@ description: "Run a single CPRa owner with authenticated access, private manifes
 
 # Deploy a CPRa instance
 
-Begin with a small, observed deployment using the monitor intervals and target types you actually need. The current preview is a single-process application; it does not establish a hosted service or high-availability cluster.
+Begin with a small, observed deployment using the monitor intervals and target types you actually need. CPRa has one active owner and one local Raft voter. Its deployment contracts preserve state across restart; there is no distributed failover.
 
 ## Assign ownership and permissions
 
@@ -36,26 +36,51 @@ Put an HTTPS reverse proxy in front of this HTTP listener. Browser login is user
 
 Confirm that checks classify your target correctly and notifications reach a test destination. Then add the intended recovery action and verify its effect.
 
-Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restarting CPRa resets in-memory incident state and can change what is admitted next.
+Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restart restores committed incident state and holds interrupted started actions as unknown. Mount the persistent data directory and retain complete backups.
 
-## Containers
+## Native services, Compose and Helm
 
-~~~sh
-docker build -f docker/Dockerfile -t cpra:local .
-docker compose -f docker/docker-compose.yml up --build
-~~~
+Use [native installation](../native-installation.md) for systemd, launchd and
+Windows SCM, standard directories, installation ownership and upgrades.
+System services always receive explicit absolute configuration and data paths.
+Linux system state is `/var/lib/cpra`; user services use the XDG state directory.
 
-The supplied Compose example disables the web listener. Edit the manifest for addresses reachable from the container; its loopback address refers to the container itself.
+The production image consumes the exact staged release executables and runs as
+UID/GID 1001. Compose uses a stable named volume, read-only configuration, bounded
+logs, a 60-second stop allowance and a loopback-published authenticated API.
+Required bind files must exist; file-backed Secret ownership follows the host.
 
-The image runs as UID 1001 and expects `/etc/cpra/monitors.yaml`. Mount configuration read-only and provide writable storage for file-based notifications. Docker actions need access to the intended Docker daemon; mounting its socket grants substantial control over that daemon.
+The Helm chart uses one StatefulSet owner with retained storage. Prefer RWOP
+on verified CSI storage; RWO is an explicit compatibility option and does not
+fence multiple pods on one node. Large manifests use a separate read-only
+configuration volume. They do not belong in Helm values, ConfigMaps or Secrets.
+Use versioned immutable token Secrets and intentional rollouts for rotation.
+
+Follow the [container and Helm guide](../container-helm.md) for exact commands,
+headless mode, probes, maintenance, backup and Helm 3/4 compatibility. Optional
+host controls and Kubernetes recovery privileges remain explicit.
 
 ## Health and shutdown
 
 - `/api/v1/healthz` reports process liveness.
-- `/api/v1/readyz` requires a recent nonempty snapshot.
+- `/api/v1/readyz` requires initialized admission, controller progress and available durable storage. Explicit empty configurations can be ready; projection freshness is separate.
 - `/metrics` exposes runtime and pipeline metrics.
-- SIGINT or SIGTERM starts graceful shutdown; the web server stops before the controller.
+- SIGINT or SIGTERM marks readiness unavailable and stops admission; diagnostics remain available while accepted work drains or is cancelled.
 
-Choose service-manager stop timeouts with enough room for your configured operation deadlines. Use an external supervisor to restart a failed process and an external observer for CPRa itself.
+The Unix/container application budget starts at 45 seconds within a 60-second supervisor allowance; Windows service handling uses a 15-second cap. Deadline expiry is visible and interrupted external outcomes remain unknown. Use an external supervisor to restart a failed process and an external observer for CPRa itself.
 
 [Current limits](../release-notes.md#current-boundaries) · [Troubleshooting](common-tasks.md)
+
+## Persistent volume and complete backup
+
+Mount a private volume at `/var/lib/cpra` for the packaged container; the shipped
+runtime configuration selects that directory. For a native process, set
+`storage.directory` to an absolute persistent path. Avoid sharing the data
+directory between processes. There is one voter and no automatic failover.
+
+Stop CPRa before taking a file-level backup. Copy `identity.json`, `raft.db`,
+`snapshots/`, and the entire retained `history/` catalog and segment set together.
+Use `cpractl local backup` to hold the exclusive state lock while copying and verifying all files. Restore all files with `cpractl local restore` into a new private directory and start with the compatible
+binary and monitor configuration. Retain credentials separately. A storage
+failure stops new admission and makes readiness unavailable; CPRa never silently
+switches to memory. See [complete recovery procedures](../durability.md).

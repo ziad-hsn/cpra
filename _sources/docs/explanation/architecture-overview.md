@@ -27,7 +27,7 @@ Manifest → validation and entities → controller schedules work
 | Intervention | Perform an admitted recovery action. |
 | Code | Deliver configured incident notifications. |
 
-Each pipeline has a queue and a worker pool. Separating work prevents slow target I/O from becoming controller state mutation inside each network call. Result application remains coordinated by the controller.
+Each pipeline has a queue and a worker pool. Separating work prevents slow target I/O from becoming controller state mutation inside each network call. Results are committed through the deterministic Raft state machine; the controller owner loop applies the committed projection to its ECS world.
 
 ## Scheduling and state
 
@@ -37,9 +37,9 @@ Configuration is loaded before startup. Live reload and runtime queue migration 
 
 ## Read-only inspection
 
-A snapshot system publishes an immutable fleet projection every five seconds by default. The API and dashboard read this projection rather than changing the ECS world. Queue and pool telemetry expose worker demand, capacity, observations, and model state.
+An incremental index publishes immutable rows as committed monitor state changes. API filtering and serialization run outside the controller owner loop. Queue and pool telemetry expose worker demand, capacity, observations, and model state.
 
-Snapshot generation scans the fleet. Above the detailed-index limit, aggregate counts remain available, but detailed monitor and incident lists return unavailable. The index limit is not an independently verified fleet-capacity claim.
+Normal monitor pages construct only the requested rows; filtered searches scan the index on the request goroutine. Page responses are capped at 500 monitors. This architecture does not itself establish a measured fleet-capacity claim.
 
 ## Concurrency and lifecycle
 

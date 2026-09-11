@@ -110,7 +110,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">main · a370969</a> · 9 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226">source · 410fbfb</a> · 11 September 2026
 
           </div>
           
@@ -294,7 +294,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+        <a href="../../durability/" class="md-tabs__link">
           
   
   
@@ -658,6 +658,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification campaigns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../how-to/deploy-to-production/" class="md-nav__link">
         
   
@@ -666,6 +750,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1114,6 +1282,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-operator-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable operator queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-administration-and-probe-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local administration and probe commands
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1376,6 +1566,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#durable-operator-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable operator queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-administration-and-probe-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local administration and probe commands
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1526,6 +1738,36 @@
 </table>
 <p>The client also reads <code>CPRA_AUTH_TOKEN</code>. <code>health</code> checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.</p>
 <p><a href="../api-reference/">API semantics</a></p>
+<h2 id="durable-operator-queries">Durable operator queries<a class="headerlink" href="#durable-operator-queries" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cpractl<span class="w"> </span>get<span class="w"> </span>state
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>cpractl<span class="w"> </span>get<span class="w"> </span>state<span class="w"> </span>YOUR_STABLE_MONITOR_ID
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>cpractl<span class="w"> </span>get<span class="w"> </span><span class="nb">history</span><span class="w"> </span>YOUR_STABLE_MONITOR_ID<span class="w"> </span>--limit<span class="w"> </span><span class="m">100</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>cpractl<span class="w"> </span>get<span class="w"> </span><span class="nb">history</span><span class="w"> </span>YOUR_STABLE_MONITOR_ID<span class="w"> </span>--cursor<span class="w"> </span>PREVIOUS_NEXT_CURSOR
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>cpractl<span class="w"> </span>get<span class="w"> </span>slo<span class="w"> </span>-o<span class="w"> </span>json
+</code></pre></div>
+<p>Use the existing server and token-file/environment configuration. These commands
+are read-only; unknown actions cannot be replayed through the CLI or dashboard.</p>
+<h2 id="local-administration-and-probe-commands">Local administration and probe commands<a class="headerlink" href="#local-administration-and-probe-commands" title="Permanent link">&para;</a></h2>
+<p><code>cpra -capabilities</code> reports compiled driver availability. <code>cpra -validate -yaml
+/path/monitors.yaml -runtime-config /path/runtime.yaml</code> validates configuration
+before opening storage or providers. Explicit <code>-data-dir</code> overrides configured
+storage and platform defaults; <code>-shutdown-timeout</code> bounds application shutdown.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cpractl<span class="w"> </span>--token-file<span class="w"> </span>/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>ready
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>paths<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>init<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>render<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>install<span class="w"> </span>--scope<span class="w"> </span>user<span class="w"> </span>--binary<span class="w"> </span>/path/cpra
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>update<span class="w"> </span>--scope<span class="w"> </span>user<span class="w"> </span>--binary<span class="w"> </span>/path/new-cpra
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>uninstall<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>backup<span class="w"> </span>--data-dir<span class="w"> </span>/path/state<span class="w"> </span>--output<span class="w"> </span>/path/new-backup
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>restore<span class="w"> </span>--backup<span class="w"> </span>/path/new-backup<span class="w"> </span>--data-dir<span class="w"> </span>/path/new-state
+</code></pre></div>
+<p><code>ready</code> and <code>health</code> make bounded API requests only; they never open Raft or
+invoke providers. Local commands operate on the local machine and do not use a
+remote API. Service operations preserve installer ownership and use explicit
+scope. Backup requires a stopped owner; restore requires an absent destination.
+See <a href="../../native-installation/">native administration</a> for platform permissions,
+configuration preservation and credential handling.</p>
 
 
 

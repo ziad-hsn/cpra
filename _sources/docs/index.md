@@ -21,9 +21,9 @@ Go · MIT · self-hosted
 
 </div>
 
-CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.
+CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single server binary.
 
-The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the source published to `main` on **9 September 2026**.
+The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the durable implementation candidate. See [release notes](release-notes.md) for its source revision and outstanding evidence gates.
 
 ## What you can do
 
@@ -57,8 +57,8 @@ The current application includes a read-only dashboard, an HTTP API, and the `cp
 
 ## Start with a small deployment
 
-Run one process for each monitor configuration. Incident state lives in memory and resets when the process restarts. Separate CPRa instances do not coordinate ownership.
+Run one process for each monitor configuration. Single-node Raft retains committed incident state by default. Separate CPRa instances do not coordinate ownership. Retain the complete data directory across restarts.
 
-Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.
+Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency and is augmented by observed percentile feedback; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.
 
 [Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)

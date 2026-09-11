@@ -6,19 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do.">
+        <meta name="description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
       
       
         <meta name="author" content="Ziad Hassan">
       
       
-        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/faq/">
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/release-engineering/">
       
       
-        <link rel="prev" href="../reference/cli/">
+        <link rel="prev" href="../container-helm/">
       
       
-        <link rel="next" href="../developer-guide/">
+        <link rel="next" href="../how-to/common-tasks/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Frequently asked questions - CPRa Documentation</title>
+        <title>Release engineering - CPRa Documentation</title>
       
     
     
@@ -66,16 +66,16 @@
   <link rel="manifest" href="../manifest.webmanifest">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="CPRa Documentation">
-  <meta property="og:title" content="Frequently asked questions">
-  <meta property="og:description" content="Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do.">
-  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/faq/">
+  <meta property="og:title" content="Release engineering">
+  <meta property="og:description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/release-engineering/">
   <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Frequently asked questions">
-  <meta name="twitter:description" content="Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do.">
+  <meta name="twitter:title" content="Release engineering">
+  <meta name="twitter:description" content="Check services, follow incidents and configure recovery with the CPRa server, dashboard and CLI.">
   <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
   <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
   
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#frequently-asked-questions" class="md-skip">
+        <a href="#release-engineering" class="md-skip">
           Skip to content
         </a>
       
@@ -142,7 +142,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Frequently asked questions
+              Release engineering
             
           </span>
         </div>
@@ -290,10 +290,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../durability/" class="md-tabs__link">
           
   
@@ -350,11 +352,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../faq/" class="md-tabs__link">
         
   
   
@@ -603,26 +603,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -640,7 +645,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -823,10 +828,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../release-engineering/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -842,6 +874,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#source-and-build-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source and build identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installable-source-and-embedded-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installable source and embedded dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproduce-unsigned-distributions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproduce unsigned distributions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#native-packages-and-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native packages and services
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container-chart-and-operational-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container, chart and operational gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publication-and-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publication and verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mainstream-reference-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mainstream reference implementations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1228,37 +1357,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    FAQ
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
         
   
   
@@ -1274,169 +1376,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-cpra" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is CPRa?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#is-cpra-free-and-open-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Is CPRa free and open source?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-can-cpra-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What can CPRa check?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-does-cpra-do-when-a-check-fails" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What does CPRa do when a check fails?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-can-cpra-send-alerts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where can CPRa send alerts?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-does-cpra-differ-from-a-metrics-stack-like-prometheus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How does CPRa differ from a metrics stack like Prometheus?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-does-cpra-differ-from-an-uptime-monitor" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How does CPRa differ from an uptime monitor?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#does-cpra-support-high-availability-or-clustering" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Does CPRa support high availability or clustering?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#does-cpra-keep-history" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Does CPRa keep history?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-is-the-dashboard-secured" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How is the dashboard secured?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-platforms-does-cpra-run-on" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What platforms does CPRa run on?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-do-i-install-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How do I install it?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-does-the-name-come-from" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where does the name come from?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1639,10 +1578,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-is-cpra" class="md-nav__link">
+  <a href="#source-and-build-identity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is CPRa?
+        Source and build identity
       
     </span>
   </a>
@@ -1650,10 +1589,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#is-cpra-free-and-open-source" class="md-nav__link">
+  <a href="#installable-source-and-embedded-dashboard" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Is CPRa free and open source?
+        Installable source and embedded dashboard
       
     </span>
   </a>
@@ -1661,10 +1600,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-can-cpra-check" class="md-nav__link">
+  <a href="#reproduce-unsigned-distributions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What can CPRa check?
+        Reproduce unsigned distributions
       
     </span>
   </a>
@@ -1672,10 +1611,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-does-cpra-do-when-a-check-fails" class="md-nav__link">
+  <a href="#native-packages-and-services" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What does CPRa do when a check fails?
+        Native packages and services
       
     </span>
   </a>
@@ -1683,10 +1622,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-can-cpra-send-alerts" class="md-nav__link">
+  <a href="#container-chart-and-operational-gates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where can CPRa send alerts?
+        Container, chart and operational gates
       
     </span>
   </a>
@@ -1694,10 +1633,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-does-cpra-differ-from-a-metrics-stack-like-prometheus" class="md-nav__link">
+  <a href="#publication-and-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How does CPRa differ from a metrics stack like Prometheus?
+        Publication and verification
       
     </span>
   </a>
@@ -1705,76 +1644,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-does-cpra-differ-from-an-uptime-monitor" class="md-nav__link">
+  <a href="#mainstream-reference-implementations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How does CPRa differ from an uptime monitor?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#does-cpra-support-high-availability-or-clustering" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Does CPRa support high availability or clustering?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#does-cpra-keep-history" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Does CPRa keep history?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-is-the-dashboard-secured" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How is the dashboard secured?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-platforms-does-cpra-run-on" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What platforms does CPRa run on?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-do-i-install-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How do I install it?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-does-the-name-come-from" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where does the name come from?
+        Mainstream reference implementations
       
     </span>
   </a>
@@ -1798,7 +1671,7 @@
 
 
   
-    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/faq.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/ziad-hsn/cpra/edit/gh-pages/_sources/docs/release-engineering.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1806,42 +1679,96 @@
   
 
 
-<h1 id="frequently-asked-questions">Frequently asked questions<a class="headerlink" href="#frequently-asked-questions" title="Permanent link">&para;</a></h1>
-<h2 id="what-is-cpra">What is CPRa?<a class="headerlink" href="#what-is-cpra" title="Permanent link">&para;</a></h2>
-<p>CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against services on a schedule, tracks incidents against failure and recovery thresholds, sends notifications, and runs a configured recovery action when a service fails. The server binary embeds a read-only dashboard and HTTP API. The separate <code>cpractl</code> command-line client provides API inspection and local installation, service, and backup operations.</p>
-<h2 id="is-cpra-free-and-open-source">Is CPRa free and open source?<a class="headerlink" href="#is-cpra-free-and-open-source" title="Permanent link">&para;</a></h2>
-<p>Yes. CPRa is licensed under the <a href="https://github.com/ziad-hsn/cpra/blob/main/LICENSE">MIT license</a>. The source is at <a href="https://github.com/ziad-hsn/cpra">github.com/ziad-hsn/cpra</a>. There is no hosted service or paid tier.</p>
-<h2 id="what-can-cpra-check">What can CPRa check?<a class="headerlink" href="#what-can-cpra-check" title="Permanent link">&para;</a></h2>
-<p>The default build checks HTTP, TCP, ICMP, DNS, UDP, TLS certificate expiry, Docker container state, and gRPC port reachability. Optional build tags add Redis, PostgreSQL, MySQL, MongoDB, RabbitMQ, and Kafka checks. See <a href="../reference/jobs-reference/">drivers and fields</a>.</p>
-<h2 id="what-does-cpra-do-when-a-check-fails">What does CPRa do when a check fails?<a class="headerlink" href="#what-does-cpra-do-when-a-check-fails" title="Permanent link">&para;</a></h2>
-<p>After the configured number of consecutive failures, CPRa opens an incident, notifies the configured destinations, and runs the monitor's recovery action once. The default build can restart a Docker container or call an HTTP webhook; optional build tags add Kubernetes rollout restart or scaling, EC2 instance reboot, and systemd unit restart. The incident closes after the configured number of consecutive healthy checks. See the <a href="../explanation/incident-lifecycle/">incident lifecycle</a>.</p>
-<h2 id="where-can-cpra-send-alerts">Where can CPRa send alerts?<a class="headerlink" href="#where-can-cpra-send-alerts" title="Permanent link">&para;</a></h2>
-<p>Log, Slack, PagerDuty, email (SMTP with STARTTLS), generic webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, and Datadog in the default build; Microsoft Teams and Twilio with build tags. Destinations can be grouped. Committed delivery state is retained per endpoint, so completing one endpoint does not cause another unfinished endpoint to repeat it after restart. An ambiguous external outcome is held for operator investigation.</p>
-<h2 id="how-does-cpra-differ-from-a-metrics-stack-like-prometheus">How does CPRa differ from a metrics stack like Prometheus?<a class="headerlink" href="#how-does-cpra-differ-from-a-metrics-stack-like-prometheus" title="Permanent link">&para;</a></h2>
-<p>CPRa is not a time-series database and does not store metric history. It performs active checks, decides whether a service is up, and acts on the answer. It exposes its own process and worker-pool state on a Prometheus-compatible <code>/metrics</code> endpoint, so it can sit alongside a metrics stack rather than replace one.</p>
-<h2 id="how-does-cpra-differ-from-an-uptime-monitor">How does CPRa differ from an uptime monitor?<a class="headerlink" href="#how-does-cpra-differ-from-an-uptime-monitor" title="Permanent link">&para;</a></h2>
-<p>Uptime monitors typically stop at notification. CPRa also runs a recovery action you configure, with one attempt per incident and thresholds that must be met before the incident closes. The trade-off is that it is designed for a single process per configuration, not for a hosted multi-region service.</p>
-<h2 id="does-cpra-support-high-availability-or-clustering">Does CPRa support high availability or clustering?<a class="headerlink" href="#does-cpra-support-high-availability-or-clustering" title="Permanent link">&para;</a></h2>
-<p>No. Run one process for a monitor configuration. Single-node Raft preserves committed incident and delivery state across restarts; separate processes do not coordinate monitor ownership or provide distributed failover. An explicit memory mode is available for disposable runs. See <a href="../how-to/deploy-to-production/">deployment and recovery</a>.</p>
-<h2 id="does-cpra-keep-history">Does CPRa keep history?<a class="headerlink" href="#does-cpra-keep-history" title="Permanent link">&para;</a></h2>
-<p>CPRa retains 30 days of incident, intervention, and per-endpoint notification events, queryable by stable monitor ID through the API, CLI, and dashboard. It does not retain raw successful checks or a per-monitor latency time series. Backups must include the complete state directory, including the history catalog and daily segments.</p>
-<h2 id="how-is-the-dashboard-secured">How is the dashboard secured?<a class="headerlink" href="#how-is-the-dashboard-secured" title="Permanent link">&para;</a></h2>
-<p>The server listens on loopback by default. Binding to any other address requires an authentication token read from a file or environment variable; the browser login uses username <code>cpra</code> with the token as the password and the API accepts a Bearer token. The built-in listener serves HTTP, so remote access needs an HTTPS reverse proxy. See <a href="../how-to/deploy-to-production/">deployment</a>.</p>
-<h2 id="what-platforms-does-cpra-run-on">What platforms does CPRa run on?<a class="headerlink" href="#what-platforms-does-cpra-run-on" title="Permanent link">&para;</a></h2>
-<p>The release recipe targets Linux, macOS, and Windows on amd64 and arm64, Linux DEB/RPM packages, and Linux OCI images on both architectures. Compose and Helm use the same image. Cross-build success does not establish native execution support: see the <a href="../release-engineering/">release engineering guide</a> for required native gates and recorded evidence. Source compatibility remains Go 1.25; the official recipe pins Go 1.27.1 and dashboard builds pin Node.js 24.21.0 and pnpm.</p>
-<h2 id="how-do-i-install-it">How do I install it?<a class="headerlink" href="#how-do-i-install-it" title="Permanent link">&para;</a></h2>
-<p>Use the <a href="../native-installation/">native installation guide</a> for versioned Go installation, archives, packages, platform paths, and service setup. The <a href="../tutorials/quickstart/">quickstart</a> also covers a foreground source build. Use <a href="../container-helm/">Compose or Helm</a> for container deployments.</p>
-<h2 id="where-does-the-name-come-from">Where does the name come from?<a class="headerlink" href="#where-does-the-name-come-from" title="Permanent link">&para;</a></h2>
-<p>"CPR" is the pulse line: the agent keeps taking the pulse of a service and resuscitates it when it flatlines. The lowercase "a" is "agent". The gold loop in the mark is a nod to Ra, the sun that makes the same circuit every day.</p>
+<h1 id="release-engineering">Release engineering<a class="headerlink" href="#release-engineering" title="Permanent link">&para;</a></h1>
+<p>CPRa distributes one source module, two command-line programs, six native archives, four Linux packages, a two-platform Linux OCI image, production Compose configuration and an OCI Helm chart. A build or a cross-compilation alone does not establish platform support. The release workflow requires the corresponding native execution, installation, storage and deployment evidence before publishing an installable version tag.</p>
+<p>Provider account verification and the million-monitor, 24-hour campaign are separate gates. Packaging tests must not be described as provider certification, a capacity result, an SLA or distributed failover evidence.</p>
+<h2 id="source-and-build-identity">Source and build identity<a class="headerlink" href="#source-and-build-identity" title="Permanent link">&para;</a></h2>
+<p>The canonical module is <code>github.com/ziad-hsn/cpra</code>. Its <code>go.mod</code> retains <code>go 1.25.0</code>; official binaries use <strong>Go 1.27.1</strong>. A separate minimum-compiler job tests Go 1.25.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the <a href="https://go.dev/doc/devel/release#policy">Go release policy</a>.</p>
+<p><code>scripts/release/recipe.json</code> is the build contract and <code>.goreleaser.yaml</code> matches it. The release recipe uses:</p>
+<ul>
+<li>Normal optimization, <code>-trimpath</code>, <code>-mod=readonly</code>, <code>-pgo=off</code>, <code>-buildvcs=false</code> and bounded build parallelism (<code>-p=2</code>).</li>
+<li><code>CGO_ENABLED=0</code>, <code>GOAMD64=v1</code> and <code>GOARM64=v8.0</code>.</li>
+<li>Symbols and DWARF retained: no <code>-s</code>, <code>-w</code> or executable compression.</li>
+<li><code>GOENV=off</code>, <code>GOWORK=off</code>, <code>GOTOOLCHAIN=local</code>; ambient <code>GOFLAGS</code>, experiments, compiler and module-policy overrides are discarded.</li>
+<li>All optional drivers, with Linux-only systemd capability excluded on other operating systems by build constraints.</li>
+</ul>
+<p>Race/coverage instrumentation belongs to verification builds. Neither <code>netgo</code>, <code>osusergo</code>, external-linker flags nor an unrepresentative PGO profile is a general release optimization. Refer to <a href="https://pkg.go.dev/cmd/go">Go build flags</a>, <a href="https://pkg.go.dev/cmd/link">linker options</a>, <a href="https://go.dev/doc/toolchain">toolchain selection</a> and <a href="https://go.dev/doc/pgo">PGO guidance</a>.</p>
+<p>Release preparation requires a clean committed tree. It generates <code>RELEASE.json</code> from that commit, recording the application version, full source commit, source UTC timestamp and epoch, target matrix, compiler archive hashes, build recipe, dashboard digest, storage-format version, chart version, package version/revision and source-file inventory. Source inputs are checked again before building. The recipe injects CPRa's actual <code>internal/version</code> variables with the canonical module path. The displayed date is labeled <strong>source date</strong>, not compilation time.</p>
+<p>Official builds deliberately omit automatic <code>vcs.*</code> fields. The explicit identity and signed provenance bind their source. Ordinary <code>go build</code> and <code>go install</code> use Go's <code>runtime/debug.ReadBuildInfo</code> fallback: a module version alone does not invent a commit.</p>
+<h2 id="installable-source-and-embedded-dashboard">Installable source and embedded dashboard<a class="headerlink" href="#installable-source-and-embedded-dashboard" title="Permanent link">&para;</a></h2>
+<p>Use the same published version for both programs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>go<span class="w"> </span>install<span class="w"> </span>github.com/ziad-hsn/cpra@VERSION
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>go<span class="w"> </span>install<span class="w"> </span>github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
+</code></pre></div>
+<p>Replace <code>VERSION</code> with an actual published tag, such as <code>vMAJOR.MINOR.PATCH</code>. Plain installation retains the default driver subset. To match prebuilt driver coverage:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>go<span class="w"> </span>install<span class="w"> </span>-tags<span class="w"> </span><span class="s1">'redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio'</span><span class="w"> </span>github.com/ziad-hsn/cpra@VERSION
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>go<span class="w"> </span>install<span class="w"> </span>-tags<span class="w"> </span><span class="s1">'redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio'</span><span class="w"> </span>github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cpra<span class="w"> </span>-capabilities
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>cpra<span class="w"> </span>-validate<span class="w"> </span>-yaml<span class="w"> </span>/absolute/path/monitors.yaml
+</code></pre></div>
+<p>The dashboard, starter configuration and local service templates are embedded. End users need no checkout, Node, pnpm or generation step. <code>scripts/release/go_install.py</code> exercises both installation variants outside a checkout with only Go on <code>PATH</code>, using a source-derived module proxy before a public tag exists. That evidence is explicitly distinct from public-proxy retrieval. This follows the <a href="https://go.dev/ref/mod#go-install">versioned go install contract</a>.</p>
+<p>Frontend development uses the exact Node <strong>24.21.0</strong> and pnpm <strong>11.22.0</strong> recorded in the recipe and the frozen lockfile. <code>dashboard_build.py --check</code> refuses local dotenv files, discards ambient frontend build variables, builds and tests, then requires generated assets and license notices to match committed files. Provider credentials never become frontend inputs. <a href="https://v6.vite.dev/guide/env-and-mode">Vite environment handling</a> explains why values exposed at build time can become public browser content.</p>
+<h2 id="reproduce-unsigned-distributions">Reproduce unsigned distributions<a class="headerlink" href="#reproduce-unsigned-distributions" title="Permanent link">&para;</a></h2>
+<p>The release builder needs Python 3.12+, the selected Go distribution, and the checksum-pinned GoReleaser OSS/nFPM tools. Node/pnpm are needed only to verify the committed dashboard, not to rebuild a shipped source archive.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>scripts/release/install_go.py<span class="w"> </span>--version<span class="w"> </span>go1.27.1<span class="w"> </span>--out<span class="w"> </span>/absolute/new/go
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span>/absolute/new/go/bin:<span class="nv">$PATH</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>python3<span class="w"> </span>scripts/release/install_tools.py
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>python3<span class="w"> </span>scripts/release/dashboard_build.py<span class="w"> </span>--check
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>make<span class="w"> </span>release-check<span class="w"> </span>check<span class="w"> </span>test-all-drivers
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>make<span class="w"> </span>release-prepare<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>vMAJOR.MINOR.PATCH
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>make<span class="w"> </span>release-build-goreleaser
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>make<span class="w"> </span>release-package
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>python3<span class="w"> </span>scripts/release/sbom.py<span class="w"> </span>--syft<span class="w"> </span>bin/release-tools/syft
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>python3<span class="w"> </span>scripts/release/release.py<span class="w"> </span>verify
+</code></pre></div>
+<p>Official artifacts are staged in <code>dist/release/OS_ARCH/</code>. Container images consume those exact staged executables. <code>scripts/release/release.py build --go /absolute/go/bin/go</code> provides the equivalent direct Go recipe for source reconstruction.</p>
+<p>Source archives come from <code>git archive</code> of the approved commit plus explicitly generated <code>RELEASE.json</code>. They preserve executable modes and include build scripts, schemas, examples, notices, embedded templates and dashboard assets. Untracked workstation files are not selected by extension. Changes to <code>go.mod</code> or <code>go.sum</code> during a release build fail the build.</p>
+<p>The full reproducibility gate compares the checkout's unsigned executables, native archives and DEB/RPM files with <strong>two separate extractions</strong> of the distributed source archive:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>scripts/release/source_rebuild.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--source<span class="w"> </span>dist/release/cpra-vMAJOR.MINOR.PATCH-source.tar.gz<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--stage<span class="w"> </span>dist/release<span class="w"> </span>--go<span class="w"> </span>/absolute/go/bin/go<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--nfpm<span class="w"> </span>/absolute/path/bin/release-tools/nfpm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--out<span class="w"> </span>dist/release/reproducibility.json
+</code></pre></div>
+<p>All six targets are compared by default. A selective local run must list its targets and cannot satisfy the complete release gate. Signing timestamps/certificates are verified separately and are not part of unsigned-byte reproducibility. The chart packager also normalizes its tar headers to source time after staging the tested immutable image digest.</p>
+<p>For an intentional dirty-tree experiment, <code>make release-prepare RELEASE_CANDIDATE=--candidate VERSION=v0.0.0-local.1</code> creates visibly marked candidate metadata. Candidate outputs cannot produce an official source archive or pass publication.</p>
+<h2 id="native-packages-and-services">Native packages and services<a class="headerlink" href="#native-packages-and-services" title="Permanent link">&para;</a></h2>
+<p>The output matrix is Linux/macOS tar archives and Windows ZIP archives for <code>amd64</code>/<code>arm64</code>; DEB and RPM are built for both Linux architectures. MSI, PKG, Homebrew, Scoop, WinGet and hosted apt/yum repositories are not provided by this release machinery. Sigstore signatures do not imply Apple notarization or Windows Authenticode.</p>
+<p>Read <a href="../native-installation/">native installation</a> for platform paths, installer ownership, service administration and stopped backup/restore. Linux system packages install administrator-owned binaries under <code>/usr/bin</code>, configuration under <code>/etc/cpra</code>, and state under <code>/var/lib/cpra</code>. A Linux user service uses absolute XDG locations with home-directory fallbacks; a system service does not put state in the installing user's home. macOS and Windows use their platform application-data locations. Explicit data-directory flags and runtime settings retain precedence.</p>
+<p>The packaged systemd unit uses <code>Type=notify</code>, a dedicated account, state mode <code>0700</code>, <code>KillMode=mixed</code>, bounded restart rate, a 45-second application shutdown budget and a 60-second stop allowance. Installation leaves the service stopped. Host recovery permissions, credential files, SDK profiles and socket access require deliberate operator configuration under the actual service identity. Package hooks never grant Docker or systemd recovery authority or copy the installing user's credentials.</p>
+<p>DEB and RPM share file definitions but have separate lifecycle scripts. Upgrades stop a running old process before file replacement and restart only if it was running. A stopped service remains stopped; upgrades preserve enabled state. Existing <code>cpra</code> accounts must have a non-root UID and the matching non-root primary group; package hooks fail rather than changing an incompatible identity. RPM's removal of the old package during an upgrade does not disable the replacement. SemVer prereleases map to a <code>~</code> prefix followed by an order-preserving identifier encoding; package revision is recorded separately. For example, tag <code>v1.2.3-rc.1</code> maps to package version <code>1.2.3~bfkevaa1a</code>. The original tag stays in archive filenames, application identity and <code>RELEASE.json</code>. This encoding also preserves arbitrary SemVer cases such as <code>a.1 &lt; a-1</code>, where copying the raw suffix would invert Debian/RPM ordering. The exact package-manager version is recorded in <code>RELEASE.json</code>.</p>
+<p>Edited package configuration is preserved through conffile/noreplace semantics. Debian scripts never rewrite a declared conffile. Removal retains durable state and the service identity. Before Debian removal, an administrator-private configuration recovery copy is kept in <code>/var/backups/cpra/package-config</code>; it survives a later purge. This credential-bearing copy is <strong>outside</strong> the Raft state directory and must be handled as secret configuration. Debian purge still applies Debian's normal conffile deletion; use the explicit recovery copy if reinstalling after purge. RPM retains edited configuration as <code>.rpmsave</code>. Neither removal nor purge recursively deletes durable state. Data deletion is a separate operator action. See <a href="https://www.debian.org/doc/debian-policy/ch-files.html#configuration-files">Debian conffile policy</a> and <a href="https://github.com/rpm-software-management/rpm/blob/master/docs/man/rpm-scriptlets.7.scd">RPM scriptlet semantics</a>.</p>
+<p>The lifecycle harness uses actual package managers and booted systemd only on explicitly isolated test hosts. It covers fresh installation, edited configuration, ready service, running/stopped updates between distinct versions, prerelease ordering and prerelease-to-final installation, enabled/disabled preservation, remove, reinstall and purge/recovery copies. The package-version fixtures reuse the candidate executable to test package-manager ordering and hooks; they do not establish compatibility between different storage-writing binary versions. A mocked <code>systemctl</code> test is a script contract test and cannot be reported as native service evidence.</p>
+<h2 id="container-chart-and-operational-gates">Container, chart and operational gates<a class="headerlink" href="#container-chart-and-operational-gates" title="Permanent link">&para;</a></h2>
+<p>Read <a href="../container-helm/">container and Helm operations</a>. Production images use the tested release executables, UID/GID <code>1001:1001</code>, certificates, notices and <code>cpractl</code>; developer builds have a separate Dockerfile. Compose uses a stable volume, read-only configuration, loopback exposure and bounded logs. No fixture tools or host-control privileges are part of the universal image. The deterministic <code>cpra-vMAJOR.MINOR.PATCH-compose.tar.gz</code> bundle contains Compose configuration, runtime settings, a versioned image example, identity and operating instructions. Its README commands run directly from the extracted bundle; the default image can be replaced with the verified release digest from <code>OCI.json</code>. Credentials and monitor manifests are supplied separately by the operator.</p>
+<p>Helm creates one StatefulSet owner with retained storage; maintenance selects zero owners. Large manifests come from a pre-populated read-only configuration volume, not Helm values or oversized Kubernetes objects. API token rotation uses a new immutable Secret reference and an intentional rollout. The chart has no automatic backup hooks, live-copy guarantee, HPA, fake reload operation or multi-node failover claim.</p>
+<p>Both Helm 3 and 4, including a 3-to-4 upgrade, are exercised. The release gate requires real RWOP contention evidence on the selected CSI fixture, in addition to chart rendering. An RWO local-path test remains useful but cannot pass the default RWOP gate. A test CSI hostpath driver is not production storage certification; record and retest the actual filesystem/storage class/CSI stack before claiming it.</p>
+<p>Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.</p>
+<h2 id="publication-and-verification">Publication and verification<a class="headerlink" href="#publication-and-verification" title="Permanent link">&para;</a></h2>
+<p>The release workflow is manually dispatched with a candidate version and the documentation ref whose source metadata matches the exact source commit. <code>publish=false</code> builds and verifies without creating a release tag. Publication requires reviewed <code>main</code>, passing compatibility/native/service/package/container/chart/documentation jobs, and the protected <code>release</code> environment. Configure required reviewers, release/tag restrictions and the narrowly scoped <code>RELEASE_ADMIN_READ_TOKEN</code> secret used to read the repository's immutable-release setting. The ordinary job token handles contents/packages/attestations; pull-request jobs have no publication credentials. <a href="https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-guides/security-hardening-for-github-actions">GitHub's workflow security guidance</a> covers these boundaries.</p>
+<p>Do not manually pre-create a stable tag. It becomes installable through Go independently of whether a GitHub Release is still a draft. The workflow first assembles signatures and evidence, creates a non-SemVer validation draft, downloads it and verifies checksums, signer identity, issuer, source commit and provenance. Only then does it create the version tag and final draft, verify the final downloads, and publish. Immutable releases must be enabled; published bytes/tags are never overwritten. Corrections use a new version. Image aliases and the chart are promoted from the exact tested payloads. The chart version is a separate immutable version: bump <code>charts/cpra/Chart.yaml</code> before releasing any changed chart or image binding, including an application prerelease-to-final transition. Authenticated registry checks reject an existing application or chart version before creating the stable Git tag; network or authorization uncertainty fails the gate. A partially failed publication remains a failed release operation; do not hide it by overwriting artifacts.</p>
+<p>A release includes source/native/package/Compose payloads, <code>RELEASE.json</code>, checksums, target-specific dependency inventories and SPDX SBOMs, executed evidence, signature/provenance bundles and a trusted-root snapshot. These establish different properties: inventory, integrity, builder/source provenance and observed runtime behavior.</p>
+<p>Verify downloaded assets before execution:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sha256sum<span class="w"> </span>--check<span class="w"> </span>SHA256SUMS
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span>--bundle<span class="w"> </span>SHA256SUMS.sigstore.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--certificate-identity<span class="w"> </span>https://github.com/ziad-hsn/cpra/.github/workflows/release.yml@refs/heads/main<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span>https://token.actions.githubusercontent.com<span class="w"> </span>SHA256SUMS
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span>cpra-vMAJOR.MINOR.PATCH-linux-amd64.tar.gz<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--repo<span class="w"> </span>ziad-hsn/cpra<span class="w"> </span>--signer-workflow<span class="w"> </span>ziad-hsn/cpra/.github/workflows/release.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span>--source-digest<span class="w"> </span>FULL_SOURCE_COMMIT<span class="w"> </span>--source-ref<span class="w"> </span>refs/heads/main<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span>--bundle<span class="w"> </span>provenance.sigstore.json
+</code></pre></div>
+<p>For offline verification, bring the asset, bundle, GitHub CLI and independently trusted roots into the offline environment. Obtain current trusted roots on a trusted connected machine with <code>gh attestation trusted-root &gt; trusted_root.jsonl</code>, then add <code>--custom-trusted-root trusted_root.jsonl</code> to the verification command. A root file shipped beside an unverified artifact is not an independent trust anchor. See <a href="https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/verify-attestations-offline">GitHub's offline verification procedure</a>.</p>
+<p>Published support claims must link to the completed evidence for the same source commit. Cross-builds, native execution, mocked protocols, provider accounts and long-duration performance runs are separate evidence classes; missing evidence remains an outstanding gate.</p>
+<h2 id="mainstream-reference-implementations">Mainstream reference implementations<a class="headerlink" href="#mainstream-reference-implementations" title="Permanent link">&para;</a></h2>
+<p>The implementation applies upstream contracts to CPRa's ownership/storage model. <a href="https://github.com/caddyserver/caddy/blob/master/.goreleaser.yml">Caddy's GoReleaser configuration</a> informs explicit recipes and native packaging; <a href="https://github.com/prometheus/prometheus/blob/main/.promu.yml">Prometheus's build configuration</a> illustrates source identity and artifact inventories; <a href="https://github.com/tailscale/tailscale/blob/main/cmd/tailscaled/tailscaled_windows.go">Tailscale's Windows service integration</a> illustrates native SCM lifecycle; and <a href="https://github.com/etcd-io/etcd/blob/main/.github/workflows/verify-released-assets.yaml">etcd's released-asset verification</a> demonstrates verification of distributed executables. These projects are references, not claims that CPRa inherits their deployment or durability guarantees.</p>
 
 
 
 
 
 
-
-  
-  
 
 
 
@@ -1871,7 +1798,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../reference/cli/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI">
+          <a href="../container-helm/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Compose and Helm">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1881,20 +1808,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                CLI
+                Compose and Helm
               </div>
             </div>
           </a>
         
         
           
-          <a href="../developer-guide/" class="md-footer__link md-footer__link--next" aria-label="Next: Development">
+          <a href="../how-to/common-tasks/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Development
+                Troubleshooting
               </div>
             </div>
             <div class="md-footer__button md-icon">

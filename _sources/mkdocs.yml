@@ -12,7 +12,7 @@ theme:
   name: material
   custom_dir: overrides
   font: false
-  logo: images/cpra-mark-dark.svg
+  logo: images/cpra-mark-color.svg
   favicon: favicon.ico
   features:
     - navigation.tabs
@@ -24,18 +24,26 @@ theme:
     - content.code.copy
     - content.action.edit
   palette:
-    - scheme: default
+    - media: "(prefers-color-scheme)"
       primary: custom
       accent: custom
       toggle:
-        icon: material/brightness-4
-        name: Switch to dark mode
-    - scheme: slate
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-7
-        name: Switch to light mode
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
 nav:
   - Home: index.md
   - Get started:
@@ -67,6 +75,7 @@ extra:
   source_commit: a370969b041b399c0778318d8915ce059fd74294
   source_date: 9 September 2026
 extra_css:
+  - assets/stylesheets/palette.css
   - assets/stylesheets/extra.css
 plugins:
   - search

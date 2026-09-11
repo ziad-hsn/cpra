@@ -49,6 +49,7 @@ assets/stylesheets/main.ec1eaa64.min.css
 assets/stylesheets/main.ec1eaa64.min.css.map
 assets/stylesheets/palette.ab4e12ef.min.css
 assets/stylesheets/palette.ab4e12ef.min.css.map
+assets/stylesheets/palette.css
 developer-guide/index.html
 examples/monitors.yaml
 explanation/architecture-overview/index.html

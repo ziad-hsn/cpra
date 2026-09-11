@@ -49,6 +49,8 @@
       
     
     
+      <link rel="stylesheet" href="../assets/stylesheets/palette.css">
+    
       <link rel="stylesheet" href="../assets/stylesheets/extra.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
@@ -124,9 +126,8 @@
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
-      
-  <img src="../images/cpra-mark-dark.svg" alt="logo">
-
+      <img class="cpra-logo-light" src="../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../images/cpra-mark-dark.svg" alt="CPRa">
     </a>
     <label class="md-header__button md-icon" for="__drawer">
       
@@ -155,20 +156,30 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
     
-      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
     
-      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
       </label>
     
   
@@ -410,9 +421,8 @@
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
-      
-  <img src="../images/cpra-mark-dark.svg" alt="logo">
-
+      <img class="cpra-logo-light" src="../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../images/cpra-mark-dark.svg" alt="CPRa">
     </a>
     CPRa Documentation
   </label>
@@ -1295,6 +1305,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#shared-theme-colors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared theme colors
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1398,6 +1419,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#shared-theme-colors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared theme colors
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1448,6 +1480,18 @@ pages. The locally served heading font and its license live in <code>assets/font
 <h2 id="publish">Publish<a class="headerlink" href="#publish" title="Permanent link">&para;</a></h2>
 <p>Push the reviewed commit to <code>gh-pages</code>. The Pages workflow rebuilds from the locked requirements, validates links and metadata, uploads the generated site, and deploys it through GitHub Pages.</p>
 <p>Retain redirects when consolidating older URLs. Verify the public homepage and a deep link after deployment. The code verification workflow on <code>main</code> is separate from the documentation deployment.</p>
+<h2 id="shared-theme-colors">Shared theme colors<a class="headerlink" href="#shared-theme-colors" title="Permanent link">&para;</a></h2>
+<p>The documentation and dashboard use the neutral white and graphite palette in
+<a href="https://github.com/ziad-hsn/cpra/blob/main/brand/palette.json"><code>brand/palette.json</code> on main</a>.
+Update that source rather than maintaining separate color values here. From a
+main checkout, run <code>python3 scripts/brand/generate.py --docs-root /path/to/gh-pages</code>
+to copy the shared stylesheet and branding assets into this checkout, then run
+<code>python _sources/rebuild.py</code> here. Add <code>--images</code> when regenerating the opaque
+icons and social preview; that option requires CairoSVG 2.8.2.</p>
+<p>Component rules live in <code>docs/assets/stylesheets/extra.css</code>. Keep backgrounds,
+reading areas, navigation, code blocks, search, tables, and callouts tied to the
+shared semantic roles. The header cycles through System, Light, and Dark; verify
+both explicit choices and system changes before publishing.</p>
 
 
 

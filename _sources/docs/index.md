@@ -3,14 +3,27 @@ title: "CPRa documentation"
 description: "Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI."
 ---
 
-# Check services. Understand failures. Recover deliberately.
+<div class="cpra-hero" markdown>
 
-CPRa (Continuous Pulse and Recovery Agent) checks your services, sends incident notifications, and runs the recovery actions you configure. It is free, self-hosted software under the MIT license.
+![CPRa](images/cpra-horizontal-color.svg#only-light){ width="464" height="128" }
+![CPRa](images/cpra-horizontal-dark.svg#only-dark){ width="464" height="128" }
 
-The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the durable implementation candidate. See [release notes](release-notes.md) for its source revision and outstanding evidence gates.
+# Continuous Pulse and Recovery Agent { #check-services-understand-failures-recover-deliberately }
+
+Checks services, sends alerts, and runs the recovery you configure.
+{ .cpra-hero__description }
+
+Go · MIT · self-hosted
+{ .cpra-hero__meta }
 
 [Run your first monitor](tutorials/quickstart.md){ .md-button .md-button--primary }
 [Explore the configuration](reference/config-schema.md){ .md-button }
+
+</div>
+
+CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single server binary.
+
+The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the durable implementation candidate. See [release notes](release-notes.md) for its source revision and outstanding evidence gates.
 
 ## What you can do
 
@@ -48,4 +61,4 @@ Run one process for each monitor configuration. Single-node Raft retains committ
 
 Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency and is augmented by observed percentile feedback; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.
 
-[Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md)
+[Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)

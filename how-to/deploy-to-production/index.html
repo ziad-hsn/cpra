@@ -18,13 +18,13 @@
         <link rel="prev" href="../../validation/">
       
       
-        <link rel="next" href="../common-tasks/">
+        <link rel="next" href="../../native-installation/">
       
       
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../../favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -57,6 +57,29 @@
 
     
     
+
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Deploy a CPRa instance">
+  <meta property="og:description" content="Run a single CPRa owner with authenticated access, private manifests, target permissions and clear restart semantics.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Deploy a CPRa instance">
+  <meta name="twitter:description" content="Run a single CPRa owner with authenticated access, private manifests, target permissions and clear restart semantics.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
   </head>
   
   
@@ -102,7 +125,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -330,6 +353,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -369,7 +411,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -798,10 +840,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#containers" class="md-nav__link">
+  <a href="#native-services-compose-and-helm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Containers
+        Native services, Compose and Helm
       
     </span>
   </a>
@@ -834,6 +876,90 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1222,6 +1348,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
     
@@ -1236,10 +1389,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1257,8 +1410,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1447,10 +1600,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#containers" class="md-nav__link">
+  <a href="#native-services-compose-and-helm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Containers
+        Native services, Compose and Helm
       
     </span>
   </a>
@@ -1505,7 +1658,7 @@
 
 
 <h1 id="deploy-a-cpra-instance">Deploy a CPRa instance<a class="headerlink" href="#deploy-a-cpra-instance" title="Permanent link">&para;</a></h1>
-<p>Begin with a small, observed deployment using the monitor intervals and target types you actually need. The current preview is a single-process application; it does not establish a hosted service or high-availability cluster.</p>
+<p>Begin with a small, observed deployment using the monitor intervals and target types you actually need. CPRa has one active owner and one local Raft voter. Its deployment contracts preserve state across restart; there is no distributed failover.</p>
 <h2 id="assign-ownership-and-permissions">Assign ownership and permissions<a class="headerlink" href="#assign-ownership-and-permissions" title="Permanent link">&para;</a></h2>
 <p>Run one process for a monitor configuration. Independent instances do not coordinate recovery or alert ownership. Give the process account only the access needed for its configured checks and actions.</p>
 <p>Keep manifests containing credentials outside version control. A manifest authorizes outbound requests and local or remote recovery actions. <code>-ssrf-protect</code> restricts HTTP(S) destinations; it does not sandbox other protocols or local actions.</p>
@@ -1523,20 +1676,31 @@
 <h2 id="observe-before-enabling-recovery">Observe before enabling recovery<a class="headerlink" href="#observe-before-enabling-recovery" title="Permanent link">&para;</a></h2>
 <p>Confirm that checks classify your target correctly and notifications reach a test destination. Then add the intended recovery action and verify its effect.</p>
 <p>Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restart restores committed incident state and holds interrupted started actions as unknown. Mount the persistent data directory and retain complete backups.</p>
-<h2 id="containers">Containers<a class="headerlink" href="#containers" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>docker/Dockerfile<span class="w"> </span>-t<span class="w"> </span>cpra:local<span class="w"> </span>.
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>--build
-</code></pre></div>
-<p>The supplied Compose example disables the web listener. Edit the manifest for addresses reachable from the container; its loopback address refers to the container itself.</p>
-<p>The image runs as UID 1001 and expects <code>/etc/cpra/monitors.yaml</code>. Mount configuration read-only and provide writable storage for file-based notifications. Docker actions need access to the intended Docker daemon; mounting its socket grants substantial control over that daemon.</p>
+<h2 id="native-services-compose-and-helm">Native services, Compose and Helm<a class="headerlink" href="#native-services-compose-and-helm" title="Permanent link">&para;</a></h2>
+<p>Use <a href="../../native-installation/">native installation</a> for systemd, launchd and
+Windows SCM, standard directories, installation ownership and upgrades.
+System services always receive explicit absolute configuration and data paths.
+Linux system state is <code>/var/lib/cpra</code>; user services use the XDG state directory.</p>
+<p>The production image consumes the exact staged release executables and runs as
+UID/GID 1001. Compose uses a stable named volume, read-only configuration, bounded
+logs, a 60-second stop allowance and a loopback-published authenticated API.
+Required bind files must exist; file-backed Secret ownership follows the host.</p>
+<p>The Helm chart uses one StatefulSet owner with retained storage. Prefer RWOP
+on verified CSI storage; RWO is an explicit compatibility option and does not
+fence multiple pods on one node. Large manifests use a separate read-only
+configuration volume. They do not belong in Helm values, ConfigMaps or Secrets.
+Use versioned immutable token Secrets and intentional rollouts for rotation.</p>
+<p>Follow the <a href="../../container-helm/">container and Helm guide</a> for exact commands,
+headless mode, probes, maintenance, backup and Helm 3/4 compatibility. Optional
+host controls and Kubernetes recovery privileges remain explicit.</p>
 <h2 id="health-and-shutdown">Health and shutdown<a class="headerlink" href="#health-and-shutdown" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>/api/v1/healthz</code> reports process liveness.</li>
-<li><code>/api/v1/readyz</code> requires a recent nonempty projection and available durable storage.</li>
+<li><code>/api/v1/readyz</code> requires initialized admission, controller progress and available durable storage. Explicit empty configurations can be ready; projection freshness is separate.</li>
 <li><code>/metrics</code> exposes runtime and pipeline metrics.</li>
-<li>SIGINT or SIGTERM starts graceful shutdown; the web server stops before the controller.</li>
+<li>SIGINT or SIGTERM marks readiness unavailable and stops admission; diagnostics remain available while accepted work drains or is cancelled.</li>
 </ul>
-<p>Choose service-manager stop timeouts with enough room for your configured operation deadlines. Use an external supervisor to restart a failed process and an external observer for CPRa itself.</p>
+<p>The Unix/container application budget starts at 45 seconds within a 60-second supervisor allowance; Windows service handling uses a 15-second cap. Deadline expiry is visible and interrupted external outcomes remain unknown. Use an external supervisor to restart a failed process and an external observer for CPRa itself.</p>
 <p><a href="../../release-notes/#current-boundaries">Current limits</a> · <a href="../common-tasks/">Troubleshooting</a></p>
 <h2 id="persistent-volume-and-complete-backup">Persistent volume and complete backup<a class="headerlink" href="#persistent-volume-and-complete-backup" title="Permanent link">&para;</a></h2>
 <p>Mount a private volume at <code>/var/lib/cpra</code> for the packaged container; the shipped
@@ -1545,7 +1709,7 @@ runtime configuration selects that directory. For a native process, set
 directory between processes. There is one voter and no automatic failover.</p>
 <p>Stop CPRa before taking a file-level backup. Copy <code>identity.json</code>, <code>raft.db</code>,
 <code>snapshots/</code>, and the entire retained <code>history/</code> catalog and segment set together.
-Restore all files into an empty private directory and start with the compatible
+Use <code>cpractl local backup</code> to hold the exclusive state lock while copying and verifying all files. Restore all files with <code>cpractl local restore</code> into a new private directory and start with the compatible
 binary and monitor configuration. Retain credentials separately. A storage
 failure stops new admission and makes readiness unavailable; CPRa never silently
 switches to memory. See <a href="../../durability/">complete recovery procedures</a>.</p>
@@ -1604,13 +1768,13 @@ switches to memory. See <a href="../../durability/">complete recovery procedures
         
         
           
-          <a href="../common-tasks/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
+          <a href="../../native-installation/" class="md-footer__link md-footer__link--next" aria-label="Next: Native installation">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Troubleshooting
+                Native installation
               </div>
             </div>
             <div class="md-footer__button md-icon">

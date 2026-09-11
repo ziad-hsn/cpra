@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Build the CPRa server and CLI, select optional drivers, rebuild dashboard assets and package Linux distributions.">
+        <meta name="description" content="Install CPRa through Go, native archives, Linux packages, containers, or Helm with explicit persistence and verification.">
       
       
         <meta name="author" content="Ziad Hassan">
@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../../favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -57,6 +57,29 @@
 
     
     
+
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Installation and builds">
+  <meta property="og:description" content="Install CPRa through Go, native archives, Linux packages, containers, or Helm with explicit persistence and verification.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/tutorials/getting-started/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Installation and builds">
+  <meta name="twitter:description" content="Install CPRa through Go, native archives, Linux packages, containers, or Helm with explicit persistence and verification.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
   </head>
   
   
@@ -102,7 +125,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -330,6 +353,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -369,7 +411,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -566,6 +608,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#install-with-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install with Go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#build-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -577,10 +630,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#include-optional-drivers" class="md-nav__link">
+  <a href="#distribution-routes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Include optional drivers
+        Distribution routes
       
     </span>
   </a>
@@ -588,32 +641,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rebuild-the-dashboard" class="md-nav__link">
+  <a href="#dashboard-and-images" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rebuild the dashboard
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#create-distribution-archives" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create distribution archives
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-a-container" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build a container
+        Dashboard and images
       
     </span>
   </a>
@@ -815,6 +846,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1211,6 +1326,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
     
@@ -1225,10 +1367,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1246,8 +1388,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1403,6 +1545,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#install-with-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install with Go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#build-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1414,10 +1567,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#include-optional-drivers" class="md-nav__link">
+  <a href="#distribution-routes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Include optional drivers
+        Distribution routes
       
     </span>
   </a>
@@ -1425,32 +1578,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rebuild-the-dashboard" class="md-nav__link">
+  <a href="#dashboard-and-images" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rebuild the dashboard
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#create-distribution-archives" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create distribution archives
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-a-container" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build a container
+        Dashboard and images
       
     </span>
   </a>
@@ -1483,32 +1614,79 @@
 
 
 <h1 id="installation-and-builds">Installation and builds<a class="headerlink" href="#installation-and-builds" title="Permanent link">&para;</a></h1>
+<p>These pages describe the release-engineering candidate. The exact source revision
+appears in the footer and <code>site-version.json</code>; use that revision when reproducing
+this documentation snapshot. Native execution gates qualify each distribution.</p>
+<h2 id="install-with-go">Install with Go<a class="headerlink" href="#install-with-go" title="Permanent link">&para;</a></h2>
+<p>Replace <code>VERSION</code> with an actual published version from a verified release:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>go<span class="w"> </span>install<span class="w"> </span>github.com/ziad-hsn/cpra@VERSION
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>go<span class="w"> </span>install<span class="w"> </span>github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>paths
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>init
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>cpra<span class="w"> </span>-capabilities
+</code></pre></div>
+<p>Go 1.25 source compatibility remains separate from the supported compiler used
+for official binaries. Installation includes the committed dashboard and embedded
+starter files; no Node, pnpm, Git or generation step is needed. Initial local
+configuration is empty and does not enable provider operations.</p>
+<p>See <a href="../../native-installation/">native installation</a> for all applicable driver
+build tags, platform paths, service identities and stopped backup/restore.
+Plain <code>go install</code> retains the default driver subset. The systemd recovery driver
+is Linux-only. <code>cpra -validate</code> explains missing compiled drivers before opening
+storage or constructing provider clients.</p>
 <h2 id="build-from-source">Build from source<a class="headerlink" href="#build-from-source" title="Permanent link">&para;</a></h2>
-<p>Use Go 1.25 or later and Make. The published code is on the repository's <code>main</code> branch:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>main<span class="w"> </span>https://github.com/ziad-hsn/cpra.git
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>cpra
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>make
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>codex/release-engineering<span class="w"> </span>https://github.com/ziad-hsn/cpra.git
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>cpra
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>make
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>./bin/cpra<span class="w"> </span>-version
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>./bin/cpractl<span class="w"> </span>--version
 </code></pre></div>
-<p><code>make</code> builds the server and CLI with embedded dashboard assets. Run <code>./bin/cpra -version</code> or <code>./bin/cpractl --version</code> to inspect the build.</p>
-<p>These docs correspond to <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">a370969</a>. Check out that commit to reproduce this documentation snapshot.</p>
-<h2 id="include-optional-drivers">Include optional drivers<a class="headerlink" href="#include-optional-drivers" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span><span class="nv">BUILD_TAGS</span><span class="o">=</span><span class="s1">'redis postgres kubernetes'</span>
-</code></pre></div>
-<p>Optional checks: <code>redis postgres mysql mongo rabbitmq kafka</code>. Optional recovery: <code>kubernetes aws systemd</code>. Optional alerts: <code>teams twilio</code>.</p>
-<p>A configuration can name an optional driver even when its implementation is absent from the binary. Build the required tags before trying that integration. <a href="../../reference/jobs-reference/">Driver reference</a></p>
-<h2 id="rebuild-the-dashboard">Rebuild the dashboard<a class="headerlink" href="#rebuild-the-dashboard" title="Permanent link">&para;</a></h2>
-<p>Use Node.js 24, pnpm 11.22.0, and Python 3:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span>dashboard-build<span class="w"> </span>dashboard-check
-</code></pre></div>
-<p>The build installs dependencies from the lockfile, builds the frontend, and stages its assets for Go embedding. Dashboard checks run TypeScript, lint, and tests.</p>
-<h2 id="create-distribution-archives">Create distribution archives<a class="headerlink" href="#create-distribution-archives" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>release<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.1.0
-</code></pre></div>
-<p>Choose a version for your own build. The example does not imply that a <code>0.1.0</code> GitHub Release exists. Packaging creates Linux amd64 and arm64 server/CLI archives, a source archive, dependency notices, and SHA-256 checksums under <code>dist/release</code>. It does not upload them.</p>
-<h2 id="build-a-container">Build a container<a class="headerlink" href="#build-a-container" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>docker/Dockerfile<span class="w"> </span>-t<span class="w"> </span>cpra:local<span class="w"> </span>.
-</code></pre></div>
-<p>The container runs as UID 1001. It needs a readable manifest and write access to configured log destinations. See <a href="../../how-to/deploy-to-production/#containers">deployment</a> before mounting host or Docker access.</p>
+<p>For a reproducible release, check out the approved full commit from the release
+metadata and follow the <a href="../../release-engineering/">recorded release recipe</a>.
+Official artifacts use Go 1.27.1, normal optimization, retained symbols/DWARF,
+trimmed source paths and explicit source identity. <code>make</code> remains a developer
+build using Go's module/VCS metadata.</p>
+<h2 id="distribution-routes">Distribution routes<a class="headerlink" href="#distribution-routes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Outputs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Native archives</td>
+<td>Linux/macOS tar.gz and Windows zip, amd64 and arm64</td>
+</tr>
+<tr>
+<td>Linux packages</td>
+<td>DEB and RPM, amd64 and arm64</td>
+</tr>
+<tr>
+<td>Containers</td>
+<td>Linux amd64/arm64 OCI image from the same staged executables</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Production Compose and separately versioned OCI Helm chart</td>
+</tr>
+<tr>
+<td>Source and evidence</td>
+<td>Complete source archive, checksums, notices, SBOMs and provenance</td>
+</tr>
+</tbody>
+</table>
+<p>A cross-build alone does not qualify an OS or architecture. Follow the release's
+native verification report. Version placeholders do not imply an existing tag
+or GitHub Release, and Sigstore signing does not imply Authenticode/notarization.</p>
+<h2 id="dashboard-and-images">Dashboard and images<a class="headerlink" href="#dashboard-and-images" title="Permanent link">&para;</a></h2>
+<p>The <a href="../../release-engineering/">release guide</a> records the pinned Node/pnpm
+versions and clean dashboard comparison. Provider credentials and developer
+<code>.env</code> files are not frontend build inputs.</p>
+<p>The production Dockerfile consumes staged release binaries. Source development
+uses <code>docker/Dockerfile.dev</code>. Prepare persistent storage and authentication using
+<a href="../../container-helm/">Compose and Helm operations</a> before starting an instance.</p>
 
 
 

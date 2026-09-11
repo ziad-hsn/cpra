@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../images/cpra-icon.svg">
+      <link rel="icon" href="../favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -57,6 +57,29 @@
 
     
     
+
+
+
+
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Durable CPRa candidate">
+  <meta property="og:description" content="Implemented durability and operator interfaces, completed checks, and outstanding release evidence.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/release-notes/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Durable CPRa candidate">
+  <meta name="twitter:description" content="Implemented durability and operator interfaces, completed checks, and outstanding release evidence.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
   </head>
   
   
@@ -102,7 +125,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -330,6 +353,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -369,7 +411,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../images/cpra-icon.svg" alt="logo">
+  <img src="../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -605,10 +647,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#completed-verification" class="md-nav__link">
+  <a href="#release-engineering-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Completed verification
+        Release engineering changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification status
       
     </span>
   </a>
@@ -804,6 +857,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1200,6 +1337,33 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
     
@@ -1214,10 +1378,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1235,8 +1399,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1403,10 +1567,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#completed-verification" class="md-nav__link">
+  <a href="#release-engineering-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Completed verification
+        Release engineering changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification status
       
     </span>
   </a>
@@ -1461,15 +1636,16 @@
 
 
 <h1 id="durable-cpra-candidate">Durable CPRa candidate<a class="headerlink" href="#durable-cpra-candidate" title="Permanent link">&para;</a></h1>
-<p>This documentation describes the <code>codex/durable-cpra</code> implementation candidate.
+<p>This documentation describes the <code>codex/release-engineering</code> implementation candidate.
 The source revision appears in the page footer and <code>site-version.json</code>.
 Publication to <code>main</code> and the public documentation site is gated on review and
 agreed release evidence. The previous published baseline is
 <a href="https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294">a370969</a>.</p>
 <h2 id="implemented-behavior">Implemented behavior<a class="headerlink" href="#implemented-behavior" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Single-node Raft storage is enabled by default in <code>./cpra-data</code>, with explicit
-  memory-only configuration for disposable processes.</li>
+<li>Single-node Raft storage defaults to the platform user state directory; system
+  services use explicit native paths. Legacy <code>./cpra-data</code> requires an explicit
+  selection or stopped migration. Memory-only mode remains explicit.</li>
 <li>Incident transitions and action intent are committed before external work.
   Restart resumes health checks and queued work, while holding interrupted
   started actions as unknown. Successful endpoints are not repeated to complete
@@ -1488,27 +1664,33 @@ agreed release evidence. The previous published baseline is
 <li>Configured live-provider and external benchmark harnesses record actual results
   and distinguish unconfigured cases from passing evidence.</li>
 </ul>
-<h2 id="completed-verification">Completed verification<a class="headerlink" href="#completed-verification" title="Permanent link">&para;</a></h2>
-<p>Go 1.25 compatibility checks, default and all-driver race tests, formatting and
-vet checks have passed during implementation. Dashboard build, type checks, lint
-and 15 component tests passed. Go vulnerability scans found no affected reachable
-symbols or imported packages; four advisories remain only in unused packages of
-required modules.</p>
-<p>Real subprocess tests cover forced termination before admission, after intent,
-after the started marker, after external webhook success and after result commit.
-The observed recovery behavior matches the conservative unknown-outcome policy.
-Local production-driver runs have passed HTTP checks, Docker checks, webhook and
-Docker recovery, webhook notification and file-log delivery. Provider acceptance
-is recorded separately from independently observed effects. Failed fixture runs
-remain in local evidence; they are not converted into passes.</p>
+<h2 id="release-engineering-changes">Release engineering changes<a class="headerlink" href="#release-engineering-changes" title="Permanent link">&para;</a></h2>
+<p>The candidate adds canonical Go installation, recorded unstripped release builds,
+standard platform paths, native supervisor integration, stopped backup/restore,
+format-specific DEB/RPM lifecycle handling, exact-binary OCI images, production
+Compose and a validated single-owner Helm chart. The release workflow must pass
+its gates before exposing a stable Git tag to Go installation.</p>
+<p>See <a href="../native-installation/">native operations</a>, <a href="../container-helm/">container and Helm operations</a>,
+and <a href="../release-engineering/">release engineering</a> for the implemented contracts.</p>
+<h2 id="verification-status">Verification status<a class="headerlink" href="#verification-status" title="Permanent link">&para;</a></h2>
+<p>Implementation tests and candidate evidence are recorded separately from final
+release qualification. Default Go 1.27.1 tests and dashboard type/lint/component
+checks passed during this work. Native Windows tests exercise metadata replacement,
+real process-crash boundaries, history, locking and stopped backup/restore; native
+SCM installation is a separate gate. Full final-source reports must identify the
+exact source and artifact digest before a released platform is claimed.</p>
+<p>Historical provider fixtures and prior candidate checks do not automatically
+qualify a new artifact. The final release record must include reproducibility,
+native platform/service/package lifecycle, image/chart operations, vulnerability
+scans and documentation checks.</p>
 <h2 id="outstanding-release-gates">Outstanding release gates<a class="headerlink" href="#outstanding-release-gates" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Full-account verification of all 33 driver types remains incomplete. User-owned
   accounts, credentials, designated targets and independent receipt observers
   are required. Local fixtures cannot certify cloud production accounts.</li>
-<li>The physical C: free-space prerequisite has failed (approximately 4 GB free
-  during this implementation, below 30 GiB plus fixture headroom). Database
-  fixture downloads and large performance campaigns were not started.</li>
+<li>The large campaign must recheck physical C: free space before starting: at
+  least 30 GiB plus measured fixture headroom. The earlier low-disk result is
+  historical, and freeing space does not itself complete a campaign.</li>
 <li>Matched 10k/100k/1m comparisons and the uninterrupted 24-hour million-monitor
   campaign have not completed. A ten-monitor harness smoke run is explicitly
   excluded from scale and endurance evidence.</li>

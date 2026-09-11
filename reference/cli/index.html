@@ -18,13 +18,13 @@
         <link rel="prev" href="../api-reference/">
       
       
-        <link rel="next" href="../../developer-guide/">
+        <link rel="next" href="../../faq/">
       
       
         
       
       
-      <link rel="icon" href="../../images/cpra-icon.svg">
+      <link rel="icon" href="../../favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
@@ -57,6 +57,29 @@
 
     
     
+
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Command-line reference">
+  <meta property="og:description" content="Use cpra server flags and cpractl commands to inspect monitors, incidents, queues, pools, configuration and health.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/reference/cli/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Command-line reference">
+  <meta name="twitter:description" content="Use cpra server flags and cpractl commands to inspect monitors, incidents, queues, pools, configuration and health.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
   </head>
   
   
@@ -102,7 +125,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -330,6 +353,25 @@
   
   
   
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
       <li class="md-tabs__item">
@@ -369,7 +411,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
       
-  <img src="../../images/cpra-icon.svg" alt="logo">
+  <img src="../../images/cpra-mark-dark.svg" alt="logo">
 
     </a>
     CPRa Documentation
@@ -708,6 +750,90 @@
     
   
     Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
   
 
     
@@ -1167,6 +1293,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#local-administration-and-probe-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local administration and probe commands
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1179,6 +1316,33 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1203,10 +1367,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1224,8 +1388,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1413,6 +1577,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#local-administration-and-probe-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local administration and probe commands
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1572,6 +1747,27 @@
 </code></pre></div>
 <p>Use the existing server and token-file/environment configuration. These commands
 are read-only; unknown actions cannot be replayed through the CLI or dashboard.</p>
+<h2 id="local-administration-and-probe-commands">Local administration and probe commands<a class="headerlink" href="#local-administration-and-probe-commands" title="Permanent link">&para;</a></h2>
+<p><code>cpra -capabilities</code> reports compiled driver availability. <code>cpra -validate -yaml
+/path/monitors.yaml -runtime-config /path/runtime.yaml</code> validates configuration
+before opening storage or providers. Explicit <code>-data-dir</code> overrides configured
+storage and platform defaults; <code>-shutdown-timeout</code> bounds application shutdown.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cpractl<span class="w"> </span>--token-file<span class="w"> </span>/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>ready
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>paths<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>init<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>render<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>install<span class="w"> </span>--scope<span class="w"> </span>user<span class="w"> </span>--binary<span class="w"> </span>/path/cpra
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>update<span class="w"> </span>--scope<span class="w"> </span>user<span class="w"> </span>--binary<span class="w"> </span>/path/new-cpra
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>uninstall<span class="w"> </span>--scope<span class="w"> </span>user
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>backup<span class="w"> </span>--data-dir<span class="w"> </span>/path/state<span class="w"> </span>--output<span class="w"> </span>/path/new-backup
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>restore<span class="w"> </span>--backup<span class="w"> </span>/path/new-backup<span class="w"> </span>--data-dir<span class="w"> </span>/path/new-state
+</code></pre></div>
+<p><code>ready</code> and <code>health</code> make bounded API requests only; they never open Raft or
+invoke providers. Local commands operate on the local machine and do not use a
+remote API. Service operations preserve installer ownership and use explicit
+scope. Backup requires a stopped owner; restore requires an absent destination.
+See <a href="../../native-installation/">native administration</a> for platform permissions,
+configuration preservation and credential handling.</p>
 
 
 
@@ -1627,13 +1823,13 @@ are read-only; unknown actions cannot be replayed through the CLI or dashboard.<
         
         
           
-          <a href="../../developer-guide/" class="md-footer__link md-footer__link--next" aria-label="Next: Development">
+          <a href="../../faq/" class="md-footer__link md-footer__link--next" aria-label="Next: FAQ">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Development
+                FAQ
               </div>
             </div>
             <div class="md-footer__button md-icon">

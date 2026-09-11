@@ -1,29 +1,64 @@
-/* CPRa's established warm gold identity, with readable light and dark modes. */
-:root {
-  --md-primary-fg-color: #725218;
-  --md-primary-fg-color--light: #d4a84b;
-  --md-primary-fg-color--dark: #513909;
+/* CPRa identity: ink on paper, gold restart loop. Light and dark schemes. */
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("../fonts/RobotoSlab-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+:root,
+[data-md-color-scheme="default"] {
+  --cpra-paper: #fbf3df;
+  --cpra-ink: #1a262e;
+  --cpra-sun: #e5a51f;
+  --cpra-sun-text: #875f10;
+  --md-primary-fg-color: #1a262e;
+  --md-primary-fg-color--light: #2b3a44;
+  --md-primary-fg-color--dark: #0f171d;
+  --md-primary-bg-color: #f4f2ee;
   --md-accent-fg-color: #875f10;
+  --md-default-bg-color: #fbf3df;
+  --md-default-fg-color: #1a262e;
+  --md-code-bg-color: #f3e8cb;
+  --md-typeset-a-color: #875f10;
   --md-text-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --md-code-font: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #302a20;
+  --cpra-paper: #15161a;
+  --cpra-ink: #f4f2ee;
+  --cpra-sun-text: #e6bc61;
+  --md-primary-fg-color: #15161a;
+  --md-primary-fg-color--light: #23252c;
+  --md-primary-fg-color--dark: #0b0c0f;
+  --md-primary-bg-color: #f4f2ee;
+  --md-primary-bg-color--light: rgba(244, 242, 238, .7);
   --md-accent-fg-color: #e6bc61;
-  --md-default-bg-color: #191a20;
+  --md-default-bg-color: #15161a;
+  --md-default-fg-color: #f4f2ee;
+  --md-code-bg-color: #1e2026;
   --md-typeset-a-color: #e6bc61;
 }
+.md-header, .md-tabs { box-shadow: 0 1px 0 rgba(229, 165, 31, 0.45); }
 .md-banner { background: #292a31; color: #f7f3e9; }
 .md-banner a { color: #f0cd83; text-decoration: underline; }
-.md-header__button.md-logo img { width: 1.65rem; height: 1.65rem; }
+.md-header__button.md-logo img { width: 1.9rem; height: 1.9rem; }
 .md-typeset h1 { font-weight: 700; letter-spacing: -.035em; color: var(--md-default-fg-color); }
 .md-typeset h2 { font-weight: 650; letter-spacing: -.015em; }
-.md-typeset .md-button { border-radius: .3rem; margin: .25rem .25rem .5rem 0; }
+.md-typeset .md-button { color: var(--md-typeset-a-color); border-radius: .3rem; margin: .25rem .25rem .5rem 0; }
+.md-typeset .md-button--primary { background: var(--cpra-ink); border-color: var(--cpra-ink); color: #fbf3df; }
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary { background: var(--cpra-sun); border-color: var(--cpra-sun); color: #15161a; }
+.md-typeset .md-button:hover, .md-typeset .md-button:focus-visible { background: var(--cpra-sun-text); border-color: var(--cpra-sun-text); color: var(--cpra-paper); }
 .md-typeset .grid.cards > ul > li { border-radius: .45rem; }
 .md-typeset table:not([class]) { font-size: .72rem; }
 .md-typeset pre > code { font-size: .7rem; }
 .md-typeset a { text-underline-offset: .16em; }
 .md-typeset a:focus-visible, .md-button:focus-visible { outline: 3px solid var(--md-accent-fg-color); outline-offset: 3px; }
+.cpra-hero { margin: .5rem 0 1.75rem; }
+.cpra-hero img { display: block; width: min(23.2rem, 100%); height: auto; }
+.md-typeset .cpra-hero h1 { font-family: "Roboto Slab", Georgia, serif; font-size: clamp(1.35rem, 3vw, 1.65rem); letter-spacing: -.02em; line-height: 1.3; margin: 1rem 0 .6rem; }
+.md-typeset .cpra-hero__description { font-size: 1rem; margin: 0 0 .6rem; }
+.md-typeset .cpra-hero__meta { color: var(--md-typeset-a-color); font-size: .75rem; margin: 0 0 1rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }

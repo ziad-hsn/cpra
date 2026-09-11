@@ -70,8 +70,8 @@ nav:
 extra:
   generator: false
   social_image: images/social-preview.png
-  source_commit: 370a60b22dcbea3b7552de987ca6a2c5bfaaf671
-  source_date: 10 September 2026
+  source_commit: 96037354f72988cb36ca4282aa0380b8b1653b25
+  source_date: 11 September 2026
 extra_css:
   - assets/stylesheets/extra.css
 plugins:

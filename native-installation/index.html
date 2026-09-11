@@ -110,7 +110,7 @@
           <div class="md-banner__inner md-grid md-typeset">
             
             
-  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/370a60b22dcbea3b7552de987ca6a2c5bfaaf671">main · 370a60b</a> · 10 September 2026
+  Documentation for <a href="https://github.com/ziad-hsn/cpra/commit/96037354f72988cb36ca4282aa0380b8b1653b25">main · 9603735</a> · 11 September 2026
 
           </div>
           
@@ -1777,6 +1777,16 @@ a system LaunchDaemon requires an existing dedicated non-root account (default
 <code>_cpra</code>, or <code>--account NAME</code>). The installer does not create directory-service
 identities. Use an absolute executable path. LaunchAgents are session services;
 they do not promise operation while the user is logged out.</p>
+<p>Start or deliberately unload a user LaunchAgent in the logged-in session:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>launchctl<span class="w"> </span>bootstrap<span class="w"> </span><span class="s2">"gui/</span><span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/Library/LaunchAgents/io.github.ziad-hsn.cpra.plist"</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>launchctl<span class="w"> </span>bootout<span class="w"> </span><span class="s2">"gui/</span><span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span><span class="s2">/io.github.ziad-hsn.cpra"</span>
+</code></pre></div>
+<p>For a system LaunchDaemon:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>launchctl<span class="w"> </span>bootstrap<span class="w"> </span>system<span class="w"> </span>/Library/LaunchDaemons/io.github.ziad-hsn.cpra.plist
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sudo<span class="w"> </span>launchctl<span class="w"> </span>bootout<span class="w"> </span>system/io.github.ziad-hsn.cpra
+</code></pre></div>
+<p>Deliberate unloading prevents failure-restart behavior from relaunching the job
+while it is under maintenance.</p>
 <p>On Windows, run system installation in an elevated terminal. It creates the
 native <code>CPRa</code> SCM service, normally under <code>NT AUTHORITY\LocalService</code>, with a
 service SID and ACLs separating administrator-managed executables/configuration
@@ -1786,8 +1796,8 @@ administration. User mode supports foreground execution, not an SCM user service
 Use <code>Start-Service CPRa</code> and <code>Stop-Service CPRa</code> for deliberate control.
 Sigstore verification does not imply Windows Authenticode or Apple notarization.</p>
 <h2 id="readiness-shutdown-and-privileges">Readiness, shutdown and privileges<a class="headerlink" href="#readiness-shutdown-and-privileges" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>cpractl<span class="w"> </span>--server<span class="w"> </span>http://127.0.0.1:8060<span class="w"> </span>--token-file<span class="w"> </span>/absolute/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>ready
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>cpractl<span class="w"> </span>--server<span class="w"> </span>http://127.0.0.1:8060<span class="w"> </span>--token-file<span class="w"> </span>/absolute/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>health
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>cpractl<span class="w"> </span>--server<span class="w"> </span>http://127.0.0.1:8060<span class="w"> </span>--token-file<span class="w"> </span>/absolute/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>ready
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>cpractl<span class="w"> </span>--server<span class="w"> </span>http://127.0.0.1:8060<span class="w"> </span>--token-file<span class="w"> </span>/absolute/path/auth.token<span class="w"> </span>--request-timeout<span class="w"> </span>2s<span class="w"> </span>health
 </code></pre></div>
 <p>These commands only make API requests. They do not load manifests, open Raft,
 or invoke a provider. Readiness requires initialized admission, controller
@@ -1811,8 +1821,8 @@ ICMP and helpers as the actual service identity before enabling those drivers.</
 enter maintenance and wait until the old owner has exited and released storage;
 account for any GitOps reconciler. A live copy is not an application-consistent
 backup, and a Raft snapshot alone does not include the retained timeline.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>backup<span class="w"> </span>--data-dir<span class="w"> </span>/absolute/path/state<span class="w"> </span>--output<span class="w"> </span>/absolute/path/backup<span class="w"> </span>--config<span class="w"> </span>/absolute/path/monitors.yaml
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>restore<span class="w"> </span>--backup<span class="w"> </span>/absolute/path/backup<span class="w"> </span>--data-dir<span class="w"> </span>/absolute/path/restored-state
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>backup<span class="w"> </span>--data-dir<span class="w"> </span>/absolute/path/state<span class="w"> </span>--output<span class="w"> </span>/absolute/path/backup<span class="w"> </span>--config<span class="w"> </span>/absolute/path/monitors.yaml
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>restore<span class="w"> </span>--backup<span class="w"> </span>/absolute/path/backup<span class="w"> </span>--data-dir<span class="w"> </span>/absolute/path/restored-state
 </code></pre></div>
 <p>Both destination directories must be absent and their parents must exist.
 Backup retains the exclusive database lock, validates storage format and
@@ -1831,8 +1841,8 @@ started action: recovery conservatively marks it unknown.</p>
 <p>Local installer upgrades validate the candidate, stop the old service, take a
 complete sibling backup when state exists, replace its managed executable,
 and restart only if the service was previously running:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>update<span class="w"> </span>--binary<span class="w"> </span>/absolute/path/new-cpra
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>uninstall
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>update<span class="w"> </span>--binary<span class="w"> </span>/absolute/path/new-cpra
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>cpractl<span class="w"> </span><span class="nb">local</span><span class="w"> </span>service<span class="w"> </span>uninstall
 </code></pre></div>
 <p>Use <code>--scope system</code> consistently for system installations. A failed update
 leaves an explicit error and may leave the service stopped for inspection.

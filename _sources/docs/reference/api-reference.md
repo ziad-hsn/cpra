@@ -63,7 +63,7 @@ The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor d
 
 The healthy-sample percentage uses committed cumulative check counters. It is not an external SLA measurement. Incident, recovery and notification events are retained for 30 days; raw check records are not retained. Pool and queue histories are separate, bounded, in-memory series.
 
-[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/370a60b22dcbea3b7552de987ca6a2c5bfaaf671/internal/web/server/types.go)
+[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/96037354f72988cb36ca4282aa0380b8b1653b25/internal/web/server/types.go)
 
 ## Durable state, history and SLOs
 

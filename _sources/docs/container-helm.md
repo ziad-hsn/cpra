@@ -10,10 +10,14 @@ The production `docker/Dockerfile` packages the exact tested Linux release binar
 docker buildx build --platform linux/amd64,linux/arm64 \
   --build-context release=dist/release --file docker/Dockerfile \
   --build-arg VERSION="$VERSION" --build-arg COMMIT="$COMMIT" \
+  --build-arg SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" --provenance=false \
+  --output type=oci,dest=cpra-image.tar,rewrite-timestamp=true \
   --tag "ghcr.io/ziad-hsn/cpra:$VERSION" .
 ```
 
 Use a digest from the verified release for deployments. Cross-compilation and OCI image creation do not prove native ARM64 execution; release evidence must identify native tests separately. The image runs as UID/GID 1001, includes CA roots and dependency notices, and declares no anonymous volume. `docker/Dockerfile.dev` is the separate pinned source build, including the dashboard. The named release context is required by the production build. Build credentials belong in BuildKit secret mounts when needed, never build arguments or copied files. See [BuildKit contexts and build options](https://docs.docker.com/reference/cli/docker/buildx/build/) and [build secrets](https://docs.docker.com/build/building/secrets/).
+
+Set `VERSION`, `COMMIT`, and `SOURCE_DATE_EPOCH` from the approved `RELEASE.json`. The pinned Alpine base supplies its CA bundle; wrapping binaries performs no package-repository installation. OCI timestamps are normalized to source time, and provenance is added separately by the release workflow. For native execution tests, export the single-platform image with `--output type=docker,dest=candidate.tar,rewrite-timestamp=true`, then run `docker load -i candidate.tar`. Direct loading with timestamp rewriting conflicts with unpacking on some Docker/containerd builders. `scripts/packaging/image_repro.py` builds without cache in two independent roots and compares every OCI payload file, including compressed blobs and image metadata, with a config-digest check against the image used by runtime tests. Tar transport headers and signing timestamps are outside this unsigned-payload comparison.
 
 ## Compose
 
@@ -97,6 +101,8 @@ The live harnesses under `scripts/packaging` accept explicit candidate images an
 ```sh
 python3 scripts/packaging/live_compose.py --image cpra:candidate \
   --release-dir dist/release/linux_amd64 --out evidence/local/compose-candidate.json
+python3 scripts/packaging/image_repro.py --release-dir dist/release --arch amd64 \
+  --reference-image cpra:candidate --out evidence/local/image-repro-candidate.json
 python3 scripts/packaging/live_helm.py --image cpra:candidate \
   --helm /path/to/helm3 --upgrade-helm /path/to/helm4 \
   --kubeconfig /private/test-kubeconfig --context kind-cpra-packaging-test \

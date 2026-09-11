@@ -114,6 +114,23 @@ a system LaunchDaemon requires an existing dedicated non-root account (default
 identities. Use an absolute executable path. LaunchAgents are session services;
 they do not promise operation while the user is logged out.
 
+Start or deliberately unload a user LaunchAgent in the logged-in session:
+
+```sh
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/io.github.ziad-hsn.cpra.plist"
+launchctl bootout "gui/$(id -u)/io.github.ziad-hsn.cpra"
+```
+
+For a system LaunchDaemon:
+
+```sh
+sudo launchctl bootstrap system /Library/LaunchDaemons/io.github.ziad-hsn.cpra.plist
+sudo launchctl bootout system/io.github.ziad-hsn.cpra
+```
+
+Deliberate unloading prevents failure-restart behavior from relaunching the job
+while it is under maintenance.
+
 On Windows, run system installation in an elevated terminal. It creates the
 native `CPRa` SCM service, normally under `NT AUTHORITY\LocalService`, with a
 service SID and ACLs separating administrator-managed executables/configuration

@@ -156,11 +156,16 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		d := yaml.NewDecoder(&metadata)
 		d.KnownFields(p.config.StrictUnknownFields)
 		var metaNode yaml.Node
-		if err := d.Decode(&metaNode); err != nil {
-			return fmt.Errorf("invalid manifest metadata: %w", err)
+		decodeErr := d.Decode(&metaNode)
+		if decodeErr != nil && decodeErr != io.EOF {
+			return fmt.Errorf("invalid manifest metadata: %w", decodeErr)
 		}
-		if err := decodeYAMLValue(&metaNode, &meta, p.config.StrictUnknownFields); err != nil {
-			return fmt.Errorf("invalid manifest metadata: %w", err)
+		// Leading/trailing comments and blank lines are collected separately
+		// from monitors. A comments-only buffer has no YAML document to decode.
+		if decodeErr == nil {
+			if err := decodeYAMLValue(&metaNode, &meta, p.config.StrictUnknownFields); err != nil {
+				return fmt.Errorf("invalid manifest metadata: %w", err)
+			}
 		}
 		var extra interface{}
 		if err := d.Decode(&extra); err != io.EOF {

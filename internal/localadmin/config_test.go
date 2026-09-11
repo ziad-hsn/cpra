@@ -1,15 +1,49 @@
 package localadmin
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/ziad-hsn/cpra/internal/durable"
 	"github.com/ziad-hsn/cpra/internal/platformpath"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
+	l := testLayout(t)
+	if err := Init(l, ""); err != nil {
+		t.Fatal(err)
+	}
+	c := runtimeconfig.Default()
+	c.Storage.Directory = l.StateDir
+	store, err := durable.Open(context.Background(), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	tokenPath := filepath.Join(l.ConfigDir, "auth.token")
+	before, err := os.ReadFile(tokenPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Init(l, ""); err == nil {
+		t.Fatal("initialization admitted a running durable store")
+	}
+	after, err := os.ReadFile(tokenPath)
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("failed initialization changed the token: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Init(l, ""); err != nil {
+		t.Fatalf("initialization of a stopped store: %v", err)
+	}
+}
 
 func testLayout(t *testing.T) platformpath.Layout {
 	t.Helper()

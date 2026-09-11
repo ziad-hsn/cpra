@@ -5,14 +5,17 @@ BUILD_TAGS ?=
 ALL_DRIVER_TAGS = redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio
 BUILD_DIR ?= bin
 RELEASE_DIR ?= dist/release
-VERSION ?= $(shell if test -e .git; then git describe --tags --always --dirty 2>/dev/null || echo dev; else echo dev; fi)
-COMMIT ?= $(shell if test -e .git; then git rev-parse --short HEAD 2>/dev/null || echo unknown; else echo unknown; fi)
-BUILD_VCS = $(shell if test -e .git; then echo true; else echo false; fi)
-DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-VERSION_FLAGS = -X github.com/ziad-hsn/cpra/internal/version.Version=$(VERSION) -X github.com/ziad-hsn/cpra/internal/version.Commit=$(COMMIT) -X github.com/ziad-hsn/cpra/internal/version.Date=$(DATE)
+# Development builds use Go's native module/VCS metadata. Official release
+# identities and source dates come only from the checked RELEASE.json recipe.
+VERSION ?= v0.0.0-dev
+RELEASE_GO ?= $(GO)
+GORELEASER ?= bin/release-tools/goreleaser
+NFPM ?= bin/release-tools/nfpm
+VERSION_FLAGS ?=
+BUILD_VCS ?= auto
 
 .DEFAULT_GOAL := all
-.PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean
+.PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean release-prepare release-build release-build-goreleaser release-package release-check release-tools
 
 all: build build-ctl
 
@@ -25,9 +28,7 @@ build-ctl:
 	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpractl ./cmd/cpractl
 
 dashboard-build:
-	cd dashboard && $(PNPM) install --frozen-lockfile
-	cd dashboard && $(PNPM) build
-	$(PYTHON) -B scripts/release/stage_dashboard.py
+	$(PYTHON) -B scripts/release/dashboard_build.py --pnpm "$(PNPM)"
 
 dashboard-check:
 	cd dashboard && $(PNPM) exec tsc --noEmit
@@ -35,7 +36,7 @@ dashboard-check:
 	cd dashboard && $(PNPM) test
 
 fmt-check:
-	@test -z "$$(gofmt -l $$(find internal cmd -name '*.go') main.go)"
+	@test -z "$$(gofmt -l $$(find internal cmd -name '*.go') $$(find . -maxdepth 1 -name '*.go'))"
 
 vet:
 	$(GO) vet ./...
@@ -48,13 +49,34 @@ check: fmt-check vet test
 test-all-drivers:
 	$(GO) test -race -tags "$(ALL_DRIVER_TAGS)" ./...
 
-release: dashboard-build
-	@mkdir -p $(BUILD_DIR)
-	@set -e; for arch in amd64 arm64; do \
-		CGO_ENABLED=0 GOOS=linux GOARCH=$$arch $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS) -s -w" -o $(BUILD_DIR)/cpra-linux-$$arch .; \
-		CGO_ENABLED=0 GOOS=linux GOARCH=$$arch $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS) -s -w" -o $(BUILD_DIR)/cpractl-linux-$$arch ./cmd/cpractl; \
-	done
-	$(PYTHON) -B scripts/release/package.py --version "$(VERSION)" --tags "$(BUILD_TAGS)" --bin-dir "$(BUILD_DIR)" --out "$(RELEASE_DIR)"
+# Release preparation requires committed, regenerated dashboard assets. It
+# never mutates the source tree. Use RELEASE_CANDIDATE=--candidate for local
+# dirty-tree smoke builds; those builds cannot produce source-release archives.
+RELEASE_CANDIDATE ?=
+release-prepare:
+	$(PYTHON) -B scripts/release/release.py prepare --version "$(VERSION)" --out "$(RELEASE_DIR)" $(RELEASE_CANDIDATE)
+
+release-build:
+	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --out "$(RELEASE_DIR)"
+
+release-build-goreleaser:
+	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --goreleaser "$(GORELEASER)" --out "$(RELEASE_DIR)"
+
+release-package:
+	$(PYTHON) -B scripts/release/release.py pack --out "$(RELEASE_DIR)"
+	$(PYTHON) -B scripts/release/linux_packages.py --out "$(RELEASE_DIR)" --nfpm "$(NFPM)"
+
+release-check:
+	$(PYTHON) -B -m unittest discover -s scripts/release -p 'test_*.py'
+	$(GO) test ./internal/version
+
+release-tools:
+	$(PYTHON) -B scripts/release/install_tools.py
+
+release:
+	$(MAKE) release-prepare
+	$(MAKE) release-build-goreleaser
+	$(MAKE) release-package
 
 clean:
 	rm -rf bin dist dashboard/dist

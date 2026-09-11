@@ -20,7 +20,7 @@ health checks against your services on a schedule, opens and closes incidents
 against configurable thresholds, sends notifications, and executes a recovery
 action — restart a container, call a webhook, restart or scale a Kubernetes
 workload, reboot an EC2 instance, restart a systemd unit — when a service
-fails. It ships as a single static binary with an embedded read-only dashboard,
+fails. It ships as a single server binary with an embedded read-only dashboard,
 an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 
 **Documentation:** [ziad-hsn.github.io/cpra](https://ziad-hsn.github.io/cpra/) —
@@ -98,11 +98,11 @@ make check
 make test-all-drivers
 ```
 
-Rebuilding the dashboard requires Node.js 24, pnpm 11.22.0, and Python 3:
+Rebuilding the dashboard requires Node.js 24.21.0, pnpm 11.22.0, and Python 3:
 
 ```sh
 make dashboard-build dashboard-check
-make release VERSION=0.1.0
+make release VERSION=v0.1.0
 ```
 
 The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned

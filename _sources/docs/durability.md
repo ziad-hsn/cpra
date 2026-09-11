@@ -1,12 +1,12 @@
----
-description: Single-node Raft persistence, recovery policy and complete backups.
----
-
 # Persistence and restart recovery
 
-The executable defaults to single-node HashiCorp Raft storage in `./cpra-data`.
-Use `-runtime-config examples/runtime.yaml` to select an absolute data directory
-and runtime settings. `-yaml` and its `-config` alias still select the monitor
+The executable defaults to single-node HashiCorp Raft storage in the platform's
+user state directory. `cpractl local paths` reports that location; Linux system
+services explicitly use `/var/lib/cpra`. Explicit `-data-dir` overrides an
+explicit runtime `storage.directory`, which overrides the platform default.
+A legacy `./cpra-data` requires an explicit path or a stopped migration, so an
+upgrade does not silently start a fresh store. Use `-runtime-config
+examples/runtime.yaml` to select storage and runtime settings. `-yaml` and its `-config` alias still select the monitor
 manifest. `examples/runtime-memory.yaml` explicitly selects disposable memory
 storage; it uses the same durable-state transition path without writing files.
 
@@ -97,7 +97,13 @@ runtime configuration, credential configuration and binary version separately.
 Credentials should remain in their existing secret-management arrangement.
 A Raft snapshot by itself is not a complete history backup.
 
-To restore, stop the process, restore the complete backup into an empty directory
+`cpractl local backup --data-dir /path/state --output /path/new-backup` performs
+this stopped operation with exclusive locking and a verified file inventory.
+`cpractl local restore --backup /path/new-backup --data-dir /path/new-state`
+requires a new destination and validates the complete inventory before publishing
+it. See [native operations](native-installation.md) for ownership and upgrade details.
+
+To restore, stop the process, restore the complete backup into a new directory
 owned by the service account, set `storage.directory` to it, supply the matching
 configuration and start CPRa. Check readiness, event history and unknown actions
 before treating the instance as recovered. Missing identity, incompatible

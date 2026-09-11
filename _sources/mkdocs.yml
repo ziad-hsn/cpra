@@ -47,6 +47,9 @@ nav:
       - Measured latency: slo.md
       - Verification campaigns: validation.md
       - Deployment: how-to/deploy-to-production.md
+      - Native installation: native-installation.md
+      - Compose and Helm: container-helm.md
+      - Release engineering: release-engineering.md
       - Troubleshooting: how-to/common-tasks.md
       - Capacity and diagnostics: how-to/performance-tuning.md
   - Concepts:

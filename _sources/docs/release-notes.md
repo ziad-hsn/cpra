@@ -5,7 +5,7 @@ description: "Implemented durability and operator interfaces, completed checks, 
 
 # Durable CPRa candidate
 
-This documentation describes the `codex/durable-cpra` implementation candidate.
+This documentation describes the `codex/release-engineering` implementation candidate.
 The source revision appears in the page footer and `site-version.json`.
 Publication to `main` and the public documentation site is gated on review and
 agreed release evidence. The previous published baseline is
@@ -13,8 +13,9 @@ agreed release evidence. The previous published baseline is
 
 ## Implemented behavior
 
-- Single-node Raft storage is enabled by default in `./cpra-data`, with explicit
-  memory-only configuration for disposable processes.
+- Single-node Raft storage defaults to the platform user state directory; system
+  services use explicit native paths. Legacy `./cpra-data` requires an explicit
+  selection or stopped migration. Memory-only mode remains explicit.
 - Incident transitions and action intent are committed before external work.
   Restart resumes health checks and queued work, while holding interrupted
   started actions as unknown. Successful endpoints are not repeated to complete
@@ -33,30 +34,39 @@ agreed release evidence. The previous published baseline is
 - Configured live-provider and external benchmark harnesses record actual results
   and distinguish unconfigured cases from passing evidence.
 
-## Completed verification
+## Release engineering changes
 
-Go 1.25 compatibility checks, default and all-driver race tests, formatting and
-vet checks have passed during implementation. Dashboard build, type checks, lint
-and 15 component tests passed. Go vulnerability scans found no affected reachable
-symbols or imported packages; four advisories remain only in unused packages of
-required modules.
+The candidate adds canonical Go installation, recorded unstripped release builds,
+standard platform paths, native supervisor integration, stopped backup/restore,
+format-specific DEB/RPM lifecycle handling, exact-binary OCI images, production
+Compose and a validated single-owner Helm chart. The release workflow must pass
+its gates before exposing a stable Git tag to Go installation.
 
-Real subprocess tests cover forced termination before admission, after intent,
-after the started marker, after external webhook success and after result commit.
-The observed recovery behavior matches the conservative unknown-outcome policy.
-Local production-driver runs have passed HTTP checks, Docker checks, webhook and
-Docker recovery, webhook notification and file-log delivery. Provider acceptance
-is recorded separately from independently observed effects. Failed fixture runs
-remain in local evidence; they are not converted into passes.
+See [native operations](native-installation.md), [container and Helm operations](container-helm.md),
+and [release engineering](release-engineering.md) for the implemented contracts.
+
+## Verification status
+
+Implementation tests and candidate evidence are recorded separately from final
+release qualification. Default Go 1.27.1 tests and dashboard type/lint/component
+checks passed during this work. Native Windows tests exercise metadata replacement,
+real process-crash boundaries, history, locking and stopped backup/restore; native
+SCM installation is a separate gate. Full final-source reports must identify the
+exact source and artifact digest before a released platform is claimed.
+
+Historical provider fixtures and prior candidate checks do not automatically
+qualify a new artifact. The final release record must include reproducibility,
+native platform/service/package lifecycle, image/chart operations, vulnerability
+scans and documentation checks.
 
 ## Outstanding release gates
 
 - Full-account verification of all 33 driver types remains incomplete. User-owned
   accounts, credentials, designated targets and independent receipt observers
   are required. Local fixtures cannot certify cloud production accounts.
-- The physical C: free-space prerequisite has failed (approximately 4 GB free
-  during this implementation, below 30 GiB plus fixture headroom). Database
-  fixture downloads and large performance campaigns were not started.
+- The large campaign must recheck physical C: free space before starting: at
+  least 30 GiB plus measured fixture headroom. The earlier low-disk result is
+  historical, and freeing space does not itself complete a campaign.
 - Matched 10k/100k/1m comparisons and the uninterrupted 24-hour million-monitor
   campaign have not completed. A ten-monitor harness smoke run is explicitly
   excluded from scale and endurance evidence.

@@ -5,7 +5,7 @@ description: "Navigate the CPRa Go source, run meaningful verification, build op
 
 # Development guide
 
-Build the `main` branch with Go 1.25 or later. Linux is the target of the current packaged distributions. Keep a focused regression case for changes that affect concurrency, parsing, deadlines, or externally visible behavior.
+Build the `main` branch with Go 1.25 or later. The release matrix includes Linux, macOS and Windows, each conditional on native execution evidence. Keep a focused regression case for changes that affect concurrency, parsing, deadlines, or externally visible behavior.
 
 ## Source layout
 
@@ -36,7 +36,7 @@ make dashboard-build dashboard-check
 
 `make check` runs formatting, vet, and default race tests. The all-driver target includes every optional integration tag. Dashboard verification includes its build, TypeScript, lint, and tests.
 
-The release workflow checks Go 1.25 and 1.27 and scans default and all-driver Go imports for reachable vulnerabilities. Local provider fixtures establish protocol behavior; they do not certify live customer accounts or production recovery permissions.
+The release workflow checks Go 1.25.0 and the pinned Go 1.27.1 release compiler and scans default and all-driver Go imports for reachable vulnerabilities. Local provider fixtures establish protocol behavior; they do not certify live customer accounts or production recovery permissions.
 
 ## Contributions
 
@@ -45,3 +45,5 @@ Report bugs with a source commit, build tags, reproducible steps, and a redacted
 CPRa remains free under MIT. Financial support is intended to be voluntary donations; it does not create a paid feature tier or a promised response-time commitment.
 
 [Adding a driver](how-to/adding-new-jobs.md) · [Documentation maintenance](maintaining-docs.md)
+
+[Recorded build and publication contract](release-engineering.md) · [Native operations](native-installation.md) · [Container and Helm operations](container-helm.md)

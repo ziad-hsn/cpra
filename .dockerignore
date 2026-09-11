@@ -10,6 +10,8 @@ dashboard/dist
 **/*.jsonl
 .env
 .env.*
+**/.env
+**/.env.*
 monitors.yaml
 cpra-token
 

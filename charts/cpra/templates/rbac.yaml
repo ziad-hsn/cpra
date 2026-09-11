@@ -1,0 +1,36 @@
+{{- if .Values.kubernetesRecovery.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cpra.fullname" . }}-recovery
+  labels:
+    {{- include "cpra.labels" . | nindent 4 }}
+rules:
+  {{- if .Values.kubernetesRecovery.restartDeployments }}
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: {{ .Values.kubernetesRecovery.restartDeployments | toJson }}
+    verbs: [patch]
+  {{- end }}
+  {{- if .Values.kubernetesRecovery.scaleDeployments }}
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    resourceNames: {{ .Values.kubernetesRecovery.scaleDeployments | toJson }}
+    verbs: [update]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cpra.fullname" . }}-recovery
+  labels:
+    {{- include "cpra.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cpra.serviceAccount" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cpra.fullname" . }}-recovery
+{{- end }}

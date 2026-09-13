@@ -4,7 +4,7 @@ site_description: Check services, follow incidents and configure recovery with t
 site_author: Ziad Hassan
 repo_url: https://github.com/ziad-hsn/cpra
 repo_name: ziad-hsn/cpra
-edit_uri: edit/gh-pages/_sources/docs/
+edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: ../.site-build
 copyright: Copyright &copy; 2025–2026 Ziad Hassan · MIT license
@@ -15,103 +15,173 @@ theme:
   logo: images/cpra-mark-color.svg
   favicon: favicon.ico
   features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.top
-    - navigation.footer
-    - search.suggest
-    - search.highlight
-    - content.code.copy
-    - content.action.edit
+  - navigation.tabs
+  - navigation.sections
+  - navigation.top
+  - navigation.footer
+  - search.suggest
+  - search.highlight
+  - content.code.copy
+  - content.action.edit
   palette:
-    - media: "(prefers-color-scheme)"
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-auto
-        name: Switch to light mode
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-4
-        name: Switch to system preference
+  - media: (prefers-color-scheme)
+    primary: custom
+    accent: custom
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: custom
+    accent: custom
+    toggle:
+      icon: material/brightness-7
+      name: Switch to dark mode
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: custom
+    accent: custom
+    toggle:
+      icon: material/brightness-4
+      name: Switch to system preference
 nav:
-  - Home: index.md
-  - Get started:
-      - Quickstart: tutorials/quickstart.md
-      - Installation: tutorials/getting-started.md
-      - Current changes: release-notes.md
-  - Guides:
-      - Deployment: how-to/deploy-to-production.md
-      - Troubleshooting: how-to/common-tasks.md
-      - Capacity and diagnostics: how-to/performance-tuning.md
-  - Concepts:
-      - Architecture: explanation/architecture-overview.md
-      - Incident lifecycle: explanation/incident-lifecycle.md
-      - Worker sizing: explanation/queueing-theory.md
-  - Reference:
-      - Monitor configuration: reference/config-schema.md
-      - Drivers and fields: reference/jobs-reference.md
-      - HTTP API and dashboard: reference/api-reference.md
-      - CLI: reference/cli.md
+- Home: index.md
+- Versions: versions.md
+- Get started:
+  - Quickstart: tutorials/quickstart.md
+  - Installation: tutorials/getting-started.md
+  - Current changes: release-notes.md
   - FAQ: faq.md
-  - Contribute:
-      - Development: developer-guide.md
-      - Add a driver: how-to/adding-new-jobs.md
-      - Maintain the docs: maintaining-docs.md
-      - License and scope: legal/disclaimer.md
+- Main guides:
+  - Deployment: how-to/deploy-to-production.md
+  - Troubleshooting: how-to/common-tasks.md
+  - Capacity: how-to/performance-tuning.md
+  - Architecture: explanation/architecture-overview.md
+  - Incident lifecycle: explanation/incident-lifecycle.md
+  - Worker sizing: explanation/queueing-theory.md
+- Reference:
+  - Configuration: reference/config-schema.md
+  - Drivers: reference/jobs-reference.md
+  - API and dashboard: reference/api-reference.md
+  - CLI: reference/cli.md
+- Release candidate:
+  - Overview: candidate/index.md
+  - Changes: candidate/release-notes.md
+  - Quickstart: candidate/tutorials/quickstart.md
+  - Installation: candidate/tutorials/getting-started.md
+  - Persistence: candidate/durability.md
+  - Measured latency: candidate/slo.md
+  - Native operations: candidate/native-installation.md
+  - Compose and Helm: candidate/container-helm.md
+  - Release engineering: candidate/release-engineering.md
+  - Verification: candidate/validation.md
+  - Provider environments: candidate/provider-testing.md
+  - Provider research: candidate/provider-testing-research.md
+  - Configuration: candidate/reference/config-schema.md
+  - Runtime settings: candidate/reference/runtime-config.md
+  - Drivers: candidate/reference/jobs-reference.md
+  - API: candidate/reference/api-reference.md
+  - CLI: candidate/reference/cli.md
+  - Deployment: candidate/how-to/deploy-to-production.md
+  - Troubleshooting: candidate/how-to/common-tasks.md
+  - Capacity: candidate/how-to/performance-tuning.md
+  - Architecture: candidate/explanation/architecture-overview.md
+  - Incident lifecycle: candidate/explanation/incident-lifecycle.md
+  - Worker sizing: candidate/explanation/queueing-theory.md
+  - FAQ: candidate/faq.md
+  - Development: candidate/developer-guide.md
+  - Adding drivers: candidate/how-to/adding-new-jobs.md
+  - Maintenance: candidate/maintaining-docs.md
+  - License and scope: candidate/legal/disclaimer.md
+- SDK candidate:
+  - Start here: sdk/index.md
+  - Core SDK: sdk/module-overview.md
+  - Collections: sdk/collections.md
+  - External worker: sdk/worker-library.md
+  - Example workspace: sdk/examples.md
+  - Queue registration: sdk/queue-registration.md
+  - AWS deregistration: sdk/aws-deregister.md
+  - Kubernetes Services: sdk/kubernetes-services.md
+  - DAO and SMS: sdk/dao-sms.md
+  - HTTP operations: sdk/api-reference.md
+  - Wire types: sdk/wire-types.md
+  - Go declarations: sdk/go-reference.md
+  - OpenAPI inputs: sdk/openapi.md
+  - Verification: sdk/verification.md
+  - Publication: sdk/publishing.md
+  - Guide maintenance: sdk/writing-guide.md
+- Plans and status:
+  - Current status: implementation/STATUS.md
+  - Management API plan: implementation/api-management-plan.md
+  - SDK status: implementation/go-sdk-status.md
+  - SDK evidence: implementation/go-sdk-verification.md
+  - Original durable review: implementation/review.md
+  - 01 Storage: implementation/01-storage.md
+  - 02 Incidents: implementation/02-incidents.md
+  - 03 History: implementation/03-history.md
+  - 04 Slo: implementation/04-slo.md
+  - 05 Interfaces: implementation/05-interfaces.md
+  - 06 Live Providers: implementation/06-live-providers.md
+  - 07 Scale Evidence: implementation/07-scale-evidence.md
+  - 08 Release: implementation/08-release.md
+- Contribute:
+  - Latest-change review: review/latest-changes.md
+  - Development: developer-guide.md
+  - Adding drivers: how-to/adding-new-jobs.md
+  - Maintain docs: maintaining-docs.md
+  - License and scope: legal/disclaimer.md
 extra:
   generator: false
   social_image: images/social-preview.png
-  source_commit: a370969b041b399c0778318d8915ce059fd74294
-  source_date: 9 September 2026
+  source_commit: 51a835a29f2fb7af2e0301910042a52e308cbb24
+  source_date: 13 September 2026
+  candidate_commit: 410fbfb0092d01277b3884cd04151c27443a4226
 extra_css:
-  - assets/stylesheets/palette.css
-  - assets/stylesheets/extra.css
+- assets/stylesheets/palette.css
+- assets/stylesheets/extra.css
 plugins:
-  - search
-  - redirects:
-      redirect_maps:
-        tutorials/index.md: tutorials/quickstart.md
-        tutorials/your-first-monitor.md: tutorials/quickstart.md
-        how-to/index.md: how-to/common-tasks.md
-        explanation/index.md: explanation/architecture-overview.md
-        reference/index.md: reference/config-schema.md
-        reference/api-documentation.md: reference/api-reference.md
-        reference/types-reference.md: developer-guide.md
-        zap-reference.md: developer-guide.md
-        architecture/index.md: explanation/architecture-overview.md
-        architecture/ARCHITECTURE.md: explanation/architecture-overview.md
-        packages/index.md: developer-guide.md
-        packages/controller.md: explanation/architecture-overview.md
-        packages/jobs.md: reference/jobs-reference.md
-        packages/loader.md: reference/config-schema.md
-        packages/logger.md: developer-guide.md
-        packages/queue.md: explanation/queueing-theory.md
+- search
+- redirects:
+    redirect_maps:
+      tutorials/index.md: tutorials/quickstart.md
+      tutorials/your-first-monitor.md: tutorials/quickstart.md
+      how-to/index.md: how-to/common-tasks.md
+      explanation/index.md: explanation/architecture-overview.md
+      reference/index.md: reference/config-schema.md
+      reference/api-documentation.md: reference/api-reference.md
+      reference/types-reference.md: developer-guide.md
+      zap-reference.md: developer-guide.md
+      architecture/index.md: explanation/architecture-overview.md
+      architecture/ARCHITECTURE.md: explanation/architecture-overview.md
+      packages/index.md: developer-guide.md
+      packages/controller.md: explanation/architecture-overview.md
+      packages/jobs.md: reference/jobs-reference.md
+      packages/loader.md: reference/config-schema.md
+      packages/logger.md: developer-guide.md
+      packages/queue.md: explanation/queueing-theory.md
+      durability.md: candidate/durability.md
+      slo.md: candidate/slo.md
+      validation.md: candidate/validation.md
+      native-installation.md: candidate/native-installation.md
+      container-helm.md: candidate/container-helm.md
+      release-engineering.md: candidate/release-engineering.md
+      provider-testing.md: candidate/provider-testing.md
+      provider-testing-research.md: candidate/provider-testing-research.md
 markdown_extensions:
-  - admonition
-  - attr_list
-  - md_in_html
-  - tables
-  - toc:
-      permalink: true
-      toc_depth: 3
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.tabbed:
-      alternate_style: true
+- admonition
+- attr_list
+- md_in_html
+- tables
+- toc:
+    permalink: true
+    toc_depth: 3
+- pymdownx.details
+- pymdownx.superfences
+- pymdownx.highlight:
+    anchor_linenums: true
+- pymdownx.inlinehilite
+- pymdownx.tabbed:
+    alternate_style: true
 validation:
   nav:
     omitted_files: warn

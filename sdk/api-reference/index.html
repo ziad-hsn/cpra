@@ -1,0 +1,7000 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="SDK candidate · SDK HTTP operation reference for the reviewed CPRa source; see the version and availability notice.">
+      
+      
+        <meta name="author" content="Ziad Hassan">
+      
+      
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/sdk/api-reference/">
+      
+      
+        <link rel="prev" href="../dao-sms/">
+      
+      
+        <link rel="next" href="../wire-types/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>SDK candidate · SDK HTTP operation reference - CPRa Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/palette.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+
+  <script src="../../assets/javascripts/theme.js"></script>
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="SDK candidate · SDK HTTP operation reference">
+  <meta property="og:description" content="SDK candidate · SDK HTTP operation reference for the reviewed CPRa source; see the version and availability notice.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/sdk/api-reference/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SDK candidate · SDK HTTP operation reference">
+  <meta name="twitter:description" content="SDK candidate · SDK HTTP operation reference for the reviewed CPRa source; see the version and availability notice.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sdk-http-operation-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+  
+  
+    Unpublished SDK candidate · server v2 and module publication pending
+  
+  · <a href="../../versions/">Versions and availability</a>
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRa Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SDK candidate · SDK HTTP operation reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../versions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Versions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+          
+  
+  
+  Main guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/config-schema/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../candidate/" class="md-tabs__link">
+          
+  
+  
+  Release candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  SDK candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../implementation/STATUS/" class="md-tabs__link">
+          
+  
+  
+  Plans and status
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../review/latest-changes/" class="md-tabs__link">
+          
+  
+  
+  Contribute
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    CPRa Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Main guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API and dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/provider-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/provider-testing-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider research
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/runtime-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SDK candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start here
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../worker-library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External worker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../queue-registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-deregister/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS deregistration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kubernetes-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes Services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dao-sms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAO and SMS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP operations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#shared-request-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared request rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operation-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operation-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operation parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#listmonitors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListMonitors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listnotificationendpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListNotificationEndpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacenotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletenotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listnotificationgroups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListNotificationGroups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacenotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletenotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listcredentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListCredentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacecredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletecredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listincidents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListIncidents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListActions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetAction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acknowledgeincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AcknowledgeIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dismissincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DismissIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reopenincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReopenIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snoozemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SnoozeMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unsnoozemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnsnoozeMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovermonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RecoverMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reviewaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReviewAction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preflightcollection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreflightCollection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uploadoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UploadOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activateoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActivateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canceloperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CancelOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getstate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetState
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gethistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetHistory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getslo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetSLO
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getqueues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetQueues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getpools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetPools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getsystems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetSystems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetReady
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getlive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetLive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getmetrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetMetrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getcapabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetCapabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetVersion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explainresource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExplainResource
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerpoll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerPoll
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerStart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerheartbeat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerHeartbeat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerlateevidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerLateEvidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listjobtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListJobTypes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createjobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getjobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacejobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletejobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listworkers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListWorkers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validateoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-prometheus-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming Prometheus export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-v1-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing v1 compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wire-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go declarations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../openapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenAPI inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../publishing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../writing-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans and status
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans and status
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/api-management-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management API plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/go-sdk-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/go-sdk-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Original durable review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/01-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/02-incidents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 Incidents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/03-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/04-slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Slo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/05-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/06-live-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 Live Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/07-scale-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Scale Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/08-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contribute
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../review/latest-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Latest-change review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintain docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#shared-request-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared request rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operation-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operation-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operation parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operation parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#listmonitors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListMonitors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchmonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listnotificationendpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListNotificationEndpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacenotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchnotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletenotificationendpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteNotificationEndpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listnotificationgroups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListNotificationGroups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacenotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchnotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletenotificationgroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteNotificationGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listcredentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListCredentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacecredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchcredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletecredential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteCredential
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listincidents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListIncidents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListActions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetAction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acknowledgeincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AcknowledgeIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dismissincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DismissIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reopenincident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReopenIncident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#snoozemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SnoozeMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unsnoozemonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnsnoozeMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovermonitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RecoverMonitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reviewaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReviewAction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preflightcollection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreflightCollection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uploadoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UploadOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#activateoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActivateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canceloperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CancelOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getstate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetState
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gethistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetHistory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getslo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetSLO
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getqueues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetQueues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getpools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetPools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getsystems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetSystems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetReady
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getlive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetLive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getmetrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetMetrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getcapabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetCapabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetVersion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explainresource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExplainResource
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerpoll" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerPoll
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerStart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerheartbeat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerHeartbeat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workerlateevidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkerLateEvidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listjobtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListJobTypes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#createjobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CreateJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getjobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GetJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacejobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReplaceJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deletejobtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeleteJobType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listworkers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ListWorkers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validateoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidateOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-prometheus-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming Prometheus export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-v1-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing v1 compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ziad-hsn/cpra/edit/main/docs/sdk/api-reference.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<blockquote>
+<p><strong>Unpublished SDK candidate:</strong> reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in <code>main</code>. See <a href="../../versions/#go-sdk-and-approved-management-plan">availability and source</a>.</p>
+</blockquote>
+<h1 id="sdk-http-operation-reference">SDK HTTP operation reference<a class="headerlink" href="#sdk-http-operation-reference" title="Permanent link">&para;</a></h1>
+<p>Generated by <code>python3 scripts/sdk/reference.py</code>. Do not edit generated tables.</p>
+<p>These are the SDK candidate contracts. The current CPRa application serves v1 read-only endpoints; its v2 management and worker servers are not implemented. A listed SDK method is not evidence of a deployed server route. See the <a href="../">guide</a> for runnable local examples.</p>
+<p>Schema input SHA-256: <code>71723960b55145b57009faa9daa7fede20b08d85117171474b7c0631b4eb4977</code>.</p>
+<h2 id="shared-request-rules">Shared request rules<a class="headerlink" href="#shared-request-rules" title="Permanent link">&para;</a></h2>
+<p>Every method takes <code>context.Context</code> first. Authenticated v2 requests require HTTPS by default. Redirects and automatic mutation retries are disabled. <code>Config.AllowInsecureHTTP</code> explicitly permits the configured origin. Ordinary requests default to ten seconds and a 64 MiB decoded-response ceiling.</p>
+<p><code>Response[T]</code> keeps <code>Data</code>, <code>ResourceVersion</code>, <code>RequestID</code>, <code>OperationID</code>, <code>StatusCode</code>, and <code>RetryAfter</code> separate. Pass the version you inspected to conditional changes. List calls default to 100 items and reject limits above 500. <code>Iterate</code> retains one page. Unknown driver observations are readable but cannot be blindly reapplied.</p>
+<p>Errors support <code>errors.Is</code> for conflicts, missing resources, unavailable features, expired operations, authentication, invalid input, oversized responses, and ambiguous mutations. Use <code>errors.As</code> for structured <code>*cpra.Error</code> details; avoid logging server detail or credential-bearing payloads. A cancelled wait does not cancel the server operation.</p>
+<h2 id="operation-inventory">Operation inventory<a class="headerlink" href="#operation-inventory" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>SDK method</th>
+<th>HTTP operation</th>
+<th>Request</th>
+<th>Response</th>
+<th>Condition</th>
+<th>Build</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MonitorsService.List</code></td>
+<td><code>GET /api/v2/monitors</code></td>
+<td>—</td>
+<td>MonitorList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Create</code></td>
+<td><code>POST /api/v2/monitors</code></td>
+<td>Monitor</td>
+<td>Monitor</td>
+<td>If-None-Match: *</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Get</code></td>
+<td><code>GET /api/v2/monitors/{id}</code></td>
+<td>—</td>
+<td>Monitor</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Replace</code></td>
+<td><code>PUT /api/v2/monitors/{id}</code></td>
+<td>Monitor</td>
+<td>Monitor</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Patch</code></td>
+<td><code>PATCH /api/v2/monitors/{id}</code></td>
+<td>MergePatch</td>
+<td>Monitor</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Delete</code></td>
+<td><code>DELETE /api/v2/monitors/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.List</code></td>
+<td><code>GET /api/v2/notification-endpoints</code></td>
+<td>—</td>
+<td>NotificationEndpointList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.Create</code></td>
+<td><code>POST /api/v2/notification-endpoints</code></td>
+<td>NotificationEndpoint</td>
+<td>NotificationEndpoint</td>
+<td>If-None-Match: *</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.Get</code></td>
+<td><code>GET /api/v2/notification-endpoints/{id}</code></td>
+<td>—</td>
+<td>NotificationEndpoint</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.Replace</code></td>
+<td><code>PUT /api/v2/notification-endpoints/{id}</code></td>
+<td>NotificationEndpoint</td>
+<td>NotificationEndpoint</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.Patch</code></td>
+<td><code>PATCH /api/v2/notification-endpoints/{id}</code></td>
+<td>MergePatch</td>
+<td>NotificationEndpoint</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationEndpointsService.Delete</code></td>
+<td><code>DELETE /api/v2/notification-endpoints/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.List</code></td>
+<td><code>GET /api/v2/notification-groups</code></td>
+<td>—</td>
+<td>NotificationGroupList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.Create</code></td>
+<td><code>POST /api/v2/notification-groups</code></td>
+<td>NotificationGroup</td>
+<td>NotificationGroup</td>
+<td>If-None-Match: *</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.Get</code></td>
+<td><code>GET /api/v2/notification-groups/{id}</code></td>
+<td>—</td>
+<td>NotificationGroup</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.Replace</code></td>
+<td><code>PUT /api/v2/notification-groups/{id}</code></td>
+<td>NotificationGroup</td>
+<td>NotificationGroup</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.Patch</code></td>
+<td><code>PATCH /api/v2/notification-groups/{id}</code></td>
+<td>MergePatch</td>
+<td>NotificationGroup</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>NotificationGroupsService.Delete</code></td>
+<td><code>DELETE /api/v2/notification-groups/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.List</code></td>
+<td><code>GET /api/v2/credentials</code></td>
+<td>—</td>
+<td>CredentialList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.Create</code></td>
+<td><code>POST /api/v2/credentials</code></td>
+<td>Credential</td>
+<td>Credential</td>
+<td>If-None-Match: *</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.Get</code></td>
+<td><code>GET /api/v2/credentials/{id}</code></td>
+<td>—</td>
+<td>Credential</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.Replace</code></td>
+<td><code>PUT /api/v2/credentials/{id}</code></td>
+<td>Credential</td>
+<td>Credential</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.Patch</code></td>
+<td><code>PATCH /api/v2/credentials/{id}</code></td>
+<td>MergePatch</td>
+<td>Credential</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>CredentialsService.Delete</code></td>
+<td><code>DELETE /api/v2/credentials/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>IncidentsService.List</code></td>
+<td><code>GET /api/v2/incidents</code></td>
+<td>—</td>
+<td>IncidentList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>IncidentsService.Get</code></td>
+<td><code>GET /api/v2/incidents/{id}</code></td>
+<td>—</td>
+<td>Incident</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>ActionsService.List</code></td>
+<td><code>GET /api/v2/actions</code></td>
+<td>—</td>
+<td>ActionList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>ActionsService.Get</code></td>
+<td><code>GET /api/v2/actions/{id}</code></td>
+<td>—</td>
+<td>Action</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>IncidentsService.Acknowledge</code></td>
+<td><code>POST /api/v2/incidents/{id}/acknowledge</code></td>
+<td>ControlRequest</td>
+<td>Incident</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>IncidentsService.Dismiss</code></td>
+<td><code>POST /api/v2/incidents/{id}/dismiss</code></td>
+<td>ControlRequest</td>
+<td>Incident</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>IncidentsService.Reopen</code></td>
+<td><code>POST /api/v2/incidents/{id}/reopen</code></td>
+<td>ControlRequest</td>
+<td>Incident</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Snooze</code></td>
+<td><code>POST /api/v2/monitors/{id}/snooze</code></td>
+<td>ControlRequest</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Unsnooze</code></td>
+<td><code>POST /api/v2/monitors/{id}/unsnooze</code></td>
+<td>ControlRequest</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>MonitorsService.Recover</code></td>
+<td><code>POST /api/v2/monitors/{id}/recover</code></td>
+<td>ControlRequest</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>ActionsService.Review</code></td>
+<td><code>POST /api/v2/actions/{id}/review</code></td>
+<td>ControlRequest</td>
+<td>Action</td>
+<td>inspected version</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Preflight</code></td>
+<td><code>POST /api/v2/collections/preflight</code></td>
+<td>PreflightRequest</td>
+<td>Preflight</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Create</code></td>
+<td><code>POST /api/v2/operations</code></td>
+<td>OperationCreateRequest</td>
+<td>Operation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Upload</code></td>
+<td><code>PUT /api/v2/operations/{id}/items</code></td>
+<td>UploadRequest</td>
+<td>Operation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Activate</code></td>
+<td><code>POST /api/v2/operations/{id}/activate</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Cancel</code></td>
+<td><code>POST /api/v2/operations/{id}/cancel</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>OperationsService.Get</code></td>
+<td><code>GET /api/v2/operations/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.State</code></td>
+<td><code>GET /api/v2/state</code></td>
+<td>—</td>
+<td>State</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.History</code></td>
+<td><code>GET /api/v2/history</code></td>
+<td>—</td>
+<td>EventList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>SLOService.Get</code></td>
+<td><code>GET /api/v2/slo</code></td>
+<td>—</td>
+<td>SLOView</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>QueuesService.List</code></td>
+<td><code>GET /api/v2/queues</code></td>
+<td>—</td>
+<td>QueueList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>PoolsService.List</code></td>
+<td><code>GET /api/v2/pools</code></td>
+<td>—</td>
+<td>PoolList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>SystemsService.List</code></td>
+<td><code>GET /api/v2/systems</code></td>
+<td>—</td>
+<td>SystemList</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.RuntimeConfig</code></td>
+<td><code>GET /api/v2/config</code></td>
+<td>—</td>
+<td>RuntimeConfig</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Ready</code></td>
+<td><code>GET /api/v2/readyz</code></td>
+<td>—</td>
+<td>Health</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Live</code></td>
+<td><code>GET /api/v2/healthz</code></td>
+<td>—</td>
+<td>Health</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Metrics</code></td>
+<td><code>GET /api/v2/metrics</code></td>
+<td>—</td>
+<td>Metrics</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Capabilities</code></td>
+<td><code>GET /api/v2/discovery</code></td>
+<td>—</td>
+<td>Capabilities</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Version</code></td>
+<td><code>GET /api/v2/version</code></td>
+<td>—</td>
+<td>Version</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>Client.Explain</code></td>
+<td><code>GET /api/v2/schemas/{id}</code></td>
+<td>—</td>
+<td>Explanation</td>
+<td>—</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>WorkerClient.Poll</code></td>
+<td><code>POST /api/v2/external-workers/poll</code></td>
+<td>PollRequest</td>
+<td>Assignments</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>WorkerClient.Start</code></td>
+<td><code>POST /api/v2/external-workers/start</code></td>
+<td>StartRequest</td>
+<td>StartResponse</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>WorkerClient.Heartbeat</code></td>
+<td><code>POST /api/v2/external-workers/heartbeat</code></td>
+<td>HeartbeatRequest</td>
+<td>HeartbeatResponse</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>WorkerClient.Result</code></td>
+<td><code>POST /api/v2/external-workers/result</code></td>
+<td>Outcome</td>
+<td>Receipt</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>WorkerClient.LateEvidence</code></td>
+<td><code>POST /api/v2/external-workers/late-evidence</code></td>
+<td>LateEvidenceRequest</td>
+<td>Receipt</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>JobTypesService.List</code></td>
+<td><code>GET /api/v2/job-types</code></td>
+<td>—</td>
+<td>JobTypeList</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>JobTypesService.Create</code></td>
+<td><code>POST /api/v2/job-types</code></td>
+<td>JobType</td>
+<td>JobType</td>
+<td>If-None-Match: *</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>JobTypesService.Get</code></td>
+<td><code>GET /api/v2/job-types/{id}</code></td>
+<td>—</td>
+<td>JobType</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>JobTypesService.Replace</code></td>
+<td><code>PUT /api/v2/job-types/{id}</code></td>
+<td>JobType</td>
+<td>JobType</td>
+<td>inspected version</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>JobTypesService.Delete</code></td>
+<td><code>DELETE /api/v2/job-types/{id}</code></td>
+<td>—</td>
+<td>Operation</td>
+<td>inspected version</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>Client.Workers</code></td>
+<td><code>GET /api/v2/external-workers</code></td>
+<td>—</td>
+<td>WorkerObservationList</td>
+<td>—</td>
+<td>externaljobs</td>
+</tr>
+<tr>
+<td><code>OperationsService.Validate</code></td>
+<td><code>POST /api/v2/operations/{id}/validate</code></td>
+<td>—</td>
+<td>Preflight</td>
+<td>—</td>
+<td>default</td>
+</tr>
+</tbody>
+</table>
+<p><code>Disable</code> and <code>Enable</code> are narrow conditional monitor patches. Acknowledge records who is investigating; dismiss pauses incident notifications; snooze pauses checks and notifications until its deadline. These controls have separate revision requirements. No check-now operation exists.</p>
+<h2 id="operation-parameters">Operation parameters<a class="headerlink" href="#operation-parameters" title="Permanent link">&para;</a></h2>
+<h3 id="listmonitors">ListMonitors<a class="headerlink" href="#listmonitors" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.List</code> → <code>GET /api/v2/monitors</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>MonitorList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createmonitor">CreateMonitor<a class="headerlink" href="#createmonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Create</code> → <code>POST /api/v2/monitors</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>If-None-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>Monitor</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Monitor</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getmonitor">GetMonitor<a class="headerlink" href="#getmonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Get</code> → <code>GET /api/v2/monitors/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Monitor</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="replacemonitor">ReplaceMonitor<a class="headerlink" href="#replacemonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Replace</code> → <code>PUT /api/v2/monitors/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>Monitor</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Monitor</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="patchmonitor">PatchMonitor<a class="headerlink" href="#patchmonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Patch</code> → <code>PATCH /api/v2/monitors/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>MergePatch</code>. Content type: <code>application/merge-patch+json</code>.</p>
+<p>Response: <code>Monitor</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="deletemonitor">DeleteMonitor<a class="headerlink" href="#deletemonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Delete</code> → <code>DELETE /api/v2/monitors/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listnotificationendpoints">ListNotificationEndpoints<a class="headerlink" href="#listnotificationendpoints" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.List</code> → <code>GET /api/v2/notification-endpoints</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>NotificationEndpointList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createnotificationendpoint">CreateNotificationEndpoint<a class="headerlink" href="#createnotificationendpoint" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.Create</code> → <code>POST /api/v2/notification-endpoints</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>If-None-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>NotificationEndpoint</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>NotificationEndpoint</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getnotificationendpoint">GetNotificationEndpoint<a class="headerlink" href="#getnotificationendpoint" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.Get</code> → <code>GET /api/v2/notification-endpoints/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>NotificationEndpoint</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="replacenotificationendpoint">ReplaceNotificationEndpoint<a class="headerlink" href="#replacenotificationendpoint" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.Replace</code> → <code>PUT /api/v2/notification-endpoints/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>NotificationEndpoint</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>NotificationEndpoint</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="patchnotificationendpoint">PatchNotificationEndpoint<a class="headerlink" href="#patchnotificationendpoint" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.Patch</code> → <code>PATCH /api/v2/notification-endpoints/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>MergePatch</code>. Content type: <code>application/merge-patch+json</code>.</p>
+<p>Response: <code>NotificationEndpoint</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="deletenotificationendpoint">DeleteNotificationEndpoint<a class="headerlink" href="#deletenotificationendpoint" title="Permanent link">&para;</a></h3>
+<p><code>NotificationEndpointsService.Delete</code> → <code>DELETE /api/v2/notification-endpoints/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listnotificationgroups">ListNotificationGroups<a class="headerlink" href="#listnotificationgroups" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.List</code> → <code>GET /api/v2/notification-groups</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>NotificationGroupList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createnotificationgroup">CreateNotificationGroup<a class="headerlink" href="#createnotificationgroup" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.Create</code> → <code>POST /api/v2/notification-groups</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>If-None-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>NotificationGroup</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>NotificationGroup</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getnotificationgroup">GetNotificationGroup<a class="headerlink" href="#getnotificationgroup" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.Get</code> → <code>GET /api/v2/notification-groups/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>NotificationGroup</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="replacenotificationgroup">ReplaceNotificationGroup<a class="headerlink" href="#replacenotificationgroup" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.Replace</code> → <code>PUT /api/v2/notification-groups/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>NotificationGroup</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>NotificationGroup</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="patchnotificationgroup">PatchNotificationGroup<a class="headerlink" href="#patchnotificationgroup" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.Patch</code> → <code>PATCH /api/v2/notification-groups/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>MergePatch</code>. Content type: <code>application/merge-patch+json</code>.</p>
+<p>Response: <code>NotificationGroup</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="deletenotificationgroup">DeleteNotificationGroup<a class="headerlink" href="#deletenotificationgroup" title="Permanent link">&para;</a></h3>
+<p><code>NotificationGroupsService.Delete</code> → <code>DELETE /api/v2/notification-groups/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listcredentials">ListCredentials<a class="headerlink" href="#listcredentials" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.List</code> → <code>GET /api/v2/credentials</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>CredentialList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createcredential">CreateCredential<a class="headerlink" href="#createcredential" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.Create</code> → <code>POST /api/v2/credentials</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>If-None-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>Credential</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Credential</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getcredential">GetCredential<a class="headerlink" href="#getcredential" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.Get</code> → <code>GET /api/v2/credentials/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Credential</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="replacecredential">ReplaceCredential<a class="headerlink" href="#replacecredential" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.Replace</code> → <code>PUT /api/v2/credentials/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>Credential</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Credential</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="patchcredential">PatchCredential<a class="headerlink" href="#patchcredential" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.Patch</code> → <code>PATCH /api/v2/credentials/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>MergePatch</code>. Content type: <code>application/merge-patch+json</code>.</p>
+<p>Response: <code>Credential</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="deletecredential">DeleteCredential<a class="headerlink" href="#deletecredential" title="Permanent link">&para;</a></h3>
+<p><code>CredentialsService.Delete</code> → <code>DELETE /api/v2/credentials/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listincidents">ListIncidents<a class="headerlink" href="#listincidents" title="Permanent link">&para;</a></h3>
+<p><code>IncidentsService.List</code> → <code>GET /api/v2/incidents</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>IncidentList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getincident">GetIncident<a class="headerlink" href="#getincident" title="Permanent link">&para;</a></h3>
+<p><code>IncidentsService.Get</code> → <code>GET /api/v2/incidents/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Incident</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listactions">ListActions<a class="headerlink" href="#listactions" title="Permanent link">&para;</a></h3>
+<p><code>ActionsService.List</code> → <code>GET /api/v2/actions</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>ActionList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getaction">GetAction<a class="headerlink" href="#getaction" title="Permanent link">&para;</a></h3>
+<p><code>ActionsService.Get</code> → <code>GET /api/v2/actions/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Action</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="acknowledgeincident">AcknowledgeIncident<a class="headerlink" href="#acknowledgeincident" title="Permanent link">&para;</a></h3>
+<p><code>IncidentsService.Acknowledge</code> → <code>POST /api/v2/incidents/{id}/acknowledge</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Incident</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="dismissincident">DismissIncident<a class="headerlink" href="#dismissincident" title="Permanent link">&para;</a></h3>
+<p><code>IncidentsService.Dismiss</code> → <code>POST /api/v2/incidents/{id}/dismiss</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Incident</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="reopenincident">ReopenIncident<a class="headerlink" href="#reopenincident" title="Permanent link">&para;</a></h3>
+<p><code>IncidentsService.Reopen</code> → <code>POST /api/v2/incidents/{id}/reopen</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Incident</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="snoozemonitor">SnoozeMonitor<a class="headerlink" href="#snoozemonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Snooze</code> → <code>POST /api/v2/monitors/{id}/snooze</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="unsnoozemonitor">UnsnoozeMonitor<a class="headerlink" href="#unsnoozemonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Unsnooze</code> → <code>POST /api/v2/monitors/{id}/unsnooze</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="recovermonitor">RecoverMonitor<a class="headerlink" href="#recovermonitor" title="Permanent link">&para;</a></h3>
+<p><code>MonitorsService.Recover</code> → <code>POST /api/v2/monitors/{id}/recover</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="reviewaction">ReviewAction<a class="headerlink" href="#reviewaction" title="Permanent link">&para;</a></h3>
+<p><code>ActionsService.Review</code> → <code>POST /api/v2/actions/{id}/review</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>ControlRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Action</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="preflightcollection">PreflightCollection<a class="headerlink" href="#preflightcollection" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Preflight</code> → <code>POST /api/v2/collections/preflight</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>PreflightRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Preflight</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createoperation">CreateOperation<a class="headerlink" href="#createoperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Create</code> → <code>POST /api/v2/operations</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>OperationCreateRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="uploadoperation">UploadOperation<a class="headerlink" href="#uploadoperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Upload</code> → <code>PUT /api/v2/operations/{id}/items</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>UploadRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="activateoperation">ActivateOperation<a class="headerlink" href="#activateoperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Activate</code> → <code>POST /api/v2/operations/{id}/activate</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="canceloperation">CancelOperation<a class="headerlink" href="#canceloperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Cancel</code> → <code>POST /api/v2/operations/{id}/cancel</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getoperation">GetOperation<a class="headerlink" href="#getoperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Get</code> → <code>GET /api/v2/operations/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getstate">GetState<a class="headerlink" href="#getstate" title="Permanent link">&para;</a></h3>
+<p><code>Client.State</code> → <code>GET /api/v2/state</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>State</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="gethistory">GetHistory<a class="headerlink" href="#gethistory" title="Permanent link">&para;</a></h3>
+<p><code>Client.History</code> → <code>GET /api/v2/history</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>EventList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getslo">GetSLO<a class="headerlink" href="#getslo" title="Permanent link">&para;</a></h3>
+<p><code>SLOService.Get</code> → <code>GET /api/v2/slo</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>SLOView</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getqueues">GetQueues<a class="headerlink" href="#getqueues" title="Permanent link">&para;</a></h3>
+<p><code>QueuesService.List</code> → <code>GET /api/v2/queues</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>QueueList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getpools">GetPools<a class="headerlink" href="#getpools" title="Permanent link">&para;</a></h3>
+<p><code>PoolsService.List</code> → <code>GET /api/v2/pools</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>PoolList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getsystems">GetSystems<a class="headerlink" href="#getsystems" title="Permanent link">&para;</a></h3>
+<p><code>SystemsService.List</code> → <code>GET /api/v2/systems</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>SystemList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getconfig">GetConfig<a class="headerlink" href="#getconfig" title="Permanent link">&para;</a></h3>
+<p><code>Client.RuntimeConfig</code> → <code>GET /api/v2/config</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>RuntimeConfig</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getready">GetReady<a class="headerlink" href="#getready" title="Permanent link">&para;</a></h3>
+<p><code>Client.Ready</code> → <code>GET /api/v2/readyz</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>Health</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getlive">GetLive<a class="headerlink" href="#getlive" title="Permanent link">&para;</a></h3>
+<p><code>Client.Live</code> → <code>GET /api/v2/healthz</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>Health</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getmetrics">GetMetrics<a class="headerlink" href="#getmetrics" title="Permanent link">&para;</a></h3>
+<p><code>Client.Metrics</code> → <code>GET /api/v2/metrics</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>Metrics</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getcapabilities">GetCapabilities<a class="headerlink" href="#getcapabilities" title="Permanent link">&para;</a></h3>
+<p><code>Client.Capabilities</code> → <code>GET /api/v2/discovery</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>Capabilities</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getversion">GetVersion<a class="headerlink" href="#getversion" title="Permanent link">&para;</a></h3>
+<p><code>Client.Version</code> → <code>GET /api/v2/version</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Response: <code>Version</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="explainresource">ExplainResource<a class="headerlink" href="#explainresource" title="Permanent link">&para;</a></h3>
+<p><code>Client.Explain</code> → <code>GET /api/v2/schemas/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Explanation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="workerpoll">WorkerPoll<a class="headerlink" href="#workerpoll" title="Permanent link">&para;</a></h3>
+<p><code>WorkerClient.Poll</code> → <code>POST /api/v2/external-workers/poll</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>PollRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Assignments</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="workerstart">WorkerStart<a class="headerlink" href="#workerstart" title="Permanent link">&para;</a></h3>
+<p><code>WorkerClient.Start</code> → <code>POST /api/v2/external-workers/start</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>StartRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>StartResponse</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="workerheartbeat">WorkerHeartbeat<a class="headerlink" href="#workerheartbeat" title="Permanent link">&para;</a></h3>
+<p><code>WorkerClient.Heartbeat</code> → <code>POST /api/v2/external-workers/heartbeat</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>HeartbeatRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>HeartbeatResponse</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="workerresult">WorkerResult<a class="headerlink" href="#workerresult" title="Permanent link">&para;</a></h3>
+<p><code>WorkerClient.Result</code> → <code>POST /api/v2/external-workers/result</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>Outcome</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Receipt</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="workerlateevidence">WorkerLateEvidence<a class="headerlink" href="#workerlateevidence" title="Permanent link">&para;</a></h3>
+<p><code>WorkerClient.LateEvidence</code> → <code>POST /api/v2/external-workers/late-evidence</code></p>
+<p>No path, query, or header parameters beyond common authentication.</p>
+<p>Body: <code>LateEvidenceRequest</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>Receipt</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listjobtypes">ListJobTypes<a class="headerlink" href="#listjobtypes" title="Permanent link">&para;</a></h3>
+<p><code>JobTypesService.List</code> → <code>GET /api/v2/job-types</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>JobTypeList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="createjobtype">CreateJobType<a class="headerlink" href="#createjobtype" title="Permanent link">&para;</a></h3>
+<p><code>JobTypesService.Create</code> → <code>POST /api/v2/job-types</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>If-None-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>JobType</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>JobType</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="getjobtype">GetJobType<a class="headerlink" href="#getjobtype" title="Permanent link">&para;</a></h3>
+<p><code>JobTypesService.Get</code> → <code>GET /api/v2/job-types/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>JobType</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="replacejobtype">ReplaceJobType<a class="headerlink" href="#replacejobtype" title="Permanent link">&para;</a></h3>
+<p><code>JobTypesService.Replace</code> → <code>PUT /api/v2/job-types/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Body: <code>JobType</code>. Content type: <code>application/json</code>.</p>
+<p>Response: <code>JobType</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="deletejobtype">DeleteJobType<a class="headerlink" href="#deletejobtype" title="Permanent link">&para;</a></h3>
+<p><code>JobTypesService.Delete</code> → <code>DELETE /api/v2/job-types/{id}</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>If-Match</code></td>
+<td>header</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Operation</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="listworkers">ListWorkers<a class="headerlink" href="#listworkers" title="Permanent link">&para;</a></h3>
+<p><code>Client.Workers</code> → <code>GET /api/v2/external-workers</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td>false</td>
+<td>integer</td>
+</tr>
+<tr>
+<td><code>selector</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+<tr>
+<td><code>monitorID</code></td>
+<td>query</td>
+<td>false</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>WorkerObservationList</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h3 id="validateoperation">ValidateOperation<a class="headerlink" href="#validateoperation" title="Permanent link">&para;</a></h3>
+<p><code>OperationsService.Validate</code> → <code>POST /api/v2/operations/{id}/validate</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Location</th>
+<th>Required</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>path</td>
+<td>true</td>
+<td>string</td>
+</tr>
+</tbody>
+</table>
+<p>Response: <code>Preflight</code>. See <a href="../wire-types/">wire types</a> and <a href="../go-reference/">Go declarations</a>.</p>
+<h2 id="streaming-prometheus-export">Streaming Prometheus export<a class="headerlink" href="#streaming-prometheus-export" title="Permanent link">&para;</a></h2>
+<p><code>Client.Prometheus(ctx context.Context, w io.Writer) error</code> streams <code>GET /metrics</code> into a caller-owned writer. It is a handwritten helper outside the 66 generated v2 operations. The SDK closes the HTTP response body and leaves the writer open. Cancellation and the configured response-byte ceiling apply; an error can leave a partial export in the writer. Discard that partial output when the export must be complete.</p>
+<p><code>Client.Metrics(ctx)</code> instead decodes the structured <code>GET /api/v2/metrics</code> response. Use it for typed observations; use <code>Prometheus</code> when you need exposition text.</p>
+<h2 id="existing-v1-compatibility">Existing v1 compatibility<a class="headerlink" href="#existing-v1-compatibility" title="Permanent link">&para;</a></h2>
+<p>Import <code>github.com/ziad-hsn/cpra/sdk/go/legacy</code>. Its read-only methods preserve the existing server and numeric monitor routes. It never silently substitutes for a v2 mutation. Exact options and return types appear in the legacy section of <a href="../go-reference/">Go declarations</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>legacy.Client.Config</code></td>
+<td><code>/api/v1/config</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Health</code></td>
+<td><code>/api/v1/healthz</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Ready</code></td>
+<td><code>/api/v1/readyz</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Metrics</code></td>
+<td><code>/metrics</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.History</code></td>
+<td><code>/api/v1/history</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.State</code></td>
+<td><code>/api/v1/state</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.SLO</code></td>
+<td><code>/api/v1/slo</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Overview</code></td>
+<td><code>/api/v1/overview</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.ListMonitors</code></td>
+<td><code>/api/v1/monitors</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.GetMonitor</code></td>
+<td><code>/api/v1/monitors/%d</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.ListIncidents</code></td>
+<td><code>/api/v1/incidents</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Queues</code></td>
+<td><code>/api/v1/queues</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.QueuesHistory</code></td>
+<td><code>/api/v1/queues/history</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Pools</code></td>
+<td><code>/api/v1/pools</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.PoolsHistory</code></td>
+<td><code>/api/v1/pools/history</code></td>
+</tr>
+<tr>
+<td><code>legacy.Client.Systems</code></td>
+<td><code>/api/v1/systems</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../dao-sms/" class="md-footer__link md-footer__link--prev" aria-label="Previous: DAO and SMS">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                DAO and SMS
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../wire-types/" class="md-footer__link md-footer__link--next" aria-label="Next: Wire types">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Wire types
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025–2026 Ziad Hassan · MIT license
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

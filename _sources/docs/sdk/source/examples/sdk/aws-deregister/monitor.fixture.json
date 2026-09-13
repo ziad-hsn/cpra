@@ -1,0 +1,17 @@
+{
+  "apiVersion": "cpra.io/v2",
+  "kind": "Monitor",
+  "metadata": {
+    "id": "payments-node",
+    "uid": "uid-1",
+    "resourceVersion": "rv-1"
+  },
+  "spec": {
+    "enabled": true,
+    "check": {
+      "driver": {"type": "http", "config": {"url": "https://node.example.invalid/health"}},
+      "interval": "60s",
+      "timeout": "5s"
+    }
+  }
+}

@@ -1,0 +1,94 @@
+// kubernetes-services discovers every Service in one namespace and creates
+// DNS-resolution monitors plus TCP monitors for directly addressable ports.
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/exampleutil"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"k8s.io/apimachinery/pkg/util/validation"
+	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+)
+
+func main() {
+	if err := command(); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func command() error {
+	namespace := flag.String("namespace", "", "namespace containing the Services (required outside demo)")
+	cluster := flag.String("cluster-id", "", "stable operator-assigned cluster identity (required outside demo)")
+	domain := flag.String("cluster-domain", "cluster.local", "cluster DNS domain, without a trailing dot")
+	kubeconfig := flag.String("kubeconfig", "", "explicit trusted kubeconfig file; empty uses in-cluster identity")
+	server := flag.String("server", "", "CPRa v2 HTTPS origin")
+	tokenFile := flag.String("token-file", "", "CPRa operator token file")
+	allowHTTP := flag.Bool("allow-http", false, "explicitly permit HTTP for the configured CPRa origin")
+	once := flag.Bool("once", false, "reconcile a complete paginated list, then exit")
+	printOnly := flag.Bool("print", false, "print monitor JSON without calling CPRa; requires -once")
+	demo := flag.Bool("demo", false, "run finite in-process HTTP fixtures; no cluster or CPRa account")
+	flag.Parse()
+	if flag.NArg() != 0 {
+		return errors.New("unexpected positional arguments")
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if *demo {
+		return runDemo(ctx, os.Stdout, os.Stderr)
+	}
+	if len(validation.IsDNS1123Label(*namespace)) != 0 {
+		return errors.New("-namespace must be a Kubernetes namespace name")
+	}
+	if strings.TrimSpace(*cluster) == "" || len(*cluster) > 512 {
+		return errors.New("-cluster-id must be a stable nonempty identity of at most 512 bytes")
+	}
+	if len(validation.IsDNS1123Subdomain(*domain)) != 0 {
+		return errors.New("-cluster-domain must be a DNS name without a trailing dot")
+	}
+	if *printOnly && !*once {
+		return errors.New("-print requires -once")
+	}
+	var config *rest.Config
+	var err error
+	if *kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	} else {
+		config, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return fmt.Errorf("load Kubernetes credentials: %w", err)
+	}
+	config.Timeout = 75 * time.Second
+	config.UserAgent = "cpra-sdk-kubernetes-services-example"
+	core, err := typedcore.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("Kubernetes client: %w", err)
+	}
+	d := &discovery{services: core.Services(*namespace), clusterID: *cluster, namespace: *namespace, domain: *domain,
+		output: os.Stdout, diagnostics: os.Stderr, printOnly: *printOnly, pageSize: 100}
+	if !*printOnly {
+		cfg, err := exampleutil.ClientConfig(*server, *tokenFile, *allowHTTP)
+		if err != nil {
+			return err
+		}
+		d.client, err = cpra.New(cfg)
+		if err != nil {
+			return err
+		}
+		defer d.client.CloseIdleConnections()
+	}
+	fmt.Fprintln(os.Stderr, "Targets use cluster Service DNS. CPRa must run inside the same cluster and be allowed to reach the namespace.")
+	return d.run(ctx, *once)
+}

@@ -1,7 +1,11 @@
 ---
-title: "Installation and builds"
-description: "Build the CPRa server and CLI, select optional drivers, rebuild dashboard assets and package Linux distributions."
+title: Installation and builds
+description: Build the CPRa server and CLI, select optional drivers, rebuild dashboard assets and package Linux distributions.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Installation and builds
 
@@ -17,7 +21,7 @@ make
 
 `make` builds the server and CLI with embedded dashboard assets. Run `./bin/cpra -version` or `./bin/cpractl --version` to inspect the build.
 
-These docs correspond to [a370969](https://github.com/ziad-hsn/cpra/commit/a370969b041b399c0778318d8915ce059fd74294). Check out that commit to reproduce this documentation snapshot.
+These docs correspond to [51a835a](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). Check out that commit to reproduce this documentation snapshot.
 
 ## Include optional drivers
 

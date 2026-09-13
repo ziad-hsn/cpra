@@ -1,7 +1,11 @@
 ---
-title: "Capacity and diagnostics"
-description: "Measure CPRa queue demand, service time, worker limits and target saturation without assuming unverified throughput guarantees."
+title: Capacity and diagnostics
+description: Measure CPRa queue demand, service time, worker limits and target saturation without assuming unverified throughput guarantees.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Capacity and diagnostics
 

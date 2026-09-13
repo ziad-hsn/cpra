@@ -1,7 +1,11 @@
 ---
-title: "Incident lifecycle"
-description: "Understand failure thresholds, recovery admission, verification, maintenance and notification delivery in CPRa."
+title: Incident lifecycle
+description: Understand failure thresholds, recovery admission, verification, maintenance and notification delivery in CPRa.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Incident lifecycle
 
@@ -9,7 +13,7 @@ CPRa schedules checks, classifies their results, optionally admits a recovery ac
 
 ## From an unknown monitor to an incident
 
-A newly loaded monitor has no observed result yet. Successful checks establish health. Consecutive unsuccessful checks accumulate toward its unhealthy threshold. When the threshold is reached, the configured incident and recovery behavior applies.
+A newly loaded monitor has no observed result yet. Successful checks establish health. Consecutive unsuccessful checks accumulate toward its unhealthy threshold. On the first failure, a configured yellow notification can be admitted. At the unhealthy threshold, an eligible recovery is attempted before opening a red incident. Without an available recovery, on a rejected recovery, or after a failed verification check, the incident opens and its configured red notification is admitted. A successful recovery emits configured cyan and starts healthy-check verification; verified recovery emits configured green. Notification rules and maintenance still govern actual delivery.
 
 | Displayed state | How to interpret it |
 | --- | --- |

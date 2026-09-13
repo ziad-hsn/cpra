@@ -1,0 +1,181 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/mockcpra"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// A merge patch must remove fields left by a different driver. Replacing a Go
+// struct in a fixture does not exercise JSON Merge Patch's recursive behavior.
+func TestReconcileRemovesObsoleteOwnedCheckFields(t *testing.T) {
+	server := mockcpra.New()
+	defer server.Close()
+	client, err := cpra.New(cpra.Config{BaseURL: server.URL, AuthToken: mockcpra.Token, AllowInsecureHTTP: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := testDiscovery()
+	d.client = client
+	service := demoService("changed-driver", corev1.ProtocolTCP, 8080)
+	wanted, _, err := d.desired(&service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := wanted[0]
+	old.Spec.Check.Driver, err = api.Driver("check", "http", api.PulseHTTPConfig{URL: api.Pointer("https://old.example.invalid/health")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old.Spec.Check.Retries = api.Pointer(int64(7))
+	old.Spec.Enabled = api.Pointer(false)
+	if _, err := client.Monitors.Create(context.Background(), old); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.upsert(context.Background(), wanted[0]); err != nil {
+		t.Fatalf("reconcile must remove obsolete fields before server validation: %v", err)
+	}
+	updated, err := client.Monitors.Get(context.Background(), wanted[0].Metadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantJSON, _ := json.Marshal(wanted[0].Spec.Check)
+	gotJSON, _ := json.Marshal(updated.Data.Spec.Check)
+	if string(wantJSON) != string(gotJSON) {
+		t.Fatalf("owned check did not converge:\nwant %s\n got %s", wantJSON, gotJSON)
+	}
+	if updated.Data.Spec.Enabled == nil || *updated.Data.Spec.Enabled {
+		t.Fatal("check reconciliation changed operator disable state")
+	}
+}
+
+func TestFullResyncRecreatesDeletedMonitorWithoutServiceChanges(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var active atomic.Pointer[mockcpra.Handler]
+	active.Store(mockcpra.NewHandler())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		active.Load().ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	client, err := cpra.New(cpra.Config{BaseURL: server.URL, AuthToken: mockcpra.Token, AllowInsecureHTTP: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listed, watched atomic.Int32
+	var monitorID string
+	var deleted atomic.Bool
+	service := demoService("resync", corev1.ProtocolUDP, 53)
+	d := newKubeDiscovery(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("watch") == "true" {
+			watched.Add(1)
+			if !deleted.Swap(true) {
+				_, err := client.Monitors.Get(ctx, monitorID)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				// The only monitor in this fixture is deleted independently of the
+				// Service stream. The next SDK GET must observe its absence.
+				active.Store(mockcpra.NewHandler())
+			}
+			// A quiet long-lived watch must not prevent the full resync deadline.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.(http.Flusher).Flush()
+			<-r.Context().Done()
+			return
+		}
+		if listed.Add(1) > 2 {
+			cancel()
+		}
+		writeList(t, w, "900", "", service)
+	})
+	d.printOnly, d.client = false, client
+	wanted, _, err := d.desired(&service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	monitorID = wanted[0].Metadata.ID
+	err = d.runWithIntervals(ctx, false, 30*time.Millisecond, time.Millisecond)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("resync loop did not finish controlled cancellation: %v", err)
+	}
+	if listed.Load() < 3 || watched.Load() == 0 || !deleted.Load() {
+		t.Fatalf("list=%d watch=%d deleted=%v", listed.Load(), watched.Load(), deleted.Load())
+	}
+	current, err := client.Monitors.Get(context.Background(), monitorID)
+	if err != nil || current.Data.Metadata.ID != monitorID {
+		t.Fatalf("full resync did not restore deleted monitor: %v", err)
+	}
+}
+
+func TestRunRelistsOnExpiredWatchAndBoundsReconnect(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var lists, watches atomic.Int32
+	d := newKubeDiscovery(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("watch") == "true" {
+			watches.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"type": "ERROR", "object": metav1.Status{
+				TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"}, Reason: metav1.StatusReasonExpired, Code: 410,
+			}})
+			return
+		}
+		if lists.Add(1) == 2 {
+			cancel()
+		}
+		writeList(t, w, "900", "", demoService("expired", corev1.ProtocolUDP, 53))
+	})
+	started := time.Now()
+	err := d.runWithIntervals(ctx, false, time.Minute, 10*time.Millisecond)
+	if !errors.Is(err, context.Canceled) || lists.Load() != 2 || watches.Load() != 1 {
+		t.Fatalf("error=%v lists=%d watches=%d", err, lists.Load(), watches.Load())
+	}
+	if time.Since(started) < 20*time.Millisecond {
+		t.Fatal("reconnect loop skipped its backoff")
+	}
+}
+
+func TestReconcileRefusesUnknownDriverObservation(t *testing.T) {
+	d := testDiscovery()
+	service := demoService("newer-driver", corev1.ProtocolTCP, 8080)
+	wanted, _, err := d.desired(&service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer := wanted[0]
+	newer.Spec.Check.Driver = api.DriverConfig{Type: "future-protocol", Config: json.RawMessage(`{"futureField":"opaque"}`)}
+	writes := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writes++
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("ETag", "v1")
+		json.NewEncoder(w).Encode(newer)
+	}))
+	defer server.Close()
+	d.client, err = cpra.New(cpra.Config{BaseURL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.upsert(context.Background(), wanted[0]); !errors.Is(err, api.ErrUnsupportedDriver) {
+		t.Fatalf("expected unsupported observation refusal, got %v", err)
+	}
+	if writes != 0 {
+		t.Fatal("unknown observed check caused a write")
+	}
+}

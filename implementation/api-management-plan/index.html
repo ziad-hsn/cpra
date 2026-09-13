@@ -1,0 +1,4883 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Plan and status · CPRa management API, batch configuration, and external workers for the reviewed CPRa source; see the version and availability notice.">
+      
+      
+        <meta name="author" content="Ziad Hassan">
+      
+      
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/implementation/api-management-plan/">
+      
+      
+        <link rel="prev" href="../STATUS/">
+      
+      
+        <link rel="next" href="../go-sdk-status/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Plan and status · CPRa management API, batch configuration, and external workers - CPRa Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/palette.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+
+  <script src="../../assets/javascripts/theme.js"></script>
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Plan and status · CPRa management API, batch configuration, and external workers">
+  <meta property="og:description" content="Plan and status · CPRa management API, batch configuration, and external workers for the reviewed CPRa source; see the version and availability notice.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/implementation/api-management-plan/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Plan and status · CPRa management API, batch configuration, and external workers">
+  <meta name="twitter:description" content="Plan and status · CPRa management API, batch configuration, and external workers for the reviewed CPRa source; see the version and availability notice.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cpra-management-api-batch-configuration-and-external-workers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+  
+  
+    Candidate plans and evidence · implementation status varies by ticket
+  
+  · <a href="../../versions/">Versions and availability</a>
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRa Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan and status · CPRa management API, batch configuration, and external workers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../versions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Versions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+          
+  
+  
+  Main guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/config-schema/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../candidate/" class="md-tabs__link">
+          
+  
+  
+  Release candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../sdk/" class="md-tabs__link">
+          
+  
+  
+  SDK candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../STATUS/" class="md-tabs__link">
+          
+  
+  
+  Plans and status
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../review/latest-changes/" class="md-tabs__link">
+          
+  
+  
+  Contribute
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    CPRa Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Main guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API and dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/provider-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/provider-testing-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider research
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/runtime-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../candidate/legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SDK candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start here
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/module-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/worker-library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External worker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/queue-registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/aws-deregister/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS deregistration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/kubernetes-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes Services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/dao-sms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAO and SMS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/wire-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/go-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go declarations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/openapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenAPI inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/publishing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/writing-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans and status
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans and status
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management API plan
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management API plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal-and-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal and boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-resource-and-http-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public resource and HTTP contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Public resource and HTTP contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-file-collections-and-resumable-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-file collections and resumable apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounds-and-retention-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounds and retention defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-execution-and-operator-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable execution and operator behavior
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Durable execution and operator behavior">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#canonical-configuration-and-ecs-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical configuration and ECS projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-and-incident-attention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls and incident attention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-and-descriptive-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI and descriptive observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-encrypted-configuration-and-key-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication, encrypted configuration, and key maintenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-external-worker-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional external-worker protocol
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional external-worker protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-and-registry-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and registry boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-identity-and-execution-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker identity and execution lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#isolation-and-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isolation and measurements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ordered-implementation-tickets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordered implementation tickets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ordered implementation tickets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ticket-1-define-the-v2-resource-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 1 — Define the v2 resource contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-2-establish-the-encrypted-configuration-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 2 — Establish the encrypted configuration catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-3-enforce-named-principal-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 3 — Enforce named principal authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-4-reconcile-dynamic-resources-through-ecs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 4 — Reconcile dynamic resources through ECS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-5-implement-conditional-resource-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 5 — Implement conditional resource operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-6-apply-multi-file-collections-resumably" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 6 — Apply multi-file collections resumably
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-7-add-operator-controls-and-diagnostic-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 7 — Add operator controls and diagnostic views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-8-introduce-the-optional-external-worker-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 8 — Introduce the optional external-worker boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-9-complete-the-cpractl-management-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 9 — Complete the cpractl management workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-10-qualify-the-management-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 10 — Qualify the management release
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Research references
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-sdk-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-sdk-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Original durable review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-incidents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 Incidents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Slo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-live-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 Live Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-scale-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Scale Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contribute
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../review/latest-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Latest-change review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintain docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal-and-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal and boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-resource-and-http-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public resource and HTTP contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Public resource and HTTP contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-file-collections-and-resumable-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-file collections and resumable apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounds-and-retention-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounds and retention defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-execution-and-operator-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable execution and operator behavior
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Durable execution and operator behavior">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#canonical-configuration-and-ecs-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical configuration and ECS projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-and-incident-attention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls and incident attention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-and-descriptive-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI and descriptive observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-encrypted-configuration-and-key-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication, encrypted configuration, and key maintenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-external-worker-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional external-worker protocol
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional external-worker protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build-and-registry-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and registry boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#worker-identity-and-execution-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker identity and execution lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#isolation-and-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isolation and measurements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ordered-implementation-tickets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordered implementation tickets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ordered implementation tickets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ticket-1-define-the-v2-resource-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 1 — Define the v2 resource contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-2-establish-the-encrypted-configuration-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 2 — Establish the encrypted configuration catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-3-enforce-named-principal-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 3 — Enforce named principal authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-4-reconcile-dynamic-resources-through-ecs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 4 — Reconcile dynamic resources through ECS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-5-implement-conditional-resource-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 5 — Implement conditional resource operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-6-apply-multi-file-collections-resumably" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 6 — Apply multi-file collections resumably
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-7-add-operator-controls-and-diagnostic-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 7 — Add operator controls and diagnostic views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-8-introduce-the-optional-external-worker-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 8 — Introduce the optional external-worker boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-9-complete-the-cpractl-management-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 9 — Complete the cpractl management workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ticket-10-qualify-the-management-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ticket 10 — Qualify the management release
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Research references
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ziad-hsn/cpra/edit/main/docs/implementation/api-management-plan.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<blockquote>
+<p><strong>Candidate design and evidence:</strong> this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in <code>main</code>. See <a href="../../versions/">version and availability</a>.</p>
+</blockquote>
+<h1 id="cpra-management-api-batch-configuration-and-external-workers">CPRa management API, batch configuration, and external workers<a class="headerlink" href="#cpra-management-api-batch-configuration-and-external-workers" title="Permanent link">&para;</a></h1>
+<p>Status: approved implementation plan; implementation and qualification are pending.
+Updated: 2026-09-12.</p>
+<h2 id="goal-and-boundaries">Goal and boundaries<a class="headerlink" href="#goal-and-boundaries" title="Permanent link">&para;</a></h2>
+<p>Deliver a versioned management API and matching cpractl commands for durable
+configuration, incident attention, operational controls, and descriptive
+diagnostics. Support collections of team/service configuration files and an
+optional external-worker protocol for custom checks, recovery, and notifications.</p>
+<p>This document consolidates the approved API plan and replaces earlier API design
+proposals in the conversation. It does not mark the existing release-engineering,
+provider-verification, or performance gates complete.</p>
+<ul>
+<li>Implement the API and CLI now. Publish the public Go SDK and dashboard editing
+  in a later phase; preserve the current read-only dashboard throughout this work.</li>
+<li>Preserve Go 1.25 source compatibility, Ark v0.4.3, existing monitor manifests,
+  optional built-in driver tags, and single-node Raft ownership.</li>
+<li>Keep the default durable mode and explicit disposable memory mode. Memory mode
+  uses the same validation and admission semantics without claiming restart
+  persistence. Encrypted canonical configuration applies to durable storage.</li>
+<li>Work on an isolated codex/ branch based on the reviewed current source
+  candidate, preserving existing release/provider work and the separate
+  documentation checkout.</li>
+<li>No check-now command or on-demand check endpoint. All checks remain scheduled.</li>
+<li>No Kubernetes-style field ownership, implicit pruning, remote configuration
+  reload from files, general workflow engine, in-process custom code, distributed
+  failover, team tenancy, subscriptions, or new provider-certification claims.</li>
+</ul>
+<h2 id="public-resource-and-http-contract">Public resource and HTTP contract<a class="headerlink" href="#public-resource-and-http-contract" title="Permanent link">&para;</a></h2>
+<p>Preserve /api/v1 response contracts, numeric monitor routes, and existing units.
+Add /api/v2 with stable string resource identities and explicit HTTP methods.</p>
+<p>Writable resources are Monitor, NotificationEndpoint, NotificationGroup, and
+Credential. The externaljobs build additionally supports dynamic JobType
+resources. Incidents, actions, operations, queues, pools, SLOs, worker observations,
+and instance state expose bounded observations or the specific commands described
+below; they are not arbitrary writable runtime objects.</p>
+<p>Use Kubernetes-inspired apiVersion, kind, metadata, spec, and read-only status.
+Keep these meanings separate:</p>
+<table>
+<thead>
+<tr>
+<th>Field or identity</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stable resource ID</td>
+<td>Preserved across renames; legacy manifests retain their existing deterministic-ID rule.</td>
+</tr>
+<tr>
+<td>Incarnation UID</td>
+<td>New on delete/recreate, even when the stable ID is reused.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>Opaque version for conditional spec/metadata edits. Routine checks do not change it.</td>
+</tr>
+<tr>
+<td>generation / observedGeneration</td>
+<td>Desired effective configuration and the version installed by the owner loop.</td>
+</tr>
+<tr>
+<td>controlRevision / incident triage version</td>
+<td>Orders relevant operational controls independently of routine observations.</td>
+</tr>
+<tr>
+<td>statusRevision</td>
+<td>Observational freshness without creating edit conflicts.</td>
+</tr>
+<tr>
+<td>Execution revision and execution ID</td>
+<td>Bind a job to its configuration/dependencies, incarnation, and one execution.</td>
+</tr>
+</tbody>
+</table>
+<p>Do not reuse the existing pulse lifecycle generation as a resource edit version.
+Metadata-only label edits and acknowledgment do not invalidate scheduled checks.
+Disable/enable are conditional edits to spec.enabled; their committed changes
+also update the admission projection and relevant scheduling revision.</p>
+<ul>
+<li>Pin OpenAPI 3.1.2 and the previously selected oapi-codegen 2.8.0. Commit generated
+  DTOs, handler interfaces, and the internal CLI transport. Keep transport DTOs
+  independent of Ark entities, Go errors, clients, and executable Job values.</li>
+<li>Use camelCase for v2, duration strings in configuration, explicit millisecond
+  telemetry fields, UTC timestamps, string IDs/revisions, and explicit unavailable
+  measurements. Preserve v1 through adapters.</li>
+<li>Round-trip every driver union correctly. Omitted enabled defaults to true;
+  explicit false remains false. Reject unknown fields, duplicate keys, trailing
+  documents where one object is expected, invalid unions, and invalid references.</li>
+<li>Return RFC 9457 problem details with field paths, request IDs, operation IDs
+  where applicable, and actionable conflict/validation errors.</li>
+<li>Create conflicts with an existing identity. Updates/deletes require If-Match;
+  create-if-absent uses the corresponding absence precondition. CLI apply resolves
+  observed versions during preflight when files omit resourceVersion.</li>
+<li>Apply replaces the desired spec and editable metadata using documented
+  omission/default rules. Preserve server-owned fields. It is not field-level
+  server-side apply.</li>
+<li>Initially support JSON Merge Patch only: arrays replace, null removes optional
+  fields, and resulting resources undergo full validation. Defer JSON Patch and
+  strategic merge patch.</li>
+<li>Enforce compare-and-swap inside the durable command application, including
+  dependency checks. An expected conflict is not a storage-failure condition.</li>
+<li>Block deletion of referenced credentials, endpoints, groups, and JobType
+  versions. Require references to be changed first; do not cascade silently.</li>
+<li>Expose discovery of resources, verbs, schemas, patch formats, compiled drivers,
+  runtime feature enablement, and external protocol versions.</li>
+</ul>
+<h3 id="multi-file-collections-and-resumable-apply">Multi-file collections and resumable apply<a class="headerlink" href="#multi-file-collections-and-resumable-apply" title="Permanent link">&para;</a></h3>
+<p>Use one shared input pipeline for create, apply, diff, and server dry-run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>shared/endpoints.yaml<span class="w"> </span>-f<span class="w"> </span>payments/api.yaml<span class="w"> </span>-f<span class="w"> </span>orders/api.yaml
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>config/payments/
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>-R<span class="w"> </span>-f<span class="w"> </span>config/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://example.com/cpra/payments.yaml
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>cpractl<span class="w"> </span>diff<span class="w"> </span>-R<span class="w"> </span>-f<span class="w"> </span>config/
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>cpractl<span class="w"> </span>apply<span class="w"> </span>--dry-run<span class="o">=</span>server<span class="w"> </span>-R<span class="w"> </span>-f<span class="w"> </span>config/
+</code></pre></div>
+<p>Accept YAML/JSON standalone resources, resource lists, multiple YAML documents,
+and existing CPRa manifest envelopes. Shared-only files must work without a
+monitors block. Directory processing selects recognized manifest extensions in
+lexical order; recursion is explicit with -R. Do not follow directory symlinks
+during traversal. Deduplicate overlapping source paths, then reject duplicate
+resource definitions even when their contents are identical. Empty documents and
+comments are ignored; a collection with no resources returns an explicit no-op.</p>
+<p>Freeze file, URL, and stdin bytes before multi-pass validation. URLs are fetched
+by the CLI with bounded redirects, bodies, decompression, deadlines, and staging
+space. Do not forward CPRa credentials to source URLs. HTTPS is the default;
+plain HTTP requires an explicit CLI opt-in. Diagnostics redact URL credentials
+and query secrets. Do not infer overrides from filenames or deep-merge two
+definitions of one monitor. External renderers can supply documents through
+stdin; an embedded template/overlay language is out of scope.</p>
+<p>CLI input spools may contain plaintext from the supplied configuration. Create
+them with owner-only permissions (0600 on Unix, equivalent user-only ACLs on
+Windows), enforce byte quotas, and remove them on completion/cancellation. They
+are not durable server staging and are never copied into Raft, evidence, or logs.</p>
+<p>One collection follows this lifecycle:</p>
+<ol>
+<li>Collect source-attributed resources into bounded private staging. Each item
+   retains resource identity, source/document/item location, and immutable content
+   identity. Persistent server staging is encrypted before durable submission.</li>
+<li>Validate the entire collection before active-resource changes: schemas,
+   permissions, duplicate identities, capabilities, references, and dependencies.
+   A preflight error causes zero active configuration changes.</li>
+<li>Resolve references against the staged union plus authorized live resources
+   omitted from the collection. Record their observed versions. Validate shared
+   definitions even if no submitted monitor references them. Preserve group
+   endpoint order; reject empty groups and duplicate members that would otherwise
+   create unintended repeated delivery.</li>
+<li>Finalize an immutable apply operation. Apply dependencies before consumers:
+   credentials and JobTypes before consumers, endpoints before groups, groups
+   before monitors. Traverse indexed dependents when a shared update affects
+   monitors outside the submitted files, and expose that impact in diff/results.</li>
+<li>Activate through bounded per-resource CAS. Independent items may continue after
+   a conflict. If an included dependency fails, mark its dependent items blocked;
+   never silently bind them to the older live dependency instead.</li>
+<li>Record created, updated, unchanged, conflict, dependencyBlocked, failed, and
+   notAttempted outcomes, with old/new versions and committed-versus-controller-
+   applied progress. Cancellation stops remaining work without undoing commits.</li>
+<li>Resume using the operation and item identities. A changed file or refetched URL
+   creates a new operation, not a reinterpretation of the old one. Do not blindly
+   retry mutations after an unknown commit outcome.</li>
+</ol>
+<p>Operation handles are server-issued and contain a store/restore epoch and
+monotonic sequence. Persist the allocation high-water mark with operation
+creation; clients cannot create an operation by supplying an arbitrary old ID.
+Lookup live records first. A missing handle from an issued/retired range returns
+expired (410), an unissued handle returns not found, and a previous restore epoch
+returns expired. All activation/retry paths require a live operation record.
+This retains replay rejection after detailed receipts expire without an unbounded
+tombstone per operation. Explicit restore creates a new operation epoch as well
+as resetting authentication; historical operations remain evidence, not executable
+resume handles. Apply the same handle discipline to retried side-effect commands.</p>
+<p>Preflight does not lock live resources. Concurrent edits can therefore produce
+partial activation after successful validation. Raft submission batching does
+not imply collection-wide atomicity or reverse external actions.</p>
+<p>Only supplied resources are applied. Omission never deletes another service's
+monitors. Team folders, labels, and source attribution do not confer authorization.
+No implicit prune is provided.</p>
+<h3 id="bounds-and-retention-defaults">Bounds and retention defaults<a class="headerlink" href="#bounds-and-retention-defaults" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Initial contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Resource payload</td>
+<td>1 MiB maximum.</td>
+</tr>
+<tr>
+<td>Collection upload chunk</td>
+<td>At most 256 resources or 4 MiB. A collection can span many chunks.</td>
+</tr>
+<tr>
+<td>Raft submission</td>
+<td>At most 1,000 commands or 5 ms, also constrained by encoded-byte limits.</td>
+</tr>
+<tr>
+<td>Owner reconciliation turn</td>
+<td>At most 100 mutations or 5 ms, whichever is reached first.</td>
+</tr>
+<tr>
+<td>Resource/history/action page</td>
+<td>100 by default, 500 maximum.</td>
+</tr>
+<tr>
+<td>Selector</td>
+<td>At most 16 clauses and 1 KiB of selector text.</td>
+</tr>
+<tr>
+<td>Catalog continuation</td>
+<td>Stable snapshot semantics with a five-minute cursor lifetime; expiry is explicit.</td>
+</tr>
+<tr>
+<td>Unactivated persistent staging</td>
+<td>Expire after 24 hours of inactivity; never expire an actively applying operation.</td>
+</tr>
+<tr>
+<td>Terminal apply results/audit</td>
+<td>Retain for 30 days; return explicit expiry afterward and never silently rerun an expired operation ID.</td>
+</tr>
+<tr>
+<td>CLI watch</td>
+<td>Poll every five seconds; server-push watch is deferred.</td>
+</tr>
+</tbody>
+</table>
+<p>Staging quotas, byte accounting, and bounded cleanup are mandatory. Store large
+collections and per-item progress incrementally; do not require fleet-sized HTTP
+bodies, Raft commands, or decoded Go slices. Server dry-run validates and returns
+redacted proposed changes without active commits, provider operations, or key
+generation; ephemeral validation staging is discarded afterward.</p>
+<p>Server dry-run uses bounded request-scoped memory and streamed validation,
+retaining only the identity/dependency information necessary for the collection.
+It does not persist submitted plaintext or create data/wrapping keys. If a dry-run
+exceeds its configured validation-memory bound, reject it explicitly before any
+active change rather than spilling plaintext or reporting partial validation as
+success. This bound is distinct from ordinary encrypted staged-apply capacity.</p>
+<p>Catalog queries use maintained indexes and bounded page construction outside the
+owner loop. Do not scan the fleet to provide exact filtered totals. Runtime-status
+filters are explicitly timestamped live views rather than snapshot claims. Keep
+label values in metadata/read indexes, not one ECS component or relation target
+per arbitrary user label.</p>
+<h2 id="durable-execution-and-operator-behavior">Durable execution and operator behavior<a class="headerlink" href="#durable-execution-and-operator-behavior" title="Permanent link">&para;</a></h2>
+<h3 id="canonical-configuration-and-ecs-projection">Canonical configuration and ECS projection<a class="headerlink" href="#canonical-configuration-and-ecs-projection" title="Permanent link">&para;</a></h3>
+<p>Introduce a versioned durable resource catalog separate from incident/action
+state. On first migration, validate and stage the complete existing manifest,
+preserve stable IDs, execution fingerprints, incidents, cooldowns, verification
+state, attempts, and unknown outcomes, then activate the catalog. Interrupted
+migration must not expose a half-imported fleet.</p>
+<p>After activation, restart restores the catalog. Existing -yaml/-config arguments
+are bootstrap/migration inputs and must not overwrite API edits or become a
+requirement for restoring the active fleet. Runtime configuration remains the
+startup authority for storage, encryption providers, server behavior, global SLO
+settings, and extension enablement.</p>
+<p>The mutation path is validation and immutable preparation, conditional durable
+commit, owner-loop reconciliation, then observational publication. Prepare clients
+and jobs outside the owner loop. HTTP handlers, Raft FSM application, and external
+workers never mutate the Ark world directly. Dynamically maintain entity
+membership, stable-ID mappings, reverse dependency indexes, schedulers, and read
+projections; the current startup-only loader/index is not a CRUD implementation.</p>
+<p>Retain the existing Disabled zero-size tag. Add a small always-present ControlState
+projection for control revision, snooze deadline, and incident suppression
+references. Keep frequently changing pending/needed/verification flags in ordinary
+state fields. Keep actor/note history outside the data touched on every dispatch.
+Do not put operator bits into a field that routine durable projection resets.</p>
+<p>Apply structural changes with queries closed and reacquire component pointers
+afterward. Reuse filters/mappers and combine unavoidable component exchanges.
+The timing wheel and ready queues remain scheduling indexes: adding a tag does
+not invalidate their entries or worker job copies. Use indexed cancellation and
+revision validation with full entity/incarnation identity, preventing unbounded
+stale entries under repeated edits. Do not replace due scheduling with a full-fleet
+archetype scan each tick.</p>
+<p>Commit changes before admitting affected work. Validate exact execution and
+dependency revisions at pre-start authorization. Preserve known results from old
+actions as historical facts without applying them to replacement targets.
+Deletion retains required tombstones, history, and unknown outcomes. Storage
+failure stops admission and makes readiness unavailable; expected conflicts and
+provider outages do not masquerade as disk failure.</p>
+<h3 id="controls-and-incident-attention">Controls and incident attention<a class="headerlink" href="#controls-and-incident-attention" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Durable meaning and scheduling behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>acknowledge incident</td>
+<td>Record authenticated actor, time, and optional note. Checks, notifications, and recovery continue.</td>
+</tr>
+<tr>
+<td>dismiss incident</td>
+<td>Require a reason; suppress future notifications for that exact incident and cancel its unsent deliveries. Checks and recovery continue.</td>
+</tr>
+<tr>
+<td>reopen incident</td>
+<td>Remove dismissal on the same still-active incident. Resume future eligible notifications without replaying cancelled, completed, started, or unknown deliveries. Reject a closed/replaced incident.</td>
+</tr>
+<tr>
+<td>snooze monitor</td>
+<td>Require a positive duration and reason; pause checks, notifications, and new recovery admission until the durable expiry.</td>
+</tr>
+<tr>
+<td>unsnooze monitor</td>
+<td>End snooze early while respecting disabled state and other admission rules.</td>
+</tr>
+<tr>
+<td>disable monitor</td>
+<td>Conditional spec.enabled=false; stop new checks, notifications, and recovery indefinitely while retaining state and history.</td>
+</tr>
+<tr>
+<td>enable monitor</td>
+<td>Conditional spec.enabled=true; resume only when other eligibility rules permit.</td>
+</tr>
+</tbody>
+</table>
+<p>Acknowledgment, dismissal, snooze, enabled state, and last observed health remain
+independent fields. Incident commands require exact incident identity and expected
+triage version; a delayed command cannot affect a replacement incident.</p>
+<p>Notification intent/retry/history records carry incident identity, including the
+closing incident's recovery notification. Dismissal must not suppress unrelated
+notifications or a future incident. Reopen preserves cooldowns and attempt limits.</p>
+<p>Snooze uses one expiry entry, replaced when extended; stale wake-ups cannot resume
+work. Expiry never enables a disabled monitor, and unsnooze never enables it.
+Resume schedules fresh work without replaying missed pause intervals or old
+actions. Bulk resumes use deterministic staggering to avoid a fleet-wide burst.
+Intentional pause intervals are reported separately; they neither count as
+healthy checks nor erase misses that occurred before the pause.</p>
+<p>Controls revoke new admission at their committed boundary. Queued work rechecks
+eligibility before starting. Already-started work retains its actual outcome;
+result ingestion and history processing remain active during a pause. Clearing an
+ECS pending flag is not evidence of cancellation. Unknown actions remain held.</p>
+<p>Disable and snooze cancel pre-existing queued/unstarted action intents with an
+audited control reason, including offers or worker-queue copies that have not
+received a start grant. Invalidate pending check slots and finalize their
+accounting without retroactively removing misses. Resume creates only fresh work
+allowed by the current incident policy; it does not revive cancelled intents.</p>
+<p>Manual recovery is allowed only for an enabled, unsnoozed monitor outside active
+maintenance, with current unhealthy state, configured recovery, and no active or
+unresolved recovery. Start with a configurable manual limit of one request per
+60 seconds and three per hour. Preserve automatic attempt limits and provide no
+general force bypass.</p>
+<p>Review of an unknown action is a distinct audited operation with actor, reason,
+and an optional evidence reference that CPRa does not automatically fetch. Store
+the operator assertion separately from provider facts. Clear a hold only for a
+conclusive review with no active executor; an unfenced remote executor may remain
+active despite lease expiry. Review never automatically replays or rearms work.
+A contradictory late receipt creates a visible conflict and restores the hold.</p>
+<h3 id="cli-and-descriptive-observations">CLI and descriptive observations<a class="headerlink" href="#cli-and-descriptive-observations" title="Permanent link">&para;</a></h3>
+<p>Provide resource discovery/explain, create/apply/diff/patch/delete, get/describe,
+operation status/resume/wait, controls, recovery requests, and action review.
+Support table, wide, JSON, and YAML output. New resource addressing uses stable
+IDs; retain existing numeric read commands as compatibility adapters.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cpractl<span class="w"> </span>api-resources
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cpractl<span class="w"> </span>explain<span class="w"> </span>monitor.spec
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cpractl<span class="w"> </span>get<span class="w"> </span>monitors<span class="w"> </span>-l<span class="w"> </span><span class="s1">'team=platform,environment=production'</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>cpractl<span class="w"> </span>describe<span class="w"> </span>monitor/MONITOR_ID
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>cpractl<span class="w"> </span>patch<span class="w"> </span>monitor/MONITOR_ID<span class="w"> </span>--type<span class="o">=</span>merge<span class="w"> </span>-p<span class="w"> </span><span class="s1">'{"spec":{"enabled":false}}'</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>cpractl<span class="w"> </span>disable<span class="w"> </span>monitor/MONITOR_ID<span class="w"> </span>--reason<span class="o">=</span><span class="s2">"Retired environment"</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>cpractl<span class="w"> </span>snooze<span class="w"> </span>monitors<span class="w"> </span>-l<span class="w"> </span><span class="s1">'service=payments'</span><span class="w"> </span>--for<span class="o">=</span>30m<span class="w"> </span>--reason<span class="o">=</span><span class="s2">"Maintenance"</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>cpractl<span class="w"> </span>acknowledge<span class="w"> </span>incident/INCIDENT_ID
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>cpractl<span class="w"> </span>dismiss<span class="w"> </span>incident/INCIDENT_ID<span class="w"> </span>--reason<span class="o">=</span><span class="s2">"Known issue"</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>cpractl<span class="w"> </span>get<span class="w"> </span>operations
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>cpractl<span class="w"> </span><span class="nb">wait</span><span class="w"> </span>operation/OPERATION_ID
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>cpractl<span class="w"> </span>get<span class="w"> </span>queues<span class="w"> </span>--watch
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>cpractl<span class="w"> </span>describe<span class="w"> </span>queue/pulse
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>cpractl<span class="w"> </span>get<span class="w"> </span>slo
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>cpractl<span class="w"> </span>describe<span class="w"> </span>state
+</code></pre></div>
+<p>Selector-based mutations freeze selected resource IDs and preconditions in a
+bounded operation. Later matching resources do not inherit the command.</p>
+<p>Monitor describe joins one configuration/status with bounded actions and recent
+events. Show last/next check, measurement availability, configuration/application
+versions, attention, pause reasons, unknown actions, and credential availability.
+Reference shared pipeline metrics without inventing a per-monitor queue position.</p>
+<p>Queue/pool/state views expose depth/capacity, arrival and service rates, drops,
+oldest queued age, pending results, worker bounds, model recommendation, last
+scaling decision and reasons, storage health, controller progress, and projection
+freshness. Add aggregate ECS table/archetype capacity, control-application lag,
+and stale scheduling-entry counters through bounded owner-produced snapshots.</p>
+<p>Retain Erlang C/Allen-Cunneen plus existing bounded percentile feedback. SLO views
+separate queue delay, execution, and scheduled-to-committed-result latency, with
+p50/p95/p99, thresholds, samples, misses, timeouts, and coverage. Preserve the
+five-minute health-check targets of 250 ms scheduling-plus-queue p99 and five
+seconds scheduled-to-result p99; these are measured objectives, not an SLA.</p>
+<h2 id="authentication-encrypted-configuration-and-key-maintenance">Authentication, encrypted configuration, and key maintenance<a class="headerlink" href="#authentication-encrypted-configuration-and-key-maintenance" title="Permanent link">&para;</a></h2>
+<p>Named principals have reader or operator access. Existing read tokens/Basic
+credentials remain read-only. Provision and rotate tokens through local
+administration; store verifiers for high-entropy tokens. Add a distinct narrowly
+scoped worker identity only for the optional protocol below. No OIDC or team
+tenancy is introduced in this phase.</p>
+<p>Management writes require bearer authentication and TLS, or a deliberately
+configured trusted TLS-terminating proxy. Browser Basic authentication never
+authorizes writes. Enforce explicit origin/content-type handling rather than
+treating CORS as authorization. Replacing a token revokes old-token admissions
+after the authoritative revocation commit, including pending poll/start requests.
+Already admitted external operations cannot be undone. Explicit backup restore
+resets authentication before network admission so old backups cannot silently
+resurrect revoked access.</p>
+<p>Encrypt canonical configuration specs and built-in provider Credential payloads
+before creating Raft commands. Snapshots and persistent staging retain ciphertext.
+Incident/history/SLO data is not blanket-encrypted by this feature, so its fields
+must use an explicit non-secret allowlist. Do not duplicate plaintext specs,
+credential-bearing URLs, tokens, or request bodies into audit logs and errors.</p>
+<p>Credential values are write-only. Reads expose identity, version, references, and
+availability. Import monitor-inline secrets into monitor-owned credentials and
+shared endpoint secrets into endpoint-owned credentials; export references.
+Derive private credential IDs deterministically from owner identity and field
+purpose, and journal their migration so restart cannot create duplicates. Preserve
+the existing resolved execution fingerprint during this representation-only
+conversion, so unchanged targets do not lose pending-action identity. Redaction
+placeholders are never accepted as replacement secrets. Updates preserve existing
+credentials through explicit references; secret
+replacement requires supplied values and a conditional write.</p>
+<p>Use standard Go AES-256-GCM envelope encryption with fresh nonces. Authenticated
+metadata binds immutable store identity, resource kind/incarnation, payload purpose,
+format, and assigned configuration revision. Randomness, key retrieval, wrapping,
+and client I/O stay outside deterministic FSM application.</p>
+<p>Support these wrapping backends through one versioned envelope contract:</p>
+<ul>
+<li>Supplied or locally generated 256-bit key files.</li>
+<li>OpenBao Transit and HashiCorp Vault Transit.</li>
+<li>AWS customer-managed symmetric KMS keys, recording the resolved key ARN.</li>
+</ul>
+<p>The default wrapping backend is local. Add an explicit local encryption init
+operation which provisions the first key and activates its reference in runtime
+configuration; the standalone Generate operation remains non-activating. Place
+the default key under the platform configuration directory's keys subdirectory,
+outside the data directory, using the existing platform path resolver. User-mode
+keys are owner-readable only; system installations grant administrators management
+access and the service identity only the required read access. Init refuses to
+overwrite existing key material and can instead bind a supplied key or configured
+Transit/KMS backend. Durable startup with no initialized key fails with the exact
+initialization instructions before catalog activation. Containers/Helm require an
+explicit mounted key or external-backend configuration; recreation must never
+generate a replacement key automatically. Package examples perform provisioning
+before enabling the service rather than manufacturing credentials in upgrade
+hooks. Memory-only runs do not need a persistent wrapping key.</p>
+<p>Use bounded data-key epochs, renewed at process startup and after 65,536 payload
+encryptions, with bounded plaintext-key caching. No remote key-service call occurs
+per health check. Keep wrapping keys and bootstrap credentials outside the Raft
+directory and ordinary data backup. Missing keys, bad ciphertext, or unavailable
+required key services never cause a fresh empty store or silent memory fallback.</p>
+<p>Provide distinct local maintenance operations:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generate</td>
+<td>Create protected key material without silently activating it.</td>
+</tr>
+<tr>
+<td>Rewrap</td>
+<td>Change wrappers around existing data keys; do not claim compromised data keys are revoked.</td>
+</tr>
+<tr>
+<td>Rotate</td>
+<td>Offline full re-encryption into a fresh store generation using new data keys.</td>
+</tr>
+<tr>
+<td>Retire</td>
+<td>Allow retirement only after every supported live recovery path works without the old key.</td>
+</tr>
+</tbody>
+</table>
+<p>Full rotation requires stopped exclusive ownership, measured staging space, a
+durable progress journal, preservation of the old generation, complete validation,
+new-key-only cold recovery, and an atomic durable generation switch. Include logs,
+snapshots, configuration, credentials, and protected staging in the dependency
+inventory; preserve incident/action/history identities and unknown outcomes.</p>
+<p>Document backend differences and backup consequences. Rewrapping does not revoke
+copied plaintext data keys. AWS rotation retains old material; independent
+retirement requires a distinct key. Transit version restrictions and permanent
+trimming have different effects. Copies of old keys/ciphertext outside the live
+store cannot be revoked by CPRa, and logical compaction is not secure erasure.</p>
+<h2 id="optional-external-worker-protocol">Optional external-worker protocol<a class="headerlink" href="#optional-external-worker-protocol" title="Permanent link">&para;</a></h2>
+<h3 id="build-and-registry-boundary">Build and registry boundary<a class="headerlink" href="#build-and-registry-boundary" title="Permanent link">&para;</a></h3>
+<p>The dedicated externaljobs build tag compiles the generic adapter, JobType
+management routes, worker polling/start/heartbeat/result routes, and related
+validation. Runtime configuration separately enables the feature. Default official
+artifacts and the ordinary all-built-in-driver build do not enable it implicitly.
+Untyped/unsupported external configuration produces explicit capability errors;
+stored resources are never silently dropped to make startup succeed.</p>
+<p>JobType definitions are dynamic durable API resources, not one compiled plugin
+per custom type. Operators register an external identifier, immutable category,
+versioned parameter/result schemas, protocol version, worker handler identifier,
+execution limits, and allowed definite-rejection classifications. Reject built-in
+name collisions. Keep old immutable versions while referenced by configurations,
+outstanding executions, or unknown actions. Changing implementation contracts
+requires a new version; executions remain pinned to their original version.</p>
+<p>Use bounded declarative schemas with locally bundled references and no executable
+validators, remote schema fetching, scripts, module downloads, or shared-library
+loading. CPRa never starts user-supplied binaries or executes custom handlers.
+The future Go SDK registers handlers in the separately deployed worker process.
+This phase implements the versioned wire contract and separate-process reference
+workers for tests; public SDK packaging remains later work.</p>
+<p>Workers manage provider credentials exclusively. Parameters may contain opaque
+worker-local credential-profile aliases; CPRa does not resolve aliases or deliver
+its stored Credential values to custom workers. Custom parameters are intended
+for non-secret data; schema key names alone cannot prove arbitrary strings are
+secret-free. Keep their stored configuration encrypted and logs bounded/redacted.
+Worker authentication credentials for CPRa are separate from provider credentials.</p>
+<h3 id="worker-identity-and-execution-lifecycle">Worker identity and execution lifecycle<a class="headerlink" href="#worker-identity-and-execution-lifecycle" title="Permanent link">&para;</a></h3>
+<p>Use authenticated HTTPS. A worker principal has operator-provisioned allowed
+JobTypes, categories, and resource scopes. Worker registration advertises versions,
+session identity, and available capacity within those grants; it grants no new
+permissions. A worker cannot edit fleet configuration, read credential values,
+claim unrelated work, or create monitors by posting observations. Optional mTLS
+can further constrain worker identity.</p>
+<p>Support checks, recovery, and notifications with this lifecycle:</p>
+<ol>
+<li>CPRa schedules eligible work and records action intent where required.</li>
+<li>A capacity-aware poll assigns work with an attempt token, worker session,
+   incarnation, execution revision, exact JobType version, and bounded deadline.
+   Assignment is not permission to invoke the provider.</li>
+<li>A separate start request checks assignment ownership, expiry, authorization,
+   current controls, dependencies, and action limits. Persist side-effect starts
+   before granting execution. Server restart invalidates unstarted check sessions;
+   durable action starts remain recoverable as unknown.</li>
+<li>The external worker executes its locally registered handler. It keeps a durable
+   journal preventing duplicate handler execution and a bounded durable outbox for
+   pending results. If the outbox fills, stop accepting new execution grants;
+   never discard pending outcomes to make room. Heartbeats cannot extend the
+   overall deadline indefinitely.</li>
+<li>Result ingress authenticates the assigned worker and derives authoritative job
+   identity from the server record. Validate bounded outcome fields against the
+   original type version, commit, then acknowledge with a receipt.</li>
+</ol>
+<p>The result envelope and its core meaning are owned by CPRa: checks distinguish
+target success/failure from noData; recovery distinguishes acceptance from
+reported completion; notifications distinguish acceptance from reported delivery.
+Definite rejection and unknown are explicit outcomes. JobType schemas validate
+bounded supplemental evidence; arbitrary custom fields cannot select FSM commands,
+set another monitor's health, or grant retry/recovery authority.
+Keep arbitrary diagnostics and supplemental result fields out of plaintext history
+unless they satisfy the existing non-secret allowlist. An authenticated worker's
+reported effect remains distinct from independently observed provider evidence.</p>
+<p>Use bounded long polling, initially up to 25 seconds with default fetch batches
+of 16 and a maximum of 100, also limited by available slots and response bytes.
+Enforce configured global/per-worker/per-type limits on active assignments,
+pollers, queues, and bytes before allocating work. Bound diagnostic output to
+64 KiB with explicit truncation; do not ingest unrestricted stdout or provider
+response bodies. Expose configured limits through discovery/state.</p>
+<p>An expired unstarted assignment can requeue with a new token. A started recovery
+or notification whose outcome is lost becomes unknown and is never automatically
+reassigned because a lease expired. An ambiguous start response grants no new
+execution permission: reconnect/status/retry must not cause a second invocation.
+Only a registered definite rejection can enter CPRa's existing bounded retry
+policy; a worker-supplied retryable boolean is insufficient.</p>
+<p>Identical repeated results return the original receipt while retained; conflicting
+results fail explicitly. Preserve current check generation/finalization watermarks
+and bounded recent receipts so expired old results never apply again. Do not
+retain every successful external check for 30 days. Retain individual recovery/
+notification identities and necessary history; unknown actions do not expire
+automatically. Credentials renewed for the same authorized principal can deliver
+its outbox; revoked credentials themselves remain invalid.</p>
+<p>Accept outcomes for already-started work during pauses and after configuration
+changes, attributed to the original action. Do not apply old recovery effects to
+a replacement target or create newly forbidden work. Late evidence contradicting
+an operator review becomes a visible resolution conflict.</p>
+<p>Missing check reports mean noData/executor-unavailable by default. Preserve last
+observed health and incident state; do not fabricate target success/failure,
+advance recovery thresholds, or verify recovery. Missed expected observations
+still reduce coverage/attainment. Actual reported target failures use ordinary
+health transitions. No unsolicited observations or manual checks are introduced.</p>
+<p>When an external check's reporting deadline expires, durably finalize that
+generation as noData with its missing/timeout accounting and finalization
+watermark. A late report can be identified as late evidence but cannot change
+current health, verification, or the finalized window's attainment retrospectively.</p>
+<p>Disable/snooze prevent new start grants according to their committed order;
+dismissal gates only its incident notifications. An already issued grant may still
+lead to I/O after a pause. Cancellation is cooperative; lease expiry does not
+fence a remote process. Claim quiescence only after acknowledged completion or
+independent fencing, and keep ambiguous actions held.</p>
+<h3 id="isolation-and-measurements">Isolation and measurements<a class="headerlink" href="#isolation-and-measurements" title="Permanent link">&para;</a></h3>
+<p>Deploy workers under separate accounts/containers with their own provider
+credentials, CPU/memory/process limits, and destination access. Never mount CPRa's
+state or encryption-key directories into worker examples. Process separation is
+not a claim that arbitrary code is sandboxed; deployment isolation remains an
+explicit operator responsibility.</p>
+<p>Use a bounded external assignment dispatcher, not one blocked internal worker or
+goroutine per remote job. Keep remote capacity separate from local worker sizing.
+Expose connected workers, allowed/advertised type versions, available slots,
+queue/assignment age, expired offers, admission failures, pending receipts, and
+unknown actions. Add cpractl get/describe forms for JobTypes and workers.</p>
+<p>Server timestamps establish scheduled-to-committed-result latency and dispatch/
+grant timing. Worker execution durations are labeled worker-reported. A start
+grant is not a measured remote execution-start timestamp, so do not claim the
+internal queue-delay percentile was directly observed remotely. Authentication
+identifies the reporter; it does not independently certify provider effects.</p>
+<h2 id="ordered-implementation-tickets">Ordered implementation tickets<a class="headerlink" href="#ordered-implementation-tickets" title="Permanent link">&para;</a></h2>
+<p>This is release-sized work. Create ten separate implementation tickets from the
+following definitions; every ticket requires independent review and relevant
+passing checks. No checklist below is complete merely because this plan exists.</p>
+<h3 id="ticket-1-define-the-v2-resource-contract">Ticket 1 — Define the v2 resource contract<a class="headerlink" href="#ticket-1-define-the-v2-resource-contract" title="Permanent link">&para;</a></h3>
+<h4 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h4>
+<p>The current telemetry DTOs and sealed driver schema are not a writable public API
+or a future SDK contract.</p>
+<h4 id="what-to-implement">What to implement<a class="headerlink" href="#what-to-implement" title="Permanent link">&para;</a></h4>
+<p>Define the resources, version meanings, OpenAPI/code generation, strict decoding,
+canonical serialization, error model, and discovery described above. Add v1
+adapters and keep generated public-facing types free of internal runtime objects.</p>
+<h4 id="where">Where<a class="headerlink" href="#where" title="Permanent link">&para;</a></h4>
+<p>Go schema/DTO layer, internal/web, internal/client, and API schema sources.</p>
+<h4 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] All 33 built-in driver configurations round-trip with correct durations,
+  defaults, redaction, and explicit enabled=false.</li>
+<li>[ ] Unknown/duplicate/trailing input and invalid unions yield field errors.</li>
+<li>[ ] V1 numeric routes and response units retain their contracts.</li>
+<li>[ ] Discovery and generated interfaces agree with executable route behavior.</li>
+</ul>
+<h4 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h4>
+<p>Public SDK publication, dashboard editing, server-side field ownership, JSON Patch.</p>
+<h4 id="depends-on">Depends on<a class="headerlink" href="#depends-on" title="Permanent link">&para;</a></h4>
+<p>None.</p>
+<h4 id="technical-notes">Technical notes<a class="headerlink" href="#technical-notes" title="Permanent link">&para;</a></h4>
+<p>Use the pinned OpenAPI/code-generator versions. Existing health generations and
+configuration fingerprints are not resource edit versions.</p>
+<h4 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and relevant contract tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Public schema and compatibility behavior are documented.</li>
+</ul>
+<h3 id="ticket-2-establish-the-encrypted-configuration-catalog">Ticket 2 — Establish the encrypted configuration catalog<a class="headerlink" href="#ticket-2-establish-the-encrypted-configuration-catalog" title="Permanent link">&para;</a></h3>
+<h4 id="context_1">Context<a class="headerlink" href="#context_1" title="Permanent link">&para;</a></h4>
+<p>Restart currently reconstructs executable configuration from files. API edits
+require canonical durable resources and a recoverable encryption contract.</p>
+<h4 id="what-to-implement_1">What to implement<a class="headerlink" href="#what-to-implement_1" title="Permanent link">&para;</a></h4>
+<p>Implement the versioned catalog, migration/activation, credential references,
+envelope encryption, local/Transit/KMS backends, protected staging, and local
+generate/rewrap/full-rotate/retire operations. Preserve lifecycle identities and
+restore requirements.</p>
+<h4 id="where_1">Where<a class="headerlink" href="#where_1" title="Permanent link">&para;</a></h4>
+<p>internal/durable, runtime configuration, schema conversion, and local cpractl
+administration/backup tooling.</p>
+<h4 id="acceptance-criteria_1">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Restart works from the catalog without reimporting an old manifest.</li>
+<li>[ ] Crash-interrupted migration and key rotation select a valid committed state.</li>
+<li>[ ] No plaintext protected payload reaches Raft, snapshots, persistent server
+  staging, or logs; CLI input spools obey their explicit private-file contract.</li>
+<li>[ ] Cold restore with only the new keys validates retirement eligibility.</li>
+<li>[ ] Missing/corrupt key material fails explicitly without resetting storage.</li>
+</ul>
+<h4 id="out-of-scope_1">Out of scope<a class="headerlink" href="#out-of-scope_1" title="Permanent link">&para;</a></h4>
+<p>Blanket encryption of all history/SLO records, online full rotation, remote
+worker-provider credential delivery, revoking copied historical keys.</p>
+<h4 id="depends-on_1">Depends on<a class="headerlink" href="#depends-on_1" title="Permanent link">&para;</a></h4>
+<p>Ticket 1 — Define the v2 resource contract.</p>
+<h4 id="technical-notes_1">Technical notes<a class="headerlink" href="#technical-notes_1" title="Permanent link">&para;</a></h4>
+<p>Use bounded data-key epochs and keep randomness/KMS calls outside FSM application.
+Exercise real local OpenBao/Vault services; report unavailable AWS account-backed
+checks explicitly rather than passing them through mocks.</p>
+<h4 id="definition-of-done_1">Definition of done<a class="headerlink" href="#definition-of-done_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and storage/migration/rotation/race tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Configuration, key maintenance, backup, and restore procedures are documented.</li>
+</ul>
+<h3 id="ticket-3-enforce-named-principal-authorization">Ticket 3 — Enforce named principal authorization<a class="headerlink" href="#ticket-3-enforce-named-principal-authorization" title="Permanent link">&para;</a></h3>
+<h4 id="context_2">Context<a class="headerlink" href="#context_2" title="Permanent link">&para;</a></h4>
+<p>Existing dashboard/probe credentials must not silently gain mutation authority.</p>
+<h4 id="what-to-implement_2">What to implement<a class="headerlink" href="#what-to-implement_2" title="Permanent link">&para;</a></h4>
+<p>Add reader/operator identities, local provisioning/rotation, authoritative token
+revocation, worker-scope support, write transport/origin policy, and restore-time
+authentication reset. Separate worker enrollment from capability advertisement.</p>
+<h4 id="where_2">Where<a class="headerlink" href="#where_2" title="Permanent link">&para;</a></h4>
+<p>HTTP middleware, durable identity records, runtime configuration, and cpractl
+local administration.</p>
+<h4 id="acceptance-criteria_2">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_2" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Legacy credentials remain read-only and cannot invoke management commands.</li>
+<li>[ ] Revoked tokens fail subsequent admissions and pending polls cannot bypass it.</li>
+<li>[ ] Worker credentials cannot edit resources or read unrelated configuration.</li>
+<li>[ ] Explicit restore cannot reopen admission with resurrected old credentials.</li>
+</ul>
+<h4 id="out-of-scope_2">Out of scope<a class="headerlink" href="#out-of-scope_2" title="Permanent link">&para;</a></h4>
+<p>OIDC, user accounts/onboarding, team tenancy, label-derived implicit authorization.</p>
+<h4 id="depends-on_2">Depends on<a class="headerlink" href="#depends-on_2" title="Permanent link">&para;</a></h4>
+<p>Tickets 1 and 2.</p>
+<h4 id="technical-notes_2">Technical notes<a class="headerlink" href="#technical-notes_2" title="Permanent link">&para;</a></h4>
+<p>Store token verifiers. Successful token revocation cannot undo already admitted
+provider operations or erase secrets held by external systems.</p>
+<h4 id="definition-of-done_2">Definition of done<a class="headerlink" href="#definition-of-done_2" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and authorization/revocation/restore tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Roles, transport requirements, and token lifecycle are documented.</li>
+</ul>
+<h3 id="ticket-4-reconcile-dynamic-resources-through-ecs">Ticket 4 — Reconcile dynamic resources through ECS<a class="headerlink" href="#ticket-4-reconcile-dynamic-resources-through-ecs" title="Permanent link">&para;</a></h3>
+<h4 id="context_3">Context<a class="headerlink" href="#context_3" title="Permanent link">&para;</a></h4>
+<p>The controller and read index were built around a startup-loaded fleet. Live API
+changes require safe dynamic membership and job revision handling.</p>
+<h4 id="what-to-implement_3">What to implement<a class="headerlink" href="#what-to-implement_3" title="Permanent link">&para;</a></h4>
+<p>Implement immutable preparation, bounded committed-update delivery, owner-loop
+membership changes, Disabled/ControlState projection, reverse dependencies,
+indexed scheduling cancellation, incarnation validation, and incremental read
+publication. Keep outcomes flowing during pauses and draining.</p>
+<h4 id="where_3">Where<a class="headerlink" href="#where_3" title="Permanent link">&para;</a></h4>
+<p>internal/controller, internal/scheduler, internal/jobs, and internal/web/snapshot.</p>
+<h4 id="acceptance-criteria_3">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_3" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Create/edit/delete/control changes work while monitoring continues.</li>
+<li>[ ] No HTTP, FSM, or worker goroutine mutates Ark components.</li>
+<li>[ ] Stale schedules/job copies cannot run against new targets or incarnations.</li>
+<li>[ ] Repeated controls cannot grow stale scheduling entries without bound.</li>
+<li>[ ] Known late outcomes survive without changing replacement-target state.</li>
+</ul>
+<h4 id="out-of-scope_3">Out of scope<a class="headerlink" href="#out-of-scope_3" title="Permanent link">&para;</a></h4>
+<p>One component per user label/status, one ECS world per team, multi-instance owners.</p>
+<h4 id="depends-on_3">Depends on<a class="headerlink" href="#depends-on_3" title="Permanent link">&para;</a></h4>
+<p>Tickets 1 and 2.</p>
+<h4 id="technical-notes_3">Technical notes<a class="headerlink" href="#technical-notes_3" title="Permanent link">&para;</a></h4>
+<p>Queries must close before structural changes; pointers are reacquired afterward.
+Keep the timing wheel rather than introducing a fleet scan for every tick.</p>
+<h4 id="definition-of-done_3">Definition of done<a class="headerlink" href="#definition-of-done_3" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and lifecycle/concurrency/race tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Owner-loop and execution-revision contracts are documented.</li>
+</ul>
+<h3 id="ticket-5-implement-conditional-resource-operations">Ticket 5 — Implement conditional resource operations<a class="headerlink" href="#ticket-5-implement-conditional-resource-operations" title="Permanent link">&para;</a></h3>
+<h4 id="context_4">Context<a class="headerlink" href="#context_4" title="Permanent link">&para;</a></h4>
+<p>The new API needs durable mutation semantics and bounded observations suitable
+for large fleets and future clients.</p>
+<h4 id="what-to-implement_4">What to implement<a class="headerlink" href="#what-to-implement_4" title="Permanent link">&para;</a></h4>
+<p>Implement create/get/list/apply/merge-patch/delete, durable CAS/idempotency,
+reference checks, schema validation/dry-run, operation lookup, indexed labels and
+allowed selectors, and bounded snapshot/live pagination.</p>
+<h4 id="where_4">Where<a class="headerlink" href="#where_4" title="Permanent link">&para;</a></h4>
+<p>Go management handlers, durable command handlers, resource/read indexes, and
+internal client transport.</p>
+<h4 id="acceptance-criteria_4">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_4" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Concurrent editors produce explicit conflicts rather than lost writes.</li>
+<li>[ ] Unknown commit responses are resolved by operation identity without replay.</li>
+<li>[ ] Referenced resource deletion is rejected and omissions never prune.</li>
+<li>[ ] Million-resource queries construct bounded pages without owner-loop scans.</li>
+<li>[ ] Discovery, describe, and dry-run cause zero provider operations.</li>
+</ul>
+<h4 id="out-of-scope_4">Out of scope<a class="headerlink" href="#out-of-scope_4" title="Permanent link">&para;</a></h4>
+<p>Field ownership, implicit cascade/prune, expensive exact filtered totals, check-now.</p>
+<h4 id="depends-on_4">Depends on<a class="headerlink" href="#depends-on_4" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–4.</p>
+<h4 id="technical-notes_4">Technical notes<a class="headerlink" href="#technical-notes_4" title="Permanent link">&para;</a></h4>
+<p>CAS runs inside the durable state transition. Ordinary conflicts never mark
+storage unavailable. Credential values remain write-only.</p>
+<h4 id="definition-of-done_4">Definition of done<a class="headerlink" href="#definition-of-done_4" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and API/client/pagination/idempotency tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Methods, errors, limits, and mutation semantics are documented.</li>
+</ul>
+<h3 id="ticket-6-apply-multi-file-collections-resumably">Ticket 6 — Apply multi-file collections resumably<a class="headerlink" href="#ticket-6-apply-multi-file-collections-resumably" title="Permanent link">&para;</a></h3>
+<h4 id="context_5">Context<a class="headerlink" href="#context_5" title="Permanent link">&para;</a></h4>
+<p>Teams need service-specific files with shared resources and a clear boundary
+between all-input validation and partial activation.</p>
+<h4 id="what-to-implement_5">What to implement<a class="headerlink" href="#what-to-implement_5" title="Permanent link">&para;</a></h4>
+<p>Implement shared file/URL/stdin collection, multi-document parsing, frozen private
+staging, cross-file catalog/dependency validation, chunked operation staging,
+dependency-ordered activation, source attribution, quotas/expiry, and resume.</p>
+<h4 id="where_5">Where<a class="headerlink" href="#where_5" title="Permanent link">&para;</a></h4>
+<p>Loader collection layer, cpractl input handling, management operation APIs, and
+durable staging/progress records.</p>
+<h4 id="acceptance-criteria_5">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_5" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Shared-only files and references across services resolve correctly.</li>
+<li>[ ] Duplicate identities report both origins and never use last-file-wins.</li>
+<li>[ ] An invalid final document causes zero active changes.</li>
+<li>[ ] A failed included dependency blocks consumers instead of using old data.</li>
+<li>[ ] Interrupted apply resumes original bytes and exposes partial outcomes.</li>
+<li>[ ] Large collections obey memory, request, staging-space, and owner budgets.</li>
+</ul>
+<h4 id="out-of-scope_5">Out of scope<a class="headerlink" href="#out-of-scope_5" title="Permanent link">&para;</a></h4>
+<p>Collection-wide atomic rollback, implicit overlays, template execution, prune.</p>
+<h4 id="depends-on_5">Depends on<a class="headerlink" href="#depends-on_5" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–5.</p>
+<h4 id="technical-notes_5">Technical notes<a class="headerlink" href="#technical-notes_5" title="Permanent link">&para;</a></h4>
+<p>Do not loop the existing startup loader, which treats one manifest's shared maps
+and present fleet as authoritative. Source paths are attribution, not identity.</p>
+<h4 id="definition-of-done_5">Definition of done<a class="headerlink" href="#definition-of-done_5" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and collection/dependency/resume/expiry tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] File layouts, partial outcomes, limits, and recovery examples are documented.</li>
+</ul>
+<h3 id="ticket-7-add-operator-controls-and-diagnostic-views">Ticket 7 — Add operator controls and diagnostic views<a class="headerlink" href="#ticket-7-add-operator-controls-and-diagnostic-views" title="Permanent link">&para;</a></h3>
+<h4 id="context_6">Context<a class="headerlink" href="#context_6" title="Permanent link">&para;</a></h4>
+<p>Operators need explicit attention, suppression, scheduling controls, and evidence
+about capacity without changing incident facts or replaying uncertain actions.</p>
+<h4 id="what-to-implement_6">What to implement<a class="headerlink" href="#what-to-implement_6" title="Permanent link">&para;</a></h4>
+<p>Implement acknowledge/dismiss/reopen, snooze/unsnooze, disable/enable, constrained
+manual recovery, audited unknown-action review, and the descriptive monitor,
+queue/pool/SLO/state/ECS views. Keep scope and control fields independent.</p>
+<h4 id="where_6">Where<a class="headerlink" href="#where_6" title="Permanent link">&para;</a></h4>
+<p>Durable lifecycle commands, controller projection/admission, API observations,
+internal client, and cpractl commands.</p>
+<h4 id="acceptance-criteria_6">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_6" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Every control obeys the behavior table across restart and concurrent changes.</li>
+<li>[ ] Dismissal follows incident identity, including closing notifications.</li>
+<li>[ ] Snooze expiry never enables a disabled monitor or creates a catch-up burst.</li>
+<li>[ ] Started outcomes remain recordable and unknown actions are not replayed.</li>
+<li>[ ] Describe reports unavailable/stale data accurately; no fake queue positions.</li>
+<li>[ ] Queueing theory stays active; intentional pauses cannot improve attainment.</li>
+</ul>
+<h4 id="out-of-scope_6">Out of scope<a class="headerlink" href="#out-of-scope_6" title="Permanent link">&para;</a></h4>
+<p>Check-now, force recovery, automatic review-based replay, dashboard editing.</p>
+<h4 id="depends-on_6">Depends on<a class="headerlink" href="#depends-on_6" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–6.</p>
+<h4 id="technical-notes_6">Technical notes<a class="headerlink" href="#technical-notes_6" title="Permanent link">&para;</a></h4>
+<p>Use execution-specific admission and incident-specific notification suppression.
+Sample/copy ECS statistics on the owner; do not expose mutable World.Stats data.</p>
+<h4 id="definition-of-done_6">Definition of done<a class="headerlink" href="#definition-of-done_6" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and control-race/expiry/SLO/diagnostic tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Command meanings, rates, uncertainty, and measurement limits are documented.</li>
+</ul>
+<h3 id="ticket-8-introduce-the-optional-external-worker-boundary">Ticket 8 — Introduce the optional external-worker boundary<a class="headerlink" href="#ticket-8-introduce-the-optional-external-worker-boundary" title="Permanent link">&para;</a></h3>
+<h4 id="context_7">Context<a class="headerlink" href="#context_7" title="Permanent link">&para;</a></h4>
+<p>Custom implementations need a future Go SDK contract without loading their code
+or credentials into CPRa's core process.</p>
+<h4 id="what-to-implement_7">What to implement<a class="headerlink" href="#what-to-implement_7" title="Permanent link">&para;</a></h4>
+<p>Add the externaljobs build boundary, dynamic versioned JobTypes, scoped worker
+enrollment, capacity-aware polling, assignment/start/heartbeat/result protocol,
+bounded external queues, durable replay handling, and separate-process reference
+workers for all three categories.</p>
+<h4 id="where_7">Where<a class="headerlink" href="#where_7" title="Permanent link">&para;</a></h4>
+<p>Build-constrained adapter/HTTP modules, durable execution records, runtime
+configuration, capabilities, CLI observations, and integration fixtures.</p>
+<h4 id="acceptance-criteria_7">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_7" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Untagged builds cannot enable execution routes through runtime settings.</li>
+<li>[ ] JobType registration is declarative and never loads custom code.</li>
+<li>[ ] Workers receive only authorized assignments and no CPRa-held provider secrets.</li>
+<li>[ ] Stale grants, forged identities, duplicate results, and revocation are handled.</li>
+<li>[ ] Lost started side effects remain unknown without lease-based redelivery.</li>
+<li>[ ] Worker loss yields noData and coverage loss rather than invented target failure.</li>
+<li>[ ] Slow external workers cannot occupy all built-in worker capacity.</li>
+<li>[ ] Separate-process faults cover lost start replies, journal/outbox restart,
+  commit-before-receipt loss, old-token/revision replay, and late receipts after
+  pause, deletion, timeout, and operator review.</li>
+<li>[ ] Fault tests assert durable receipts and actual handler invocation counts;
+  a full result outbox stops new grants without losing pending outcomes.</li>
+</ul>
+<h4 id="out-of-scope_7">Out of scope<a class="headerlink" href="#out-of-scope_7" title="Permanent link">&para;</a></h4>
+<p>Public SDK publication, in-process plugins, worker process management, executable
+upload, unsolicited results, custom-job credential delivery, automatic side-effect
+retry after uncertain loss.</p>
+<h4 id="depends-on_7">Depends on<a class="headerlink" href="#depends-on_7" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–7.</p>
+<h4 id="technical-notes_7">Technical notes<a class="headerlink" href="#technical-notes_7" title="Permanent link">&para;</a></h4>
+<p>Persist assignment/action identity; retain bounded check receipts and durable
+finalization watermarks. A grant or heartbeat lease cannot fence remote I/O.</p>
+<h4 id="definition-of-done_7">Definition of done<a class="headerlink" href="#definition-of-done_7" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and real-process/network-failure/protocol tests pass.</li>
+<li>[ ] Tagged/untagged/all-driver builds introduce no lint, type, or build errors.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Protocol, deployment isolation, credentials, and evidence boundaries are documented.</li>
+</ul>
+<h3 id="ticket-9-complete-the-cpractl-management-workflow">Ticket 9 — Complete the cpractl management workflow<a class="headerlink" href="#ticket-9-complete-the-cpractl-management-workflow" title="Permanent link">&para;</a></h3>
+<h4 id="context_8">Context<a class="headerlink" href="#context_8" title="Permanent link">&para;</a></h4>
+<p>The command-line interface must exercise the same public contracts later used by
+the SDK and dashboard rather than acquire private controller shortcuts.</p>
+<h4 id="what-to-implement_8">What to implement<a class="headerlink" href="#what-to-implement_8" title="Permanent link">&para;</a></h4>
+<p>Integrate all management, input collection, attention/control, operation, worker,
+and diagnostic commands through the versioned client. Add structured output,
+pagination, five-second polling watch, wait/resume, token-file refresh, and
+actionable exit codes without blind mutation retries.</p>
+<h4 id="where_8">Where<a class="headerlink" href="#where_8" title="Permanent link">&para;</a></h4>
+<p>cmd/cpractl, internal/cpractl, internal/client, embedded help/examples, and CLI
+integration tests.</p>
+<h4 id="acceptance-criteria_8">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_8" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] API and CLI outcomes agree for individual and multi-file operations.</li>
+<li>[ ] All selected inputs work outside a source checkout.</li>
+<li>[ ] Nonzero exits identify unresolved/failed items without hiding successful ones.</li>
+<li>[ ] Existing numeric reads and authenticated probes continue to work.</li>
+<li>[ ] No command or route implements manual health checks.</li>
+</ul>
+<h4 id="out-of-scope_8">Out of scope<a class="headerlink" href="#out-of-scope_8" title="Permanent link">&para;</a></h4>
+<p>Public SDK packaging, dashboard mutation flows, server-push watch.</p>
+<h4 id="depends-on_8">Depends on<a class="headerlink" href="#depends-on_8" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–8; individual command work may proceed alongside completed contracts.</p>
+<h4 id="technical-notes_8">Technical notes<a class="headerlink" href="#technical-notes_8" title="Permanent link">&para;</a></h4>
+<p>Handle 201/202/204 and problem details correctly. Resume by operation identity;
+the local source need not remain unchanged after a collection has been frozen.</p>
+<h4 id="definition-of-done_8">Definition of done<a class="headerlink" href="#definition-of-done_8" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and CLI/API integration tests pass.</li>
+<li>[ ] No new build, lint, or type errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Help, installation examples, and client-visible behavior are documented.</li>
+</ul>
+<h3 id="ticket-10-qualify-the-management-release">Ticket 10 — Qualify the management release<a class="headerlink" href="#ticket-10-qualify-the-management-release" title="Permanent link">&para;</a></h3>
+<h4 id="context_9">Context<a class="headerlink" href="#context_9" title="Permanent link">&para;</a></h4>
+<p>The new management surface changes persistence, authorization, and dispatch. Its
+release evidence must cover packaged behavior without overstating broader gates.</p>
+<h4 id="what-to-implement_9">What to implement<a class="headerlink" href="#what-to-implement_9" title="Permanent link">&para;</a></h4>
+<p>Complete the cross-ticket validation matrix, compatibility checks, operational
+documentation, deployment examples for key mounts and external workers, source
+notices, strict documentation build/links, and candidate identity/evidence.</p>
+<h4 id="where_9">Where<a class="headerlink" href="#where_9" title="Permanent link">&para;</a></h4>
+<p>CI, test/benchmark harnesses, native/container/Helm packaging checks, documentation
+sources, and the separate documentation checkout.</p>
+<h4 id="acceptance-criteria_9">Acceptance criteria<a class="headerlink" href="#acceptance-criteria_9" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Go 1.25, release compiler, default/all-driver/externaljobs builds pass.</li>
+<li>[ ] Required race, vulnerability, dashboard compatibility, and packaging checks pass.</li>
+<li>[ ] Real crashes cover migration, mutation, starts, results, and key maintenance.</li>
+<li>[ ] Million-resource collection/navigation/control tests show bounded resource work.</li>
+<li>[ ] ECS comparisons hold eligible workload constant and report measured results.</li>
+<li>[ ] Source/docs/artifact evidence identify the same candidate and no unchecked
+  provider, endurance, platform, or SLA claim appears.</li>
+</ul>
+<h4 id="out-of-scope_9">Out of scope<a class="headerlink" href="#out-of-scope_9" title="Permanent link">&para;</a></h4>
+<p>Treating this work as production-account certification or completion of the
+separate one-million-monitor 24-hour endurance gate; automatic stable publication
+before its applicable gates pass.</p>
+<h4 id="depends-on_9">Depends on<a class="headerlink" href="#depends-on_9" title="Permanent link">&para;</a></h4>
+<p>Tickets 1–9.</p>
+<h4 id="technical-notes_9">Technical notes<a class="headerlink" href="#technical-notes_9" title="Permanent link">&para;</a></h4>
+<p>Respect physical-host disk prerequisites for large campaigns. Benchmark real
+component payloads at 0/50/95/100 percent disabled/snoozed and during bulk changes;
+report CPU, RSS/allocations, retained table capacity, controller lag, queue delay,
+and achieved eligible check rate. Remote start grants are not observed execution
+starts. Missing provider configuration remains not verified.</p>
+<h4 id="definition-of-done_9">Definition of done<a class="headerlink" href="#definition-of-done_9" title="Permanent link">&para;</a></h4>
+<ul>
+<li>[ ] Acceptance criteria and all relevant release checks have recorded evidence.</li>
+<li>[ ] No new build, lint, type, vulnerability, or documentation errors remain.</li>
+<li>[ ] Independent review is complete.</li>
+<li>[ ] Support limits, upgrade/restore compatibility, and open gates are documented.</li>
+</ul>
+<h2 id="research-references">Research references<a class="headerlink" href="#research-references" title="Permanent link">&para;</a></h2>
+<p>These are design references; their guarantees do not automatically become CPRa
+guarantees. The approved CPRa contracts above govern implementation choices.</p>
+<ul>
+<li><a href="https://github.com/kubernetes/community/blob/main/contributors/devel/sig-architecture/api-conventions.md">Kubernetes API conventions</a>
+  inform resource/status separation and descriptive object metadata.</li>
+<li><a href="https://kubernetes.io/docs/reference/using-api/api-concepts/">Kubernetes API concepts</a>
+  inform conditional updates, discovery, and bounded list behavior.</li>
+<li><a href="https://kubernetes.io/docs/concepts/workloads/management/">Kubernetes configuration organization</a>
+  and <a href="https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/">kubectl apply</a>
+  inform repeated files, directories, URLs, stdin, and explicit recursion.</li>
+<li><a href="https://google.aip.dev/233">Google AIP-233</a> informs explicit asynchronous partial
+  outcomes, rather than treating a batch response as proof of atomic success.</li>
+<li><a href="https://spec.openapis.org/oas/v3.1.2.html">OpenAPI 3.1.2</a>,
+  <a href="https://github.com/oapi-codegen/oapi-codegen/releases/tag/v2.8.0">oapi-codegen 2.8.0</a>,
+  <a href="https://www.rfc-editor.org/rfc/rfc9457.html">RFC 9457</a>, and
+  <a href="https://www.rfc-editor.org/rfc/rfc7396">RFC 7396</a> define selected interface formats.</li>
+<li><a href="https://mlange-42.github.io/ark/architecture/">Ark architecture</a>,
+  <a href="https://mlange-42.github.io/ark/queries/">queries</a>, and
+  <a href="https://mlange-42.github.io/ark/performance/">performance guidance</a>, checked
+  against <a href="https://github.com/mlange-42/ark/tree/v0.4.3">v0.4.3 source</a>, explain
+  archetype selection, structural moves, ownership, and measurement tradeoffs.</li>
+<li><a href="https://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html">AWS GenerateDataKey</a>,
+  <a href="https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html">KMS rotation</a>,
+  <a href="https://openbao.org/docs/secrets/transit/">OpenBao Transit</a>, and
+  <a href="https://developer.hashicorp.com/vault/api-docs/secret/transit">Vault Transit</a>
+  inform envelope/key lifecycle boundaries.</li>
+<li><a href="https://docs.temporal.io/task-queue">Temporal task queues</a> and
+  <a href="https://docs.temporal.io/activity-execution">activity execution</a> inform polling,
+  attempt identity, completion, and cooperative cancellation. CPRa retains its
+  stricter hold policy for uncertain side effects.</li>
+<li><a href="https://developer.hashicorp.com/terraform/plugin/terraform-plugin-protocol">Terraform provider protocol</a>
+  informs wire/schema versioning independent of worker implementation versions.</li>
+<li><a href="https://pkg.go.dev/plugin">Go plugin</a> and
+  <a href="https://github.com/hashicorp/go-plugin">HashiCorp go-plugin</a> clarify why shared
+  libraries and local subprocess plugins do not supply the selected remote model.</li>
+<li><a href="https://json-schema.org/understanding-json-schema/structuring">JSON Schema references</a>
+  inform bounded, locally bundled descriptor validation without automatic fetches.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../STATUS/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Current status">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Current status
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../go-sdk-status/" class="md-footer__link md-footer__link--next" aria-label="Next: SDK status">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                SDK status
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025–2026 Ziad Hassan · MIT license
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

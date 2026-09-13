@@ -1,7 +1,11 @@
 ---
-title: "CPRa documentation"
-description: "Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI."
+title: CPRa documentation
+description: Run CPRa to check services, send alerts and perform configured recovery actions. Start with the current Go application, dashboard and CLI.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](versions.md) for newer candidate work.
+
 
 <div class="cpra-hero" markdown>
 
@@ -23,7 +27,7 @@ Go · MIT · self-hosted
 
 CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.
 
-The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the source published to `main` on **9 September 2026**.
+The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the source at `51a835a`, published to `main` on **11 September 2026**.
 
 ## What you can do
 
@@ -62,3 +66,7 @@ Run one process for each monitor configuration. Incident state lives in memory a
 Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.
 
 [Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)
+
+## Follow the latest development
+
+Use [versions and availability](versions.md) to choose between these main guides, the [durable release candidate](candidate/index.md), the [Go SDK candidate](sdk/index.md), and the [approved management plan](implementation/api-management-plan.md). Their implementation and publication states are recorded separately.

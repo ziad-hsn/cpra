@@ -1,7 +1,11 @@
 ---
-title: "Worker sizing and queueing"
-description: "The runtime Erlang C and Allen\u2013Cunneen model, observed variability, headroom, fallback and capacity limits in CPRa."
+title: Worker sizing and queueing
+description: The runtime Erlang C and Allen–Cunneen model, observed variability, headroom, fallback and capacity limits in CPRa.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Worker sizing and queueing
 
@@ -59,4 +63,4 @@ This is a mean-latency approximation, not a p95 or p99 guarantee. Network failur
 
 The current release review observed the model in a running process. It did not establish a million-monitor capacity benchmark or a long-duration production soak result.
 
-[Runtime implementation](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/queue/dynamic_worker_pool.go) · [Sizing mathematics](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/queue/sizing.go)
+[Runtime implementation](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/queue/dynamic_worker_pool.go) · [Sizing mathematics](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/queue/sizing.go)

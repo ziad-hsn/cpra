@@ -1,7 +1,11 @@
 ---
-title: "Frequently asked questions"
-description: "Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do."
+title: Frequently asked questions
+description: Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](versions.md) for newer candidate work.
+
 
 # Frequently asked questions
 
@@ -19,7 +23,7 @@ The default build checks HTTP, TCP, ICMP, DNS, UDP, TLS certificate expiry, Dock
 
 ## What does CPRa do when a check fails?
 
-After the configured number of consecutive failures, CPRa opens an incident, notifies the configured destinations, and runs the monitor's recovery action once. The default build can restart a Docker container or call an HTTP webhook; optional build tags add Kubernetes rollout restart or scaling, EC2 instance reboot, and systemd unit restart. The incident closes after the configured number of consecutive healthy checks. See the [incident lifecycle](explanation/incident-lifecycle.md).
+An initial failure can send a configured yellow notification. At the failure threshold, CPRa admits one eligible recovery operation. If no recovery is available, recovery fails, or healthy-check verification fails, it opens an incident and sends the configured red notification. The default build can restart a Docker container or call an HTTP webhook; optional build tags add Kubernetes rollout restart or scaling, EC2 instance reboot, and systemd unit restart. The incident closes after the configured number of consecutive healthy checks. See the [incident lifecycle](explanation/incident-lifecycle.md).
 
 ## Where can CPRa send alerts?
 
@@ -56,3 +60,11 @@ Follow the [quickstart](tutorials/quickstart.md): build, copy the example manife
 ## Where does the name come from?
 
 "CPR" is the pulse line: the agent keeps taking the pulse of a service and resuscitates it when it flatlines. The lowercase "a" is "agent". The gold loop in the mark is a nod to Ra, the sun that makes the same circuit every day.
+
+## Are persistence, native services and the Go SDK available on main?
+
+They are documented as [separate candidates](versions.md). Main still resets incident state on restart and exposes read-only v1. The release candidate adds local persistence and native operations. The SDK and approved management plan include proposed v2 writes and external workers, whose server implementation and publication are pending.
+
+## How do I change the appearance?
+
+Use the dashboard Settings page to choose System, Light or Dark. System follows your operating system. The documentation header cycles the same three choices. Both preserve explicit preferences across reloads.

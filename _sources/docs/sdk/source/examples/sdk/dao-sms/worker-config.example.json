@@ -1,0 +1,13 @@
+{
+  "rpc": {
+    "url": "https://ethereum-rpc.internal.example/rpc",
+    "tokenFile": "/etc/cpra-dao-worker/rpc.token"
+  },
+  "sms": {
+    "url": "https://sms.internal.example/v1/messages",
+    "tokenFile": "/etc/cpra-dao-worker/sms.token",
+    "recipients": {
+      "dao-oncall": "REPLACE_WITH_YOUR_DESIGNATED_TEST_DESTINATION"
+    }
+  }
+}

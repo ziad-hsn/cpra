@@ -1,0 +1,257 @@
+// queue-registration consumes a bounded, in-memory Redis-style queue fixture.
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"os/signal"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/exampleutil"
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/mockcpra"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
+)
+
+type registration struct {
+	EventID   string `json:"eventID"`
+	ServiceID string `json:"serviceID"`
+	Name      string `json:"name"`
+	HealthURL string `json:"healthURL"`
+}
+
+// mockQueue deliberately keeps deliveries pending until Ack. Restarting the
+// example rereads the input; no Redis wire protocol or durable broker is used.
+type mockQueue struct {
+	messages     []registration
+	next         int
+	pending      *registration
+	acknowledged int
+}
+
+func (q *mockQueue) Next(ctx context.Context) (registration, error) {
+	if err := ctx.Err(); err != nil {
+		return registration{}, err
+	}
+	if q.pending != nil {
+		return *q.pending, nil
+	}
+	if q.next == len(q.messages) {
+		return registration{}, io.EOF
+	}
+	q.pending = &q.messages[q.next]
+	return *q.pending, nil
+}
+func (q *mockQueue) Ack(id string) error {
+	if q.pending == nil || q.pending.EventID != id {
+		return errors.New("ack does not match pending delivery")
+	}
+	q.pending = nil
+	q.next++
+	q.acknowledged++
+	return nil
+}
+
+var serviceIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+func validateRegistration(e registration) error {
+	if !serviceIDPattern.MatchString(e.ServiceID) || e.EventID == "" || len(e.EventID) > 128 || e.Name == "" || len(e.Name) > 256 {
+		return errors.New("invalid registration identity or name")
+	}
+	u, err := url.Parse(e.HealthURL)
+	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || (u.Scheme != "http" && u.Scheme != "https") || u.RawQuery != "" {
+		return errors.New("healthURL must be an HTTP(S) URL without credentials, query, or fragment")
+	}
+	return nil
+}
+func loadQueue(r io.Reader) (*mockQueue, error) {
+	rawInput, err := io.ReadAll(io.LimitReader(r, (4<<20)+1))
+	if err != nil {
+		return nil, errors.New("cannot read queue input")
+	}
+	if len(rawInput) > 4<<20 {
+		return nil, errors.New("queue input exceeds 4 MiB")
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(rawInput))
+	scanner.Buffer(make([]byte, 4096), 64<<10)
+	q := &mockQueue{}
+	line := 0
+	seenEvents := map[string]registration{}
+	for scanner.Scan() {
+		line++
+		raw := scanner.Bytes()
+
+		if len(strings.TrimSpace(string(raw))) == 0 {
+			continue
+		}
+		var e registration
+		if err := api.StrictDecode(raw, &e); err != nil {
+			return nil, fmt.Errorf("queue line %d: invalid JSON registration", line)
+		}
+		if err := validateRegistration(e); err != nil {
+			return nil, fmt.Errorf("queue line %d: %w", line, err)
+		}
+		if old, ok := seenEvents[e.EventID]; ok && old != e {
+			return nil, fmt.Errorf("queue line %d: event identity reused with changed content", line)
+		}
+		seenEvents[e.EventID] = e
+		if len(q.messages) >= 1000 {
+			return nil, errors.New("queue fixture exceeds 1000 messages")
+		}
+		q.messages = append(q.messages, e)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, errors.New("queue line exceeds 64 KiB or input read failed")
+	}
+	return q, nil
+}
+func desiredMonitor(e registration) (api.Monitor, error) {
+	if err := validateRegistration(e); err != nil {
+		return api.Monitor{}, err
+	}
+	driver, err := api.Driver("check", "http", api.PulseHTTPConfig{URL: &e.HealthURL})
+	if err != nil {
+		return api.Monitor{}, err
+	}
+	spec := api.MonitorSpec{Check: api.CheckSpec{Driver: driver, Interval: "60s", Timeout: "5s"}}
+	raw, _ := json.Marshal(spec)
+	sum := sha256.Sum256(raw)
+	labels := map[string]string{"examples.cpra.io/owner": "queue-registration", "examples.cpra.io/service-id": e.ServiceID, "examples.cpra.io/check-digest": hex.EncodeToString(sum[:])}
+	return api.Monitor{APIVersion: api.APIVersion, Kind: "Monitor", Metadata: api.Metadata{ID: "service-" + e.ServiceID, Name: &e.Name, Labels: &labels}, Spec: spec}, nil
+}
+
+// Reconcile only creates missing monitors. A repeated registration may be
+// acknowledged only when the same owned check is already present. It never
+// re-enables a monitor or overwrites another operator's configuration.
+func reconcile(ctx context.Context, c *cpra.Client, e registration) (string, error) {
+	want, err := desiredMonitor(e)
+	if err != nil {
+		return "", err
+	}
+	current, err := c.Monitors.Get(ctx, want.Metadata.ID)
+	if errors.Is(err, cpra.ErrNotFound) {
+		_, err = c.Monitors.Create(ctx, want)
+		if err == nil {
+			return "created", nil
+		}
+		if !errors.Is(err, cpra.ErrConflict) && !errors.Is(err, cpra.ErrAmbiguous) {
+			return "", err
+		}
+		// Reconcile a lost create response or a competing create by reading the
+		// original stable ID. Never issue a second blind mutation.
+		current, err = c.Monitors.Get(ctx, want.Metadata.ID)
+	}
+	if err != nil {
+		return "", err
+	}
+	got := current.Data
+	if got.Metadata.ID != want.Metadata.ID {
+		return "", errors.New("server returned a different monitor identity")
+	}
+	if got.Metadata.Labels == nil {
+		return "", errors.New("existing monitor has no queue ownership")
+	}
+	for _, key := range []string{"examples.cpra.io/owner", "examples.cpra.io/service-id", "examples.cpra.io/check-digest"} {
+		if (*got.Metadata.Labels)[key] != (*want.Metadata.Labels)[key] {
+			return "", errors.New("existing monitor differs; leave message pending for operator review")
+		}
+	}
+	// Compare actual check content as well as labels, which an operator could
+	// retain while editing a URL. Other controls and labels are left alone.
+	a, _ := json.Marshal(got.Spec.Check)
+	b, _ := json.Marshal(want.Spec.Check)
+	if string(a) != string(b) {
+		return "", errors.New("existing check changed; leave message pending for operator review")
+	}
+	return "already-present", nil
+}
+func consume(ctx context.Context, c *cpra.Client, q *mockQueue, out io.Writer) error {
+	for {
+		e, err := q.Next(ctx)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		state, err := reconcile(ctx, c, e)
+		if err != nil {
+			return fmt.Errorf("registration failed; message remains pending: %w", err)
+		}
+		if err = q.Ack(e.EventID); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "service=%s monitor=service-%s outcome=%s acknowledged=true\n", e.ServiceID, e.ServiceID, state)
+	}
+}
+func demo(ctx context.Context, out io.Writer) error {
+	server := mockcpra.New()
+	defer server.Close()
+	c, err := cpra.New(cpra.Config{BaseURL: server.URL, AuthToken: mockcpra.Token, AllowInsecureHTTP: true})
+	if err != nil {
+		return err
+	}
+	event := registration{EventID: "registration-1", ServiceID: "payments", Name: "Payments API", HealthURL: "https://payments.example.test/health"}
+	q := &mockQueue{messages: []registration{event, event}}
+	fmt.Fprintln(out, "Local queue + HTTP contract fixtures; no Redis broker or CPRa health checks run.")
+	if err = consume(ctx, c, q, out); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "messages_acknowledged=%d monitors=%d\n", q.acknowledged, len(server.Snapshot()))
+	return nil
+}
+func run() error {
+	isDemo := flag.Bool("demo", false, "run a finite local demonstration")
+	server := flag.String("server", "https://localhost:8443", "CPRa v2 origin")
+	token := flag.String("token-file", "", "CPRa operator token file")
+	allow := flag.Bool("allow-http", false, "explicitly allow HTTP to the configured origin")
+	input := flag.String("input", "registrations.jsonl", "JSONL mock queue input; '-' reads stdin")
+	flag.Parse()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if *isDemo {
+		return demo(ctx, os.Stdout)
+	}
+	var r io.Reader = os.Stdin
+	if *input != "-" {
+		f, err := os.Open(*input)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		r = f
+	}
+	q, err := loadQueue(r)
+	if err != nil {
+		return err
+	}
+	cfg, err := exampleutil.ClientConfig(*server, *token, *allow)
+	if err != nil {
+		return err
+	}
+	c, err := cpra.New(cfg)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	return consume(ctx, c, q, os.Stdout)
+}
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

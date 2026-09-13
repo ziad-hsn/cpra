@@ -1,7 +1,11 @@
 ---
-title: "Troubleshooting"
-description: "Diagnose startup, authentication, unavailable snapshots, missing optional drivers, notifications and recovery behavior."
+title: Troubleshooting
+description: Diagnose startup, authentication, unavailable snapshots, missing optional drivers, notifications and recovery behavior.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Troubleshooting
 

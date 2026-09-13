@@ -1,7 +1,11 @@
 ---
-title: "HTTP API and dashboard"
-description: "Read CPRa fleet state, monitor details, incidents, queues, worker pools and metrics through the current API."
+title: HTTP API and dashboard
+description: Read CPRa fleet state, monitor details, incidents, queues, worker pools and metrics through the current API.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # HTTP API and dashboard
 
@@ -63,4 +67,12 @@ The dashboard offers Overview, Monitors, Alerts, System, Settings, and monitor d
 
 The healthy-sample percentage is based on snapshots observed during the current process run. It is not an external SLA measurement. Per-monitor historical results are not retained. Pool and queue histories are separate, bounded, in-memory series.
 
-[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/a370969b041b399c0778318d8915ce059fd74294/internal/web/server/types.go)
+[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/web/server/types.go)
+
+## Newer contracts
+
+The [candidate v1 API](../candidate/reference/api-reference.md) adds history, state and measured SLOs. The [unpublished SDK](../sdk/api-reference.md) defines draft v2 write contracts; current main implements none of those v2 routes.
+
+## Appearance
+
+Settings offers System, Light and Dark. System follows the operating-system preference; explicit choices persist across reloads. The top-bar toggle switches the current appearance. Shared roles come from `brand/palette.json` on main.

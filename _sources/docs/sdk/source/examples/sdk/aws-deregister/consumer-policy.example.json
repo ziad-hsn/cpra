@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ConsumeDesignatedEventQueue",
+      "Effect": "Allow",
+      "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage"],
+      "Resource": "arn:aws:sqs:us-east-1:123456789012:cpra-deregister"
+    },
+    {
+      "Sid": "ConfirmRegistrationInDesignatedRegion",
+      "Effect": "Allow",
+      "Action": ["elasticloadbalancing:DescribeTargetHealth", "elasticloadbalancing:DescribeLoadBalancers"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestedRegion": "us-east-1"}}
+    }
+  ]
+}

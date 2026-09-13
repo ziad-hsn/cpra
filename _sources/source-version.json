@@ -1,6 +1,20 @@
 {
-  "source_commit": "a370969b041b399c0778318d8915ce059fd74294",
+  "source_commit": "51a835a29f2fb7af2e0301910042a52e308cbb24",
   "source_branch": "main",
-  "updated": "2026-09-09",
-  "repository": "https://github.com/ziad-hsn/cpra"
+  "updated": "2026-09-13",
+  "repository": "https://github.com/ziad-hsn/cpra",
+  "release_status": "main OSS preview; separate release/SDK candidates documented without merging or releasing them",
+  "reviewed_sources": {
+    "updated": "2026-09-13",
+    "repository": "https://github.com/ziad-hsn/cpra",
+    "main_runtime_commit": "51a835a29f2fb7af2e0301910042a52e308cbb24",
+    "release_candidate_commit": "410fbfb0092d01277b3884cd04151c27443a4226",
+    "sdk": {
+      "branch": "codex/go-sdk",
+      "state": "uncommitted source snapshot; public modules and v2 server pending",
+      "inventory_sha256": "dbe16a914008eac6ac672a9a3a06a9b74636176de3a7bca756f7ea31e057a10a"
+    },
+    "documentation_scope": "current main plus explicitly labelled release, SDK and management-plan candidates"
+  },
+  "documentation_commit": "fc4edb4ab474191fbe8839ca2b6399828b391c1b"
 }

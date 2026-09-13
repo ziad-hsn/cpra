@@ -1,60 +1,92 @@
 ---
-title: "Maintain these docs"
-description: "Edit Markdown on gh-pages, rebuild the static CPRa documentation and publish through the Pages workflow."
+title: Maintain these docs
+description: Keep canonical main documentation, gh-pages sources, generated output, version labels and CPRa brand assets synchronized.
+cpra_scope: docs
 ---
 
 # Maintain these docs
 
-The `main` branch contains the application. The `gh-pages` branch contains these documentation sources and the generated site. Keep the documentation's source commit in sync with the application behavior you have verified.
+Edit documentation in **`docs/` on `main`**. The `gh-pages` branch holds the exact
+copy in `_sources/docs/`, the MkDocs configuration and templates, and the generated
+website. The application and documentation branches use separate Git worktrees.
 
-## Edit and build
+## Choose the source scope
 
-In a checkout of `gh-pages`:
+Read [versions and availability](versions.md) before changing a behavior claim.
+Main guides describe the reviewed main runtime. `candidate/` describes the pinned
+release commit. `sdk/` describes the identified unpublished SDK snapshot.
+`implementation/` records plans and historical qualification work. Keep the
+scope in page notices, examples, source links and search descriptions.
 
-~~~sh
+Record source changes in `docs/source-version.json`. Uncommitted candidates need
+a content inventory as well as a parent commit. A docs-only commit does not
+change the runtime revision. Update the matching fields in
+`_sources/source-version.json` and `extra` in `_sources/mkdocs.yml`; keep
+`documentation_commit` separate from `source_commit`.
+
+## Edit, synchronize and build
+
+Use separate checkouts such as `/work/cpra-main` and `/work/cpra-pages`. From main:
+
+```sh
+python3 scripts/docs/check.py
+python3 scripts/docs/sync.py --site /work/cpra-pages
+python3 scripts/docs/sync.py --site /work/cpra-pages --check
+```
+
+From gh-pages, use Python 3.12 with the locked dependencies:
+
+```sh
 python3 -m venv .venv-docs
 . .venv-docs/bin/activate
 python -m pip install -r _sources/requirements.txt
 python _sources/rebuild.py
 python _sources/verify_site.py .
-~~~
+```
 
-Edit Markdown under `_sources/docs`. Navigation, redirects, page metadata, and theme settings live in `_sources/mkdocs.yml`. Update `_sources/source-version.json` when documenting a newer application commit, and check version links in the pages.
+Navigation, redirects, theme configuration and build validation live under
+`_sources/` on gh-pages. The strict build checks links and anchors, titles,
+descriptions, one primary heading per page, project-prefixed URLs and search.
+It replaces only paths in `_sources/generated-files.txt`. Commit canonical
+Markdown on main and synchronized sources plus generated output on gh-pages.
+Do not hand-edit generated HTML or the search index.
 
-Brand masters and usage terms live in `brand/` on `main`. Copy the published
-light and dark SVG lockups and marks to `_sources/docs/images`, and keep
-`images/social-preview.png` in sync with `brand/dist/png/social-preview.png`.
-The favicon set belongs directly under `_sources/docs`; its relative manifest
-paths and the theme's URL filter keep links working under `/cpra/` and on deep
-pages. The locally served heading font and its license live in `assets/fonts`.
+`python _sources/rebuild.py --output /path/to/new-artifact` builds a separate
+artifact without replacing the tracked site; the output path must be absent.
+`python -m mkdocs serve -f _sources/mkdocs.yml` provides a local preview.
 
-The rebuild command writes only generated paths recorded in `_sources/generated-files.txt`. It uses a temporary build directory, validates the build, then replaces the generated output. Keep sources and regenerated output in the same commit.
+## Theme and artwork
 
-## Preview
+`brand/palette.json` on main owns the neutral light and graphite dark roles.
+After changing it, run `python3 scripts/brand/generate.py`; add `--images` to
+regenerate opaque icons and the social preview using CairoSVG 2.8.2. Copy the
+outputs to the corresponding canonical `docs/` paths before synchronization.
+Preserve the transparent logo artwork and `brand/BRANDING.md` license terms.
 
-~~~sh
-python -m mkdocs serve -f _sources/mkdocs.yml
-~~~
+`docs/assets/stylesheets/extra.css` uses shared roles for reading areas,
+navigation, search, code, tables and callouts. The heading font and license are
+in `docs/assets/fonts`. The header cycles System, Light, Dark. Keep the saved-theme
+migration loaded before Material initializes its palette. Use the MkDocs `url`
+filter for assets so the `/cpra/` prefix works on deep pages.
 
-Open the local address printed by MkDocs. The preview respects the `/cpra/` project prefix.
+## SDK references
 
-## Publish
+In a complete SDK candidate checkout, run `scripts/sdk/reference.py` and
+`scripts/sdk/sync_guides.py` to regenerate references and lesson source assets.
+Their `--check` modes verify the outputs. Import `docs/sdk` into canonical docs
+with the candidate notices retained. Reconcile reviewed wording before replacing
+pages. Source downloads keep exact bytes and `.txt` suffixes for Go/Markdown.
 
-Push the reviewed commit to `gh-pages`. The Pages workflow rebuilds from the locked requirements, validates links and metadata, uploads the generated site, and deploys it through GitHub Pages.
+Update the snapshot inventory when candidate inputs change. An unchanged parent
+commit cannot identify new uncommitted content. SDK fixtures do not establish
+v2 server availability, public-module downloads or provider delivery.
 
-Retain redirects when consolidating older URLs. Verify the public homepage and a deep link after deployment. The code verification workflow on `main` is separate from the documentation deployment.
+## Publish and verify
 
-## Shared theme colors
-
-The documentation and dashboard use the neutral white and graphite palette in
-[`brand/palette.json` on main](https://github.com/ziad-hsn/cpra/blob/main/brand/palette.json).
-Update that source rather than maintaining separate color values here. From a
-main checkout, run `python3 scripts/brand/generate.py --docs-root /path/to/gh-pages`
-to copy the shared stylesheet and branding assets into this checkout, then run
-`python _sources/rebuild.py` here. Add `--images` when regenerating the opaque
-icons and social preview; that option requires CairoSVG 2.8.2.
-
-Component rules live in `docs/assets/stylesheets/extra.css`. Keep backgrounds,
-reading areas, navigation, code blocks, search, tables, and callouts tied to the
-shared semantic roles. The header cycles through System, Light, and Dark; verify
-both explicit choices and system changes before publishing.
+Push reviewed commits to main and gh-pages. The Pages workflow rebuilds from
+locked dependencies and deploys the site. Check its exact commit, then inspect
+the published homepage, main quickstart, candidate guide, SDK reference and a
+retained redirect. Exercise search, deep links, mobile layout, both themes,
+saved choices and System mode. Compare published `site-version.json` and selected
+assets with reviewed files. Documentation publication does not merge candidate
+code or publish SDK tags, application binaries or containers.

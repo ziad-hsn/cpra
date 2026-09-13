@@ -1,0 +1,3882 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Candidate · Provider test endpoints, sandboxes and local verification for the reviewed CPRa source; see the version and availability notice.">
+      
+      
+        <meta name="author" content="Ziad Hassan">
+      
+      
+        <link rel="canonical" href="https://ziad-hsn.github.io/cpra/candidate/provider-testing-research/">
+      
+      
+        <link rel="prev" href="../provider-testing/">
+      
+      
+        <link rel="next" href="../reference/config-schema/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Candidate · Provider test endpoints, sandboxes and local verification - CPRa Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/palette.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+
+  <script src="../../assets/javascripts/theme.js"></script>
+
+
+
+  <link rel="icon" href="../../icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CPRa Documentation">
+  <meta property="og:title" content="Candidate · Provider test endpoints, sandboxes and local verification">
+  <meta property="og:description" content="Candidate · Provider test endpoints, sandboxes and local verification for the reviewed CPRa source; see the version and availability notice.">
+  <meta property="og:url" content="https://ziad-hsn.github.io/cpra/candidate/provider-testing-research/">
+  <meta property="og:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Candidate · Provider test endpoints, sandboxes and local verification">
+  <meta name="twitter:description" content="Candidate · Provider test endpoints, sandboxes and local verification for the reviewed CPRa source; see the version and availability notice.">
+  <meta name="twitter:image" content="https://ziad-hsn.github.io/cpra/images/social-preview.png">
+  <meta name="twitter:image:alt" content="CPRa — Continuous Pulse and Recovery Agent">
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#provider-test-endpoints-sandboxes-and-local-verification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+  
+  
+    Release candidate · <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226">410fbfb</a>
+  
+  · <a href="../../versions/">Versions and availability</a>
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="CPRa Documentation" class="md-header__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CPRa Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Candidate · Provider test endpoints, sandboxes and local verification
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../versions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Versions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/deploy-to-production/" class="md-tabs__link">
+          
+  
+  
+  Main guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/config-schema/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Release candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../sdk/" class="md-tabs__link">
+          
+  
+  
+  SDK candidate
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../implementation/STATUS/" class="md-tabs__link">
+          
+  
+  
+  Plans and status
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../review/latest-changes/" class="md-tabs__link">
+          
+  
+  
+  Contribute
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="CPRa Documentation" class="md-nav__button md-logo" aria-label="CPRa Documentation" data-md-component="logo">
+      <img class="cpra-logo-light" src="../../images/cpra-mark-color.svg" alt="CPRa">
+<img class="cpra-logo-dark" src="../../images/cpra-mark-dark.svg" alt="CPRa">
+    </a>
+    CPRa Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="https://github.com/ziad-hsn/cpra" title="Go to repository" class="md-source">
+  <div class="md-source__icon md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">ziad-hsn/cpra</div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Main guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API and dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measured latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../native-installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../container-helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose and Helm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-engineering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release engineering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../provider-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider research
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider research
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-categories-for-a-future-verification-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence categories for a future verification update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks-14-of-14-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks: 14 of 14 researched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recovery-drivers-5-of-5-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery drivers: 5 of 5 researched
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recovery drivers: 5 of 5 researched">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aws-mock-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS mock selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code references
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications-14-of-14-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications: 14 of 14 researched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changes-implied-by-an-account-free-test-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changes implied by an account-free test suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-repository-coverage-and-the-next-practical-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing repository coverage and the next practical step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-code-grounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local code grounding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-gaps-exposed-by-this-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration gaps exposed by this research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implemented-verification-tooling-since-this-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implemented verification tooling since this research
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/runtime-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/jobs-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/deploy-to-production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/performance-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/incident-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incident lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../explanation/queueing-theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker sizing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK candidate
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SDK candidate
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start here
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/module-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/worker-library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External worker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/queue-registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/aws-deregister/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS deregistration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/kubernetes-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes Services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/dao-sms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAO and SMS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HTTP operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/wire-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/go-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go declarations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/openapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenAPI inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/publishing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sdk/writing-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans and status
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans and status
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/api-management-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Management API plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/go-sdk-status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/go-sdk-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Original durable review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/01-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/02-incidents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 Incidents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/03-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/04-slo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 Slo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/05-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/06-live-providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 Live Providers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/07-scale-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 Scale Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/08-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribute
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contribute
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../review/latest-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Latest-change review
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/adding-new-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding drivers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining-docs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maintain docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../legal/disclaimer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-categories-for-a-future-verification-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence categories for a future verification update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks-14-of-14-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks: 14 of 14 researched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recovery-drivers-5-of-5-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery drivers: 5 of 5 researched
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recovery drivers: 5 of 5 researched">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aws-mock-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS mock selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code references
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications-14-of-14-researched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications: 14 of 14 researched
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changes-implied-by-an-account-free-test-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changes implied by an account-free test suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-repository-coverage-and-the-next-practical-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing repository coverage and the next practical step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-code-grounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local code grounding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-gaps-exposed-by-this-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration gaps exposed by this research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implemented-verification-tooling-since-this-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implemented verification tooling since this research
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/ziad-hsn/cpra/edit/main/docs/candidate/provider-testing-research.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<blockquote>
+<p><strong>Release candidate:</strong> this page describes <a href="https://github.com/ziad-hsn/cpra/commit/410fbfb0092d01277b3884cd04151c27443a4226"><code>410fbfb</code></a>, which is separate from <code>main</code>. See <a href="../../versions/">version and availability</a>.</p>
+</blockquote>
+<h1 id="provider-test-endpoints-sandboxes-and-local-verification">Provider test endpoints, sandboxes and local verification<a class="headerlink" href="#provider-test-endpoints-sandboxes-and-local-verification" title="Permanent link">&para;</a></h1>
+<p>Researched on 2026-09-10 against official provider/project documentation and CPRa source candidate <code>370a60b22dcbea3b7552de987ca6a2c5bfaaf671</code>.</p>
+<p>This reference covers the complete inventory: 14 health checks, five recovery drivers and 14 notification drivers. It records available testing approaches and their compatibility with the current source. No new provider test, account creation, fixture download or external operation was performed for this research. The existing six passing live local cases remain the only such evidence recorded in <code>evidence/local/final-370a60b</code>; a documented testing option is not a passing result.</p>
+<h2 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h2>
+<p>The inventory does not require 33 production accounts. Based on the implementations and sources below, <strong>22 driver types have a local verification route without a hosted provider account</strong>: all 14 health checks; Docker, webhook, Kubernetes and systemd recovery; and log, email, webhook and Mattermost notifications. Some require local fixture implementation, images, system permissions or configuration changes. These routes verify the operations CPRa actually implements, within the coverage limits in the matrix.</p>
+<p>Other providers offer useful alternatives: Twilio's test credentials suppress real delivery, Telegram has a separate test environment, Slack offers developer sandboxes, and Microsoft offers eligible developers a Microsoft 365 sandbox. Moto provides a third-party EC2 mock. These options have different account requirements and establish different evidence; none should silently become a live delivery or real EC2 reboot result.</p>
+<p>For negative availability findings, "not found" means no suitable public option was located in the official documentation reviewed. It is not proof that a provider has no private partner environment. A provider's button for testing an outgoing webhook does not verify CPRa's incoming event submission path.</p>
+<h2 id="evidence-categories-for-a-future-verification-update">Evidence categories for a future verification update<a class="headerlink" href="#evidence-categories-for-a-future-verification-update" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local integration</td>
+<td>Production CPRa driver communicates with an actual local service or protocol endpoint; the observer checks the operation at that boundary.</td>
+</tr>
+<tr>
+<td>Mock contract</td>
+<td>A controlled server validates the documented request and supplies scripted replies/faults. This exercises serialization and error handling, not the provider backend.</td>
+</tr>
+<tr>
+<td>Provider sandbox</td>
+<td>The provider's designated test service/account validates behavior within its documented sandbox scope. Delivery may be suppressed.</td>
+</tr>
+<tr>
+<td>Live account</td>
+<td>A designated real resource or destination independently confirms the actual requested effect. This is specific evidence, not formal vendor certification.</td>
+</tr>
+</tbody>
+</table>
+<p>These categories are recommendations, not fields already implemented in the live runner. <code>internal/verification/runner.go</code> currently reports pass/fail/not_configured and a single <code>all_providers_verified</code> flag; it requires an independently observed effect. Do not use a fabricated observer to force Twilio test credentials or an EC2 mock through that gate.</p>
+<p>The practical next implementation is to record evidence type and observed boundary explicitly, add missing isolated endpoint selection where necessary, and run real local services alongside strict HTTP contract fixtures. Retain provider-account results separately. This research does not change the agreed release gate or claim that the missing live campaign has passed.</p>
+<h2 id="health-checks-14-of-14-researched">Health checks: 14 of 14 researched<a class="headerlink" href="#health-checks-14-of-14-researched" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>CPRa check / build tag</th>
+<th>Current operation in CPRa</th>
+<th>Official documentation and usable local endpoint / fixture</th>
+<th>Account and configuration requirements</th>
+<th>What a passing case establishes; applicability limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>http</code> / default</td>
+<td>Sends the configured HTTP method, headers and body; checks configured status codes, otherwise any 2xx.</td>
+<td>Go's official <a href="https://pkg.go.dev/net/http/httptest#NewServer"><code>httptest.NewServer</code></a> starts a real loopback HTTP server. Script successful status, unexpected status, delayed response, redirects and dropped connections while leaving CPRa's HTTP transport intact. This is an official Go test facility, not a mock of a named SaaS provider.</td>
+<td>No external account. Set <code>url</code> to the loopback URL and configure the expected response. Existing fixture already exercises this route.</td>
+<td>Independent handler request count/method/body receipt plus CPRa result establish the actual HTTP exchange. No assertion about any particular Internet service follows. <code>NewServer</code> works with Go 1.25; do not require the newer <code>NewTestServer</code> API.</td>
+</tr>
+<tr>
+<td><code>tcp</code> / default</td>
+<td>Opens and closes a TCP connection; no application payload.</td>
+<td>Official Go <a href="https://pkg.go.dev/net#Listen"><code>net.Listen</code></a> and <code>Listener.Accept</code> provide a real local TCP endpoint. A listener that is opened, closed, or deliberately left unresponsive supports reachability/failure cases.</td>
+<td>No account. Loopback <code>host</code> and an available <code>port</code>.</td>
+<td>Accepted-connection counters plus CPRa results prove TCP reachability. This check cannot establish application-level health.</td>
+</tr>
+<tr>
+<td><code>icmp</code> / default</td>
+<td>Sends ICMP echo requests and requires at least one response. Linux uses the dependency's unprivileged ping mode.</td>
+<td>The exact dependency's first-party <a href="https://github.com/prometheus-community/pro-bing#supported-operating-systems"><code>pro-bing</code> documentation</a> documents ICMP echo behavior and Linux <code>ping_group_range</code> prerequisites. Use loopback or a disposable network namespace with a real kernel ICMP responder.</td>
+<td>No account. Local OS permission for ping sockets; inspect the existing Linux configuration first. CPRa selects unprivileged mode on Linux, so a raw-socket mock alone does not exercise that path.</td>
+<td>Kernel replies and independently observed echo request/reply counts establish actual ICMP behavior. Block or isolate only the dedicated test target for negative cases.</td>
+</tr>
+<tr>
+<td><code>dns</code> / default</td>
+<td>Calls <code>LookupHost</code> for A/AAAA address resolution; a configured resolver is dialed on <strong>port 53</strong>.</td>
+<td>CoreDNS's official <a href="https://coredns.io/plugins/hosts/"><code>hosts</code> plugin</a> serves controlled A/AAAA records from an inline Corefile or hosts file; the <a href="https://coredns.io/manual/toc/#docker">CoreDNS manual</a> documents its Docker image. CoreDNS is an actual open-source DNS implementation.</td>
+<td>No account or registered domain needed. Use a reserved test name with a controlled DNS server. Bind isolated loopback/container port 53 because current CPRa <code>server</code> cannot specify a custom port. Avoid overriding the machine's normal resolver.</td>
+<td>Query logs plus positive lookup, NXDOMAIN and unavailable-server cases establish resolver behavior. CPRa currently tests successful resolution, not equality to an expected address or an SRV record.</td>
+</tr>
+<tr>
+<td><code>udp</code> / default</td>
+<td>Sends a required nonempty configured payload and waits for a nonempty datagram reply.</td>
+<td>Official Go <a href="https://pkg.go.dev/net#ListenPacket"><code>net.ListenPacket</code></a> provides a real local UDP socket; implement an echo responder and a no-reply mode. This is a custom protocol fixture using the official standard library, not a provider emulator.</td>
+<td>No account. Loopback <code>host</code>, free <code>port</code>, nonempty <code>payload</code>.</td>
+<td>Server-side received payload/reply counters plus result prove a round trip. CPRa does not compare response contents with an expected value; a successful UDP connect alone is insufficient.</td>
+</tr>
+<tr>
+<td><code>grpc</code> / default</td>
+<td><strong>Only TCP reachability</strong>, despite the type name and accepted <code>service</code> setting. No RPC is sent.</td>
+<td>gRPC publishes the <a href="https://grpc.io/docs/guides/health-checking/">standard health service</a> and an official <a href="https://github.com/grpc/grpc-go/blob/master/examples/features/health/README.md">Go health server example</a>, which can run locally.</td>
+<td>No account. Local <code>host</code>/<code>port</code>; use the real example server to expose the current boundary.</td>
+<td>The present job can only prove its port is listening. Switching the example service from <code>SERVING</code> to <code>NOT_SERVING</code> while retaining the listening socket will not make CPRa fail. A full <code>grpc.health.v1.Health/Check</code> test requires an actual driver enhancement; a mock cannot supply the missing behavior.</td>
+</tr>
+<tr>
+<td><code>docker</code> / default</td>
+<td>Calls daemon <code>ContainerInspect</code> and requires <code>State.Running</code>; does not inspect Docker HEALTHCHECK status.</td>
+<td>Docker documents <a href="https://docs.docker.com/reference/cli/docker/container/inspect/"><code>docker container inspect</code></a>. Use a real installed daemon with an isolated running/stopped disposable container, and inspect it independently.</td>
+<td>No hosted account. Access to the local daemon and an available container image; daemon address/credentials use the normal Docker environment.</td>
+<td>Match CPRa outcomes to independently inspected running/stopped state. This path already has live local passing evidence in the candidate. It is Docker daemon integration, not an HTTP mock.</td>
+</tr>
+<tr>
+<td><code>tls</code> / default</td>
+<td>Completes TLS handshake and reports leaf-certificate expiration; optional warning/critical day thresholds.</td>
+<td>Official <a href="https://docs.openssl.org/3.5/man1/openssl-s_server/">OpenSSL <code>s_server</code></a> supplies a real TLS endpoint accepting chosen certificate/key material. Go's <a href="https://pkg.go.dev/net/http/httptest#NewTLSServer"><code>httptest.NewTLSServer</code></a> is another official local test facility.</td>
+<td>No account. Generate test CA/leaf certificates and configure <code>host</code>, <code>port</code>, <code>server_name</code> and thresholds. To prove trust/name validation, make the test CA trusted by the isolated test process; <code>insecure_skip_verify</code> cases only establish the explicitly insecure mode.</td>
+<td>Server handshake logs and known certificate dates establish handshake/expiration results; include valid, expired, untrusted and wrong-name cases. No public certificate purchase or live third-party endpoint is required.</td>
+</tr>
+<tr>
+<td><code>redis</code> / <code>redis</code></td>
+<td>Connects using optional username/password and selected DB, then issues RESP <code>PING</code>.</td>
+<td>Redis's official <a href="https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/docker/">Docker instructions</a> use <code>redis:&lt;version&gt;</code>; the official <a href="https://redis.io/docs/latest/commands/ping/"><code>PING</code> reference</a> describes its response. Existing compose profile is <code>redis:7.4</code>.</td>
+<td>No hosted account. Local fixture credentials, <code>addr</code>, optional <code>username</code>/<code>password</code>/<code>db</code>; enable the <code>redis</code> build tag.</td>
+<td>Observe actual <code>PING</code>/response on the dedicated server or via an auditing relay and verify wrong-password and offline failures. Current schema does not configure Redis TLS; this local route validates the supported plain RESP path.</td>
+</tr>
+<tr>
+<td><code>postgres</code> / <code>postgres</code></td>
+<td>Authenticates through pgx and runs its ping operation (current pgx sends the SQL comment <code>-- ping</code>, not a business query).</td>
+<td>PostgreSQL's official <a href="https://www.postgresql.org/docs/current/app-pg-ctl.html"><code>pg_ctl</code></a> can initialize/start/stop a disposable cluster. <a href="https://hub.docker.com/_/postgres"><code>postgres</code> Docker Official Image</a> is maintained by the PostgreSQL Docker Community and documents initialization credentials; current compose profile is <code>postgres:17</code>.</td>
+<td>No hosted account. Local database/user/password, DSN or discrete fields, <code>sslmode</code>; enable <code>postgres</code>.</td>
+<td>Successful protocol ping plus server/relay evidence establishes connectivity/authentication and query round trip. Include bad credentials and shutdown. It does not establish arbitrary SQL correctness or managed-service compatibility.</td>
+</tr>
+<tr>
+<td><code>mysql</code> / <code>mysql</code></td>
+<td>Uses <code>database/sql.PingContext</code> with go-sql-driver/mysql, issuing COM_PING after connection/authentication.</td>
+<td>Oracle's official <a href="https://dev.mysql.com/doc/refman/8.4/en/docker-mysql-getting-started.html">MySQL 8.4 Docker instructions</a> provide <code>container-registry.oracle.com/mysql/community-server:8.4</code>. The separate <a href="https://hub.docker.com/_/mysql"><code>mysql</code> Docker Official Image</a> documents fixture environment variables; current compose uses <code>mysql:8.4</code>.</td>
+<td>Community server needs no hosted database account; configure local user/password/database and DSN or discrete fields; enable <code>mysql</code>. Oracle's Enterprise image is a different subscription/login route and is unnecessary here.</td>
+<td>Observe real connection/COM_PING request and response plus success/failure results; wrong credentials and server shutdown are negative cases. No business data write is performed by CPRa's check.</td>
+</tr>
+<tr>
+<td><code>mongo</code> / <code>mongo</code></td>
+<td>MongoDB driver connects and sends <code>ping</code> using primary read preference; explicitly rejects <code>mongodb+srv:</code>.</td>
+<td>MongoDB's own <a href="https://www.mongodb.com/docs/v8.0/tutorial/install-mongodb-community-with-docker/">Community Docker guide</a> provides the vendor-maintained <code>mongodb/mongodb-community-server</code> image, and <a href="https://www.mongodb.com/docs/manual/reference/command/ping/">ping documentation</a> defines the command. The current compose's <a href="https://hub.docker.com/_/mongo"><code>mongo:8.0</code></a> is a separate Docker Official Image, not MongoDB's vendor-maintained image.</td>
+<td>No Atlas/cloud account. Direct <code>mongodb://127.0.0.1:&lt;port&gt;</code> URI, local credentials if enabled; build tag <code>mongo</code>. Check host CPU requirements for the selected server version (MongoDB 5+ images require AVX).</td>
+<td>Observe actual command traffic and ping result; stop the local server for failure. Using the vendor image is possible with fixture adjustment and version/digest recording. This does not remove or test support for SRV discovery.</td>
+</tr>
+<tr>
+<td><code>rabbitmq</code> / <code>rabbitmq</code></td>
+<td>Opens an AMQP 0-9-1 connection and channel, then closes both; does not publish/consume.</td>
+<td>RabbitMQ's official <a href="https://www.rabbitmq.com/docs/download">installation page</a> recommends the <strong>community-maintained</strong> <code>rabbitmq:4-management</code> Docker image for workstation experiments. The <a href="https://www.rabbitmq.com/tutorials/tutorial-one-go">official Go tutorial</a> shows connection/channel operations with the same amqp091-go client family. Current compose pins <code>rabbitmq:4.1-management</code>.</td>
+<td>No hosted account. Dedicated local user/password/vhost in the AMQP URL; enable <code>rabbitmq</code>. Use an explicit fixture user rather than depending on guest's remote-login restrictions.</td>
+<td>Observe successful authentication/channel open, wrong-password rejection and stopped-broker failure. A message round trip could validate the fixture independently, but cannot be claimed as CPRa check behavior because this driver sends no messages.</td>
+</tr>
+<tr>
+<td><code>kafka</code> / <code>kafka</code></td>
+<td>franz-go <code>Ping</code> sends a broker-only Metadata request and succeeds when a broker responds; no produce/consume.</td>
+<td>Apache's official <a href="https://kafka.apache.org/quickstart/">quickstart</a> offers a local server and Apache-maintained <code>apache/kafka</code> / <code>apache/kafka-native</code> Docker images. Current compose uses <code>apache/kafka:3.9.1</code> in single-node KRaft mode.</td>
+<td>No Confluent/cloud account. Reachable broker addresses and matching advertised listener configuration; enable <code>kafka</code>. Current CPRa schema only exposes brokers/retries, so a local PLAINTEXT listener matches the implemented configuration; SASL/TLS account modes are not configured by this driver.</td>
+<td>Broker/relay traffic and successful metadata response prove supported protocol reachability. Wrong address/stopped broker establishes failure. This is not producer/consumer delivery evidence.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="recovery-drivers-5-of-5-researched">Recovery drivers: 5 of 5 researched<a class="headerlink" href="#recovery-drivers-5-of-5-researched" title="Permanent link">&para;</a></h2>
+<p>These are documented testing options, not newly executed verification results. Source inspected: CPRa <code>370a60b</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Driver</th>
+<th>Test endpoint, local implementation or mock</th>
+<th>Hosted account needed?</th>
+<th>CPRa applicability and evidence boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker</code></td>
+<td>Real local Docker Engine with a disposable container. Docker documents the <a href="https://docs.docker.com/reference/api/engine/version/v1.46/#tag/Container/operation/ContainerRestart">restart API</a>. A local HTTP server can also implement that API contract for failure tests.</td>
+<td>No hosted account; daemon access and an available image are required.</td>
+<td>Existing production driver uses <code>DOCKER_HOST</code> and API negotiation. Existing <code>docker_local.py</code> verifies a changed container start time. A mocked 204 response alone cannot demonstrate process replacement.</td>
+</tr>
+<tr>
+<td><code>webhook</code></td>
+<td>Isolated local HTTP receiver with a state change and receipt endpoint; Go supplies <a href="https://pkg.go.dev/net/http/httptest">HTTP test servers</a>. This is a CPRa-owned protocol fixture, not a vendor sandbox.</td>
+<td>No.</td>
+<td>Configurable URL, method, headers and body already work with the production driver. Existing <code>local.py</code> exercises this path. Independently inspect the receiver's state and test a lost response after applying the effect.</td>
+</tr>
+<tr>
+<td><code>kubernetes</code></td>
+<td>Kubernetes SIGs' <a href="https://kind.sigs.k8s.io/docs/user/quick-start/">kind</a> runs actual Kubernetes nodes in containers. <a href="https://book.kubebuilder.io/reference/envtest">envtest</a> starts an API server and etcd but omits kubelet and built-in controllers.</td>
+<td>No cloud account; local runtime, images and resources are required.</td>
+<td>Use kind and a dedicated Deployment for completed rollout/scale evidence. Existing driver accepts a designated kubeconfig with token/certificate credentials. envtest is appropriate for API validation, not proof that Pods were replaced. Current exec-credential restriction remains.</td>
+</tr>
+<tr>
+<td><code>aws</code></td>
+<td>AWS <a href="https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RebootInstances.html">RebootInstances DryRun</a> checks permission without rebooting. Third-party Moto documents <a href="https://docs.getmoto.org/en/latest/docs/services/ec2.html">reboot_instances support</a> and <a href="https://docs.getmoto.org/en/latest/docs/server_mode.html">server mode for non-Python clients</a>. LocalStack is another third-party emulator with <a href="https://docs.localstack.cloud/aws/services/ec2/">mock/Docker EC2 backends</a>.</td>
+<td>AWS DryRun needs AWS credentials and designated resources; Moto can use fake local credentials without an AWS account. LocalStack has its own account/licensing requirements.</td>
+<td>Candidate already uses AWS SDK v2 endpoint configuration: <code>AWS_ENDPOINT_URL_EC2</code> can target Moto without replacing the production HTTP transport. This was confirmed in the pinned SDK source and <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html">AWS endpoint documentation</a>. Candidate does <strong>not</strong> expose or set DryRun. Add a separate validation path if wanted. Moto establishes emulated request/response behavior, not real EC2 reboot. AWS success itself only queues a reboot.</td>
+</tr>
+<tr>
+<td><code>systemd</code></td>
+<td>A dedicated local service managed by actual systemd. Upstream documents <a href="https://raw.githubusercontent.com/systemd/systemd/main/man/systemd-run.xml">transient service creation</a> and the <a href="https://raw.githubusercontent.com/systemd/systemd/main/man/org.freedesktop.systemd1.xml">D-Bus RestartUnit interface</a>.</td>
+<td>No hosted account; system bus and permission to manage the dedicated unit are required.</td>
+<td>Existing driver uses the system bus, so a user-bus-only fixture would not exercise it. Observe a changed invocation/process identity and active state after restart; current <code>observe_effect.py systemd</code> does this. D-Bus mocks can separately exercise job completion/failure without proving a real restart.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aws-mock-selection">AWS mock selection<a class="headerlink" href="#aws-mock-selection" title="Permanent link">&para;</a></h3>
+<p>Moto is the simpler candidate for account-free EC2 contract testing because its support list explicitly includes <code>reboot_instances</code>. Support documentation does not establish that the chosen Moto version models a reboot side effect; pin it and verify the exact behavior. The current runner's guest-boot observer must not pass against a mock response. Introduce an explicit emulated-evidence mode before reporting these results.</p>
+<p>LocalStack's current <a href="https://docs.localstack.cloud/aws/services/ec2/#operations">EC2 operation table</a> omits <code>RebootInstances</code> and states that unlisted Docker-backend operations use its mock manager. Do not claim a Docker-backed guest actually rebooted. Its current <a href="https://docs.localstack.cloud/aws/licensing/">licensing documentation</a> describes an authenticated Hobby option and separately approved OSS sponsorship; it should not be described as universally account-free.</p>
+<h3 id="code-references">Code references<a class="headerlink" href="#code-references" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>internal/jobs/intervention_aws.go</code>: <code>LoadDefaultConfig</code>, <code>ec2.NewFromConfig</code>, and the reboot call without DryRun.</li>
+<li><code>go.mod</code>: AWS config <code>v1.32.38</code>, EC2 <code>v1.322.0</code>; pinned EC2 <code>endpoints.go</code> reads <code>AWS_ENDPOINT_URL_EC2</code>.</li>
+<li><code>internal/jobs/intervention_kubernetes.go</code>: Deployment patch/scale and exec-credential rejection.</li>
+<li><code>internal/jobs/intervention_systemd.go</code>: system-bus connection and completed job outcome.</li>
+<li><code>internal/jobs/intervention_webhook.go</code>: configurable HTTP target and ambiguous-outcome handling.</li>
+<li><code>internal/jobs/jobs.go</code>: Docker inspection and restart.</li>
+<li><code>scripts/verification/{local.py,docker_local.py,observe_effect.py}</code> and <code>examples/verification/{kubernetes.yaml,cpra-verification.service}</code>.</li>
+</ul>
+<p>The freedesktop HTML manual returned HTTP 403 to the research reader; the corresponding systemd-owned manual source was read instead.</p>
+<h2 id="notifications-14-of-14-researched">Notifications: 14 of 14 researched<a class="headerlink" href="#notifications-14-of-14-researched" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Driver</th>
+<th>Documented test option and classification</th>
+<th>Account, delivery, and CPRa fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>log</strong></td>
+<td><strong>Real local filesystem</strong>, no vendor or mock needed. CPRa appends JSON lines to the configured file.</td>
+<td>No account. Configure <code>file</code> under a disposable directory and independently read the result. This exercises the actual implementation, including directory creation and append errors. Code: <code>internal/jobs/jobs.go:1019</code>. High confidence.</td>
+</tr>
+<tr>
+<td><strong>slack</strong></td>
+<td><strong>First-party developer sandbox</strong> through the Slack Developer Program. A dedicated normal test workspace/channel also works. <a href="https://docs.slack.dev/tools/developer-sandboxes/">Developer sandboxes</a>, <a href="https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/">incoming webhooks</a>.</td>
+<td>Enrollment is open, but provisioning needs qualifying paid-workspace membership or payment-method identity verification; the verification is not charged. Enterprise policy can require approval. Sandbox webhooks deliver real messages inside that sandbox; this is not a no-send API. CPRa’s <code>hook</code> URL already supports a sandbox webhook or our own local HTTP protocol mock. Code: <code>jobs.go:1155</code>. High confidence for documented sandbox; account eligibility remains untested.</td>
+</tr>
+<tr>
+<td><strong>pagerduty</strong></td>
+<td><strong>Real trial/test account and service</strong> using Events API v2; alternatively an independently implemented local protocol mock. No public no-send Events API sandbox or provider-hosted mock was found in the reviewed docs. <a href="https://support.pagerduty.com/main/docs/trial-account-onboarding">Trial onboarding</a>, <a href="https://support.pagerduty.com/main/docs/services-and-integrations">Events integration setup</a>.</td>
+<td>Trial signup currently requires a work email. Events require a service integration/routing key and may create actual incidents/notifications according to its configuration. CPRa’s <code>url</code> already permits a local mock or regional endpoint. PagerDuty’s outbound webhook “Send Test Event” tests the opposite direction and does not verify CPRa’s Events API integration. Code: <code>jobs.go:1112</code>. High confidence for trial/API path; moderate confidence for absence of a dedicated sandbox.</td>
+</tr>
+<tr>
+<td><strong>email / SMTP</strong></td>
+<td><strong>Mailpit SMTP capture fixture</strong>, an open-source test service, not a Gmail/Exchange/provider emulator. Its maintainers document SMTP, optional STARTTLS, intercepted-message UI/API, and configurable SMTP error injection. <a href="https://mailpit.axllent.org/docs/">Mailpit features</a>, <a href="https://mailpit.axllent.org/docs/install/docker/">official Docker images</a>.</td>
+<td>No hosted account. CPRa’s configurable <code>server</code> can send through its actual SMTP implementation; verify the captured message through Mailpit’s independent API. Use trusted local <code>allow_insecure</code> for plain local SMTP, or configure trusted STARTTLS. CPRa currently does not perform SMTP AUTH, so an unauthenticated local relay fits its current path. Avoid enabling Mailpit forwarding/relaying. This validates SMTP acceptance/content, not Internet mailbox deliverability. Code: <code>notifications.go:56</code>, schema <code>groups.go:69</code>. High confidence.</td>
+</tr>
+<tr>
+<td><strong>webhook</strong></td>
+<td><strong>Real local HTTP receiver / protocol fixture</strong>. There is no specific external provider for this driver. Go’s standard library provides local HTTP test servers. <a href="https://pkg.go.dev/net/http/httptest#NewServer">Go httptest</a>.</td>
+<td>No account. Configure <code>url</code>, method and headers to a dedicated receiver; assert the request independently and inject rejection, timeout, disconnect, and delayed-response scenarios. An arbitrary success-returning public URL would not establish payload correctness. Code: <code>jobs.go:1214</code>, <code>groups.go:90</code>. High confidence.</td>
+</tr>
+<tr>
+<td><strong>telegram</strong></td>
+<td><strong>First-party dedicated test environment</strong>, with <code>https://api.telegram.org/bot&lt;token&gt;/test/METHOD_NAME</code>. Alternatively use a separate normal bot for testing. <a href="https://core.telegram.org/bots/features#dedicated-test-environment">Testing your bot / dedicated test environment</a>.</td>
+<td>Requires a separate test-environment user and bot created through BotFather. Messages are real within the isolated test environment; production users are separate. Flood limits are not lifted. CPRa currently hardcodes <code>/bot&lt;token&gt;/sendMessage</code>, so proper test-mode/base-URL configuration is needed; do not hide <code>/test</code> inside a credential string. A local Bot API server is a Telegram gateway, not an offline mock of Telegram. Code: <code>jobs.go:1254</code>, schema <code>manifest.go:725</code>. High confidence.</td>
+</tr>
+<tr>
+<td><strong>discord</strong></td>
+<td><strong>Dedicated test server/channel with incoming webhook</strong>, or our own local protocol mock. No dedicated public no-send webhook sandbox was found in the reviewed API docs. <a href="https://docs.discord.com/developers/resources/webhook#execute-webhook">Discord webhook resource</a>.</td>
+<td>A Discord user/server with permission is needed to create the webhook; executing it needs the webhook URL/token, not a bot account. Messages really appear in the selected channel. CPRa’s <code>webhook_url</code> supports local mocks and a real test channel. Use <code>?wait=true</code> for provider confirmation: the docs warn that with the default false, an unsaved message need not return an error. Independent channel observation is stronger than HTTP acceptance. Code: <code>jobs.go:1290</code>. High confidence for API; moderate for no sandbox found.</td>
+</tr>
+<tr>
+<td><strong>opsgenie</strong></td>
+<td><strong>Local protocol mock</strong>, or an existing designated Opsgenie account/integration. Atlassian’s migration demo is a limited migration trial for existing Opsgenie owners, not a general no-account alert sandbox. <a href="https://docs.opsgenie.com/docs/alert-api">Alert API</a>, <a href="https://support.atlassian.com/opsgenie/docs/set-up-a-migration-demo-account-to-test-migration/">migration demo</a>, <a href="https://support.atlassian.com/opsgenie/docs/choose-the-right-path-and-schedule-migration/">end-of-sales/support notice</a>.</td>
+<td><code>url</code> already configurable for a local mock/EU endpoint. Real calls require integration API keys; HTTP 202 means asynchronous acceptance, so the observer must check request status/created alert. New sales ended June 4, 2025; support ends April 5, 2027. No public no-send alert endpoint/mock was found. Code: <code>jobs.go:1332</code>. High confidence for API/lifecycle; moderate for no alternative found.</td>
+</tr>
+<tr>
+<td><strong>mattermost</strong></td>
+<td><strong>First-party local Docker Preview / self-hosted Mattermost</strong>, i.e. the actual server rather than an API imitation. <a href="https://docs.mattermost.com/deployment-guide/server/deploy-containers">Container deployment</a>, <a href="https://docs.mattermost.com/developers/integrate/webhooks/incoming">incoming webhooks</a>.</td>
+<td>No cloud account or purchase needed for the documented local evaluation route; create fixture-local users/channel/webhook. The preview is self-contained and disables email by default. Messages appear in the local Mattermost channel, enabling independent read-back. CPRa’s <code>webhook_url</code> already accepts that server or a simpler local protocol mock. Preview is disposable and not a production deployment. Code: <code>code_mattermost.go:28</code>. High confidence.</td>
+</tr>
+<tr>
+<td><strong>victorops / Splunk On-Call</strong></td>
+<td><strong>Local protocol mock</strong>. If an account already exists, <code>message_type: INFO</code> is a documented lighter real operation: it adds a timeline event without triggering an incident. <a href="https://help.splunk.com/en/splunk-cloud-platform/alert-and-respond/splunk-on-call/integrations-with-splunk-on-call/rest-endpoint-integration-for-splunk-on-call">REST endpoint integration</a>.</td>
+<td>Real calls need an enabled integration endpoint key and routing key. <code>INFO</code> still writes real account data and does not test critical-alert escalation. CPRa supports <code>message_type</code> but hardcodes the provider URL; a full URL override is needed for a normal local network mock. No first-party no-send sandbox/mock or authoritative On-Call retirement date was found in the reviewed docs; do not conflate other Splunk products’ end-of-life notices. Code: <code>code_victorops.go:30</code> and <code>:40</code>. High confidence for INFO/API; moderate for absence/lifecycle search.</td>
+</tr>
+<tr>
+<td><strong>pushover</strong></td>
+<td><strong>First-party credential/user validation endpoint</strong> <code>POST /1/users/validate.json</code>, plus our own local message-API mock. <a href="https://pushover.net/api#validation">Pushover API / user validation</a>.</td>
+<td>Validation requires a real app token and user/group key; it checks a usable user/device without posting a notification. It does <strong>not</strong> exercise CPRa’s <code>/1/messages.json</code> production send operation. Quiet/lowest-priority sends are still real delivery, not a sandbox. The sample token in docs is explicitly nonfunctional. CPRa hardcodes the message host, so a URL override is needed for a normal local mock. No documented send-message sandbox was found. Code: <code>code_pushover.go:91</code>. High confidence for validation boundary; moderate for no sandbox found.</td>
+</tr>
+<tr>
+<td><strong>datadog</strong></td>
+<td><strong>First-party API-key validation endpoint</strong> <code>GET /api/v1/validate</code>, plus our own local Events API mock. <a href="https://docs.datadoghq.com/api/latest/authentication/validate-api-key/">API-key validation</a>, <a href="https://docs.datadoghq.com/api/latest/events/post-an-event/">posting events</a>.</td>
+<td>Key validation needs an organization API key and checks authentication only. CPRa posts real v1 events; validation does not prove ingestion. No documented no-send sandbox for this operation was found. <code>site</code> selects <code>https://api.&lt;site&gt;/api/v1/events</code>; it is not a general local base-URL field. Add an explicit endpoint override for a local network mock; do not treat a local Datadog Agent as an Events API emulator. Code: <code>code_datadog.go:66</code>. High confidence for endpoints; moderate for absence. The web reader rejected these pages’ content type, so their current page HTML was also retrieved read-only directly.</td>
+</tr>
+<tr>
+<td><strong>teams</strong></td>
+<td><strong>Microsoft 365 E5 developer sandbox for qualifying members</strong>, with a real Workflows/Power Automate webhook; or a local JSON/Adaptive Card protocol mock. <a href="https://learn.microsoft.com/en-us/office/developer-program/microsoft-365-developer-program-get-started">Developer sandbox setup</a>, <a href="https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook">Teams incoming webhooks</a>, <a href="https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/">connector retirement</a>.</td>
+<td>The sandbox requires qualification and, in current docs, a valid billing account; the sandbox itself is not charged. Messages sent to a real workflow are delivered inside its tenant/channel, not suppressed. CPRa already supports configurable <code>webhook_url</code> and an Adaptive Card under the <code>teams</code> build tag. Test workflow permissions/authentication and completed channel delivery, not just request acceptance. Legacy Office 365 connector shutdown was scheduled for May 18–22, 2026; use Workflows. High confidence for documented alternatives; user eligibility untested.</td>
+</tr>
+<tr>
+<td><strong>twilio</strong></td>
+<td><strong>First-party test credentials and magic phone numbers</strong> for the exact SMS Messages API used by CPRa. <a href="https://www.twilio.com/docs/iam/test-credentials">Twilio test credentials</a>.</td>
+<td>Account required to obtain the test Account SID/Auth Token, but no purchased sending number is needed for these tests. Requests use the normal host with the test SID; <code>From: +15005550006</code> selects success and documented magic inputs exercise failures. No charges, real SMS, production-account mutations, or delivery status callbacks occur. This works through current CPRa configuration and <code>twilio</code> build tag; a local network mock would separately need endpoint configurability. It verifies provider-side validation and synchronous outcomes, not carrier/device delivery. Code: <code>code_twilio.go:54</code>. High confidence.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="changes-implied-by-an-account-free-test-suite">Changes implied by an account-free test suite<a class="headerlink" href="#changes-implied-by-an-account-free-test-suite" title="Permanent link">&para;</a></h2>
+<p>Seven HTTP notification drivers already have configurable endpoint URLs: Slack, PagerDuty, generic webhook, Discord, Opsgenie, Mattermost, Teams. They can exercise their real network code against a local receiver whose responses and independently stored receipts follow the provider’s published contract. Local-target settings must agree with CPRa’s configured SSRF policy; this is a deliberate isolated fixture setup, not a reason to weaken production defaults.</p>
+<p>Five currently fix the host/path or expose only a site selector: Telegram, VictorOps, Pushover, Datadog, Twilio. Existing unit contract tests replace the transport (<code>internal/jobs/provider_contract_test.go:19</code>, <code>tagged_notification_contract_test.go:14</code>), so fast mock testing is already possible. To include these in a configuration-driven external network suite, add explicit endpoint configuration while preserving default production URLs, credential redaction, and conservative replay behavior. Telegram additionally needs a genuine test-mode path. Twilio’s official test credentials require no code change.</p>
+<p>Use separate evidence labels: <strong>local protocol contract passed</strong>, <strong>actual local service passed</strong>, <strong>provider sandbox/test API passed</strong>, and <strong>real destination effect observed</strong>. No tests were executed during this documentation research, so these findings do not increase the current passing-provider count.</p>
+<h2 id="existing-repository-coverage-and-the-next-practical-step">Existing repository coverage and the next practical step<a class="headerlink" href="#existing-repository-coverage-and-the-next-practical-step" title="Permanent link">&para;</a></h2>
+<p>The source already contains sequential real-server fixtures for Redis, PostgreSQL, MySQL, MongoDB, RabbitMQ and Kafka in <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/examples/verification/fixtures.compose.yaml"><code>examples/verification/fixtures.compose.yaml</code></a>, with the <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/scripts/verification/database_local.py"><code>database_local.py</code></a> runner. It starts one server at a time and forwards the unmodified production protocol through a byte-counting TCP relay. Its physical-disk prerequisite applies before starting or pulling those fixtures. The relay currently proves fresh connections and bidirectional traffic; a decoded command trace or target-side operation counter is stronger proof of the named operation. Do not overstate byte counts alone as command-level evidence.</p>
+<p>The historical local <code>final-370a60b</code> campaign summary recorded six local passes across all driver categories, with HTTP and Docker being the two health-check passes. Prepared database/broker profiles are not new passing results. The full account-free health-check campaign can be expanded with loopback TCP/UDP/TLS, kernel ICMP, a controlled CoreDNS server, and the official gRPC example; the last must retain the explicit TCP-only coverage label.</p>
+<p>For regression testing, local protocol responders can deliberately send malformed frames, delayed replies, or disconnects. Those supplement actual server tests. No official cloud sandbox is needed for these 14 checks, and no hosted-account evidence should be asserted from the local campaign. Container versions/digests and account-free test scope should be recorded in the resulting matrix; examples above describe the current fixtures and documented alternatives rather than asserting that all listed version tags are newly validated.</p>
+<h2 id="local-code-grounding">Local code grounding<a class="headerlink" href="#local-code-grounding" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Default checks and the TCP-only gRPC boundary: <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/jobs/jobs.go#L484"><code>internal/jobs/jobs.go</code></a>.</li>
+<li>TLS behavior: <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/jobs/pulse_tls.go#L64"><code>internal/jobs/pulse_tls.go</code></a>.</li>
+<li>Database and broker schema, auth fields and build-tag split: <a href="https://github.com/ziad-hsn/cpra/blob/410fbfb0092d01277b3884cd04151c27443a4226/internal/loader/schema/pulse_types_new.go#L1"><code>internal/loader/schema/pulse_types_new.go</code></a>, plus <code>internal/jobs/pulse_{redis,postgres,mysql,mongo,rabbitmq,kafka}.go</code>.</li>
+<li>Exact dependency ping semantics were checked locally in pgx <code>v5.10.0</code> and franz-go <code>v1.21.6</code> source.</li>
+</ul>
+<h2 id="configuration-gaps-exposed-by-this-research">Configuration gaps exposed by this research<a class="headerlink" href="#configuration-gaps-exposed-by-this-research" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The example DNS case uses <code>server: 127.0.0.1:15353</code>, but the current driver appends port 53 itself. This configuration will not work as written. A host-only server on an isolated port 53 or explicit custom-port support is needed before that case can pass.</li>
+<li>Telegram needs a real test-environment selector. A credential string must remain a credential, not an implicit way to insert <code>/test/</code> into an API path.</li>
+<li>Twilio's existing credential fields can call its official test API, but the live runner's delivery observer is unsuitable for intentionally undelivered SMS. Record provider-side validation separately.</li>
+<li>AWS supports local SDK endpoint selection already, but a mock needs its own contract observer/evidence class. AWS DryRun is not currently exposed by CPRa and does not prove a reboot.</li>
+<li>For fixed notification URLs, add explicit isolated-test endpoint configuration before claiming that the external mock suite uses an unchanged production transport. Existing in-process transport stubs remain unit contract tests.</li>
+</ul>
+<p>Research recommendations should be implemented and measured before any matrix row is marked passed. Public release documentation remains tied to the candidate's completed evidence, not this list of available tools.</p>
+<h2 id="implemented-verification-tooling-since-this-research">Implemented verification tooling since this research<a class="headerlink" href="#implemented-verification-tooling-since-this-research" title="Permanent link">&para;</a></h2>
+<p>This research is the dated design background. The reviewed candidate now includes notification contract fixtures, protocol listeners, actual database-service fixtures, local Mattermost, Moto and isolated cluster checks. Use <a href="../provider-testing/">provider test environments</a> for current commands, supported endpoint overrides and evidence fields. Historical local passes are not refreshed provider-account certification.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../provider-testing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Provider environments">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Provider environments
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../reference/config-schema/" class="md-footer__link md-footer__link--next" aria-label="Next: Configuration">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Configuration
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025–2026 Ziad Hassan · MIT license
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

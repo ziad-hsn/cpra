@@ -44,5 +44,17 @@
   {% endif %}
 {% endblock %}
 {% block announce %}
-  Documentation for <a href="{{ config.repo_url }}/commit/{{ config.extra.source_commit }}">main · {{ config.extra.source_commit[:7] }}</a> · {{ config.extra.source_date }}
+  {% set scope = page.meta.cpra_scope if page and page.meta else "docs" %}
+  {% if scope == "release_candidate" %}
+    Release candidate · <a href="{{ config.repo_url }}/commit/{{ config.extra.candidate_commit }}">{{ config.extra.candidate_commit[:7] }}</a>
+  {% elif scope == "sdk" %}
+    Unpublished SDK candidate · server v2 and module publication pending
+  {% elif scope == "plan" %}
+    Candidate plans and evidence · implementation status varies by ticket
+  {% elif scope == "main" %}
+    Current main runtime · <a href="{{ config.repo_url }}/commit/{{ config.extra.source_commit }}">{{ config.extra.source_commit[:7] }}</a>
+  {% else %}
+    CPRa documentation · reviewed {{ config.extra.source_date }}
+  {% endif %}
+  · <a href="{{ 'versions/' | url }}">Versions and availability</a>
 {% endblock %}

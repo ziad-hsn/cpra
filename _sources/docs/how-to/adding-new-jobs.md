@@ -1,7 +1,11 @@
 ---
-title: "Add a check or action"
-description: "Extend CPRa through schema, execution and verification while respecting contexts and incident ownership."
+title: Add a check or action
+description: Extend CPRa through schema, execution and verification while respecting contexts and incident ownership.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Add a check or action
 

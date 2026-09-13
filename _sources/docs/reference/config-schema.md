@@ -1,7 +1,11 @@
 ---
-title: "Monitor configuration"
-description: "Configure CPRa YAML manifests, check thresholds, alert groups, maintenance windows and recovery targets."
+title: Monitor configuration
+description: Configure CPRa YAML manifests, check thresholds, alert groups, maintenance windows and recovery targets.
+cpra_scope: main
 ---
+
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+
 
 # Monitor configuration
 

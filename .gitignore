@@ -8,6 +8,7 @@ coverage/
 *.test
 *.log
 *.jsonl
+!docs/sdk/source/**/*.jsonl
 .env
 .env.*
 /monitors.yaml

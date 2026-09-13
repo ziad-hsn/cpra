@@ -31,6 +31,22 @@ an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 [deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/) ·
 [FAQ](https://ziad-hsn.github.io/cpra/faq/)
 
+## Documentation and current development
+
+The complete [documentation source](docs/index.md) is now kept on `main` and
+synchronized to the [published site](https://ziad-hsn.github.io/cpra/).
+[Versions and availability](docs/versions.md) identifies the code behind each guide:
+
+- Current main: the quickstart, drivers, read-only API/CLI and in-memory runtime described below.
+- [Durable release candidate](docs/candidate/index.md): persistence, history/SLOs, native installation, backups, Compose, Helm and release recipes at `410fbfb`.
+- [Unpublished Go SDK](docs/sdk/index.md): public client/collection/worker contracts, four integration lessons and complete generated references.
+- [Approved management plan](docs/implementation/api-management-plan.md): encrypted configuration, conditional collection apply, controls and optional external workers; server implementation remains pending.
+
+The candidate guides describe source that is separate from this branch. Their
+publication does not add those APIs, storage or installation commands to main.
+See the [latest-change review](docs/review/latest-changes.md) for the corrections
+and source boundaries behind the documentation refresh.
+
 ## Quick start
 
 Requires Go 1.25 or later and Make. The repository already contains the built dashboard assets, so a Go toolchain is enough.

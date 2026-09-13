@@ -59,3 +59,7 @@ release: dashboard-build
 
 clean:
 	rm -rf bin dist dashboard/dist
+
+.PHONY: docs-check
+docs-check:
+	python3 scripts/docs/check.py

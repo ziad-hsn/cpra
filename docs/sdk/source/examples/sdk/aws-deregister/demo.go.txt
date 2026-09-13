@@ -1,0 +1,67 @@
+package main
+
+import (
+	"context"
+	_ "embed"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/mockcpra"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
+)
+
+//go:embed monitor.fixture.json
+var monitorFixtureJSON []byte
+
+//go:embed event.fixture.json
+var eventFixtureJSON string
+
+func runDemo(output io.Writer) error {
+	server := mockcpra.New()
+	defer server.Close()
+	client, err := cpra.New(cpra.Config{BaseURL: server.URL, AuthToken: mockcpra.Token, AllowInsecureHTTP: true})
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var monitor api.Monitor
+	if err := json.Unmarshal(monitorFixtureJSON, &monitor); err != nil {
+		return err
+	}
+	// The API owns these fields; take returned values rather than inventing them.
+	monitor.Metadata.UID = ""
+	monitor.Metadata.ResourceVersion = ""
+	created, err := client.Monitors.Create(ctx, monitor)
+	if err != nil {
+		return err
+	}
+	var raw event
+	if err := json.Unmarshal([]byte(eventFixtureJSON), &raw); err != nil {
+		return err
+	}
+	m := mapping{TargetGroupARN: raw.Detail.RequestParameters.TargetGroupARN,
+		TargetID: "i-123", MonitorID: created.Data.Metadata.ID,
+		MonitorUID: created.Data.Metadata.UID, ResourceVersion: created.Data.Metadata.ResourceVersion,
+		EventsAfter: raw.Detail.EventTime.Add(-time.Minute)}
+	p := processor{cfg: settings{Account: raw.Account, Region: raw.Region, Mappings: []mapping{m}}, cpra: client, aws: fixtureRegistration{}, output: output}
+	fmt.Fprintln(output, "fixture mode: in-memory CPRa HTTP contract and local AWS absence; no live providers")
+	for range 2 {
+		if err := p.process(ctx, eventFixtureJSON); err != nil {
+			return err
+		}
+	}
+	result, err := client.Monitors.Get(ctx, m.MonitorID)
+	if err != nil {
+		return err
+	}
+	if result.Data.Spec.Enabled == nil || *result.Data.Spec.Enabled {
+		return errors.New("demo monitor was not disabled")
+	}
+	fmt.Fprintln(output, "verified through SDK GET: enabled=false; duplicate event made no further change")
+	return nil
+}

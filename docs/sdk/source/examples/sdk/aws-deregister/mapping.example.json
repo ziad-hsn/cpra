@@ -1,0 +1,14 @@
+{
+  "account": "123456789012",
+  "region": "us-east-1",
+  "mappings": [
+    {
+      "targetGroupARN": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/payments/abc",
+      "targetID": "i-123",
+      "monitorID": "payments-node",
+      "monitorUID": "uid-1",
+      "resourceVersion": "rv-1",
+      "eventsAfter": "2026-09-01T00:00:00Z"
+    }
+  ]
+}

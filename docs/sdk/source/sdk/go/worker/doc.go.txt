@@ -1,0 +1,41 @@
+//go:build externaljobs
+
+// Package worker executes operator-owned Go handlers outside the CPRa process.
+// Every source file requires the externaljobs build tag, including this package
+// comment. The library is a separately versioned module and is excluded from a
+// normal SDK application's dependency graph.
+//
+// # Register and run
+//
+// Create a [Registry] with [NewRegistry] and register exact JobType ID, version,
+// and category matches before starting a [Runner]. Supply a [Config] with a
+// scoped worker protocol client, private state directory, and a raw 32-byte
+// wrapping-key file outside that directory. [CredentialResolver] loads provider
+// credentials in the worker process; CPRa does not supply provider secrets.
+//
+// [Runner.Run] freezes the registry, reserves journal capacity before requesting
+// permission to start, records execution before calling a [Handler], and records
+// the bounded outcome before attempting delivery. A lost outcome receipt resends
+// the recorded outcome without invoking the handler again. Interrupted handlers
+// never resume after restart; uncertain side effects remain unknown.
+//
+// # Ownership and shutdown
+//
+// The journal uses an exclusive directory lock and synchronous encrypted writes.
+// Preserve the complete stopped state directory and its matching key separately.
+// Missing keys, incompatible server identity, and corrupted state fail explicitly.
+//
+// Run owns its goroutines and journal lock until all handlers have exited. It
+// installs no signal handler and never exits the process. Handlers must honor
+// their contexts; a supervisor supplies the hard deadline for uncooperative code.
+// A separate process and credentials do not sandbox hostile Go handlers.
+//
+// # Documentation and compatibility
+//
+// The corresponding management and worker server contracts remain pending.
+// Fixture and process tests verify the client library's boundary, not live
+// provider effects or production-server compatibility. Hosted pkg.go.dev does
+// not select arbitrary custom build tags; use this module's README, source
+// comments, and the CPRa generated tagged API reference. The ordinary go doc
+// command also omits this package under its default build context.
+package worker

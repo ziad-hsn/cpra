@@ -1,3 +1,11 @@
+---
+title: SDK candidate · Maintain the SDK lessons and reference
+description: SDK candidate · Maintain the SDK lessons and reference for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: sdk
+---
+
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+
 # Maintain the SDK lessons and reference
 
 Keep each lesson focused on a visible result. Begin with one command that works

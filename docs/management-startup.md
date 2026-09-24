@@ -6,7 +6,7 @@ exposes the authenticated management API used by the dashboard and SDK. Existing
 read-only startup remains available for stores that have never acquired a managed
 catalog.
 
-For a fresh Linux user instance, the [empty dashboard example](../examples/management/README.md)
+For a fresh Linux user instance, the [empty dashboard example](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/management/README.md)
 generates private local sources and a test certificate, demonstrates verifier
 derivation, and starts without an existing state directory. Its templates include
 the runtime file and a verifier-only policy schema.
@@ -129,7 +129,7 @@ manifest from silently overriding committed changes. An explicit disposable
 `storage.mode: memory` configuration may omit encryption and use an ephemeral
 wrapping key; neither its catalog nor that key survives process restart. A
 configured backend still fails on missing keys or unavailable services even in
-memory mode. See the [encryption setup contract](../internal/encryptionsetup/README.md)
+memory mode. See the [encryption setup contract](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/encryptionsetup/README.md)
 for previous local keys, OpenBao/Vault Transit and AWS KMS.
 
 `-validate` shares collection, graph and compiled-driver validation. It uses a

@@ -3,8 +3,10 @@ import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { MetricsView } from '../components/MetricsView';
 import { formatDurationNs } from '../lib/format';
+import { useTheme, type ThemePreference } from '../theme/useTheme';
 
 export default function Settings() {
+  const { preference, setTheme } = useTheme();
   const { data: config, isLoading, isError, refetch } = useConfig();
   const { data: health, isError: healthError } = useHealth();
 
@@ -15,6 +17,15 @@ export default function Settings() {
           <h1>Settings</h1>
           <div className="lead">Engine configuration &amp; diagnostics</div>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><label className="card-title" htmlFor="appearance">Appearance</label></div>
+        <select id="appearance" className="input" value={preference} onChange={(event) => setTheme(event.target.value as ThemePreference)}>
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
       </div>
 
       {/* Config */}

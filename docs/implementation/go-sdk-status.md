@@ -1,3 +1,11 @@
+---
+title: Plan and status · Go SDK implementation and qualification
+description: Plan and status · Go SDK implementation and qualification for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: plan
+---
+
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
+
 # Go SDK implementation and qualification
 
 The SDK is developed as two modules in this repository: `sdk/go` for management
@@ -156,8 +164,9 @@ separate gates. This document does not declare them completed.
 | 6. Consumers and publication | `cpractl` uses the current public SDK for reads and writes; examples; multi-module/native CI entry points; archive and generation checks | Public prerelease tags, actual downloaded-release qualification, signatures/notices, compatibility certification |
 
 The implementation and review evidence is recorded in
-[Go SDK verification](go-sdk-verification.md). No SDK tags, application release,
-or documentation deployment were published by this work.
+[Go SDK verification](go-sdk-verification.md). No SDK tags or application release
+were published by the SDK implementation work. Candidate documentation is
+published separately for review; SDK and server release gates remain open.
 
 ## Service integration examples
 

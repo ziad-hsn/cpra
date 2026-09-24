@@ -1,3 +1,11 @@
+---
+title: SDK candidate · SDK example verification
+description: SDK candidate · SDK example verification for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: sdk
+---
+
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+
 # SDK example verification
 
 The examples are an uncommitted candidate on `codex/go-sdk`, based on application

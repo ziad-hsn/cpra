@@ -1,3 +1,11 @@
+---
+title: Plan and status · CPRa implementation status
+description: Plan and status · CPRa implementation status for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: plan
+---
+
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; the current finalization record below preserves the later branch checkpoints.
+
 # CPRa implementation status
 
 ## Current finalization plan
@@ -233,6 +241,9 @@ The baseline and evidence below describe the earlier durability work. They do
 not qualify the current integrated candidate; old disk readings are historical.
 
 Base: `a370969b041b399c0778318d8915ce059fd74294`; branch: `codex/durable-cpra`.
+The 13 September documentation review also identified release candidate
+`410fbfb0092d01277b3884cd04151c27443a4226` on `codex/release-engineering`.
+That reviewed snapshot predates the current finalization checkpoints above.
 
 The eight adjacent tickets follow the approved dependency order. This is an
 implementation candidate. The complete release gate is **open**.
@@ -245,8 +256,8 @@ implementation candidate. The complete release gate is **open**.
 | 4 SLO | Bounded driver histograms, exact counters, persisted coverage, cadence obligations, model plus feedback | Distribution, unfinished/missed work, timeout, restart and control-response tests. Full workload targets remain unverified. |
 | 5 Interfaces | Read-only state/history/SLO API and CLI; incremental fleet index; dashboard timeline/status | Auth/route/page tests, real browser and API/CLI agreement; 15 dashboard tests/build/lint/type checks. |
 | 6 Providers | 33-case config runner, effect/receipt observers, disposable fixture setup, evidence files, manual workflow | Six local driver scenarios passed. Remaining 27 have no passing live evidence. Actual database images, privileged systemd, designated Kubernetes/cloud accounts and receipt readers remain prerequisites. |
-| 7 Scale | Pinned matched-build preparation, physical-disk gate, 10k/100k/1m comparison, fault and 24-hour harness | Ten-monitor harness smoke only. The physical host has approximately 4 GB free and fails the required 30 GiB plus fixture allowance. Large campaign blocked before fixture creation. |
-| 8 Release | Persistent deployments, backup docs, workflow entry points, dependency notices and documentation candidate | Local packaging and docs-link checks. Independent review, completed provider/performance/endurance evidence and publication to main/public gh-pages remain outstanding. |
+| 7 Scale | Pinned matched-build preparation, physical-disk gate, 10k/100k/1m comparison, fault and 24-hour harness | Ten-monitor harness smoke only. The earlier campaign stopped at its physical-space preflight. That historical free-space reading is not current; rerun preflight for at least 30 GiB plus fixture headroom before any large campaign. No completed full campaign is established here. |
+| 8 Release | Persistent deployments, backup docs, workflow entry points, dependency notices and documentation candidate | Local packaging and docs-link checks. Independent review, completed provider/performance/endurance evidence and application publication to main remain outstanding. Candidate documentation is now included in the public documentation; that does not qualify the application. |
 
 No ticket's independent-review checkbox is marked complete. The implementation
 was checked and revised by its author; that is not an independent review.

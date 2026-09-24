@@ -1,7 +1,16 @@
+---
+title: Plan and status · CPRa management API, batch configuration, and external workers
+description: Plan and status · CPRa management API, batch configuration, and external workers for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: plan
+---
+
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
+
 # CPRa management API, batch configuration, and external workers
 
-Status: approved implementation plan; implementation and qualification are pending.
-Updated: 2026-09-13.
+Status: approved implementation plan; implementation and remaining qualification
+are tracked in [current implementation status](STATUS.md).
+Plan updated: 2026-09-13.
 
 The [dashboard finalization and shipping plan](dashboard-shipping-plan.md) records
 the integrated execution order and 2026-09-14 private-candidate publication policy.
@@ -52,10 +61,12 @@ SDK packaging or browser UI assign work to those companion workstreams; they do
 not remove it from the overall scope. Full management qualification includes
 the SDK and writable dashboard acceptance checks.
 
-At this correction, the application server and dashboard still expose read-only
-v1 behavior. Draft SDK v2 methods and fixtures exist, but do not establish a
-working management server, CLI writes, or browser writes. The control definitions
-below are requirements, not a claim that those controls are implemented.
+At the 2026-09-13 scope correction, the application server and dashboard still
+exposed read-only v1 behavior. Draft SDK v2 methods and fixtures did not establish
+a working management server, CLI writes, or browser writes. Later implementation
+and executed checks are recorded in [current status](STATUS.md) and the
+[progress record](dashboard-implementation-progress.md). The control definitions
+below remain requirements; their presence alone is not implementation evidence.
 
 ## Public resource and HTTP contract
 

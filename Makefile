@@ -42,6 +42,7 @@ build-ctl: | dev-workspace
 	CGO_ENABLED=0 $(DEV_GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o "$(BUILD_DIR)/cpractl" ./cmd/cpractl
 
 dashboard-build:
+	$(PYTHON) -B scripts/brand/generate.py --check
 	$(PYTHON) -B scripts/release/dashboard_build.py --pnpm "$(PNPM)" --go "$(RELEASE_GO)"
 
 .PHONY: dashboard-freshness
@@ -146,3 +147,7 @@ sdk-examples-check:
 sdk-reference-check: | dev-workspace
 	GOWORK="$(DEV_GOWORK)" $(PYTHON) scripts/sdk/reference.py --go "$(GO)" --check
 	$(PYTHON) scripts/sdk/sync_guides.py --check
+
+.PHONY: docs-check
+docs-check:
+	$(PYTHON) -B scripts/docs/check.py

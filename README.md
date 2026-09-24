@@ -12,7 +12,7 @@ Checks services, sends alerts, and runs the recovery actions you configure.</p>
   <a href="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml"><img src="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a262e" alt="MIT license"></a>
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25%2B-1a262e" alt="Go 1.25+"></a>
-  <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-e5a51f" alt="Documentation"></a>
+  <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-8A5A00" alt="Documentation"></a>
 </p>
 
 CPRa is a self-hosted monitoring and recovery agent written in Go. It runs
@@ -30,6 +30,26 @@ an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 [HTTP API](https://ziad-hsn.github.io/cpra/reference/api-reference/) ·
 [deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/) ·
 [FAQ](https://ziad-hsn.github.io/cpra/faq/)
+
+## Documentation and current development
+
+The [documentation source](docs/index.md) includes current development references
+and explicitly dated guides for earlier revisions. The
+[published site](https://ziad-hsn.github.io/cpra/) is updated separately.
+[Versions and availability](docs/versions.md) identifies those boundaries:
+
+- This source includes Raft persistence, history/SLOs, encrypted management resources,
+  dashboard forms, and SDK/CLI collection workflows.
+- The [implementation progress](docs/implementation/dashboard-implementation-progress.md)
+  records completed checks and remaining external-worker integration and release gates.
+- The [Go SDK](docs/sdk/index.md) documents the current source contracts; public
+  module-version and downloaded-consumer qualification remain pending.
+- [Earlier candidate guides](docs/candidate/index.md) describe the pinned `410fbfb`
+  revision and are not a release qualification for this development branch.
+
+The [shipping plan](docs/implementation/dashboard-shipping-plan.md) governs
+publication. Source availability does not establish completed provider or
+endurance verification.
 
 ## Quick start
 
@@ -180,4 +200,4 @@ Reports distinguish these results from real-account delivery and recovery.
 
 CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
 
-The CPRa name and mark are not covered by the MIT licence. Brand assets, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).
+The CPRa name and mark are not covered by the MIT licence. Brand assets, shared light/dark theme colors, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).

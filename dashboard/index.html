@@ -8,18 +8,13 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Service health checks, alerts, and recovery actions." />
-    <meta name="theme-color" content="#fbf3df" />
+    <meta name="theme-color" content="#F7F8FA" />
+    <link rel="stylesheet" href="/theme.css" />
     <script src="/theme.js"></script>
     <title>CPRa Dashboard</title>
   </head>
   <body>
-    <div id="root">
-      <style>
-        #root { background: #fbf3df; min-height: 100vh; }
-        [data-theme='dark'] #root { background: #15161a; }
-        body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-      </style>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,3 +1,11 @@
+---
+title: SDK candidate · Build integrations with the CPRa Go SDK
+description: SDK candidate · Build integrations with the CPRa Go SDK for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: sdk
+---
+
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+
 # Build integrations with the CPRa Go SDK
 
 Start with a queue event that creates a monitor. Then connect the same SDK to
@@ -154,3 +162,7 @@ Generate references from the repository root with
 `python3 scripts/sdk/reference.py`. Run it with `--check` to reject stale output.
 The schemas and Go declarations are the inputs; tutorial prose is maintained
 separately so a generator does not replace explanations of behavior.
+
+## Package guides
+
+[Core SDK](module-overview.md) · [Configuration collections](collections.md) · [External worker](worker-library.md) · [OpenAPI inputs](openapi.md) · [Example workspace](examples.md)

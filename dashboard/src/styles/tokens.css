@@ -1,128 +1,60 @@
-/**
- * CPRa identity: warm paper, dark ink, and the gold restart loop.
- * Status colors retain their operational meanings in both themes.
- */
+@import '../../../brand/dist/palette.css';
 
-:root,
-:root[data-theme='dark'] {
-  /* Gold text is lighter on dark surfaces; the mark keeps its original gold. */
-  --brand-sun: #e5a51f;
-  --accent: #e6bc61;
-  --accent-bright: #f0cd83;
-  --accent-dim: #d6a541;
-  --accent-soft: rgba(229, 165, 31, 0.12);
-  --accent-glow: rgba(229, 165, 31, 0.16);
-  --accent-contrast: #15161a;
+/* Component roles inherit the shared neutral light and graphite dark palette. */
+:root {
+  --brand-sun: var(--cpra-gold);
+  --accent: var(--cpra-accent);
+  --accent-bright: var(--cpra-accent);
+  --accent-dim: var(--cpra-accent);
+  --accent-soft: var(--cpra-inset);
+  --accent-contrast: var(--cpra-on-gold);
 
-  /* Status colors — luminous on dark */
-  --status-critical: #ff5470;
-  --status-degraded: #ffcc4d;
-  --status-operational: #34d399;
-  --status-info: #38bdf8;
-  --status-disabled: #a19d95;
-  --status-unknown: #94a3b8;
+  --status-critical: var(--cpra-danger);
+  --status-degraded: var(--cpra-warning);
+  --status-operational: var(--cpra-success);
+  --status-info: var(--cpra-info);
+  --status-disabled: var(--cpra-muted);
+  --status-unknown: var(--cpra-muted);
+  --status-bg-critical: color-mix(in srgb, var(--status-critical) 8%, var(--cpra-surface));
+  --status-bg-degraded: color-mix(in srgb, var(--status-degraded) 8%, var(--cpra-surface));
+  --status-bg-operational: color-mix(in srgb, var(--status-operational) 8%, var(--cpra-surface));
+  --status-bg-info: color-mix(in srgb, var(--status-info) 8%, var(--cpra-surface));
+  --status-bg-disabled: color-mix(in srgb, var(--status-disabled) 8%, var(--cpra-surface));
+  --status-border-critical: var(--cpra-border);
+  --status-border-degraded: var(--cpra-border);
+  --status-border-operational: var(--cpra-border);
+  --status-border-info: var(--cpra-border);
+  --status-border-disabled: var(--cpra-border);
 
-  /* Status tints (bg fills + borders) */
-  --status-bg-critical: rgba(255, 84, 112, 0.10);
-  --status-bg-degraded: rgba(255, 204, 77, 0.10);
-  --status-bg-operational: rgba(52, 211, 153, 0.10);
-  --status-bg-info: rgba(56, 189, 248, 0.10);
-  --status-bg-disabled: rgba(100, 116, 139, 0.10);
+  --surface-0: var(--cpra-canvas);
+  --surface-1: var(--cpra-surface);
+  --surface-2: var(--cpra-inset);
+  --surface-3: var(--cpra-border);
+  --surface-raised: var(--cpra-surface);
+  --text-primary: var(--cpra-text);
+  --text-secondary: var(--cpra-secondary);
+  --text-muted: var(--cpra-muted);
+  --text-inverse: var(--cpra-on-gold);
+  --border-default: var(--cpra-border);
+  --border-strong: var(--cpra-control);
+  --border-subtle: var(--cpra-border);
 
-  --status-border-critical: rgba(255, 84, 112, 0.35);
-  --status-border-degraded: rgba(255, 204, 77, 0.35);
-  --status-border-operational: rgba(52, 211, 153, 0.35);
-  --status-border-info: rgba(56, 189, 248, 0.35);
-  --status-border-disabled: rgba(100, 116, 139, 0.35);
-
-  /* Flat surfaces with a small change in tone for elevation. */
-  --surface-0: #15161a;
-  --surface-1: #1c1d22;
-  --surface-2: #24252b;
-  --surface-3: #2e3037;
-  --surface-raised: #24252b;
-
-  /* Gradients for depth */
-  --gradient-shell: none;
-  --gradient-card: none;
-
-  /* Text */
-  --text-primary: #f4f2ee;
-  --text-secondary: #c3c0b9;
-  --text-muted: #a19d95;
-  --text-inverse: #15161a;
-
-  /* Borders */
-  --border-default: #34353b;
-  --border-strong: #51525a;
-  --border-subtle: #2b2c32;
-
-  /* Elevation */
-  --elevation-1: 0 1px 2px rgba(0,0,0,0.5);
-  --elevation-2: 0 4px 14px rgba(0,0,0,0.5);
-  --elevation-3: 0 16px 40px rgba(0,0,0,0.6);
-  --ring-glow: 0 0 0 1px var(--accent-soft), 0 0 24px var(--accent-glow);
-
-  /* Typography */
+  --elevation-1: 0 1px 2px rgb(26 38 46 / 6%);
+  --elevation-2: 0 4px 14px rgb(26 38 46 / 10%);
+  --elevation-3: 0 16px 40px rgb(26 38 46 / 14%);
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: 'Roboto Slab', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
-
-  /* Motion */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 120ms;
   --dur: 200ms;
   --dur-slow: 360ms;
-
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-:root[data-theme='light'] {
-  --accent: #875f10;
-  --accent-bright: #6b490c;
-  --accent-dim: #725218;
-  --accent-soft: rgba(229, 165, 31, 0.14);
-  --accent-glow: rgba(229, 165, 31, 0.16);
-  --accent-contrast: #fbf3df;
-
-  --status-critical: #bd223c;
-  --status-degraded: #965b00;
-  --status-operational: #18704a;
-  --status-info: #156e96;
-  --status-disabled: #6d685f;
-  --status-unknown: #6d685f;
-
-  --status-bg-critical: rgba(225, 29, 72, 0.08);
-  --status-bg-degraded: rgba(217, 119, 6, 0.08);
-  --status-bg-operational: rgba(5, 150, 105, 0.08);
-  --status-bg-info: rgba(2, 132, 199, 0.08);
-  --status-bg-disabled: rgba(100, 116, 139, 0.08);
-
-  --status-border-critical: rgba(225, 29, 72, 0.30);
-  --status-border-degraded: rgba(217, 119, 6, 0.30);
-  --status-border-operational: rgba(5, 150, 105, 0.30);
-  --status-border-info: rgba(2, 132, 199, 0.30);
-  --status-border-disabled: rgba(100, 116, 139, 0.30);
-
-  --surface-0: #fbf3df;
-  --surface-1: #fffaf0;
-  --surface-2: #f3e8cb;
-  --surface-3: #ebddba;
-  --surface-raised: #fffaf0;
-
-  --text-primary: #1a262e;
-  --text-secondary: #4a5560;
-  --text-muted: #6d685f;
-  --text-inverse: #fbf3df;
-
-  --border-default: #e0d3b2;
-  --border-strong: #bcaa7d;
-  --border-subtle: #eee2c4;
-
-  --elevation-1: 0 1px 2px rgba(15,23,42,0.08);
-  --elevation-2: 0 4px 14px rgba(15,23,42,0.10);
-  --elevation-3: 0 16px 40px rgba(15,23,42,0.14);
-  --ring-glow: 0 0 0 1px var(--accent-soft), 0 0 24px var(--accent-glow);
-
-  color-scheme: light;
+:root[data-theme='dark'] {
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 18%);
+  --elevation-2: 0 4px 14px rgb(0 0 0 / 24%);
+  --elevation-3: 0 16px 40px rgb(0 0 0 / 32%);
+  color-scheme: dark;
 }

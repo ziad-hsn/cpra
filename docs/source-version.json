@@ -1,0 +1,16 @@
+{
+  "updated": "2026-09-24",
+  "repository": "https://github.com/ziad-hsn/cpra",
+  "main_runtime_commit": "51a835a29f2fb7af2e0301910042a52e308cbb24",
+  "release_candidate_commit": "410fbfb0092d01277b3884cd04151c27443a4226",
+  "sdk": {
+    "branch": "codex/dashboard-finalization",
+    "state": "committed development source; management implemented, worker integration and publication qualification pending",
+    "inventory_sha256": "dbe16a914008eac6ac672a9a3a06a9b74636176de3a7bca756f7ea31e057a10a",
+    "inventory_scope": "historical source inventory from 2026-09-13; not the current generated SDK reference inventory"
+  },
+  "documentation_scope": "current development references plus explicitly pinned historical main and candidate guides",
+  "historical_review_date": "2026-09-13",
+  "development_commit": "4c6baf58df8bf7fd4e02e0399fbe092ba867b20f",
+  "integrated_main_commit": "fc4edb4ab474191fbe8839ca2b6399828b391c1b"
+}

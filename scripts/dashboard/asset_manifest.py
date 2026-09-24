@@ -31,6 +31,7 @@ def snapshot(root):
               "scripts/dashboard/build_collection_parser.py", "scripts/dashboard/generate_api.py",
               "scripts/dashboard/inspect_collection_parser.cjs", "scripts/dashboard/asset_manifest.py")]
     paths += list((root / "scripts/dashboard/collectionwasm").glob("*.go"))
+    paths += [root / "brand/palette.json", root / "brand/dist/palette.css"]
     outputs = list(assets.rglob("*")) + [root / "LICENSES/dashboard.json", root / "LICENSES/dashboard.txt"]
     return {"schema_version": 1, "inputs": inventory(root, paths), "outputs": inventory(root, outputs)}
 

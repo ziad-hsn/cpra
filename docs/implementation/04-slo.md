@@ -1,3 +1,11 @@
+---
+title: 'Plan and status · 04-slo: Add percentile SLO control'
+description: 'Plan and status · 04-slo: Add percentile SLO control for the reviewed CPRa source; see the version and availability notice.'
+cpra_scope: plan
+---
+
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
+
 # 04-slo: Add percentile SLO control
 
 ## Context

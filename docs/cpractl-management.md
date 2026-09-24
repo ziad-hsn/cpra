@@ -31,7 +31,7 @@ service-api` for a monitor's action state. `get overview` is not a current comma
 ## Connection and authorization
 
 Start an explicitly enabled management server with named identities and TLS.
-The [local management example](../examples/management/README.md) creates a
+The [local management example](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/management/README.md) creates a
 private example installation. Connect to it without putting a bearer token in
 the command line:
 
@@ -57,7 +57,7 @@ login accounts.
 
 ## Create contacts, destinations, and a monitor
 
-The [example files](../examples/cpractl) contain one resource per file. Apply the
+The [example files](https://github.com/ziad-hsn/cpra/tree/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/cpractl) contain one resource per file. Apply the
 dependencies in this order: credential, endpoint, recipient, group, monitor.
 These commands use the connection environment above.
 

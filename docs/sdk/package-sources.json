@@ -1,0 +1,9 @@
+{
+  "sdk/source/sdk/go/LICENSE.txt": "sdk/go/LICENSE",
+  "sdk/source/sdk/go/example_test.go.txt": "sdk/go/example_test.go",
+  "sdk/source/sdk/go/collection/example_test.go.txt": "sdk/go/collection/example_test.go",
+  "sdk/source/sdk/go/collection/example_reselection_test.go.txt": "sdk/go/collection/example_reselection_test.go",
+  "sdk/source/sdk/go/worker/LICENSE.txt": "sdk/go/worker/LICENSE",
+  "sdk/source/sdk/go/worker/doc.go.txt": "sdk/go/worker/doc.go",
+  "sdk/source/sdk/go/worker/example_test.go.txt": "sdk/go/worker/example_test.go"
+}

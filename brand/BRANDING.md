@@ -31,14 +31,42 @@ to link to or copy. Consumers should never reference `src/`.
 
 ## Colour
 
-| Token | Light | Dark | Notes |
-| --- | --- | --- | --- |
-| `--cpra-paper` | `#fbf3df` | `#15161a` | Background |
-| `--cpra-ink` | `#1a262e` | `#f4f2ee` | Pulse, wordmark, body text |
-| `--cpra-sun` | `#e5a51f` | `#e5a51f` | The ring. 1.95:1 on light paper, 8.4:1 on dark. On light backgrounds the ink pulse carries the mark's legibility; do not use `--cpra-sun` for text on light backgrounds. |
-| `--cpra-sun-text` | `#875f10` | `#e6bc61` | Gold for links and small text where contrast is required (5.2:1 / 10.1:1 on their papers). |
+The approved interface palette is neutral white and graphite. `palette.json` is
+the source of truth; `dist/palette.css` is generated from it and shared by the
+dashboard and documentation. Keep large surfaces neutral and use gold sparingly.
 
-Contrast figures are WCAG 2.x relative luminance.
+| Role | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `canvas` | `#F7F8FA` | `#15181D` | Page background |
+| `surface` | `#FFFFFF` | `#1D2229` | Reading area, navigation, cards and menus |
+| `inset` | `#F0F2F5` | `#252B33` | Code, inputs and neutral selections |
+| `text` | `#1A262E` | `#E7EBF0` | Body text and headings |
+| `secondary` | `#53606C` | `#BAC3CE` | Supporting labels |
+| `muted` | `#606E7C` | `#9AA7B5` | Metadata and code comments |
+| `border` | `#DDE2E7` | `#343D48` | Decorative dividers |
+| `control` | `#7B8794` | `#728091` | Essential input boundaries |
+| `accent` | `#8A5A00` | `#E6BC61` | Underlined links and focus indicators |
+| `gold` | `#E5A51F` | `#E5A51F` | Original logo ring and primary button fill |
+| `onGold` | `#1A262E` | `#1A262E` | Text on gold buttons |
+| `success` | `#18704A` | `#6BC69C` | Operational status |
+| `danger` | `#BD223C` | `#FF8E9D` | Critical status |
+| `warning` | `#965B00` | `#EFC46D` | Degraded status |
+| `info` | `#156E96` | `#84C7EF` | Information and verification status |
+
+Body text on the reading surface measures 15.43:1 in light mode and 13.36:1
+in dark mode. Ink labels on the original gold measure 7.15:1. The logo gold
+against white is only 2.16:1, so essential indicators and small links use the
+separate `accent` color. Contrast figures use WCAG 2.x relative luminance.
+
+The transparent logo files retain their original ink (`#1a262e`), off-white
+(`#f4f2ee`), and gold (`#e5a51f`). These artwork colors are separate from UI text.
+Opaque social previews, Apple touch icons and maskable icons use the neutral
+light canvas. Keep the mark and wordmark geometry unchanged.
+
+Use opaque layered surfaces, underlined body links, neutral selections, and
+visible focus outlines. Pair status colors with labels. Avoid tinted page
+backgrounds, gold glows, and white labels on gold buttons. Both interfaces
+start with the system appearance and remember explicit Light or Dark choices.
 
 ## Typography
 
@@ -76,6 +104,21 @@ Use your deployment's base path for other sites. Manifest icon paths are
 relative to the manifest so they also work under a project prefix.
 
 ## Regenerating
+
+Generate the shared CSS and the dashboard's initial theme assets with:
+
+```sh
+python3 scripts/brand/generate.py
+python3 scripts/brand/generate.py --check
+```
+
+To rebuild opaque images, install `cairosvg==2.8.2` in a Python virtual environment
+and run `python scripts/brand/generate.py --images`. To synchronize these assets
+into a documentation checkout, add `--docs-root /path/to/gh-pages` and then run
+that checkout's `_sources/rebuild.py`. Commit the generated CSS, startup assets,
+PNG files, and rebuilt dashboard/site output with their sources. `make
+dashboard-build` checks that generated theme text is current.
+
 
 Masters carry `class="sun"` and `class="ink"` on every path so variants can
 be produced by token substitution. `svgo.config.js` is the optimiser config

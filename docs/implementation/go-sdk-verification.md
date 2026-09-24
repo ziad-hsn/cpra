@@ -1,3 +1,11 @@
+---
+title: Plan and status · Go SDK implementation verification
+description: Plan and status · Go SDK implementation verification for the reviewed CPRa source; see the version and availability notice.
+cpra_scope: plan
+---
+
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
+
 # Go SDK implementation verification
 
 This records local source verification for `codex/go-sdk`, based on application
@@ -59,10 +67,14 @@ lifecycle and the SDK transport/input paths. Corrections covered:
 - Native CI explicitly enters both nested modules; private/public module checks
   compare downloaded contents instead of inferring identity from a local hash.
 
-## Unfinished gates
+## Unfinished gates at this historical checkpoint
 
-The production server still implements v1 read operations only. All 66 management
-and extension operations are draft SDK contracts tested using HTTP/protocol
+Later server and client implementation is tracked in
+[current SDK status](go-sdk-status.md) and [implementation status](STATUS.md).
+The following records the boundary of these earlier checks.
+
+At this checkpoint, the production server implemented v1 read operations only.
+All 66 management and extension operations were draft SDK contracts tested using HTTP/protocol
 fixtures. Those fixtures do not establish durable server CAS, encryption of
 server staging, authorization, runtime feature controls, or actual external job
 delivery. The worker crash tests terminate a real worker process around local

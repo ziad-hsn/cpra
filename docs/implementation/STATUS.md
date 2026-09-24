@@ -10,6 +10,12 @@ cpra_scope: plan
 
 ## Current finalization plan
 
+**Additional remaining work (2026-09-24):** add an A2A intervention job type and
+an A2A notification type. The requested escalation example is a failed Docker
+restart intervention notifying an agent to investigate. Protocol, authorization,
+task lifecycle and integration design remain open; no A2A implementation is
+claimed. See the [A2A backlog and acceptance scope](dashboard-shipping-plan.md#remaining-addition-a2a-agent-intervention-and-notifications).
+
 The [2026-09-23 audit checkpoint](audit-findings-2026-09-23.md) records the
 `internal/persistence` rename, security/runtime fixes, scoped verification, and
 local controller leadership-recovery implementation. Current affected-package

@@ -2,7 +2,7 @@
 
 Status: implementation in progress on the private local branch
 `codex/dashboard-finalization`; implementation and release gates remain open.
-Updated: 2026-09-20.
+Updated: 2026-09-24 (A2A remaining-work addition).
 Source inspected: `/home/ziad/cpra-durable`, `codex/go-sdk`,
 `410fbfb0092d01277b3884cd04151c27443a4226`, with existing uncommitted work.
 No implementation, campaign or publication is performed by saving this plan.
@@ -23,6 +23,8 @@ native packages/services, OCI/Compose/Helm, CI, documentation and OSS release.
 API/SDK/packaging tickets remain the implementation definitions; this document
 orders them with dashboard completion and publication. Large foundation and
 campaign tickets have the explicit work packages referenced below.
+The A2A addition below is also remaining work; its implementation tickets and
+dependencies must be defined before candidate qualification.
 
 ## Authority and preserved decisions
 
@@ -57,6 +59,48 @@ are outside this delivery.
 Complements, guarded recovery and audited unknown-action review follow the API
 plan. Started work may still complete; retain its outcomes. There is no check-now
 command, force bypass or automatic replay of uncertain actions.
+
+## Remaining addition: A2A agent intervention and notifications
+
+Requested on 2026-09-24. **Planned, not implemented.** Add A2A (agent-to-agent)
+integration in two roles:
+
+- [ ] An intervention job type that delegates a configured investigation or
+  recovery task to an external agent, with explicit limits on authorized actions.
+- [ ] A notification type that sends incident and intervention-failure context
+  to an agent for investigation. Notification delivery must not itself grant
+  permission to perform recovery actions. Preserve the existing separation:
+  Code `notifyType` selects delivery; recipients/groups select destinations.
+- [ ] Configurable failure escalation: for example, a health check fails, the
+  Docker restart intervention fails, and CPRa notifies the selected agent with
+  the incident ID, attempted action, confirmed outcome and bounded diagnostic
+  context. Preserve the failed intervention in history and correlate the agent
+  task with that incident. Define whether escalation occurs per failed attempt
+  or after configured recovery attempts are exhausted.
+- [ ] Integrate configuration, credential references, capability discovery,
+  SDK/CLI/dashboard forms, history and qualification cases. Extend the existing
+  driver inventory when implemented; the existing 33-driver evidence does not
+  qualify these new operations.
+
+Design must select and verify the A2A protocol version, supported agent/task
+capabilities, authentication, transport, deadlines and asynchronous result
+handling. Decide whether this is a built-in driver or uses the optional external
+worker path; preserve build exclusion for anything using `externaljobs`.
+
+Keep task acceptance separate from successful investigation, completed recovery
+and observed health recovery. Persist task correlation and action intent, bound
+retries and escalation, and preserve ambiguous outcomes as unknown without
+automatically repeating external actions. A timed-out Docker restart must not
+be presented to the agent as a confirmed failure. Use sanitized diagnostic
+context and scoped credentials; agent output cannot bypass CPRa authorization or
+change monitor configuration by itself. Existing acknowledge, dismiss, snooze and
+disable semantics continue to apply to the corresponding job category.
+
+Acceptance must cover the Docker-failure escalation flow, accepted-but-incomplete
+agent tasks, restart/response loss, unknown outcomes, escalation-loop prevention,
+operator controls and credential redaction. Protocol fixtures and actual agent
+interoperability must be reported separately. Adding this backlog item does not
+resume implementation or claim release readiness.
 
 ## Verified starting point
 

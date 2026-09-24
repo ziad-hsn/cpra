@@ -2732,3 +2732,14 @@ comparison and million-monitor 24-hour campaign. The campaign still requires a
 fresh physical-host free-space check and at least 30 GiB plus fixture headroom.
 Final documentation and artifact publication remain gated on that evidence.
 Pushing this development branch does not qualify or publish a release candidate.
+
+### 2026-09-24 — A2A added to remaining work
+
+The user requested an A2A intervention job type for delegating work to agents,
+plus an A2A notification type for incident escalation. The example is a Docker
+restart intervention failing and CPRa asking an agent to investigate. The
+[shipping backlog](dashboard-shipping-plan.md#remaining-addition-a2a-agent-intervention-and-notifications)
+records both roles, failure-versus-unknown handling, bounded task correlation,
+authorization and operator-control requirements, and integration/verification
+work. Protocol and build-placement decisions remain open. This is a planning
+addition only; implementation remains paused.

@@ -20,6 +20,7 @@ jobs:
   live:
     # A designated machine with user-managed accounts and targets. Ordinary
     # hosted CI and pull requests never invoke these operations.
+    if: github.event.repository.private == true && github.event.repository.visibility == 'private'
     runs-on: [self-hosted, cpra-verification]
     timeout-minutes: 1800
     environment: live-verification

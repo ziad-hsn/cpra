@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // CodeDatadogJob posts an event to the Datadog events API. Pure stdlib
@@ -31,7 +31,7 @@ type CodeDatadogJob struct {
 	ID          uuid.UUID
 }
 
-func newCodeDatadogJob(cfg *schema.CodeNotificationDatadog, monitor, color, message string, entity ecs.Entity) (Job, error) {
+func newCodeDatadogJob(cfg *manifest.CodeNotificationDatadog, monitor, color, message string, entity ecs.Entity) (Job, error) {
 	if cfg.URL != "" {
 		if err := validateTargetURL(cfg.URL); err != nil {
 			return nil, err

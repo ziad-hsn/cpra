@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/systems"
-	"github.com/ziad-hsn/cpra/internal/durable"
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/management"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"log"
@@ -20,8 +21,8 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
-	"github.com/ziad-hsn/cpra/internal/loader/streaming"
-	"github.com/ziad-hsn/cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/loader"
 
 	"github.com/mlange-42/ark-tools/app"
 	"github.com/mlange-42/ark/ecs"
@@ -89,15 +90,16 @@ type Controller struct {
 
 	// Observability surfaces for the web server.
 	metricsAgg     *MetricsAggregator
-	snapshotHolder *snapshot.Holder
+	snapshotHolder *fleetview.Holder
 }
 
 // Config holds all configuration for the controller.
 type Config struct {
-	Store           *durable.Store
+	Catalog         *management.Catalog
+	Store           *persistence.Store
 	Runtime         runtimeconfig.Config
 	Debug           bool
-	StreamingConfig streaming.StreamingConfig
+	StreamingConfig loader.StreamingConfig
 	QueueCapacity   uint64
 	WorkerConfig    queue.WorkerPoolConfig
 	BatchSize       int
@@ -131,7 +133,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Runtime:           runtimeconfig.Default(),
-		StreamingConfig:   streaming.DefaultStreamingConfig(),
+		StreamingConfig:   loader.DefaultStreamingConfig(),
 		QueueCapacity:     65536, // Must be a power of 2
 		WorkerConfig:      queue.DefaultWorkerPoolConfig(),
 		BatchSize:         1000,
@@ -209,7 +211,7 @@ func NewController(config Config) *Controller {
 
 	stateLogger := systems.NewStateLogger(config.Debug)
 	metricsAgg := NewMetricsAggregator()
-	snapshotHolder := snapshot.NewHolder()
+	snapshotHolder := fleetview.NewHolder()
 	logger := &LoggerAdapter{logger: SystemLogger, metrics: metricsAgg}
 
 	// Construct the alert manager once and share it across the systems that
@@ -309,7 +311,10 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	if c.doneCh != nil {
 		return fmt.Errorf("monitors must be loaded before starting the controller")
 	}
-	loader := streaming.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
+	if c.config.Catalog != nil {
+		return errors.New("managed configuration must load from its durable catalog")
+	}
+	loader := loader.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
 	stats, err := loader.Load(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to load monitors: %w", err)
@@ -327,6 +332,23 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	c.CheckEntityCountAndSwitchQueue()
 
 	// Pre-calculate worker sizing from initial configuration/world (Pulse only)
+	c.precomputeSizingFromConfig()
+	return nil
+}
+
+// LoadCatalog initializes the authoritative managed configuration before the
+// owner loop starts. Subsequent commits are reconciled incrementally by that
+// owner; HTTP handlers and background preparation never share the Ark world.
+func (c *Controller) LoadCatalog(ctx context.Context) error {
+	c.lifecycleMu.Lock()
+	defer c.lifecycleMu.Unlock()
+	if c.doneCh != nil || c.durableSystem == nil || c.config.Catalog == nil {
+		return errors.New("catalog must be loaded into a durable controller before start")
+	}
+	if err := c.durableSystem.LoadCatalog(ctx, c.config.Catalog, c.mapper); err != nil {
+		return err
+	}
+	c.CheckEntityCountAndSwitchQueue()
 	c.precomputeSizingFromConfig()
 	return nil
 }
@@ -356,10 +378,6 @@ func (c *Controller) precomputeSizingFromConfig() {
 
 	// Compute λ for Pulse from world: sum over active monitors of 1/Interval
 	lambda := computePulseLambda(c.world)
-	if lambda <= 0 {
-		SystemLogger.Warn("[Pre-Sizing] No active pulse workload detected; skipping sizing")
-		return
-	}
 
 	// Determine safe headroom: env CPRA_SIZING_HEADROOM_PCT (e.g., 0.15 or 15), or config, default 0.15
 	headroom := c.config.SizingHeadroomPct
@@ -377,6 +395,9 @@ func (c *Controller) precomputeSizingFromConfig() {
 		headroom = 0.15
 	} // default 15%%
 	c.pulsePool.SetSizingPolicy(wSLO, headroom)
+	if lambda <= 0 {
+		return
+	}
 	cMin, w, err := queue.FindCForSLO(lambda, tau.Seconds(), wSLO.Seconds(), 1, 1, c.pulsePool.Stats().MaxWorkers)
 	if err != nil {
 		SystemLogger.Warn("[Pre-Sizing] Could not compute Pulse workers: %v", err)
@@ -446,7 +467,7 @@ func (c *Controller) sizingTau() time.Duration {
 // latent demand; lambda can.
 func (c *Controller) feedArrivalRate() {
 	lambda := computePulseLambda(c.world)
-	if lambda <= 0 || c.pulsePool == nil {
+	if c.pulsePool == nil {
 		return
 	}
 	tau := c.sizingTau().Seconds()
@@ -477,6 +498,9 @@ func (c *Controller) Start() error {
 func (c *Controller) run() {
 	defer close(c.doneCh)
 	c.app.Initialize()
+	if c.durableSystem != nil {
+		c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
+	}
 	c.lastProgress.Store(time.Now().UnixNano())
 	c.initializedState.Store(true)
 	close(c.initialized)
@@ -520,6 +544,9 @@ func (c *Controller) run() {
 			}
 		case <-ticker.C:
 			c.app.Update()
+			if c.durableSystem != nil {
+				c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
+			}
 			c.lastProgress.Store(time.Now().UnixNano())
 		}
 	}
@@ -527,7 +554,7 @@ func (c *Controller) run() {
 
 // Ready reports process admission readiness without reading mutable ECS state.
 func (c *Controller) Ready() bool {
-	return c.initializedState.Load() && !c.stoppingState.Load() && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second && (c.config.Store == nil || c.config.Store.Status().Ready)
+	return c.initializedState.Load() && !c.stoppingState.Load() && (c.durableSystem == nil || c.durableSystem.AdmissionReady()) && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second && (c.config.Store == nil || c.config.Store.Status().Ready)
 }
 
 func (c *Controller) WaitReady(ctx context.Context) error {
@@ -693,7 +720,7 @@ func (c *Controller) CheckEntityCountAndSwitchQueue() {
 func (c *Controller) Metrics() *MetricsAggregator { return c.metricsAgg }
 
 // SnapshotHolder returns the holder publishing fleet snapshots for the dashboard.
-func (c *Controller) SnapshotHolder() *snapshot.Holder { return c.snapshotHolder }
+func (c *Controller) SnapshotHolder() *fleetview.Holder { return c.snapshotHolder }
 
 // PulseQueue returns the pulse job queue.
 func (c *Controller) PulseQueue() queue.Queue { return c.pulseQueue }

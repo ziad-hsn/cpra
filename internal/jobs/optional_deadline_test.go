@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/dns"
 )
 
@@ -82,7 +82,7 @@ func TestPostgresPasswordRedaction(t *testing.T) {
 	if err != nil || parsed.Password != "first' private-review-tail" {
 		t.Fatalf("valid quoted password fixture failed: %v", err)
 	}
-	cfg := &schema.PulsePostgresConfig{DSN: strings.Replace(valid, "sslmode=disable", "sslmode=bad-mode", 1)}
+	cfg := &manifest.PulsePostgresConfig{DSN: strings.Replace(valid, "sslmode=disable", "sslmode=bad-mode", 1)}
 	j := &PulsePostgresJob{ConnString: postgresConnString(cfg), Timeout: 25 * time.Millisecond}
 	r := j.Execute()
 	if r.Err == nil {

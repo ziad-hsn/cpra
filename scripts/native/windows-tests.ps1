@@ -8,7 +8,7 @@ $BinaryDirectory = (Resolve-Path $BinaryDirectory).Path
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
 $results = @()
-foreach ($name in @('cpra-localadmin-windows.test.exe','cpra-durable-windows.test.exe','cpra-runtime-windows.test.exe')) {
+foreach ($name in @('cpra-localadmin-windows.test.exe','cpra-persistence-windows.test.exe','cpra-runtime-windows.test.exe')) {
     $binary = Join-Path $BinaryDirectory $name
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo.FileName = $binary

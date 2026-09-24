@@ -77,10 +77,15 @@ class ChartContract(unittest.TestCase):
             command = c[field]['exec']['command']
             self.assertEqual(command[:2], ['/usr/local/bin/cpractl', subcommand])
             self.assertIn('--token-file', command)
+            self.assertIn('--allow-insecure-http', command)
+            self.assertEqual(command[command.index('--server') + 1], 'http://127.0.0.1:8060')
             self.assertNotIn('httpGet', c[field])
         self.assertEqual(spec['terminationGracePeriodSeconds'], 60)
         job = kind(render(), 'Job')['spec']['template']['spec']
         self.assertEqual(job['containers'][0]['command'], ['/usr/local/bin/cpractl'])
+        args = job['containers'][0]['args']
+        self.assertIn('--allow-insecure-http', args)
+        self.assertEqual(args[args.index('--server') + 1], 'http://contract-cpra:8060')
         self.assertEqual([x['name'] for x in job['volumes']], ['auth'])
         self.assertFalse(job['automountServiceAccountToken'])
 
@@ -184,6 +189,7 @@ class ComposeContract(unittest.TestCase):
             self.assertEqual(config['volumes']['cpra-data']['name'], 'cpra-contract-data')
             self.assertEqual(service['logging']['options']['max-file'], '3')
             self.assertIn('ready', service['healthcheck']['test'])
+            self.assertIn('--allow-insecure-http', service['healthcheck']['test'])
 
 
 if __name__ == '__main__':

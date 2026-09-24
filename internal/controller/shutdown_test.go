@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"io"
 	"net/http"
@@ -38,7 +38,7 @@ func TestStopDeadlineCancelsWorkAndRetainsUnknownAction(t *testing.T) {
 	}
 	runtimeConfig := runtimeconfig.Default()
 	runtimeConfig.Storage.Mode = "memory"
-	store, err := durable.Open(context.Background(), runtimeConfig)
+	store, err := persistence.Open(context.Background(), runtimeConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestStopDeadlineCancelsWorkAndRetainsUnknownAction(t *testing.T) {
 	}
 	unknown := 0
 	for _, action := range m.Actions {
-		if action.State == durable.Unknown {
+		if action.State == persistence.Unknown {
 			unknown++
 		}
 	}

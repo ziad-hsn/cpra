@@ -16,3 +16,8 @@ slo:
   evaluation_interval: 5s
   minimum_samples: 1000
   healthy_hold: 60s
+
+# Manual requests still consume the monitor's ordinary recovery attempt budget.
+manual_recovery:
+  minimum_interval: 60s
+  per_hour: 3

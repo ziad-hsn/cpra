@@ -79,6 +79,12 @@ export function formatMs(ms: number): string {
   return (Math.round(m / 60 * 10) / 10) + 'h';
 }
 
+/** An absent or invalid observation is distinct from a measured zero. */
+export function formatMeasuredLatency(available: boolean | undefined, ms: number | undefined): string {
+  return available === true && typeof ms === 'number' && Number.isFinite(ms) && ms >= 0
+    ? formatMs(ms) : 'Unavailable';
+}
+
 /** Format an uptime fraction (0..1) as a percentage string. */
 export function formatUptime(frac: number | undefined): string {
   if (frac === undefined || frac === null || isNaN(frac)) return '—';
@@ -94,4 +100,3 @@ export function uptimeColor(frac: number | undefined): string {
   if (frac >= 0.9) return 'var(--status-degraded)';
   return 'var(--status-critical)';
 }
-

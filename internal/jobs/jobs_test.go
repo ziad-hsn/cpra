@@ -7,14 +7,14 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 func TestCreatePulseJobDefaultsHTTPMethod(t *testing.T) {
-	pulse := schema.Pulse{
+	pulse := manifest.Pulse{
 		Type:    "http",
 		Timeout: time.Second,
-		Config:  &schema.PulseHTTPConfig{Url: "https://example.com/health"},
+		Config:  &manifest.PulseHTTPConfig{Url: "https://example.com/health"},
 	}
 
 	job, err := CreatePulseJob(pulse, ecs.Entity{})

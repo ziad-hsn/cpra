@@ -1,5 +1,15 @@
 # Release engineering
 
+The [dashboard finalization and shipping plan](implementation/dashboard-shipping-plan.md)
+adds the integrated management, SDK/worker, provider and endurance gates and the
+decision to keep candidates private until those gates pass. Publication is now
+locked while that combined gate is unfinished. Release qualification requires
+an explicitly private repository and `publish=false`; missing visibility,
+public/internal repositories and publication requests fail before checkout or
+artifact creation. The publisher also rejects direct invocation before reading
+release payloads or running external operations. This temporary lock is not a
+completed evidence gate or proof that any release requirement passed.
+
 CPRa distributes one source module, two command-line programs, six native archives, four Linux packages, a two-platform Linux OCI image, production Compose configuration and an OCI Helm chart. A build or a cross-compilation alone does not establish platform support. The release workflow requires the corresponding native execution, installation, storage and deployment evidence before publishing an installable version tag.
 
 Provider account verification and the million-monitor, 24-hour campaign are separate gates. Packaging tests must not be described as provider certification, a capacity result, an SLA or distributed failover evidence.
@@ -103,11 +113,22 @@ Both Helm 3 and 4, including a 3-to-4 upgrade, are exercised. The release gate r
 
 Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
+The current private management candidate supports application storage formats
+through **7**. Committing its new collection-validation request promotes that
+store to format 7; older format-6 binaries cannot read it. The release recipe
+records this maximum reader/writer format. Snapshot compatibility and private
+request/claim restart checks do not establish public collection activation or
+waive the remaining platform and aggregate release gates.
+
 ## Publication and verification
 
-The release workflow is manually dispatched with a candidate version and the documentation ref whose source metadata matches the exact source commit. `publish=false` builds and verifies without creating a release tag. Publication requires reviewed `main`, passing compatibility/native/service/package/container/chart/documentation jobs, and the protected `release` environment. Configure required reviewers, release/tag restrictions and the narrowly scoped `RELEASE_ADMIN_READ_TOKEN` secret used to read the repository's immutable-release setting. The ordinary job token handles contents/packages/attestations; pull-request jobs have no publication credentials. [GitHub's workflow security guidance](https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-guides/security-hardening-for-github-actions) covers these boundaries.
+The release workflow is manually dispatched with a candidate version and the documentation ref whose source metadata matches the exact source commit. Its initial policy job permits only a private repository with `publish=false`; every build/qualification job depends on that decision. The publication job requires `publish=true`, so it is unreachable under this policy. Direct `scripts/release/publish.py` execution is also locked, with no CLI or environment override. Replace these locks only when ticket 16's complete, source/artifact-bound gate has been implemented and independently reviewed. Existing packaging evidence is insufficient to unlock publication.
 
-Do not manually pre-create a stable tag. It becomes installable through Go independently of whether a GitHub Release is still a draft. The workflow first assembles signatures and evidence, creates a non-SemVer validation draft, downloads it and verifies checksums, signer identity, issuer, source commit and provenance. Only then does it create the version tag and final draft, verify the final downloads, and publish. Immutable releases must be enabled; published bytes/tags are never overwritten. Corrections use a new version. Image aliases and the chart are promoted from the exact tested payloads. The chart version is a separate immutable version: bump `charts/cpra/Chart.yaml` before releasing any changed chart or image binding, including an application prerelease-to-final transition. Authenticated registry checks reject an existing application or chart version before creating the stable Git tag; network or authorization uncertainty fails the gate. A partially failed publication remains a failed release operation; do not hide it by overwriting artifacts.
+CI report uploads and the dedicated live-campaign workflow likewise require explicit private visibility. Ordinary CI can still test already-public source; these guards cannot prevent a person from pushing a candidate branch or tag. Repository/registry access settings and external branch/tag protections have not been verified by these local checks. Keep candidate source and SDK tags local or in access-controlled private storage. GitHub permits signed-in repository readers to download workflow artifacts, so an artifact upload is not private merely because it is not attached to a release. [GitHub artifact access](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).
+
+After the complete gate exists and passes, publication must additionally require reviewed `main` and the protected `release` environment. Configure required reviewers, release/tag restrictions and the narrowly scoped `RELEASE_ADMIN_READ_TOKEN` secret used to read the repository's immutable-release setting. The ordinary job token handles contents/packages/attestations; pull-request jobs have no publication credentials. [GitHub's workflow security guidance](https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-guides/security-hardening-for-github-actions) covers these boundaries.
+
+Do not manually pre-create a stable tag. It becomes installable through Go independently of whether a GitHub Release is still a draft. The currently locked publisher retains its draft/readback implementation for the later ticket-16 integration; it is not an enabled shipping procedure. That integration must put the aggregate gate before image pushes, public signing or attestation, drafts, and all tags. After authorization, verify checksums, signer identity, issuer, source commit and provenance against the frozen candidate. Immutable releases must be enabled; published bytes/tags are never overwritten. Corrections use a new version. Image aliases and the chart are promoted from the exact tested payloads. The chart version is a separate immutable version: bump `charts/cpra/Chart.yaml` before releasing any changed chart or image binding, including an application prerelease-to-final transition. Authenticated registry checks reject an existing application or chart version before creating the stable Git tag; network or authorization uncertainty fails the gate. A partially failed publication remains a failed release operation; do not hide it by overwriting artifacts.
 
 A release includes source/native/package/Compose payloads, `RELEASE.json`, checksums, target-specific dependency inventories and SPDX SBOMs, executed evidence, signature/provenance bundles and a trusted-root snapshot. These establish different properties: inventory, integrity, builder/source provenance and observed runtime behavior.
 

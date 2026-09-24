@@ -8,9 +8,9 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
-func newPulseRabbitMQJob(cfg *schema.PulseRabbitMQConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseRabbitMQJob(cfg *manifest.PulseRabbitMQConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return nil, fmt.Errorf("rabbitmq check requires building with -tags=rabbitmq")
 }

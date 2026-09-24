@@ -3,18 +3,18 @@ package main
 import (
 	"testing"
 
-	"github.com/ziad-hsn/cpra/internal/verification"
+	"github.com/ziad-hsn/cpra/internal/drivertest"
 )
 
 func TestExitPolicyDoesNotPromoteConfiguredSuiteToCertification(t *testing.T) {
-	local := verification.Report{AllConfiguredPassed: true}
+	local := drivertest.Report{AllConfiguredPassed: true}
 	if successful(local, false) || !successful(local, true) {
 		t.Fatal("configured-only success must be explicitly selected")
 	}
-	if successful(verification.Report{}, true) {
+	if successful(drivertest.Report{}, true) {
 		t.Fatal("an empty or unconfigured suite must fail")
 	}
-	if !successful(verification.Report{Complete: true, AllConfiguredPassed: true}, false) {
+	if !successful(drivertest.Report{Complete: true, AllConfiguredPassed: true}, false) {
 		t.Fatal("full live verification must preserve the existing successful exit")
 	}
 }

@@ -2,6 +2,8 @@ package queue
 
 import (
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/slo"
 	"io"
 	"log"
 	"math"
@@ -188,4 +190,32 @@ func TestObservedRateRetainsBacklogRelief(t *testing.T) {
 	if got := p.desiredCapacity(q.Stats()); got != 64 {
 		t.Fatalf("backlog after quiet period should raise observed-rate target: %d", got)
 	}
+}
+
+func TestExplicitZeroDemandIgnoresHistoricalThroughput(t *testing.T) {
+	q := &sizingQueue{stats: Stats{EnqueueRate: 100, DequeueRate: 100}}
+	p := newSizingPool(t, q)
+	p.SetArrivalRate(0)
+	if got := p.desiredCapacity(q.Stats()); got != p.config.MinWorkers {
+		t.Fatalf("zero demand retained capacity %d", got)
+	}
+	q.stats.QueueDepth = 50
+	if got := p.desiredCapacity(q.Stats()); got <= p.config.MinWorkers {
+		t.Fatalf("zero future demand suppressed pending work: %d", got)
+	}
+}
+
+func TestAutoscaleExplicitZeroDemandOverridesHistoricalFeedbackHold(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		q := &sizingQueue{stats: Stats{EnqueueRate: 100, DequeueRate: 100}}
+		p := newSizingPool(t, q)
+		cfg := runtimeconfig.Default().SLO
+		p.SetSLOFeedback(slo.New(time.Now(), cfg.QueueTarget, cfg.ResultTarget), cfg)
+		p.SetArrivalRate(0)
+		p.Start()
+		time.Sleep(2 * time.Second)
+		if got := p.Stats().CurrentCapacity; got != p.config.MinWorkers {
+			t.Fatalf("historical feedback retained idle capacity: %d", got)
+		}
+	})
 }

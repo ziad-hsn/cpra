@@ -1,0 +1,13 @@
+.management-page { gap: 20px; }
+.management-form { display: flex; flex-direction: column; gap: 20px; max-width: 900px; }
+.management-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+fieldset.management-field { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+fieldset.management-field legend { padding: 0 6px; }
+.management-field .input { width: 100%; }
+.management-field .btn { align-self: flex-start; }
+.reference-list { display: flex; flex-direction: column; gap: 6px; padding-left: 20px; overflow-wrap: anywhere; }
+.reference-list li .btn { margin-left: 8px; }
+.management-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 55%); }
+.management-modal > .card { width: min(100%, 640px); max-height: calc(100dvh - 40px); overflow-y: auto; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 20px; }
+.management-page .data-table { width: 100%; }
+.management-page > .card { overflow-x: auto; }

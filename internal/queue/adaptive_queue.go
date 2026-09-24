@@ -8,14 +8,16 @@ import (
 	"time"
 )
 
-// AdaptiveQueue is a lock-free, thread-safe, fixed-size circular queue using
-// the Vyukov bounded MPMC algorithm. Each cell carries a sequence number that
+// AdaptiveQueue is a thread-safe, fixed-size circular queue whose core uses
+// the lock-free Vyukov bounded MPMC algorithm. Metrics use short mutex sections.
+// Each cell carries a sequence number that
 // establishes a happens-before edge between the producer's write and the
 // consumer's read, so a consumer can never observe a slot before its job has
 // been published (the previous implementation advanced tail before writing the
 // slot, which could hand a nil/stale job to a concurrent consumer).
 type AdaptiveQueue struct {
 	arrivals   durationMetrics
+	pending    pendingAges
 	buffer     []adaptiveCell
 	mask       uint64
 	capacity   atomic.Uint64
@@ -25,6 +27,7 @@ type AdaptiveQueue struct {
 
 	enqueuedCount       atomic.Int64
 	dequeuedCount       atomic.Int64
+	droppedCount        atomic.Int64
 	totalQueueWaitNanos atomic.Int64
 	maxQueueWaitNanos   atomic.Int64
 	startUnixNano       atomic.Int64
@@ -37,7 +40,7 @@ type AdaptiveQueue struct {
 // when sequence == pos+1, and free for the next wrap when sequence == pos+mask+1.
 type adaptiveCell struct {
 	sequence atomic.Uint64
-	job      jobs.Job
+	pending  *pendingEntry
 }
 
 // NewAdaptiveQueue creates a new AdaptiveQueue with the given capacity.
@@ -66,6 +69,9 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 		return ErrQueueClosed
 	}
 	now := time.Now()
+	entry := q.pending.begin(job)
+	accepted := false
+	defer func() { q.pending.finish(entry, accepted) }()
 	pos := q.enqueuePos.Load()
 	for {
 		cell := &q.buffer[pos&q.mask]
@@ -77,9 +83,10 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 				if !isNilJob(job) {
 					job.SetEnqueueTime(now)
 				}
-				cell.job = job
+				cell.pending = entry
 				// Publish: make the job visible to consumers.
 				cell.sequence.Store(pos + 1)
+				accepted = true
 				q.enqueuedCount.Add(1)
 				q.arrivals.recordArrival()
 				q.lastEnqueueUnixNano.Store(now.UnixNano())
@@ -87,6 +94,7 @@ func (q *AdaptiveQueue) Enqueue(job jobs.Job) error {
 			}
 		} else if dif < 0 {
 			// Queue is full.
+			q.droppedCount.Add(1)
 			return ErrQueueFull
 		} else {
 			// Another producer advanced enqueuePos; reload.
@@ -126,8 +134,8 @@ func (q *AdaptiveQueue) Dequeue() (jobs.Job, error) {
 		if dif == 0 {
 			// Cell is readable at this position.
 			if q.dequeuePos.CompareAndSwap(pos, pos+1) {
-				job := cell.job
-				cell.job = nil // help GC
+				job := q.pending.take(cell.pending)
+				cell.pending = nil
 				// Free the cell for the next wrap.
 				cell.sequence.Store(pos + q.mask + 1)
 				now := time.Now()
@@ -212,13 +220,13 @@ func (q *AdaptiveQueue) Stats() Stats {
 	if dequeued > 0 {
 		avgWaitNs = q.totalQueueWaitNanos.Load() / dequeued
 	}
-	return Stats{
+	return q.pending.addTo(Stats{
 		ArrivalCV: arrivalCV, ArrivalSamples: arrivalSamples,
 		QueueDepth:   int(depth),
 		Capacity:     int(q.capacity.Load()),
 		Enqueued:     enqueued,
 		Dequeued:     dequeued,
-		Dropped:      0,
+		Dropped:      q.droppedCount.Load(),
 		MaxQueueTime: time.Duration(q.maxQueueWaitNanos.Load()),
 		AvgQueueTime: time.Duration(avgWaitNs),
 		EnqueueRate:  float64(enqueued) / elapsed.Seconds(),
@@ -226,7 +234,7 @@ func (q *AdaptiveQueue) Stats() Stats {
 		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
 		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
-	}
+	})
 }
 
 // EnsureCapacity is a no-op for AdaptiveQueue as it has a fixed capacity.

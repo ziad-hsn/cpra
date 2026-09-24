@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 func TestTwilioCustomEndpoint(t *testing.T) {
-	testNotificationEndpoint(t, endpointCase{"twilio", func(target string) schema.CodeNotification {
-		return &schema.CodeNotificationTwilio{URL: target, AccountSID: "fixture-sid", AuthToken: "fixture-token", From: "+15005550006", To: "+15005550001"}
+	testNotificationEndpoint(t, endpointCase{"twilio", func(target string) manifest.CodeNotification {
+		return &manifest.CodeNotificationTwilio{URL: target, AccountSID: "fixture-sid", AuthToken: "fixture-token", From: "+15005550006", To: "+15005550001"}
 	}, func(t *testing.T, r *http.Request) {
 		user, password, ok := r.BasicAuth()
 		if !ok || user != "fixture-sid" || password != "fixture-token" {
@@ -35,7 +35,7 @@ func TestTwilioDefaultEndpoint(t *testing.T) {
 		destination = r.URL.String()
 		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
 	})
-	job, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: "twilio", Config: &schema.CodeNotificationTwilio{AccountSID: "ACfixture", AuthToken: "fixture"}}, ecs.Entity{}, "red")
+	job, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: "twilio", Config: &manifest.CodeNotificationTwilio{AccountSID: "ACfixture", AuthToken: "fixture"}}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}

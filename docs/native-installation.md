@@ -85,7 +85,7 @@ For a Linux system service, use an administrator terminal:
 ```sh
 sudo cpractl local service install --scope system --binary /absolute/path/to/cpra
 sudo systemctl enable --now cpra.service
-sudo cpractl --token-file /etc/cpra/auth.token ready
+sudo cpractl --server http://127.0.0.1:8060 --allow-insecure-http --token-file /etc/cpra/auth.token ready
 ```
 
 The local installer uses `/usr/local/lib/cpra/cpra`; DEB/RPM use `/usr/bin/cpra`.
@@ -143,11 +143,13 @@ Sigstore verification does not imply Windows Authenticode or Apple notarization.
 ## Readiness, shutdown and privileges
 
 ```sh
-cpractl --server http://127.0.0.1:8060 --token-file /absolute/path/auth.token --request-timeout 2s ready
-cpractl --server http://127.0.0.1:8060 --token-file /absolute/path/auth.token --request-timeout 2s health
+cpractl --server http://127.0.0.1:8060 --allow-insecure-http --token-file /absolute/path/auth.token --request-timeout 2s ready
+cpractl --server http://127.0.0.1:8060 --allow-insecure-http --token-file /absolute/path/auth.token --request-timeout 2s health
 ```
 
-These commands only make API requests. They do not load manifests, open Raft,
+These commands explicitly permit bearer authentication over the local loopback
+HTTP listener. Remote clients use HTTPS. The commands only make API requests;
+they do not load manifests, open Raft,
 or invoke a provider. Readiness requires initialized admission, controller
 progress and available storage. Explicit empty configurations can be ready.
 Provider outages and unknown actions do not make the process dead. Dashboard
@@ -175,18 +177,43 @@ account for any GitOps reconciler. A live copy is not an application-consistent
 backup, and a Raft snapshot alone does not include the retained timeline.
 
 ```sh
-cpractl local backup --data-dir /absolute/path/state --output /absolute/path/backup --config /absolute/path/monitors.yaml
-cpractl local restore --backup /absolute/path/backup --data-dir /absolute/path/restored-state
+cpractl local backup --data-dir /absolute/path/state --output /absolute/path/backup --config /absolute/path/monitors.yaml --backup-auth-key /absolute/path/backup-keys/authentication.key
+cpractl local restore --backup /absolute/path/backup --data-dir /absolute/path/restored-state --backup-auth-key /absolute/path/backup-keys/authentication.key
 ```
 
 Both destination directories must be absent and their parents must exist.
 Backup retains the exclusive database lock, validates storage format and
 history, copies every state file, and records SHA-256 hashes in `BACKUP.json`.
+Format 2 authenticates the complete inventory and its metadata with HMAC-SHA256.
+Provision a separate cryptographically random 32-byte binary authentication key
+through your secret-management arrangement. Its path must be absolute and outside
+both the state and backup/destination directories, including aliases. The key is
+never copied into the backup. Keep it with independent access controls and retain
+the matching key for every backup you need to restore; use a separate key from
+management encryption keys. File access uses the native protected-file policy:
+owner-only files/directories on Linux and a protected owner/administrator DACL on
+Windows. Other Unix platforms currently reject this key access until their native
+ACL checks are qualified.
+
+Restore requires that independently trusted key before reading or publishing state.
+Changing data and recomputing the file hashes cannot authenticate a replacement
+manifest. Unsigned format 1 backups are rejected; create a new authenticated backup
+from the original stopped store. There is no automatic unsigned fallback. Manifest
+authentication proves possession of the key, not that a backup is the newest one;
+choose the intended recovery point separately.
+
 The inventory includes node identity, Raft database, snapshots, history catalog,
 and retained segments. It records the running tool's artifact identity and an
 optional matching configuration fingerprint; keep the exact runtime
 configuration and source artifact identity with the backup. Credentials remain
 in a separate protected arrangement.
+
+An unfinished configuration migration is not accepted as a complete backup.
+Resume its original encrypted staging data, complete activation, then stop the
+owner and retry the backup. Offline validation checks committed snapshot and log
+state without opening Raft, activating staged input, decrypting secrets, or
+invoking providers; it does not treat an uncommitted or rejected activation as
+completed migration.
 
 Restore verifies the inventory and storage before publishing a new directory.
 It never overwrites an existing store or invokes a recovery action. Restore as
@@ -195,12 +222,13 @@ owner while stopped. Resume with matching configuration and explicit data path;
 check readiness, history and unknown outcomes. A backup may still contain a
 started action: recovery conservatively marks it unknown.
 
-Local installer upgrades validate the candidate, stop the old service, take a
-complete sibling backup when state exists, replace its managed executable,
+Local installer upgrades validate and retain the backup authentication key before
+running the candidate or stopping the old service, then take a complete sibling
+backup when state exists, replace its managed executable,
 and restart only if the service was previously running:
 
 ```sh
-cpractl local service update --binary /absolute/path/new-cpra
+cpractl local service update --binary /absolute/path/new-cpra --backup-auth-key /absolute/path/backup-keys/authentication.key
 cpractl local service uninstall
 ```
 

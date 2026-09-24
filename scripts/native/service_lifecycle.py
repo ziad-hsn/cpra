@@ -67,6 +67,7 @@ class Harness:
         self.user_manager_started = False
         self.enabled_linger = False
         self.fixture = None
+        self.backup_key = None
         self.layout = None
         self.roots = []
 
@@ -211,6 +212,42 @@ class Harness:
         self.fixture = Path(tempfile.mkdtemp(prefix="cpra-native-service-")).resolve()
         self.mark("clean supervisor environment and source identity", paths=self.layout)
 
+    def prepare_backup_key(self):
+        # This independent test-only key stays in the disposable private fixture,
+        # outside state and backup inventories. Its bytes never enter argv/logs.
+        directory = self.fixture / "backup-keys"
+        directory.mkdir(mode=0o700)
+        self.backup_key = directory / "authentication.key"
+
+        def protect_windows(path, is_directory):
+            kind = "DirectorySecurity" if is_directory else "FileSecurity"
+            flags = "ContainerInherit, ObjectInherit" if is_directory else "None"
+            self.ps(
+                "$owner = [Security.Principal.WindowsIdentity]::GetCurrent().User; "
+                f"$acl = New-Object Security.AccessControl.{kind}; "
+                "$acl.SetOwner($owner); $acl.SetAccessRuleProtection($true, $false); "
+                "foreach ($sid in @($owner, [Security.Principal.SecurityIdentifier]::new('S-1-5-18'), "
+                "[Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))) { "
+                "$rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, "
+                "[Security.AccessControl.FileSystemRights]::FullControl, "
+                f"[Security.AccessControl.InheritanceFlags]'{flags}', "
+                "[Security.AccessControl.PropagationFlags]::None, "
+                "[Security.AccessControl.AccessControlType]::Allow); $acl.AddAccessRule($rule) }; "
+                f"Set-Acl -LiteralPath {psquote(path)} -AclObject $acl")
+
+        if self.os == "Windows":
+            protect_windows(directory, True)
+        with self.backup_key.open("xb") as stream:
+            stream.write(os.urandom(32))
+        if self.os == "Windows":
+            protect_windows(self.backup_key, False)
+        else:
+            self.backup_key.chmod(0o600)
+        if self.os == "Darwin":
+            self.record["pending_backup_requirement"] = (
+                "Darwin native ACL qualification for protected backup authentication keys is pending; "
+                "the key reader currently fails closed")
+
     def prepare_linux_user_manager(self):
         if self.os != "Linux" or self.scope != "user":
             return
@@ -330,7 +367,7 @@ class Harness:
                 if time.monotonic() > deadline:
                     raise RuntimeError("native service did not become ready")
                 time.sleep(.25)
-        self.run([self.cli, "--server", "http://127.0.0.1:8060", "--token-file", self.config / "auth.token", "--request-timeout", "2s", "ready"])
+        self.run([self.cli, "--server", "http://127.0.0.1:8060", "--allow-insecure-http", "--token-file", self.config / "auth.token", "--request-timeout", "2s", "ready"])
         if self.request("overview").get("total") != 0:
             raise RuntimeError("fixture unexpectedly admitted monitors/provider operations")
         if not self.status()["running"]:
@@ -409,6 +446,7 @@ class Harness:
     def execute(self):
         self.guard()
         self.owned = True
+        self.prepare_backup_key()
         self.create_mac_account()
         self.created_account |= self.os == "Linux" and self.scope == "system"
         self.created_group |= self.os == "Linux" and self.scope == "system"
@@ -429,7 +467,7 @@ class Harness:
         manifest.write_text("# Operator edit must survive update and removal.\nmonitors: []\n", encoding="utf-8")
         config_inventory = {name: digest(self.config / name) for name in ("monitors.yaml", "runtime.yaml", "auth.token")}
         old_pid, startup = self.status()["pid"], self.status()["startup"]
-        self.ctl("service", "update", "--binary", self.binary)
+        self.ctl("service", "update", "--binary", self.binary, "--backup-auth-key", self.backup_key)
         self.wait_ready()
         if self.status()["pid"] == old_pid or self.status()["startup"] != startup:
             raise RuntimeError("running update did not replace the process while preserving startup mode")
@@ -449,14 +487,14 @@ class Harness:
         self.mark("deliberate stop remains stopped", observed_seconds=21)
         self.mode(False)
         startup = self.status()["startup"]
-        self.ctl("service", "update", "--binary", self.binary)
+        self.ctl("service", "update", "--binary", self.binary, "--backup-auth-key", self.backup_key)
         if self.status()["running"] or self.status()["startup"] != startup:
             raise RuntimeError("stopped update changed stopped/disabled state")
         if config_inventory != {name: digest(self.config / name) for name in config_inventory}:
             raise RuntimeError("stopped update changed configuration")
         self.mark("stopped update preserves disabled state and edited configuration", startup=startup)
         backup = self.fixture / "backup"
-        self.ctl("backup", "--data-dir", self.state, "--output", backup, "--config", manifest)
+        self.ctl("backup", "--data-dir", self.state, "--output", backup, "--config", manifest, "--backup-auth-key", self.backup_key)
         stopped_inventory = inventory(self.state)
         self.ctl("service", "uninstall")
         deadline = time.monotonic() + 15
@@ -480,7 +518,15 @@ class Harness:
         # it to make an inconsistent backup appear usable.
         original = self.state.with_name(self.state.name + ".pre-restore")
         self.state.rename(original)
-        self.ctl("restore", "--backup", backup, "--data-dir", self.state)
+        self.ctl("restore", "--backup", backup, "--data-dir", self.state, "--backup-auth-key", self.backup_key)
+        # Restore intentionally removes previous authority. Do not weaken that
+        # boundary to keep the old native lifecycle fixture reporting a pass.
+        restored_access = json.loads(self.ctl("auth", "list", "--data-dir", self.state).stdout)
+        if restored_access.get("resetRequired"):
+            self.record["pending_restore_requirement"] = (
+                "Native lifecycle fixture must reprovision fresh named authentication and configure "
+                "its management/TLS transport before restarting restored state")
+            raise RuntimeError(self.record["pending_restore_requirement"])
         self.ctl("service", "install", *install_args)
         self.mode(True)
         self.start()

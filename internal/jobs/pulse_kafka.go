@@ -10,7 +10,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseKafkaJob checks a Kafka cluster by connecting to seed brokers and
@@ -27,7 +27,7 @@ type PulseKafkaJob struct {
 	payload     map[string]interface{}
 }
 
-func newPulseKafkaJob(cfg *schema.PulseKafkaConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseKafkaJob(cfg *manifest.PulseKafkaConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return &PulseKafkaJob{
 		ID:      uuid.New(),
 		Entity:  entity,
@@ -44,12 +44,14 @@ func (p *PulseKafkaJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		client, err := kgo.NewClient(kgo.SeedBrokers(p.Brokers...), kgo.RequestRetries(0), kgo.DialTimeout(remaining(ctx)), kgo.RequestTimeoutOverhead(remaining(ctx)))
 		if err == nil {
 			err = client.Ping(ctx)
@@ -59,13 +61,8 @@ func (p *PulseKafkaJob) Execute() (result Result) {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("kafka check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("kafka check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseKafkaJob) Copy() Job {

@@ -17,8 +17,8 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY internal/ ./internal/
 COPY cmd/cpractl/ ./cmd/cpractl/
 COPY *.go LICENSE ./
-RUN rm -rf internal/web/server/assets
-COPY --from=dashboard /src/dashboard/dist/ ./internal/web/server/assets/
+RUN rm -rf internal/httpserver/assets
+COPY --from=dashboard /src/dashboard/dist/ ./internal/httpserver/assets/
 COPY scripts/release/ ./scripts/release/
 COPY --from=dashboard /src/dashboard/package.json ./dashboard/package.json
 COPY --from=dashboard /src/dashboard/node_modules/ ./dashboard/node_modules/

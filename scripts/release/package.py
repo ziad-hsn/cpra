@@ -100,6 +100,42 @@ def bundled_font_inventory():
             'source_file':'brand/fonts/RobotoSlab-Bold.ttf','sha256':hashlib.sha256(data).hexdigest(),
             'license_url':license_url}
 
+def dashboard_wasm_inventory():
+    """Inventory only the parser actually present in the completed Vite output.
+
+    The build input catalog comes from runtime/debug on the exact compiled Wasm,
+    not the (potentially larger) Go source import graph.
+    """
+    artifacts = sorted((ROOT / 'dashboard/dist').rglob('collection-parser*.wasm'))
+    if not artifacts:
+        return [], {}
+    generated = ROOT / 'dashboard/src/import/generated'
+    metadata = json.loads((generated / 'BUILD.json').read_text())
+    if metadata.get('target') != 'js/wasm' or metadata.get('externaljobs') is not False:
+        raise RuntimeError('Unsupported embedded collection parser build')
+    required = {'collection-parser.wasm', 'wasm_exec.js', 'GO-LICENSE.txt', 'DEPENDENCIES.json', 'LICENSES.txt'}
+    if set(metadata.get('files', {})) != required:
+        raise RuntimeError('Missing or unexpected generated parser file identity')
+    for name, record in metadata['files'].items():
+        if Path(name).name != name:
+            raise RuntimeError('Invalid generated parser file identity')
+        data = (generated / name).read_bytes()
+        if len(data) != record['bytes'] or hashlib.sha256(data).hexdigest() != record['sha256']:
+            raise RuntimeError('Generated parser input differs: ' + name)
+    expected = metadata['files']['collection-parser.wasm']['sha256']
+    if len(artifacts) != 1 or hashlib.sha256(artifacts[0].read_bytes()).hexdigest() != expected:
+        raise RuntimeError('Embedded parser differs from the qualified Wasm artifact')
+    dependencies = json.loads((generated / 'DEPENDENCIES.json').read_text())
+    if not dependencies or any(item.get('scope') != 'dashboard-wasm' for item in dependencies):
+        raise RuntimeError('Missing linked parser dependency inventory')
+    dependencies.append({'ecosystem': 'wasm', 'scope': 'dashboard-wasm', 'name': 'CPRa collection parser',
+                         'version': 'source', 'sha256': expected,
+                         'source_file': 'dashboard/src/import/generated/collection-parser.wasm',
+                         'source_identity': metadata['sdk_source_sha256'], 'declared_license': 'MIT',
+                         'license_files': ['sdk/go/LICENSE']})
+    return dependencies, {'dashboard-wasm/LICENSES.txt': (generated / 'LICENSES.txt').read_bytes()}
+
+
 def dashboard_inventory():
     inventory, notices = [], {}
     # Resolve the installed production dependency graph using Node's parent
@@ -137,6 +173,9 @@ def dashboard_inventory():
         optional_names = package.get('optionalDependencies', {})
         for name in package.get('dependencies', {}) | optional_names:
             pending.append((directory, name, name in optional_names))
+    wasm_dependencies, wasm_notices = dashboard_wasm_inventory()
+    inventory.extend(wasm_dependencies)
+    notices.update(wasm_notices)
     inventory.append(bundled_font_inventory())
     notices['fonts/RobotoSlab/LICENSE.txt'] = (ROOT / 'brand/fonts/LICENSE.txt').read_bytes()
     return sorted(inventory, key=lambda x: x['name']), notices

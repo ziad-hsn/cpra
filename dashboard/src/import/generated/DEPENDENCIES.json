@@ -1,0 +1,67 @@
+[
+  {
+    "declared_license": "MIT",
+    "ecosystem": "go",
+    "license_files": [
+      "sdk/go/LICENSE"
+    ],
+    "name": "github.com/ziad-hsn/cpra/sdk/go",
+    "scope": "dashboard-wasm",
+    "source_sha256": "3da61563c367cdc5427a2f9d3ac7cb15060d6d77d569475f24491e180d0cfef4",
+    "version": "source"
+  },
+  {
+    "ecosystem": "go",
+    "license_files": [
+      "LICENSE"
+    ],
+    "module_sum": "h1:axGnT1gRIfimI7gJifB699GoE/oq+F2MU7Dml6nw9rQ=",
+    "name": "github.com/apapsch/go-jsonmerge/v2",
+    "scope": "dashboard-wasm",
+    "version": "v2.0.0"
+  },
+  {
+    "ecosystem": "go",
+    "license_files": [
+      "LICENSE"
+    ],
+    "module_sum": "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+    "name": "github.com/google/uuid",
+    "scope": "dashboard-wasm",
+    "version": "v1.6.0"
+  },
+  {
+    "ecosystem": "go",
+    "license_files": [
+      "LICENSE"
+    ],
+    "module_sum": "h1:7Xx+GlueD6nRuyKoCPzL434Jfi3BetbiJOrzCHp/VPU=",
+    "name": "github.com/oapi-codegen/runtime",
+    "scope": "dashboard-wasm",
+    "version": "v1.6.0"
+  },
+  {
+    "ecosystem": "go",
+    "license_files": [
+      "LICENSE",
+      "NOTICE"
+    ],
+    "module_sum": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
+    "name": "gopkg.in/yaml.v3",
+    "scope": "dashboard-wasm",
+    "version": "v3.0.1"
+  },
+  {
+    "declared_license": "BSD-3-Clause",
+    "ecosystem": "go-toolchain",
+    "license_files": [
+      "GO-LICENSE.txt"
+    ],
+    "name": "Go browser runtime",
+    "scope": "dashboard-wasm",
+    "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+    "source_file": "dashboard/src/import/generated/wasm_exec.js",
+    "source_identity": "go1.27.1",
+    "version": "go1.27.1"
+  }
+]

@@ -1,0 +1,10 @@
+apiVersion: cpra.io/v2
+kind: NotificationEndpoint
+metadata:
+  id: oncall-webhook
+  name: On-call webhook
+spec:
+  type: webhook
+  config: {}
+  credentialRefs:
+    url: oncall-webhook-url

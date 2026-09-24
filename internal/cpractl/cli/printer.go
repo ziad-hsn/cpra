@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -49,7 +48,16 @@ func (p *printer) JSON(v interface{}) error {
 
 // YAML writes v as YAML.
 func (p *printer) YAML(v interface{}) error {
-	b, err := yaml.Marshal(v)
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	defer clear(raw)
+	var node yaml.Node
+	if err := yaml.Unmarshal(raw, &node); err != nil {
+		return err
+	}
+	b, err := yaml.Marshal(&node)
 	if err != nil {
 		return err
 	}
@@ -83,54 +91,6 @@ func fmtBool(b bool) string {
 		return "true"
 	}
 	return "false"
-}
-
-// fmtDur renders a duration in milliseconds with one decimal, or "-" for zero.
-func fmtDur(d time.Duration) string {
-	if d <= 0 {
-		return "-"
-	}
-	if d < time.Millisecond {
-		return fmt.Sprintf("%dns", d.Nanoseconds())
-	}
-	return fmt.Sprintf("%.1fms", float64(d.Nanoseconds())/1e6)
-}
-
-// fmtAgo renders a time as a relative age like "3m2s", or "-" if unset/invalid.
-func fmtAgo(t time.Time) string {
-	if t.IsZero() {
-		return "-"
-	}
-	d := time.Since(t)
-	if d < 0 {
-		d = 0
-	}
-	switch {
-	case d >= time.Hour:
-		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
-	case d >= time.Minute:
-		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
-	case d >= time.Second:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	default:
-		return "<1s"
-	}
-}
-
-// fmtNext renders the scheduled time without treating it as a past age.
-func fmtNext(t time.Time) string {
-	if t.IsZero() {
-		return "-"
-	}
-	return t.Format(time.RFC3339)
-}
-
-// fmtRate renders a per-second rate, or "-" for zero.
-func fmtRate(f float64) string {
-	if f <= 0 {
-		return "-"
-	}
-	return fmt.Sprintf("%.1f/s", f)
 }
 
 // strOrDash returns "-" for an empty string.

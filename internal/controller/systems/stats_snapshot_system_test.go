@@ -6,8 +6,8 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
-	"github.com/ziad-hsn/cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -22,24 +22,24 @@ func (noopLogger) Error(string, ...interface{})                    {}
 func (noopLogger) LogSystemPerformance(string, time.Duration, int) {}
 func (noopLogger) LogComponentState(uint32, string, string)        {}
 
-func mkMonitor(name, ptype string, enabled bool) *schema.Monitor {
-	cfg := &schema.PulseHTTPConfig{Url: "http://example.com/health"}
+func mkMonitor(name, ptype string, enabled bool) *manifest.Monitor {
+	cfg := &manifest.PulseHTTPConfig{Url: "http://example.com/health"}
 	if ptype == "tcp" {
 		cfg = nil
 	}
-	m := &schema.Monitor{
+	m := &manifest.Monitor{
 		Name:    name,
 		Enabled: enabled,
-		Pulse: schema.Pulse{
+		Pulse: manifest.Pulse{
 			Type:     ptype,
 			Interval: time.Second,
 			Timeout:  time.Second,
 		},
 	}
 	if ptype == "http" {
-		m.Pulse.Config = &schema.PulseHTTPConfig{Url: "http://example.com/health"}
+		m.Pulse.Config = &manifest.PulseHTTPConfig{Url: "http://example.com/health"}
 	} else if ptype == "tcp" {
-		m.Pulse.Config = &schema.PulseTCPConfig{Host: "example.com", Port: 80}
+		m.Pulse.Config = &manifest.PulseTCPConfig{Host: "example.com", Port: 80}
 	}
 	_ = cfg
 	return m
@@ -83,7 +83,7 @@ func TestStatsSnapshotAggregates(t *testing.T) {
 		st.PendingCode = "red"
 	})
 
-	holder := snapshot.NewHolder()
+	holder := fleetview.NewHolder()
 	sys := NewBatchStatsSnapshotSystem(&w, noopLogger{}, holder, time.Second, 50000)
 	sys.Initialize(&w)
 	// Bypass throttle by calling buildSnapshot directly.
@@ -121,7 +121,7 @@ func TestStatsSnapshotAggregates(t *testing.T) {
 
 func TestStatsSnapshotThrottle(t *testing.T) {
 	w := ecs.NewWorld()
-	holder := snapshot.NewHolder()
+	holder := fleetview.NewHolder()
 	sys := NewBatchStatsSnapshotSystem(&w, noopLogger{}, holder, time.Hour, 50000)
 	sys.Initialize(&w)
 	sys.last = time.Now() // recent

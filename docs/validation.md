@@ -105,8 +105,8 @@ python3 scripts/benchmark/prepare.py --go /path/to/go1.25/bin/go --out /path/to/
 
 ```sh
 python3 scripts/benchmark/campaign.py --mode preflight --out evidence/local/preflight
-python3 scripts/benchmark/campaign.py --mode compare --builds /path/to/prepared-builds/builds.json --candidate /path/to/candidate --baseline /path/to/baseline --target bin/cpra-target --out evidence/local/comparison
-python3 scripts/benchmark/campaign.py --mode soak --builds /path/to/prepared-builds/builds.json --candidate /path/to/candidate --target bin/cpra-target --out evidence/local/soak
+python3 scripts/benchmark/campaign.py --mode compare --builds /path/to/prepared-builds/builds.json --candidate /path/to/candidate --baseline /path/to/baseline --target bin/cpra-bench-target --out evidence/local/comparison
+python3 scripts/benchmark/campaign.py --mode soak --builds /path/to/prepared-builds/builds.json --candidate /path/to/candidate --target bin/cpra-bench-target --out evidence/local/soak
 ```
 
 Comparison uses 10,000, 100,000 and 1,000,000 distinct monitor configurations,

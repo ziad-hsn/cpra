@@ -12,9 +12,11 @@ import base64
 import copy
 import gzip
 import hashlib
+import http.client
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import secrets
 import subprocess
 import sys
@@ -24,6 +26,56 @@ import time
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_history(kubectl, token):
+    """Own a loopback tunnel for one bounded, authenticated history read."""
+    with tempfile.TemporaryDirectory(prefix='cpra-history-') as directory, (Path(directory) / 'forward.log').open('w+b') as log:
+        forward = subprocess.Popen(kubectl + ['port-forward', '--address', '127.0.0.1',
+                                              'pod/cpra-fixture-0', ':8060'],
+                                   stdout=log, stderr=subprocess.STDOUT)
+        try:
+            deadline = time.monotonic() + 8
+            while True:
+                # Use a separate handle so reading cannot move the child's
+                # stdout file offset while kubectl is still writing.
+                with (Path(directory) / 'forward.log').open('rb') as reader:
+                    output = reader.read(4097)
+                if len(output) > 4096 or forward.poll() is not None:
+                    raise RuntimeError('fixture API tunnel failed')
+                bound = re.search(rb'Forwarding from 127\.0\.0\.1:([0-9]+) -> 8060', output)
+                if bound:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('fixture API tunnel startup timed out')
+                time.sleep(.05)
+            port = int(bound.group(1))
+            if not 0 < port < 65536:
+                raise RuntimeError('fixture API tunnel port is invalid')
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
+            try:
+                connection.request('GET', '/api/v1/history?monitor_id=packaging-fixture&limit=100',
+                                   headers={'Authorization': 'Bearer ' + token})
+                response = connection.getresponse()
+                body = response.read((2 << 20) + 1)
+                if response.status != 200 or len(body) > 2 << 20:
+                    raise RuntimeError('fixture history response was unavailable or oversized')
+                events = json.loads(body)['events']
+                if not isinstance(events, list) or any(event.get('monitor_id') != 'packaging-fixture' for event in events):
+                    raise RuntimeError('fixture history contained an unexpected monitor')
+                return events
+            finally:
+                connection.close()
+        except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, AttributeError):
+            raise RuntimeError('authenticated fixture history read failed') from None
+        finally:
+            if forward.poll() is None:
+                forward.terminate()
+            try:
+                forward.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                forward.kill()
+                forward.wait(timeout=2)
 
 
 def main():
@@ -88,18 +140,19 @@ def main():
 
     def ctl(*args, check=True):
         return run(k + ['exec', 'cpra-fixture-0', '--', '/usr/local/bin/cpractl', *args,
-                        '--server', 'http://127.0.0.1:8060', '--token-file', '/run/secrets/cpra/token',
+                        '--server', 'http://127.0.0.1:8060', '--allow-insecure-http', '--token-file', '/run/secrets/cpra/token',
                         '--request-timeout', '2s'], check=check, timeout=10)
 
     def history():
-        return json.loads(ctl('get', 'history', 'packaging-fixture', '-o', 'json').stdout)['events']
+        token = dict(zip(('cpra-api-v1', 'cpra-api-v2'), tokens))[values['auth']['existingSecret']]
+        return read_history(k, token)
 
     def wait_ready():
         run(k + ['rollout', 'status', 'statefulset/cpra-fixture', '--timeout=180s'])
         until(lambda: ctl('ready', check=False).returncode == 0, 'authenticated readiness')
 
     def target_count():
-        return int(run(k + ['exec', 'cpra-target', '--', 'sh', '-c', 'wc -l < /tmp/checks']).stdout)
+        return int(run(k + ['exec', 'cpra-bench-target', '--', 'sh', '-c', 'wc -l < /tmp/checks']).stdout)
 
     try:
         if run(k + ['get', 'namespace', a.namespace], check=False).returncode == 0:
@@ -115,7 +168,7 @@ def main():
         manifest = {'monitors': [{'id': 'packaging-fixture', 'name': 'packaging-fixture', 'enabled': True,
                     'pulse_check': {'type': 'http', 'interval': '1h', 'timeout': '1s',
                                     'unhealthy_threshold': 1, 'healthy_threshold': 1,
-                                    'config': {'url': 'http://cpra-target:8080/cgi-bin/check'}},
+                                    'config': {'url': 'http://cpra-bench-target:8080/cgi-bin/check'}},
                     'codes': {'red': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}},
                               'green': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}}}}]}
         monitor_config = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'cpra-monitors'},
@@ -132,14 +185,14 @@ CGI
 chmod 755 /tmp/www/cgi-bin/check
 exec httpd -f -p 8080 -h /tmp/www
 """
-        apply({'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': 'cpra-target', 'labels': {'fixture': 'cpra-target'}},
+        apply({'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': 'cpra-bench-target', 'labels': {'fixture': 'cpra-bench-target'}},
                'spec': {'automountServiceAccountToken': False, 'containers': [{'name': 'target', 'image': a.target_image,
                         'imagePullPolicy': 'IfNotPresent', 'command': ['/bin/sh', '-c', target_script],
                         'securityContext': {'runAsUser': 1001, 'readOnlyRootFilesystem': True, 'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
                         'volumeMounts': [{'name': 'tmp', 'mountPath': '/tmp'}]}], 'volumes': [{'name': 'tmp', 'emptyDir': {'sizeLimit': '16Mi'}}]}})
-        apply({'apiVersion': 'v1', 'kind': 'Service', 'metadata': {'name': 'cpra-target'},
-               'spec': {'selector': {'fixture': 'cpra-target'}, 'ports': [{'port': 8080, 'targetPort': 8080}]}})
-        run(k + ['wait', '--for=condition=Ready', 'pod/cpra-target', '--timeout=120s'])
+        apply({'apiVersion': 'v1', 'kind': 'Service', 'metadata': {'name': 'cpra-bench-target'},
+               'spec': {'selector': {'fixture': 'cpra-bench-target'}, 'ports': [{'port': 8080, 'targetPort': 8080}]}})
+        run(k + ['wait', '--for=condition=Ready', 'pod/cpra-bench-target', '--timeout=120s'])
         if '@sha256:' in a.image:
             repo, digest = a.image.rsplit('@', 1)
             image_values = {'repository': repo, 'digest': digest, 'pullPolicy': 'Never'}
@@ -204,7 +257,7 @@ exec httpd -f -p 8080 -h /tmp/www
             # Calibrate the independent receipt counter, then keep normal scheduled
             # work an hour apart while checking for calls induced by client probes.
             previous = target_count()
-            run(k + ['exec', 'cpra-target', '--', 'wget', '-qO-', 'http://127.0.0.1:8080/cgi-bin/check'])
+            run(k + ['exec', 'cpra-bench-target', '--', 'wget', '-qO-', 'http://127.0.0.1:8080/cgi-bin/check'])
             assert target_count() > previous
             count = target_count()
             for _ in range(5):
@@ -226,7 +279,7 @@ exec httpd -f -p 8080 -h /tmp/www
             values['manifest']['existingConfigMap'] = 'cpra-monitors-active'
             deploy()
             wait_ready()
-            run(k + ['exec', 'cpra-target', '--', 'touch', '/tmp/fail'])
+            run(k + ['exec', 'cpra-bench-target', '--', 'touch', '/tmp/fail'])
             events = until(lambda: history(), 'durable incident event')
             ids = {event['id'] for event in events}
             assert all(event['monitor_id'] == 'packaging-fixture' for event in events)

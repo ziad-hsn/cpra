@@ -7,7 +7,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"github.com/ziad-hsn/cpra/internal/jobs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"testing"
 	"time"
@@ -16,9 +16,9 @@ import (
 func releaseMonitor(t *testing.T, w *ecs.World, unhealthy, healthy int) ecs.Entity {
 	t.Helper()
 	mgr := entities.NewEntityManager(w)
-	m := schema.Monitor{Name: "release", Enabled: true, Pulse: schema.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: unhealthy, HealthyThreshold: healthy, Config: &schema.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: map[string]schema.CodeConfig{}}
+	m := manifest.Monitor{Name: "release", Enabled: true, Pulse: manifest.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: unhealthy, HealthyThreshold: healthy, Config: &manifest.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: map[string]manifest.CodeConfig{}}
 	for _, color := range []string{"yellow", "red", "green", "cyan"} {
-		m.Codes[color] = schema.CodeConfig{Dispatch: true, Notify: "log", Config: &schema.CodeNotificationLog{File: t.TempDir() + "/alerts.jsonl"}}
+		m.Codes[color] = manifest.CodeConfig{Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: t.TempDir() + "/alerts.jsonl"}}
 	}
 	if err := mgr.CreateEntityFromMonitor(&m, w); err != nil {
 		t.Fatal(err)

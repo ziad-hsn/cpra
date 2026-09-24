@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -15,12 +15,12 @@ func TestCreatePulseJobNewTypes(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		pulse schema.Pulse
+		pulse manifest.Pulse
 	}{
-		{"dns", schema.Pulse{Type: "dns", Timeout: time.Second, Config: &schema.PulseDNSConfig{Host: "example.com"}}},
-		{"udp", schema.Pulse{Type: "udp", Timeout: time.Second, Config: &schema.PulseUDPConfig{Host: "127.0.0.1", Port: 53}}},
-		{"grpc", schema.Pulse{Type: "grpc", Timeout: time.Second, Config: &schema.PulseGRPCConfig{Host: "127.0.0.1", Port: 50051}}},
-		{"docker", schema.Pulse{Type: "docker", Timeout: time.Second, Config: &schema.PulseDockerConfig{Container: "foo"}}},
+		{"dns", manifest.Pulse{Type: "dns", Timeout: time.Second, Config: &manifest.PulseDNSConfig{Host: "example.com"}}},
+		{"udp", manifest.Pulse{Type: "udp", Timeout: time.Second, Config: &manifest.PulseUDPConfig{Host: "127.0.0.1", Port: 53}}},
+		{"grpc", manifest.Pulse{Type: "grpc", Timeout: time.Second, Config: &manifest.PulseGRPCConfig{Host: "127.0.0.1", Port: 50051}}},
+		{"docker", manifest.Pulse{Type: "docker", Timeout: time.Second, Config: &manifest.PulseDockerConfig{Container: "foo"}}},
 	}
 
 	for _, tc := range cases {

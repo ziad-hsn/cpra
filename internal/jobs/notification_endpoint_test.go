@@ -11,19 +11,19 @@ import (
 	"testing"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 type endpointCase struct {
 	name   string
-	config func(string) schema.CodeNotification
+	config func(string) manifest.CodeNotification
 	verify func(*testing.T, *http.Request)
 }
 
 func notificationEndpointCases() []endpointCase {
 	return []endpointCase{
-		{"telegram", func(target string) schema.CodeNotification {
-			return &schema.CodeNotificationTelegram{URL: target, BotToken: "123:fixture", ChatID: "456"}
+		{"telegram", func(target string) manifest.CodeNotification {
+			return &manifest.CodeNotificationTelegram{URL: target, BotToken: "123:fixture", ChatID: "456"}
 		}, func(t *testing.T, r *http.Request) {
 			var body map[string]string
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -33,8 +33,8 @@ func notificationEndpointCases() []endpointCase {
 				t.Errorf("unexpected telegram body: %v", body)
 			}
 		}},
-		{"victorops", func(target string) schema.CodeNotification {
-			return &schema.CodeNotificationVictorOps{URL: target, RestEndpointKey: "fixture", RoutingKey: "routing", MessageType: "INFO", EntityID: "fixture"}
+		{"victorops", func(target string) manifest.CodeNotification {
+			return &manifest.CodeNotificationVictorOps{URL: target, RestEndpointKey: "fixture", RoutingKey: "routing", MessageType: "INFO", EntityID: "fixture"}
 		}, func(t *testing.T, r *http.Request) {
 			var body map[string]string
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -44,8 +44,8 @@ func notificationEndpointCases() []endpointCase {
 				t.Errorf("unexpected victorops body: %v", body)
 			}
 		}},
-		{"pushover", func(target string) schema.CodeNotification {
-			return &schema.CodeNotificationPushover{URL: target, AppToken: "fixture-token", UserKey: "fixture-user"}
+		{"pushover", func(target string) manifest.CodeNotification {
+			return &manifest.CodeNotificationPushover{URL: target, AppToken: "fixture-token", UserKey: "fixture-user"}
 		}, func(t *testing.T, r *http.Request) {
 			if err := r.ParseForm(); err != nil {
 				t.Error(err)
@@ -54,8 +54,8 @@ func notificationEndpointCases() []endpointCase {
 				t.Error("unexpected pushover form")
 			}
 		}},
-		{"datadog", func(target string) schema.CodeNotification {
-			return &schema.CodeNotificationDatadog{URL: target, APIKey: "fixture-key", AppKey: "fixture-app", Tags: []string{"env:fixture"}}
+		{"datadog", func(target string) manifest.CodeNotification {
+			return &manifest.CodeNotificationDatadog{URL: target, APIKey: "fixture-key", AppKey: "fixture-app", Tags: []string{"env:fixture"}}
 		}, func(t *testing.T, r *http.Request) {
 			if r.Header.Get("DD-API-KEY") != "fixture-key" || r.Header.Get("DD-APPLICATION-KEY") != "fixture-app" {
 				t.Error("missing datadog auth")
@@ -97,7 +97,7 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 	}))
 	defer server.Close()
 	target := server.URL + "/operation/fixture-secret?key=query-secret"
-	job, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config(target)}, ecs.Entity{}, "red")
+	job, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config(target)}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 	if count.Load() != 3 {
 		t.Error("protected request reached loopback")
 	}
-	if _, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config(target)}, ecs.Entity{}, "red"); err == nil {
+	if _, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config(target)}, ecs.Entity{}, "red"); err == nil {
 		t.Error("constructor accepted blocked destination")
 	}
 	SSRFProtect = false
@@ -136,7 +136,7 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 	} else if strings.Contains(result.Err.Error(), "fixture-secret") || strings.Contains(result.Err.Error(), "query-secret") {
 		t.Errorf("endpoint credential leaked: %v", result.Err)
 	}
-	if _, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config("file:///fixture-secret")}, ecs.Entity{}, "red"); err == nil {
+	if _, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config("file:///fixture-secret")}, ecs.Entity{}, "red"); err == nil {
 		t.Error("invalid endpoint scheme accepted")
 	}
 }
@@ -167,7 +167,7 @@ func TestTelegramTestEndpointSelection(t *testing.T) {
 			}
 		})
 	}
-	_, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: "telegram", Config: &schema.CodeNotificationTelegram{URL: "https://fixture.invalid", TestMode: true}}, ecs.Entity{}, "red")
+	_, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: "telegram", Config: &manifest.CodeNotificationTelegram{URL: "https://fixture.invalid", TestMode: true}}, ecs.Entity{}, "red")
 	if err == nil {
 		t.Error("conflicting Telegram settings accepted")
 	}
@@ -192,7 +192,7 @@ func TestNotificationDefaultURLs(t *testing.T) {
 	}
 	for _, tt := range notificationEndpointCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			job, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config("")}, ecs.Entity{}, "red")
+			job, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config("")}, ecs.Entity{}, "red")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -204,7 +204,7 @@ func TestNotificationDefaultURLs(t *testing.T) {
 			}
 		})
 	}
-	job, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: "datadog", Config: &schema.CodeNotificationDatadog{Site: "datadoghq.eu"}}, ecs.Entity{}, "red")
+	job, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: "datadog", Config: &manifest.CodeNotificationDatadog{Site: "datadoghq.eu"}}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestNotificationDefaultURLs(t *testing.T) {
 	if destination != "https://api.datadoghq.eu/api/v1/events" {
 		t.Errorf("configured Datadog site ignored: %s", destination)
 	}
-	job, err = CreateCodeJob("fixture", schema.CodeConfig{Notify: "telegram", Config: &schema.CodeNotificationTelegram{BotToken: "123:fixture", TestMode: true}}, ecs.Entity{}, "red")
+	job, err = CreateCodeJob("fixture", manifest.CodeConfig{Notify: "telegram", Config: &manifest.CodeNotificationTelegram{BotToken: "123:fixture", TestMode: true}}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}

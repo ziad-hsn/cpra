@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Read back a signed staging draft before creating any installable version tag.
+"""Publication is locked pending the complete private qualification gate.
 
-Only the protected, manually dispatched main workflow invokes this tool. Draft
-status does not hide a Go module tag; the staging tag deliberately is not SemVer.
+The retained publisher below requires review and integration with management,
+SDK/worker, all-provider and endurance evidence before it can be enabled. Its
+packaging evidence alone does not authorize publication. Draft status does not
+hide a Go module tag.
 """
 import argparse
 import hashlib
@@ -99,7 +101,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT/'dist/release')
     parser.add_argument('--cosign', required=True)
-    args = parser.parse_args(); out = args.out.resolve()
+    args = parser.parse_args()
+    # Deliberately no environment/CLI override. Replace this lock with the
+    # aggregate gate in shipping ticket 16; never bypass it for a prerelease.
+    parser.error('Public publication is locked until the complete private qualification gate is implemented and passes.')
+    out = args.out.resolve()
     manifest = json.loads((out/'RELEASE.json').read_text()); version = manifest['version']
     if manifest['candidate'] or manifest['dirty']:
         parser.error('candidate/dirty builds cannot be published')

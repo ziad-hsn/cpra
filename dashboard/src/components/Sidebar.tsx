@@ -6,6 +6,8 @@ import logoLight from '../../../brand/dist/svg/cpra-horizontal-color.svg';
 import logoDark from '../../../brand/dist/svg/cpra-horizontal-dark.svg';
 import markLight from '../../../brand/dist/svg/cpra-mark-color.svg';
 import markDark from '../../../brand/dist/svg/cpra-mark-dark.svg';
+import { useAccess, useDashboardSession } from '../auth/SessionBoundary';
+import { resourceKinds } from '../api/resources';
 
 const NAV_ITEMS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'Overview', icon: 'overview', end: true },
@@ -16,6 +18,8 @@ const NAV_ITEMS: { to: string; label: string; icon: IconName; end?: boolean }[] 
 ];
 
 export function Sidebar() {
+  const access = useAccess();
+  const session = useDashboardSession();
   const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme((state) => state.theme);
   const logo = theme === 'dark' ? logoDark : logoLight;
@@ -40,6 +44,7 @@ export function Sidebar() {
 
       <nav className="sidebar-nav">
         <div className="nav-section-label">Workspace</div>
+        {access.phase === 'authenticated' && access.access?.role === 'operator' && <NavLink to="/import" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Import files" title="Import files"><Icon name="settings" size={18} className="nav-icon" /><span className="nav-label">Import files</span></NavLink>}
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -53,6 +58,12 @@ export function Sidebar() {
             <span className="nav-label">{item.label}</span>
           </NavLink>
         ))}
+        {access.phase === 'authenticated' && Object.values(resourceKinds).filter(item => session.can(item.listOperation)).map(item => (
+          <NavLink key={item.route} to={item.route} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label={item.title} title={item.title}>
+            <Icon name="settings" size={18} className="nav-icon" /><span className="nav-label">{item.title}</span>
+          </NavLink>
+        ))}
+        {access.phase === 'authenticated' && (session.can('GetOperation') || session.can('ListOperations')) && <NavLink to="/operations" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Operation progress" title="Operation progress"><Icon name="activity" size={18} className="nav-icon" /><span className="nav-label">Operation progress</span></NavLink>}
       </nav>
 
       <div className="sidebar-foot">

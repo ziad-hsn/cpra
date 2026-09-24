@@ -21,7 +21,7 @@ For negative availability findings, "not found" means no suitable public option 
 | Provider sandbox | The provider's designated test service/account validates behavior within its documented sandbox scope. Delivery may be suppressed. |
 | Live account | A designated real resource or destination independently confirms the actual requested effect. This is specific evidence, not formal vendor certification. |
 
-These categories are recommendations, not fields already implemented in the live runner. `internal/verification/runner.go` currently reports pass/fail/not_configured and a single `all_providers_verified` flag; it requires an independently observed effect. Do not use a fabricated observer to force Twilio test credentials or an EC2 mock through that gate.
+These categories are recommendations, not fields already implemented in the live runner. `internal/drivertest/runner.go` currently reports pass/fail/not_configured and a single `all_providers_verified` flag; it requires an independently observed effect. Do not use a fabricated observer to force Twilio test credentials or an EC2 mock through that gate.
 
 The practical next implementation is to record evidence type and observed boundary explicitly, add missing isolated endpoint selection where necessary, and run real local services alongside strict HTTP contract fixtures. Retain provider-account results separately. This research does not change the agreed release gate or claim that the missing live campaign has passed.
 
@@ -117,7 +117,7 @@ For regression testing, local protocol responders can deliberately send malforme
 
 - Default checks and the TCP-only gRPC boundary: [`internal/jobs/jobs.go`](/home/ziad/cpra-durable/internal/jobs/jobs.go:484).
 - TLS behavior: [`internal/jobs/pulse_tls.go`](/home/ziad/cpra-durable/internal/jobs/pulse_tls.go:64).
-- Database and broker schema, auth fields and build-tag split: [`internal/loader/schema/pulse_types_new.go`](/home/ziad/cpra-durable/internal/loader/schema/pulse_types_new.go:1), plus `internal/jobs/pulse_{redis,postgres,mysql,mongo,rabbitmq,kafka}.go`.
+- Database and broker schema, auth fields and build-tag split: [`internal/manifest/pulse_types_new.go`](/home/ziad/cpra-durable/internal/manifest/pulse_types_new.go:1), plus `internal/jobs/pulse_{redis,postgres,mysql,mongo,rabbitmq,kafka}.go`.
 - Exact dependency ping semantics were checked locally in pgx `v5.10.0` and franz-go `v1.21.6` source.
 
 ## Configuration gaps exposed by this research

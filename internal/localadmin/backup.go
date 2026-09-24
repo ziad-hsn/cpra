@@ -3,6 +3,7 @@
 package localadmin
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/version"
 )
 
@@ -34,13 +35,27 @@ type BackupManifest struct {
 	Artifact      string    `json:"artifact"`
 	// ConfigurationDigest identifies matching configuration without copying
 	// provider credentials into the backup manifest.
-	ConfigurationDigest string       `json:"configuration_sha256,omitempty"`
-	Files               []BackupFile `json:"files"`
+	ConfigurationDigest string               `json:"configuration_sha256,omitempty"`
+	Files               []BackupFile         `json:"files"`
+	Authentication      BackupAuthentication `json:"authentication"`
 }
 
 // Backup creates a new complete directory. It holds the same exclusive bbolt
 // lock as CPRa until all data has been copied, synced, and verified.
-func Backup(source, destination, config string) error {
+func Backup(source, destination, config, authenticationKeyFile string) error {
+	source, destination, err := separatePaths(source, destination)
+	if err != nil {
+		return err
+	}
+	key, err := loadBackupKey(context.Background(), authenticationKeyFile, source, destination)
+	if err != nil {
+		return err
+	}
+	defer clear(key)
+	return backupWithKey(source, destination, config, key)
+}
+
+func backupWithKey(source, destination, config string, key []byte) error {
 	source, destination, err := separatePaths(source, destination)
 	if err != nil {
 		return err
@@ -48,7 +63,7 @@ func Backup(source, destination, config string) error {
 	if err = requireAbsent(destination); err != nil {
 		return err
 	}
-	lock, err := durable.LockOffline(source)
+	lock, err := persistence.LockOffline(source)
 	if err != nil {
 		return err
 	}
@@ -62,13 +77,16 @@ func Backup(source, destination, config string) error {
 	if err != nil {
 		return err
 	}
-	m := BackupManifest{Version: 1, StorageFormat: durable.FormatVersion, NodeID: lock.NodeID, Created: time.Now().UTC(), Artifact: version.Info(), Files: files}
+	m := BackupManifest{Version: 2, StorageFormat: persistence.FormatVersion, NodeID: lock.NodeID, Created: time.Now().UTC(), Artifact: version.Info(), Files: files}
 	if config != "" {
 		f, err := hashFile(config)
 		if err != nil {
 			return fmt.Errorf("matching configuration: %w", err)
 		}
 		m.ConfigurationDigest = f.SHA256
+	}
+	if err := signBackupManifest(&m, key); err != nil {
+		return err
 	}
 	encoded, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -77,7 +95,7 @@ func Backup(source, destination, config string) error {
 	if err = writeNew(filepath.Join(stage, "BACKUP.json"), append(encoded, '\n'), 0600); err != nil {
 		return err
 	}
-	if _, err = verifyBackup(stage); err != nil {
+	if _, err = verifyBackup(stage, key); err != nil {
 		return err
 	}
 	if err = syncDirectory(stage); err != nil {
@@ -88,7 +106,7 @@ func Backup(source, destination, config string) error {
 
 // Restore validates every file and the storage format before publishing a new
 // data directory. It never overwrites an existing store or repairs corrupt data.
-func Restore(backup, destination string) error {
+func Restore(backup, destination, authenticationKeyFile string) error {
 	backup, destination, err := separatePaths(backup, destination)
 	if err != nil {
 		return err
@@ -96,11 +114,16 @@ func Restore(backup, destination string) error {
 	if err = requireAbsent(destination); err != nil {
 		return err
 	}
-	m, err := verifyBackup(backup)
+	key, err := loadBackupKey(context.Background(), authenticationKeyFile, backup, destination)
 	if err != nil {
 		return err
 	}
-	lock, err := durable.LockOffline(filepath.Join(backup, "data"))
+	defer clear(key)
+	m, err := verifyBackup(backup, key)
+	if err != nil {
+		return err
+	}
+	lock, err := persistence.LockOffline(filepath.Join(backup, "data"))
 	if err != nil {
 		return err
 	}
@@ -122,37 +145,19 @@ func Restore(backup, destination string) error {
 	if !sameInventory(files, m.Files) {
 		return fmt.Errorf("backup changed while restoring")
 	}
-	validation, err := durable.LockOffline(copied)
-	if err != nil {
-		return err
-	}
-	if err = validation.Close(); err != nil {
+	if err = persistence.MarkRestored(copied, time.Now().UTC()); err != nil {
 		return err
 	}
 	return replacePath(copied, destination)
 }
 
-func verifyBackup(root string) (BackupManifest, error) {
-	var m BackupManifest
-	f, err := os.Open(filepath.Join(root, "BACKUP.json"))
+func verifyBackup(root string, key []byte) (BackupManifest, error) {
+	m, err := readBackupManifest(filepath.Join(root, "BACKUP.json"))
 	if err != nil {
 		return m, err
 	}
-	d := json.NewDecoder(io.LimitReader(f, 32<<20))
-	d.DisallowUnknownFields()
-	err = d.Decode(&m)
-	if err == nil {
-		var extra any
-		if d.Decode(&extra) != io.EOF {
-			err = fmt.Errorf("trailing backup inventory data")
-		}
-	}
-	err = errors.Join(err, f.Close())
-	if err != nil {
+	if err := authenticateBackupManifest(m, key); err != nil {
 		return m, err
-	}
-	if m.Version != 1 || m.StorageFormat != durable.FormatVersion || m.NodeID == "" || len(m.Files) == 0 {
-		return m, fmt.Errorf("incompatible or empty backup inventory")
 	}
 	files, err := treeInventory(filepath.Join(root, "data"))
 	if err != nil {

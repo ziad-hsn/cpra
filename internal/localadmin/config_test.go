@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ziad-hsn/cpra/internal/durable"
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
@@ -20,7 +20,7 @@ func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
 	}
 	c := runtimeconfig.Default()
 	c.Storage.Directory = l.StateDir
-	store, err := durable.Open(context.Background(), c)
+	store, err := persistence.Open(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +45,13 @@ func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
 	}
 }
 
-func testLayout(t *testing.T) platformpath.Layout {
+func testLayout(t *testing.T) installpath.Layout {
 	t.Helper()
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return platformpath.Layout{Scope: "user", ConfigDir: filepath.Join(root, "config"), StateDir: filepath.Join(root, "state"), BinDir: filepath.Join(root, "bin"), LogDir: filepath.Join(root, "logs"), ServiceFile: filepath.Join(root, "service")}
+	return installpath.Layout{Scope: "user", ConfigDir: filepath.Join(root, "config"), StateDir: filepath.Join(root, "state"), BinDir: filepath.Join(root, "bin"), LogDir: filepath.Join(root, "logs"), ServiceFile: filepath.Join(root, "service")}
 }
 
 func TestInitPreservesOperatorFilesAndResolvesState(t *testing.T) {

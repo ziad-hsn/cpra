@@ -10,6 +10,7 @@ own fixture resources. Evidence files cannot overwrite previous attempts.
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,26 @@ import time
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_history(port, token):
+    """Read this manifest-mode fixture directly; no CLI compatibility client."""
+    connection = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
+    try:
+        connection.request('GET', '/api/v1/history?monitor_id=packaging-fixture&limit=100',
+                           headers={'Authorization': 'Bearer ' + token})
+        response = connection.getresponse()
+        body = response.read((2 << 20) + 1)
+        if response.status != 200 or len(body) > 2 << 20:
+            raise RuntimeError('fixture history response was unavailable or oversized')
+        events = json.loads(body)['events']
+        if not isinstance(events, list) or any(event.get('monitor_id') != 'packaging-fixture' for event in events):
+            raise RuntimeError('fixture history contained an unexpected monitor')
+        return events
+    except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, AttributeError):
+        raise RuntimeError('authenticated fixture history read failed') from None
+    finally:
+        connection.close()
 
 
 def main():
@@ -97,11 +118,18 @@ def main():
             return compose('ps', '-q', 'cpra').stdout.strip()
 
         def ctl(*args, check=True):
-            return run(['docker', 'exec', cid(), '/usr/local/bin/cpractl', *args, '--server', 'http://127.0.0.1:8060',
+            return run(['docker', 'exec', cid(), '/usr/local/bin/cpractl', *args, '--server', 'http://127.0.0.1:8060', '--allow-insecure-http',
                         '--token-file', '/run/secrets/cpra_api_token', '--request-timeout', '2s'], check=check, timeout=15)
 
         def history():
-            return json.loads(ctl('get', 'history', 'packaging-fixture', '-o', 'json').stdout)['events']
+            bindings = json.loads(run(['docker', 'inspect', cid()], timeout=15).stdout)[0]['NetworkSettings']['Ports']['8060/tcp']
+            if len(bindings) != 1 or bindings[0]['HostIp'] != '127.0.0.1':
+                raise RuntimeError('fixture API must have one loopback port binding')
+            port = int(bindings[0]['HostPort'])
+            if not 0 < port < 65536:
+                raise RuntimeError('fixture API port is invalid')
+            token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
+            return read_history(port, token)
 
         try:
             report['docker_server_version'] = run(['docker', 'version', '--format', '{{.Server.Version}}']).stdout.strip()

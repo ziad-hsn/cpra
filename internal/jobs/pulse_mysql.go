@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseMySQLJob checks a MySQL server by connecting and issuing a COM_PING.
@@ -27,7 +27,7 @@ type PulseMySQLJob struct {
 	payload     map[string]interface{}
 }
 
-func mysqlDSN(cfg *schema.PulseMySQLConfig) string {
+func mysqlDSN(cfg *manifest.PulseMySQLConfig) string {
 	if cfg.DSN != "" {
 		return cfg.DSN
 	}
@@ -42,7 +42,7 @@ func mysqlDSN(cfg *schema.PulseMySQLConfig) string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.User, cfg.Password, host, port, cfg.Database)
 }
 
-func newPulseMySQLJob(cfg *schema.PulseMySQLConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseMySQLJob(cfg *manifest.PulseMySQLConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return &PulseMySQLJob{
 		ID:      uuid.New(),
 		Entity:  entity,
@@ -65,24 +65,21 @@ func (p *PulseMySQLJob) Execute() (result Result) {
 	}
 	defer func() { _ = db.Close() }()
 
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		err := db.PingContext(ctx)
 		if err == nil {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("mysql check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("mysql check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseMySQLJob) Copy() Job                  { job := *p; return &job }

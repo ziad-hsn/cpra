@@ -40,6 +40,7 @@ spec:
             - ready
             - --server
             - {{ printf "http://%s:%v" (include "cpra.fullname" .) .Values.service.port | quote }}
+            - --allow-insecure-http
             - --token-file
             - /run/secrets/cpra/token
             - --request-timeout

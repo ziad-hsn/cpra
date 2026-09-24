@@ -58,16 +58,17 @@ func (h Histogram) Percentile(p float64) *float64 {
 }
 
 type Bucket struct {
-	Epoch     int64     `json:"epoch"`
-	Queue     Histogram `json:"queue"`
-	Execution Histogram `json:"execution"`
-	Result    Histogram `json:"result"`
-	Expected  uint64    `json:"expected"`
-	Samples   uint64    `json:"samples"`
-	QueueMet  uint64    `json:"queue_met"`
-	ResultMet uint64    `json:"result_met"`
-	Timeouts  uint64    `json:"timeouts"`
-	Missed    uint64    `json:"missed"`
+	PausedSeconds float64   `json:"paused_monitor_seconds,omitempty"`
+	Epoch         int64     `json:"epoch"`
+	Queue         Histogram `json:"queue"`
+	Execution     Histogram `json:"execution"`
+	Result        Histogram `json:"result"`
+	Expected      uint64    `json:"expected"`
+	Samples       uint64    `json:"samples"`
+	QueueMet      uint64    `json:"queue_met"`
+	ResultMet     uint64    `json:"result_met"`
+	Timeouts      uint64    `json:"timeouts"`
+	Missed        uint64    `json:"missed"`
 }
 type State struct {
 	ByDriver     map[string]*[Slots]Bucket `json:"by_driver"`
@@ -95,8 +96,9 @@ func (s State) Clone() State {
 }
 
 type Recorder struct {
-	mu    sync.RWMutex
-	state State
+	mu     sync.RWMutex
+	state  State
+	pauses map[string]pauseExposure
 }
 
 func New(at time.Time, queue, result time.Duration) *Recorder {
@@ -109,12 +111,14 @@ func (r *Recorder) Restore(s State, at time.Time) {
 		return
 	}
 	r.state = s.Clone()
+	r.pauses = nil // The new controller must re-establish actual pause membership.
 	r.state.GapStart = s.Persisted
 	r.state.GapEnd = at
 }
 func (r *Recorder) Snapshot(at time.Time) State {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.flushPauses(at)
 	s := r.state.Clone()
 	s.Persisted = at
 	return s
@@ -211,21 +215,23 @@ func percentiles(h Histogram) Percentiles {
 }
 
 type Report struct {
-	Driver           string      `json:"driver"`
-	Samples          uint64      `json:"samples"`
-	Expected         uint64      `json:"expected"`
-	Overdue          uint64      `json:"overdue"`
-	Pending          uint64      `json:"pending"`
-	Timeouts         uint64      `json:"timeouts"`
-	Missed           uint64      `json:"missed"`
-	Queue            Percentiles `json:"scheduling_queue"`
-	Execution        Percentiles `json:"execution"`
-	Result           Percentiles `json:"scheduled_result"`
-	QueueMet         uint64      `json:"queue_met"`
-	ResultMet        uint64      `json:"result_met"`
-	QueueAttainment  *float64    `json:"queue_attainment"`
-	ResultAttainment *float64    `json:"result_attainment"`
-	Condition        string      `json:"condition"`
+	PausedMonitors       uint64      `json:"paused_monitors"`
+	PausedMonitorSeconds float64     `json:"paused_monitor_seconds"`
+	Driver               string      `json:"driver"`
+	Samples              uint64      `json:"samples"`
+	Expected             uint64      `json:"expected"`
+	Overdue              uint64      `json:"overdue"`
+	Pending              uint64      `json:"pending"`
+	Timeouts             uint64      `json:"timeouts"`
+	Missed               uint64      `json:"missed"`
+	Queue                Percentiles `json:"scheduling_queue"`
+	Execution            Percentiles `json:"execution"`
+	Result               Percentiles `json:"scheduled_result"`
+	QueueMet             uint64      `json:"queue_met"`
+	ResultMet            uint64      `json:"result_met"`
+	QueueAttainment      *float64    `json:"queue_attainment"`
+	ResultAttainment     *float64    `json:"result_attainment"`
+	Condition            string      `json:"condition"`
 }
 type View struct {
 	Generated        time.Time `json:"generated"`
@@ -239,8 +245,9 @@ type View struct {
 }
 
 func (r *Recorder) View(at time.Time, duration time.Duration, minSamples uint64) View {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.flushPauses(at)
 	s := r.state
 	v := View{Generated: at, WindowSeconds: int(duration.Seconds()), QueueTargetMS: float64(s.QueueTarget) / float64(time.Millisecond), ResultTargetMS: float64(s.ResultTarget) / float64(time.Millisecond), GapStart: s.GapStart, GapEnd: s.GapEnd, Reports: []Report{}}
 	v.CoverageComplete = !s.Started.After(at.Add(-duration)) && !s.GapEnd.After(at.Add(-duration))
@@ -266,11 +273,14 @@ func (r *Recorder) View(at time.Time, duration time.Duration, minSamples uint64)
 				}
 			}
 			total.Missed += b.Missed
+			total.PausedSeconds += b.PausedSeconds
 			total.Timeouts += b.Timeouts
 			total.QueueMet += b.QueueMet
 			total.ResultMet += b.ResultMet
 		}
 		report := Report{Driver: driver, Samples: total.Samples, Overdue: overdue, Pending: pending, Expected: total.Samples + total.Missed + overdue, Missed: total.Missed, Timeouts: total.Timeouts, Queue: percentiles(total.Queue), Execution: percentiles(total.Execution), Result: percentiles(total.Result), QueueMet: total.QueueMet, ResultMet: total.ResultMet, Condition: "insufficient_observations"}
+		report.PausedMonitors = r.pauses[driver].count
+		report.PausedMonitorSeconds = total.PausedSeconds
 		if report.Expected > 0 {
 			q := float64(report.QueueMet) / float64(report.Expected)
 			e := float64(report.ResultMet) / float64(report.Expected)
@@ -322,7 +332,7 @@ func (s State) Validate() error {
 			return fmt.Errorf("invalid SLO driver window")
 		}
 		for _, b := range window {
-			if b.Epoch < 0 || b.QueueMet > b.Samples || b.ResultMet > b.Samples || b.Timeouts > b.Samples {
+			if b.Epoch < 0 || b.QueueMet > b.Samples || b.ResultMet > b.Samples || b.Timeouts > b.Samples || b.PausedSeconds < 0 || math.IsNaN(b.PausedSeconds) || math.IsInf(b.PausedSeconds, 0) {
 				return fmt.Errorf("invalid SLO counts")
 			}
 			for _, h := range []Histogram{b.Queue, b.Execution, b.Result} {

@@ -2,6 +2,9 @@ GO ?= go
 PNPM ?= pnpm
 PYTHON ?= python3
 BUILD_TAGS ?=
+# The full management race suite includes the measured large encrypted-input
+# fixture. Its combined runtime exceeds Go's default ten-minute package limit.
+GO_TEST_TIMEOUT ?= 20m
 ALL_DRIVER_TAGS = redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio
 BUILD_DIR ?= bin
 RELEASE_DIR ?= dist/release
@@ -13,22 +16,37 @@ GORELEASER ?= bin/release-tools/goreleaser
 NFPM ?= bin/release-tools/nfpm
 VERSION_FLAGS ?=
 BUILD_VCS ?= auto
+# Make's development commands build the application and unpublished nested SDK
+# modules together. Explicit GOWORK (including off) always takes precedence.
+# This is command-local: release tools retain their isolated recorded recipe.
+DEV_GOWORK = $(if $(strip $(GOWORK)),$(GOWORK),$(abspath $(BUILD_DIR)/cpra-sdk.work))
+DEV_GO = GOWORK="$(DEV_GOWORK)" $(GO)
 
 .DEFAULT_GOAL := all
 .PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean release-prepare release-build release-build-goreleaser release-package release-check release-tools
 
 all: build build-ctl
 
-build:
-	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpra .
+.PHONY: dev-workspace
+dev-workspace:
+ifeq ($(strip $(GOWORK)),)
+	$(PYTHON) -B scripts/sdk/workspace.py --output "$(DEV_GOWORK)" --no-github-env
+endif
 
-build-ctl:
-	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 $(GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpractl ./cmd/cpractl
+build: dashboard-freshness | dev-workspace
+	@mkdir -p "$(BUILD_DIR)"
+	CGO_ENABLED=0 $(DEV_GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o "$(BUILD_DIR)/cpra" .
+
+build-ctl: | dev-workspace
+	@mkdir -p "$(BUILD_DIR)"
+	CGO_ENABLED=0 $(DEV_GO) build -trimpath -buildvcs=$(BUILD_VCS) -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o "$(BUILD_DIR)/cpractl" ./cmd/cpractl
 
 dashboard-build:
-	$(PYTHON) -B scripts/release/dashboard_build.py --pnpm "$(PNPM)"
+	$(PYTHON) -B scripts/release/dashboard_build.py --pnpm "$(PNPM)" --go "$(RELEASE_GO)"
+
+.PHONY: dashboard-freshness
+dashboard-freshness:
+	$(PYTHON) -B scripts/dashboard/asset_manifest.py
 
 dashboard-check:
 	cd dashboard && $(PNPM) exec tsc --noEmit
@@ -38,16 +56,16 @@ dashboard-check:
 fmt-check:
 	@unformatted="$$(gofmt -l internal cmd *.go)" || exit $$?; if [ -n "$$unformatted" ]; then printf '%s\n' "$$unformatted"; exit 1; fi
 
-vet:
-	$(GO) vet ./...
+vet: | dev-workspace
+	$(DEV_GO) vet ./...
 
-test:
-	$(GO) test -race ./...
+test: | dev-workspace
+	$(DEV_GO) test -race -timeout "$(GO_TEST_TIMEOUT)" ./...
 
 check: fmt-check vet test
 
-test-all-drivers:
-	$(GO) test -race -tags "$(ALL_DRIVER_TAGS)" ./...
+test-all-drivers: | dev-workspace
+	$(DEV_GO) test -race -timeout "$(GO_TEST_TIMEOUT)" -tags "$(ALL_DRIVER_TAGS)" ./...
 
 # Release preparation requires committed, regenerated dashboard assets. It
 # never mutates the source tree. Use RELEASE_CANDIDATE=--candidate for local
@@ -82,10 +100,10 @@ clean:
 	rm -rf bin dist dashboard/dist
 
 .PHONY: build-verification verify-local verify-contracts verify-protocols benchmark-preflight
-build-verification:
-	@mkdir -p $(BUILD_DIR)
-	$(GO) build -trimpath -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o $(BUILD_DIR)/cpra-verify ./cmd/cpra-verify
-	$(GO) build -trimpath -o $(BUILD_DIR)/cpra-target ./cmd/cpra-target
+build-verification: | dev-workspace
+	@mkdir -p "$(BUILD_DIR)"
+	$(DEV_GO) build -trimpath -tags "$(BUILD_TAGS)" -ldflags="$(VERSION_FLAGS)" -o "$(BUILD_DIR)/cpra-verify" ./cmd/cpra-verify
+	$(DEV_GO) build -trimpath -o "$(BUILD_DIR)/cpra-bench-target" ./cmd/cpra-bench-target
 
 verify-local: build-verification
 	@mkdir -p evidence/local
@@ -103,3 +121,28 @@ verify-protocols: build-verification
 
 benchmark-preflight:
 	$(PYTHON) -B scripts/benchmark/campaign.py --mode preflight --out evidence/local/preflight
+
+# Source verification uses the same development workspace as normal builds.
+# Official releases keep GOWORK=off; local workspaces do not qualify published
+# module dependencies or downloaded release artifacts.
+.PHONY: sdk-check sdk-consumer-check
+sdk-check: | dev-workspace
+	cd sdk/go && $(DEV_GO) test -race ./...
+	cd sdk/go && $(DEV_GO) test -race -tags externaljobs ./...
+	cd sdk/go/worker && $(DEV_GO) test -race -tags externaljobs ./...
+	cd sdk/go && $(DEV_GO) vet ./...
+	cd sdk/go && $(DEV_GO) vet -tags externaljobs ./...
+	cd sdk/go/worker && $(DEV_GO) vet -tags externaljobs ./...
+
+sdk-consumer-check: | dev-workspace
+	$(PYTHON) -B -m unittest discover -s scripts/sdk -p 'test_*.py'
+	$(DEV_GO) test ./scripts/sdk/doccheck
+	$(PYTHON) -B scripts/sdk/verify.py --go "$(GO)" --out evidence/local/sdk-consumer.json
+
+.PHONY: sdk-examples-check sdk-reference-check
+sdk-examples-check:
+	$(PYTHON) scripts/sdk/verify_examples.py --go "$(GO)" --race --out evidence/local/sdk-examples.json
+
+sdk-reference-check: | dev-workspace
+	GOWORK="$(DEV_GOWORK)" $(PYTHON) scripts/sdk/reference.py --go "$(GO)" --check
+	$(PYTHON) scripts/sdk/sync_guides.py --check

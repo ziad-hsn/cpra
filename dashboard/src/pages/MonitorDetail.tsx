@@ -1,18 +1,22 @@
 import { MonitorTimeline } from '../components/MonitorTimeline';
-import { useParams, useNavigate } from 'react-router-dom';
+import { MonitorControls } from '../components/MonitorControls';
+import { MonitorActions } from '../components/MonitorActions';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useDashboardSession } from '../auth/SessionBoundary';
 import { useMonitor } from '../hooks/queries';
 import { StatusChip } from '../components/StatusChip';
 import { CodeBadge } from '../components/CodeBadge';
 import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { Icon } from '../components/Icon';
-import { formatDateTime, formatNumber, formatMs, formatUptime, uptimeColor } from '../lib/format';
+import { formatDateTime, formatNumber, formatMs, formatMeasuredLatency, formatUptime, uptimeColor } from '../lib/format';
 import type { CpraCode } from '../theme/tokens';
 import type { ReactNode } from 'react';
 
 export default function MonitorDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const session = useDashboardSession();
   const { data: monitor, isLoading, isError, refetch } = useMonitor(id);
 
   const backBtn = (
@@ -35,7 +39,7 @@ export default function MonitorDetail() {
 
   return (
     <div className='page'>
-      <div>{backBtn}</div>
+      <div className='row' style={{ gap: 8, flexWrap: 'wrap' }}>{backBtn}{m.monitor_id && session.can('GetMonitor') && <Link className='btn' to={`/monitor-configurations/${encodeURIComponent(m.monitor_id)}`}>View saved configuration</Link>}</div>
 
       <div className='card' style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div className='spread' style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
@@ -54,7 +58,7 @@ export default function MonitorDetail() {
 
         <div className='grid-4'>
           <KpiStat label='Healthy samples' value={formatUptime(sampledHealth)} accent={uptimeColor(sampledHealth)} />
-          <KpiStat label='Latency' value={m.latency_available ? formatMs(m.latency_ms ?? 0) : 'Unavailable'} accent='var(--status-info)' />
+          <KpiStat label='Latency' value={formatMeasuredLatency(m.latency_available, m.latency_ms)} accent='var(--status-info)' />
           <KpiStat label='Check Interval' value={m.interval_ms ? formatMs(m.interval_ms) : '—'} accent='var(--accent)' />
           <KpiStat label='Consecutive Failures' value={formatNumber(m.consecutive_failures ?? 0)} accent={m.consecutive_failures ? 'var(--status-degraded)' : 'var(--text-muted)'} />
         </div>
@@ -66,6 +70,8 @@ export default function MonitorDetail() {
 	    {m.warning && <p role='status' style={{ color: 'var(--status-degraded)' }}>{m.warning}</p>}
       </div>
 
+      {m.monitor_id && <MonitorControls key={`controls/${m.monitor_id}`} monitorID={m.monitor_id} />}
+      {m.monitor_id && <MonitorActions key={`actions/${m.monitor_id}`} monitorID={m.monitor_id} />}
       {m.monitor_id && <MonitorTimeline key={m.monitor_id} monitorID={m.monitor_id} />}
 
       <div className='grid-2'>

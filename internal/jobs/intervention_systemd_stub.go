@@ -8,10 +8,10 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
-func newInterventionSystemdJob(t *schema.InterventionTargetSystemd, retries int, entity ecs.Entity) (Job, error) {
+func newInterventionSystemdJob(t *manifest.InterventionTargetSystemd, retries int, entity ecs.Entity) (Job, error) {
 	if runtime.GOOS != "linux" {
 		return nil, fmt.Errorf("systemd intervention is only supported on Linux")
 	}

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/ziad-hsn/cpra/internal/verification"
+	"github.com/ziad-hsn/cpra/internal/drivertest"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 	out := flag.String("out", "verification-report.json", "Redacted evidence report")
 	requireConfiguredPass := flag.Bool("require-configured-pass", false, "Exit successfully when every enabled case passes (at least one required); does not certify all 33 live providers")
 	flag.Parse()
-	cfg, err := verification.Load(*config)
+	cfg, err := drivertest.Load(*config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -34,7 +34,7 @@ func main() {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	report, err := verification.Run(ctx, cfg, *live)
+	report, err := drivertest.Run(ctx, cfg, *live)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -55,7 +55,7 @@ func main() {
 	}
 }
 
-func successful(report verification.Report, configuredOnly bool) bool {
+func successful(report drivertest.Report, configuredOnly bool) bool {
 	if configuredOnly {
 		return report.AllConfiguredPassed
 	}

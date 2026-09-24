@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/durable"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
@@ -38,8 +38,8 @@ func TestDurableControllerUsesCommittedStateAndResumesChecks(t *testing.T) {
 	}
 	runtime := runtimeconfig.Default()
 	runtime.Storage.Directory = filepath.Join(dir, "data")
-	start := func() (*Controller, *durable.Store) {
-		s, err := durable.Open(context.Background(), runtime)
+	start := func() (*Controller, *persistence.Store) {
+		s, err := persistence.Open(context.Background(), runtime)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // CodePushoverJob delivers an alert to a Pushover user/group via the push
@@ -34,7 +34,7 @@ type CodePushoverJob struct {
 	ID          uuid.UUID
 }
 
-func newCodePushoverJob(cfg *schema.CodeNotificationPushover, monitor, color, message string, entity ecs.Entity) (Job, error) {
+func newCodePushoverJob(cfg *manifest.CodeNotificationPushover, monitor, color, message string, entity ecs.Entity) (Job, error) {
 	if cfg.URL != "" {
 		if err := validateTargetURL(cfg.URL); err != nil {
 			return nil, err

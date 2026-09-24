@@ -47,4 +47,9 @@ type Stats struct {
 	Enqueued       int64         `json:"enqueued"`
 	Capacity       int           `json:"capacity"`
 	SampleWindow   time.Duration `json:"sample_window"`
+	// OldestPendingAge measures a still-pending admitted copy, never an active
+	// executor. A missing source or empty queue has no age measurement.
+	OldestPendingAge       time.Duration `json:"oldest_pending_age"`
+	OldestPendingAvailable bool          `json:"oldest_pending_available"`
+	OldestPendingReason    string        `json:"oldest_pending_reason,omitempty"`
 }

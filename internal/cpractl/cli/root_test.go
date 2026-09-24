@@ -4,158 +4,120 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
-// newTestCommand builds a root command pointed at the given server, capturing
-// stdout into a buffer so output can be asserted.
 func newTestCommand(t *testing.T, srvURL string, extraArgs ...string) (*cobra.Command, *bytes.Buffer) {
 	t.Helper()
 	buf := &bytes.Buffer{}
 	root := NewRootCommand()
 	root.SetOut(buf)
 	root.SetErr(buf)
-	args := append([]string{"--server", srvURL}, extraArgs...)
-	root.SetArgs(args)
+	root.SetArgs(append([]string{"--server", srvURL}, extraArgs...))
 	return root, buf
 }
 
-// apiStub returns an httptest server serving canned API payloads.
-func apiStub(t *testing.T) *httptest.Server {
-	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/overview", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"generated":  "2024-01-01T00:00:00Z",
-			"total":      3,
-			"disabled":   1,
-			"by_status":  map[string]int{"up": 2, "down": 1},
-			"up_percent": 66.67,
-		})
+func TestGetMonitorsUsesStableV2ResourcePage(t *testing.T) {
+	var requests atomic.Int32
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.URL.Path != "/api/v2/monitors" || r.Method != "GET" || r.URL.Query().Get("limit") != "2" || r.URL.Query().Get("cursor") != "original-page" {
+			t.Error("wrong monitor page request")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		m := cliResource("Monitor", "service-api")
+		m.Metadata.Name = api.Pointer("alpha")
+		m.Metadata.ResourceVersion = "revision-1"
+		m.Status = json.RawMessage(`{"health":"down"}`)
+		_ = json.NewEncoder(w).Encode(struct {
+			Items      []api.Resource `json:"items"`
+			NextCursor string         `json:"nextCursor"`
+		}{[]api.Resource{m}, "next-page"})
 	})
-	mux.HandleFunc("/api/v1/monitors", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"generated": "2024-01-01T00:00:00Z",
-			"page":      1, "size": 50, "total": 2,
-			"monitors": []map[string]interface{}{
-				{"id": 1, "name": "alpha", "pulse_type": "http", "status": "up"},
-				{"id": 2, "name": "beta", "pulse_type": "tcp", "status": "down", "pending_code": "red", "consecutive_failures": 3},
-			},
-		})
-	})
-	mux.HandleFunc("/api/v1/monitors/", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"id": 2, "name": "beta", "pulse_type": "tcp", "status": "down", "pending_code": "red",
-		})
-	})
-	mux.HandleFunc("/api/v1/queues", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"pulse": map[string]interface{}{"name": "pulse", "queue_depth": 5, "capacity": 131072, "enqueue_rate": 1.5, "dequeue_rate": 1.4},
-		})
-	})
-	mux.HandleFunc("/api/v1/healthz", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
-	return srv
-}
-
-func TestGetMonitorsTable(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "get", "monitors")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	out := buf.String()
-	for _, want := range []string{"ID", "NAME", "STATUS", "alpha", "beta", "red"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("table output missing %q:\n%s", want, out)
+	for _, output := range []string{"table", "wide", "json", "yaml"} {
+		stdout, stderr, err := fixture.run(t, nil, "get", "monitors", "--limit", "2", "--cursor", "original-page", "-o", output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"service-api", "alpha", "revision-1"} {
+			if !strings.Contains(stdout, want) {
+				t.Fatalf("missing %s: %s", want, stdout)
+			}
+		}
+		if !strings.Contains(stdout+stderr, "next-page") {
+			t.Fatal("lost page cursor")
 		}
 	}
-}
-
-func TestGetMonitorsJSON(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "get", "monitors", "-o", "json")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "\"monitors\"") || !strings.Contains(out, "\"name\": \"alpha\"") {
-		t.Errorf("json output missing monitors:\n%s", out)
+	if requests.Load() != 4 {
+		t.Fatal("unexpected automatic pagination")
 	}
 }
-
-func TestGetMonitorDetail(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "get", "monitor", "2")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "beta") || !strings.Contains(out, "Pending code") {
-		t.Errorf("detail output:\n%s", out)
-	}
-}
-
-func TestGetMonitorInvalidID(t *testing.T) {
-	srv := apiStub(t)
-	root, _ := newTestCommand(t, srv.URL, "get", "monitor", "notanumber")
-	err := root.Execute()
-	if err == nil || !strings.Contains(err.Error(), "invalid monitor ID") {
-		t.Fatalf("expected invalid ID error, got %v", err)
-	}
-}
-
-func TestGetQueuesTable(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "get", "queues")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "pulse") || !strings.Contains(out, "DEPTH") || !strings.Contains(out, "1.5/s") {
-		t.Errorf("queues table output:\n%s", out)
-	}
-}
-
-func TestGetOverview(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "get", "overview")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Total monitors") || !strings.Contains(out, "up") {
-		t.Errorf("overview output:\n%s", out)
-	}
-}
-
-func TestHealth(t *testing.T) {
-	srv := apiStub(t)
-	root, buf := newTestCommand(t, srv.URL, "health")
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute: %v", err)
-	}
-	if !strings.Contains(buf.String(), "ok") {
-		t.Errorf("health output: %q", buf.String())
-	}
-}
-
-func TestHealthUnhealthy(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
+func TestGetMonitorUsesStableStringID(t *testing.T) {
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v2/monitors/service-api" {
+			t.Error("stable ID changed")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cliResource("Monitor", "service-api"))
 	})
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
-	root, _ := newTestCommand(t, srv.URL, "health")
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "unhealthy") {
-		t.Fatalf("expected unhealthy error, got %v", err)
+	stdout, _, err := fixture.run(t, nil, "get", "monitor", "service-api", "-o", "json")
+	if err != nil || !strings.Contains(stdout, `"id": "service-api"`) {
+		t.Fatalf("stable monitor read: %v %s", err, stdout)
+	}
+}
+func TestGetRejectsRemovedInputsWithoutRequests(t *testing.T) {
+	var requests atomic.Int32
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) { requests.Add(1); t.Error("invalid command sent request") })
+	for _, args := range [][]string{{"get", "overview"}, {"get", "state", "service-api"}, {"get", "monitors", "--status", "down"}, {"get", "monitors", "--type", "http"}, {"get", "monitors", "--code", "red"}, {"get", "monitors", "--query", "x"}, {"get", "monitors", "--page", "1"}, {"get", "monitors", "--size", "5"}, {"get", "monitor", "../invalid"}} {
+		if _, _, err := fixture.run(t, nil, args...); err == nil {
+			t.Fatalf("removed/invalid command accepted: %v", args)
+		}
+	}
+	if requests.Load() != 0 {
+		t.Fatal("invalid command reached server")
+	}
+}
+func TestHealthUsesV2Availability(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		status    int
+		available bool
+		wantError bool
+	}{{"live", 200, true, false}, {"not-reported", 200, false, true}, {"unhealthy", 503, false, true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v2/healthz" {
+					t.Error("wrong health path")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_ = json.NewEncoder(w).Encode(api.Health{Available: tc.available})
+			})
+			out, _, err := fixture.run(t, nil, "health")
+			if (err != nil) != tc.wantError {
+				t.Fatalf("health: %v", err)
+			}
+			if !tc.wantError && !strings.Contains(out, "ok") {
+				t.Fatal("missing health success")
+			}
+		})
+	}
+}
+func TestMetricsUsesBoundedSDKPrometheus(t *testing.T) {
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/metrics" || r.Method != "GET" || r.Header.Get("Authorization") != "Bearer named-operator-token" {
+			t.Error("wrong metrics request")
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte("cpra_up 1\n"))
+	})
+	out, _, err := fixture.run(t, nil, "metrics")
+	if err != nil || out != "cpra_up 1\n" {
+		t.Fatalf("metrics: %v %q", err, out)
 	}
 }

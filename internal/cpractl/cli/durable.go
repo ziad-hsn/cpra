@@ -3,103 +3,84 @@ package cli
 import (
 	"fmt"
 	"io"
-	"strconv"
-	"time"
 
 	"github.com/spf13/cobra"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 func addDurableCommands(get *cobra.Command, o *options) {
-	var cursor string
-	var limit int
-	history := &cobra.Command{Use: "history monitor_id", Short: "Show retained incident and action events", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	opts := cpra.ListOptions{Limit: 100}
+	history := &cobra.Command{Use: "history stable-monitor-id", Short: "Read one retained monitor event page", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if _, _, err := managementAddressParts([]string{"monitor", args[0]}, true); err != nil {
+			return err
+		}
 		c, err := o.mustClient()
 		if err != nil {
 			return err
 		}
-		v, err := c.History(cmd.Context(), args[0], cursor, limit)
+		defer c.CloseIdleConnections()
+		opts.MonitorID = args[0]
+		reply, err := managementResponse(c.History(cmd.Context(), opts))
 		if err != nil {
 			return err
 		}
-		return newPrinter(cmd, o).render(v, func(w io.Writer) error {
-			rows := make([][]string, 0, len(v.Events))
-			for _, e := range v.Events {
-				rows = append(rows, []string{e.ID, e.At.Format(time.RFC3339), e.Type, e.Color, displayEndpoint(e.ActionID, e.Endpoint), e.Outcome})
-			}
-			if err := table(w, []string{"EVENT", "TIME", "TYPE", "COLOR", "ENDPOINT", "OUTCOME"}, rows); err != nil {
-				return err
-			}
-			if v.NextCursor != "" {
-				_, err := fmt.Fprintf(w, "Next cursor: %s\n", v.NextCursor)
-				return err
-			}
-			return nil
-		})
+		return writeManagementReply(cmd, o, reply, false, false)
 	}}
-	history.Flags().StringVar(&cursor, "cursor", "", "Continue a history page")
-	history.Flags().IntVar(&limit, "limit", 100, "Event limit (1..500)")
-	state := &cobra.Command{Use: "state [monitor_id]", Short: "Show persistence health and action outcomes", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	history.Flags().StringVar(&opts.Cursor, "cursor", "", "continue the original monitor timeline page")
+	history.Flags().IntVar(&opts.Limit, "limit", 100, "page size (1..500); no implicit timeline collection")
+	state := &cobra.Command{Use: "state", Short: "Show controller and storage observations", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		c, err := o.mustClient()
 		if err != nil {
 			return err
 		}
-		id := ""
-		if len(args) > 0 {
-			id = args[0]
-		}
-		v, err := c.State(cmd.Context(), id)
+		defer c.CloseIdleConnections()
+		r, err := c.State(cmd.Context())
 		if err != nil {
-			return err
+			return managementFailure(err)
 		}
-		return newPrinter(cmd, o).render(v, func(w io.Writer) error {
-			if err := kv(w, [][2]string{{"Mode", v.Storage.Mode}, {"Ready", fmtBool(v.Storage.Ready)}, {"Committed index", strconv.FormatUint(v.Storage.CommittedIndex, 10)}, {"Monitor ID", v.MonitorID}}); err != nil {
-				return err
-			}
-			rows := make([][]string, 0, len(v.Actions))
-			for _, a := range v.Actions {
-				rows = append(rows, []string{a.ID, a.Kind, a.Color, displayEndpoint(a.ID, a.Endpoint), string(a.State), a.Outcome})
-			}
-			return table(w, []string{"ACTION", "KIND", "COLOR", "ENDPOINT", "STATE", "OUTCOME"}, rows)
-		})
+		return writeState(newPrinter(cmd, o), r.Data)
 	}}
-	sloCmd := &cobra.Command{Use: "slo", Short: "Show the current five-minute latency targets and attainment", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	slo := &cobra.Command{Use: "slo", Short: "Show reported latency targets, attainment and pause exposure", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		c, err := o.mustClient()
 		if err != nil {
 			return err
 		}
-		v, err := c.SLO(cmd.Context())
+		defer c.CloseIdleConnections()
+		r, err := c.SLO.Get(cmd.Context())
 		if err != nil {
+			return managementFailure(err)
+		}
+		return writeSLO(newPrinter(cmd, o), r.Data)
+	}}
+	get.AddCommand(history, state, slo)
+}
+func writeState(p *printer, s api.State) error {
+	return p.render(s, func(w io.Writer) error {
+		return kv(w, [][2]string{{"Live", fmtBool(s.Live)}, {"Ready", fmtBool(s.Ready)}, {"Readiness reason", managementDisplay(s.ReadinessReason)}, {"Controller ready", observedBool(s.ControllerAvailable, s.ControllerReady)}, {"Controller reason", observedText(s.ControllerAvailable, s.ControllerReason)}, {"Storage mode", observedText(s.Storage.Available, s.Storage.Mode)}, {"Applied index", observedCount(s.Storage.Available, s.Storage.AppliedIndex)}, {"Storage bytes", observedCount(s.Storage.Available && s.Storage.BytesAvailable, s.Storage.Bytes)}, {"Unknown actions", observedCount(s.UnknownActionsAvailable, s.UnknownActions)}, {"Projection fresh", observedBool(s.ProjectionAvailable, s.ProjectionFresh)}, {"Projection age ms", observedNumber(s.ProjectionAvailable, s.ProjectionAgeMS)}})
+	})
+}
+func writeSLO(p *printer, s api.SLOView) error {
+	return p.render(s, func(w io.Writer) error {
+		if err := kv(w, [][2]string{{"Available", fmtBool(s.Available)}, {"Window", observedText(s.Available, s.Window)}, {"Queue target ms", observedNumber(s.Available, s.QueueTargetMS)}, {"Result target ms", observedNumber(s.Available, s.ResultTargetMS)}, {"Coverage gap", observedBool(s.Available, s.CoverageGap)}}); err != nil {
 			return err
 		}
-		return newPrinter(cmd, o).render(v, func(w io.Writer) error {
-			if _, err := fmt.Fprintf(w, "Window: %ds; queue target: %.1fms; result target: %.1fms; complete coverage: %t\n", v.WindowSeconds, v.QueueTargetMS, v.ResultTargetMS, v.CoverageComplete); err != nil {
-				return err
+		rows := make([][]string, 0, len(s.Reports))
+		for _, r := range s.Reports {
+			queueAttainment, resultAttainment := "unavailable", "unavailable"
+			if s.Available {
+				queueAttainment = measurementPercent(r.QueueAttainment)
+				resultAttainment = measurementPercent(r.ResultAttainment)
 			}
-			rows := make([][]string, 0, len(v.Reports))
-			for _, r := range v.Reports {
-				rows = append(rows, []string{r.Driver, strconv.FormatUint(r.Samples, 10), measurement(r.Queue.P99), measurement(r.Result.P99), measurementPercent(r.QueueAttainment), measurementPercent(r.ResultAttainment), strconv.FormatUint(r.Missed, 10), strconv.FormatUint(r.Timeouts, 10), strconv.FormatUint(r.Overdue, 10), r.Condition})
-			}
-			return table(w, []string{"DRIVER", "SAMPLES", "QUEUE P99 MS", "RESULT P99 MS", "QUEUE ATTAINMENT", "RESULT ATTAINMENT", "MISSED", "TIMEOUTS", "OVERDUE", "CONDITION"}, rows)
-		})
-	}}
-	get.AddCommand(history, state, sloCmd)
-}
-func measurement(value *float64) string {
-	if value == nil {
-		return "unavailable"
-	}
-	return fmt.Sprintf("%.3f", *value)
-}
-
-func displayEndpoint(actionID string, endpoint int) string {
-	if actionID == "" {
-		return "-"
-	}
-	return strconv.Itoa(endpoint + 1)
-}
-func measurementPercent(value *float64) string {
-	if value == nil {
-		return "unavailable"
-	}
-	return fmt.Sprintf("%.3f%%", *value*100)
+			rows = append(rows, []string{managementDisplay(r.Driver), observedText(s.Available, r.Pipeline), observedCount(s.Available, r.Samples), percentile(s.Available, r.QueueDelay), percentile(s.Available, r.TotalLatency), queueAttainment, resultAttainment, observedCount(s.Available, r.Missed), observedCount(s.Available, r.Timeouts), observedCount(s.Available, r.Overdue), observedCount(s.Available, r.PausedMonitors), observedNumber(s.Available, r.PausedMonitorSeconds), managementDisplay(r.Condition)})
+		}
+		if err := table(w, []string{"DRIVER", "PIPELINE", "SAMPLES", "QUEUE P99 MS", "RESULT P99 MS", "QUEUE ATTAINMENT", "RESULT ATTAINMENT", "MISSED", "TIMEOUTS", "OVERDUE", "PAUSED", "PAUSE MONITOR-SECONDS", "CONDITION"}, rows); err != nil {
+			return err
+		}
+		if !s.Available {
+			_, err := fmt.Fprintln(w, "Observation unavailable")
+			return err
+		}
+		return nil
+	})
 }

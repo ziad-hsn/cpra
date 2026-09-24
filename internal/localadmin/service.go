@@ -12,8 +12,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/durable"
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 )
 
 type Installation struct {
@@ -25,7 +25,7 @@ type Installation struct {
 	Account      string `json:"account"`
 }
 
-func installation(l platformpath.Layout) (Installation, error) {
+func installation(l installpath.Layout) (Installation, error) {
 	var r Installation
 	data, err := os.ReadFile(filepath.Join(l.ConfigDir, "install.json"))
 	if err != nil {
@@ -46,7 +46,7 @@ func installation(l platformpath.Layout) (Installation, error) {
 
 // Install maintains a stable service executable separate from GOBIN. Updates
 // preserve the supervisor's enabled state and restart only a running service.
-func Install(ctx context.Context, l platformpath.Layout, source, account string, update bool) error {
+func Install(ctx context.Context, l installpath.Layout, source, account string, update bool, authenticationKeyFile string) error {
 	if runtime.GOOS == "windows" && l.Scope != "system" {
 		return fmt.Errorf("Windows user mode is foreground-only; SCM installation requires --scope system")
 	}
@@ -101,6 +101,18 @@ func Install(ctx context.Context, l platformpath.Layout, source, account string,
 	if source == binaryPath(l) {
 		return fmt.Errorf("candidate must be separate from the managed service executable")
 	}
+	// Validate and retain the external backup authority before stopping or
+	// changing a working installation. Missing keys cannot strand it stopped.
+	var backupPath string
+	var backupKey []byte
+	if update {
+		backupPath = l.StateDir + "-backup-" + time.Now().UTC().Format("20060102T150405.000000000Z")
+		backupKey, err = loadBackupKey(ctx, authenticationKeyFile, l.StateDir, backupPath)
+		if err != nil {
+			return err
+		}
+		defer clear(backupKey)
+	}
 	account, err = nativePrepare(l, account)
 	if err != nil {
 		return err
@@ -126,8 +138,7 @@ func Install(ctx context.Context, l platformpath.Layout, source, account string,
 			return err
 		}
 		if _, err = os.Stat(filepath.Join(l.StateDir, "raft.db")); err == nil {
-			backup := l.StateDir + "-backup-" + time.Now().UTC().Format("20060102T150405.000000000Z")
-			if err = Backup(l.StateDir, backup, filepath.Join(l.ConfigDir, "monitors.yaml")); err != nil {
+			if err = backupWithKey(l.StateDir, backupPath, filepath.Join(l.ConfigDir, "monitors.yaml"), backupKey); err != nil {
 				return fmt.Errorf("service stopped; pre-update backup failed: %w", err)
 			}
 		} else if !os.IsNotExist(err) {
@@ -176,9 +187,9 @@ func Install(ctx context.Context, l platformpath.Layout, source, account string,
 	return nil
 }
 
-func secureStoppedInstallation(l platformpath.Layout, account string) error {
+func secureStoppedInstallation(l installpath.Layout, account string) error {
 	if _, err := os.Lstat(filepath.Join(l.StateDir, "raft.db")); err == nil {
-		lock, err := durable.LockOffline(l.StateDir)
+		lock, err := persistence.LockOffline(l.StateDir)
 		if err != nil {
 			return err
 		}
@@ -191,7 +202,7 @@ func secureStoppedInstallation(l platformpath.Layout, account string) error {
 
 // Uninstall removes only recorded installation files. Configuration, account,
 // backups and durable state are intentionally preserved.
-func Uninstall(ctx context.Context, l platformpath.Layout) error {
+func Uninstall(ctx context.Context, l installpath.Layout) error {
 	r, err := installation(l)
 	if err != nil {
 		return err
@@ -220,7 +231,7 @@ func Uninstall(ctx context.Context, l platformpath.Layout) error {
 	return os.Remove(filepath.Join(l.ConfigDir, "install.json"))
 }
 
-func refuseForeignInstallation(l platformpath.Layout) error {
+func refuseForeignInstallation(l installpath.Layout) error {
 	paths := []string{binaryPath(l), l.ServiceFile}
 	if l.Scope == "system" {
 		paths = append(paths, "/usr/lib/systemd/system/cpra.service", "/lib/systemd/system/cpra.service")

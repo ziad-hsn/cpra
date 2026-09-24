@@ -70,11 +70,15 @@ def main():
                 page.screenshot(path=str(out/'timeline.png'),full_page=True)
                 if errors:raise RuntimeError('browser errors: '+str(errors))
                 browser.close()
-            # Match the CLI's JSON response to the API event identities.
-            cli=subprocess.check_output([str(pathlib.Path(a.client).resolve()),'--server',base,'get','history','browser-fixture','-o','json'],text=True,env=env)
-            records=json.loads(cli)
-            if [e['id'] for e in records['events']]!=[e['id'] for e in history['events']]:raise RuntimeError('CLI/API history differ')
-            report={'status':'pass','browser_errors':errors,'numeric_monitor_id':ident,'stable_monitor_id':'browser-fixture','history_events':len(history['events']),'checks':counters['checks'],'notifications':counters['alerts'],'api_cli_agree':True}
+            # This manifest-mode fixture has no management catalog. Read its
+            # existing authenticated history API directly and exercise the
+            # current SDK-backed CLI only through its supported probes.
+            records=api('/api/v1/history?monitor_id=browser-fixture')
+            if not {e['id'] for e in history['events']} <= {e['id'] for e in records['events']}:raise RuntimeError('API timeline lost observed event identities')
+            if any(e['monitor_id']!='browser-fixture' for e in records['events']):raise RuntimeError('API timeline returned another monitor')
+            for probe in ('health','ready'):
+                subprocess.run([str(pathlib.Path(a.client).resolve()),'--server',base,'--allow-insecure-http','--request-timeout','5s',probe],check=True,timeout=10,text=True,env=env,stdout=subprocess.DEVNULL)
+            report={'status':'pass','browser_errors':errors,'numeric_monitor_id':ident,'stable_monitor_id':'browser-fixture','history_events':len(records['events']),'checks':counters['checks'],'notifications':counters['alerts'],'api_history_ids_retained':True,'cli_probes_pass':True,'history_endpoint':'/api/v1/history'}
             (out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
     finally:
         if process is not None:

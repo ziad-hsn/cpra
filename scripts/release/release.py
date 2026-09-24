@@ -118,6 +118,31 @@ def source_inventory():
     return inventory
 
 
+def storage_format(build_tags):
+    """Resolve the build-selected format constant without executing source code."""
+    directory = ROOT / 'internal/persistence'
+    external = 'externaljobs' in build_tags
+    entry = directory / ('job_type_external.go' if external else 'extensions_base.go')
+    constraint = '//go:build externaljobs' if external else '//go:build !externaljobs'
+    if entry.read_text().splitlines()[0] != constraint:
+        raise ValueError('Storage format entry has an unexpected build constraint')
+    definition = re.compile(r'^const ([A-Za-z][A-Za-z0-9_]*) = ([A-Za-z][A-Za-z0-9_]*|[0-9]+)$', re.MULTILINE)
+    selected = dict(definition.findall(entry.read_text())).get('LatestFormatVersion')
+    sources = [path for path in directory.glob('*.go') if not path.name.endswith('_test.go')]
+    seen = set()
+    while selected and not selected.isdigit():
+        if selected in seen or len(seen) >= 8:
+            raise ValueError('Storage format constant aliases are cyclic or too deep')
+        seen.add(selected)
+        candidates = [value for path in sources for name, value in definition.findall(path.read_text()) if name == selected]
+        if len(candidates) != 1:
+            raise ValueError('Storage format alias must have one explicit definition')
+        selected = candidates[0]
+    if not selected:
+        raise ValueError('Storage format constant is not explicitly resolvable')
+    return int(selected)
+
+
 def check_manifest(manifest):
     if manifest.get('schema_version') != 1 or manifest.get('recipe') != RECIPE:
         raise ValueError('Unsupported release manifest or recipe; use its matching source archive')
@@ -128,14 +153,13 @@ def check_manifest(manifest):
     expected = datetime.fromtimestamp(manifest['source_date_epoch'],timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     if manifest.get('source_date') != expected:
         raise ValueError('Source timestamp and epoch do not agree')
-    if tree_digest(ROOT/'internal/web/server/assets') != manifest['dashboard_sha256']:
+    if tree_digest(ROOT/'internal/httpserver/assets') != manifest['dashboard_sha256']:
         raise ValueError('Embedded dashboard differs from RELEASE.json')
     if manifest.get('toolchain_archives') != TOOLCHAINS[RECIPE['go_version']]:
         raise ValueError('Compiler archive pins differ from RELEASE.json')
     if manifest.get('storage_format_version') != RECIPE['storage_format_version']:
         raise ValueError('Storage format differs from RELEASE.json')
-    actual_format = re.search(r'const FormatVersion = (\d+)', (ROOT/'internal/durable/model.go').read_text())
-    if not actual_format or int(actual_format[1]) != manifest['storage_format_version']:
+    if storage_format(RECIPE['build_tags']) != manifest['storage_format_version']:
         raise ValueError('Storage implementation differs from the recorded release format')
     if not manifest.get('candidate'):
         if not manifest.get('source_files'):
@@ -175,7 +199,7 @@ def prepare(version, out, candidate=False):
     manifest = {'schema_version':1,'version':version,'commit':commit,
                 'source_date_epoch':epoch,'source_date':datetime.fromtimestamp(epoch,timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'candidate':candidate,'dirty':dirty,'recipe':RECIPE,
-                'dashboard_sha256':tree_digest(ROOT/'internal/web/server/assets'),
+                'dashboard_sha256':tree_digest(ROOT/'internal/httpserver/assets'),
                 'toolchain_archives':TOOLCHAINS[RECIPE['go_version']],
                 'storage_format_version':RECIPE['storage_format_version'],
                 'package_revision':RECIPE['package_revision'],

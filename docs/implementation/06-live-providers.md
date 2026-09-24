@@ -10,7 +10,7 @@ Production driver paths for 33 configured scenarios with independent effect obse
 
 ## Where
 
-cmd/cpra-verify/; internal/verification/; examples/verification/; scripts/verification/
+cmd/cpra-verify/; internal/drivertest/; examples/verification/; scripts/verification/
 
 ## Acceptance criteria
 

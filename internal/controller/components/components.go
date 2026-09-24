@@ -8,12 +8,27 @@ import (
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/jobs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // Disabled is a zero-size tag component marking an entity as disabled.
 // Using a tag allows filters to exclude disabled entities efficiently at the archetype level.
 type Disabled struct{}
+
+// CheckPause exists only while the owner excludes a monitor from new checks
+// because it is disabled or snoozed. Driver retains the accounted membership
+// across a configuration replacement; it contains no provider configuration.
+type CheckPause struct{ Driver string }
+
+// ControlState is the owner's compact durable-control projection. Arbitrary
+// labels and actor notes stay out of the scheduler's hot data. Replacing provider
+// configuration must preserve these independent incident and pause decisions.
+type ControlState struct {
+	Revision                     string
+	SnoozedUntil                 time.Time
+	IncidentID, IncidentRevision string
+	NotificationsDismissed       bool
+}
 
 // AlertRequest records a notification waiting for dispatch.
 type AlertRequest struct {
@@ -34,12 +49,14 @@ type MonitorState struct {
 	Revision          string
 	LastLatency       time.Duration
 	LatencyAvailable  bool
-	Maintenance       []schema.CompiledWindow
+	Maintenance       []manifest.CompiledWindow
 	PendingAlerts     []AlertRequest
 	Deliveries        map[string]*CodeDelivery
 	CodeSequence      uint64
 	VerificationAfter uint64
 
+	MissedChecks           uint64
+	QueueRejections        uint64
 	PulseGeneration        uint64
 	InterventionGeneration uint64
 	InterventionAttempted  bool
@@ -141,7 +158,7 @@ func (m *MonitorState) SetCodePending(pending bool) {
 
 // PulseConfig consolidates pulse configuration
 type PulseConfig struct {
-	Config             schema.PulseConfig
+	Config             manifest.PulseConfig
 	Type               string
 	Timeout            time.Duration
 	Interval           time.Duration
@@ -171,7 +188,7 @@ func (c *PulseConfig) Copy() *PulseConfig {
 
 // InterventionConfig consolidates intervention configuration
 type InterventionConfig struct {
-	Target      schema.InterventionTarget
+	Target      manifest.InterventionTarget
 	Action      string
 	MaxFailures int
 }
@@ -199,7 +216,7 @@ type CodeConfig struct {
 }
 
 type ColorCodeConfig struct {
-	Config      schema.CodeNotification
+	Config      manifest.CodeNotification
 	Notify      string
 	MaxFailures int
 	Dispatch    bool
@@ -297,6 +314,7 @@ func (c *CodeStatus) Copy() *CodeStatus {
 // JobStorage consolidates all job storage instead of separate job components.
 // This single component replaces PulseJob, InterventionJob, CodeJob, etc.
 type JobStorage struct {
+	jobStorageExtensions
 	PulseJob        jobs.Job
 	InterventionJob jobs.Job
 	CodeJobs        map[string][]jobs.Job // Jobs for each code color (one per delivery endpoint)
@@ -307,7 +325,8 @@ func (j *JobStorage) Copy() *JobStorage {
 		return nil
 	}
 	cpy := &JobStorage{
-		CodeJobs: make(map[string][]jobs.Job),
+		jobStorageExtensions: j.jobStorageExtensions.clone(),
+		CodeJobs:             make(map[string][]jobs.Job),
 	}
 	if j.PulseJob != nil {
 		cpy.PulseJob = j.PulseJob.Copy()
@@ -317,12 +336,15 @@ func (j *JobStorage) Copy() *JobStorage {
 	}
 	for color, colorJobs := range j.CodeJobs {
 		if colorJobs == nil {
+			cpy.CodeJobs[color] = nil
 			continue
 		}
-		cpyJobs := make([]jobs.Job, 0, len(colorJobs))
-		for _, job := range colorJobs {
+		// Endpoint ordinals are durable action identities. Empty positions must
+		// survive a copy even when another executor owns that destination.
+		cpyJobs := make([]jobs.Job, len(colorJobs))
+		for i, job := range colorJobs {
 			if job != nil {
-				cpyJobs = append(cpyJobs, job.Copy())
+				cpyJobs[i] = job.Copy()
 			}
 		}
 		cpy.CodeJobs[color] = cpyJobs

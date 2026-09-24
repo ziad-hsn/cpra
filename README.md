@@ -33,7 +33,13 @@ an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
 
 ## Quick start
 
-Requires Go 1.25 or later and Make. The repository already contains the built dashboard assets, so a Go toolchain is enough.
+Requires Go 1.25 or later, Make, and Python 3 for the source workspace below.
+The repository already contains the built dashboard assets.
+
+Make creates an ignored `bin/cpra-sdk.work` for the application and its local
+SDK modules, so the unpublished SDK candidate can be built from this checkout.
+The integrations example module remains opt-in. An explicit `GOWORK` path or
+`GOWORK=off` takes precedence; Make never changes the selected external workspace.
 
 ```sh
 make
@@ -42,9 +48,21 @@ cp examples/monitors.yaml monitors.yaml
 ./bin/cpra -yaml monitors.yaml
 ```
 
+For direct Go commands, select the workspace explicitly after `make dev-workspace`:
+
+```sh
+GOWORK="$PWD/bin/cpra-sdk.work" go test ./internal/cpractl/cli
+```
+
+Official release builds retain `GOWORK=off` and require separately qualified
+module dependencies. Local workspace builds do not establish public module
+availability or release readiness.
+
 State is durable by default in the platform's user state directory (`cpractl local paths`); Linux system services explicitly use `/var/lib/cpra`. Keep that directory across restarts. An explicit `-data-dir` overrides runtime configuration and the platform default. A legacy `./cpra-data` requires an explicit path or a stopped migration. Use `-runtime-config examples/runtime-memory.yaml` for a disposable run. [Persistence and recovery](docs/durability.md) describes identities, unknown outcomes and complete backups.
 
-Open `http://localhost:8060` or run `./bin/cpractl get monitors`. Missing or malformed configuration stops startup. Empty configurations require `-allow-empty`.
+Open `http://localhost:8060` using the configured API credentials. The
+[management setup](docs/management-startup.md) enables current SDK commands such
+as `./bin/cpractl get monitors`; those commands use stable resource IDs. Missing or malformed configuration stops startup. Empty configurations require `-allow-empty`.
 
 The example checks an HTTP endpoint and writes incident transitions to `alerts.jsonl`. Each monitor can specify a check interval, timeout, failure threshold, recovery threshold, notification destinations, and a recovery action. Maintenance windows suppress alerts and recovery while checks continue; they use five-field cron expressions, a duration, and an IANA timezone.
 
@@ -84,7 +102,7 @@ Manifests authorize checks, notification destinations, and recovery actions with
 - Single-node Raft commits incident state and action intent before dispatch. Started external actions with interrupted results are held as unknown after restart; health checks resume. This is one-node persistence, without distributed failover.
 - Each incident admits one recovery operation. Successful recovery must be followed by the configured consecutive successful checks. Inspect provider records for unknown actions; restarting does not automatically repeat them.
 - Notification endpoint outcomes are separate. A successful endpoint is not repeated because another endpoint failed. Confirmed retryable rejections allow at most three attempts per endpoint. Transport acceptance does not confirm delivery to a person.
-- `/api/v1/healthz` reports liveness. `/api/v1/readyz` requires initialized admission, controller progress and available storage; explicitly empty configurations can be ready. Dashboard projection freshness is reported separately. Provider outages do not make the process dead.
+- `/api/v2/healthz` reports liveness. `/api/v2/readyz` requires initialized admission, controller progress and available storage; explicitly empty configurations can be ready. Dashboard projection freshness is reported separately. Provider outages do not make the process dead.
 - Fleet views update incrementally, retain numeric routes and add stable `monitor_id` values. Pages are bounded. `/api/v1/history` retains incident and action events for 30 days; `/api/v1/state` exposes persistence and unknown actions; `/api/v1/slo` exposes measured latency distributions. All remain read-only and use the existing authentication.
 - Raw health-check history is not retained. Current counters and the aggregate SLO window survive restart; gaps in measurement coverage are explicit. See [measured SLO definitions](docs/slo.md).
 - JSON is decoded incrementally. YAML requires a block sequence for monitors and limits each entry and the metadata to 1 MiB. Both formats have a decompressed-input budget. Memory use grows with monitor count; capacity depends on check intervals, targets, and host resources.
@@ -134,6 +152,23 @@ file-backed manifests, and distinguishes Helm 3 and 4 operations. Follow the
 configuration before starting either route.
 
 ## Release evidence
+
+The [Go SDK](sdk/go/README.md) and optional
+[external worker library](sdk/go/worker/README.md) are independent modules.
+`cpractl` uses the public SDK for management and observation requests, with stable
+resource IDs and cursor pagination. The worker protocol still requires its
+separate server qualification; neither module has been published by this work.
+The [four SDK integration lessons](examples/sdk/README.md) demonstrate queue
+registration, AWS deregistration, Kubernetes Service discovery, and a DAO/SMS
+worker. The [SDK guide and full API reference](docs/sdk/index.md) describe their
+methods, fields, and verification boundaries.
+
+[SDK status](docs/implementation/go-sdk-status.md) records the remaining gates,
+and [SDK verification](docs/implementation/go-sdk-verification.md) distinguishes
+executed tests from pending server and release evidence. Root `go test ./...`
+does not include the nested modules; use `make sdk-check` with the source
+workspace above. Official releases keep `GOWORK=off` and require the SDK versions
+to be published first.
 
 The durable implementation is a release candidate. Full-provider verification and the one-million-monitor 24-hour endurance gate require completed evidence before a full release-readiness claim. User-configured live verification covers 33 driver types and never passes a missing configuration. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
 

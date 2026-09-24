@@ -10,7 +10,7 @@ Read-only history/state/SLO API, CLI and dashboard, stable IDs and incremental f
 
 ## Where
 
-internal/web/; internal/client/; internal/cpractl/; dashboard/src/
+internal/httpserver/; internal/fleetview/; sdk/go/; internal/cpractl/; dashboard/src/
 
 ## Acceptance criteria
 

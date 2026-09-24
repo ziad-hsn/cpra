@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "api:generate": "python3 ../scripts/dashboard/generate_api.py",
+    "api:check": "python3 ../scripts/dashboard/generate_api.py --check",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "python3 ../scripts/dashboard/generate_api.py --check && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

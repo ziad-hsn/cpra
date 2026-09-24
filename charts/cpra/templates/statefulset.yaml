@@ -109,6 +109,7 @@ spec:
                 - {{ ternary "ready" "health" (eq $name "readiness") }}
                 - --server
                 - http://127.0.0.1:8060
+                - --allow-insecure-http
                 - --token-file
                 - /run/secrets/cpra/token
                 - --request-timeout

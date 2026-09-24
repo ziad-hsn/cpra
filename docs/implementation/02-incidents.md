@@ -10,7 +10,7 @@ Commit intent and started markers before external operations; restore state and 
 
 ## Where
 
-internal/durable/transitions.go; internal/controller/systems/durable_system.go; internal/controller/controller.go; internal/jobs/{execution,results}.go
+internal/persistence/transitions.go; internal/controller/systems/durable_system.go; internal/controller/controller.go; internal/jobs/{execution,results}.go
 
 ## Acceptance criteria
 

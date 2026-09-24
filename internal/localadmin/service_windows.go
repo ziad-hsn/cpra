@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -19,7 +19,7 @@ import (
 
 const windowsServiceName = "CPRa"
 
-func nativePrepare(l platformpath.Layout, account string) (string, error) {
+func nativePrepare(l installpath.Layout, account string) (string, error) {
 	if l.Scope == "user" {
 		if account != "" {
 			return "", errors.New("Windows user mode uses the current user; omit --account")
@@ -51,7 +51,7 @@ func nativePrepare(l platformpath.Layout, account string) (string, error) {
 
 // Before registration, configuration is restricted to administrators and SYSTEM.
 // Once registered, only the service SID receives access, not all LocalService processes.
-func nativeSecure(l platformpath.Layout, _ string) error {
+func nativeSecure(l installpath.Layout, _ string) error {
 	var principal string
 	if l.Scope == "system" {
 		sid, _, _, err := windows.LookupSID("", `NT SERVICE\`+windowsServiceName)
@@ -105,7 +105,7 @@ func nativeSecure(l platformpath.Layout, _ string) error {
 	return nil
 }
 
-func openNativeService(l platformpath.Layout) (*mgr.Mgr, *mgr.Service, error) {
+func openNativeService(l installpath.Layout) (*mgr.Mgr, *mgr.Service, error) {
 	if l.Scope != "system" {
 		return nil, nil, errors.New("Windows user mode runs in the foreground; SCM services require system scope")
 	}
@@ -120,7 +120,7 @@ func openNativeService(l platformpath.Layout) (*mgr.Mgr, *mgr.Service, error) {
 	}
 	return manager, service, nil
 }
-func nativeRunning(ctx context.Context, l platformpath.Layout) (bool, error) {
+func nativeRunning(ctx context.Context, l installpath.Layout) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -147,7 +147,7 @@ func nativeRunning(ctx context.Context, l platformpath.Layout) (bool, error) {
 	status, err := service.Query()
 	return status.State != svc.Stopped, err
 }
-func nativeRegister(ctx context.Context, l platformpath.Layout, account string) error {
+func nativeRegister(ctx context.Context, l installpath.Layout, account string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func waitNativeState(ctx context.Context, service *mgr.Service, want svc.State) 
 		}
 	}
 }
-func nativeStop(ctx context.Context, l platformpath.Layout) error {
+func nativeStop(ctx context.Context, l installpath.Layout) error {
 	manager, service, err := openNativeService(l)
 	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
 		return nil
@@ -251,7 +251,7 @@ func nativeStop(ctx context.Context, l platformpath.Layout) error {
 	}
 	return waitNativeState(ctx, service, svc.Stopped)
 }
-func nativeStart(ctx context.Context, l platformpath.Layout) error {
+func nativeStart(ctx context.Context, l installpath.Layout) error {
 	manager, service, err := openNativeService(l)
 	if err != nil {
 		return err
@@ -272,7 +272,7 @@ func nativeStart(ctx context.Context, l platformpath.Layout) error {
 	}
 	return waitNativeState(ctx, service, svc.Running)
 }
-func nativeUnregister(ctx context.Context, l platformpath.Layout) error {
+func nativeUnregister(ctx context.Context, l installpath.Layout) error {
 	if err := nativeStop(ctx, l); err != nil {
 		return err
 	}

@@ -29,10 +29,15 @@ type ResultRouter struct {
 
 // WorkerPoolStats exposes runtime metrics for the dynamic worker pool.
 type WorkerPoolStats struct {
+	Attempts        int64         `json:"attempts"`
+	AttemptTimeouts int64         `json:"attempt_timeouts"`
+	AttemptDuration time.Duration `json:"attempt_duration"`
+	RetryDelay      time.Duration `json:"retry_delay"`
 	SLOCondition    string        `json:"slo_condition"`
 	ServiceTime     time.Duration `json:"service_time"`
 	ServiceCV       float64       `json:"service_cv"`
 	ServiceSamples  int           `json:"service_samples"`
+	ArrivalRate     float64       `json:"arrival_rate"`
 	SizingModel     string        `json:"sizing_model"`
 	LastScaleTime   time.Time     `json:"last_scale_time"`
 	MinWorkers      int           `json:"min_workers"`
@@ -173,7 +178,12 @@ type DynamicWorkerPool struct {
 	// as float64 bits. When set (>0), the autoscaler sizes the pool from it
 	// instead of the throttled enqueue rate, so it can scale up even when the
 	// queue is empty.
-	arrivalRate atomic.Uint64
+	arrivalRate     atomic.Uint64
+	arrivalRateSet  atomic.Bool
+	attempts        atomic.Int64
+	attemptTimeouts atomic.Int64
+	attemptDuration atomic.Int64
+	retryDelay      atomic.Int64
 
 	// serviceTime is the externally-provided per-job service time (tau, seconds),
 	// stored as float64 bits. Used until completed jobs provide observations.
@@ -309,6 +319,10 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 		started := time.Now()
 		result := j.Execute()
 		pool.serviceMetrics.observe(time.Since(started))
+		pool.attempts.Add(int64(result.Attempts))
+		pool.attemptTimeouts.Add(int64(result.AttemptTimeouts))
+		pool.attemptDuration.Add(int64(result.AttemptDuration))
+		pool.retryDelay.Add(int64(result.RetryDelay))
 		shard := int(result.Entity().ID() % uint32(pool.numShards))
 		q := pool.resultQueues[shard]
 		// Fast path: lock-free enqueue into the shard's MPMC queue. This avoids
@@ -611,7 +625,11 @@ func (p *DynamicWorkerPool) autoScale() {
 			desired := p.desiredCapacity(stats)
 			current := p.antsPool.Cap()
 			if p.feedback != nil {
-				desired = p.feedback.adjust(current, desired, p.config.MaxWorkers, stats.QueueDepth, time.Now())
+				adjusted := p.feedback.adjust(current, desired, p.config.MaxWorkers, stats.QueueDepth, time.Now())
+				// Historical SLO breaches cannot require capacity for an empty workload.
+				if !p.arrivalRateSet.Load() || p.getArrivalRate() != 0 || stats.QueueDepth != 0 {
+					desired = adjusted
+				}
 			}
 			if desired != current {
 				p.antsPool.Tune(desired)
@@ -666,6 +684,10 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 		current = minimum
 	}
 	lambda := p.getArrivalRate()
+	if p.arrivalRateSet.Load() && lambda == 0 && stats.QueueDepth == 0 {
+		p.sizingModel.Store(sizingWaiting)
+		return minimum
+	}
 	if !finitePositive(lambda) {
 		lambda = stats.EnqueueRate
 	}
@@ -737,7 +759,10 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 	models := [...]string{"awaiting_observations", "erlang_c_allen_cunneen", "little_law_fallback", "slo_unattainable"}
 	pending := int(p.pendingResults.Load())
 	return WorkerPoolStats{
+		Attempts: p.attempts.Load(), AttemptTimeouts: p.attemptTimeouts.Load(),
+		AttemptDuration: time.Duration(p.attemptDuration.Load()), RetryDelay: time.Duration(p.retryDelay.Load()),
 		SLOCondition: p.sloCondition(),
+		ArrivalRate:  p.getArrivalRate(),
 		ServiceTime:  time.Duration(mean * float64(time.Second)), ServiceCV: cv, ServiceSamples: samples, SizingModel: models[p.sizingModel.Load()],
 		MinWorkers:      p.config.MinWorkers,
 		MaxWorkers:      p.config.MaxWorkers,
@@ -778,7 +803,11 @@ func (p *DynamicWorkerPool) Resume() {
 // When set (>0), desiredCapacity sizes the pool from lambda instead of the
 // throttled enqueue rate, so the pool can scale up even when the queue is empty.
 func (p *DynamicWorkerPool) SetArrivalRate(lambda float64) {
+	if lambda < 0 || math.IsNaN(lambda) || math.IsInf(lambda, 0) {
+		return
+	}
 	p.arrivalRate.Store(math.Float64bits(lambda))
+	p.arrivalRateSet.Store(true)
 }
 
 func (p *DynamicWorkerPool) getArrivalRate() float64 {

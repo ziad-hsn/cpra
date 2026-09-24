@@ -1,0 +1,24 @@
+{
+  "generator": "github.com/oapi-codegen/oapi-codegen/v2@v2.8.0",
+  "inputs": {
+    "api/openapi/contract.base.json": "c12a05509711f356585219b2c5eab12326ed6dd5098b9d511f28f27168e68a99",
+    "api/openapi/externaljobs.json": "a7b4fe7a79105e4c720c82d3db5ed3f98537cf254f4fdb8004a5f3f40550af0c",
+    "api/openapi/models.base.json": "35e2e8f652fa41001a04a75c148f8aa5de3b546d9786a075b64939d880d7c4ea",
+    "api/openapi/operations.json": "42298294454877e9edba7e8850272fbfa4ccab55dc3bc59a215df6538bf5688a",
+    "tools/sdkgen/generate.py": "8f3f93f9ece0617fd4ffa36ce9c873677605e9d215c6530512669caf0fe3cf03",
+    "tools/sdkgen/go.mod": "576c1d0c0289ac591fa92a4be70dd9cc07552b1fdb2e51c187898cd15e3c1f14",
+    "tools/sdkgen/go.sum": "380f4e9569dcabced6790bc6fac01135aa01476451341d456ed984b8455338ba"
+  },
+  "outputs": {
+    "sdk/go/api/generated_base.go": "f5f4f9f1c290e30109dfad57ec002dc7452651da019c45b8952defb733e55b4a",
+    "sdk/go/api/generated_external.go": "8c38330e7066d6b4c4249ff4431dbe0885410c1e913b43126a1092aaaef761a8",
+    "sdk/go/api/schema_base.go": "a8fa11e296bd5be5ca9a65ed8bf5affb1a0a8506189e17addf9e3c6abf0f2cd1",
+    "sdk/go/api/schema_base.json": "c35cbcf33c2e15c70d9584436f19d0eeddffcd97d8f95ed6743237aac6183f7f",
+    "sdk/go/api/schema_external.go": "a03633f38a167e653e280620000934156a4482a7abe3c8136c77d2ae6d715e08",
+    "sdk/go/api/schema_external.json": "0448fecb8ef42bc6df2a0df5e8e4de38a48998e451bc0798caf2af5ab5747195",
+    "sdk/go/internal/transport/generated_base.go": "b11b347ae47b38a77f41c0e11ce7e4fc6aaaf20ec659156a375e28cae0a54ac1",
+    "sdk/go/internal/transport/generated_external.go": "79ec390e1f997c1f0b75ee74e77cdd00437318d7ef501eb2f27d3bca1bf813e6",
+    "sdk/go/testdata/operations.json": "42298294454877e9edba7e8850272fbfa4ccab55dc3bc59a215df6538bf5688a"
+  },
+  "runtime": "github.com/oapi-codegen/runtime@v1.6.0"
+}

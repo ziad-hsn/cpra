@@ -1,0 +1,15 @@
+# Linux user-installation template. Replace every /home/REPLACE_WITH_USER path.
+# For a complete local example, follow README.md or run init-user.py.
+storage:
+  mode: raft
+  directory: /home/REPLACE_WITH_USER/.local/state/cpra
+management:
+  enabled: true
+  policy_file: /home/REPLACE_WITH_USER/.config/cpra/private/principals.yaml
+  tls:
+    cert_file: /home/REPLACE_WITH_USER/.config/cpra/private/server.pem
+    key_file: /home/REPLACE_WITH_USER/.config/cpra/private/server.key
+  encryption:
+    backend: local
+    local:
+      active_key_file: /home/REPLACE_WITH_USER/.config/cpra/private/wrapping.key

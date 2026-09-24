@@ -16,16 +16,6 @@ func remaining(ctx context.Context) time.Duration {
 	}
 	return t
 }
-func retryDelay(ctx context.Context) bool {
-	t := time.NewTimer(50 * time.Millisecond)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return ctx.Err() == nil
-	}
-}
 
 type ownedConn struct {
 	net.Conn

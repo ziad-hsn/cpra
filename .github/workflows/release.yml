@@ -1,4 +1,4 @@
-name: Build and publish verified releases
+name: Private release qualification (publication locked)
 on:
   workflow_dispatch:
     inputs:
@@ -11,7 +11,7 @@ on:
         required: true
         default: gh-pages
       publish:
-        description: Publish from reviewed main after all gates and protected environment approval
+        description: Unavailable until the complete private qualification gate is implemented
         type: boolean
         default: false
 permissions:
@@ -23,7 +23,29 @@ env:
   GOTOOLCHAIN: local
   RELEASE_VERSION: ${{ inputs.version }}
 jobs:
+  private-staging:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      # Run before checkout, credentials, artifact creation or upload. Repository
+      # readers can download Actions artifacts, even when publish is false.
+      - name: Require private candidate storage
+        env:
+          CPRA_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          CPRA_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          CPRA_PUBLISH_REQUESTED: ${{ inputs.publish }}
+        run: |
+          if [ "$CPRA_REPOSITORY_PRIVATE" != true ] || [ "$CPRA_REPOSITORY_VISIBILITY" != private ]; then
+            echo 'Candidate qualification requires a private repository; public and internal repositories are not private staging.' >&2
+            exit 1
+          fi
+          if [ "$CPRA_PUBLISH_REQUESTED" != false ]; then
+            echo 'Publication is locked until the complete management, SDK, platform, provider and endurance gate is implemented and passes.' >&2
+            exit 1
+          fi
+
   build:
+    needs: private-staging
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -39,7 +61,7 @@ jobs:
         run: |
           npm install --global pnpm@11.22.0
           python3 -B scripts/release/dashboard_build.py --check
-          git diff --exit-code -- internal/web/server/assets LICENSES dashboard/pnpm-lock.yaml
+          git diff --exit-code -- internal/httpserver/assets LICENSES dashboard/pnpm-lock.yaml dashboard/src/import/generated
           make release-check check test-all-drivers
           go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
           python3 scripts/release/install_tools.py
@@ -142,7 +164,7 @@ jobs:
         shell: bash
         run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-go"
       - name: Native storage and platform correctness
-        run: go test -p=2 ./internal/platformpath ./internal/localadmin ./internal/durable
+        run: go test -p=2 ./internal/installpath ./internal/localadmin ./internal/persistence
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-assets
@@ -251,6 +273,8 @@ jobs:
 
   publish:
     needs: [build, compatibility, native, packages, containers, charts, documentation]
+    # Unreachable while private-staging requires publish=false. Replace that
+    # lock only with the reviewed aggregate gate, before any public action.
     if: inputs.publish && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     # Repository administrators must configure required reviewers and tag
@@ -348,6 +372,7 @@ jobs:
           bin/release-tools/helm4 push "dist/release/cpra-chart-$(python3 -c 'import json; print(json.load(open("dist/release/RELEASE.json"))["chart_version"])').tgz" oci://ghcr.io/ziad-hsn/charts
 
   compatibility:
+    needs: private-staging
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -357,10 +382,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: python3 scripts/release/install_go.py --version "${{ matrix.compiler }}" --out "$RUNNER_TEMP/cpra-go"
       - run: |
-          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race ./...
-          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
+          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -timeout=20m ./...
+          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -timeout=20m -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
 
   documentation:
+    needs: private-staging
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -40,7 +40,7 @@ def main():
                 records.append({'name': name, 'commit': command(['git', 'rev-parse', 'HEAD'], source),
                                 'dirty': bool(status), 'go_version': compiler, 'flags': flags,
                                 'binary': str(binary), 'sha256': hashlib.sha256(binary.read_bytes()).hexdigest()})
-            subprocess.run([args.go, 'build', *flags, '-o', str(out / 'target'), './cmd/cpra-target'], cwd=root, check=True)
+            subprocess.run([args.go, 'build', *flags, '-o', str(out / 'target'), './cmd/cpra-bench-target'], cwd=root, check=True)
             (out / 'builds.json').write_text(json.dumps({'baseline_commit': BASELINE, 'builds': records}, indent=2) + '\n')
         finally:
             subprocess.run(['git', 'worktree', 'remove', str(checkout)], cwd=root, check=True)

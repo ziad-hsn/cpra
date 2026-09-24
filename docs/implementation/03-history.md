@@ -10,7 +10,7 @@ Daily indexed bbolt segments, 30-day event retention, replay identity, history c
 
 ## Where
 
-internal/durable/history.go
+internal/persistence/history.go
 
 ## Acceptance criteria
 

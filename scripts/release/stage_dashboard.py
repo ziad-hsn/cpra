@@ -11,7 +11,7 @@ source = root / 'dashboard/dist'
 if not (source / 'index.html').is_file():
     raise SystemExit('Build the dashboard before staging assets')
 inventory, notices = dashboard_inventory()
-target = root / 'internal/web/server/assets'
+target = root / 'internal/httpserver/assets'
 # This directory contains generated assets only. Do not touch dashboard sources.
 shutil.rmtree(target)
 shutil.copytree(source, target)

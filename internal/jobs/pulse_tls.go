@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseTLSJob checks a TLS endpoint by completing a handshake and reports
@@ -32,7 +32,7 @@ type PulseTLSJob struct {
 	payload            map[string]interface{}
 }
 
-func newPulseTLSJob(cfg *schema.PulseTLSConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseTLSJob(cfg *manifest.PulseTLSConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	serverName := cfg.ServerName
 	if serverName == "" {
 		serverName = cfg.Host
@@ -58,24 +58,21 @@ func (p *PulseTLSJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	addr := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 	dialer := &net.Dialer{Timeout: p.Timeout}
 	tlsCfg := &tls.Config{ServerName: p.ServerName, InsecureSkipVerify: p.InsecureSkipVerify}
 
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := (&tls.Dialer{NetDialer: dialer, Config: tlsCfg}).DialContext(ctx, "tcp", addr)
 		if err != nil {
 			lastErr = err
-			if attempt < attempts-1 {
-				if !retryDelay(ctx) {
-					break
-				}
-			}
 			continue
 		}
 		state := conn.(*tls.Conn).ConnectionState()
@@ -99,7 +96,7 @@ func (p *PulseTLSJob) Execute() (result Result) {
 		}
 		return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: out}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("tls check failed for %s after %d attempt(s): %w", addr, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("tls check failed for %s after %d attempt(s): %w", addr, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseTLSJob) Copy() Job                  { job := *p; return &job }

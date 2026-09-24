@@ -25,6 +25,14 @@ func (p *PulseScheduler) Schedule(entity ecs.Entity, due time.Time) {
 	p.heap.Schedule(entity, due)
 }
 
+// Cancel removes both scheduled and ready membership. A tag alone cannot remove
+// scheduler entries; dispatch authorization must additionally fence worker copies.
+func (p *PulseScheduler) Cancel(entity ecs.Entity) bool {
+	scheduled := p.heap.Cancel(entity)
+	ready := p.ready.Cancel(entity)
+	return scheduled || ready
+}
+
 // Due pops and returns all entities due at or before now from the scheduler.
 func (p *PulseScheduler) Due(now time.Time) []ecs.Entity {
 	return p.heap.Due(now)

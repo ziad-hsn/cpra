@@ -3,7 +3,7 @@ package jobs
 import (
 	"testing"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -14,11 +14,11 @@ func TestCreateCodeJobNewTypes(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		config schema.CodeConfig
+		config manifest.CodeConfig
 	}{
-		{"telegram", schema.CodeConfig{Notify: "telegram", Config: &schema.CodeNotificationTelegram{BotToken: "t", ChatID: "c"}}},
-		{"discord", schema.CodeConfig{Notify: "discord", Config: &schema.CodeNotificationDiscord{WebhookURL: "https://x"}}},
-		{"opsgenie", schema.CodeConfig{Notify: "opsgenie", Config: &schema.CodeNotificationOpsgenie{APIKey: "k"}}},
+		{"telegram", manifest.CodeConfig{Notify: "telegram", Config: &manifest.CodeNotificationTelegram{BotToken: "t", ChatID: "c"}}},
+		{"discord", manifest.CodeConfig{Notify: "discord", Config: &manifest.CodeNotificationDiscord{WebhookURL: "https://x"}}},
+		{"opsgenie", manifest.CodeConfig{Notify: "opsgenie", Config: &manifest.CodeNotificationOpsgenie{APIKey: "k"}}},
 	}
 
 	for _, tc := range cases {

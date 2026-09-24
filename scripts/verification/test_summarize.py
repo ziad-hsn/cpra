@@ -49,7 +49,7 @@ class EvidenceSummaryTests(unittest.TestCase):
         return fixture_report(self.directory.name, name, passes, **kw)
 
     def test_inventory_matches_production_runner_and_documented_counts(self):
-        source = pathlib.Path(__file__).resolve().parents[2] / 'internal/verification/runner.go'
+        source = pathlib.Path(__file__).resolve().parents[2] / 'internal/drivertest/runner.go'
         inventory = source.read_text().split('func Inventory()', 1)[1].split('type Case', 1)[0]
         rows = re.findall(r'\{"(pulse|intervention|code)", "([^"]+)"\}', inventory)
         expected = [(kind, driver) for kind, names in rows for driver in names.split()]

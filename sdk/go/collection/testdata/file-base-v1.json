@@ -1,0 +1,846 @@
+{
+  "profile": "cpra.file.base.v1",
+  "cases": [
+    {
+      "name": "json-resource",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+    },
+    {
+      "name": "json-array",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        },
+        {
+          "id": "Recipient/bob",
+          "document": 1,
+          "item": 2,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "[{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}},{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}]"
+    },
+    {
+      "name": "json-adjacent-documents",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        },
+        {
+          "id": "Recipient/bob",
+          "document": 2,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}\n{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+    },
+    {
+      "name": "json-list",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        },
+        {
+          "id": "Recipient/bob",
+          "document": 1,
+          "item": 2,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"List\",\"items\":[{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}},{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}]}"
+    },
+    {
+      "name": "yaml-resource",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata:\n  id: alice\nspec:\n  endpointRefs: [mail]\n"
+    },
+    {
+      "name": "yaml-multiple-documents",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        },
+        {
+          "id": "Recipient/bob",
+          "document": 2,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "---\n# first\napiVersion: cpra.io/v2\nkind: Recipient\nmetadata:\n  id: alice\nspec:\n  endpointRefs: [mail]\n---\n---\napiVersion: cpra.io/v2\nkind: Recipient\nmetadata:\n  id: bob\nspec:\n  endpointRefs: [mail]\n...\n"
+    },
+    {
+      "name": "yaml-streamed-list",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        },
+        {
+          "id": "Recipient/bob",
+          "document": 1,
+          "item": 2,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: List\nitems:\n  - apiVersion: cpra.io/v2\n    kind: Recipient\n    metadata: {id: alice}\n    spec: {endpointRefs: [mail]}\n  - apiVersion: cpra.io/v2\n    kind: Recipient\n    metadata: {id: bob}\n    spec: {endpointRefs: [mail]}\n"
+    },
+    {
+      "name": "empty",
+      "valid": true,
+      "items": [],
+      "source": ""
+    },
+    {
+      "name": "comment-only",
+      "valid": true,
+      "items": [],
+      "source": "# comment\n---\n# last comment\n"
+    },
+    {
+      "name": "valid-multibyte",
+      "valid": true,
+      "items": [
+        {
+          "id": "Credential/utf8",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Credential\",\"metadata\":{\"id\":\"utf8\"},\"spec\":{\"value\":\"é猫😀\"}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Credential\",\"metadata\":{\"id\":\"utf8\"},\"spec\":{\"value\":\"é猫😀\"}}"
+    },
+    {
+      "name": "invalid-utf8",
+      "valid": false,
+      "items": [],
+      "sourceBase64": "eyJhcGlWZXJzaW9uIjoiY3ByYS5pby92MiIsImtpbmQiOiJDcmVkZW50aWFsIiwibWV0YWRhdGEiOnsiaWQiOiJiYWQifSwic3BlYyI6eyJ2YWx1ZSI6Iv8ifX0="
+    },
+    {
+      "name": "truncated-utf8",
+      "valid": false,
+      "items": [],
+      "sourceBase64": "IyBpbnZhbGlkIHRhaWwg4oI="
+    },
+    {
+      "name": "utf8-surrogate",
+      "valid": false,
+      "items": [],
+      "sourceBase64": "IyBzdXJyb2dhdGUg7aCA"
+    },
+    {
+      "name": "duplicate-json-key",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\",\"id\":\"bob\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+    },
+    {
+      "name": "duplicate-yaml-key",
+      "valid": false,
+      "items": [],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata:\n  id: alice\n  id: bob\nspec:\n  endpointRefs: [mail]\n"
+    },
+    {
+      "name": "yaml-alias",
+      "valid": false,
+      "items": [],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: &metadata {id: alice}\nspec: *metadata\n"
+    },
+    {
+      "name": "late-json-failure",
+      "valid": false,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}\n{bad}"
+    },
+    {
+      "name": "late-yaml-failure",
+      "valid": false,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata:\n  id: alice\nspec:\n  endpointRefs: [mail]\n---\nspec: [\n"
+    },
+    {
+      "name": "duplicate-resource",
+      "valid": false,
+      "items": [
+        {
+          "id": "Recipient/alice",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}"
+        }
+      ],
+      "source": "[{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}},{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"alice\"},\"spec\":{\"endpointRefs\":[\"mail\"]}}]"
+    },
+    {
+      "name": "json-integer-9007199254740993",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":9007199254740993,\"timeout\":\"5s\"}}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":9007199254740993,\"timeout\":\"5s\"}}}"
+    },
+    {
+      "name": "json-integer-9223372036854775807",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":9223372036854775807,\"timeout\":\"5s\"}}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":9223372036854775807,\"timeout\":\"5s\"}}}"
+    },
+    {
+      "name": "json-integer--0",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":-0,\"timeout\":\"5s\"}}}"
+        }
+      ],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"retries\":-0,\"timeout\":\"5s\"}}}"
+    },
+    {
+      "name": "invalid-integer-0.99999999999999999",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":0.99999999999999999,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "invalid-integer-1e-999",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":1e-999,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "invalid-integer-9007199254740993.0",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":9007199254740993.0,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "invalid-integer-1.0",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":1.0,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "invalid-integer-1e3",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":1e3,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "invalid-integer-9223372036854775808",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"retries\":9223372036854775808,\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}}}}}"
+    },
+    {
+      "name": "yaml-decimal-+.5",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":0.5}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: +.5}\n"
+    },
+    {
+      "name": "yaml-decimal--000.50",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":-0.50}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: -000.50}\n"
+    },
+    {
+      "name": "yaml-decimal-1_000.25",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":1000.25}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: 1_000.25}\n"
+    },
+    {
+      "name": "yaml-decimal-1.",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":1.0}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: 1.}\n"
+    },
+    {
+      "name": "yaml-decimal-1e-999",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":1e-999}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: 1e-999}\n"
+    },
+    {
+      "name": "yaml-decimal-9007199254740993.0",
+      "valid": true,
+      "items": [
+        {
+          "id": "Recipient/numeric",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Recipient\",\"metadata\":{\"id\":\"numeric\"},\"spec\":{\"endpointRefs\":[\"mail\"]},\"status\":{\"measured\":9007199254740993.0}}"
+        }
+      ],
+      "source": "apiVersion: cpra.io/v2\nkind: Recipient\nmetadata: {id: numeric}\nspec: {endpointRefs: [mail]}\nstatus: {measured: 9007199254740993.0}\n"
+    },
+    {
+      "name": "legacy-inheritance",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/name:c49fea7425fa7f8699897a97c159c6690267d9003bb78c53fafa8fc15c325d84",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"name:c49fea7425fa7f8699897a97c159c6690267d9003bb78c53fafa8fc15c325d84\",\"name\":\"legacy\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"retries\":3,\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"maxFailures\":4,\"retries\":3,\"timeout\":\"5s\",\"unhealthyThreshold\":4}}}"
+        }
+      ],
+      "source": "monitors:\n  - name: legacy\n    pulse_check:\n      type: http\n      interval: 60s\n      timeout: 5s\n      retries: 3\n      max_failures: 4\n      unhealthy_threshold: 0\n      config:\n        url: https://example.test\n        retries: 0\n"
+    },
+    {
+      "name": "external-check",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"custom\"},\"spec\":{\"check\":{\"interval\":\"60s\",\"timeout\":\"5s\",\"driver\":{\"type\":\"external\",\"config\":{\"jobTypeID\":\"custom-check\",\"version\":\"v1\"}}}}}"
+    },
+    {
+      "name": "external-jobtype",
+      "valid": false,
+      "items": [],
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"JobType\",\"metadata\":{\"id\":\"custom-check\"},\"spec\":{\"kind\":\"check\",\"version\":\"v1\",\"handler\":\"handler\",\"protocolVersion\":\"v1\"}}"
+    },
+    {
+      "name": "json-escaping-and-null",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Credential\",\"metadata\":{\"id\":\"escape\"},\"spec\":{\"value\":\"<>&é\\u2028\\u2029\",\"description\":null}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Credential/escape",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Credential\",\"metadata\":{\"id\":\"escape\"},\"spec\":{\"description\":null,\"value\":\"\\u003c\\u003e\\u0026é\\u2028\\u2029\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-http",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-http\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-http",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-http\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-tcp",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-tcp\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"tcp\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-tcp",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-tcp\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"tcp\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-icmp",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-icmp\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"icmp\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-icmp",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-icmp\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"icmp\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-dns",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-dns\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"dns\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-dns",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-dns\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"dns\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-udp",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-udp\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"udp\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-udp",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-udp\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"udp\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-grpc",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-grpc\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"grpc\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-grpc",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-grpc\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"grpc\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-docker",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-docker\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"docker\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-docker",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-docker\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"docker\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-redis",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-redis\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"redis\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-redis",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-redis\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"redis\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-postgres",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-postgres\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"postgres\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-postgres",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-postgres\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"postgres\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-mysql",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-mysql\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"mysql\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-mysql",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-mysql\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"mysql\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-mongo",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-mongo\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"mongo\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-mongo",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-mongo\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"mongo\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-rabbitmq",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-rabbitmq\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"rabbitmq\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-rabbitmq",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-rabbitmq\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"rabbitmq\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-kafka",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-kafka\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"kafka\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-kafka",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-kafka\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"kafka\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-check-tls",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-tls\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"tls\",\"config\":{}},\"interval\":\"60s\",\"timeout\":\"5s\"}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/check-tls",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"check-tls\"},\"spec\":{\"check\":{\"driver\":{\"config\":{},\"type\":\"tls\"},\"interval\":\"60s\",\"timeout\":\"5s\"}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-recovery-kubernetes",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-kubernetes\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"type\":\"kubernetes\",\"config\":{}}}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/recovery-kubernetes",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-kubernetes\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"config\":{},\"type\":\"kubernetes\"}}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-recovery-webhook",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-webhook\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"type\":\"webhook\",\"config\":{}}}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/recovery-webhook",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-webhook\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"config\":{},\"type\":\"webhook\"}}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-recovery-systemd",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-systemd\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"type\":\"systemd\",\"config\":{}}}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/recovery-systemd",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-systemd\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"config\":{},\"type\":\"systemd\"}}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-recovery-aws",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-aws\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"type\":\"aws\",\"config\":{}}}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/recovery-aws",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-aws\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"config\":{},\"type\":\"aws\"}}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-recovery-docker",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-docker\"},\"spec\":{\"check\":{\"driver\":{\"type\":\"http\",\"config\":{\"url\":\"https://example.test\"}},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"type\":\"docker\",\"config\":{}}}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "Monitor/recovery-docker",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"Monitor\",\"metadata\":{\"id\":\"recovery-docker\"},\"spec\":{\"check\":{\"driver\":{\"config\":{\"url\":\"https://example.test\"},\"type\":\"http\"},\"interval\":\"60s\",\"timeout\":\"5s\"},\"recovery\":{\"driver\":{\"config\":{},\"type\":\"docker\"}}}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-email",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-email\"},\"spec\":{\"type\":\"email\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-email",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-email\"},\"spec\":{\"config\":{},\"type\":\"email\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-webhook",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-webhook\"},\"spec\":{\"type\":\"webhook\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-webhook",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-webhook\"},\"spec\":{\"config\":{},\"type\":\"webhook\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-log",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-log\"},\"spec\":{\"type\":\"log\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-log",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-log\"},\"spec\":{\"config\":{},\"type\":\"log\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-pagerduty",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-pagerduty\"},\"spec\":{\"type\":\"pagerduty\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-pagerduty",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-pagerduty\"},\"spec\":{\"config\":{},\"type\":\"pagerduty\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-slack",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-slack\"},\"spec\":{\"type\":\"slack\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-slack",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-slack\"},\"spec\":{\"config\":{},\"type\":\"slack\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-telegram",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-telegram\"},\"spec\":{\"type\":\"telegram\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-telegram",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-telegram\"},\"spec\":{\"config\":{},\"type\":\"telegram\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-discord",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-discord\"},\"spec\":{\"type\":\"discord\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-discord",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-discord\"},\"spec\":{\"config\":{},\"type\":\"discord\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-opsgenie",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-opsgenie\"},\"spec\":{\"type\":\"opsgenie\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-opsgenie",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-opsgenie\"},\"spec\":{\"config\":{},\"type\":\"opsgenie\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-teams",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-teams\"},\"spec\":{\"type\":\"teams\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-teams",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-teams\"},\"spec\":{\"config\":{},\"type\":\"teams\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-mattermost",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-mattermost\"},\"spec\":{\"type\":\"mattermost\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-mattermost",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-mattermost\"},\"spec\":{\"config\":{},\"type\":\"mattermost\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-pushover",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-pushover\"},\"spec\":{\"type\":\"pushover\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-pushover",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-pushover\"},\"spec\":{\"config\":{},\"type\":\"pushover\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-twilio",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-twilio\"},\"spec\":{\"type\":\"twilio\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-twilio",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-twilio\"},\"spec\":{\"config\":{},\"type\":\"twilio\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-datadog",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-datadog\"},\"spec\":{\"type\":\"datadog\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-datadog",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-datadog\"},\"spec\":{\"config\":{},\"type\":\"datadog\"}}"
+        }
+      ]
+    },
+    {
+      "name": "builtin-notification-victorops",
+      "source": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-victorops\"},\"spec\":{\"type\":\"victorops\",\"config\":{}}}",
+      "valid": true,
+      "items": [
+        {
+          "id": "NotificationEndpoint/notification-victorops",
+          "document": 1,
+          "item": 1,
+          "json": "{\"apiVersion\":\"cpra.io/v2\",\"kind\":\"NotificationEndpoint\",\"metadata\":{\"id\":\"notification-victorops\"},\"spec\":{\"config\":{},\"type\":\"victorops\"}}"
+        }
+      ]
+    }
+  ]
+}

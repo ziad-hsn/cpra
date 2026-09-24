@@ -1,0 +1,4136 @@
+{
+  "openapi": "3.1.2",
+  "info": {
+    "title": "CPRa SDK draft management contract",
+    "version": "0.1.0-rc.1",
+    "description": "Draft contract. V2 server qualification is pending. Existing v1 is separate."
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Duration": {
+        "type": "string",
+        "description": "Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.",
+        "x-go-type": "string"
+      },
+      "CodeNotificationEmail": {
+        "type": "object",
+        "properties": {
+          "allowInsecure": {
+            "type": "boolean",
+            "x-go-name": "AllowInsecure"
+          },
+          "to": {
+            "type": "string",
+            "x-go-name": "To"
+          },
+          "from": {
+            "type": "string",
+            "x-go-name": "From"
+          },
+          "server": {
+            "type": "string",
+            "x-go-name": "Server"
+          },
+          "subject": {
+            "type": "string",
+            "x-go-name": "Subject"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationWebhook": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "method": {
+            "type": "string",
+            "x-go-name": "Method"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-go-name": "Headers"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "InterventionTargetKubernetes": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-name": "Type"
+          },
+          "kubeconfigPath": {
+            "type": "string",
+            "x-go-name": "KubeconfigPath"
+          },
+          "namespace": {
+            "type": "string",
+            "x-go-name": "Namespace"
+          },
+          "kind": {
+            "type": "string",
+            "x-go-name": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "x-go-name": "Name"
+          },
+          "replicas": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Replicas"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "InterventionTargetWebhook": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-name": "Type"
+          },
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "method": {
+            "type": "string",
+            "x-go-name": "Method"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-go-name": "Headers"
+          },
+          "body": {
+            "type": "string",
+            "x-go-name": "Body"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "InterventionTargetSystemd": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-name": "Type"
+          },
+          "unit": {
+            "type": "string",
+            "x-go-name": "Unit"
+          },
+          "mode": {
+            "type": "string",
+            "x-go-name": "Mode"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "InterventionTargetAWS": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-name": "Type"
+          },
+          "region": {
+            "type": "string",
+            "x-go-name": "Region"
+          },
+          "operation": {
+            "type": "string",
+            "x-go-name": "Operation"
+          },
+          "instanceId": {
+            "type": "string",
+            "x-go-name": "InstanceID"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseHTTPConfig": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "method": {
+            "type": "string",
+            "x-go-name": "Method"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-go-name": "Headers"
+          },
+          "body": {
+            "type": "string",
+            "x-go-name": "Body"
+          },
+          "expectedStatus": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "x-go-name": "ExpectedStatus"
+          },
+          "insecureSkipVerify": {
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseTCPConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseICMPConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "ignorePrivilege": {
+            "type": "boolean",
+            "x-go-name": "Privilege"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Count"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseDNSConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "server": {
+            "type": "string",
+            "x-go-name": "Server"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseUDPConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "payload": {
+            "type": "string",
+            "x-go-name": "Payload"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseGRPCConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "service": {
+            "type": "string",
+            "x-go-name": "Service"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseDockerConfig": {
+        "type": "object",
+        "properties": {
+          "container": {
+            "type": "string",
+            "x-go-name": "Container"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "InterventionTargetDocker": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-name": "Type"
+          },
+          "container": {
+            "type": "string",
+            "x-go-name": "Container"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationLog": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "x-go-name": "File"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationPagerDuty": {
+        "type": "object",
+        "properties": {
+          "routingKey": {
+            "type": "string",
+            "x-go-name": "RoutingKey"
+          },
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationSlack": {
+        "type": "object",
+        "properties": {
+          "hook": {
+            "type": "string",
+            "x-go-name": "WebHook"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationTelegram": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "testMode": {
+            "type": "boolean",
+            "x-go-name": "TestMode"
+          },
+          "botToken": {
+            "type": "string",
+            "x-go-name": "BotToken"
+          },
+          "chatId": {
+            "type": "string",
+            "x-go-name": "ChatID"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationDiscord": {
+        "type": "object",
+        "properties": {
+          "webhookUrl": {
+            "type": "string",
+            "x-go-name": "WebhookURL"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationOpsgenie": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "x-go-name": "APIKey"
+          },
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationTeams": {
+        "type": "object",
+        "properties": {
+          "webhookUrl": {
+            "type": "string",
+            "x-go-name": "WebhookURL"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationMattermost": {
+        "type": "object",
+        "properties": {
+          "webhookUrl": {
+            "type": "string",
+            "x-go-name": "WebhookURL"
+          },
+          "channel": {
+            "type": "string",
+            "x-go-name": "Channel"
+          },
+          "username": {
+            "type": "string",
+            "x-go-name": "Username"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationPushover": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "appToken": {
+            "type": "string",
+            "x-go-name": "AppToken"
+          },
+          "userKey": {
+            "type": "string",
+            "x-go-name": "UserKey"
+          },
+          "title": {
+            "type": "string",
+            "x-go-name": "Title"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Priority"
+          },
+          "retry": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retry"
+          },
+          "expire": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Expire"
+          },
+          "sound": {
+            "type": "string",
+            "x-go-name": "Sound"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationTwilio": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "accountSid": {
+            "type": "string",
+            "x-go-name": "AccountSID"
+          },
+          "authToken": {
+            "type": "string",
+            "x-go-name": "AuthToken"
+          },
+          "from": {
+            "type": "string",
+            "x-go-name": "From"
+          },
+          "to": {
+            "type": "string",
+            "x-go-name": "To"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationDatadog": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "apiKey": {
+            "type": "string",
+            "x-go-name": "APIKey"
+          },
+          "appKey": {
+            "type": "string",
+            "x-go-name": "AppKey"
+          },
+          "site": {
+            "type": "string",
+            "x-go-name": "Site"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-go-name": "Tags"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationVictorOps": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "restEndpointKey": {
+            "type": "string",
+            "x-go-name": "RESTEndpointKey"
+          },
+          "routingKey": {
+            "type": "string",
+            "x-go-name": "RoutingKey"
+          },
+          "messageType": {
+            "type": "string",
+            "x-go-name": "MessageType"
+          },
+          "entityId": {
+            "type": "string",
+            "x-go-name": "EntityID"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseRedisConfig": {
+        "type": "object",
+        "properties": {
+          "addr": {
+            "type": "string",
+            "x-go-name": "Addr"
+          },
+          "password": {
+            "type": "string",
+            "x-go-name": "Password"
+          },
+          "username": {
+            "type": "string",
+            "x-go-name": "Username"
+          },
+          "db": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "DB"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulsePostgresConfig": {
+        "type": "object",
+        "properties": {
+          "dsn": {
+            "type": "string",
+            "x-go-name": "DSN"
+          },
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "user": {
+            "type": "string",
+            "x-go-name": "User"
+          },
+          "password": {
+            "type": "string",
+            "x-go-name": "Password"
+          },
+          "database": {
+            "type": "string",
+            "x-go-name": "Database"
+          },
+          "sslmode": {
+            "type": "string",
+            "x-go-name": "SSLMode"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseMySQLConfig": {
+        "type": "object",
+        "properties": {
+          "dsn": {
+            "type": "string",
+            "x-go-name": "DSN"
+          },
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "user": {
+            "type": "string",
+            "x-go-name": "User"
+          },
+          "password": {
+            "type": "string",
+            "x-go-name": "Password"
+          },
+          "database": {
+            "type": "string",
+            "x-go-name": "Database"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseMongoConfig": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "x-go-name": "URI"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseRabbitMQConfig": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseKafkaConfig": {
+        "type": "object",
+        "properties": {
+          "brokers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-go-name": "Brokers"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PulseTLSConfig": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "x-go-name": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Port"
+          },
+          "serverName": {
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "warnDays": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "WarnDays"
+          },
+          "criticalDays": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "CriticalDays"
+          },
+          "insecureSkipVerify": {
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Retries"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "Metadata": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "uid": {
+            "type": "string",
+            "x-go-name": "UID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "resourceVersion": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "Resource": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "x-go-type": "json.RawMessage"
+          },
+          "status": {
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "DriverConfig": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "config": {
+            "x-go-type": "json.RawMessage"
+          },
+          "credentialRefs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "config"
+        ],
+        "additionalProperties": false
+      },
+      "CheckSpec": {
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/DriverConfig"
+          },
+          "interval": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "unhealthyThreshold": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "healthyThreshold": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxFailures": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "driver",
+          "interval",
+          "timeout"
+        ],
+        "additionalProperties": false
+      },
+      "RecoverySpec": {
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/DriverConfig"
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cooldown": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxFailures": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "driver"
+        ],
+        "additionalProperties": false
+      },
+      "MaintenanceWindow": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "MonitorSpec": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "check": {
+            "$ref": "#/components/schemas/CheckSpec"
+          },
+          "recovery": {
+            "$ref": "#/components/schemas/RecoverySpec"
+          },
+          "notificationGroupRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notifications": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AlertRule"
+            }
+          },
+          "maintenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceWindow"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "check"
+        ],
+        "additionalProperties": false
+      },
+      "Measurement": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "description": "Meaningful only when available is true; units are defined by the containing field."
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "additionalProperties": false
+      },
+      "MonitorStatus": {
+        "type": "object",
+        "properties": {
+          "observedGeneration": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "controlRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "statusRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "executionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "health": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "lastCheckedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "lastCheckLatencyMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "LastCheckLatencyMS"
+          },
+          "snoozedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-name": "IncidentID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "unknownActions": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "Monitor": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/MonitorSpec"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MonitorStatus",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationEndpoint": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/DriverConfig"
+          },
+          "status": {
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationGroup": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/NotificationGroupSpec"
+          },
+          "status": {
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "Credential": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/CredentialSpec"
+          },
+          "status": {
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationGroupSpec": {
+        "type": "object",
+        "properties": {
+          "endpointRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "x-go-type-skip-optional-pointer": true
+          },
+          "recipientRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ordered endpoint and recipient references. At least one member is required; groups cannot contain other groups.",
+        "not": {
+          "properties": {
+            "endpointRefs": {
+              "maxItems": 0
+            },
+            "recipientRefs": {
+              "maxItems": 0
+            }
+          }
+        }
+      },
+      "CredentialSpec": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "FieldError": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "title": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "detail": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "instance": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "requestID": {
+            "type": "string",
+            "x-go-name": "RequestID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "operationID": {
+            "type": "string",
+            "x-go-name": "OperationID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "code": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "ControlRequest": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "note": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "duration": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-name": "IncidentID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "resolution": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "monitorID": {
+            "type": "string",
+            "x-go-name": "MonitorID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incarnationUID": {
+            "type": "string",
+            "x-go-name": "IncarnationUID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-name": "IncidentID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "state": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "executionID": {
+            "type": "string",
+            "x-go-name": "ExecutionID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "executionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "receiptID": {
+            "type": "string",
+            "x-go-name": "ReceiptID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "reviewRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Opaque action observation version required for a conditional operator review."
+          },
+          "held": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "An unresolved action hold; independent of the recorded provider outcome."
+          },
+          "executorFenced": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Whether the original executor is known finished or fenced for review."
+          },
+          "outcome": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Recorded provider outcome classification, unchanged by operator review."
+          },
+          "review": {
+            "$ref": "#/components/schemas/ActionReview"
+          },
+          "lateEvidence": {
+            "$ref": "#/components/schemas/ActionEvidence"
+          },
+          "conflictingEvidence": {
+            "$ref": "#/components/schemas/ActionEvidence"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "held",
+          "executorFenced"
+        ],
+        "additionalProperties": false
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "monitorID": {
+            "type": "string",
+            "x-go-name": "MonitorID"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "acknowledgedBy": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "acknowledgedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "dismissed": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "id",
+          "monitorID",
+          "revision",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "monitorID": {
+            "type": "string",
+            "x-go-name": "MonitorID"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "actionID": {
+            "type": "string",
+            "x-go-name": "ActionID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-name": "IncidentID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "note": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Operator note recorded with the original audited event; never provider credentials."
+          },
+          "actionKind": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original action category, when the event belongs to an action."
+          },
+          "color": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original notification Code, when applicable."
+          },
+          "outcome": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Recorded safe outcome classification; never a provider response body."
+          },
+          "executionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original execution revision, never a configuration or control version."
+          },
+          "controlRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original control or incident attention revision, when applicable."
+          },
+          "endpoint": {
+            "type": "integer",
+            "description": "Original notification endpoint index; explicit zero is retained when applicable."
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "description": "Opaque operator-supplied evidence references. CPRa does not fetch these references.",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "id",
+          "monitorID",
+          "kind",
+          "time"
+        ],
+        "additionalProperties": false
+      },
+      "ApplyItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID",
+            "maxLength": 321,
+            "description": "Exact Kind/ID identity bound by the item MAC."
+          },
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "HMAC of ordinal, identity, source coordinates and exact transmitted resource-object bytes."
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^source\\.[0-9]{20}$",
+            "minLength": 27,
+            "maxLength": 27,
+            "description": "Opaque ordered source token; never a filename or URL."
+          },
+          "resource": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "ordinal": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "sourceDocument": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "sourceItem": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "id",
+          "contentDigest",
+          "source",
+          "resource",
+          "ordinal",
+          "sourceDocument",
+          "sourceItem"
+        ],
+        "additionalProperties": false
+      },
+      "ApplyResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Compatibility outcome observation. For collection execution, catalogDecision and childDisposition carry separate authoritative facts. Unknown future values remain readable."
+          },
+          "oldVersion": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "newVersion": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "message": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "committed": {
+            "type": "boolean",
+            "description": "Optional catalog observation; true means a new mutation was accepted, false means none was accepted. Unchanged is successful without a new mutation. Omission means unavailable; null is unsupported."
+          },
+          "applied": {
+            "type": "boolean",
+            "description": "Optional retained child observation. Absent while the accepted child is pending or when no child exists; explicit false records a terminal child that was not applied. Null is unsupported."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource kind for collection execution rows. Collection id retains Kind/resourceID; ordinary resource receipts retain their existing id form.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "inputOrdinal": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "One-based original input ordinal, defining result page order."
+          },
+          "planOrdinal": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "One-based original execution plan ordinal; independent of input order."
+          },
+          "source": {
+            "type": "string",
+            "description": "Opaque original source token; never a source path, URL, fingerprint or key.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "sourceDocument": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "One-based original source document."
+          },
+          "sourceItem": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "One-based original source item."
+          },
+          "originalUID": {
+            "type": "string",
+            "description": "Original incarnation from the frozen plan guard.",
+            "x-go-name": "OriginalUID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "uid": {
+            "type": "string",
+            "description": "Incarnation produced or confirmed by the original catalog decision.",
+            "x-go-name": "UID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Generation produced or confirmed by the original decision."
+          },
+          "catalogDecision": {
+            "type": "string",
+            "description": "Original conditional decision: accepted, unchanged, conflict, dependencyBlocked or unattempted. A child failure never changes an accepted decision. Unknown future values remain readable.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "committedIndex": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Original decision log index; absent for an unattempted input."
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original decision time; absent for unattempted inputs."
+          },
+          "childDisposition": {
+            "$ref": "#/components/schemas/ExecutionChildDisposition"
+          }
+        },
+        "required": [
+          "id",
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
+      "PreflightRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplyItem"
+            },
+            "maxItems": 10000
+          },
+          "identityFormat": {
+            "type": "string",
+            "enum": [
+              "cpra.collection.hmac-sha256-json-bytes.v1"
+            ],
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Versioned commitment to exact transmitted resource-object bytes. No JSON canonicalization is performed."
+          },
+          "identityKey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private per-frozen-collection HMAC key. Send only to the configured authenticated server. Never return, log or persist unencrypted."
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private keyed source commitment. Source paths and URLs remain client-local."
+          },
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Opaque keyed inventory commitment; requires the original frozen key and bytes to resume."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "items",
+          "identityFormat",
+          "identityKey",
+          "sourceFingerprint",
+          "contentDigest",
+          "itemCount"
+        ],
+        "additionalProperties": false
+      },
+      "Preflight": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "contentDigest": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplyResult"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "identityFormat": {
+            "type": "string",
+            "enum": [
+              "cpra.collection.hmac-sha256-json-bytes.v1"
+            ],
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Present for collection protocol receipts; the caller must recognize it before uploading, validating or activating."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Declared frozen collection size. Required by collection protocol receipts; absent for non-collection operations. Null is unsupported."
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "additionalProperties": false
+      },
+      "OperationCreateRequest": {
+        "type": "object",
+        "properties": {
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Opaque keyed inventory commitment; requires the original frozen key and bytes to resume."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "identityFormat": {
+            "type": "string",
+            "enum": [
+              "cpra.collection.hmac-sha256-json-bytes.v1"
+            ],
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Versioned commitment to exact transmitted resource-object bytes. No JSON canonicalization is performed."
+          },
+          "identityKey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private per-frozen-collection HMAC key. Send only to the configured authenticated server. Never return, log or persist unencrypted."
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private keyed source commitment. Source paths and URLs remain client-local."
+          },
+          "admissionTicket": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 131072,
+            "description": "Original opaque ticket returned by PrepareCollection. Keep it with the frozen input. Never replace it automatically after attempting Create. Expired or restored-epoch tickets cannot allocate new operations."
+          },
+          "normalizationProfile": {
+            "type": "string",
+            "pattern": "^cpra\\.file\\.base\\.v1$",
+            "maxLength": 96,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Optional versioned raw-file normalization contract, bound to the original admission and encrypted collection identity. Omit for unprofiled or typed-resource inputs. This field alone does not enable source reselection."
+          }
+        },
+        "required": [
+          "contentDigest",
+          "itemCount",
+          "identityFormat",
+          "identityKey",
+          "sourceFingerprint",
+          "admissionTicket"
+        ],
+        "additionalProperties": false
+      },
+      "UploadRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplyItem"
+            },
+            "maxItems": 256,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "x-go-name": "ID"
+          },
+          "state": {
+            "type": "string",
+            "description": "Parent progress/outcome. canceled and invalidated stop further decisions but do not imply executionResult.state is ready. Unknown future values remain read-only."
+          },
+          "contentDigest": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplyResult"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "committed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optional observed progress; omission means not reported. Explicit zero or false is retained. Null is unsupported."
+          },
+          "applied": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optional observed progress; omission means not reported. Explicit zero or false is retained. Null is unsupported."
+          },
+          "uploaded": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optional observed progress; omission means not reported. Explicit zero or false is retained. Null is unsupported."
+          },
+          "validated": {
+            "type": "boolean",
+            "description": "Optional observed progress; omission means not reported. Explicit zero or false is retained. Null is unsupported."
+          },
+          "identityFormat": {
+            "type": "string",
+            "enum": [
+              "cpra.collection.hmac-sha256-json-bytes.v1"
+            ],
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Present for collection protocol receipts; the caller must recognize it before uploading, validating or activating."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Declared frozen collection size. Required by collection protocol receipts; absent for non-collection operations. Null is unsupported."
+          },
+          "executionResult": {
+            "$ref": "#/components/schemas/ExecutionResultAvailability"
+          },
+          "normalizationProfile": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original raw-file normalization contract when declared. Missing means no file profile was recorded. Unknown future values are read-only and must not be used to reinterpret the original inventory."
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "contentDigest"
+        ],
+        "additionalProperties": false
+      },
+      "StorageState": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Current durable-store observation."
+          },
+          "mode": {
+            "type": "string"
+          },
+          "formatVersion": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Current application snapshot format, distinct from node identity and authentication format versions."
+          },
+          "commitIndex": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Compatibility observation of the FSM-applied log index; not an independently sampled Raft commit index."
+          },
+          "appliedIndex": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "error": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "bytesAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "commitLatency": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshotDuration": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "singleNode": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "description": "Current durable-store observation."
+          }
+        },
+        "required": [
+          "available",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "State": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageState"
+          },
+          "projectionAgeMs": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "ProjectionAgeMS"
+          },
+          "unknownActions": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "projectionAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "projectionFresh": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "unknownActionsAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "controllerAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "controllerReady": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "controllerReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "readinessReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "generatedAt",
+          "ready",
+          "live",
+          "storage"
+        ],
+        "additionalProperties": false
+      },
+      "Queue": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "capacity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "oldestPendingMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "OldestPendingMS"
+          },
+          "enqueuedPerSecond": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "completedPerSecond": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Absent when completed-execution rate is not measured; consult completedRateAvailable."
+          },
+          "drops": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "saturated": {
+            "type": "boolean"
+          },
+          "limitReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "ratesAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "dequeuedPerSecond": {
+            "type": "number",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "double",
+            "description": "Dequeued jobs per second; this is not a completed-execution rate."
+          },
+          "completedRateAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "utilization": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "averageWait": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "maximumWait": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "sampleWindow": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "name",
+          "depth",
+          "capacity",
+          "saturated"
+        ],
+        "additionalProperties": false
+      },
+      "Pool": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "workers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Current worker goroutines, including idle workers; not a count of busy executions."
+          },
+          "minimum": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "maximum": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "busy": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "modelRecommendation": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "adjustmentReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "capacity": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "target": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "pendingResults": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "waitingTasks": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "tasksSubmitted": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "tasksCompleted": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "scalingEvents": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "busyAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "modelRecommendationAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "sizingModel": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "sloCondition": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "lastScaleAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serviceTime": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "serviceSamples": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          }
+        },
+        "required": [
+          "name",
+          "workers"
+        ],
+        "additionalProperties": false
+      },
+      "System": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "updates": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "entitiesProcessed": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "lastUpdateDurationMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "LastUpdateDurationMS"
+          },
+          "progressAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "averageUpdateDuration": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "maximumUpdateDuration": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "minimumUpdateDuration": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "Percentiles": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "p50Ms": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "P50MS",
+            "x-omitempty": false
+          },
+          "p95Ms": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "P95MS",
+            "x-omitempty": false
+          },
+          "p99Ms": {
+            "type": "number",
+            "format": "double",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "P99MS",
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "additionalProperties": false
+      },
+      "SLOReport": {
+        "type": "object",
+        "properties": {
+          "pipeline": {
+            "type": "string"
+          },
+          "driver": {
+            "type": "string"
+          },
+          "samples": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "missed": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "timeouts": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "queueDelay": {
+            "$ref": "#/components/schemas/Percentiles",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "execution": {
+            "$ref": "#/components/schemas/Percentiles",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "totalLatency": {
+            "$ref": "#/components/schemas/Percentiles",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "queueThresholdPassed": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "totalThresholdPassed": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "attainment": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Compatibility alias for resultAttainment, a fraction from 0 to 1; unavailable when no expectations were recorded."
+          },
+          "condition": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "expected": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "overdue": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "pending": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64"
+          },
+          "queueAttainment": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "resultAttainment": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "pausedMonitors": {
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "int64",
+            "description": "Current owner-observed intentionally paused monitor count; not missed checks."
+          },
+          "pausedMonitorSeconds": {
+            "type": "number",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "double",
+            "description": "Intentional pause exposure inside this rolling window, in monitor-seconds; this is a gauge, not a monotonic counter."
+          }
+        },
+        "required": [
+          "pipeline",
+          "driver",
+          "samples"
+        ],
+        "additionalProperties": false
+      },
+      "SLOView": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "coverageGap": {
+            "type": "boolean"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SLOReport"
+            }
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "queueTargetMs": {
+            "type": "number",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "double",
+            "x-go-name": "QueueTargetMS"
+          },
+          "resultTargetMs": {
+            "type": "number",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "format": "double",
+            "x-go-name": "ResultTargetMS"
+          },
+          "gapStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gapEnd": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "window",
+          "coverageGap",
+          "reports"
+        ],
+        "additionalProperties": false
+      },
+      "Metrics": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "pools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pool"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "systems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/System"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "slo": {
+            "$ref": "#/components/schemas/SLOView",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "SLO"
+          },
+          "queuesAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "poolsAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "systemsAvailable": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "generatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RuntimeConfig": {
+        "type": "object",
+        "properties": {
+          "storageMode": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "historyRetention": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "queueCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "readOnly": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "sloWindow": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "queueTarget": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "resultTarget": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "additionalProperties": false
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "apiVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-go-name": "APIVersions"
+          },
+          "drivers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "patchTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resourceOperations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Supported operations by resource; availability does not grant authorization.",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersions",
+          "drivers",
+          "resources",
+          "patchTypes"
+        ],
+        "additionalProperties": false
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "sourceTime": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "goVersion": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "storageFormat": {
+            "type": "integer",
+            "format": "int64",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "Explanation": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "schema": {
+            "x-go-type": "json.RawMessage"
+          }
+        },
+        "required": [
+          "resource",
+          "description",
+          "schema"
+        ],
+        "additionalProperties": false
+      },
+      "MonitorList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Monitor"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationEndpointList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationEndpoint"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationGroupList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationGroup"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "CredentialList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Credential"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Incident"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ActionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "EventList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "QueueList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PoolList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pool"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "SystemList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/System"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "available": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "MergePatch": {
+        "x-go-type": "json.RawMessage"
+      },
+      "AlertRule": {
+        "type": "object",
+        "properties": {
+          "dispatch": {
+            "type": "boolean"
+          },
+          "endpointRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groupRef": {
+            "type": "string"
+          },
+          "driver": {
+            "$ref": "#/components/schemas/DriverConfig"
+          },
+          "notifyType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Actual notification driver key selected by the Code. Requires recipientRefs or groupRef, and excludes inline driver and direct endpointRefs."
+          },
+          "recipientRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipientSpec": {
+        "type": "object",
+        "description": "A notification contact with ordered references to typed notification endpoints; not an authentication principal.",
+        "properties": {
+          "endpointRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "endpointRefs"
+        ],
+        "additionalProperties": false
+      },
+      "Recipient": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "x-go-name": "APIVersion"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/RecipientSpec"
+          },
+          "status": {
+            "x-go-type": "json.RawMessage",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "RecipientList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recipient"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AccessInfo": {
+        "type": "object",
+        "description": "The authenticated principal and effective permissions for this request. Notification contacts are separate resources. Missing permissions never grant access.",
+        "properties": {
+          "principalId": {
+            "type": "string",
+            "x-go-name": "PrincipalID"
+          },
+          "role": {
+            "type": "string",
+            "description": "The named principal role: reader or operator. Future unknown roles do not implicitly grant permissions."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true,
+            "description": "Explicit effective permission identifiers, exactly matching case-sensitive OpenAPI operationId values such as CreateMonitor and AcknowledgeIncident. Clients must not infer write permission solely from a role."
+          }
+        },
+        "required": [
+          "principalId",
+          "role",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "OperationList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ActionReview": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "inconclusive"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Optional operator note."
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "conflict": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "revision",
+          "resolution",
+          "actor",
+          "reviewedAt",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ActionEvidence": {
+        "type": "object",
+        "description": "Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "executionStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "outcome",
+          "executionStart",
+          "executionEnd",
+          "recordedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CollectionPrepareRequest": {
+        "type": "object",
+        "properties": {
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Opaque keyed inventory commitment; requires the original frozen key and bytes to resume."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "identityFormat": {
+            "type": "string",
+            "enum": [
+              "cpra.collection.hmac-sha256-json-bytes.v1"
+            ],
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Versioned commitment to exact transmitted resource-object bytes. No JSON canonicalization is performed."
+          },
+          "identityKey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private per-frozen-collection HMAC key. Send only to the configured authenticated server. Never return, log or persist unencrypted."
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64,
+            "writeOnly": true,
+            "description": "Private keyed source commitment. Source paths and URLs remain client-local."
+          },
+          "normalizationProfile": {
+            "type": "string",
+            "pattern": "^cpra\\.file\\.base\\.v1$",
+            "maxLength": 96,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Optional versioned raw-file normalization contract, bound to the original admission and encrypted collection identity. Omit for unprofiled or typed-resource inputs. This field alone does not enable source reselection."
+          }
+        },
+        "required": [
+          "contentDigest",
+          "itemCount",
+          "identityFormat",
+          "identityKey",
+          "sourceFingerprint"
+        ],
+        "additionalProperties": false,
+        "description": "Prepare an authenticated creation ticket for one frozen collection before its first Create request. Preparing a ticket never uploads or activates resources."
+      },
+      "CollectionAdmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 131072,
+            "description": "Private opaque creation ticket; keep in client memory with the original frozen input and omit from diagnostics."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ticket",
+          "expiresAt"
+        ]
+      },
+      "ValidationResultItem": {
+        "type": "object",
+        "description": "Retained, safe validation metadata in original input order. Contains no resource bodies or credentials.",
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "x-go-name": "ID"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^source\\.[0-9]{20}$",
+            "minLength": 27,
+            "maxLength": 27,
+            "description": "Opaque ordered source token; never a filename or URL."
+          },
+          "sourceDocument": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "sourceItem": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "change": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Known changes: create, update, unchanged. Unknown values are read-only observations.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "issue": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Allowlisted issue code, never a provider diagnostic or source path. Unknown codes are read-only observations.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "uid": {
+            "type": "string",
+            "maxLength": 256,
+            "x-go-name": "UID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "resourceVersion": {
+            "type": "string",
+            "maxLength": 256,
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "ordinal",
+          "kind",
+          "id",
+          "source",
+          "sourceDocument",
+          "sourceItem"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationResultSummary": {
+        "type": "object",
+        "description": "Immutable original validation verdict. Count is retained result rows, distinct from declared input itemCount. A successful plan is not permission to execute.",
+        "properties": {
+          "resultID": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "x-go-name": "ResultID"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "issue": {
+            "type": "string",
+            "maxLength": 64,
+            "x-go-type-skip-optional-pointer": true
+          },
+          "summaryOnly": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "digest": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "planID": {
+            "type": "string",
+            "maxLength": 128,
+            "x-go-name": "PlanID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "planDigest": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "capabilitiesDigest": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "resultID",
+          "valid",
+          "summaryOnly",
+          "count",
+          "digest",
+          "capabilitiesDigest",
+          "finalizedAt",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationResultPage": {
+        "type": "object",
+        "description": "A bounded page from one sealed validation result. Pending validation is a problem response, never valid=false. At most 4 MiB encoded response; default 100 rows, maximum 500.",
+        "properties": {
+          "operationID": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "x-go-name": "OperationID"
+          },
+          "identityFormat": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "contentDigest": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ValidationResultSummary"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/ValidationResultItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 4096,
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "operationID",
+          "identityFormat",
+          "contentDigest",
+          "itemCount",
+          "summary",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ExecutionResultCounts": {
+        "type": "object",
+        "description": "Scalar execution observations. Catalog acceptance and controller application are independent; explicit zero is available, omission of the entire object is unavailable.",
+        "properties": {
+          "processed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original plan decisions recorded; excludes the unattempted suffix."
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "New catalog mutations accepted. Controller disposition does not change this count."
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Successful unchanged decisions with no new mutation or controller child."
+          },
+          "conflicts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original conditional decisions rejected by a conflicting version or incarnation."
+          },
+          "dependencyBlocked": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original decisions blocked by their frozen dependencies."
+          },
+          "unattempted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original inputs never decided, certified by the final stop observation; zero while applying."
+          },
+          "childPending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children without a retained terminal disposition."
+          },
+          "childApplied": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children with completed/applied evidence."
+          },
+          "childFailed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children with failed/projection_failed evidence."
+          },
+          "childSuperseded": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children superseded independently of explicit restore."
+          },
+          "childInvalidated": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children invalidated by explicit restore, separately counted."
+          }
+        },
+        "required": [
+          "processed",
+          "accepted",
+          "unchanged",
+          "conflicts",
+          "dependencyBlocked",
+          "unattempted",
+          "childPending",
+          "childApplied",
+          "childFailed",
+          "childSuperseded",
+          "childInvalidated"
+        ],
+        "additionalProperties": false
+      },
+      "ExecutionResultSummary": {
+        "type": "object",
+        "description": "Immutable original identities, terminal counters and sealed result descriptor. Presence alone never establishes availability; consult executionResult.state.",
+        "properties": {
+          "resultID": {
+            "type": "string",
+            "description": "Original activation identity; never regenerated for result publication.",
+            "x-go-name": "ResultID"
+          },
+          "uploadID": {
+            "type": "string",
+            "description": "Original upload identity.",
+            "x-go-name": "UploadID"
+          },
+          "planID": {
+            "type": "string",
+            "description": "Original immutable plan identity.",
+            "x-go-name": "PlanID"
+          },
+          "planDigest": {
+            "type": "string",
+            "description": "Original immutable plan digest."
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Final original parent outcome: completed, partial, failed, canceled or invalidated. Unknown future values are read-only observations."
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original input count; public pages follow inputOrdinal, independently of planOrdinal."
+          },
+          "processed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original plan decisions recorded; excludes the unattempted suffix."
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "New catalog mutations accepted. Controller disposition does not change this count."
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Successful unchanged decisions with no new mutation or controller child."
+          },
+          "conflicts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original conditional decisions rejected by a conflicting version or incarnation."
+          },
+          "dependencyBlocked": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original decisions blocked by their frozen dependencies."
+          },
+          "unattempted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Original inputs never decided, certified by the final stop observation; zero while applying."
+          },
+          "childPending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children without a retained terminal disposition."
+          },
+          "childApplied": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children with completed/applied evidence."
+          },
+          "childFailed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children with failed/projection_failed evidence."
+          },
+          "childSuperseded": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children superseded independently of explicit restore."
+          },
+          "childInvalidated": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "Accepted children invalidated by explicit restore, separately counted."
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Immutable finalization time; begins the retention cohort."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Retained result deadline, independent of cancellation receipt expiry."
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Canonical sealed item bytes."
+          },
+          "digest": {
+            "type": "string",
+            "description": "Canonical sealed item digest."
+          }
+        },
+        "required": [
+          "resultID",
+          "uploadID",
+          "planID",
+          "planDigest",
+          "outcome",
+          "itemCount",
+          "processed",
+          "accepted",
+          "unchanged",
+          "conflicts",
+          "dependencyBlocked",
+          "unattempted",
+          "childPending",
+          "childApplied",
+          "childFailed",
+          "childSuperseded",
+          "childInvalidated",
+          "finalizedAt",
+          "expiresAt",
+          "bytes",
+          "digest"
+        ],
+        "additionalProperties": false
+      },
+      "ExecutionResultAvailability": {
+        "type": "object",
+        "description": "Separate result availability, independent of Operation.state. Omission means the server has not reported execution-result support for this operation. Errors remain typed problems.",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "pending: original execution or publication has not sealed; ready: immutable pages are available; expired: retained result deadline passed. Unknown values remain read-only. A canceled parent may still be pending."
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ExecutionResultCounts"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ExecutionResultSummary"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "ExecutionChildDisposition": {
+        "type": "object",
+        "description": "Controller disposition of the original accepted catalog child. Never substitutes for catalogDecision and never exists for unchanged or rejected rows.",
+        "properties": {
+          "operationID": {
+            "type": "string",
+            "description": "Original accepted child operation handle.",
+            "x-go-name": "OperationID"
+          },
+          "state": {
+            "type": "string",
+            "description": "pending, completed, failed or partial. Unknown future values are observational only."
+          },
+          "outcome": {
+            "type": "string",
+            "description": "applied, projection_failed or superseded; absent while pending.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original retained terminal observation; absent while pending."
+          },
+          "invalidatedByRestore": {
+            "type": "string",
+            "description": "Original explicit restore marker, distinct from ordinary supersession.",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "operationID",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "CollectionReselectionCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceCount",
+          "normalizationProfile"
+        ],
+        "properties": {
+          "sourceCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "normalizationProfile": {
+            "type": "string",
+            "pattern": "^cpra\\.file\\.base\\.v1$",
+            "maxLength": 96
+          }
+        },
+        "description": "Create a disposable attempt owned by the authenticated original operation owner. The explicit base file normalization profile must match the original operation. This request neither extends the original operation expiry nor creates a replacement operation. Attempts are process-local and unavailable after restart."
+      },
+      "CollectionReselectionAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationID",
+          "normalizationProfile",
+          "phase",
+          "sourceCount",
+          "sourcesCompleted",
+          "rawBytes",
+          "nextSource",
+          "nextOffset",
+          "expiresAt",
+          "operationUploaded"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "maxLength": 36,
+            "description": "Opaque attempt identity. This is not authorization.",
+            "x-go-name": "ID"
+          },
+          "operationID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The unchanged original collection operation handle."
+          },
+          "normalizationProfile": {
+            "type": "string",
+            "maxLength": 96,
+            "description": "The original supported file normalization profile; no parser source, key or commitment is returned."
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "uploading",
+              "verifying",
+              "verified",
+              "transferring",
+              "completed",
+              "failed"
+            ]
+          },
+          "sourceCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "sourcesCompleted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "rawBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "nextSource": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1000,
+            "description": "Next sequential source ordinal while input is incomplete; zero after all sources are complete."
+          },
+          "nextOffset": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 67108864,
+            "description": "Next raw byte offset within nextSource; zero after all sources are complete."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fixed attempt expiry. Reads and failed requests do not renew this deadline or the original operation."
+          },
+          "errorCode": {
+            "type": "string",
+            "enum": [
+              "input_mismatch",
+              "authorization_changed",
+              "operation_changed",
+              "expired",
+              "storage_unavailable",
+              "quota_exceeded",
+              "verification_failed",
+              "transfer_failed"
+            ],
+            "description": "Safe failure category; contains no input text, path, provider diagnostic or private commitment."
+          },
+          "operationUploaded": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Observed number of uploaded resources in the original operation; not an activation or execution count."
+          }
+        },
+        "description": "Bounded observation of an owned, disposable source-reselection attempt. Source bytes include comments and unused text. This response contains no file names, source paths, item digests, source fingerprints, inventory keys or resource plaintext. Verification and remainder upload do not activate configuration."
+      }
+    }
+  }
+}

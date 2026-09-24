@@ -9,6 +9,12 @@ const TITLES: Record<string, { title: string; crumb: string }> = {
   '/alerts': { title: 'Alerts & Incidents', crumb: 'Workspace / Alerts' },
   '/system': { title: 'System Health', crumb: 'Workspace / System' },
   '/settings': { title: 'Settings', crumb: 'Workspace / Settings' },
+  '/monitor-configurations': { title: 'Monitor configurations', crumb: 'Workspace / Configuration' },
+  '/operations': { title: 'Operation progress', crumb: 'Workspace / Configuration' },
+  '/recipients': { title: 'Recipients', crumb: 'Workspace / Notifications' },
+  '/notification-endpoints': { title: 'Notification endpoints', crumb: 'Workspace / Notifications' },
+  '/notification-groups': { title: 'Notification groups', crumb: 'Workspace / Notifications' },
+  '/secrets': { title: 'Secrets', crumb: 'Workspace / Configuration' },
 };
 
 export function Topbar() {
@@ -16,7 +22,7 @@ export function Topbar() {
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
 
-  const meta = TITLES[pathname] ?? { title: 'CPRa', crumb: 'Workspace' };
+  const meta = TITLES[pathname] ?? TITLES[`/${pathname.split('/')[1]}`] ?? { title: 'CPRa', crumb: 'Workspace' };
 
   const incidentCount = overview?.by_status?.incident ?? 0;
   const downCount = overview?.by_status?.down ?? 0;

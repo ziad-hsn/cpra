@@ -1,0 +1,10 @@
+# Verifiers only. These placeholders intentionally fail startup validation.
+# Generate distinct tokens from at least 256 random bits, then SHA-256 hash the
+# exact printable token bytes (without the token file's trailing newline).
+principals:
+  - id: example/oncall
+    role: operator
+    token_sha256: REPLACE_WITH_OPERATOR_TOKEN_SHA256
+  - id: example/observer
+    role: reader
+    token_sha256: REPLACE_WITH_READER_TOKEN_SHA256

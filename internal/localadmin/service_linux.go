@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
 )
 
-func nativePrepare(l platformpath.Layout, account string) (string, error) {
+func nativePrepare(l installpath.Layout, account string) (string, error) {
 	if l.Scope == "user" {
 		if account != "" {
 			return "", fmt.Errorf("user services use the current user; omit --account")
@@ -59,7 +59,7 @@ func nativePrepare(l platformpath.Layout, account string) (string, error) {
 	return account, nil
 }
 
-func nativeSecure(l platformpath.Layout, account string) error {
+func nativeSecure(l installpath.Layout, account string) error {
 	if l.Scope == "user" {
 		return nil
 	}
@@ -140,13 +140,13 @@ func nativeSecure(l platformpath.Layout, account string) error {
 	return nil
 }
 
-func systemctlArgs(l platformpath.Layout, args ...string) []string {
+func systemctlArgs(l installpath.Layout, args ...string) []string {
 	if l.Scope == "user" {
 		return append([]string{"--user"}, args...)
 	}
 	return args
 }
-func nativeRunning(ctx context.Context, l platformpath.Layout) (bool, error) {
+func nativeRunning(ctx context.Context, l installpath.Layout) (bool, error) {
 	cmd := exec.CommandContext(ctx, "systemctl", systemctlArgs(l, "show", "--property=ActiveState", "--value", "cpra.service")...)
 	out, err := cmd.Output()
 	if err != nil {
@@ -161,16 +161,16 @@ func nativeRunning(ctx context.Context, l platformpath.Layout) (bool, error) {
 		return false, fmt.Errorf("service is transitioning; wait before changing installation: %s", strings.TrimSpace(string(out)))
 	}
 }
-func nativeRegister(ctx context.Context, l platformpath.Layout, _ string) error {
+func nativeRegister(ctx context.Context, l installpath.Layout, _ string) error {
 	return runCommand(ctx, "systemctl", systemctlArgs(l, "daemon-reload")...)
 }
-func nativeStop(ctx context.Context, l platformpath.Layout) error {
+func nativeStop(ctx context.Context, l installpath.Layout) error {
 	return runCommand(ctx, "systemctl", systemctlArgs(l, "stop", "cpra.service")...)
 }
-func nativeStart(ctx context.Context, l platformpath.Layout) error {
+func nativeStart(ctx context.Context, l installpath.Layout) error {
 	return runCommand(ctx, "systemctl", systemctlArgs(l, "start", "cpra.service")...)
 }
-func nativeUnregister(ctx context.Context, l platformpath.Layout) error {
+func nativeUnregister(ctx context.Context, l installpath.Layout) error {
 	if err := runCommand(ctx, "systemctl", systemctlArgs(l, "disable", "cpra.service")...); err != nil {
 		return err
 	}

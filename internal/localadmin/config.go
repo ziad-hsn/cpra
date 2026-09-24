@@ -14,8 +14,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/ziad-hsn/cpra/internal/durable"
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,7 +24,7 @@ var templates embed.FS
 
 // Init writes only absent starter files. It never imports the installing
 // user's credentials or enables interventions or service auto-start.
-func Init(l platformpath.Layout, account string) error {
+func Init(l installpath.Layout, account string) error {
 	for _, path := range []string{l.ConfigDir, l.StateDir, l.LogDir, filepath.Join(l.ConfigDir, "monitors.yaml"), filepath.Join(l.ConfigDir, "runtime.yaml"), filepath.Join(l.ConfigDir, "auth.token")} {
 		if path != "" {
 			if err := rejectSymlinkAncestors(path); err != nil {
@@ -39,7 +39,7 @@ func Init(l platformpath.Layout, account string) error {
 	// Initialization can adjust ownership on native platforms. Hold the same
 	// exclusive lock as the runtime before touching an existing store.
 	if _, err = os.Lstat(filepath.Join(l.StateDir, "raft.db")); err == nil {
-		lock, err := durable.LockOffline(l.StateDir)
+		lock, err := persistence.LockOffline(l.StateDir)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func rejectSymlinkAncestors(path string) error {
 	}
 }
 
-func binaryPath(l platformpath.Layout) string {
+func binaryPath(l installpath.Layout) string {
 	name := "cpra"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -112,12 +112,12 @@ func binaryPath(l platformpath.Layout) string {
 	return filepath.Join(l.BinDir, name)
 }
 
-func serviceArgs(l platformpath.Layout) []string {
+func serviceArgs(l installpath.Layout) []string {
 	return []string{"-yaml", filepath.Join(l.ConfigDir, "monitors.yaml"), "-runtime-config", filepath.Join(l.ConfigDir, "runtime.yaml"), "-data-dir", l.StateDir, "-web.addr", "127.0.0.1:8060", "-web.auth-file", filepath.Join(l.ConfigDir, "auth.token"), "-allow-empty", "-shutdown-timeout", "45s"}
 }
 
 // Render returns the service definition without creating files or accounts.
-func Render(l platformpath.Layout, account string) (string, error) {
+func Render(l installpath.Layout, account string) (string, error) {
 	if account == "" {
 		account = "cpra"
 		if runtime.GOOS == "darwin" {

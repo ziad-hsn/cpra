@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
 )
 
 const launchdLabel = "io.github.ziad-hsn.cpra"
@@ -40,7 +40,7 @@ func darwinIdentity(account string) (int, int, error) {
 	return ids[0], ids[1], nil
 }
 
-func nativePrepare(l platformpath.Layout, account string) (string, error) {
+func nativePrepare(l installpath.Layout, account string) (string, error) {
 	if l.Scope == "user" {
 		if account != "" {
 			return "", errors.New("LaunchAgents use the current user; omit --account")
@@ -63,7 +63,7 @@ func nativePrepare(l platformpath.Layout, account string) (string, error) {
 	return account, nil
 }
 
-func nativeSecure(l platformpath.Layout, account string) error {
+func nativeSecure(l installpath.Layout, account string) error {
 	uid, gid := os.Geteuid(), os.Getegid()
 	var err error
 	if l.Scope == "system" {
@@ -133,13 +133,13 @@ func nativeSecure(l platformpath.Layout, account string) error {
 	return nil
 }
 
-func launchdDomain(l platformpath.Layout) string {
+func launchdDomain(l installpath.Layout) string {
 	if l.Scope == "system" {
 		return "system"
 	}
 	return "gui/" + strconv.Itoa(os.Getuid())
 }
-func launchdTarget(l platformpath.Layout) string { return launchdDomain(l) + "/" + launchdLabel }
+func launchdTarget(l installpath.Layout) string { return launchdDomain(l) + "/" + launchdLabel }
 
 type launchdStatus struct {
 	loaded, running bool
@@ -162,7 +162,7 @@ func parseLaunchdStatus(output string) launchdStatus {
 	}
 	return status
 }
-func queryLaunchd(ctx context.Context, l platformpath.Layout) (launchdStatus, error) {
+func queryLaunchd(ctx context.Context, l installpath.Layout) (launchdStatus, error) {
 	output, err := exec.CommandContext(ctx, "/bin/launchctl", "print", launchdTarget(l)).CombinedOutput()
 	if ctx.Err() != nil {
 		return launchdStatus{}, ctx.Err()
@@ -176,14 +176,14 @@ func queryLaunchd(ctx context.Context, l platformpath.Layout) (launchdStatus, er
 	}
 	return parseLaunchdStatus(string(output)), nil
 }
-func nativeRunning(ctx context.Context, l platformpath.Layout) (bool, error) {
+func nativeRunning(ctx context.Context, l installpath.Layout) (bool, error) {
 	status, err := queryLaunchd(ctx, l)
 	// A loaded job can temporarily have no PID while launchd throttles a crash
 	// restart. Preserve that active registration across an update. A deliberate
 	// local stop uses bootout, so an intentionally stopped job remains unloaded.
 	return status.loaded, err
 }
-func nativeRegister(ctx context.Context, l platformpath.Layout, _ string) error {
+func nativeRegister(ctx context.Context, l installpath.Layout, _ string) error {
 	// Installing a definition does not start it. bootstrap occurs only when the
 	// operator explicitly requests start, or an upgrade resumes a running job.
 	status, err := queryLaunchd(ctx, l)
@@ -197,7 +197,7 @@ func nativeRegister(ctx context.Context, l platformpath.Layout, _ string) error 
 	}
 	return runCommand(ctx, "/usr/bin/plutil", "-lint", l.ServiceFile)
 }
-func nativeStart(ctx context.Context, l platformpath.Layout) error {
+func nativeStart(ctx context.Context, l installpath.Layout) error {
 	status, err := queryLaunchd(ctx, l)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func nativeStart(ctx context.Context, l platformpath.Layout) error {
 		}
 	}
 }
-func nativeStop(ctx context.Context, l platformpath.Layout) error {
+func nativeStop(ctx context.Context, l installpath.Layout) error {
 	status, err := queryLaunchd(ctx, l)
 	if err != nil || !status.loaded {
 		return err
@@ -259,4 +259,4 @@ func nativeStop(ctx context.Context, l platformpath.Layout) error {
 		}
 	}
 }
-func nativeUnregister(ctx context.Context, l platformpath.Layout) error { return nativeStop(ctx, l) }
+func nativeUnregister(ctx context.Context, l installpath.Layout) error { return nativeStop(ctx, l) }

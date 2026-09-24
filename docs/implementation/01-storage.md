@@ -10,7 +10,7 @@ Default single-node Raft, stable monitor identities, versioned records, synchron
 
 ## Where
 
-internal/durable/{model,store,fsm,files}.go; internal/runtimeconfig/config.go; internal/loader/schema/{manifest,identity}.go; internal/controller/entities/mapper.go; main.go
+internal/persistence/{model,store,fsm,files}.go; internal/runtimeconfig/config.go; internal/manifest/{manifest,identity}.go; internal/controller/entities/mapper.go; main.go
 
 ## Acceptance criteria
 

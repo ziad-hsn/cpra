@@ -1,5 +1,5 @@
 // Package cli implements the cpractl command tree. It is a thin frontend over
-// the typed API client in internal/client: it builds Cobra commands, parses
+// the public SDK: it builds Cobra commands, parses
 // flags, calls the client, and renders the result in the requested output
 // format. It contains no HTTP logic of its own.
 package cli
@@ -7,13 +7,12 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/ziad-hsn/cpra/internal/client"
 	"github.com/ziad-hsn/cpra/internal/version"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
 )
 
 // Output format identifiers for the --output (-o) flag.
@@ -32,33 +31,9 @@ type options struct {
 	timeout   time.Duration
 	output    string
 
-	apiClient *client.Client
-}
-
-// mustClient returns the API client, constructing it on first use. Commands
-// that do not talk to the server (completion, help) never call this, so a
-// malformed --server value does not break them.
-func (o *options) mustClient() (*client.Client, error) {
-	if o.apiClient != nil {
-		return o.apiClient, nil
-	}
-	token := os.Getenv("CPRA_AUTH_TOKEN")
-	if o.tokenFile != "" {
-		data, err := os.ReadFile(o.tokenFile)
-		if err != nil {
-			return nil, fmt.Errorf("read auth token file: %w", err)
-		}
-		token = strings.TrimSpace(string(data))
-		if token == "" {
-			return nil, fmt.Errorf("auth token file is empty")
-		}
-	}
-	c, err := client.New(client.Config{BaseURL: o.server, Timeout: o.timeout, AuthToken: token})
-	if err != nil {
-		return nil, err
-	}
-	o.apiClient = c
-	return c, nil
+	apiClient    *cpra.Client
+	caFile       string
+	insecureHTTP bool
 }
 
 // NewRootCommand builds the cpractl command tree.
@@ -67,9 +42,9 @@ func NewRootCommand() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:   "cpractl",
-		Short: "Inspect CPRa monitors and runtime state",
-		Long: "cpractl queries the CPRA web server's read-only API to inspect " +
-			"monitors, incidents, queues, worker pools, and runtime config. " +
+		Short: "Manage CPRa configuration and inspect runtime state",
+		Long: "cpractl manages CPRa monitors, notification contacts, groups and secrets, " +
+			"and inspects incidents, queues, worker pools and runtime configuration. " +
 			"Point it at a server with --server or the CPRA_SERVER environment variable.",
 		Version:       version.Info(),
 		SilenceUsage:  true, // don't print usage on every error
@@ -79,6 +54,8 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&o.server, "server", envOr("CPRA_SERVER", "http://localhost:8060"),
 		"CPRA server address (env CPRA_SERVER)")
 	root.PersistentFlags().StringVar(&o.tokenFile, "token-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "file containing the API token (or use CPRA_AUTH_TOKEN)")
+	root.PersistentFlags().StringVar(&o.caFile, "ca-file", os.Getenv("CPRA_CA_FILE"), "PEM trust roots for API HTTPS requests")
+	root.PersistentFlags().BoolVar(&o.insecureHTTP, "allow-insecure-http", false, "explicitly allow API authentication over HTTP for the configured origin")
 	root.PersistentFlags().DurationVar(&o.timeout, "request-timeout", 10*time.Second,
 		"per-request timeout")
 	root.PersistentFlags().StringVarP(&o.output, "output", "o", formatTable,
@@ -89,17 +66,28 @@ func NewRootCommand() *cobra.Command {
 		case formatTable, formatWide, formatJSON, formatYAML:
 			return nil
 		default:
-			return fmt.Errorf("invalid output format %q: must be one of table|wide|json|yaml", o.output)
+			err := fmt.Errorf("invalid output format %q: must be one of table|wide|json|yaml", o.output)
+			if cmd.Name() == "diff" {
+				return diffFailure(&managementCommandError{"diff output must be one of table|wide|json|yaml", err})
+			}
+			return err
 		}
 	}
 
+	get := newGetCommand(o)
+	get.AddCommand(newGetUploadAttemptCommand(o))
 	root.AddCommand(
-		newGetCommand(o),
+		get,
 		newHealthCommand(o),
 		newReadyCommand(o),
 		newLocalCommand(),
 		newMetricsCommand(o),
+		newDiffCommand(o),
+		newApplyCommand(o),
+		newResumeUploadCommand(o),
+		newWaitCommand(o),
 	)
+	addManagementCommands(root, o)
 	return root
 }
 

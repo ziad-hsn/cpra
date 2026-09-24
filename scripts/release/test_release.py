@@ -3,6 +3,8 @@ import hashlib
 import io
 import json
 import os
+import re
+import sys
 from pathlib import Path
 import subprocess
 import tarfile
@@ -19,6 +21,42 @@ import sbom
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_publication_lock_precedes_payload_reads_and_external_io(self):
+        with patch.object(sys, 'argv', ['publish.py', '--cosign', '/unused/cosign', '--out', '/unused/payload']), \
+                patch.object(publish.Path, 'read_text', side_effect=AssertionError('payload read')), \
+                patch.object(publish.subprocess, 'run', side_effect=AssertionError('external process')), \
+                patch.object(publish.subprocess, 'check_output', side_effect=AssertionError('external process')), \
+                patch.object(publish, 'verify') as verify, patch.object(publish, 'evidence') as evidence, \
+                patch('sys.stderr', new_callable=io.StringIO) as stderr:
+            with self.assertRaises(SystemExit) as stopped:
+                publish.main()
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertIn('Public publication is locked', stderr.getvalue())
+            verify.assert_not_called()
+            evidence.assert_not_called()
+
+    def test_storage_recipe_matches_current_reader(self):
+        self.assertEqual(release.storage_format(release.RECIPE['build_tags']), release.RECIPE['storage_format_version'])
+        self.assertNotIn('externaljobs', release.RECIPE['build_tags'])
+        self.assertEqual(release.storage_format(['externaljobs']), 21)
+
+    def test_storage_recipe_rejects_ambiguous_or_cyclic_format(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            storage = root / 'internal/persistence'
+            storage.mkdir(parents=True)
+            (storage / 'extensions_base.go').write_text('//go:build !externaljobs\n\npackage persistence\nconst LatestFormatVersion = Selected\n')
+            definitions = storage / 'versions.go'
+            with patch.object(release, 'ROOT', root):
+                definitions.write_text('package persistence\nconst Selected = Missing\n')
+                with self.assertRaises(ValueError): release.storage_format([])
+                definitions.write_text('package persistence\nconst Selected = Selected\n')
+                with self.assertRaises(ValueError): release.storage_format([])
+                definitions.write_text('package persistence\nconst Selected = 14\n')
+                self.assertEqual(release.storage_format([]), 14)
+                (storage / 'ambiguous.go').write_text('package persistence\nconst Selected = 14\n')
+                with self.assertRaises(ValueError): release.storage_format([])
+
     def test_build_config_matches_recipe(self):
         text=(release.ROOT/'.goreleaser.yaml').read_text().split('\n',1)[1]
         config=json.loads(text)
@@ -107,15 +145,16 @@ class ReleaseTests(unittest.TestCase):
     def test_source_change_after_preparation_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
-            (root/'internal/durable').mkdir(parents=True)
-            (root/'internal/durable/model.go').write_text('package durable\nconst FormatVersion = 1\n')
-            (root/'internal/web/server/assets').mkdir(parents=True)
+            (root/'internal/persistence').mkdir(parents=True)
+            storage_version=release.RECIPE['storage_format_version']
+            (root/'internal/persistence/extensions_base.go').write_text(f'//go:build !externaljobs\n\npackage persistence\nconst LatestFormatVersion = {storage_version}\n')
+            (root/'internal/httpserver/assets').mkdir(parents=True)
             source=root/'main.go';source.write_text('package main\n')
             manifest={'schema_version':1,'version':'v1.2.3','commit':'a'*40,'source_date_epoch':0,
                       'source_date':'1970-01-01T00:00:00Z','recipe':release.RECIPE,'candidate':False,
-                      'dashboard_sha256':release.tree_digest(root/'internal/web/server/assets'),
+                      'dashboard_sha256':release.tree_digest(root/'internal/httpserver/assets'),
                       'toolchain_archives':release.TOOLCHAINS[release.RECIPE['go_version']],
-                      'storage_format_version':1,'source_files':{'main.go':{'mode':'100644','sha256':release.sha(source)},'internal/durable/model.go':{'mode':'100644','sha256':release.sha(root/'internal/durable/model.go')}}}
+                      'storage_format_version':storage_version,'source_files':{'main.go':{'mode':'100644','sha256':release.sha(source)},'internal/persistence/extensions_base.go':{'mode':'100644','sha256':release.sha(root/'internal/persistence/extensions_base.go')}}}
             with patch.object(release,'ROOT',root):
                 release.check_manifest(manifest)
                 source.write_text('package injected\n')

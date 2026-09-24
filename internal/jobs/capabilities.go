@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"fmt"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"runtime"
 	"sync"
 )
@@ -71,7 +71,7 @@ func ValidateDriver(kind, driver string) error {
 	return fmt.Errorf("unknown %s driver %q", kind, driver)
 }
 
-func ValidateCapabilities(m *schema.Monitor) error {
+func ValidateCapabilities(m *manifest.Monitor) error {
 	if err := ValidateDriver("check", m.Pulse.Type); err != nil {
 		return err
 	}

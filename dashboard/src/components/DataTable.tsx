@@ -8,7 +8,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { MonitorSummary } from '../api/types';
 import { StatusChip } from './StatusChip';
-import { formatMs, formatTime, formatUptime, uptimeColor } from '../lib/format';
+import { formatMeasuredLatency, formatTime, formatUptime, uptimeColor } from '../lib/format';
 import { CodeBadge } from './CodeBadge';
 import type { CpraCode } from '../theme/tokens';
 
@@ -54,9 +54,8 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
       header: 'Latency',
       id: 'latency',
       cell: (info) => {
-        const lat = info.row.original.latency_ms ?? 0;
-        if (!lat) return <span className='muted'>—</span>;
-        return <span className='mono' style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{formatMs(lat)}</span>;
+        const monitor = info.row.original;
+        return <span className='mono' style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{formatMeasuredLatency(monitor.latency_available, monitor.latency_ms)}</span>;
       },
     },
     {
@@ -103,11 +102,11 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
   const items = virtualizer.getVirtualItems();
 
   return (
-    <div ref={parentRef} style={{ height: '100%', overflow: 'auto', position: 'relative' }} role='table' aria-label='Monitors table' tabIndex={0}>
+    <div ref={parentRef} style={{ height: '100%', overflow: 'auto', position: 'relative' }} role='table' aria-label='Monitors table' aria-rowcount={rows.length + 1} aria-colcount={columns.length} tabIndex={0}>
       {/* Sticky header — a real grid row, not a <table>, so it aligns exactly */}
-      <div className='vtable-head' style={{ display: 'grid', gridTemplateColumns: COLS, position: 'sticky', top: 0, zIndex: 3 }}>
+      <div className='vtable-head' role='row' aria-rowindex={1} style={{ display: 'grid', gridTemplateColumns: COLS, position: 'sticky', top: 0, zIndex: 3 }}>
         {table.getFlatHeaders().map((h) => (
-          <div key={h.id} className='vtable-th'>
+          <div key={h.id} className='vtable-th' role='columnheader'>
             {flexRender(h.column.columnDef.header, h.getContext())}
           </div>
         ))}
@@ -132,9 +131,10 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
               onKeyDown={(e) => { if (e.key === 'Enter') onRowClick(row.original.id); }}
               tabIndex={0}
               role='row'
+              aria-rowindex={virtualRow.index + 2}
             >
               {row.getVisibleCells().map((cell, i) => (
-                <div key={cell.id} className={'vtable-td' + (i === row.getVisibleCells().length - 1 ? ' last' : '')}>
+                <div key={cell.id} role='cell' className={'vtable-td' + (i === row.getVisibleCells().length - 1 ? ' last' : '')}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </div>
               ))}
@@ -145,4 +145,3 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
     </div>
   );
 }
-

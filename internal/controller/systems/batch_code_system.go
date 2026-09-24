@@ -5,7 +5,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/jobs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"time"
 )
@@ -55,7 +55,7 @@ func (s *BatchCodeSystem) Update(*ecs.World) {
 			if cfg.Configs[color] == nil || !cfg.Configs[color].Dispatch || len(prototypes) == 0 {
 				continue
 			}
-			if schema.InMaintenance(state.Maintenance, now) {
+			if manifest.InMaintenance(state.Maintenance, now) {
 				continue
 			}
 			if request.NotBefore.After(now) || (state.Deliveries[color] != nil && state.Deliveries[color].Next == len(prototypes)) {

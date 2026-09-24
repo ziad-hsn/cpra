@@ -23,6 +23,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Keep DOM workers bounded alongside native/race checks on developer hosts.
+    // CLI overrides remain available; test assertions and deadlines are unchanged.
+    maxWorkers: 2,
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],

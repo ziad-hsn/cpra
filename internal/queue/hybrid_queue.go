@@ -72,12 +72,13 @@ func DefaultHybridQueueConfig() HybridQueueConfig {
 // The ring handles steady-state work while the overflow absorbs bursts before optional dropping.
 type HybridQueue struct {
 	arrivals durationMetrics
-	ring     *xsync.MPMCQueue[jobs.Job]
+	pending  pendingAges
+	ring     *xsync.MPMCQueue[*pendingEntry]
 	cfg      HybridQueueConfig
 	logger   *zap.Logger
 
 	mu                sync.Mutex
-	overflow          []jobs.Job
+	overflow          []*pendingEntry
 	overflowHead      int
 	softOverflowLimit int
 	hardOverflowLimit int
@@ -123,12 +124,12 @@ func NewHybridQueue(config HybridQueueConfig) (*HybridQueue, error) {
 	}
 
 	queue := &HybridQueue{
-		ring:   xsync.NewMPMCQueue[jobs.Job](cfg.RingCapacity),
+		ring:   xsync.NewMPMCQueue[*pendingEntry](cfg.RingCapacity),
 		cfg:    cfg,
 		logger: cfg.Logger,
 	}
 	if cfg.OverflowCapacity > 0 {
-		queue.overflow = make([]jobs.Job, 0, cfg.OverflowCapacity)
+		queue.overflow = make([]*pendingEntry, 0, cfg.OverflowCapacity)
 	}
 	queue.softOverflowLimit = computeWatermarkLimit(cfg.OverflowCapacity, cfg.SoftWatermark)
 	queue.hardOverflowLimit = computeWatermarkLimit(cfg.OverflowCapacity, cfg.HardWatermark)
@@ -150,17 +151,22 @@ func (q *HybridQueue) Enqueue(job jobs.Job) error {
 	}
 
 	now := q.enqueueTimestamp(job)
+	entry := q.pending.begin(job)
+	accepted := false
+	defer func() { q.pending.finish(entry, accepted) }()
 
-	if q.ring.TryEnqueue(job) {
+	if q.ring.TryEnqueue(entry) {
+		accepted = true
 		q.ringEnqueued.Add(1)
 		q.recordEnqueue(now)
 		return nil
 	}
 
 	q.markRingSaturated()
-	if err := q.enqueueOverflow(job, now); err != nil {
+	if err := q.enqueueOverflow(entry, now); err != nil {
 		return err
 	}
+	accepted = true
 	q.recordEnqueue(now)
 	return nil
 }
@@ -198,11 +204,12 @@ func (q *HybridQueue) EnqueueBatch(items []interface{}) error {
 
 // tryDequeueRing accounts for a successful ring removal.
 func (q *HybridQueue) tryDequeueRing() (jobs.Job, bool) {
-	job, ok := q.ring.TryDequeue()
+	entry, ok := q.ring.TryDequeue()
 	if ok {
 		q.ringDequeued.Add(1)
+		return q.pending.take(entry), true
 	}
-	return job, ok
+	return nil, false
 }
 
 // Dequeue alternates preference between overflow and ring to keep both moving.
@@ -292,7 +299,7 @@ func (q *HybridQueue) Stats() Stats {
 
 	maxWait := time.Duration(q.maxQueueWait.Load())
 
-	return Stats{
+	return q.pending.addTo(Stats{
 		ArrivalCV: arrivalCV, ArrivalSamples: arrivalSamples,
 		QueueDepth:    int(depth),
 		Capacity:      q.cfg.RingCapacity + q.cfg.OverflowCapacity,
@@ -308,7 +315,7 @@ func (q *HybridQueue) Stats() Stats {
 		LastEnqueue:   time.Unix(0, q.lastEnqueueNano.Load()),
 		LastDequeue:   time.Unix(0, q.lastDequeueNano.Load()),
 		SampleWindow:  elapsed,
-	}
+	})
 }
 
 // OverflowDepth returns the current overflow-slice depth (debug/metrics).
@@ -320,7 +327,7 @@ func (q *HybridQueue) RingDepth() int { return int(q.ringDepthNow()) }
 // OverflowEvents returns the total number of overflow enqueue events (debug/metrics).
 func (q *HybridQueue) OverflowEvents() uint64 { return q.overflowEvents.Load() }
 
-func (q *HybridQueue) enqueueOverflow(job jobs.Job, now time.Time) error {
+func (q *HybridQueue) enqueueOverflow(job *pendingEntry, now time.Time) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.enqueueOverflowLocked(job, now)
@@ -352,7 +359,7 @@ func (q *HybridQueue) compactOverflowLocked() {
 	}
 }
 
-func (q *HybridQueue) enqueueOverflowLocked(job jobs.Job, now time.Time) error {
+func (q *HybridQueue) enqueueOverflowLocked(job *pendingEntry, now time.Time) error {
 	if q.cfg.OverflowCapacity == 0 {
 		return q.handleDropLocked(job, now, q.liveOverflowDepth(), "overflow_disabled")
 	}
@@ -375,7 +382,7 @@ func (q *HybridQueue) enqueueOverflowLocked(job jobs.Job, now time.Time) error {
 	return nil
 }
 
-func (q *HybridQueue) handleDropLocked(job jobs.Job, now time.Time, currentDepth int, reason string) error {
+func (q *HybridQueue) handleDropLocked(job *pendingEntry, now time.Time, currentDepth int, reason string) error {
 	q.droppedCount.Add(1)
 
 	fields := []zap.Field{
@@ -392,6 +399,7 @@ func (q *HybridQueue) handleDropLocked(job jobs.Job, now time.Time, currentDepth
 			q.logger.Warn("hybrid queue has no overflow items to drop; rejecting newest job", fields...)
 			return ErrQueueFull
 		}
+		q.pending.take(q.overflow[q.overflowHead])
 		q.overflow[q.overflowHead] = nil
 		q.overflowHead++
 		q.compactOverflowLocked()
@@ -451,7 +459,7 @@ func (q *HybridQueue) tryDequeueOverflow() (jobs.Job, bool) {
 		return nil, false
 	}
 
-	job := q.overflow[q.overflowHead]
+	job := q.pending.take(q.overflow[q.overflowHead])
 	q.overflow[q.overflowHead] = nil
 	q.overflowHead++
 	q.compactOverflowLocked()
@@ -482,9 +490,8 @@ func (q *HybridQueue) drainOverflow(limit int) []jobs.Job {
 	}
 
 	out := make([]jobs.Job, limit)
-	copy(out, q.overflow[q.overflowHead:q.overflowHead+limit])
-
 	for i := 0; i < limit; i++ {
+		out[i] = q.pending.take(q.overflow[q.overflowHead+i])
 		q.overflow[q.overflowHead+i] = nil
 	}
 	q.overflowHead += limit

@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // InterventionAWSJob performs a cloud-provider remediation action (EC2 reboot
@@ -29,7 +29,7 @@ type InterventionAWSJob struct {
 	ID          uuid.UUID
 }
 
-func newInterventionAWSJob(t *schema.InterventionTargetAWS, retries int, entity ecs.Entity) (Job, error) {
+func newInterventionAWSJob(t *manifest.InterventionTargetAWS, retries int, entity ecs.Entity) (Job, error) {
 	return &InterventionAWSJob{
 		ID:         uuid.New(),
 		Entity:     entity,

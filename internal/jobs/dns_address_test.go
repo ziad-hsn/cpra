@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -73,7 +73,7 @@ func TestDNSCustomPortNetwork(t *testing.T) {
 			}
 		}
 	}()
-	job, err := CreatePulseJob(schema.Pulse{Type: "dns", Timeout: time.Second, Config: &schema.PulseDNSConfig{Host: "cpra-fixture.invalid", Server: conn.LocalAddr().String()}}, ecs.Entity{})
+	job, err := CreatePulseJob(manifest.Pulse{Type: "dns", Timeout: time.Second, Config: &manifest.PulseDNSConfig{Host: "cpra-fixture.invalid", Server: conn.LocalAddr().String()}}, ecs.Entity{})
 	if err != nil {
 		t.Fatal(err)
 	}

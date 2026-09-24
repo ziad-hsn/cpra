@@ -53,10 +53,10 @@
     "node_version": "v24.21.0",
     "pnpm_version": "11.22.0"
   },
-  "storage_format_version": 1,
+  "storage_format_version": 14,
   "package_revision": "1",
   "embedded_inputs": [
-    "internal/web/server/assets",
+    "internal/httpserver/assets",
     "internal/localadmin/templates"
   ],
   "package_version_encoding": "semver-order-v1"

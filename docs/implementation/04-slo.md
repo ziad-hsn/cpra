@@ -10,7 +10,7 @@ Five-minute latency histograms and exact attainment, persistent aggregate window
 
 ## Where
 
-internal/slo/; internal/queue/dynamic_worker_pool.go; internal/jobs/; internal/durable/
+internal/slo/; internal/queue/dynamic_worker_pool.go; internal/jobs/; internal/persistence/
 
 ## Acceptance criteria
 

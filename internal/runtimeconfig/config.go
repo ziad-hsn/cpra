@@ -2,8 +2,9 @@
 package runtimeconfig
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/ziad-hsn/cpra/internal/platformpath"
+	"github.com/ziad-hsn/cpra/internal/installpath"
 	"io"
 	"os"
 	"path/filepath"
@@ -36,16 +37,20 @@ type SLO struct {
 }
 
 type Config struct {
-	Storage Storage `yaml:"storage"`
-	History History `yaml:"history"`
-	SLO     SLO     `yaml:"slo"`
+	processExtensions `yaml:",inline" json:"-"`
+	ManualRecovery    ManualRecovery `yaml:"manual_recovery"`
+	Management        Management     `yaml:"management,omitempty" json:"-"`
+	Storage           Storage        `yaml:"storage"`
+	History           History        `yaml:"history"`
+	SLO               SLO            `yaml:"slo"`
 }
 
 func Default() Config {
 	return Config{
-		Storage: Storage{Mode: "raft", BatchDelay: 5 * time.Millisecond, BatchSize: 1000, SnapshotInterval: 5 * time.Minute, SnapshotRetain: 3},
-		History: History{RetentionDays: 30},
-		SLO:     SLO{QueueTarget: 250 * time.Millisecond, ResultTarget: 5 * time.Second, Window: 5 * time.Minute, ControlWindow: 30 * time.Second, EvaluationInterval: 5 * time.Second, MinimumSamples: 1000, HealthyHold: 60 * time.Second},
+		ManualRecovery: ManualRecovery{MinimumInterval: time.Minute, PerHour: 3},
+		Storage:        Storage{Mode: "raft", BatchDelay: 5 * time.Millisecond, BatchSize: 1000, SnapshotInterval: 5 * time.Minute, SnapshotRetain: 3},
+		History:        History{RetentionDays: 30},
+		SLO:            SLO{QueueTarget: 250 * time.Millisecond, ResultTarget: 5 * time.Second, Window: 5 * time.Minute, ControlWindow: 30 * time.Second, EvaluationInterval: 5 * time.Second, MinimumSamples: 1000, HealthyHold: 60 * time.Second},
 	}
 }
 
@@ -59,7 +64,15 @@ func Load(path string) (Config, error) {
 		return c, fmt.Errorf("open runtime configuration: %w", err)
 	}
 	defer f.Close()
-	d := yaml.NewDecoder(io.LimitReader(f, 1<<20))
+	data, err := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+	if err != nil {
+		return c, fmt.Errorf("read runtime configuration: %w", err)
+	}
+	defer clear(data)
+	if len(data) > 1<<20 {
+		return c, fmt.Errorf("runtime configuration exceeds 1 MiB")
+	}
+	d := yaml.NewDecoder(bytes.NewReader(data))
 	d.KnownFields(true)
 	if err := d.Decode(&c); err != nil {
 		return c, fmt.Errorf("runtime configuration: %w", err)
@@ -72,6 +85,15 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if err := c.ManualRecovery.Validate(); err != nil {
+		return err
+	}
+	if err := c.Management.Validate(c.Storage); err != nil {
+		return err
+	}
+	if err := c.validateExtensions(); err != nil {
+		return err
+	}
 	s := c.Storage
 	if s.Mode != "raft" && s.Mode != "memory" {
 		return fmt.Errorf("storage.mode must be raft or memory")
@@ -109,7 +131,7 @@ func (c *Config) ResolveStorageDirectory(override string) error {
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("inspect legacy data directory: %w", err)
 		}
-		layout, err := platformpath.Resolve("user")
+		layout, err := installpath.Resolve("user")
 		if err != nil {
 			return err
 		}

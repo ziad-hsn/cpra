@@ -4,10 +4,10 @@ import (
 	"errors"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/queue"
-	"github.com/ziad-hsn/cpra/internal/web/snapshot"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -79,12 +79,12 @@ func TestMaintenanceSuppressesDelayedIntervention(t *testing.T) {
 		world := ecs.NewWorld()
 		ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
 		state := ecs.NewMap1[components.MonitorState](&world).Get(ent)
-		windows, err := schema.CompileMaintenance([]schema.MaintenanceWindow{{Cron: "* * * * *", Duration: "10s", Timezone: "UTC"}})
+		windows, err := manifest.CompileMaintenance([]manifest.MaintenanceWindow{{Cron: "* * * * *", Duration: "10s", Timezone: "UTC"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		state.Maintenance = windows
-		if schema.InMaintenance(state.Maintenance, time.Now()) {
+		if manifest.InMaintenance(state.Maintenance, time.Now()) {
 			t.Fatal("setup inside maintenance")
 		}
 		ready := &ReadyQueue{}
@@ -101,7 +101,7 @@ func TestMaintenanceSuppressesDelayedIntervention(t *testing.T) {
 		applyPulseResult(pulse, state, ent, errors.New("target down"))
 		dispatch.Update(&world)
 		time.Sleep(50 * time.Second)
-		if !schema.InMaintenance(state.Maintenance, time.Now()) {
+		if !manifest.InMaintenance(state.Maintenance, time.Now()) {
 			t.Fatal("setup did not enter maintenance")
 		}
 		q.DequeueBatch(2)
@@ -127,7 +127,7 @@ func TestSnapshotReportsConsecutivePulseFailures(t *testing.T) {
 	pulse := NewBatchPulseResultSystem(&world, nil, NewPulseScheduler(), &ReadyQueue{}, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
 	applyPulseResult(pulse, state, ent, errors.New("target down"))
 	applyPulseResult(pulse, state, ent, errors.New("still down"))
-	holder := snapshot.NewHolder()
+	holder := fleetview.NewHolder()
 	ss := NewBatchStatsSnapshotSystem(&world, noopLogger{}, holder, time.Second, 100)
 	ss.Initialize(&world)
 	ss.Update(&world)

@@ -4,7 +4,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
-	"github.com/ziad-hsn/cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"time"
 )
 
@@ -15,7 +15,7 @@ func requestCode(ent ecs.Entity, state *components.MonitorState, color string, c
 	now := time.Now()
 	// Maintenance suppresses events, including recovery notices, at trigger and
 	// dispatch. Checks continue; automatic interventions are suppressed as well.
-	if schema.InMaintenance(state.Maintenance, now) {
+	if manifest.InMaintenance(state.Maintenance, now) {
 		return
 	}
 	for _, request := range state.PendingAlerts {

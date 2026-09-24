@@ -12,8 +12,8 @@ def append_frontend(document, dependencies):
     """Include embedded packages and vendored assets using their observed identity."""
     for dependency in dependencies:
         ecosystem=dependency['ecosystem']
-        if ecosystem not in ('npm','font'):continue
-        identity=dependency['name']+'@'+dependency.get('version','')+'#'+dependency.get('sha256','')
+        if ecosystem not in ('npm','font') and dependency.get('scope') != 'dashboard-wasm':continue
+        identity=dependency['name']+'@'+dependency.get('version','')+'#'+dependency.get('sha256','')+'#'+dependency.get('scope','')
         spdx='SPDXRef-'+ecosystem+'-'+hashlib.sha256(identity.encode()).hexdigest()[:24]
         package={'SPDXID':spdx,'name':dependency['name'],'downloadLocation':'NOASSERTION','filesAnalyzed':False,
             'licenseConcluded':'NOASSERTION','licenseDeclared':dependency.get('declared_license','NOASSERTION'),
@@ -23,6 +23,10 @@ def append_frontend(document, dependencies):
         if dependency.get('sha256'):
             package['checksums']=[{'algorithm':'SHA256','checksumValue':dependency['sha256']}]
             package['sourceInfo']='Vendored '+dependency['source_file']+'; embedded identity '+dependency['source_identity']
+        if dependency.get('source_sha256'):
+            package['sourceInfo']='Checked-out SDK source tree SHA256 '+dependency['source_sha256']+'; no published module version is claimed.'
+        if dependency.get('module_sum'):
+            package['sourceInfo']='Linked Wasm module checksum '+dependency['module_sum']
         document.setdefault('packages',[]).append(package)
         document.setdefault('relationships',[]).append({'spdxElementId':document['SPDXID'],'relationshipType':'DESCRIBES','relatedSpdxElement':spdx})
 

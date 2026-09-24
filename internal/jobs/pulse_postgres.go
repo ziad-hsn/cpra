@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulsePostgresJob checks a PostgreSQL server by connecting and issuing a ping.
@@ -27,7 +27,7 @@ type PulsePostgresJob struct {
 	payload     map[string]interface{}
 }
 
-func postgresConnString(cfg *schema.PulsePostgresConfig) string {
+func postgresConnString(cfg *manifest.PulsePostgresConfig) string {
 	if cfg.DSN != "" {
 		return cfg.DSN
 	}
@@ -49,7 +49,7 @@ func postgresConnString(cfg *schema.PulsePostgresConfig) string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", quote(host), port, quote(cfg.User), quote(cfg.Password), quote(cfg.Database), quote(sslmode))
 }
 
-func newPulsePostgresJob(cfg *schema.PulsePostgresConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulsePostgresJob(cfg *manifest.PulsePostgresConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return &PulsePostgresJob{
 		ID:         uuid.New(),
 		Entity:     entity,
@@ -70,12 +70,14 @@ func (p *PulsePostgresJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: p.ID, Ent: p.Entity, Err: safeError{err, "invalid postgres connection configuration"}, Payload: payload}
 	}
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := pgx.ConnectConfig(ctx, config)
 		if err == nil {
 			err = conn.Ping(ctx)
@@ -85,13 +87,8 @@ func (p *PulsePostgresJob) Execute() (result Result) {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("postgres check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("postgres check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulsePostgresJob) Copy() Job                  { job := *p; return &job }

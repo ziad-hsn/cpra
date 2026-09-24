@@ -1,4 +1,4 @@
-//go:build systemd
+//go:build linux && systemd
 
 package jobs
 
@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // InterventionSystemdJob restarts a systemd unit on the local host.
@@ -26,7 +26,7 @@ type InterventionSystemdJob struct {
 	ID          uuid.UUID
 }
 
-func newInterventionSystemdJob(t *schema.InterventionTargetSystemd, retries int, entity ecs.Entity) (Job, error) {
+func newInterventionSystemdJob(t *manifest.InterventionTargetSystemd, retries int, entity ecs.Entity) (Job, error) {
 	mode := t.Mode
 	if mode == "" {
 		mode = "replace"

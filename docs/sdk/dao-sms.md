@@ -1,11 +1,3 @@
----
-title: SDK candidate · Monitor a DAO's RPC and notify an internal SMS gateway
-description: SDK candidate · Monitor a DAO's RPC and notify an internal SMS gateway for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
-
 # Monitor a DAO's RPC and notify an internal SMS gateway
 
 A DAO's governance application needs an RPC endpoint to read proposals, voting
@@ -239,7 +231,9 @@ result, err := collection.Apply(ctx, client.Operations, frozen)
 resource and byte limits. `Close` removes the client staging files. Keep both the
 returned `result` and `err`: a server operation may exist even when waiting or a
 later request fails. `register` subsequently calls
-`client.Operations.Wait(ctx, result.OperationID)` and checks the terminal state.
+`collection.Wait(ctx, client.Operations, result)` and checks the immutable
+execution summary outcome. The helper pins the original content identity and
+returns one bounded first result page with aggregate counts.
 Whole-collection validation does not imply collection-wide rollback; inspect
 item outcomes if activation is partial.
 
@@ -313,10 +307,19 @@ go run -tags externaljobs ./dao-sms \
   -token-file /etc/cpra-dao-worker/worker.token \
   -server-id VERIFIED_STORE_RESTORE_IDENTITY \
   -worker-id dao-worker \
+  -worker-uid PROVISIONED_WORKER_UID \
   -local-config /etc/cpra-dao-worker/worker.json \
   -state-dir "$HOME/.local/state/cpra-dao-worker" \
   -key-file "$HOME/.config/cpra-dao-worker/wrapping.key"
 ```
+
+Use the `protocolServerID` and worker `uid` returned by local worker-auth
+provisioning for `-server-id` and `-worker-uid`. These identify the server restore
+epoch and the worker incarnation; a display name is insufficient. Preserve them
+with the encrypted journal across ordinary restarts and token rotation. Restoring
+a server changes its protocol identity and requires explicit reprovisioning. The
+execution routes remain unavailable in the normal server while that protocol is
+being implemented.
 
 The example allows two concurrent handlers. It inherits the worker library's
 bounded encrypted outbox and reserves outcome capacity before requesting a start

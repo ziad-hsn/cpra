@@ -37,7 +37,7 @@ it('does not format an unperformed check as a real clock time',()=>{
  const zero='0001-01-01T00:00:00Z';
  render(<DataTable data={[{id:1,name:'new monitor',pulse_type:'http',status:'unknown',incident:false,pending_code:'',consecutive_failures:0,last_check:zero,last_success:zero,next_check:zero,active_codes:[]}]} onRowClick={()=>{}}/>);
  const renderedZero=new Date(zero).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
- expect(screen.getByRole('row')).not.toHaveTextContent(renderedZero);
+ expect(screen.getByRole('row', {name: /new monitor/})).not.toHaveTextContent(renderedZero);
 });
 
 it('allows filtering a supported DNS check type',()=>{

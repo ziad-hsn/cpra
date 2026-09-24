@@ -1,0 +1,215 @@
+{
+  "format": 1,
+  "models": "api/openapi/models.base.json",
+  "operations": "api/openapi/operations.json",
+  "contract": "api/openapi/contract.base.json",
+  "output": "dashboard/src/api/generated.ts",
+  "notificationDrivers": {
+    "email": {
+      "schema": "CodeNotificationEmail",
+      "protected": [
+        "server"
+      ]
+    },
+    "webhook": {
+      "schema": "CodeNotificationWebhook",
+      "protected": [
+        "url",
+        "headers"
+      ]
+    },
+    "log": {
+      "schema": "CodeNotificationLog",
+      "protected": []
+    },
+    "pagerduty": {
+      "schema": "CodeNotificationPagerDuty",
+      "protected": [
+        "routingKey",
+        "url"
+      ]
+    },
+    "slack": {
+      "schema": "CodeNotificationSlack",
+      "protected": [
+        "hook"
+      ]
+    },
+    "telegram": {
+      "schema": "CodeNotificationTelegram",
+      "protected": [
+        "botToken",
+        "url"
+      ]
+    },
+    "discord": {
+      "schema": "CodeNotificationDiscord",
+      "protected": [
+        "webhookUrl"
+      ]
+    },
+    "opsgenie": {
+      "schema": "CodeNotificationOpsgenie",
+      "protected": [
+        "apiKey",
+        "url"
+      ]
+    },
+    "teams": {
+      "schema": "CodeNotificationTeams",
+      "protected": [
+        "webhookUrl"
+      ]
+    },
+    "mattermost": {
+      "schema": "CodeNotificationMattermost",
+      "protected": [
+        "webhookUrl"
+      ]
+    },
+    "pushover": {
+      "schema": "CodeNotificationPushover",
+      "protected": [
+        "appToken",
+        "userKey",
+        "url"
+      ]
+    },
+    "twilio": {
+      "schema": "CodeNotificationTwilio",
+      "protected": [
+        "accountSid",
+        "authToken",
+        "url"
+      ]
+    },
+    "datadog": {
+      "schema": "CodeNotificationDatadog",
+      "protected": [
+        "apiKey",
+        "appKey",
+        "url"
+      ]
+    },
+    "victorops": {
+      "schema": "CodeNotificationVictorOps",
+      "protected": [
+        "restEndpointKey",
+        "routingKey",
+        "url"
+      ]
+    }
+  },
+  "checkDrivers": {
+    "http": {
+      "schema": "PulseHTTPConfig",
+      "protected": [
+        "headers",
+        "body"
+      ]
+    },
+    "tcp": {
+      "schema": "PulseTCPConfig",
+      "protected": []
+    },
+    "icmp": {
+      "schema": "PulseICMPConfig",
+      "protected": []
+    },
+    "dns": {
+      "schema": "PulseDNSConfig",
+      "protected": []
+    },
+    "udp": {
+      "schema": "PulseUDPConfig",
+      "protected": []
+    },
+    "grpc": {
+      "schema": "PulseGRPCConfig",
+      "protected": []
+    },
+    "docker": {
+      "schema": "PulseDockerConfig",
+      "protected": []
+    },
+    "redis": {
+      "schema": "PulseRedisConfig",
+      "protected": [
+        "password"
+      ]
+    },
+    "postgres": {
+      "schema": "PulsePostgresConfig",
+      "protected": [
+        "dsn",
+        "password"
+      ]
+    },
+    "mysql": {
+      "schema": "PulseMySQLConfig",
+      "protected": [
+        "dsn",
+        "password"
+      ]
+    },
+    "mongo": {
+      "schema": "PulseMongoConfig",
+      "protected": [
+        "uri"
+      ]
+    },
+    "rabbitmq": {
+      "schema": "PulseRabbitMQConfig",
+      "protected": [
+        "url"
+      ]
+    },
+    "kafka": {
+      "schema": "PulseKafkaConfig",
+      "protected": []
+    },
+    "tls": {
+      "schema": "PulseTLSConfig",
+      "protected": []
+    }
+  },
+  "recoveryDrivers": {
+    "kubernetes": {
+      "schema": "InterventionTargetKubernetes",
+      "protected": [],
+      "labels": {
+        "name": "Kubernetes resource name"
+      }
+    },
+    "webhook": {
+      "schema": "InterventionTargetWebhook",
+      "protected": [
+        "url",
+        "headers",
+        "body"
+      ]
+    },
+    "systemd": {
+      "schema": "InterventionTargetSystemd",
+      "protected": []
+    },
+    "aws": {
+      "schema": "InterventionTargetAWS",
+      "protected": []
+    },
+    "docker": {
+      "schema": "InterventionTargetDocker",
+      "protected": []
+    }
+  },
+  "monitorShapes": [
+    "MonitorSpec",
+    "CheckSpec",
+    "RecoverySpec",
+    "MaintenanceWindow",
+    "AlertRule",
+    "Duration",
+    "MonitorStatus",
+    "Measurement"
+  ]
+}

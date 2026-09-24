@@ -3,9 +3,9 @@ package jobs
 import (
 	"bufio"
 	"context"
-	"cpra/internal/loader/schema"
 	"encoding/json"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"io"
 	"net"
 	"net/http"
@@ -41,16 +41,16 @@ func TestNotificationsReachDestination(t *testing.T) {
 				w.WriteHeader(202)
 			}))
 			defer server.Close()
-			var cfg schema.CodeNotification
+			var cfg manifest.CodeNotification
 			switch kind {
 			case "slack":
-				cfg = &schema.CodeNotificationSlack{WebHook: server.URL}
+				cfg = &manifest.CodeNotificationSlack{WebHook: server.URL}
 			case "pagerduty":
-				cfg = &schema.CodeNotificationPagerDuty{URL: server.URL, RoutingKey: "fixture-key"}
+				cfg = &manifest.CodeNotificationPagerDuty{URL: server.URL, RoutingKey: "fixture-key"}
 			case "webhook":
-				cfg = &schema.CodeNotificationWebhook{URL: server.URL, Headers: map[string]string{"X-Fixture": "value"}}
+				cfg = &manifest.CodeNotificationWebhook{URL: server.URL, Headers: map[string]string{"X-Fixture": "value"}}
 			}
-			job, err := CreateCodeJob("fixture-monitor", schema.CodeConfig{Notify: kind, Config: cfg}, ecs.Entity{}, "red")
+			job, err := CreateCodeJob("fixture-monitor", manifest.CodeConfig{Notify: kind, Config: cfg}, ecs.Entity{}, "red")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -152,8 +152,8 @@ func TestEmailRequiresActualRelayAcceptance(t *testing.T) {
 			}
 		}
 	}()
-	cfg := schema.CodeNotificationEmail{Server: ln.Addr().String(), From: "cpra@example.com", To: "ops@example.com", Subject: "fixture", AllowInsecure: true}
-	job, err := CreateCodeJob("fixture-monitor", schema.CodeConfig{Notify: "email", Config: &cfg}, ecs.Entity{}, "red")
+	cfg := manifest.CodeNotificationEmail{Server: ln.Addr().String(), From: "cpra@example.com", To: "ops@example.com", Subject: "fixture", AllowInsecure: true}
+	job, err := CreateCodeJob("fixture-monitor", manifest.CodeConfig{Notify: "email", Config: &cfg}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,7 +4,7 @@ description: Plan and status · Candidate author review for the reviewed CPRa so
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # Candidate author review
 
@@ -51,4 +51,5 @@ independent review and the required provider, comparative and endurance evidence
 are complete. No full-provider certification, production-capacity claim, HA
 claim or unconditional SLA is justified by the available evidence.
 
-The candidate documentation is now published for review alongside the main documentation. That publication does not close the application release gates above.
+The candidate documentation is now published for review alongside the main
+documentation. That publication does not close the application release gates above.

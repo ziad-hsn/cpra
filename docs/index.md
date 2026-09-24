@@ -4,7 +4,11 @@ description: Run CPRa to check services, send alerts and perform configured reco
 cpra_scope: main
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](versions.md) for newer candidate work.
+> **Development source:** includes durable management and the writable dashboard.
+> Individual guides identify their source revision; several tutorials below retain
+> the historical `51a835a` instructions. See [versions and availability](versions.md)
+> and [implementation progress](implementation/dashboard-implementation-progress.md)
+> before selecting installation instructions.
 
 
 <div class="cpra-hero" markdown>
@@ -27,7 +31,10 @@ Go · MIT · self-hosted
 
 CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.
 
-The current application includes a read-only dashboard, an HTTP API, and the `cpractl` command-line client. These guides describe the source at `51a835a`, published to `main` on **11 September 2026**.
+The current development source includes a management dashboard, an HTTP API,
+and the `cpractl` command-line client. Tutorials explicitly pinned to `51a835a`
+describe the earlier read-only application published on **11 September 2026**;
+use the current references and implementation status for the management features.
 
 ## What you can do
 
@@ -61,9 +68,15 @@ The current application includes a read-only dashboard, an HTTP API, and the `cp
 
 ## Start with a small deployment
 
-Run one process for each monitor configuration. Incident state lives in memory and resets when the process restarts. Separate CPRa instances do not coordinate ownership.
+Run one owner for each state directory. This development source defaults to
+single-node Raft and restores committed incident state after restart. An explicit
+memory-only mode is available for disposable runs. Separate CPRa instances do not
+coordinate monitor ownership. See [durability](durability.md) for recovery behavior.
 
-Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment. It estimates mean latency; actual capacity depends on your targets, intervals, host, and workload. This preview does not establish a million-monitor benchmark, a percentile latency guarantee, or high availability.
+Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment and
+observed latency feedback. Percentile SLO measurements remain distinct from an
+SLA guarantee. The million-monitor benchmark, full endurance campaign and
+provider-account qualification remain open [shipping gates](implementation/dashboard-shipping-plan.md).
 
 [Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)
 

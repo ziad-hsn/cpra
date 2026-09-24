@@ -4,7 +4,7 @@ description: SDK candidate · CPRa external worker library for the reviewed CPRa
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this package guide reflects the 13 September source snapshot. See [availability and source](../versions.md#go-sdk-and-approved-management-plan) before running candidate commands.
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # CPRa external worker library
 
@@ -18,6 +18,11 @@ depend on this module or bbolt.
 termination. CPRa's management/external-worker server contracts are a release
 prerequisite; fixture success is not evidence of production-server integration,
 provider certification, or a published module version.
+
+The private server now implements JobType registration and
+[stopped worker credential provisioning](../worker-authentication.md).
+Assignment, start, heartbeat, result and late-evidence routes remain unfinished;
+provisioning a token does not make this runner usable against those routes yet.
 
 ## Add the module to your worker application
 
@@ -61,8 +66,9 @@ Windows qualification is separate from cross compilation.
 
 The key protects a data-key envelope, encrypted results, and replay metadata. It
 is never generated or replaced automatically. Back up the **stopped complete
-worker state directory**, and retain the matching key separately. The worker
-identity and CPRa store/restore identity must match on every restart. A restored
+worker state directory**, and retain the matching key separately. The worker ID, immutable provisioned worker UID, and CPRa store/restore identity
+must match on every restart. Credential rotation may retain the same UID; it
+does not change the identity of pending results. A restored
 or replaced server identity requires operator reconciliation; changing the
 configured identity must never silently discard an old outbox.
 
@@ -101,7 +107,7 @@ func main() {
 
     runner, err := worker.New(worker.Config{
         Client: client, Registry: registry,
-        WorkerID: "checks-west", ServerID: "<verified-server-store-epoch>",
+        WorkerID: "checks-west", WorkerUID: "<provisioned-worker-uid>", ServerID: "<verified-server-store-epoch>",
         StateDir: "/var/lib/cpra-example-worker",
         WrappingKeyPath: "/etc/cpra-example-worker/wrapping.key",
     })
@@ -151,7 +157,7 @@ operator client; advertising a capability does not grant permission to use it.
 | `recovery` | `accepted`, `completed` | `unknown`, `rejected` |
 | `notification` | `accepted`, `delivered` | `unknown`, `rejected` |
 
-The runner fills execution/grant/category identity. A returned error, panic,
+The runner fills server, worker UID, execution, grant, and category identity. A returned error, panic,
 invalid status, or oversized result becomes `unknown` (`noData` for checks).
 Handler error text is not persisted because it may expose provider secrets.
 `accepted` distinguishes provider acceptance from observed completion/delivery.
@@ -170,12 +176,30 @@ encrypted locally but are deliberately delivered to CPRa when returned.
 3. Persist the resulting bounded envelope before attempting delivery.
 4. Resend the same envelope until an authoritative durable receipt arrives.
 
-A lost start response never causes speculative execution. On restart, reserved
-or started entries are reconciled with the original execution; interrupted
-handlers are never run again. Uncertain recovery and notification entries stay
-held even after an unknown-result receipt. Only an authoritative terminal start
-disposition removes that hold. This relies on the server never returning an old
-executable grant for a terminal execution.
+The original live path calls `begin` once. Only its confirmed `granted` response
+can lead to a handler call, after the durable marker and a cancellation check.
+A lost start reply, `started`, or `unknown` never invokes a handler. Journal
+recovery sends `reconcile`; `pending` retains the reservation until the server
+reports an authoritative state. `started` records an interrupted outcome without
+invocation. An authoritative `rejected` releases only an unstarted reservation;
+`terminal` confirms the retained receipt. Uncertain recovery and notification
+entries remain held after an unknown-result receipt. No local timeout or missing
+response releases that hold.
+
+Each `Run` creates a fresh client session nonce. One poll is outstanding at a
+time; its exact nonce, session, sequence, capabilities, capacity, and limit remain
+frozen across lost replies. The next sequence is sent only after the batch is
+validated and admitted locally. Only the explicit `workerSessionExpired` error
+opens a new session with a fresh nonce. Generic conflicts and transport failures
+never replace a session. A newly accepted sequence may advance session expiry;
+an exact replay does not renew it. All assignment, start, heartbeat, and receipt echoes
+must match their original identities. Poll offers do not authorize execution.
+
+An outbox result or late evidence uses the journal's original server ID and worker
+UID and does not require a current polling session or new-work grant. A rotated
+credential for the same UID can deliver it; a different UID or restored server ID
+cannot silently adopt the journal. This is a client boundary, not a claim that
+server execution routes or provider-side fencing are implemented.
 
 `QueueLateEvidence` appends evidence using the original receipt and a stable new
 evidence identity. It does not replace the result, clear the hold, or re-enable
@@ -194,7 +218,10 @@ file; offline operational compaction is not provided by this first library.
 
 The runner uses a single bounded poller and result-delivery loop. Execution
 goroutines are bounded by concurrency slots, and durable record/byte capacity is
-reserved before requesting start permission or invoking a handler. Polls wait at
+reserved before requesting start permission or invoking a handler. Each pending
+execution reserves the outcome limit plus 32 KiB for bounded, JSON-escaped
+identity metadata. An outcome limit too small for its interrupted result prevents
+admission. Polls wait at
 most 25 seconds. Result retries default to one second and use the same
 persisted identity and envelope; ordinary SDK mutation retry policy stays off.
 
@@ -220,7 +247,10 @@ go test -race -tags externaljobs ./...
 ```
 
 Initial release tags are `sdk/go/worker/v0.1.0-rc.1` and, after qualification,
-`sdk/go/worker/v0.1.0`. Journal format is **1**. SDK, server API, worker protocol,
+`sdk/go/worker/v0.1.0`. Journal format is **2**. Worker UID is bound into metadata and encryption AAD;
+records retain their original session and execution identities. Format 1 is
+explicitly rejected with `ErrJournalVersion`, preserving its records and key.
+There is no automatic migration, journal reset, or outbox deletion. SDK, server API, worker protocol,
 and journal versions are separate compatibility contracts. No tag is implied to
 exist merely because it appears in the candidate module requirement.
 
@@ -253,4 +283,4 @@ For publication from the complete repository checkout, follow the
 repository document outside this nested module archive; the installation and
 execution requirements above remain available in the downloaded module.
 
-<!-- Imported from sdk/go/worker/README.md; preserve candidate scope and reconcile with original before regenerating. -->
+<!-- Adapted from sdk/go/worker/README.md. -->

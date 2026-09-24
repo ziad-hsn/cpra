@@ -2,6 +2,7 @@
 """Replace the Go embedding directory with an already successful Vite build."""
 from pathlib import Path
 import shutil
+import json
 
 from package import dashboard_inventory
 
@@ -9,8 +10,8 @@ root = Path(__file__).resolve().parents[2]
 source = root / 'dashboard/dist'
 if not (source / 'index.html').is_file():
     raise SystemExit('Build the dashboard before staging assets')
-_, notices = dashboard_inventory()
-target = root / 'internal/web/server/assets'
+inventory, notices = dashboard_inventory()
+target = root / 'internal/httpserver/assets'
 # This directory contains generated assets only. Do not touch dashboard sources.
 shutil.rmtree(target)
 shutil.copytree(source, target)
@@ -22,3 +23,5 @@ for name, content in sorted(notices.items()):
     text += '\n' + '=' * 72 + '\n' + name + '\n' + '=' * 72 + '\n'
     text += content.decode('utf-8') + '\n'
 (license_dir / 'dashboard.txt').write_text(text)
+
+(license_dir / "dashboard.json").write_text(json.dumps(inventory, indent=2) + "\n")

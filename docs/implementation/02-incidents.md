@@ -4,7 +4,7 @@ description: 'Plan and status · 02-incidents: Integrate crash-safe incident pro
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # 02-incidents: Integrate crash-safe incident processing
 
@@ -18,7 +18,7 @@ Commit intent and started markers before external operations; restore state and 
 
 ## Where
 
-internal/durable/transitions.go; internal/controller/systems/durable_system.go; internal/controller/controller.go; internal/jobs/{execution,results}.go
+internal/persistence/transitions.go; internal/controller/systems/durable_system.go; internal/controller/controller.go; internal/jobs/{execution,results}.go
 
 ## Acceptance criteria
 

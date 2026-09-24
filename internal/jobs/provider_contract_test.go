@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 type notificationTestTransport func(*http.Request) (*http.Response, error)
@@ -41,20 +41,20 @@ func TestRetryableNotificationRejections(t *testing.T) {
 	})
 	cases := []struct {
 		name   string
-		config schema.CodeNotification
+		config manifest.CodeNotification
 	}{
-		{"slack", &schema.CodeNotificationSlack{WebHook: "https://fixture.invalid"}},
-		{"discord", &schema.CodeNotificationDiscord{WebhookURL: "https://fixture.invalid"}},
-		{"mattermost", &schema.CodeNotificationMattermost{WebhookURL: "https://fixture.invalid"}},
-		{"telegram", &schema.CodeNotificationTelegram{BotToken: "fixture", ChatID: "1"}},
-		{"pushover", &schema.CodeNotificationPushover{AppToken: "fixture", UserKey: "fixture"}},
-		{"victorops", &schema.CodeNotificationVictorOps{RestEndpointKey: "fixture", RoutingKey: "fixture"}},
-		{"opsgenie", &schema.CodeNotificationOpsgenie{APIKey: "fixture"}},
-		{"datadog", &schema.CodeNotificationDatadog{APIKey: "fixture"}},
+		{"slack", &manifest.CodeNotificationSlack{WebHook: "https://fixture.invalid"}},
+		{"discord", &manifest.CodeNotificationDiscord{WebhookURL: "https://fixture.invalid"}},
+		{"mattermost", &manifest.CodeNotificationMattermost{WebhookURL: "https://fixture.invalid"}},
+		{"telegram", &manifest.CodeNotificationTelegram{BotToken: "fixture", ChatID: "1"}},
+		{"pushover", &manifest.CodeNotificationPushover{AppToken: "fixture", UserKey: "fixture"}},
+		{"victorops", &manifest.CodeNotificationVictorOps{RestEndpointKey: "fixture", RoutingKey: "fixture"}},
+		{"opsgenie", &manifest.CodeNotificationOpsgenie{APIKey: "fixture"}},
+		{"datadog", &manifest.CodeNotificationDatadog{APIKey: "fixture"}},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			j, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config}, ecs.Entity{}, "red")
+			j, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config}, ecs.Entity{}, "red")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -72,7 +72,7 @@ func TestOpsgenieMessageLimit(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 		return &http.Response{StatusCode: 202, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
 	})
-	j, err := CreateCodeJob("api", schema.CodeConfig{Notify: "opsgenie", Config: &schema.CodeNotificationOpsgenie{APIKey: "fixture"}}, ecs.Entity{}, "red")
+	j, err := CreateCodeJob("api", manifest.CodeConfig{Notify: "opsgenie", Config: &manifest.CodeNotificationOpsgenie{APIKey: "fixture"}}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestPushoverEmergencyParameters(t *testing.T) {
 		expire = r.Form.Get("expire")
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
 	})
-	j, err := CreateCodeJob("api", schema.CodeConfig{Notify: "pushover", Config: &schema.CodeNotificationPushover{AppToken: "fixture", UserKey: "fixture", Priority: 2}}, ecs.Entity{}, "red")
+	j, err := CreateCodeJob("api", manifest.CodeConfig{Notify: "pushover", Config: &manifest.CodeNotificationPushover{AppToken: "fixture", UserKey: "fixture", Priority: 2}}, ecs.Entity{}, "red")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestDockerDefaultStopGrace(t *testing.T) {
 	t.Setenv("DOCKER_TLS_VERIFY", "")
 	t.Setenv("DOCKER_CERT_PATH", "")
 	t.Setenv("DOCKER_API_VERSION", "1.52")
-	j, err := CreateInterventionJob(schema.Intervention{Action: "docker", Target: &schema.InterventionTargetDocker{Container: "fixture"}}, ecs.Entity{})
+	j, err := CreateInterventionJob(manifest.Intervention{Action: "docker", Target: &manifest.InterventionTargetDocker{Container: "fixture"}}, ecs.Entity{})
 	if err != nil {
 		t.Fatal(err)
 	}

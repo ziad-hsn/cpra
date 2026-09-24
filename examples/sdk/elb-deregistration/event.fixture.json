@@ -1,0 +1,21 @@
+{
+  "version": "0",
+  "id": "fixture-event-1",
+  "detail-type": "AWS API Call via CloudTrail",
+  "source": "aws.elasticloadbalancing",
+  "account": "123456789012",
+  "region": "us-east-1",
+  "time": "2026-09-13T12:00:01Z",
+  "detail": {
+    "eventID": "fixture-cloudtrail-1",
+    "eventSource": "elasticloadbalancing.amazonaws.com",
+    "eventName": "DeregisterTargets",
+    "awsRegion": "us-east-1",
+    "recipientAccountId": "123456789012",
+    "eventTime": "2026-09-13T12:00:00Z",
+    "requestParameters": {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/payments/abc",
+      "targets": [{"id": "i-123"}]
+    }
+  }
+}

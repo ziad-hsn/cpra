@@ -11,12 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // CodeTwilioJob delivers an alert as SMS via the Twilio API.
 type CodeTwilioJob struct {
 	Execution
+	URL         string
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Monitor     string
@@ -30,8 +31,15 @@ type CodeTwilioJob struct {
 	ID          uuid.UUID
 }
 
-func newCodeTwilioJob(cfg *schema.CodeNotificationTwilio, monitor, color, message string, entity ecs.Entity) (Job, error) {
+func newCodeTwilioJob(cfg *manifest.CodeNotificationTwilio, monitor, color, message string, entity ecs.Entity) (Job, error) {
+	if cfg.URL != "" {
+		if err := validateTargetURL(cfg.URL); err != nil {
+			return nil, err
+		}
+	}
+
 	return &CodeTwilioJob{
+		URL:        cfg.URL,
 		ID:         uuid.New(),
 		Entity:     entity,
 		Monitor:    monitor,
@@ -51,7 +59,10 @@ func (c *CodeTwilioJob) Execute() (result Result) {
 
 	payload := map[string]interface{}{"type": "code", "driver": "twilio", "color": c.Color}
 	form := url.Values{"To": {c.To}, "From": {c.From}, "Body": {c.Message}}
-	target := "https://api.twilio.com/2010-04-01/Accounts/" + url.PathEscape(c.AccountSID) + "/Messages.json"
+	target, err := notificationURL(c.URL, "https://api.twilio.com/2010-04-01/Accounts/"+url.PathEscape(c.AccountSID)+"/Messages.json")
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(form.Encode()))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}

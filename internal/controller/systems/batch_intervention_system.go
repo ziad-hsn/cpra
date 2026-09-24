@@ -1,10 +1,10 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
-	"cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
+	"github.com/ziad-hsn/cpra/internal/queue"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -84,7 +84,7 @@ func (s *BatchInterventionSystem) Update(_ *ecs.World) {
 		if state == nil || !state.IsInterventionNeeded() || state.IsInterventionPending() {
 			continue
 		}
-		if schema.InMaintenance(state.Maintenance, startTime) {
+		if manifest.InMaintenance(state.Maintenance, startTime) {
 			s.ready.Enqueue([]ecs.Entity{ent})
 			continue
 		}

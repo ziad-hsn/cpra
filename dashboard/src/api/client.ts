@@ -1,4 +1,5 @@
 import type {
+  DurableStateResponse, HistoryResponse, SLOResponse,
   ConfigResponse,
   HealthResponse,
   IncidentsResponse,
@@ -10,6 +11,7 @@ import type {
   QueuesResponse,
   SystemsResponse,
 } from './types';
+import { dashboardSession, ManagementError } from './session';
 
 /** Base URL for API requests. In dev, the Vite proxy forwards /api → localhost:8060. */
 export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
@@ -24,21 +26,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string): Promise<T> {
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    try {
-      const body = await res.json();
-      if (body?.error) msg = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new ApiError(msg, res.status);
+  try {
+    return await dashboardSession.legacy<T>(`${API_BASE}${path}`);
+  } catch (error) {
+    if (error instanceof ManagementError && error.status !== undefined) throw new ApiError(error.message, error.status);
+    throw error;
   }
-  return res.json() as Promise<T>;
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -52,6 +45,9 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const api = {
+  getState: (monitorID?: string) => request<DurableStateResponse>("/api/v1/state" + buildQuery({monitor_id: monitorID})),
+  getHistory: (monitorID: string, cursor = "") => request<HistoryResponse>("/api/v1/history" + buildQuery({monitor_id: monitorID, cursor, limit: 100})),
+  getSLO: () => request<SLOResponse>("/api/v1/slo"),
   getOverview: () => request<OverviewResponse>('/api/v1/overview'),
 
   getMonitors: (params: MonitorsFilters & { page?: number; size?: number; sort?: string } = {}) =>

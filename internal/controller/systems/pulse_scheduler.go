@@ -3,7 +3,7 @@ package systems
 import (
 	"time"
 
-	"cpra/internal/scheduler"
+	"github.com/ziad-hsn/cpra/internal/scheduler"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -23,6 +23,14 @@ func NewPulseScheduler() *PulseScheduler {
 // Schedule inserts an entity in the scheduler to become due at the given time.
 func (p *PulseScheduler) Schedule(entity ecs.Entity, due time.Time) {
 	p.heap.Schedule(entity, due)
+}
+
+// Cancel removes both scheduled and ready membership. A tag alone cannot remove
+// scheduler entries; dispatch authorization must additionally fence worker copies.
+func (p *PulseScheduler) Cancel(entity ecs.Entity) bool {
+	scheduled := p.heap.Cancel(entity)
+	ready := p.ready.Cancel(entity)
+	return scheduled || ready
 }
 
 // Due pops and returns all entities due at or before now from the scheduler.

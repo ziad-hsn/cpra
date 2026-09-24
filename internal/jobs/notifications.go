@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 func sendJSON(ctx context.Context, method, target string, headers map[string]string, data interface{}) error {
@@ -53,7 +53,7 @@ func truncateNotification(text string, limit int) string {
 	return text
 }
 
-func sendEmail(ctx context.Context, cfg schema.CodeNotificationEmail, message string) error {
+func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message string) error {
 	if strings.ContainsAny(cfg.Subject, "\r\n") {
 		return fmt.Errorf("email subject contains a newline")
 	}

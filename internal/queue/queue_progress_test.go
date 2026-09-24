@@ -56,7 +56,7 @@ func TestAdaptiveRejectsUnsupportedCapacities(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := q.Enqueue(newTestHybridJob(2)); err != ErrQueueFull {
-			t.Fatalf("one-slot queue accepted overwrite: err=%v depth=%d cell job=%d", err, q.Stats().QueueDepth, q.buffer[0].job.(*testHybridJob).id)
+			t.Fatalf("one-slot queue accepted overwrite: err=%v depth=%d", err, q.Stats().QueueDepth)
 		}
 	})
 }

@@ -1,0 +1,1278 @@
+{
+  "schemas": {
+    "ExternalConfig": {
+      "type": "object",
+      "properties": {
+        "jobTypeID": {
+          "type": "string",
+          "x-go-name": "JobTypeID"
+        },
+        "version": {
+          "type": "string"
+        },
+        "parameters": {
+          "x-go-type": "json.RawMessage"
+        },
+        "credentialProfile": {
+          "type": "string",
+          "x-go-type-skip-optional-pointer": true
+        }
+      },
+      "required": [
+        "jobTypeID",
+        "version",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "JobTypeSpec": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "protocolVersion": {
+          "type": "string"
+        },
+        "parameterSchema": {
+          "x-go-type": "json.RawMessage"
+        },
+        "resultSchema": {
+          "x-go-type": "json.RawMessage"
+        },
+        "timeout": {
+          "$ref": "#/components/schemas/Duration",
+          "x-go-type-skip-optional-pointer": true
+        },
+        "rejectionCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-type-skip-optional-pointer": true
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "handler",
+        "protocolVersion",
+        "parameterSchema",
+        "resultSchema"
+      ],
+      "additionalProperties": false
+    },
+    "JobType": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "x-go-name": "APIVersion"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/components/schemas/Metadata"
+        },
+        "spec": {
+          "$ref": "#/components/schemas/JobTypeSpec"
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "additionalProperties": false
+    },
+    "JobTypeList": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JobType"
+          }
+        },
+        "nextCursor": {
+          "type": "string",
+          "x-go-type-skip-optional-pointer": true
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "WorkerCapability": {
+      "type": "object",
+      "properties": {
+        "jobTypeID": {
+          "type": "string",
+          "x-go-name": "JobTypeID"
+        },
+        "version": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobTypeID",
+        "version",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "PollRequest": {
+      "type": "object",
+      "properties": {
+        "workerID": {
+          "type": "string",
+          "x-go-name": "WorkerID"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/WorkerCapability"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "capacity": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "waitSeconds": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0,
+          "maximum": 25
+        },
+        "serverID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ServerID"
+        },
+        "clientSessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ClientSessionID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "pollSequence": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "workerID",
+        "capabilities",
+        "capacity",
+        "limit",
+        "waitSeconds",
+        "serverID",
+        "clientSessionID",
+        "sessionID",
+        "pollSequence"
+      ],
+      "additionalProperties": false
+    },
+    "Assignment": {
+      "type": "object",
+      "properties": {
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "executionRevision": {
+          "type": "string"
+        },
+        "leaseID": {
+          "type": "string",
+          "x-go-name": "LeaseID"
+        },
+        "serverID": {
+          "type": "string",
+          "x-go-name": "ServerID"
+        },
+        "monitorID": {
+          "type": "string",
+          "x-go-name": "MonitorID"
+        },
+        "incarnationUID": {
+          "type": "string",
+          "x-go-name": "IncarnationUID"
+        },
+        "jobTypeID": {
+          "type": "string",
+          "x-go-name": "JobTypeID"
+        },
+        "jobTypeVersion": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "parameters": {
+          "x-go-type": "json.RawMessage"
+        },
+        "credentialProfile": {
+          "type": "string"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "jobTypeUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "JobTypeUID"
+        }
+      },
+      "required": [
+        "executionID",
+        "executionRevision",
+        "leaseID",
+        "serverID",
+        "monitorID",
+        "incarnationUID",
+        "jobTypeID",
+        "jobTypeVersion",
+        "kind",
+        "parameters",
+        "credentialProfile",
+        "deadline",
+        "workerUID",
+        "sessionID",
+        "jobTypeUID"
+      ],
+      "additionalProperties": false
+    },
+    "Assignments": {
+      "type": "object",
+      "properties": {
+        "serverID": {
+          "type": "string",
+          "x-go-name": "ServerID"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Assignment"
+          },
+          "maxItems": 100
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        },
+        "clientSessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ClientSessionID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "pollSequence": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "sessionExpiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "serverID",
+        "items",
+        "workerUID",
+        "clientSessionID",
+        "sessionID",
+        "pollSequence",
+        "sessionExpiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "StartRequest": {
+      "type": "object",
+      "properties": {
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "leaseID": {
+          "type": "string",
+          "x-go-name": "LeaseID"
+        },
+        "executionRevision": {
+          "type": "string"
+        },
+        "serverID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ServerID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "mode": {
+          "$ref": "#/components/schemas/StartMode"
+        }
+      },
+      "required": [
+        "executionID",
+        "leaseID",
+        "executionRevision",
+        "serverID",
+        "sessionID",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "StartResponse": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "$ref": "#/components/schemas/StartDisposition"
+        },
+        "grantID": {
+          "type": "string",
+          "x-go-name": "GrantID"
+        },
+        "serverID": {
+          "type": "string",
+          "x-go-name": "ServerID"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receiptID": {
+          "type": "string",
+          "x-go-name": "ReceiptID"
+        },
+        "executionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ExecutionID"
+        },
+        "executionRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "leaseID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "LeaseID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        }
+      },
+      "required": [
+        "disposition",
+        "grantID",
+        "serverID",
+        "deadline",
+        "receiptID",
+        "executionID",
+        "executionRevision",
+        "leaseID",
+        "sessionID",
+        "workerUID"
+      ],
+      "additionalProperties": false,
+      "description": "Only granted from the original live begin permits invocation. Reconcile never grants. Other dispositions report original attempt state with conditional grant and receipt fields."
+    },
+    "HeartbeatRequest": {
+      "type": "object",
+      "properties": {
+        "workerID": {
+          "type": "string",
+          "x-go-name": "WorkerID"
+        },
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "grantID": {
+          "type": "string",
+          "x-go-name": "GrantID"
+        },
+        "serverID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ServerID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        }
+      },
+      "required": [
+        "workerID",
+        "executionID",
+        "grantID",
+        "serverID",
+        "sessionID"
+      ],
+      "additionalProperties": false
+    },
+    "HeartbeatResponse": {
+      "type": "object",
+      "properties": {
+        "serverID": {
+          "type": "string",
+          "x-go-name": "ServerID"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "executionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ExecutionID"
+        },
+        "grantID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "GrantID"
+        },
+        "sessionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "SessionID"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        }
+      },
+      "required": [
+        "serverID",
+        "accepted",
+        "executionID",
+        "grantID",
+        "sessionID",
+        "workerUID"
+      ],
+      "additionalProperties": false
+    },
+    "Outcome": {
+      "type": "object",
+      "properties": {
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "grantID": {
+          "type": "string",
+          "x-go-name": "GrantID"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "diagnostic": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "rejectionCode": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64
+        },
+        "data": {
+          "x-go-type": "json.RawMessage"
+        },
+        "diagnosticTruncated": {
+          "type": "boolean"
+        },
+        "serverID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ServerID"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        }
+      },
+      "required": [
+        "executionID",
+        "grantID",
+        "kind",
+        "status",
+        "diagnostic",
+        "rejectionCode",
+        "evidence",
+        "data",
+        "diagnosticTruncated",
+        "serverID",
+        "workerUID"
+      ],
+      "additionalProperties": false
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "receiptID": {
+          "type": "string",
+          "x-go-name": "ReceiptID"
+        },
+        "disposition": {
+          "$ref": "#/components/schemas/ReceiptDisposition"
+        },
+        "serverID": {
+          "type": "string",
+          "x-go-name": "ServerID"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        }
+      },
+      "required": [
+        "executionID",
+        "receiptID",
+        "disposition",
+        "serverID",
+        "workerUID"
+      ],
+      "additionalProperties": false
+    },
+    "LateEvidenceRequest": {
+      "type": "object",
+      "properties": {
+        "executionID": {
+          "type": "string",
+          "x-go-name": "ExecutionID"
+        },
+        "evidenceID": {
+          "type": "string",
+          "x-go-name": "EvidenceID"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 64
+        },
+        "diagnostic": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "originalReceiptID": {
+          "type": "string",
+          "x-go-name": "OriginalReceiptID"
+        },
+        "data": {
+          "x-go-type": "json.RawMessage"
+        },
+        "serverID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "ServerID"
+        },
+        "workerUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-go-name": "WorkerUID"
+        }
+      },
+      "required": [
+        "executionID",
+        "evidenceID",
+        "evidence",
+        "diagnostic",
+        "originalReceiptID",
+        "data",
+        "serverID",
+        "workerUID"
+      ],
+      "additionalProperties": false
+    },
+    "WorkerObservation": {
+      "type": "object",
+      "properties": {
+        "workerID": {
+          "type": "string",
+          "x-go-name": "WorkerID"
+        },
+        "capacity": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "active": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastSeenAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "workerID",
+        "capacity",
+        "active",
+        "lastSeenAt"
+      ],
+      "additionalProperties": false
+    },
+    "WorkerObservationList": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/WorkerObservation"
+          }
+        },
+        "nextCursor": {
+          "type": "string",
+          "x-go-type-skip-optional-pointer": true
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "StartMode": {
+      "type": "string",
+      "enum": [
+        "begin",
+        "reconcile"
+      ],
+      "x-enum-varnames": [
+        "StartModeBegin",
+        "StartModeReconcile"
+      ]
+    },
+    "StartDisposition": {
+      "type": "string",
+      "enum": [
+        "granted",
+        "started",
+        "pending",
+        "unknown",
+        "terminal",
+        "rejected"
+      ],
+      "x-enum-varnames": [
+        "StartDispositionGranted",
+        "StartDispositionStarted",
+        "StartDispositionPending",
+        "StartDispositionUnknown",
+        "StartDispositionTerminal",
+        "StartDispositionRejected"
+      ]
+    },
+    "ReceiptDisposition": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "finalized",
+        "unknown"
+      ],
+      "x-enum-varnames": [
+        "ReceiptDispositionAccepted",
+        "ReceiptDispositionFinalized",
+        "ReceiptDispositionUnknown"
+      ]
+    }
+  },
+  "paths": {
+    "/api/v2/external-workers/poll": {
+      "post": {
+        "operationId": "WorkerPoll",
+        "summary": "WorkerPoll",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Assignments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/PollRequest"
+              }
+            }
+          }
+        },
+        "description": "Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification."
+      }
+    },
+    "/api/v2/external-workers/start": {
+      "post": {
+        "operationId": "WorkerStart",
+        "summary": "WorkerStart",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/StartResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/StartRequest"
+              }
+            }
+          }
+        },
+        "description": "Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification."
+      }
+    },
+    "/api/v2/external-workers/heartbeat": {
+      "post": {
+        "operationId": "WorkerHeartbeat",
+        "summary": "WorkerHeartbeat",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/HeartbeatResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/HeartbeatRequest"
+              }
+            }
+          }
+        },
+        "description": "Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification."
+      }
+    },
+    "/api/v2/external-workers/result": {
+      "post": {
+        "operationId": "WorkerResult",
+        "summary": "WorkerResult",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/Outcome"
+              }
+            }
+          }
+        },
+        "description": "Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification."
+      }
+    },
+    "/api/v2/external-workers/late-evidence": {
+      "post": {
+        "operationId": "WorkerLateEvidence",
+        "summary": "WorkerLateEvidence",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/LateEvidenceRequest"
+              }
+            }
+          }
+        },
+        "description": "Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification."
+      }
+    },
+    "/api/v2/job-types": {
+      "get": {
+        "operationId": "ListJobTypes",
+        "summary": "ListJobTypes",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/JobTypeList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitorID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "CreateJobType",
+        "summary": "CreateJobType",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/JobType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "*"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/JobType"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/job-types/{id}": {
+      "get": {
+        "operationId": "GetJobType",
+        "summary": "GetJobType",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/JobType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "ReplaceJobType",
+        "summary": "ReplaceJobType",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/JobType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/JobType"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteJobType",
+        "summary": "DeleteJobType",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v2/external-workers": {
+      "get": {
+        "operationId": "ListWorkers",
+        "summary": "ListWorkers",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/WorkerObservationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitorID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

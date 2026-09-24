@@ -1,10 +1,10 @@
 package systems
 
 import (
-	"cpra/internal/alerts"
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/alerts"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -148,7 +148,7 @@ func (s *BatchPulseResultSystem) ProcessBatch(results []jobs.Result) {
 				if unhealthy <= 0 {
 					unhealthy = 1
 				}
-				if state.PulseFailures >= unhealthy && !schema.InMaintenance(state.Maintenance, now) {
+				if state.PulseFailures >= unhealthy && !manifest.InMaintenance(state.Maintenance, now) {
 					if s.interventionConfigMapper.Get(ent) != nil && !state.InterventionAttempted && !state.IsInterventionNeeded() && !state.IsInterventionPending() {
 						state.InterventionAttempted = true
 						s.logger.Warn("Monitor '%s' reached max failures, triggering intervention.", state.Name)

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // CodeTeamsJob delivers an alert to Microsoft Teams via a Workflow/Power
@@ -26,7 +26,7 @@ type CodeTeamsJob struct {
 	ID          uuid.UUID
 }
 
-func newCodeTeamsJob(cfg *schema.CodeNotificationTeams, monitor, color, message string, entity ecs.Entity) (Job, error) {
+func newCodeTeamsJob(cfg *manifest.CodeNotificationTeams, monitor, color, message string, entity ecs.Entity) (Job, error) {
 	return &CodeTeamsJob{
 		ID:         uuid.New(),
 		Entity:     entity,

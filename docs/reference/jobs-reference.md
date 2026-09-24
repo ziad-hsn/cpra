@@ -4,7 +4,7 @@ description: Current CPRa driver availability and YAML configuration fields for 
 cpra_scope: main
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+> **Current development checkout:** this reference follows the merged runtime source. See [version and availability](../versions.md) for the distinction between current development and historical candidate guides.
 
 
 # Checks, recovery and notifications
@@ -44,7 +44,7 @@ TLS `warn_days` produces a yellow warning and degraded state without recovery. `
 
 ### http
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -58,7 +58,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### tcp
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -68,7 +68,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### icmp
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -79,7 +79,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### dns
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -89,7 +89,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### udp
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -100,7 +100,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### grpc
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -111,7 +111,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### docker
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -120,7 +120,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### tls
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -134,7 +134,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### redis
 
-Build: `redis`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `redis`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -146,7 +146,7 @@ Build: `redis`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### postgres
 
-Build: `postgres`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `postgres`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -161,7 +161,7 @@ Build: `postgres`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7
 
 ### mysql
 
-Build: `mysql`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `mysql`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -175,7 +175,7 @@ Build: `mysql`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### mongo
 
-Build: `mongo`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `mongo`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -184,7 +184,7 @@ Build: `mongo`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### rabbitmq
 
-Build: `rabbitmq`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `rabbitmq`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -193,7 +193,7 @@ Build: `rabbitmq`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7
 
 ### kafka
 
-Build: `kafka`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/pulse_types_new.go)
+Build: `kafka`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/pulse_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -220,7 +220,7 @@ The controller admits one recovery operation per incident. A response timeout ca
 
 ### docker
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -230,7 +230,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### webhook
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/intervention_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/intervention_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -243,7 +243,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### kubernetes
 
-Build: `kubernetes`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/intervention_types_new.go)
+Build: `kubernetes`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/intervention_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -257,7 +257,7 @@ Build: `kubernetes`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2f
 
 ### aws
 
-Build: `aws`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/intervention_types_new.go)
+Build: `aws`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/intervention_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -269,7 +269,7 @@ Build: `aws`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0
 
 ### systemd
 
-Build: `systemd`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/intervention_types_new.go)
+Build: `systemd`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/intervention_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -292,7 +292,7 @@ All listed notifications are included by default except `teams` and `twilio`, wh
 
 ### log
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -300,7 +300,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### slack
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -308,7 +308,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### pagerduty
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -317,7 +317,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### email
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/groups.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/groups.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -329,7 +329,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### webhook
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/groups.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/groups.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -339,16 +339,18 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### telegram
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
+| `url` | string; optional complete operation URL |
+| `test_mode` | boolean; Telegram test environment, mutually exclusive with `url` |
 | `bot_token` | string |
 | `chat_id` | string |
 
 ### discord
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -356,7 +358,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### opsgenie
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/manifest.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -365,7 +367,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### mattermost
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -375,10 +377,11 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### victorops
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
+| `url` | string; optional complete operation URL |
 | `rest_endpoint_key` | string |
 | `routing_key` | string |
 | `message_type` | string |
@@ -386,10 +389,11 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### pushover
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
+| `url` | string; optional complete operation URL |
 | `app_token` | string |
 | `user_key` | string |
 | `title` | string |
@@ -400,10 +404,11 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### datadog
 
-Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
+| `url` | string; optional complete operation URL |
 | `api_key` | string |
 | `app_key` | string |
 | `site` | string |
@@ -411,7 +416,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### teams
 
-Build: `teams`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: `teams`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
@@ -419,10 +424,11 @@ Build: `teams`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2
 
 ### twilio
 
-Build: `twilio`. [Schema](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/loader/schema/notification_types_new.go)
+Build: `twilio`. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/notification_types_new.go)
 
 | YAML field | Value type |
 | --- | --- |
+| `url` | string; optional complete operation URL |
 | `account_sid` | string |
 | `auth_token` | string |
 | `from` | string |

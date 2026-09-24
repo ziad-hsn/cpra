@@ -1,11 +1,3 @@
----
-title: SDK candidate · Register monitors from a service-registration queue
-description: SDK candidate · Register monitors from a service-registration queue for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
-
 # Register monitors from a service-registration queue
 
 This example turns a registration message into a CPRa HTTP monitor. It models a

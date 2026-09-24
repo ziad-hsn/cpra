@@ -4,7 +4,7 @@ description: SDK candidate · Build integrations with the CPRa Go SDK for the re
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # Build integrations with the CPRa Go SDK
 
@@ -13,18 +13,21 @@ load-balancer changes, Kubernetes Service discovery, and an external worker.
 Each lesson includes a finite local demo, expected output, code to inspect, and
 steps for supplying your own configuration.
 
-**These are candidate SDK integrations.** The existing CPRa server supports
-read-only v1. Its v2 management API and external-worker dispatcher still need
-implementation and qualification. Local demos exercise SDK HTTP requests and
-worker behavior against fixtures; they do not establish production-server,
-cloud-account, cluster, or SMS delivery certification.
+**These are candidate SDK integrations.** The private working branch implements
+v2 management, observations and complete collection application through public
+activation and retained results. Cross-process file reselection and
+external-worker server qualification remain separate unfinished gates; consult
+the [implementation progress record](../implementation/dashboard-implementation-progress.md)
+and server discovery before using a configured workflow. Local demos exercise
+SDK HTTP requests and worker behavior against fixtures; they do not establish
+production-server, cloud-account, cluster, or SMS delivery certification.
 
 ## Choose a lesson
 
 | Lesson | What you build | What to observe |
 | --- | --- | --- |
 | [Queue registration](queue-registration.md) | A mock Redis-style queue consumer | A repeated registration resolves to the same monitor before acknowledgment |
-| [AWS deregistration](aws-deregister.md) | An EventBridge/SQS consumer for load-balancer changes | Target absence, monitor incarnation, and configuration version are checked before disabling |
+| [AWS deregistration](elb-deregistration.md) | An EventBridge/SQS consumer for load-balancer changes | Target absence, monitor incarnation, and configuration version are checked before disabling |
 | [Kubernetes Services](kubernetes-services.md) | Namespace discovery for all Services | DNS checks for every Service and TCP checks for usable TCP ports; disabled monitors stay disabled |
 | [DAO and SMS worker](dao-sms.md) | A read-only governance RPC check and internal SMS handler | A stale chain head triggers a fixture notification; replaying a result receipt does not resend SMS |
 
@@ -68,7 +71,7 @@ the candidate contract; run the lessons against their local fixtures today.
 
 `Disable` and `Enable` change only admission state. Acknowledge records the
 person investigating the exact incident. Dismiss pauses that incident's
-notifications. Snooze pauses checks, notifications and new recovery until its deadline.
+notifications. Snooze pauses checks and notifications until its deadline.
 None of these operations introduces a check-now command.
 
 ## Apply several resources
@@ -84,14 +87,29 @@ frozen collection to remove its restrictive temporary spool.
 an apply operation. They accept at most one 4 MiB request. Larger inputs use
 staged validation through `collection.Apply`.
 `collection.Apply` stages the frozen collection, asks the server to validate all
-items, then requests dependency-ordered activation with per-resource conditions.
-It returns an operation handle even when work is partial. The DAO lesson shows
+items, then requests dependency-ordered activation with per-resource conditions
+on a server implementing that complete workflow. The private working branch has
+normal-startup CLI coverage of public activation, controller application, bounded
+retained result pages and restart. Apply returns on admission and retains its
+operation handle even when work is partial. The DAO lesson shows
 five linked resources in one apply operation.
 
-Call `Operations.Wait` to observe progress. Cancelling its context stops waiting;
+Before its first creation request, Apply prepares and retains one private
+admission ticket in the original Frozen. Repeating Apply reuses that ticket,
+including after an uncertain response or expiry; it never renews the ticket
+automatically. Close clears its owned ticket buffer together with the frozen key
+and staging. Concurrent Apply/Resume calls for the same Frozen return
+`collection.ErrApplyInProgress` without submitting the competing request.
+
+Call `collection.Wait(ctx, client.Operations, result)` to await retained execution
+readiness while pinning the original collection identity. It returns one bounded
+first page and retains verified partial counts on interruption. Inspect the
+immutable summary outcome; a ready result may be partial or failed. Cancelling its context stops waiting;
 `Operations.Cancel` is a separate request. Resume only the original operation
 with the original frozen content. A changed file requires a new operation.
-There is no collection-wide rollback or implicit pruning.
+There is no collection-wide rollback or implicit pruning. Cross-process resume
+requires the separately planned server-assisted identical-input reselection;
+freezing the same files again does not recreate the original private identity.
 
 ## Read state and measurements
 
@@ -99,12 +117,12 @@ There is no collection-wide rollback or implicit pruning.
 return structured candidate observations. `Metrics` returns structured metrics;
 `Prometheus` streams the exposition response to a writer. Measurement values
 carry availability and units. A missing latency measurement is not zero.
+The private server candidate now implements these bounded observation reads;
+see [management observations](../management-observations.md) for exact source
+meanings, readiness behavior, unsupported measurements, and Prometheus units.
 
 Page calls default to 100 items and accept at most 500. Use `Iterate` to process
 one page at a time. An iterator never gathers a million-monitor fleet for you.
-The SDK's `legacy` package exposes the current v1 read endpoints, including
-numeric monitor routes, queue and pool history, retained events, readiness,
-state, SLOs, and Prometheus text. V2 writes never silently downgrade to v1.
 
 ## Configure transport and errors
 
@@ -129,12 +147,12 @@ responses.
 
 ## Find an exact method or field
 
-- [HTTP operations](api-reference.md): all 66 candidate operations, parameters,
+- [HTTP operations](api-reference.md): the complete candidate operation inventory, parameters,
   request/response types, version conditions, build tags, and current v1 routes.
 - [Wire types](wire-types.md): resource fields, every built-in driver schema,
   optional values, tagged types, and complete nested JSON schemas.
 - [Go declarations](go-reference.md): exported services, helpers, configuration,
-  errors, iterators, collections, legacy types, and worker interfaces.
+  errors, iterators, collections, and worker interfaces.
 - [Verification](verification.md): executed checks and their observation boundary.
 - [Package documentation and publication](publishing.md): module contents,
   executable examples, pkg.go.dev behavior, and the ordered release gates.

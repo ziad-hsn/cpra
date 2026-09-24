@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/loader/schema"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 func TestPostgresDiscreteCredentials(t *testing.T) {
 	for _, password := range []string{"", "first second", "first\\second", "first' second"} {
-		c := &schema.PulsePostgresConfig{Host: "127.0.0.1", User: "fixture", Password: password, Database: "fixture", SSLMode: "disable"}
+		c := &manifest.PulsePostgresConfig{Host: "127.0.0.1", User: "fixture", Password: password, Database: "fixture", SSLMode: "disable"}
 		parsed, err := pgx.ParseConfig(postgresConnString(c))
 		if err != nil {
 			t.Errorf("password %q parse error: %v", password, err)
@@ -27,7 +27,7 @@ func TestPostgresDiscreteCredentials(t *testing.T) {
 	}
 }
 func TestMySQLIPv6DiscreteHost(t *testing.T) {
-	c := &schema.PulseMySQLConfig{Host: "::1", User: "fixture", Password: "fixture", Database: "fixture"}
+	c := &manifest.PulseMySQLConfig{Host: "::1", User: "fixture", Password: "fixture", Database: "fixture"}
 	parsed, err := mysql.ParseDSN(mysqlDSN(c))
 	if err != nil {
 		t.Fatal(err)

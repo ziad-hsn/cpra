@@ -4,7 +4,7 @@ description: 'Plan and status · 01-storage: Establish durable Raft storage for 
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # 01-storage: Establish durable Raft storage
 
@@ -18,7 +18,7 @@ Default single-node Raft, stable monitor identities, versioned records, synchron
 
 ## Where
 
-internal/durable/{model,store,fsm,files}.go; internal/runtimeconfig/config.go; internal/loader/schema/{manifest,identity}.go; internal/controller/entities/mapper.go; main.go
+internal/persistence/{model,store,fsm,files}.go; internal/runtimeconfig/config.go; internal/manifest/{manifest,identity}.go; internal/controller/entities/mapper.go; main.go
 
 ## Acceptance criteria
 

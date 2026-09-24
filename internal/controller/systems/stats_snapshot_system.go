@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/loader/schema"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -22,7 +22,7 @@ type perfStat struct {
 }
 
 // BatchStatsSnapshotSystem periodically projects the ECS world into a
-// read-only snapshot.StatsSnapshot that the web server serves to the
+// read-only fleetview.StatsSnapshot that the web server serves to the
 // dashboard. All world reads happen inside this system tick, so HTTP handler
 // goroutines never touch the (non-concurrent-safe) ECS world directly.
 //
@@ -33,7 +33,7 @@ type perfStat struct {
 type BatchStatsSnapshotSystem struct {
 	world  *ecs.World
 	logger Logger
-	holder *snapshot.Holder
+	holder *fleetview.Holder
 
 	// Throttling.
 	interval time.Duration
@@ -59,7 +59,7 @@ type BatchStatsSnapshotSystem struct {
 
 // NewBatchStatsSnapshotSystem creates a new snapshot system that publishes
 // into the given Holder every interval.
-func NewBatchStatsSnapshotSystem(world *ecs.World, logger Logger, holder *snapshot.Holder, interval time.Duration, maxIndex int) *BatchStatsSnapshotSystem {
+func NewBatchStatsSnapshotSystem(world *ecs.World, logger Logger, holder *fleetview.Holder, interval time.Duration, maxIndex int) *BatchStatsSnapshotSystem {
 	if interval <= 0 {
 		interval = time.Second
 	}
@@ -105,7 +105,7 @@ func (s *BatchStatsSnapshotSystem) Update(_ *ecs.World) {
 
 // buildSnapshot iterates the world (inside the tick) and publishes a snapshot.
 func (s *BatchStatsSnapshotSystem) buildSnapshot(now time.Time) {
-	snap := &snapshot.StatsSnapshot{
+	snap := &fleetview.StatsSnapshot{
 		Generated:   now,
 		ByStatus:    map[string]int{},
 		ByPulseType: map[string]int{},
@@ -141,10 +141,10 @@ func (s *BatchStatsSnapshotSystem) buildSnapshot(now time.Time) {
 
 	buildIndex := count <= s.maxIndex
 
-	var monitors []snapshot.MonitorSummary
+	var monitors []fleetview.MonitorSummary
 	byID := map[uint32]int{}
 	if buildIndex {
-		monitors = make([]snapshot.MonitorSummary, 0, count)
+		monitors = make([]fleetview.MonitorSummary, 0, count)
 	}
 
 	// Track which entity IDs are observed this pass so we can prune the
@@ -195,7 +195,7 @@ func (s *BatchStatsSnapshotSystem) buildSnapshot(now time.Time) {
 				}
 				sort.Strings(activeCodes)
 			}
-			monitors = append(monitors, snapshot.MonitorSummary{
+			monitors = append(monitors, fleetview.MonitorSummary{
 				ID:                  id,
 				Name:                state.Name,
 				PulseType:           pulseTypeOrUnknown(cfg),
@@ -333,19 +333,19 @@ func pulseTarget(cfg *components.PulseConfig) string {
 		return ""
 	}
 	switch c := cfg.Config.(type) {
-	case *schema.PulseHTTPConfig:
+	case *manifest.PulseHTTPConfig:
 		return redactURL(c.Url)
-	case *schema.PulseTCPConfig:
+	case *manifest.PulseTCPConfig:
 		return joinHostPort(c.Host, c.Port)
-	case *schema.PulseICMPConfig:
+	case *manifest.PulseICMPConfig:
 		return c.Host
-	case *schema.PulseDNSConfig:
+	case *manifest.PulseDNSConfig:
 		return c.Host
-	case *schema.PulseUDPConfig:
+	case *manifest.PulseUDPConfig:
 		return joinHostPort(c.Host, c.Port)
-	case *schema.PulseGRPCConfig:
+	case *manifest.PulseGRPCConfig:
 		return joinHostPort(c.Host, c.Port)
-	case *schema.PulseDockerConfig:
+	case *manifest.PulseDockerConfig:
 		return c.Container
 	default:
 		return ""

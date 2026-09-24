@@ -4,7 +4,7 @@ description: 'Plan and status · 05-interfaces: Update operator interfaces for t
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # 05-interfaces: Update operator interfaces
 
@@ -18,7 +18,7 @@ Read-only history/state/SLO API, CLI and dashboard, stable IDs and incremental f
 
 ## Where
 
-internal/web/; internal/client/; internal/cpractl/; dashboard/src/
+internal/httpserver/; internal/fleetview/; sdk/go/; internal/cpractl/; dashboard/src/
 
 ## Acceptance criteria
 

@@ -1,7 +1,7 @@
 import { useConfig, useHealth } from '../hooks/queries';
 import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { Icon } from '../components/Icon';
+import { MetricsView } from '../components/MetricsView';
 import { formatDurationNs } from '../lib/format';
 import { useTheme, type ThemePreference } from '../theme/useTheme';
 
@@ -69,19 +69,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Metrics link */}
-      <div className="card">
-        <div className="card-head">
-          <span className="card-title">Prometheus Metrics</span>
-          <span className="card-sub">raw text exposition</span>
-        </div>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-          Raw Prometheus text exposition is available at the /metrics endpoint.
-        </p>
-        <a href="/metrics" target="_blank" rel="noopener noreferrer" className="btn">
-          Open /metrics <Icon name="external" size={14} />
-        </a>
-      </div>
+      <MetricsView />
 
       {/* About */}
       <div className="card">

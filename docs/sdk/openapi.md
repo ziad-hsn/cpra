@@ -4,13 +4,18 @@ description: SDK candidate · CPRa SDK contract sources for the reviewed CPRa so
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this package guide reflects the 13 September source snapshot. See [availability and source](../versions.md#go-sdk-and-approved-management-plan) before running candidate commands.
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # CPRa SDK contract sources
 
-These files define the **draft management v2 client contract**. They do not claim
-that the current CPRa server implements v2. The existing v1 API remains separately
-qualified through the public SDK `legacy` package and repository server tests.
+These files define the **management v2 client contract for the private candidate**.
+The working branch implements and tests resource management, incident controls,
+action review, and observations through the normal server, SDK and dashboard.
+Collection staging/activation and the external-worker protocol still have
+outstanding server gates. The
+[implementation progress](../implementation/dashboard-implementation-progress.md)
+records the implemented boundaries and execution evidence; generated code alone
+does not establish server coverage. The SDK uses the current management and observation contract.
 
 - `models.base.json` defines the canonical public types, including concrete data
   structures for all 33 built-in driver configurations. Optional mutable fields
@@ -24,7 +29,7 @@ qualified through the public SDK `legacy` package and repository server tests.
   configuration payload, worker protocol messages, and extension HTTP paths.
   Generation combines it only for `externaljobs` builds. Default compiled types,
   clients, and embedded OpenAPI contain none of those extension definitions.
-- `operations.json` maps each draft operation to a public SDK method and named
+- `operations.json` maps each operation to a public SDK method and named
   contract test. The test inventory is copied into the SDK module so downloaded
   source tests never need the application module or repository-relative imports.
 
@@ -55,4 +60,30 @@ Separate SDK tests check retries, response bounds, optional field presence,
 preconditions, cancellation, and build exclusion. Publication requires actual
 server v2 and worker-protocol qualification in addition to these tests.
 
-<!-- Imported from api/openapi/README.md; preserve candidate scope and reconcile with original before regenerating. -->
+The six original-file reselection operations are marked `implemented` after the
+working-branch TLS/SDK and normal-startup/restart tests passed. Routes and runtime
+discovery remain conditional on the server reselection manager; normal managed
+web startup configures it. Older published servers may not provide these routes.
+`TestReselectionOperationInventory` covers their distinct 201/202/204 status codes
+and bounded `application/octet-stream` source body. Generated models and browser
+operation descriptors describe wire contracts; they do not advertise runtime
+availability or grant permission. Attempts contain only bounded progress and safe
+failure codes, never source paths, inventory keys, or private commitments.
+
+The shared contact additions use `Recipient.spec.endpointRefs` as an ordered list
+of existing notification endpoints. Groups may contain endpoint and recipient
+references, with at least one member and no nested groups. A Code's `notifyType`
+selects the actual driver key; `recipientRefs` and `groupRef` provide destinations.
+That typed mode excludes inline drivers and direct rule endpoint references.
+Local SDK validation checks shapes and duplicate references; matching destination
+methods, reverse dependencies and delivery deduplication require the authoritative
+server catalog. Legacy endpoint-only group fanout remains supported.
+
+`GET /api/v2/self` returns `AccessInfo` with `principalId`, `role`, and an explicit
+`permissions` array. Permissions exactly match case-sensitive OpenAPI operation IDs
+such as `CreateMonitor`. Role names and `discovery.resourceOperations` do not grant
+permission: discovery lists supported operations, while self describes access for
+the authenticated request. An empty permission array grants no operations.
+`GET /api/v2/operations` and recipient list routes use bounded cursor pagination.
+
+<!-- Adapted from api/openapi/README.md. -->

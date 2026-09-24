@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cpra
+description: A single-owner CPRa controller with durable local Raft state
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.32.0-0 <1.37.0-0"
+home: https://github.com/ziad-hsn/cpra
+sources:
+  - https://github.com/ziad-hsn/cpra
+keywords: [monitoring, recovery, single-node]
+maintainers:
+  - name: ziad-hsn
+    url: https://github.com/ziad-hsn

@@ -1,9 +1,9 @@
 package queue
 
 import (
-	"cpra/internal/jobs"
 	"errors"
 	wqueue "github.com/Workiva/go-datastructures/queue"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,8 +26,9 @@ type rbSeg struct {
 // WorkivaQueue is a capacity-expanding MPMC queue using Workiva ring buffers.
 // Producers serialize per segment so retired segments cannot receive new jobs.
 type WorkivaQueue struct {
-	head atomic.Pointer[rbSeg]
-	tail atomic.Pointer[rbSeg]
+	pending pendingAges
+	head    atomic.Pointer[rbSeg]
+	tail    atomic.Pointer[rbSeg]
 
 	closed atomic.Int32
 
@@ -66,6 +67,9 @@ func (q *WorkivaQueue) Enqueue(job jobs.Job) error {
 	if !isNilJob(job) {
 		job.SetEnqueueTime(now)
 	}
+	entry := q.pending.begin(job)
+	accepted := false
+	defer func() { q.pending.finish(entry, accepted) }()
 	for {
 		if q.closed.Load() == 1 {
 			return ErrQueueClosed
@@ -79,12 +83,13 @@ func (q *WorkivaQueue) Enqueue(job jobs.Job) error {
 			q.tail.CompareAndSwap(tail, next)
 			continue
 		}
-		ok, err := tail.rb.Offer(job)
+		ok, err := tail.rb.Offer(entry)
 		if err != nil {
 			tail.mu.Unlock()
 			return err
 		}
 		if ok {
+			accepted = true
 			q.enqueuedCount.Add(1)
 			q.lastEnqueueUnixNano.Store(now.UnixNano())
 			tail.mu.Unlock()
@@ -126,9 +131,12 @@ func (q *WorkivaQueue) Dequeue() (jobs.Job, error) {
 		head := q.head.Load()
 		item, err := head.rb.Poll(1 * time.Microsecond)
 		if err == nil && item != nil {
-			job := item.(jobs.Job)
+			job := q.pending.take(item.(*pendingEntry))
 			now := time.Now()
-			enqueueTime := job.GetEnqueueTime()
+			var enqueueTime time.Time
+			if !isNilJob(job) {
+				enqueueTime = job.GetEnqueueTime()
+			}
 			if !enqueueTime.IsZero() {
 				wait := now.Sub(enqueueTime)
 				q.totalQueueWaitNanos.Add(int64(wait))
@@ -171,7 +179,7 @@ func (q *WorkivaQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 		head := q.head.Load()
 		item, err := head.rb.Poll(1 * time.Microsecond)
 		if err == nil && item != nil {
-			out = append(out, item.(jobs.Job))
+			out = append(out, q.pending.take(item.(*pendingEntry)))
 			continue
 		}
 		if err != nil && !errors.Is(err, wqueue.ErrTimeout) {
@@ -187,6 +195,9 @@ func (q *WorkivaQueue) DequeueBatch(maxSize int) ([]jobs.Job, error) {
 		now := time.Now()
 		var totalWait, maxWait int64
 		for _, j := range out {
+			if isNilJob(j) {
+				continue
+			}
 			enqueueTime := j.GetEnqueueTime()
 			if !enqueueTime.IsZero() {
 				w := int64(now.Sub(enqueueTime))
@@ -245,7 +256,7 @@ func (q *WorkivaQueue) Stats() Stats {
 	if deq > 0 {
 		avgWaitNs = q.totalQueueWaitNanos.Load() / deq
 	}
-	return Stats{
+	stats := Stats{
 		QueueDepth:   int(depth),
 		Capacity:     int(q.capacity.Load()),
 		Enqueued:     enq,
@@ -259,4 +270,10 @@ func (q *WorkivaQueue) Stats() Stats {
 		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
 	}
+	if q.closed.Load() == 1 {
+		// Workiva Dispose prevents draining, unlike Hybrid/Adaptive Close.
+		stats.OldestPendingReason = "queue_closed"
+		return stats
+	}
+	return q.pending.addTo(stats)
 }

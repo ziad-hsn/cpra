@@ -4,7 +4,7 @@ description: 'Plan and status · 07-scale-evidence: Validate million-monitor ope
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # 07-scale-evidence: Validate million-monitor operation
 

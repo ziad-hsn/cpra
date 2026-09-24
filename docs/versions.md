@@ -1,16 +1,36 @@
 ---
 title: Versions and availability
-description: Choose the documentation for published main, the durable release candidate, or the unpublished Go SDK and approved management API plan.
+description: Distinguish current management development from historical source guides and release qualification.
 cpra_scope: docs
 ---
 
 # Versions and availability
 
-Reviewed on **13 September 2026**. The application on `main`, the release
-candidate, and the Go SDK candidate have different capabilities. Publishing
-their documentation does not merge or release their code.
+## Current development source
 
-| Capability | Current main · `51a835a` | Release candidate · `410fbfb` | SDK and management plan |
+Updated **24 September 2026**. The `codex/dashboard-finalization` checkpoint
+[`4c6baf5`](https://github.com/ziad-hsn/cpra/commit/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f)
+includes persistence, encrypted management CRUD, operator controls, dashboard
+forms, and SDK/CLI collection validation, Apply and upload recovery. The merge
+with `fc4edb4` brings in the shared light/dark theme and documentation sources.
+Current [API](reference/api-reference.md), [CLI](reference/cli.md),
+[driver](reference/jobs-reference.md) and [SDK](sdk/index.md) references describe
+this development source.
+
+The unreleased SDK compatibility client has been removed. External-worker offers
+and Start have scoped tests, while normal-startup worker routes, controller
+dispatch, result processing and full interoperability remain incomplete.
+[Implementation progress](implementation/dashboard-implementation-progress.md)
+records the precise boundary. [Release gates](implementation/dashboard-shipping-plan.md)
+remain open; a pushed development branch is not a qualified release.
+
+## Historical documentation review: 13 September 2026
+
+The comparison below describes those exact older revisions, not the current
+development checkout. Pinned historical tutorials and candidate guides remain
+available so their evidence is not confused with current implementation.
+
+| Capability | Historical main · `51a835a` | Earlier candidate · `410fbfb` | SDK and plan at that review |
 | --- | --- | --- | --- |
 | Checks, notifications, configured recovery | Implemented | Implemented | Management examples use fixtures |
 | Incident state after restart | Resets with the process | Single-node Raft; interrupted started actions held as unknown | Encrypted canonical configuration is planned |
@@ -21,10 +41,10 @@ their documentation does not merge or release their code.
 | Packaging | Linux archives and source-built container | Multi-platform recipes, native services, DEB/RPM, Compose and Helm | Public SDK tags remain unpublished |
 | Dashboard appearance | Neutral light, graphite dark, System preference | Earlier dashboard with durable views; palette parity needs integration | SDK work does not change the dashboard |
 
-## Current main
+## Historical main: `51a835a`
 
-Use the [main quickstart](tutorials/quickstart.md), [configuration](reference/config-schema.md),
-[API](reference/api-reference.md), [CLI](reference/cli.md), and [FAQ](faq.md)
+Use the historical [quickstart](tutorials/quickstart.md),
+[configuration](reference/config-schema.md), and [FAQ](faq.md)
 for [`51a835a29f2fb7af2e0301910042a52e308cbb24`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24).
 That commit includes the September branding and theme changes. Documentation
 can advance on main without changing this runtime revision.
@@ -51,15 +71,13 @@ capacity comparisons and the million-monitor 24-hour campaign remain separate
 from documentation verification. See [candidate changes](candidate/release-notes.md)
 and [verification requirements](candidate/validation.md).
 
-## Go SDK and approved management plan
+## Historical SDK and management review
 
-The [SDK guide](sdk/index.md), [operations](sdk/api-reference.md),
-[wire types](sdk/wire-types.md), [Go declarations](sdk/go-reference.md), and four
-lessons describe the **uncommitted `codex/go-sdk` source snapshot** reviewed on
-13 September. That local branch is based on `410fbfb`; the parent commit does not
-identify its added SDK files. The public candidate branch does not contain them.
-Neither `git checkout codex/go-sdk` nor `go get` is a public installation path
-for this snapshot.
+The 13 September review covered an **uncommitted `codex/go-sdk` source snapshot**
+based on `410fbfb`; the parent commit did not identify the added SDK files. The
+source inventory below preserves that historical review. Current SDK guides and
+generated references have since advanced with the development branch described
+above. Public versioned module installation remains a separate release gate.
 
 Commands under `scripts/sdk`, `sdk/go` and `examples/sdk` require the complete
 local SDK source tree. Lesson source downloads here are reference excerpts,
@@ -71,9 +89,10 @@ local evidence and remaining publication gates.
 The [approved management plan](implementation/api-management-plan.md) covers
 encrypted durable configuration, named authorization, complete collection
 preflight followed by per-resource conditional activation, operator controls,
-and optional pull-based workers. It is a plan. SDK methods and fixture tests do
-not implement its server contract. Neither main nor `410fbfb` has a v2 management
-server or external-worker dispatcher.
+and optional pull-based workers. SDK methods and fixture tests alone do not
+establish its server contract. The historical `51a835a` and `410fbfb` revisions
+have no v2 management server or external-worker dispatcher; consult current
+implementation progress for the later implemented management paths.
 
 ## Evidence and maintenance
 

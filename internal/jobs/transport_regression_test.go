@@ -1,8 +1,8 @@
 package jobs
 
 import (
-	"cpra/internal/loader/schema"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +16,7 @@ func TestNotificationsRequireConfiguredDestination(t *testing.T) {
 	entity := world.NewEntity()
 	for _, channel := range []string{"slack", "pagerduty", "email", "webhook"} {
 		t.Run(channel, func(t *testing.T) {
-			job, err := CreateCodeJob("review", schema.CodeConfig{Notify: channel, Dispatch: true}, entity, "red")
+			job, err := CreateCodeJob("review", manifest.CodeConfig{Notify: channel, Dispatch: true}, entity, "red")
 			if err != nil {
 				return
 			}

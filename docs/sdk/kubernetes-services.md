@@ -1,11 +1,3 @@
----
-title: SDK candidate · Discover Services in a Kubernetes namespace
-description: SDK candidate · Discover Services in a Kubernetes namespace for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
-
 # Discover Services in a Kubernetes namespace
 
 This program reads **all Services in one namespace** and registers CPRa monitors

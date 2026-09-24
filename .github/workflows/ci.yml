@@ -17,28 +17,175 @@ jobs:
       - run: python3 scripts/docs/check.py
   go:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     strategy:
       matrix:
-        go: ['1.25.x', '1.27.x']
+        go: ['1.25.0', '1.27.1']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ matrix.go }}
           cache: true
+      - name: Use the SDK candidate modules for source verification
+        run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
+      - run: make release-check
       - run: make check
+      - run: make verify-local
+      - run: make verify-contracts verify-protocols BUILD_TAGS="teams twilio"
+      - run: python3 -m unittest discover -s scripts/benchmark -p "test_*.py"
+      - run: python3 -m unittest discover -s scripts/verification -p "test_*.py"
       - run: make test-all-drivers
+      - name: Verify worker implementation is excluded from default and built-in builds
+        run: python3 scripts/release/verify_worker_exclusion.py --workspace "$RUNNER_TEMP/cpra-sdk.work" --out evidence/local/worker-exclusion.json
+      - name: Verify tagged worker admission, preparation, and authentication
+        run: |
+          go test -race -count=1 -timeout=5m -tags=externaljobs ./internal/httpauth ./internal/localadmin ./internal/cpractl/cli
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(Worker|JobType|CatalogJobType|Authentication|DigestV1)' ./internal/persistence
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|ExternalRuntime|WorkerOutcome|WorkerAssignment|WorkerPreparation|WorkerExecutionStartup)' ./internal/management
+          go test -race -count=1 -timeout=5m -tags=externaljobs ./internal/manifest ./internal/controller/components ./internal/controller/entities
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|WorkerSession|WorkerStart|WorkerAssignment)' ./internal/httpserver
+      - name: Execute collection apply and upload recovery through the native CLI
+        env:
+          CPRA_RUN_CLI_INTEGRATION: '1'
+        run: go test -race -count=1 -timeout=5m -run '^TestMainManagementCollection(ApplyCLI|ReselectionCLI|ReselectionCLILostReplies)$' .
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
-        if: matrix.go == '1.27.x'
+        if: matrix.go == '1.27.1'
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
-        if: matrix.go == '1.27.x'
+        if: matrix.go == '1.27.1'
   dashboard:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install checksum-pinned parser compiler
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-parser-go"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '24'
+          node-version: '24.21.0'
       - run: npm install --global pnpm@11.22.0
-      - run: make dashboard-build dashboard-check
+      - run: python3 -B scripts/release/dashboard_build.py --check
       - run: pnpm --dir dashboard audit
+      - name: Verify dashboard freshness and browser campaign contracts
+        run: |
+          python3 scripts/dashboard/asset_manifest.py
+          python3 -m unittest discover -s scripts/dashboard -p 'test_*.py'
+      - name: Install locked browser verification tooling
+        working-directory: scripts/dashboard/browser
+        run: |
+          npm ci --ignore-scripts
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Run required browser security and normal startup campaigns
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work" --no-github-env
+          GOWORK="$RUNNER_TEMP/cpra-sdk.work" python3 scripts/dashboard/browser_campaign.py
+
+  native-go:
+    name: Native correctness (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.1'
+      - name: Use the SDK candidate modules for native source verification
+        shell: bash
+        run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
+      - name: Native platform, preflight, administration and persistence tests
+        run: go test ./internal/version ./internal/installpath ./internal/manifestcheck ./internal/localadmin ./internal/persistence
+      - name: Compile all advertised drivers for native platform
+        run: go build -mod=readonly -tags="redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio" ./...
+      - name: Native SDK transport and private collection storage
+        working-directory: sdk/go
+        run: |
+          go test ./...
+          go test -tags=externaljobs ./...
+      - name: Native encrypted worker storage and process contracts
+        working-directory: sdk/go/worker
+        run: go test -tags=externaljobs ./...
+
+  container-chart-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: |
+          python3 -m pip install -r scripts/packaging/requirements.txt
+          python3 -m unittest discover -s scripts/packaging -p test_release_policy.py -v
+          python3 scripts/release/install_tools.py helm3 helm4 actionlint
+          bin/release-tools/actionlint
+          HELM_BIN="$PWD/bin/release-tools/helm3" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
+          HELM_BIN="$PWD/bin/release-tools/helm4" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
+
+  sdk:
+    name: SDK modules (Go ${{ matrix.go }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.25.0', '1.27.1']
+    env:
+      GOTOOLCHAIN: local
+      GOENV: off
+      GOFLAGS: ''
+      GOEXPERIMENT: ''
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: |
+            sdk/go/go.sum
+            sdk/go/worker/go.sum
+            examples/sdk/go.sum
+      - run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
+      - name: Reproduce public models and transport from pinned schemas
+        run: python3 scripts/sdk/regenerate_check.py --out evidence/local/sdk-generation.json
+      - name: Core and optional protocol contracts
+        working-directory: sdk/go
+        run: |
+          go test -race ./...
+          go test -race -tags=externaljobs ./...
+          go vet ./...
+          go vet -tags=externaljobs ./...
+      - name: Encrypted worker and process-crash contracts
+        working-directory: sdk/go/worker
+        run: |
+          go test -race -tags=externaljobs ./...
+          go vet -tags=externaljobs ./...
+      - name: Module archive and excluded-feature consumer contracts
+        run: |
+          python3 -m unittest discover -s scripts/sdk -p 'test_*.py'
+          go test ./scripts/sdk/doccheck
+          python3 scripts/sdk/verify.py --out evidence/local/sdk-consumer.json
+      - name: SDK lessons, local fixtures, and generated reference
+        run: |
+          python3 scripts/sdk/reference.py --check
+          python3 scripts/sdk/sync_guides.py --check
+          python3 scripts/sdk/workspace.py --examples --output "$RUNNER_TEMP/cpra-sdk-examples.work"
+          GOWORK="$RUNNER_TEMP/cpra-sdk-examples.work" python3 scripts/sdk/verify_examples.py --race --out evidence/local/sdk-examples.json
+          python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
+      - name: SDK vulnerability checks
+        if: matrix.go == '1.27.1'
+        run: |
+          cd sdk/go
+          go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+          go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags=externaljobs ./...
+          cd worker
+          go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags=externaljobs ./...
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && github.event.repository.private == true && github.event.repository.visibility == 'private'
+        with:
+          name: sdk-consumer-${{ matrix.go }}
+          path: |
+            evidence/local/sdk-consumer.json
+            evidence/local/sdk-generation.json
+            evidence/local/sdk-examples.json
+          if-no-files-found: warn

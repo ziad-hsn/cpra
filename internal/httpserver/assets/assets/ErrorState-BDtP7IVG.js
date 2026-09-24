@@ -1,0 +1,1 @@
+import{j as r}from"./index-BYrXMkLD.js";function o({message:e,onRetry:t}){return r.jsxs("div",{className:"error-state",role:"alert",children:[r.jsx("span",{style:{fontSize:16,fontWeight:600,color:"var(--status-critical)"},children:"⚠ Error"}),r.jsx("span",{style:{fontSize:12},children:e}),t&&r.jsx("button",{onClick:t,style:{marginTop:4},children:"Retry"})]})}export{o as E};

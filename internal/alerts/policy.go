@@ -9,7 +9,7 @@ package alerts
 import (
 	"time"
 
-	"cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
 
 	"github.com/mlange-42/ark/ecs"
 )

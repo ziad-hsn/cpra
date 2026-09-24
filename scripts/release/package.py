@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
 import tarfile
 import time
 
@@ -31,17 +32,28 @@ def license_files(directory):
     return sorted(p for p in directory.iterdir() if p.is_file() and
                   re.match(r'(?i)^(licen[cs]e|copying|notice|copyright)([.\-_].*)?$', p.name))
 
-def dependency_inventory(tags):
+def dependency_inventory(tags, binaries=None, go=None, env=None):
     modules = {}
-    arguments = ['go', 'list']
+    go = go or os.environ.get('GO', 'go')
+    arguments = [go, 'list', '-mod=readonly']
     if tags:
         arguments += ['-tags', tags]
     arguments += ['-deps', '-json', '.', './cmd/cpractl']
-    for package in json_objects(command(*arguments)):
-        module = package.get('Module', {})
-        if module and not module.get('Main'):
-            module = module.get('Replace', module)
-            modules[module['Path']] = module
+    if binaries:
+        for binary in binaries:
+            info = json.loads(subprocess.check_output([go, 'version', '-m', '-json', str(binary)], cwd=ROOT, env=env, text=True))
+            for module in info.get('Deps', []):
+                module = module.get('Replace', module)
+                if not module.get('Version'):
+                    raise RuntimeError(f"Local module replacement is not releasable: {module['Path']}")
+                resolved = json.loads(subprocess.check_output([go, 'mod', 'download', '-json', module['Path']+'@'+module['Version']], cwd=ROOT, env=env, text=True))
+                modules[module['Path']] = resolved
+    else:
+        for package in json_objects(subprocess.check_output(arguments, cwd=ROOT, env=env, text=True)):
+            module = package.get('Module', {})
+            if module and not module.get('Main'):
+                module = module.get('Replace', module)
+                modules[module['Path']] = module
     inventory, notices = [], {}
     for name, module in sorted(modules.items()):
         directory = Path(module['Dir'])
@@ -53,12 +65,76 @@ def dependency_inventory(tags):
                           'license_files': [p.name for p in found]})
         for path in found:
             notices[f'{identity}/{path.name}'] = path.read_bytes()
-    frontend, frontend_notices = dashboard_inventory()
+    stored = ROOT / 'LICENSES/dashboard.json'
+    if stored.is_file():
+        frontend = json.loads(stored.read_text())
+        frontend_notices = {'dashboard/LICENSES.txt': (ROOT / 'LICENSES/dashboard.txt').read_bytes()}
+    else:
+        frontend, frontend_notices = dashboard_inventory()
     inventory.extend(frontend)
     notices.update(frontend_notices)
-    goroot = Path(command('go', 'env', 'GOROOT').strip())
+    goroot = Path(subprocess.check_output([go, 'env', 'GOROOT'], env=env, text=True).strip())
     notices['go-toolchain/LICENSE'] = (goroot / 'LICENSE').read_bytes()
     return sorted(inventory, key=lambda x: (x['ecosystem'], x['name'])), notices
+
+def bundled_font_inventory():
+    """Read identity from the actual vendored TTF, without guessing a package URL."""
+    path=ROOT/'brand/fonts/RobotoSlab-Bold.ttf';data=path.read_bytes();names={}
+    for index in range(struct.unpack_from('>H',data,4)[0]):
+        tag,_,offset,_=struct.unpack_from('>4sIII',data,12+16*index)
+        if tag!=b'name':continue
+        _,count,storage=struct.unpack_from('>HHH',data,offset)
+        for ordinal in range(count):
+            platform,_,_,identity,length,start=struct.unpack_from('>HHHHHH',data,offset+6+12*ordinal)
+            value=data[offset+storage+start:offset+storage+start+length]
+            names[identity]=value.decode('utf-16-be' if platform in (0,3) else 'mac_roman')
+        break
+    license_url=names.get(14,'')
+    if license_url not in ('http://www.apache.org/licenses/LICENSE-2.0','https://www.apache.org/licenses/LICENSE-2.0'):
+        raise ValueError('Vendored font license changed; review its distribution contract')
+    version=names.get(5,'')
+    if not version.startswith('Version '):raise ValueError('Vendored font has no explicit version identity')
+    return {'ecosystem':'font','name':names[1]+' '+names[2],'version':version.removeprefix('Version '),
+            'declared_license':'Apache-2.0','license_files':['brand/fonts/LICENSE.txt'],
+            'copyright':names.get(0,'NOASSERTION'),'source_identity':names[3],
+            'source_file':'brand/fonts/RobotoSlab-Bold.ttf','sha256':hashlib.sha256(data).hexdigest(),
+            'license_url':license_url}
+
+def dashboard_wasm_inventory():
+    """Inventory only the parser actually present in the completed Vite output.
+
+    The build input catalog comes from runtime/debug on the exact compiled Wasm,
+    not the (potentially larger) Go source import graph.
+    """
+    artifacts = sorted((ROOT / 'dashboard/dist').rglob('collection-parser*.wasm'))
+    if not artifacts:
+        return [], {}
+    generated = ROOT / 'dashboard/src/import/generated'
+    metadata = json.loads((generated / 'BUILD.json').read_text())
+    if metadata.get('target') != 'js/wasm' or metadata.get('externaljobs') is not False:
+        raise RuntimeError('Unsupported embedded collection parser build')
+    required = {'collection-parser.wasm', 'wasm_exec.js', 'GO-LICENSE.txt', 'DEPENDENCIES.json', 'LICENSES.txt'}
+    if set(metadata.get('files', {})) != required:
+        raise RuntimeError('Missing or unexpected generated parser file identity')
+    for name, record in metadata['files'].items():
+        if Path(name).name != name:
+            raise RuntimeError('Invalid generated parser file identity')
+        data = (generated / name).read_bytes()
+        if len(data) != record['bytes'] or hashlib.sha256(data).hexdigest() != record['sha256']:
+            raise RuntimeError('Generated parser input differs: ' + name)
+    expected = metadata['files']['collection-parser.wasm']['sha256']
+    if len(artifacts) != 1 or hashlib.sha256(artifacts[0].read_bytes()).hexdigest() != expected:
+        raise RuntimeError('Embedded parser differs from the qualified Wasm artifact')
+    dependencies = json.loads((generated / 'DEPENDENCIES.json').read_text())
+    if not dependencies or any(item.get('scope') != 'dashboard-wasm' for item in dependencies):
+        raise RuntimeError('Missing linked parser dependency inventory')
+    dependencies.append({'ecosystem': 'wasm', 'scope': 'dashboard-wasm', 'name': 'CPRa collection parser',
+                         'version': 'source', 'sha256': expected,
+                         'source_file': 'dashboard/src/import/generated/collection-parser.wasm',
+                         'source_identity': metadata['sdk_source_sha256'], 'declared_license': 'MIT',
+                         'license_files': ['sdk/go/LICENSE']})
+    return dependencies, {'dashboard-wasm/LICENSES.txt': (generated / 'LICENSES.txt').read_bytes()}
+
 
 def dashboard_inventory():
     inventory, notices = [], {}
@@ -97,34 +173,12 @@ def dashboard_inventory():
         optional_names = package.get('optionalDependencies', {})
         for name in package.get('dependencies', {}) | optional_names:
             pending.append((directory, name, name in optional_names))
+    wasm_dependencies, wasm_notices = dashboard_wasm_inventory()
+    inventory.extend(wasm_dependencies)
+    notices.update(wasm_notices)
+    inventory.append(bundled_font_inventory())
     notices['fonts/RobotoSlab/LICENSE.txt'] = (ROOT / 'brand/fonts/LICENSE.txt').read_bytes()
     return sorted(inventory, key=lambda x: x['name']), notices
-
-def source_files():
-    files = set()
-    for name in ['LICENSE', 'README.md', 'LICENSES/dashboard.txt', 'go.mod', 'go.sum',
-                 'main.go', 'Makefile', '.dockerignore', '.gitignore', '.github/workflows/ci.yml',
-                 'dashboard/.prettierrc']:
-        path = ROOT / name
-        if not path.is_file():
-            raise RuntimeError(f'Missing release input: {name}')
-        files.add(path)
-    for name in ['internal', 'cmd/cpractl', 'examples', 'scripts/release', 'docker']:
-        for path in (ROOT / name).rglob('*'):
-            if path.is_file() and path.suffix in {'.go', '.json', '.yaml', '.yml', '.py', '.sh', '.md', '.html', '.js', '.css', '.svg'}:
-                files.add(path)
-    files.add(ROOT / 'docker/Dockerfile')
-    # Vite imports the canonical brand assets, and the Go embed includes binary
-    # fonts and icons as well as text files. Keep both sets in source archives.
-    for name in ['brand', 'internal/web/server/assets']:
-        files.update(path for path in (ROOT / name).rglob('*') if path.is_file())
-    for directory, children, names in os.walk(ROOT / 'dashboard'):
-        children[:] = [name for name in children if name not in {'node_modules', 'dist', '.git', 'coverage'}]
-        for name in names:
-            path = Path(directory) / name
-            if path.suffix in {'.json', '.yaml', '.ts', '.tsx', '.js', '.html', '.css', '.svg', '.png', '.ico', '.webmanifest'}:
-                files.add(path)
-    return sorted(files)
 
 def archive(path, entries, epoch):
     import gzip
@@ -136,56 +190,20 @@ def archive(path, entries, epoch):
                 tar.addfile(info, io.BytesIO(contents))
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--version', required=True)
+    parser = argparse.ArgumentParser(description='Collect dependency notices; use release.py for release archives')
+    parser.add_argument('--version', default='dev')
     parser.add_argument('--tags', default='')
     parser.add_argument('--out', default='dist/release')
-    parser.add_argument('--bin-dir', default='bin')
-    parser.add_argument('--notices-only', action='store_true')
+    parser.add_argument('--notices-only', action='store_true', required=True)
     args = parser.parse_args()
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', args.version):
-        raise SystemExit('Version must be a simple archive-safe name')
     output = ROOT / args.out
     output.mkdir(parents=True, exist_ok=True)
-    epoch = int(os.environ.get('SOURCE_DATE_EPOCH', str(int(time.time()))))
     inventory, notices = dependency_inventory(args.tags)
-    if args.notices_only:
-        for name, contents in notices.items():
-            target = output / 'THIRD_PARTY_NOTICES' / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(contents)
-        (output / 'DEPENDENCIES.json').write_text(json.dumps(inventory, indent=2) + '\n')
-        return
-    has_git = (ROOT / '.git').exists()
-    metadata = {'version': args.version, 'commit': command('git', 'rev-parse', 'HEAD').strip() if has_git else 'unknown',
-                'dirty': bool(command('git', 'status', '--porcelain').strip()) if has_git else None,
-                'toolchain': command('go', 'version').strip(), 'build_tags': args.tags,
-                'source_date_epoch': epoch, 'dependencies': inventory}
-    inventory_bytes = (json.dumps(metadata, indent=2) + '\n').encode()
-    common = {'LICENSE': ((ROOT / 'LICENSE').read_bytes(), False),
-              'README.md': ((ROOT / 'README.md').read_bytes(), False),
-              'LICENSES/dashboard.txt': ((ROOT / 'LICENSES/dashboard.txt').read_bytes(), False),
-              'DEPENDENCIES.json': (inventory_bytes, False)}
-    common.update({f'THIRD_PARTY_NOTICES/{name}': (contents, False) for name, contents in notices.items()})
-    artifacts = []
-    for arch in ['amd64', 'arm64']:
-        entries = dict(common)
-        for name in ['cpra', 'cpractl']:
-            entries[name] = ((ROOT / args.bin_dir / f'{name}-linux-{arch}').read_bytes(), True)
-        entries['examples/monitors.yaml'] = ((ROOT / 'examples/monitors.yaml').read_bytes(), False)
-        target = output / f'cpra-{args.version}-linux-{arch}.tar.gz'
-        archive(target, entries, epoch)
-        artifacts.append(target)
-    source = dict(common)
-    for path in source_files():
-        source[str(path.relative_to(ROOT))] = (path.read_bytes(), path.suffix == '.sh')
-    target = output / f'cpra-{args.version}-source.tar.gz'
-    archive(target, source, epoch)
-    artifacts.append(target)
-    (output / 'DEPENDENCIES.json').write_bytes(inventory_bytes)
-    checksums = ''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in artifacts)
-    (output / 'SHA256SUMS').write_text(checksums)
-    print(f'Packaged {len(artifacts)} archives, {len(inventory)} dependencies and {len(notices)} license/notice files in {output}')
+    for name, contents in notices.items():
+        target = output / 'THIRD_PARTY_NOTICES' / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(contents)
+    (output / 'DEPENDENCIES.json').write_text(json.dumps(inventory, indent=2) + '\n')
 
 if __name__ == '__main__':
     main()

@@ -9,9 +9,39 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def source_path(source: Path, *names: str) -> Path:
+    """Support both the current layout and the pinned pre-refactor candidate."""
+    for name in names:
+        path = source / name
+        if path.exists():
+            return path
+    raise FileNotFoundError(f"missing source contract input in {source}: {', '.join(names)}")
+
+
+def check_links(document: Path, docs: Path, errors: list, local_evidence: list):
+    for target in re.findall(r"\[[^\]\n]*\]\(([^)\s]+)\)", document.read_text()):
+        url = urlsplit(target)
+        if url.scheme or url.netloc or not url.path:
+            continue
+        relative = Path(unquote(url.path))
+        path = (document.parent / relative).resolve()
+        implementation = document.is_relative_to(docs / "implementation")
+        # Implementation records intentionally refer to repository source and
+        # ignored local evidence. Evidence is not distributed with a checkout;
+        # record its availability without claiming that it was verified here.
+        if implementation and not relative.is_absolute() and path.is_relative_to(ROOT / "bin/verification"):
+            local_evidence.append({"document": document.relative_to(ROOT).as_posix(),
+                                   "target": target, "available": path.exists()})
+            continue
+        boundary = ROOT if implementation else docs
+        if relative.is_absolute() or not path.is_relative_to(boundary) or not path.exists():
+            errors.append(f"{document.relative_to(ROOT)}: missing or nonportable link {target}")
+
+
 def driver_fields(source: Path, document: Path, errors: list, label: str):
     schemas = {}
-    for path in (source / "internal/loader/schema").glob("*.go"):
+    schema = source_path(source, "internal/manifest", "internal/loader/schema")
+    for path in schema.glob("*.go"):
         if path.name.endswith("_test.go"):
             continue
         for name, body in re.findall(r"^type (\w+) struct \{(.*?)^\}", path.read_text(), re.S | re.M):
@@ -21,6 +51,8 @@ def driver_fields(source: Path, document: Path, errors: list, label: str):
             category = "Checks" if match[1] else "Recovery actions" if match[2] else "Notifications"
             driver = next(value for value in match.groups() if value).lower()
             schemas[(category, driver)] = set(re.findall(r'yaml:"([^",]+)', body)) - {"-"}
+    if not schemas:
+        errors.append(f"{label}: no driver schemas found in {schema}")
     sections = {}
     category = driver = None
     for line in document.read_text().splitlines():
@@ -41,6 +73,7 @@ def driver_fields(source: Path, document: Path, errors: list, label: str):
 def check(candidate: Path | None = None):
     docs = ROOT / "docs"
     errors = []
+    local_evidence = []
     pages = sorted(docs.rglob("*.md"))
     required = ["versions.md", "review/latest-changes.md", "maintaining-docs.md",
                 "candidate/reference/runtime-config.md", "candidate/durability.md",
@@ -72,13 +105,7 @@ def check(candidate: Path | None = None):
                     fence = None
         if fence:
             errors.append(f"{p.relative_to(ROOT)}: unclosed code fence")
-        for target in re.findall(r"\[[^\]\n]*\]\(([^)\s]+)\)", text):
-            url = urlsplit(target)
-            if url.scheme or url.netloc or not url.path:
-                continue
-            path = (p.parent / unquote(url.path)).resolve()
-            if not path.is_relative_to(docs) or not path.exists():
-                errors.append(f"{p.relative_to(ROOT)}: missing or nonportable link {target}")
+        check_links(p, docs, errors, local_evidence)
     contracts = []
     for label, source, prefix in [("main", ROOT, ""), ("candidate", candidate, "candidate/")]:
         if source is None:
@@ -89,7 +116,8 @@ def check(candidate: Path | None = None):
             if "`-" + name + "`" not in cli:
                 errors.append(f"{label}: missing server flag -{name}")
         api = (docs / (prefix + "reference/api-reference.md")).read_text()
-        routes = sorted(set(re.findall(r'mux\.HandleFunc\("(?:GET )?(/api/v1/[^" ]+|/metrics)"', (source / "internal/web/server/server.go").read_text())))
+        server = source_path(source, "internal/httpserver/server.go", "internal/web/server/server.go")
+        routes = sorted(set(re.findall(r'mux\.HandleFunc\("(?:GET )?(/api/v1/[^" ]+|/metrics)"', server.read_text())))
         for route in routes:
             if route not in api:
                 errors.append(f"{label}: missing API route {route}")
@@ -98,7 +126,8 @@ def check(candidate: Path | None = None):
     # The two public surfaces use the same generated palette and original assets.
     if (ROOT / "brand/dist/palette.css").read_bytes() != (docs / "assets/stylesheets/palette.css").read_bytes():
         errors.append("canonical documentation palette differs from brand output")
-    result = {"markdown_pages": len(pages), "source_contracts": contracts, "errors": errors}
+    result = {"markdown_pages": len(pages), "source_contracts": contracts,
+              "local_evidence_links": local_evidence, "errors": errors}
     print(json.dumps(result, indent=2))
     if errors:
         raise SystemExit(1)

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"cpra/internal/controller/components"
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 
 	"github.com/mlange-42/ark/ecs"
 )
@@ -14,24 +14,24 @@ func TestCreateEntityFromMonitorFanOut(t *testing.T) {
 	w := ecs.NewWorld()
 	mgr := NewEntityManager(&w)
 
-	mgr.Endpoints = map[string]schema.Endpoint{
-		"ops_email":   {Type: "email", Config: &schema.CodeNotificationEmail{To: "ops@example.com", From: "cpra@example.com", Server: "localhost:25"}},
-		"status_hook": {Type: "webhook", Config: &schema.CodeNotificationWebhook{URL: "https://hooks.example.com"}},
+	mgr.Endpoints = map[string]manifest.Endpoint{
+		"ops_email":   {Type: "email", Config: &manifest.CodeNotificationEmail{To: "ops@example.com", From: "cpra@example.com", Server: "localhost:25"}},
+		"status_hook": {Type: "webhook", Config: &manifest.CodeNotificationWebhook{URL: "https://hooks.example.com"}},
 	}
-	mgr.NotificationGroups = schema.NotificationGroups{
+	mgr.NotificationGroups = manifest.NotificationGroups{
 		"oncall": {"ops_email", "status_hook"},
 	}
 
-	monitor := &schema.Monitor{
+	monitor := &manifest.Monitor{
 		Name:    "api",
 		Enabled: true,
-		Pulse: schema.Pulse{
+		Pulse: manifest.Pulse{
 			Type:     "http",
 			Interval: time.Second,
 			Timeout:  time.Second,
-			Config:   &schema.PulseHTTPConfig{Url: "https://api.example.com/health"},
+			Config:   &manifest.PulseHTTPConfig{Url: "https://api.example.com/health"},
 		},
-		Codes: schema.Codes{
+		Codes: manifest.Codes{
 			"red": {Dispatch: true, NotifyGroup: "oncall"},
 		},
 	}
@@ -59,17 +59,17 @@ func TestCreateEntityFromMonitorInlineSingleJob(t *testing.T) {
 	w := ecs.NewWorld()
 	mgr := NewEntityManager(&w)
 
-	monitor := &schema.Monitor{
+	monitor := &manifest.Monitor{
 		Name:    "api",
 		Enabled: true,
-		Pulse: schema.Pulse{
+		Pulse: manifest.Pulse{
 			Type:     "http",
 			Interval: time.Second,
 			Timeout:  time.Second,
-			Config:   &schema.PulseHTTPConfig{Url: "https://api.example.com/health"},
+			Config:   &manifest.PulseHTTPConfig{Url: "https://api.example.com/health"},
 		},
-		Codes: schema.Codes{
-			"red": {Dispatch: true, Notify: "log", Config: &schema.CodeNotificationLog{File: "x.log"}},
+		Codes: manifest.Codes{
+			"red": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: "x.log"}},
 		},
 	}
 

@@ -4,7 +4,7 @@ description: SDK candidate · Maintain the SDK lessons and reference for the rev
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # Maintain the SDK lessons and reference
 

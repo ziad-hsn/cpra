@@ -1,0 +1,2 @@
+# Add monitor definitions before enabling the service. Empty is intentional.
+monitors: []

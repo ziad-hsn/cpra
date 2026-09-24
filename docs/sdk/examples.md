@@ -4,7 +4,7 @@ description: SDK candidate · CPRa SDK examples for the reviewed CPRa source; se
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this package guide reflects the 13 September source snapshot. See [availability and source](../versions.md#go-sdk-and-approved-management-plan) before running candidate commands.
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # CPRa SDK examples
 
@@ -15,10 +15,26 @@ The examples use a separate Go module so AWS and Kubernetes dependencies stay
 out of the public SDK. Go 1.25 or later is required. Node, Redis, a Kubernetes
 cluster, an AWS account, and SMS credentials are unnecessary for the local demos.
 
-**Current boundary:** CPRa's application server exposes the read-only v1 API.
-The v2 management and external-worker contracts are SDK candidates. The finite
-demos use clearly labeled local fixtures. Configured modes require a server
-that implements and qualifies those contracts; this branch cannot supply one.
+**Current boundary:** the private working branch implements v2 management and
+public collection activation with retained execution results. Cross-process
+file reselection and external-worker qualification remain separate gates.
+These finite demos use clearly labeled local fixtures. Configured modes
+require a server that implements and qualifies every operation the chosen example
+uses; passing a local demo does not establish that server capability.
+
+The collection fixture accepts preparation tickets and verifies the keyed item
+and inventory commitments produced by `collection.Freeze`. Repeating Create with
+the original ticket resolves its original operation. Its 202 validation admission
+seals an immediate, immutable in-memory result; a separate bounded GET serves
+that original result. Repeating validation reconciles it, and further uploads are
+rejected. Activation completes fixture children synchronously and returns a
+metadata-only admission; a bounded GET serves immutable original-order execution
+rows for `collection.Wait`. This fixture does not model production worker
+scheduling or history retention; its cursor is a local ordinal and its summary
+digest is fixture-only.
+All fixture state and private
+input remain in process memory; there is no Raft, encrypted storage, retained
+history, restore fencing or provider certification in this mock server.
 
 ## Set up the candidate workspace
 
@@ -47,7 +63,7 @@ selection.
 | Command, from `examples/sdk` | Observable result | Guide |
 | --- | --- | --- |
 | `go run ./queue-registration -demo` | Two deliveries acknowledged; one monitor created | [Queue registration](queue-registration.md) |
-| `go run ./aws-deregister -demo` | A mapped monitor disabled once; repeated event ignored | [AWS deregistration](aws-deregister.md) |
+| `go run ./elb-deregistration -demo` | A mapped monitor disabled once; repeated event ignored | [AWS deregistration](elb-deregistration.md) |
 | `go run ./kubernetes-services -demo` | Five DNS/TCP monitors created from three Services; second listing creates no duplicates | [Kubernetes Services](kubernetes-services.md) |
 | `go run -tags=externaljobs ./dao-sms -mode=demo` | DAO RPC checked, stale head detected, one SMS accepted, lost receipt replayed | [DAO and internal SMS](dao-sms.md) |
 
@@ -104,10 +120,9 @@ or production-server certification.
 
 The [SDK guide](index.md) introduces conditional changes, batch
 application, controls, errors, pagination, and observations. The
-[HTTP reference](api-reference.md) covers every operation in the
-SDK inventory, including explicit v1 compatibility. The
+[HTTP reference](api-reference.md) covers the SDK HTTP operations. The
 [wire reference](wire-types.md) lists every schema and driver
 field; the [Go reference](go-reference.md) contains exported
 signatures, configuration, helpers, and worker types.
 
-<!-- Imported from examples/sdk/README.md; preserve candidate scope and reconcile with original before regenerating. -->
+<!-- Adapted from examples/sdk/README.md. -->

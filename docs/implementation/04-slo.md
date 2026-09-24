@@ -4,7 +4,7 @@ description: 'Plan and status · 04-slo: Add percentile SLO control for the revi
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # 04-slo: Add percentile SLO control
 
@@ -18,7 +18,7 @@ Five-minute latency histograms and exact attainment, persistent aggregate window
 
 ## Where
 
-internal/slo/; internal/queue/dynamic_worker_pool.go; internal/jobs/; internal/durable/
+internal/slo/; internal/queue/dynamic_worker_pool.go; internal/jobs/; internal/persistence/
 
 ## Acceptance criteria
 

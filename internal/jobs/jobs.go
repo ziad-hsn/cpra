@@ -20,7 +20,7 @@ import (
 	"github.com/moby/moby/client"
 	ping "github.com/prometheus-community/pro-bing"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 var icmpPingerSem = make(chan struct{}, 2048)
@@ -45,10 +45,10 @@ type EnqueueTimeTracker interface {
 }
 
 // CreatePulseJob creates a new pulse job based on the provided schema.
-func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
+func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 	timeout := pulseSchema.Timeout
 	switch cfg := pulseSchema.Config.(type) {
-	case *schema.PulseHTTPConfig:
+	case *manifest.PulseHTTPConfig:
 		method := cfg.Method
 		if method == "" {
 			method = http.MethodGet
@@ -67,7 +67,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Client:             *GetHTTPClient(timeout),
 			payload:            map[string]interface{}{"type": "pulse", "driver": "http"},
 		}, nil
-	case *schema.PulseTCPConfig:
+	case *manifest.PulseTCPConfig:
 		return &PulseTCPJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
@@ -77,7 +77,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Retries: cfg.Retries,
 			payload: map[string]interface{}{"type": "pulse", "driver": "tcp"},
 		}, nil
-	case *schema.PulseICMPConfig:
+	case *manifest.PulseICMPConfig:
 		return &PulseICMPJob{
 			ID:              uuid.New(),
 			Entity:          jobID,
@@ -89,7 +89,12 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			payload:         map[string]interface{}{"type": "pulse", "driver": "icmp"},
 		}, nil
 
-	case *schema.PulseDNSConfig:
+	case *manifest.PulseDNSConfig:
+		if cfg.Server != "" {
+			if _, err := dnsServerAddress(cfg.Server); err != nil {
+				return nil, err
+			}
+		}
 		return &PulseDNSJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
@@ -99,7 +104,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Retries: cfg.Retries,
 			payload: map[string]interface{}{"type": "pulse", "driver": "dns"},
 		}, nil
-	case *schema.PulseUDPConfig:
+	case *manifest.PulseUDPConfig:
 		return &PulseUDPJob{
 			ID:          uuid.New(),
 			Entity:      jobID,
@@ -110,7 +115,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Retries:     cfg.Retries,
 			payload:     map[string]interface{}{"type": "pulse", "driver": "udp"},
 		}, nil
-	case *schema.PulseGRPCConfig:
+	case *manifest.PulseGRPCConfig:
 		return &PulseGRPCJob{
 			ID:      uuid.New(),
 			Entity:  jobID,
@@ -121,7 +126,7 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Retries: cfg.Retries,
 			payload: map[string]interface{}{"type": "pulse", "driver": "grpc"},
 		}, nil
-	case *schema.PulseDockerConfig:
+	case *manifest.PulseDockerConfig:
 		return &PulseDockerJob{
 			ID:        uuid.New(),
 			Entity:    jobID,
@@ -130,19 +135,19 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 			Retries:   cfg.Retries,
 			payload:   map[string]interface{}{"type": "pulse", "driver": "docker"},
 		}, nil
-	case *schema.PulseRedisConfig:
+	case *manifest.PulseRedisConfig:
 		return newPulseRedisJob(cfg, timeout, jobID)
-	case *schema.PulsePostgresConfig:
+	case *manifest.PulsePostgresConfig:
 		return newPulsePostgresJob(cfg, timeout, jobID)
-	case *schema.PulseMySQLConfig:
+	case *manifest.PulseMySQLConfig:
 		return newPulseMySQLJob(cfg, timeout, jobID)
-	case *schema.PulseMongoConfig:
+	case *manifest.PulseMongoConfig:
 		return newPulseMongoJob(cfg, timeout, jobID)
-	case *schema.PulseRabbitMQConfig:
+	case *manifest.PulseRabbitMQConfig:
 		return newPulseRabbitMQJob(cfg, timeout, jobID)
-	case *schema.PulseKafkaConfig:
+	case *manifest.PulseKafkaConfig:
 		return newPulseKafkaJob(cfg, timeout, jobID)
-	case *schema.PulseTLSConfig:
+	case *manifest.PulseTLSConfig:
 		return newPulseTLSJob(cfg, timeout, jobID)
 	default:
 		return nil, fmt.Errorf("unknown pulse config type: %T for job creation", pulseSchema.Config)
@@ -150,37 +155,37 @@ func CreatePulseJob(pulseSchema schema.Pulse, jobID ecs.Entity) (Job, error) {
 }
 
 // CreateInterventionJob creates a new intervention job based on the provided schema.
-func CreateInterventionJob(interventionSchema schema.Intervention, jobID ecs.Entity) (Job, error) {
+func CreateInterventionJob(interventionSchema manifest.Intervention, jobID ecs.Entity) (Job, error) {
 	retries := interventionSchema.Retries
 	switch interventionSchema.Action {
 	case "docker":
 		return &InterventionDockerJob{
 			ID:        uuid.New(),
 			Entity:    jobID,
-			Container: interventionSchema.Target.(*schema.InterventionTargetDocker).Container,
+			Container: interventionSchema.Target.(*manifest.InterventionTargetDocker).Container,
 			Retries:   retries,
-			Timeout:   interventionSchema.Target.(*schema.InterventionTargetDocker).Timeout,
+			Timeout:   interventionSchema.Target.(*manifest.InterventionTargetDocker).Timeout,
 		}, nil
 	case "kubernetes":
-		t, ok := interventionSchema.Target.(*schema.InterventionTargetKubernetes)
+		t, ok := interventionSchema.Target.(*manifest.InterventionTargetKubernetes)
 		if !ok || t == nil {
 			return nil, fmt.Errorf("intervention 'kubernetes' requires a kubernetes target")
 		}
 		return newInterventionKubernetesJob(t, retries, jobID)
 	case "webhook":
-		t, ok := interventionSchema.Target.(*schema.InterventionTargetWebhook)
+		t, ok := interventionSchema.Target.(*manifest.InterventionTargetWebhook)
 		if !ok || t == nil {
 			return nil, fmt.Errorf("intervention 'webhook' requires a webhook target")
 		}
 		return newInterventionWebhookJob(t, retries, jobID)
 	case "systemd":
-		t, ok := interventionSchema.Target.(*schema.InterventionTargetSystemd)
+		t, ok := interventionSchema.Target.(*manifest.InterventionTargetSystemd)
 		if !ok || t == nil {
 			return nil, fmt.Errorf("intervention 'systemd' requires a systemd target")
 		}
 		return newInterventionSystemdJob(t, retries, jobID)
 	case "aws":
-		t, ok := interventionSchema.Target.(*schema.InterventionTargetAWS)
+		t, ok := interventionSchema.Target.(*manifest.InterventionTargetAWS)
 		if !ok || t == nil {
 			return nil, fmt.Errorf("intervention 'aws' requires an aws target")
 		}
@@ -282,14 +287,14 @@ func buildCodeNotificationMessage(monitor string, tpl codeAlertTemplate) string 
 }
 
 // CreateCodeJob creates a new code alert job based on the provided configuration.
-func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, color string) (Job, error) {
+func CreateCodeJob(monitor string, config manifest.CodeConfig, jobID ecs.Entity, color string) (Job, error) {
 	template := codeAlertTemplateFor(color)
 	colorClone := color
 	monitorClone := monitor
 
 	switch config.Notify {
 	case "log":
-		cfg, ok := config.Config.(*schema.CodeNotificationLog)
+		cfg, ok := config.Config.(*manifest.CodeNotificationLog)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'log' requires a log config")
 		}
@@ -306,7 +311,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			NextSteps: template.NextSteps,
 		}, nil
 	case "pagerduty":
-		cfg, ok := config.Config.(*schema.CodeNotificationPagerDuty)
+		cfg, ok := config.Config.(*manifest.CodeNotificationPagerDuty)
 		if !ok || cfg == nil || cfg.RoutingKey == "" {
 			return nil, fmt.Errorf("code notification 'pagerduty' requires complete pagerduty configuration")
 		}
@@ -314,7 +319,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			Message: buildCodeNotificationMessage(monitorClone, template), URL: cfg.URL, RoutingKey: cfg.RoutingKey}, nil
 
 	case "slack":
-		cfg, ok := config.Config.(*schema.CodeNotificationSlack)
+		cfg, ok := config.Config.(*manifest.CodeNotificationSlack)
 		if !ok || cfg == nil || cfg.WebHook == "" {
 			return nil, fmt.Errorf("code notification 'slack' requires complete slack configuration")
 		}
@@ -322,7 +327,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			Message: buildCodeNotificationMessage(monitorClone, template), WebhookURL: cfg.WebHook}, nil
 
 	case "email":
-		cfg, ok := config.Config.(*schema.CodeNotificationEmail)
+		cfg, ok := config.Config.(*manifest.CodeNotificationEmail)
 		if !ok || cfg == nil || cfg.Server == "" || cfg.From == "" || cfg.To == "" {
 			return nil, fmt.Errorf("code notification 'email' requires complete email configuration")
 		}
@@ -330,7 +335,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			Message: buildCodeNotificationMessage(monitorClone, template), Config: *cfg}, nil
 
 	case "webhook":
-		cfg, ok := config.Config.(*schema.CodeNotificationWebhook)
+		cfg, ok := config.Config.(*manifest.CodeNotificationWebhook)
 		if !ok || cfg == nil || cfg.URL == "" {
 			return nil, fmt.Errorf("code notification 'webhook' requires complete webhook configuration")
 		}
@@ -338,11 +343,16 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			Message: buildCodeNotificationMessage(monitorClone, template), URL: cfg.URL, Method: cfg.Method, Headers: cfg.Headers}, nil
 
 	case "telegram":
-		cfg, ok := config.Config.(*schema.CodeNotificationTelegram)
+		cfg, ok := config.Config.(*manifest.CodeNotificationTelegram)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'telegram' requires a telegram config")
 		}
+		if _, err := telegramURL(cfg.URL, cfg.BotToken, cfg.TestMode); err != nil {
+			return nil, err
+		}
 		return &CodeTelegramJob{
+			URL:      cfg.URL,
+			TestMode: cfg.TestMode,
 			ID:       uuid.New(),
 			Entity:   jobID,
 			Monitor:  monitorClone,
@@ -352,7 +362,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			ChatID:   cfg.ChatID,
 		}, nil
 	case "discord":
-		cfg, ok := config.Config.(*schema.CodeNotificationDiscord)
+		cfg, ok := config.Config.(*manifest.CodeNotificationDiscord)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'discord' requires a discord config")
 		}
@@ -365,7 +375,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			WebhookURL: cfg.WebhookURL,
 		}, nil
 	case "opsgenie":
-		cfg, ok := config.Config.(*schema.CodeNotificationOpsgenie)
+		cfg, ok := config.Config.(*manifest.CodeNotificationOpsgenie)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'opsgenie' requires an opsgenie config")
 		}
@@ -379,7 +389,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			URL:     cfg.URL,
 		}, nil
 	case "mattermost":
-		cfg, ok := config.Config.(*schema.CodeNotificationMattermost)
+		cfg, ok := config.Config.(*manifest.CodeNotificationMattermost)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'mattermost' requires a mattermost config")
 		}
@@ -394,11 +404,15 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			Username:   cfg.Username,
 		}, nil
 	case "victorops":
-		cfg, ok := config.Config.(*schema.CodeNotificationVictorOps)
+		cfg, ok := config.Config.(*manifest.CodeNotificationVictorOps)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'victorops' requires a victorops config")
 		}
+		if _, err := victorOpsURL(cfg.URL, cfg.RestEndpointKey, cfg.RoutingKey); err != nil {
+			return nil, err
+		}
 		return &CodeVictorOpsJob{
+			URL:             cfg.URL,
 			ID:              uuid.New(),
 			Entity:          jobID,
 			Monitor:         monitorClone,
@@ -410,25 +424,25 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 			EntityID:        cfg.EntityID,
 		}, nil
 	case "teams":
-		cfg, ok := config.Config.(*schema.CodeNotificationTeams)
+		cfg, ok := config.Config.(*manifest.CodeNotificationTeams)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'teams' requires a teams config")
 		}
 		return newCodeTeamsJob(cfg, monitorClone, colorClone, buildCodeNotificationMessage(monitorClone, template), jobID)
 	case "pushover":
-		cfg, ok := config.Config.(*schema.CodeNotificationPushover)
+		cfg, ok := config.Config.(*manifest.CodeNotificationPushover)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'pushover' requires a pushover config")
 		}
 		return newCodePushoverJob(cfg, monitorClone, colorClone, buildCodeNotificationMessage(monitorClone, template), jobID)
 	case "twilio":
-		cfg, ok := config.Config.(*schema.CodeNotificationTwilio)
+		cfg, ok := config.Config.(*manifest.CodeNotificationTwilio)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'twilio' requires a twilio config")
 		}
 		return newCodeTwilioJob(cfg, monitorClone, colorClone, buildCodeNotificationMessage(monitorClone, template), jobID)
 	case "datadog":
-		cfg, ok := config.Config.(*schema.CodeNotificationDatadog)
+		cfg, ok := config.Config.(*manifest.CodeNotificationDatadog)
 		if !ok || cfg == nil {
 			return nil, fmt.Errorf("code notification 'datadog' requires a datadog config")
 		}
@@ -442,7 +456,7 @@ func CreateCodeJob(monitor string, config schema.CodeConfig, jobID ecs.Entity, c
 // config references a notification group, it resolves the group to its
 // endpoints and creates one job per endpoint; otherwise it creates a single
 // inline job.
-func CreateCodeJobs(monitor string, config schema.CodeConfig, jobID ecs.Entity, color string, endpoints map[string]schema.Endpoint, groups schema.NotificationGroups) ([]Job, error) {
+func CreateCodeJobs(monitor string, config manifest.CodeConfig, jobID ecs.Entity, color string, endpoints map[string]manifest.Endpoint, groups manifest.NotificationGroups) ([]Job, error) {
 	if config.NotifyGroup == "" {
 		job, err := CreateCodeJob(monitor, config, jobID, color)
 		if err != nil {
@@ -465,7 +479,7 @@ func CreateCodeJobs(monitor string, config schema.CodeConfig, jobID ecs.Entity, 
 		if !ok {
 			return nil, fmt.Errorf("endpoint %q not found for group %q", name, config.NotifyGroup)
 		}
-		inline := schema.CodeConfig{
+		inline := manifest.CodeConfig{
 			Dispatch: config.Dispatch,
 			Notify:   ep.Type,
 			Config:   ep.Config,
@@ -508,10 +522,8 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: p.payload}
 	}
 	var lastErr error
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	payload := p.payload
 
 	client := *httpClient(p.Timeout, p.InsecureSkipVerify)
@@ -519,10 +531,14 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 		client.Transport = p.Client.Transport
 	}
 	if p.Method != "GET" && p.Method != "HEAD" && p.Method != "OPTIONS" {
-		attempts = 1
+		attempts.limit = 1
 	}
 
-	for i := 0; i < attempts; i++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		var body io.Reader
 		if p.Body != "" {
 			body = strings.NewReader(p.Body)
@@ -537,11 +553,6 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 		resp, err := client.Do(req)
 		if err != nil {
 			lastErr = err
-			if i < attempts-1 {
-				if !retryDelay(ctx) {
-					break
-				}
-			}
 			continue
 		}
 		// Close response body immediately after checking status
@@ -555,7 +566,7 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 			break
 		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("http check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("http check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 // statusOK reports whether a response status code is considered healthy. When
@@ -599,15 +610,17 @@ func (p *PulseTCPJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 	var lastErr error
 
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
 		if err == nil {
 			_ = conn.SetDeadline(time.Now().Add(p.Timeout))
@@ -615,17 +628,12 @@ func (p *PulseTCPJob) Execute() (result Result) {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
 
 	return Result{
 		ID:      p.ID,
 		Ent:     p.Entity,
-		Err:     fmt.Errorf("tcp check failed for %s after %d attempt(s): %w", address, attempts, lastErr),
+		Err:     fmt.Errorf("tcp check failed for %s after %d attempt(s): %w", address, attempts.count, lastErr),
 		Payload: payload,
 	}
 }
@@ -675,7 +683,13 @@ func (p *PulseICMPJob) Execute() (result Result) {
 		result.Err = fmt.Errorf("ICMP destination has no addresses")
 		return
 	}
-	for n := 0; n <= max(0, p.Retries); n++ {
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		pr, err := ping.NewPinger(ips[0].IP.String())
 		if err != nil {
 			result.Err = err
@@ -696,9 +710,6 @@ func (p *PulseICMPJob) Execute() (result Result) {
 			err = fmt.Errorf("no ICMP replies received")
 		}
 		result.Err = err
-		if n < p.Retries && !retryDelay(ctx) {
-			break
-		}
 	}
 	return
 }
@@ -730,36 +741,37 @@ func (p *PulseDNSJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 
 	resolver := &net.Resolver{}
 	if p.Server != "" {
+		server, err := dnsServerAddress(p.Server)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
 		resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				d := net.Dialer{Timeout: p.Timeout}
-				return d.DialContext(ctx, network, net.JoinHostPort(p.Server, "53"))
+				return d.DialContext(ctx, network, server)
 			},
 		}
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		_, err := resolver.LookupHost(ctx, p.Host)
 		if err == nil {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("dns check failed for %s after %d attempt(s): %w", p.Host, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("dns check failed for %s after %d attempt(s): %w", p.Host, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseDNSJob) Copy() Job                  { job := *p; return &job }
@@ -790,14 +802,16 @@ func (p *PulseUDPJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := dialBounded(ctx, "udp", address)
 		if err == nil {
 			// dialBounded installed the operation deadline.
@@ -819,13 +833,8 @@ func (p *PulseUDPJob) Execute() (result Result) {
 			}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("udp check failed for %s after %d attempt(s): %w", address, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("udp check failed for %s after %d attempt(s): %w", address, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseUDPJob) Copy() Job                  { job := *p; return &job }
@@ -858,27 +867,24 @@ func (p *PulseGRPCJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	address := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
 		if err == nil {
 			_ = conn.Close()
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("grpc check failed for %s after %d attempt(s): %w", address, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("grpc check failed for %s after %d attempt(s): %w", address, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseGRPCJob) Copy() Job                  { job := *p; return &job }
@@ -913,12 +919,14 @@ func (p *PulseDockerJob) Execute() (result Result) {
 	}
 	defer func() { _ = cli.Close() }()
 
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		inspect, err := cli.ContainerInspect(ctx, p.Container)
 		if err == nil && inspect.State != nil && inspect.State.Running {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
@@ -928,13 +936,8 @@ func (p *PulseDockerJob) Execute() (result Result) {
 		} else {
 			lastErr = err
 		}
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("docker check failed for %q after %d attempt(s): %w", p.Container, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("docker check failed for %q after %d attempt(s): %w", p.Container, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseDockerJob) Copy() Job                  { job := *p; return &job }
@@ -1170,7 +1173,7 @@ func (c *CodeSlackJob) IsNil() bool                { return c == nil }
 
 // CodeEmailJob implements an email notification job.
 type CodeEmailJob struct {
-	Config schema.CodeNotificationEmail
+	Config manifest.CodeNotificationEmail
 	Execution
 	EnqueueTime time.Time
 	StartTime   time.Time
@@ -1234,6 +1237,8 @@ func (c *CodeWebhookJob) IsNil() bool                { return c == nil }
 // CodeTelegramJob delivers an alert to a Telegram chat via the Bot API.
 type CodeTelegramJob struct {
 	Execution
+	URL         string
+	TestMode    bool
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Monitor     string
@@ -1251,12 +1256,15 @@ func (c *CodeTelegramJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "telegram", "color": c.Color}
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.BotToken)
+	target, err := telegramURL(c.URL, c.BotToken, c.TestMode)
+	if err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+	}
 	body, err := json.Marshal(map[string]string{"chat_id": c.ChatID, "text": c.Message})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	resp, err := postNotification(ctx, url, "application/json", strings.NewReader(string(body)))
+	resp, err := postNotification(ctx, target, "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

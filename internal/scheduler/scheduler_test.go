@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -14,6 +15,83 @@ func newTestEntities(n int) []ecs.Entity {
 		ents[i] = w.NewEntity()
 	}
 	return ents
+}
+
+func TestIndexedCancellationReplacementAndRecycledIdentity(t *testing.T) {
+	s := New()
+	base := time.Now()
+	w := ecs.NewWorld()
+	a, b, c := w.NewEntity(), w.NewEntity(), w.NewEntity()
+	s.Schedule(a, base.Add(time.Hour))
+	s.Schedule(b, base.Add(2*time.Hour))
+	s.Schedule(c, base.Add(5*time.Millisecond))
+	for n := 0; n < 10000; n++ {
+		s.Schedule(a, base.Add(time.Duration(n%3)*time.Hour))
+	}
+	if s.Len() != 3 || len(s.wheel.locations) != 3 {
+		t.Fatal("repeated edits accumulated stale entries", s.Len())
+	}
+	if !s.Cancel(b) || s.Cancel(b) || !s.Cancel(c) {
+		t.Fatal("cancel failed")
+	}
+	if len(s.Due(base.Add(3*time.Hour))) != 1 || s.Len() != 0 {
+		t.Fatal("canceled due work returned")
+	}
+	w.RemoveEntity(a)
+	replacement := w.NewEntity()
+	s.Schedule(replacement, base.Add(4*time.Hour))
+	if s.Cancel(a) {
+		t.Fatal("old incarnation canceled a recycled entity")
+	}
+	if got := s.Due(base.Add(5 * time.Hour)); len(got) != 1 || got[0] != replacement {
+		t.Fatal(got)
+	}
+}
+
+func TestIndexedSchedulerAgainstReference(t *testing.T) {
+	s := New()
+	base := time.Now()
+	entities := newTestEntities(200)
+	ref := map[ecs.Entity]time.Time{}
+	rng := rand.New(rand.NewPCG(91, 13))
+	for n := 0; n < 10000; n++ {
+		entity := entities[rng.IntN(len(entities))]
+		if rng.IntN(4) == 0 {
+			s.Cancel(entity)
+			delete(ref, entity)
+		} else {
+			due := base.Add(time.Duration(rng.IntN(20000)) * time.Millisecond)
+			s.Schedule(entity, due)
+			ref[entity] = due
+		}
+		if s.Len() != len(ref) || len(s.wheel.locations) != len(ref) {
+			t.Fatalf("membership diverged at %d", n)
+		}
+	}
+	seen := map[ecs.Entity]bool{}
+	for _, entity := range s.Due(base.Add(24 * time.Hour)) {
+		if seen[entity] {
+			t.Fatal("duplicate due entity")
+		}
+		if _, ok := ref[entity]; !ok {
+			t.Fatal("canceled entity returned")
+		}
+		seen[entity] = true
+	}
+	if len(seen) != len(ref) || s.Len() != 0 {
+		t.Fatal("accepted schedule lost")
+	}
+}
+
+func TestIndexedScheduleCancelHasNoSteadyStateAllocations(t *testing.T) {
+	s := New()
+	entity := newTestEntities(1)[0]
+	due := time.Now().Add(time.Hour)
+	s.Schedule(entity, due)
+	s.Cancel(entity)
+	if got := testing.AllocsPerRun(100, func() { s.Schedule(entity, due); s.Cancel(entity) }); got != 0 {
+		t.Fatalf("schedule/cancel allocations = %g", got)
+	}
 }
 
 func TestSchedulerDueOrdering(t *testing.T) {

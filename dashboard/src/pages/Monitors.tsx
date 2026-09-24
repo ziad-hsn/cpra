@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDashboardSession } from '../auth/SessionBoundary';
 import { useMonitors, useOverview } from '../hooks/queries';
 import { DataTable } from '../components/DataTable';
 import { FilterBar, type FilterValues } from '../components/FilterBar';
@@ -13,6 +14,7 @@ const PAGE_SIZES = [25, 50, 100, 200];
 
 export default function Monitors() {
   const navigate = useNavigate();
+  const session = useDashboardSession();
   const { data: overview } = useOverview();
   const [filters, setFilters] = useState<FilterValues>({ status: '', type: '', code: '', q: '' });
   const [page, setPage] = useState(1);
@@ -49,6 +51,7 @@ export default function Monitors() {
           <h1>Monitor Fleet</h1>
           <div className="lead">Browse active monitors in the current snapshot</div>
         </div>
+        {session.can('ListMonitors') && <Link className="btn" to="/monitor-configurations">Manage monitor configurations</Link>}
       </div>
 
       <FilterBar filters={filters} onChange={handleFilterChange} pulseTypes={Object.keys(overview?.by_pulse_type ?? {}).sort()} />

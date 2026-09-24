@@ -1,0 +1,64 @@
+{
+  "compiler": "go1.27.1",
+  "externaljobs": false,
+  "files": {
+    "DEPENDENCIES.json": {
+      "bytes": 1710,
+      "sha256": "1cc84e4ee3b29a46b409baffafe45f19a7d29fe62ed136cf01a61bb3592718ad"
+    },
+    "GO-LICENSE.txt": {
+      "bytes": 1453,
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    "LICENSES.txt": {
+      "bytes": 20518,
+      "sha256": "244d43c5b9dcad05949ec414f6687d1db22210e6273cf289f3d022b7d2882076"
+    },
+    "collection-parser.wasm": {
+      "bytes": 8210262,
+      "sha256": "e8a91342a5679052f453d34aa5dd383035801e091590c44a33c01cf854673e37"
+    },
+    "wasm_exec.js": {
+      "bytes": 16992,
+      "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14"
+    }
+  },
+  "linked_modules": [
+    {
+      "Path": "github.com/apapsch/go-jsonmerge/v2",
+      "Sum": "h1:axGnT1gRIfimI7gJifB699GoE/oq+F2MU7Dml6nw9rQ=",
+      "Version": "v2.0.0"
+    },
+    {
+      "Path": "github.com/google/uuid",
+      "Sum": "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
+      "Version": "v1.6.0"
+    },
+    {
+      "Path": "github.com/oapi-codegen/runtime",
+      "Sum": "h1:7Xx+GlueD6nRuyKoCPzL434Jfi3BetbiJOrzCHp/VPU=",
+      "Version": "v1.6.0"
+    },
+    {
+      "Path": "github.com/ziad-hsn/cpra/sdk/go",
+      "Version": "(devel)"
+    },
+    {
+      "Path": "gopkg.in/yaml.v3",
+      "Sum": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
+      "Version": "v3.0.1"
+    }
+  ],
+  "normalization_fixtures_sha256": "f91f47321ca93c416ef18ebc9753696c31979eb653d9571f839518dc2d824c4a",
+  "normalization_profile": "cpra.file.base.v1",
+  "recipe": [
+    "-trimpath",
+    "-buildvcs=false",
+    "-mod=readonly",
+    "-pgo=off",
+    "-tags=",
+    "-ldflags="
+  ],
+  "sdk_source_sha256": "3da61563c367cdc5427a2f9d3ac7cb15060d6d77d569475f24491e180d0cfef4",
+  "target": "js/wasm"
+}

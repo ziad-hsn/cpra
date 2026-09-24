@@ -1,4 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAccess, useDashboardSession } from '../auth/SessionBoundary';
+import { IncidentsList } from '../components/IncidentsList';
 import { useIncidents } from '../hooks/queries';
 import { KpiTile } from '../components/KpiTile';
 import { StatusChip } from '../components/StatusChip';
@@ -11,7 +13,15 @@ import type { MonitorSummary, MonitorStatus } from '../api/types';
 import type { CpraCode } from '../theme/tokens';
 
 export default function Alerts() {
-  const navigate = useNavigate();
+  const access = useAccess();
+  const session = useDashboardSession();
+  if (access.phase !== 'authenticated') return <LegacyAlerts />;
+  return <div className="page"><div className="page-head"><div><h1>Alerts &amp; Incidents</h1><div className="lead">Incident attention and notification state</div></div></div>
+    {session.can('ListIncidents') ? <IncidentsList /> : <p role="status">Your identity cannot list incidents.</p>}
+  </div>;
+}
+
+function LegacyAlerts() {
   const { data, isLoading, isError, refetch } = useIncidents();
 
   const incidents = data?.incidents ?? [];
@@ -44,27 +54,29 @@ export default function Alerts() {
           sub={isError ? 'unavailable' : isLoading ? 'loading' : count > 0 ? 'requires attention' : 'no open incidents'}
         />
         <KpiTile
-          label="Critical (Red)"
+          label="Critical (this response)"
           value={isError || isLoading ? '—' : formatNumber(redCount)}
           code="red"
           icon="warning"
           sub="pending red code"
         />
         <KpiTile
-          label="Degraded (Yellow)"
+          label="Degraded (this response)"
           value={isError || isLoading ? '—' : formatNumber(yellowCount)}
           code="yellow"
           icon="clock"
           sub="pending yellow code"
         />
         <KpiTile
-          label="Recovering (Green)"
+          label="Recovering (this response)"
           value={isError || isLoading ? '—' : formatNumber(greenCount)}
           code="green"
           icon="check"
           sub="pending green code"
         />
       </div>
+
+      <p className="muted">Legacy read-only observations. Severity counts cover only this response, which may contain fewer incidents than the reported total.</p>
 
       <div className="card table-scroll" style={{ padding: 0 }} role="region" aria-label="Incidents" tabIndex={0}>
         {isError ? (
@@ -89,11 +101,7 @@ export default function Alerts() {
             </thead>
             <tbody>
               {incidents.map((m: MonitorSummary) => (
-                <tr
-                  key={m.id}
-                  className="clickable"
-                  onClick={() => navigate(`/monitors/${m.id}`)}
-                >
+                <tr key={m.id}>
                   <td>
                     {isValidCode(m.pending_code) ? (
                       <CodeBadge code={m.pending_code} />
@@ -101,7 +109,7 @@ export default function Alerts() {
                       <span className="muted">—</span>
                     )}
                   </td>
-                  <td className="mono">{m.name}</td>
+                  <td className="mono"><Link to={`/monitors/${m.id}`}>{m.name}</Link></td>
                   <td><StatusChip status={m.status as MonitorStatus} /></td>
                   <td style={{ textAlign: 'right', color: m.consecutive_failures > 0 ? 'var(--status-degraded)' : undefined, fontWeight: m.consecutive_failures > 0 ? 600 : 400 }}>{m.consecutive_failures}</td>
                   <td>{m.pending_code ? m.pending_code.toUpperCase() : '—'}</td>

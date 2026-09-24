@@ -4,26 +4,34 @@ description: Plan and status · CPRa management API, batch configuration, and ex
 cpra_scope: plan
 ---
 
-> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. See [version and availability](../versions.md).
+> **Candidate design and evidence:** this record describes unreleased implementation work or an approved plan. Its checklists do not establish availability in `main`. [Version and availability](../versions.md) identifies the earlier 13 September reviewed snapshots; [current implementation status](STATUS.md) records the later branch checkpoints.
 
 # CPRa management API, batch configuration, and external workers
 
-Status: approved implementation plan; implementation and qualification are pending.
-Updated: 2026-09-12.
+Status: approved implementation plan; implementation and remaining qualification
+are tracked in [current implementation status](STATUS.md).
+Plan updated: 2026-09-13.
+
+The [dashboard finalization and shipping plan](dashboard-shipping-plan.md) records
+the integrated execution order and 2026-09-14 private-candidate publication policy.
+The contracts and foundation tickets in this document remain authoritative.
 
 ## Goal and boundaries
 
-Deliver a versioned management API and matching cpractl commands for durable
-configuration, incident attention, operational controls, and descriptive
-diagnostics. Support collections of team/service configuration files and an
-optional external-worker protocol for custom checks, recovery, and notifications.
+Deliver a versioned management API used by the public Go SDK, cpractl, and a
+writable dashboard for durable configuration, incident attention, operational
+controls, and descriptive diagnostics. Support collections of team/service
+configuration files and an optional external-worker protocol for custom checks,
+recovery, and notifications.
 
 This document consolidates the approved API plan and replaces earlier API design
 proposals in the conversation. It does not mark the existing release-engineering,
 provider-verification, or performance gates complete.
 
-- Implement the API and CLI now. Publish the public Go SDK and dashboard editing
-  in a later phase; preserve the current read-only dashboard throughout this work.
+- Implement the API foundation first, then complete its SDK, CLI, and dashboard
+  consumers against the same tested contracts. This is dependency order, not an
+  exclusion of SDK or dashboard management from the agreed delivery. Preserve
+  existing read behavior while adding authorized writes.
 - Preserve Go 1.25 source compatibility, Ark v0.4.3, existing monitor manifests,
   optional built-in driver tags, and single-node Raft ownership.
 - Keep the default durable mode and explicit disposable memory mode. Memory mode
@@ -37,13 +45,41 @@ provider-verification, or performance gates complete.
   reload from files, general workflow engine, in-process custom code, distributed
   failover, team tenancy, subscriptions, or new provider-certification claims.
 
+### Delivery scope and current implementation boundary
+
+The original request included API improvements followed by SDK, cpractl, and
+dashboard management. Acknowledge, dismiss, and snooze are part of that request;
+disable/enable were subsequently added. Their behavior is defined in
+[Controls and incident attention](#controls-and-incident-attention) and must agree
+across every supported consumer. No check-now operation is included.
+
+The ten tickets below define the server and CLI foundation. The
+[SDK status](go-sdk-status.md) tracks the SDK implementation and its server gates.
+The [dashboard management plan](dashboard-management-plan.md) records the browser
+work and shared recipient/group/credential additions. Ticket-local exclusions of
+SDK packaging or browser UI assign work to those companion workstreams; they do
+not remove it from the overall scope. Full management qualification includes
+the SDK and writable dashboard acceptance checks.
+
+At the 2026-09-13 scope correction, the application server and dashboard still
+exposed read-only v1 behavior. Draft SDK v2 methods and fixtures did not establish
+a working management server, CLI writes, or browser writes. Later implementation
+and executed checks are recorded in [current status](STATUS.md) and the
+[progress record](dashboard-implementation-progress.md). The control definitions
+below remain requirements; their presence alone is not implementation evidence.
+
 ## Public resource and HTTP contract
 
 Preserve /api/v1 response contracts, numeric monitor routes, and existing units.
 Add /api/v2 with stable string resource identities and explicit HTTP methods.
 
-Writable resources are Monitor, NotificationEndpoint, NotificationGroup, and
-Credential. The externaljobs build additionally supports dynamic JobType
+Writable resources are Monitor, NotificationEndpoint, Recipient,
+NotificationGroup, and Credential. Recipient is a notification contact, not an
+authentication principal. Its references, group membership, and Code-selected
+notification routing are defined in the
+[dashboard plan's shared resource contract](dashboard-management-plan.md#shared-resource-contract)
+and must be available through the API, SDK, CLI, and file collections.
+The externaljobs build additionally supports dynamic JobType
 resources. Incidents, actions, operations, queues, pools, SLOs, worker observations,
 and instance state expose bounded observations or the specific commands described
 below; they are not arbitrary writable runtime objects.
@@ -67,8 +103,10 @@ Disable/enable are conditional edits to spec.enabled; their committed changes
 also update the admission projection and relevant scheduling revision.
 
 - Pin OpenAPI 3.1.2 and the previously selected oapi-codegen 2.8.0. Commit generated
-  DTOs, handler interfaces, and the internal CLI transport. Keep transport DTOs
-  independent of Ark entities, Go errors, clients, and executable Job values.
+  public SDK types, its internal transport, and server interfaces. cpractl uses
+  the public SDK; the browser contract is generated from the same OpenAPI sources.
+  Keep transport DTOs independent of Ark entities, Go errors, clients, and
+  executable Job values.
 - Use camelCase for v2, duration strings in configuration, explicit millisecond
   telemetry fields, UTC timestamps, string IDs/revisions, and explicit unavailable
   measurements. Preserve v1 through adapters.
@@ -88,7 +126,7 @@ also update the admission projection and relevant scheduling revision.
   strategic merge patch.
 - Enforce compare-and-swap inside the durable command application, including
   dependency checks. An expected conflict is not a storage-failure condition.
-- Block deletion of referenced credentials, endpoints, groups, and JobType
+- Block deletion of referenced credentials, endpoints, recipients, groups, and JobType
   versions. Require references to be changed first; do not cascade silently.
 - Expose discovery of resources, verbs, schemas, patch formats, compiled drivers,
   runtime feature enablement, and external protocol versions.
@@ -142,8 +180,9 @@ One collection follows this lifecycle:
    endpoint order; reject empty groups and duplicate members that would otherwise
    create unintended repeated delivery.
 4. Finalize an immutable apply operation. Apply dependencies before consumers:
-   credentials and JobTypes before consumers, endpoints before groups, groups
-   before monitors. Traverse indexed dependents when a shared update affects
+   credentials and JobTypes before consumers, endpoints before recipients,
+   recipients before groups, and all referenced recipients/groups before monitors.
+   Traverse indexed dependents when a shared update affects
    monitors outside the submitted files, and expose that impact in diff/results.
 5. Activate through bounded per-resource CAS. Independent items may continue after
    a conflict. If an included dependency fails, mark its dependent items blocked;
@@ -457,9 +496,11 @@ requires a new version; executions remain pinned to their original version.
 Use bounded declarative schemas with locally bundled references and no executable
 validators, remote schema fetching, scripts, module downloads, or shared-library
 loading. CPRa never starts user-supplied binaries or executes custom handlers.
-The future Go SDK registers handlers in the separately deployed worker process.
-This phase implements the versioned wire contract and separate-process reference
-workers for tests; public SDK packaging remains later work.
+The Go SDK worker module registers handlers in the separately deployed worker
+process. Its [implementation status](go-sdk-status.md) records the existing
+library and pending server qualification. This server ticket implements the
+versioned wire contract and separate-process integration; SDK publication requires
+that interoperability evidence in addition to its own packaging checks.
 
 Workers manage provider credentials exclusively. Parameters may contain opaque
 worker-local credential-profile aliases; CPRa does not resolve aliases or deliver
@@ -580,8 +621,8 @@ passing checks. No checklist below is complete merely because this plan exists.
 
 #### Context
 
-The current telemetry DTOs and sealed driver schema are not a writable public API
-or a future SDK contract.
+The current telemetry DTOs and sealed driver schema do not implement a writable
+public API. Qualify the draft SDK contract against real server behavior.
 
 #### What to implement
 
@@ -591,7 +632,8 @@ adapters and keep generated public-facing types free of internal runtime objects
 
 #### Where
 
-Go schema/DTO layer, internal/web, internal/client, and API schema sources.
+Go schema/DTO layer, internal/httpserver, public SDK api types/internal transport, and
+API schema sources.
 
 #### Acceptance criteria
 
@@ -603,7 +645,9 @@ Go schema/DTO layer, internal/web, internal/client, and API schema sources.
 
 #### Out of scope
 
-Public SDK publication, dashboard editing, server-side field ownership, JSON Patch.
+SDK publication and browser forms are companion workstreams, not part of this
+resource-contract ticket. Server-side field ownership and JSON Patch remain
+outside the agreed API scope.
 
 #### Depends on
 
@@ -637,7 +681,7 @@ restore requirements.
 
 #### Where
 
-internal/durable, runtime configuration, schema conversion, and local cpractl
+internal/persistence, runtime configuration, schema conversion, and local cpractl
 administration/backup tooling.
 
 #### Acceptance criteria
@@ -731,7 +775,7 @@ publication. Keep outcomes flowing during pauses and draining.
 
 #### Where
 
-internal/controller, internal/scheduler, internal/jobs, and internal/web/snapshot.
+internal/controller, internal/scheduler, internal/jobs, and internal/fleetview.
 
 #### Acceptance criteria
 
@@ -883,7 +927,8 @@ internal client, and cpractl commands.
 
 #### Out of scope
 
-Check-now, force recovery, automatic review-based replay, dashboard editing.
+Check-now, force recovery, automatic review-based replay. The companion dashboard
+plan implements browser controls using this ticket's shared server behavior.
 
 #### Depends on
 
@@ -905,8 +950,8 @@ Sample/copy ECS statistics on the owner; do not expose mutable World.Stats data.
 
 #### Context
 
-Custom implementations need a future Go SDK contract without loading their code
-or credentials into CPRa's core process.
+Custom implementations need a real server contract for the existing draft Go SDK
+worker module without loading their code or credentials into CPRa's core process.
 
 #### What to implement
 
@@ -961,8 +1006,8 @@ finalization watermarks. A grant or heartbeat lease cannot fence remote I/O.
 
 #### Context
 
-The command-line interface must exercise the same public contracts later used by
-the SDK and dashboard rather than acquire private controller shortcuts.
+The command-line interface must use the public SDK and exercise the same server
+contracts as the dashboard, without private controller shortcuts.
 
 #### What to implement
 
@@ -973,7 +1018,7 @@ actionable exit codes without blind mutation retries.
 
 #### Where
 
-cmd/cpractl, internal/cpractl, internal/client, embedded help/examples, and CLI
+cmd/cpractl, internal/cpractl, public SDK services, embedded help/examples, and CLI
 integration tests.
 
 #### Acceptance criteria
@@ -986,7 +1031,8 @@ integration tests.
 
 #### Out of scope
 
-Public SDK packaging, dashboard mutation flows, server-push watch.
+SDK packaging and dashboard mutation flows have companion workstreams.
+Server-push watch remains outside this ticket.
 
 #### Depends on
 
@@ -1026,6 +1072,9 @@ sources, and the separate documentation checkout.
 
 - [ ] Go 1.25, release compiler, default/all-driver/externaljobs builds pass.
 - [ ] Required race, vulnerability, dashboard compatibility, and packaging checks pass.
+- [ ] API, SDK, CLI, and dashboard management agree for CRUD, collection outcomes,
+  controls, recipients/groups/credentials, and queue/SLO/state observations;
+  fixtures or read-only compatibility checks alone cannot satisfy this gate.
 - [ ] Real crashes cover migration, mutation, starts, results, and key maintenance.
 - [ ] Million-resource collection/navigation/control tests show bounded resource work.
 - [ ] ECS comparisons hold eligible workload constant and report measured results.
@@ -1040,7 +1089,8 @@ before its applicable gates pass.
 
 #### Depends on
 
-Tickets 1–9.
+Tickets 1–9 and the SDK and dashboard management acceptance gates for the complete
+management release. Foundation checks can run as their implementations land.
 
 #### Technical notes
 

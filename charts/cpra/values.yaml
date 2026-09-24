@@ -1,0 +1,94 @@
+# One running owner. Maintenance stops it and retains its claim for offline backup.
+maintenance: false
+nameOverride: ""
+fullnameOverride: ""
+image:
+  repository: ghcr.io/ziad-hsn/cpra
+  tag: "" # Defaults to Chart.appVersion; releases should set the immutable digest.
+  digest: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+api:
+  enabled: true
+auth:
+  # Supply an immutable, versioned Secret. Never put credentials into Helm values.
+  existingSecret: ""
+  key: token
+manifest:
+  # Set exactly one existing source. Secret/ConfigMap objects are limited to 1 MiB.
+  existingSecret: ""
+  existingConfigMap: ""
+  existingClaim: "" # Large manifests: mount a separately provisioned configuration PVC read-only.
+  key: monitors.yaml # Key in a Secret/ConfigMap.
+  file: monitors.yaml # Relative file path inside an existing configuration PVC.
+  revision: "" # Change deliberately to restart after externally managed configuration changes.
+allowEmpty: false
+providerFiles:
+  # Optional SDK/profile files, mounted at /etc/cpra/provider with mode 0440.
+  existingSecret: ""
+# Secret references only, e.g. [{name: AWS_PROFILE, secret: cpra-provider-v1, key: profile}].
+providerEnv: []
+storage:
+  mode: raft # memory is an explicit disposable mode and requires persistence.enabled=false.
+persistence:
+  enabled: true
+  existingClaim: ""
+  size: 10Gi # Starter allocation; size production storage from measured state/history usage.
+  storageClass: null # null: cluster default; "": disable dynamic provisioning.
+  accessMode: ReadWriteOncePod
+  acknowledgeReadWriteOnce: false # Required to select RWO, which is not a single-pod fence.
+service:
+  port: 8060
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  path: / # The dashboard currently supports the root path only.
+  tlsSecret: ""
+  annotations: {}
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+kubernetesRecovery:
+  enabled: false
+  # Named Deployments in this release's namespace only. Other namespaces need operator-managed Roles.
+  restartDeployments: []
+  scaleDeployments: []
+icmp:
+  enabled: false # Enables unprivileged ping sockets for GID 1001; adds no capabilities.
+# Small-installation example only. Replace with measured fleet sizing.
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+go:
+  memoryLimit: 512MiB # Go runtime memory only; not an RSS or million-monitor capacity guarantee.
+terminationGracePeriodSeconds: 60
+probes:
+  startup:
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 120
+  readiness:
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+podAnnotations: {}
+nodeSelector:
+  kubernetes.io/os: linux
+tolerations: []
+affinity: {}
+networkPolicy:
+  enabled: false
+  # These are complete Kubernetes NetworkPolicy rules, including DNS/provider egress when enabled.
+  ingress: []
+  egress: []
+test:
+  enabled: true

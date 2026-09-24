@@ -1,0 +1,1 @@
+import{j as t}from"./index-BYrXMkLD.js";import{C as o}from"./tokens-Blk6Ncpn.js";function m({code:s,label:e}){const a=e??o[s];return t.jsxs("span",{className:"code-badge "+s,role:"status","aria-label":a,children:[t.jsx("span",{className:"status-dot"}),a]})}export{m as C};

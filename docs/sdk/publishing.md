@@ -4,7 +4,7 @@ description: SDK candidate · Prepare the SDK for Go packages and publication fo
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** reviewed source snapshot of 13 September 2026; SDK modules, v2 writes and the external-worker dispatcher are unavailable in `main`. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
 
 # Prepare the SDK for Go packages and publication
 
@@ -12,16 +12,20 @@ This guide applies the official Go package-documentation and module-publishing
 rules to CPRa. It distinguishes documentation that we can verify locally from
 public module downloads and hosted documentation that require published tags.
 
-**Current status:** both SDK modules are unpublished candidates. The existing
-CPRa server implements read-only v1. Real v2 management and external-worker server
-contracts must be implemented and qualified before the SDK prerelease is
-published. Improving a README or passing a fixture does not complete that gate.
+**Current status:** both SDK modules are unpublished candidates. The private
+working branch has real TLS/Raft integration for v2 resource management,
+controls, action review, operation reads and observations. Resumable collection
+application and external-worker server integration remain unfinished. See the
+[implementation progress record](../implementation/dashboard-implementation-progress.md)
+for the exact executed scope. Earlier published servers are not qualified by
+working-branch tests. Candidates stay private until every agreed gate passes;
+improving a README or passing a fixture does not complete that gate.
 
 ## Understand the modules
 
 | Module | Importable packages | First candidate tag in this repository |
 | --- | --- | --- |
-| `github.com/ziad-hsn/cpra/sdk/go` | `cpra`, `api`, `collection`, `legacy` | `sdk/go/v0.1.0-rc.1` |
+| `github.com/ziad-hsn/cpra/sdk/go` | `cpra`, `api`, `collection`, `collection/commitment` | `sdk/go/v0.1.0-rc.1` |
 | `github.com/ziad-hsn/cpra/sdk/go/worker` | `worker`, with `externaljobs` | `sdk/go/worker/v0.1.0-rc.1` |
 
 These are libraries. A consumer adds a published version with `go get`; `go
@@ -125,7 +129,7 @@ module cache. It checks:
 
 - Every downloaded name and byte matches the selected candidate module payload.
 - README, license, package overviews, and executable example sources are included.
-- The four public core package overviews render in default and tagged builds;
+- The client, API model and collection package overviews render in default and tagged builds;
   the worker overview renders in its tagged build.
 - Documentation examples execute from the downloaded modules, without borrowing
   the repository's fixtures or implementation packages.

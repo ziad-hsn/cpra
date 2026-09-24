@@ -1,0 +1,254 @@
+{
+  "Action": {
+    "id": "test",
+    "state": "test",
+    "held": false,
+    "executorFenced": false
+  },
+  "ActionList": {
+    "items": []
+  },
+  "Assignments": {
+    "items": [],
+    "serverID": "test"
+  },
+  "Capabilities": {
+    "apiVersions": [],
+    "drivers": {},
+    "patchTypes": [],
+    "resources": []
+  },
+  "Credential": {
+    "apiVersion": "test",
+    "kind": "test",
+    "metadata": {
+      "id": "test"
+    },
+    "spec": {}
+  },
+  "CredentialList": {
+    "items": []
+  },
+  "EventList": {
+    "items": []
+  },
+  "Explanation": {
+    "description": "test",
+    "resource": "test",
+    "schema": {}
+  },
+  "Health": {
+    "available": false
+  },
+  "HeartbeatResponse": {
+    "accepted": false,
+    "serverID": "test"
+  },
+  "Incident": {
+    "id": "test",
+    "monitorID": "test",
+    "revision": "test",
+    "state": "test"
+  },
+  "IncidentList": {
+    "items": []
+  },
+  "JobType": {
+    "apiVersion": "test",
+    "kind": "test",
+    "metadata": {
+      "id": "test"
+    },
+    "spec": {
+      "handler": "test",
+      "kind": "test",
+      "parameterSchema": {},
+      "protocolVersion": "test",
+      "resultSchema": {},
+      "version": "test"
+    }
+  },
+  "JobTypeList": {
+    "items": []
+  },
+  "Metrics": {
+    "generatedAt": "2026-01-01T00:00:00Z"
+  },
+  "Monitor": {
+    "apiVersion": "test",
+    "kind": "test",
+    "metadata": {
+      "id": "test"
+    },
+    "spec": {
+      "check": {
+        "driver": {
+          "config": {},
+          "type": "test"
+        },
+        "interval": "test",
+        "timeout": "test"
+      }
+    }
+  },
+  "MonitorList": {
+    "items": []
+  },
+  "NotificationEndpoint": {
+    "apiVersion": "test",
+    "kind": "test",
+    "metadata": {
+      "id": "test"
+    },
+    "spec": {
+      "config": {},
+      "type": "test"
+    }
+  },
+  "NotificationEndpointList": {
+    "items": []
+  },
+  "NotificationGroup": {
+    "apiVersion": "test",
+    "kind": "test",
+    "metadata": {
+      "id": "test"
+    },
+    "spec": {
+      "endpointRefs": []
+    }
+  },
+  "NotificationGroupList": {
+    "items": []
+  },
+  "Operation": {
+    "contentDigest": "test",
+    "id": "m",
+    "state": "test"
+  },
+  "PoolList": {
+    "items": []
+  },
+  "Preflight": {
+    "valid": false
+  },
+  "QueueList": {
+    "items": []
+  },
+  "Receipt": {
+    "disposition": "test",
+    "executionID": "test",
+    "receiptID": "test",
+    "serverID": "test"
+  },
+  "RuntimeConfig": {},
+  "SLOView": {
+    "coverageGap": false,
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "reports": [],
+    "window": "test"
+  },
+  "StartResponse": {
+    "deadline": "2026-01-01T00:00:00Z",
+    "disposition": "test",
+    "grantID": "test",
+    "receiptID": "test",
+    "serverID": "test"
+  },
+  "State": {
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "live": false,
+    "ready": false,
+    "storage": {
+      "available": false,
+      "mode": "test"
+    }
+  },
+  "SystemList": {
+    "items": []
+  },
+  "Version": {
+    "version": "test"
+  },
+  "WorkerObservationList": {
+    "items": []
+  },
+  "Recipient": {
+    "apiVersion": "cpra.io/v2",
+    "kind": "Recipient",
+    "metadata": {
+      "id": "m"
+    },
+    "spec": {
+      "endpointRefs": [
+        "e"
+      ]
+    }
+  },
+  "RecipientList": {
+    "items": [
+      {
+        "apiVersion": "cpra.io/v2",
+        "kind": "Recipient",
+        "metadata": {
+          "id": "m"
+        },
+        "spec": {
+          "endpointRefs": [
+            "e"
+          ]
+        }
+      }
+    ]
+  },
+  "OperationList": {
+    "items": [
+      {
+        "contentDigest": "test",
+        "id": "test",
+        "state": "test"
+      }
+    ]
+  },
+  "AccessInfo": {
+    "principalId": "operator-one",
+    "role": "operator",
+    "permissions": [
+      "GetAccess",
+      "CreateMonitor"
+    ]
+  },
+  "CollectionAdmission": {
+    "ticket": "fixture-ticket",
+    "expiresAt": "2099-01-01T00:00:00Z"
+  },
+  "ValidationResultPage": {
+    "operationID": "m",
+    "identityFormat": "cpra.collection.hmac-sha256-json-bytes.v1",
+    "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "itemCount": 1,
+    "summary": {
+      "resultID": "original-result",
+      "valid": true,
+      "summaryOnly": false,
+      "count": 1,
+      "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "planID": "original-plan",
+      "planDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "capabilitiesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "finalizedAt": "2026-09-20T00:00:00Z",
+      "expiresAt": "2026-10-20T00:00:00Z"
+    },
+    "items": [
+      {
+        "ordinal": 1,
+        "kind": "Monitor",
+        "id": "m",
+        "source": "source.00000000000000000001",
+        "sourceDocument": 1,
+        "sourceItem": 1,
+        "change": "create"
+      }
+    ]
+  }
+}

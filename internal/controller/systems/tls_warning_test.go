@@ -1,9 +1,9 @@
 package systems
 
 import (
-	"cpra/internal/controller/components"
-	"cpra/internal/jobs"
-	"cpra/internal/web/snapshot"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +40,7 @@ func TestTLSWarningAlertsWithoutRecoveryAndCriticalStillFails(t *testing.T) {
 	if len(state.PendingAlerts) != 1 || state.PendingAlerts[0].Color != "yellow" {
 		t.Fatalf("warning must produce one yellow alert: %+v", state.PendingAlerts)
 	}
-	holder := snapshot.NewHolder()
+	holder := fleetview.NewHolder()
 	snapshots := NewBatchStatsSnapshotSystem(&w, noopLogger{}, holder, time.Second, 100)
 	snapshots.Initialize(&w)
 	snapshots.Update(&w)

@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // InterventionKubernetesJob restarts or scales a Kubernetes workload.
@@ -36,7 +36,7 @@ type InterventionKubernetesJob struct {
 	ID             uuid.UUID
 }
 
-func newInterventionKubernetesJob(t *schema.InterventionTargetKubernetes, retries int, entity ecs.Entity) (Job, error) {
+func newInterventionKubernetesJob(t *manifest.InterventionTargetKubernetes, retries int, entity ecs.Entity) (Job, error) {
 	job := &InterventionKubernetesJob{
 		ID:             uuid.New(),
 		Entity:         entity,

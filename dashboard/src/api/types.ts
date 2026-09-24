@@ -1,5 +1,5 @@
 /**
- * CPRA API types — matching cpra/internal/web/server/types.go and snapshot/queue/controller shapes.
+ * CPRA API types — matching cpra/internal/httpserver/types.go and snapshot/queue/controller shapes.
  * Durations are Go time.Duration nanoseconds; time fields are RFC3339 strings.
  */
 
@@ -7,6 +7,9 @@ export type MonitorStatus = 'up' | 'down' | 'degraded' | 'verifying' | 'incident
 
 export interface MonitorSummary {
 	warning?: string;
+  monitor_id?: string;
+  latency_available?: boolean;
+  unknown_actions?: number;
   id: number;
   name: string;
   pulse_type: string;
@@ -24,7 +27,7 @@ export interface MonitorSummary {
   interval_ms?: number;
   /** Rolling success ratio 0..1 over observed checks. */
   uptime?: number;
-  /** Last observed latency in milliseconds (0 when unavailable). */
+  /** Last observed latency in milliseconds; meaningful only when latency_available is true. */
   latency_ms?: number;
 }
 
@@ -95,6 +98,12 @@ export interface SystemsResponse {
 }
 
 export interface QueueStats {
+	/** Nanoseconds for a currently pending admission; consult availability. */
+	oldest_pending_age?: number;
+	oldest_pending_available?: boolean;
+	oldest_pending_reason?: string;
+  arrival_cv?: number;
+  arrival_samples?: number;
   last_enqueue: string;
   last_dequeue: string;
   avg_queue_time: number; // ns
@@ -112,6 +121,11 @@ export interface QueueStats {
 }
 
 export interface WorkerPoolStats {
+  slo_condition?: string;
+  sizing_model?: string;
+  service_time?: number; // ns
+  service_cv?: number;
+  service_samples?: number;
   last_scale_time: string;
   min_workers: number;
   max_workers: number;
@@ -148,4 +162,51 @@ export interface ConfigResponse {
 
 export interface HealthResponse {
   status: string;
+}
+
+export interface DurableAction {
+  id: string;
+  revision: string;
+  kind: string;
+  color?: string;
+  endpoint: number;
+  attempt: number;
+  state: 'queued' | 'started' | 'succeeded' | 'failed' | 'unknown' | 'cancelled';
+  outcome?: string;
+}
+export interface DurableStateResponse {
+  storage: { mode: 'raft' | 'memory'; ready: boolean; node_id?: string; committed_index: number; commit_latency_ms: number; snapshot_duration_ms: number; error?: string };
+  actions: DurableAction[];
+  monitor_id?: string;
+  revision?: string;
+}
+export interface MonitorEvent {
+  id: string;
+  monitor_id: string;
+  revision: string;
+  at: string;
+  type: string;
+  action_id?: string;
+  kind?: string;
+  color?: string;
+  endpoint?: number;
+  outcome?: string;
+  actor?: string;
+  reason?: string;
+  note?: string;
+  incident_id?: string;
+  control_revision?: string;
+  evidence_refs?: string[];
+}
+export interface HistoryResponse { events: MonitorEvent[]; next_cursor?: string; retention_days: number }
+export interface Percentiles { p50_ms: number | null; p95_ms: number | null; p99_ms: number | null }
+export interface SLOResponse {
+  generated: string;
+  window_seconds: number;
+  queue_target_ms: number;
+  result_target_ms: number;
+  coverage_complete: boolean;
+  gap_start?: string;
+  gap_end?: string;
+  reports: { driver: string; samples: number; expected: number; overdue?: number; pending?: number; timeouts: number; missed: number; paused_monitors?: number; paused_monitor_seconds?: number; scheduling_queue: Percentiles; execution: Percentiles; scheduled_result: Percentiles; queue_met: number; result_met: number; queue_attainment: number | null; result_attainment: number | null; condition: string }[];
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/redis/go-redis/v9"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseRedisJob checks a Redis server by issuing a RESP PING.
@@ -29,7 +29,7 @@ type PulseRedisJob struct {
 	payload     map[string]interface{}
 }
 
-func newPulseRedisJob(cfg *schema.PulseRedisConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseRedisJob(cfg *manifest.PulseRedisConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return &PulseRedisJob{
 		ID:       uuid.New(),
 		Entity:   entity,
@@ -60,24 +60,21 @@ func (p *PulseRedisJob) Execute() (result Result) {
 	})
 	defer func() { _ = client.Close() }()
 
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		err := client.Ping(ctx).Err()
 		if err == nil {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("redis check failed for %s after %d attempt(s): %w", p.Addr, attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("redis check failed for %s after %d attempt(s): %w", p.Addr, attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseRedisJob) Copy() Job                  { job := *p; return &job }

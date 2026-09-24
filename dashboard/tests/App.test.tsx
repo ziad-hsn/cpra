@@ -87,6 +87,7 @@ const emptyPool = {
 };
 
 const server = setupServer(
+  http.get('/api/v2/self', () => HttpResponse.json({ error: 'not found' }, { status: 404 })),
   http.get('/api/v1/overview', () => HttpResponse.json(overviewResponse)),
   http.get('/api/v1/monitors', () => HttpResponse.json(monitorsResponse)),
   http.get('/api/v1/monitors/:id', () => HttpResponse.json(monitorsResponse.monitors[0])),
@@ -135,9 +136,9 @@ describe('App', () => {
     expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
   });
 
-  it('renders the layout shell with CPRa branding', () => {
+  it('renders the layout shell with CPRa branding', async () => {
     renderApp('/');
-    expect(screen.getByRole('img', { name: 'CPRa' })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'CPRa' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'CPRa overview' })).toHaveAttribute('href', '/');
   });
 
@@ -151,10 +152,18 @@ describe('App', () => {
     );
   });
 
-  it('renders nav items', () => {
+  it('renders nav items', async () => {
     renderApp('/');
-    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(await screen.findByText('Overview')).toBeInTheDocument();
     expect(screen.getByText('Monitors')).toBeInTheDocument();
     expect(screen.getByText('Alerts')).toBeInTheDocument();
+  });
+
+  it('keeps the original numeric monitor observation route usable without management access', async () => {
+    renderApp('/monitors/1');
+    expect(await screen.findByText('example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Back to Monitors/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View saved configuration' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /check now|Edit monitor|Delete monitor/i })).not.toBeInTheDocument();
   });
 });

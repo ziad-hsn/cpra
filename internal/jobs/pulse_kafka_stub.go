@@ -8,9 +8,9 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
-func newPulseKafkaJob(cfg *schema.PulseKafkaConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseKafkaJob(cfg *manifest.PulseKafkaConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return nil, fmt.Errorf("kafka check requires building with -tags=kafka")
 }

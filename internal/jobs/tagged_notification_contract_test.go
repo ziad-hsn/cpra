@@ -3,9 +3,9 @@
 package jobs
 
 import (
-	"cpra/internal/loader/schema"
 	"errors"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"io"
 	"net/http"
 	"strings"
@@ -18,11 +18,11 @@ func TestTaggedNotificationRejections(t *testing.T) {
 	})
 	cases := []struct {
 		name   string
-		config schema.CodeNotification
-	}{{"teams", &schema.CodeNotificationTeams{WebhookURL: "https://fixture.invalid"}}, {"twilio", &schema.CodeNotificationTwilio{AccountSID: "fixture", AuthToken: "fixture", From: "fixture", To: "fixture"}}}
+		config manifest.CodeNotification
+	}{{"teams", &manifest.CodeNotificationTeams{WebhookURL: "https://fixture.invalid"}}, {"twilio", &manifest.CodeNotificationTwilio{AccountSID: "fixture", AuthToken: "fixture", From: "fixture", To: "fixture"}}}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			j, err := CreateCodeJob("fixture", schema.CodeConfig{Notify: tt.name, Config: tt.config}, ecs.Entity{}, "red")
+			j, err := CreateCodeJob("fixture", manifest.CodeConfig{Notify: tt.name, Config: tt.config}, ecs.Entity{}, "red")
 			if err != nil {
 				t.Fatal(err)
 			}

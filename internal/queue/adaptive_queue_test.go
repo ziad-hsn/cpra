@@ -117,3 +117,24 @@ func TestAdaptiveQueueConcurrent(t *testing.T) {
 		}
 	}
 }
+
+func TestAdaptiveQueueCountsRejectedAdmissions(t *testing.T) {
+	q, err := NewAdaptiveQueue(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < 2; n++ {
+		if err := q.Enqueue(newTestHybridJob(n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for n := 0; n < 3; n++ {
+		if err := q.Enqueue(newTestHybridJob(2)); err != ErrQueueFull {
+			t.Fatal(err)
+		}
+	}
+	stats := q.Stats()
+	if stats.Dropped != 3 || stats.Enqueued != 2 || stats.QueueDepth != 2 {
+		t.Fatalf("rejection accounting: %+v", stats)
+	}
+}

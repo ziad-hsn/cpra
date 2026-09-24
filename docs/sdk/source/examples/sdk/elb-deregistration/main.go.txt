@@ -1,0 +1,131 @@
+// elb-deregistration consumes EventBridge/CloudTrail deregistration events from SQS.
+// Its CPRa v2 calls require the planned management server; see README.md.
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/ziad-hsn/cpra/examples/sdk/internal/clientconfig"
+	cpra "github.com/ziad-hsn/cpra/sdk/go"
+)
+
+func main() {
+	if err := run(); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	server := flag.String("server", "https://cpra.example.invalid", "CPRa v2 API origin")
+	tokenFile := flag.String("token-file", "", "file containing a CPRa management token")
+	allowHTTP := flag.Bool("allow-http", false, "allow HTTP for the configured CPRa origin (local fixtures only)")
+	mappingFile := flag.String("mapping", "", "JSON mapping from AWS targets to pinned CPRa monitor identities")
+	queueURL := flag.String("queue-url", "", "regional SQS queue URL containing unchanged EventBridge events")
+	eventFile := flag.String("event-file", "", "process one local EventBridge JSON fixture instead of polling SQS")
+	fixture := flag.Bool("fixture-aws-absent", false, "use local fixture registration evidence; requires -event-file and makes no AWS calls")
+	demo := flag.Bool("demo", false, "run a finite local SDK/HTTP demonstration without AWS or CPRa accounts")
+	flag.Parse()
+	if *demo {
+		if *mappingFile != "" || *queueURL != "" || *eventFile != "" || *tokenFile != "" || *fixture || *server != "https://cpra.example.invalid" {
+			return errors.New("-demo must run without account, event, or server configuration")
+		}
+		return runDemo(os.Stdout)
+	}
+	if *mappingFile == "" || (*queueURL == "") == (*eventFile == "") || *fixture && *eventFile == "" {
+		return errors.New("provide -mapping and exactly one of -queue-url or -event-file; fixture mode requires -event-file")
+	}
+	f, err := os.Open(*mappingFile)
+	if err != nil {
+		return err
+	}
+	cfg, err := readSettings(f)
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	clientConfig, err := clientconfig.FromTokenFile(*server, *tokenFile, *allowHTTP)
+	if err != nil {
+		return err
+	}
+	client, err := cpra.New(clientConfig)
+	if err != nil {
+		return err
+	}
+	defer client.CloseIdleConnections()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ready, err := client.Ready(ctx)
+	if err != nil || !ready.Data.Available {
+		return errors.New("configured server does not provide an available CPRa v2 API")
+	}
+	p := &processor{cfg: cfg, cpra: client, output: os.Stdout}
+	var queue queueAPI
+	if *fixture {
+		fmt.Fprintln(os.Stdout, "fixture mode: AWS absence is supplied locally; no AWS account verification")
+		p.aws = fixtureRegistration{}
+	} else {
+		awsCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+		awsCfg, err := config.LoadDefaultConfig(awsCtx, config.WithRegion(cfg.Region))
+		if err != nil {
+			return errors.New("load AWS credential/configuration chain failed")
+		}
+		clients, err := newAWSClients(awsCfg)
+		if err != nil {
+			return err
+		}
+		identity, err := clients.identity.GetCallerIdentity(awsCtx, &sts.GetCallerIdentityInput{})
+		if err != nil || identity == nil || aws.ToString(identity.Account) != cfg.Account {
+			return errors.New("AWS caller identity does not match the configured account")
+		}
+		p.aws = clients.registration
+		queue = clients.queue
+	}
+	if *eventFile != "" {
+		f, err := os.Open(*eventFile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		raw, err := io.ReadAll(io.LimitReader(f, maxEventBytes+1))
+		if err != nil || len(raw) > maxEventBytes {
+			return errors.New("event fixture cannot be read within 1 MiB")
+		}
+		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		defer cancel()
+		return p.process(ctx, string(raw))
+	}
+	if err := validateQueueURL(*queueURL, cfg); err != nil {
+		return err
+	}
+	return consume(ctx, queue, *queueURL, p, os.Stderr)
+}
+
+func validateQueueURL(raw string, cfg settings) error {
+	u, err := url.Parse(raw)
+	suffix := ".amazonaws.com"
+	if strings.HasPrefix(cfg.Region, "cn-") {
+		suffix += ".cn"
+	}
+	if err != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Host != "sqs."+cfg.Region+suffix || !strings.HasPrefix(u.Path, "/"+cfg.Account+"/") || strings.TrimPrefix(u.Path, "/"+cfg.Account+"/") == "" {
+		return errors.New("queue URL must use the configured AWS account and regional SQS HTTPS endpoint")
+	}
+	return nil
+}

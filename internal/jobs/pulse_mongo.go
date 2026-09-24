@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseMongoJob checks a MongoDB server by issuing a ping command.
@@ -29,7 +29,7 @@ type PulseMongoJob struct {
 	payload     map[string]interface{}
 }
 
-func newPulseMongoJob(cfg *schema.PulseMongoConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseMongoJob(cfg *manifest.PulseMongoConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	if strings.HasPrefix(strings.ToLower(cfg.URI), "mongodb+srv:") {
 		return nil, fmt.Errorf("mongodb+srv discovery cannot honor check deadlines; use a direct mongodb:// URI")
 	}
@@ -61,24 +61,21 @@ func (p *PulseMongoJob) Execute() (result Result) {
 		_ = client.Disconnect(ctx)
 	}()
 
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		err := client.Ping(ctx, readpref.Primary())
 		if err == nil {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("mongo check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("mongo check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseMongoJob) Copy() Job                  { job := *p; return &job }

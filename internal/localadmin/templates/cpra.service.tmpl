@@ -1,0 +1,24 @@
+[Unit]
+Description=CPRa monitoring and recovery controller
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=notify
+NotifyAccess=main
+{{if .System}}User={{.Account}}
+Group={{.Account}}
+StateDirectory=cpra
+StateDirectoryMode=0700
+{{end}}ExecStart={{.ExecStart}}
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=600s
+TimeoutStopSec=60s
+KillMode=mixed
+UMask=0077
+
+[Install]
+WantedBy={{if .System}}multi-user.target{{else}}default.target{{end}}

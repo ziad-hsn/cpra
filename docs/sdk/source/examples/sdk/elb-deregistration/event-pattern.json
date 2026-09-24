@@ -1,0 +1,9 @@
+{
+  "source": ["aws.elasticloadbalancing", "aws.elb"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventSource": ["elasticloadbalancing.amazonaws.com", "elb.amazonaws.com"],
+    "eventName": ["DeregisterTargets", "DeregisterInstancesFromLoadBalancer"],
+    "errorCode": [{"exists": false}]
+  }
+}

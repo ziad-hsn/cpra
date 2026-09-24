@@ -8,9 +8,9 @@ import (
 
 	"github.com/mlange-42/ark/ecs"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
-func newPulseMongoJob(cfg *schema.PulseMongoConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseMongoJob(cfg *manifest.PulseMongoConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return nil, fmt.Errorf("mongo check requires building with -tags=mongo")
 }

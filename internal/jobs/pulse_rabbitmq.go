@@ -11,7 +11,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"cpra/internal/loader/schema"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // PulseRabbitMQJob checks a RabbitMQ broker by opening an AMQP connection and
@@ -28,7 +28,7 @@ type PulseRabbitMQJob struct {
 	payload     map[string]interface{}
 }
 
-func newPulseRabbitMQJob(cfg *schema.PulseRabbitMQConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+func newPulseRabbitMQJob(cfg *manifest.PulseRabbitMQConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
 	return &PulseRabbitMQJob{
 		ID:      uuid.New(),
 		Entity:  entity,
@@ -45,12 +45,14 @@ func (p *PulseRabbitMQJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	attempts := p.Retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := newPulseAttempts(ctx, p.Retries)
+	defer attempts.complete(&result)
 	var lastErr error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for {
+		ctx, ok := attempts.next()
+		if !ok {
+			break
+		}
 		conn, err := amqp.DialConfig(p.URL, amqp.Config{Dial: func(network, address string) (net.Conn, error) { return dialBounded(ctx, network, address) }})
 		if err == nil {
 			var ch *amqp.Channel
@@ -64,13 +66,8 @@ func (p *PulseRabbitMQJob) Execute() (result Result) {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		lastErr = err
-		if attempt < attempts-1 {
-			if !retryDelay(ctx) {
-				break
-			}
-		}
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("rabbitmq check failed after %d attempt(s): %w", attempts, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("rabbitmq check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
 }
 
 func (p *PulseRabbitMQJob) Copy() Job                  { job := *p; return &job }

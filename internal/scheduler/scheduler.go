@@ -16,63 +16,66 @@ type entry struct {
 	entity ecs.Entity
 }
 
-// minHeap is a min-heap of entries ordered by due time (earliest first). It is
-// retained only as the overflow structure for entries beyond the wheel's span.
-type minHeap []entry
+// location makes replacement/cancellation bounded by one bucket removal or one
+// indexed heap removal. Full ecs.Entity identity includes the recycled-ID epoch.
+type location struct{ slot, index int }
 
-func (h minHeap) Len() int           { return len(h) }
-func (h minHeap) Less(i, j int) bool { return h[i].due < h[j].due }
-func (h minHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+type minHeap struct {
+	entries   []entry
+	locations map[ecs.Entity]location
+}
 
-// push appends e and sifts it up to restore the min-heap invariant.
+func (h minHeap) Len() int           { return len(h.entries) }
+func (h minHeap) Less(i, j int) bool { return h.entries[i].due < h.entries[j].due }
+func (h minHeap) Swap(i, j int) {
+	h.entries[i], h.entries[j] = h.entries[j], h.entries[i]
+	h.locations[h.entries[i].entity] = location{-1, i}
+	h.locations[h.entries[j].entity] = location{-1, j}
+}
 func (h *minHeap) push(e entry) {
-	*h = append(*h, e)
-	h.siftUp(len(*h) - 1)
+	h.locations[e.entity] = location{-1, len(h.entries)}
+	h.entries = append(h.entries, e)
+	h.up(len(h.entries) - 1)
 }
-
-// pop removes and returns the root (earliest due) entry.
-func (h *minHeap) pop() entry {
-	old := *h
-	n := len(old)
-	x := old[0]
-	old[0] = old[n-1]
-	*h = old[:n-1]
-	if n-1 > 0 {
-		h.siftDown(0)
+func (h *minHeap) remove(index int) entry {
+	n := len(h.entries) - 1
+	h.Swap(index, n)
+	e := h.entries[n]
+	h.entries[n] = entry{}
+	h.entries = h.entries[:n]
+	delete(h.locations, e.entity)
+	if index < n {
+		if index > 0 && h.Less(index, (index-1)/2) {
+			h.up(index)
+		} else {
+			h.down(index)
+		}
 	}
-	return x
+	return e
 }
-
-// siftUp moves the element at i up toward the root until the invariant holds.
-func (h *minHeap) siftUp(i int) {
-	items := *h
+func (h *minHeap) up(i int) {
 	for i > 0 {
 		parent := (i - 1) / 2
-		if items[i].due >= items[parent].due {
-			break
+		if !h.Less(i, parent) {
+			return
 		}
-		items[i], items[parent] = items[parent], items[i]
+		h.Swap(i, parent)
 		i = parent
 	}
 }
-
-// siftDown moves the element at i down toward the leaves until the invariant holds.
-func (h *minHeap) siftDown(i int) {
-	items := *h
-	n := len(items)
+func (h *minHeap) down(i int) {
 	for {
-		left := 2*i + 1
-		if left >= n {
-			break
+		child := i*2 + 1
+		if child >= len(h.entries) {
+			return
 		}
-		child := left
-		if right := left + 1; right < n && items[right].due < items[left].due {
-			child = right
+		if child+1 < len(h.entries) && h.Less(child+1, child) {
+			child++
 		}
-		if items[child].due >= items[i].due {
-			break
+		if !h.Less(child, i) {
+			return
 		}
-		items[i], items[child] = items[child], items[i]
+		h.Swap(i, child)
 		i = child
 	}
 }
@@ -92,24 +95,29 @@ const (
 // pop (in resolution units). Entries due more than one full span ahead go to
 // the overflow min-heap.
 type timingWheel struct {
-	slots    [][]entry
-	tick     int64
-	overflow minHeap
-	count    int
+	slots     [][]entry
+	tick      int64
+	overflow  minHeap
+	count     int
+	locations map[ecs.Entity]location
 }
 
 func newTimingWheel() *timingWheel {
-	return &timingWheel{
+	w := &timingWheel{
 		slots: make([][]entry, wheelNumSlots),
 		// Anchor the wheel to the current time so the first insert lands in a
 		// slot rather than the overflow heap (tick starts at 0 otherwise, and
 		// every due time is ~1.6e12 slots ahead of it).
-		tick: time.Now().UnixNano() / wheelResolution,
+		tick:      time.Now().UnixNano() / wheelResolution,
+		locations: make(map[ecs.Entity]location),
 	}
+	w.overflow.locations = w.locations
+	return w
 }
 
 // insert places e in a wheel bucket or the overflow heap.
 func (w *timingWheel) insert(e entry) {
+	w.cancel(e.entity)
 	slot := e.due / wheelResolution
 	if slot < w.tick {
 		// Overdue: clamp to the next slot to pop so it is returned immediately.
@@ -122,8 +130,31 @@ func (w *timingWheel) insert(e entry) {
 		return
 	}
 	idx := slot & wheelMask
+	w.locations[e.entity] = location{int(idx), len(w.slots[idx])}
 	w.slots[idx] = append(w.slots[idx], e)
 	w.count++
+}
+
+func (w *timingWheel) cancel(entity ecs.Entity) bool {
+	loc, ok := w.locations[entity]
+	if !ok {
+		return false
+	}
+	if loc.slot < 0 {
+		w.overflow.remove(loc.index)
+	} else {
+		bucket := w.slots[loc.slot]
+		last := len(bucket) - 1
+		if loc.index != last {
+			bucket[loc.index] = bucket[last]
+			w.locations[bucket[loc.index].entity] = location{loc.slot, loc.index}
+		}
+		bucket[last] = entry{}
+		w.slots[loc.slot] = bucket[:last]
+		delete(w.locations, entity)
+	}
+	w.count--
+	return true
 }
 
 // popDue pops and returns the entities of all entries due at or before now.
@@ -131,18 +162,24 @@ func (w *timingWheel) insert(e entry) {
 func (w *timingWheel) popDue(now int64) []ecs.Entity {
 	currentTick := now / wheelResolution
 	var due []ecs.Entity
-	for w.tick <= currentTick {
+	// Every wheel entry is within one wheel span of tick. After a host sleep,
+	// visit each bucket at most once instead of iterating every elapsed tick.
+	end := min(currentTick, w.tick+wheelNumSlots-1)
+	for w.tick <= end {
 		idx := w.tick & wheelMask
 		if n := len(w.slots[idx]); n > 0 {
 			for _, e := range w.slots[idx] {
 				due = append(due, e.entity)
+				delete(w.locations, e.entity)
 			}
+			clear(w.slots[idx])
 			w.slots[idx] = w.slots[idx][:0]
 		}
 		w.tick++
 	}
-	for w.overflow.Len() > 0 && w.overflow[0].due <= now {
-		due = append(due, w.overflow.pop().entity)
+	w.tick = max(w.tick, currentTick+1)
+	for w.overflow.Len() > 0 && w.overflow.entries[0].due <= now {
+		due = append(due, w.overflow.remove(0).entity)
 	}
 	w.count -= len(due)
 	return due
@@ -165,8 +202,8 @@ func (w *timingWheel) peek() (int64, bool) {
 			}
 		}
 	}
-	if w.overflow.Len() > 0 && (!found || w.overflow[0].due < earliest) {
-		earliest = w.overflow[0].due
+	if w.overflow.Len() > 0 && (!found || w.overflow.entries[0].due < earliest) {
+		earliest = w.overflow.entries[0].due
 		found = true
 	}
 	return earliest, found
@@ -190,10 +227,13 @@ func NewSharded(numShards int) *Scheduler {
 	return &Scheduler{wheel: newTimingWheel()}
 }
 
-// Schedule inserts entity to become due at the given time.
+// Schedule inserts or replaces the entity's one due time.
 func (s *Scheduler) Schedule(entity ecs.Entity, due time.Time) {
 	s.wheel.insert(entry{due: due.UnixNano(), entity: entity})
 }
+
+// Cancel removes an entity's indexed due entry without a fleet scan.
+func (s *Scheduler) Cancel(entity ecs.Entity) bool { return s.wheel.cancel(entity) }
 
 // Due pops and returns the entities of all monitors due at or before now.
 // Times within the current wheel tick are included.

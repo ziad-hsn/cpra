@@ -18,6 +18,18 @@ import (
 // A caller may establish a fresh session; it must preserve old execution records.
 var ErrWorkerSessionExpired = errors.New("worker session expired")
 
+// ErrWorkerCheckExpired identifies an explicit expired-check response. Only a
+// check's local replay record may be removed; action outcomes remain retained.
+var ErrWorkerCheckExpired = errors.New("worker check record expired")
+
+func workerCheckExpiry(err error) error {
+	var problem *Error
+	if errors.As(err, &problem) && problem.StatusCode == http.StatusGone && problem.Problem.Code == "workerCheckExpired" {
+		return errors.Join(ErrWorkerCheckExpired, err)
+	}
+	return err
+}
+
 const (
 	workerPollBytes    = 4 << 20
 	workerOutcomeBytes = 128 << 10
@@ -107,7 +119,7 @@ func (c *WorkerClient) Start(ctx context.Context, req api.StartRequest) (*api.St
 	r, e := c.c.generated.WorkerStart(ctx, req)
 	v, e := responseBounded[api.StartResponse](c.c, r, e, true, workerReplyBytes)
 	if e != nil {
-		return nil, e
+		return nil, workerCheckExpiry(e)
 	}
 	s := v.Data
 	if v.StatusCode != http.StatusOK || s.ServerID != req.ServerID || s.SessionID != req.SessionID || s.ExecutionID != req.ExecutionID ||
@@ -156,6 +168,9 @@ func (c *WorkerClient) Result(ctx context.Context, req api.Outcome) (*api.Receip
 	r, e := c.c.generated.WorkerResult(ctx, req)
 	v, e := responseBounded[api.Receipt](c.c, r, e, true, workerReplyBytes)
 	if e != nil {
+		if req.Kind == "check" {
+			return nil, workerCheckExpiry(e)
+		}
 		return nil, e
 	}
 	if v.StatusCode != http.StatusOK || !workerReceipt(v.Data, req.ServerID, req.WorkerUID, req.ExecutionID) {
@@ -247,7 +262,7 @@ func workerStartDisposition(mode api.StartMode, s api.StartResponse) bool {
 	case api.StartDispositionPending, api.StartDispositionRejected:
 		return s.GrantID == "" && s.ReceiptID == "" && s.Deadline.IsZero()
 	case api.StartDispositionUnknown:
-		return workerIDs(s.GrantID) && workerDeadline(s.Deadline) && (s.ReceiptID == "" || workerIDs(s.ReceiptID))
+		return workerIDs(s.GrantID) && workerDeadline(s.Deadline) && s.ReceiptID == ""
 	case api.StartDispositionTerminal:
 		return s.GrantID == "" && s.Deadline.IsZero() && workerIDs(s.ReceiptID)
 	default:

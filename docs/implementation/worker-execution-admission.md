@@ -1,12 +1,14 @@
 # External execution admission
 
 Updated: 2026-09-24. Private implementation checkpoint for
-[shipping Ticket 8](dashboard-shipping-plan.md#ticket-8--qualify-the-external-worker-server).
+[shipping Ticket 8](dashboard-shipping-plan.md#ticket-8-qualify-the-external-worker-server).
 This implements encrypted queued intent and inert runtime preparation. Assignment
 offers and Start grants are extended by the later [format-21 checkpoint](worker-offers-and-start.md).
-Receipts and controller dispatch remain incomplete. Normal
-startup does not register worker execution routes or accept external monitor
-configuration.
+The later [format-22 checkpoint](worker-result-receipts.md) adds result receipts;
+[format 26](worker-scheduling.md) adds successive check admission and unstarted requeue;
+controller dispatch and public external monitor configuration remain incomplete.
+The subsequent [worker HTTP integration](worker-http.md) connects explicitly
+enabled routes and completion-aware shutdown to normal startup.
 
 ## Committed intent
 
@@ -17,8 +19,9 @@ scheduled time and deadline. A check identifies its generation; recovery and
 notification work identify an existing queued action. Notification admission also
 checks the endpoint's ID, incarnation and configuration revision at the original
 color/ordinal in `Policy.WorkerNotificationSources`. Built-in endpoint slots remain
-empty in that parallel array. Inline external notification configuration is not
-eligible for the current endpoint-scoped worker grants.
+empty in that parallel array. The later [format-28 notification contract](worker-notifications.md)
+adds explicit monitor-owned inline sources and separate monitor-scoped worker
+grants. Endpoint grants do not authorize those sources.
 
 `CommitWorkerExecution` checks committed controls, dependencies, action limits and
 the process owner before adding an intent. It does not transition an action to
@@ -28,11 +31,17 @@ After eligibility changes, lookup still returns the original record even when
 admission rejects a retry. The command digest uses a frozen versioned
 projection. Time and identities are supplied before state-machine application.
 
+The [format-27 check-retention path](worker-check-retention.md) reserves a unique
+check identity before encryption. An exact retry returns its original retained
+record even after the check generation advances; a retired identity returns
+explicit expiry and cannot be admitted again. This path still checks current
+admission guards before the first commit.
+
 | Bound | Initial value |
 | --- | --- |
-| Retained queued executions | 4,096 |
+| Retained executions, including terminal receipts | 4,096 |
 | Accounted namespace encoding | 256 MiB |
-| Executions per JobType incarnation, across versions | 256 |
+| Active executions per JobType incarnation, across versions | 256 |
 | Concurrent queued checks per monitor incarnation | 1 |
 | Queued execution records per action identity | 1 |
 | Assignment plaintext | 128 KiB, including its identity wrapper |
@@ -41,9 +50,12 @@ projection. Time and identities are supplied before state-machine application.
 
 Ready lookup uses an index for the exact JobType version and checks current owner,
 deadline, controls and dependencies again. It returns detached ciphertext. Expired
-or old-owner records remain inspectable and continue consuming their reservation;
-they are not silently reactivated or deleted to make room. Terminalization and
-check finalization must be implemented before dispatch opens.
+or old-owner records remain inspectable and continue consuming their reservation.
+The [scheduling contract](worker-scheduling.md) permits guarded requeue of unstarted
+work and active-slot reuse after a known terminal outcome. It preserves receipts
+and unknown actions. [Bounded completed-check retention](worker-check-retention.md)
+has scoped passing verification. Dispatcher accounting and full runtime
+integration are still required before dispatch opens.
 
 Snapshots include the encrypted namespace and exact byte accounting. Retained
 execution references protect their JobType incarnation against deletion. Default
@@ -80,7 +92,7 @@ notification slots and detach the retained descriptor buffers.
 ## Result preparation
 
 `Catalog.PrepareWorkerOutcome` checks the original server identity, worker UID,
-execution, grant and pinned JobType contract supplied by the future committed
+execution, grant and pinned JobType contract supplied by the committed
 result-admission path. It encrypts the complete report and provides a stable replay
 digest. It does not authenticate a worker, commit an outcome or issue a receipt.
 
@@ -99,7 +111,7 @@ and makes no durable mutation.
 
 ## Verification boundary
 
-The [local evidence record](../../bin/verification/worker-admission-2026-09-24/result.json)
+The [local evidence record](../review/local-evidence.md#record-9a233417141c5b303c2be4d1)
 identifies exact commands, source hashes and scoped results. The prepared assignment
 tests exercise encrypted source read → committed queued intent → ready lookup →
 authenticated reopening. Storage tests cover original category/source checks,

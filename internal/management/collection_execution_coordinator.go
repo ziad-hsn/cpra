@@ -55,7 +55,7 @@ func (c *Catalog) StartCollectionExecutionCoordinator(ctx context.Context, now f
 	if !c.verified.Load() || c.failed.Load() {
 		return nil, ErrUnavailable
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := c.collectionValidationProfile()
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,16 @@ func (c *Catalog) StartCollectionExecutionCoordinator(ctx context.Context, now f
 }
 
 func (w *CollectionExecutionCoordinator) Ready() bool {
-	return w != nil && w.ready.Load() && w.ctx.Err() == nil && w.catalog.store.Status().Ready
+	return w.ReadyContext(context.Background())
+}
+
+// ReadyContext keeps request cancellation separate from coordinator failure.
+func (w *CollectionExecutionCoordinator) ReadyContext(ctx context.Context) bool {
+	if w == nil || ctx == nil || ctx.Err() != nil || !w.ready.Load() || w.ctx.Err() != nil {
+		return false
+	}
+	status, err := w.catalog.store.StatusContext(ctx)
+	return err == nil && status.Ready && ctx.Err() == nil && w.ready.Load() && w.ctx.Err() == nil
 }
 
 // BeginStop never abandons a running crypto call or releases Store ownership.

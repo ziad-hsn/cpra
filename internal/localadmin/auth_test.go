@@ -279,3 +279,71 @@ func TestAuthenticationPrincipalLimitFailsBeforePublication(t *testing.T) {
 		t.Fatal("quota failure published token material")
 	}
 }
+
+func TestReadTokenRotationKeepsNamedGrantsAndUncertainOutput(t *testing.T) {
+	for _, uncertain := range []bool{false, true} {
+		t.Run(fmt.Sprint(uncertain), func(t *testing.T) {
+			directory, output := authTestPaths(t)
+			before := persistence.AuthenticationState{Version: persistence.AuthenticationLifecycleFormatVersion, Epoch: "read-epoch", Revision: "read-revision", BootstrapConsumed: true,
+				LegacyTokenSHA256: strings.Repeat("a", 64), Principals: []persistence.AuthenticationPrincipal{{ID: "oncall", Role: "operator", TokenSHA256: strings.Repeat("b", 64)}}}
+			fixture := &authStoreFixture{state: before.Clone()}
+			if uncertain {
+				fixture.commitErr = persistence.ErrCommitUnconfirmed
+				fixture.commitDespite = true
+			}
+			fixture.beforeCommit = func(c persistence.AuthenticationCommand) {
+				token := assertAuthToken(t, output, c.LegacyTokenSHA256)
+				clear(token)
+				if !reflect.DeepEqual(c.Principals, before.Principals) || c.Epoch != before.Epoch || c.LegacyTokenSHA256 == before.LegacyTokenSHA256 {
+					t.Fatal("read-token rotation changed another grant, the epoch, or failed to rotate")
+				}
+			}
+			report, err := administerAuthentication(t.Context(), AuthenticationRequest{Action: "rotate-read-token", DataDirectory: directory, TokenOutput: output}, fixture.open)
+			if uncertain {
+				if !errors.Is(err, persistence.ErrCommitUnconfirmed) || report.Outcome != "unconfirmed" {
+					t.Fatal("uncertain rotation was treated as confirmed", err)
+				}
+			} else if err != nil || report.Outcome != "committed" {
+				t.Fatal("rotation failed", err)
+			}
+			if len(fixture.commands) != 1 || report.IntendedRevision == "" || report.TokenOutput != output {
+				t.Fatal("rotation retried or lost reconciliation metadata")
+			}
+			token := assertAuthToken(t, output, fixture.state.LegacyTokenSHA256)
+			defer clear(token)
+			data, _ := json.Marshal(report)
+			if bytes.Contains(data, token) || bytes.Contains(data, []byte(fixture.state.LegacyTokenSHA256)) {
+				t.Fatal("rotation report exposed authentication material")
+			}
+		})
+	}
+}
+
+func TestReadTokenRotationCannotRestoreAccessOrChangeNamedPolicy(t *testing.T) {
+	directory, output := authTestPaths(t)
+	request := AuthenticationRequest{Action: "rotate-read-token", DataDirectory: directory, TokenOutput: output}
+	for _, invalid := range []AuthenticationRequest{
+		{Action: request.Action, DataDirectory: directory, TokenOutput: output, PrincipalID: "named"},
+		{Action: request.Action, DataDirectory: directory, TokenOutput: output, Role: "reader"},
+		{Action: request.Action, DataDirectory: directory, TokenOutput: output, ExpiresAt: new(time.Time)},
+	} {
+		fixture := &authStoreFixture{}
+		if _, err := administerAuthentication(t.Context(), invalid, fixture.open); !errors.Is(err, ErrAuthenticationInput) || fixture.opened != 0 {
+			t.Fatal("invalid rotation opened storage", err)
+		}
+	}
+	for _, state := range []persistence.AuthenticationState{
+		{},
+		{Epoch: "epoch", BootstrapConsumed: true, ResetRequired: true, LegacyTokenSHA256: strings.Repeat("a", 64)},
+		{Epoch: "epoch", BootstrapConsumed: true, AnonymousLoopback: true},
+		{Epoch: "epoch", BootstrapConsumed: true, Principals: []persistence.AuthenticationPrincipal{{ID: "named", Role: "reader"}}},
+	} {
+		fixture := &authStoreFixture{state: state}
+		if _, err := administerAuthentication(t.Context(), request, fixture.open); !errors.Is(err, ErrAuthenticationState) || len(fixture.commands) != 0 {
+			t.Fatal("rotation restored absent or reset access", err)
+		}
+		if _, err := os.Stat(output); !os.IsNotExist(err) {
+			t.Fatal("rejected rotation published a token", err)
+		}
+	}
+}

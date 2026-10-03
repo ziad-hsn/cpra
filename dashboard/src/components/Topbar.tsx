@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useOverview } from '../hooks/queries';
 import { useTheme } from '../theme/useTheme';
@@ -23,6 +24,7 @@ export function Topbar() {
   const { pathname } = useLocation();
 
   const meta = TITLES[pathname] ?? TITLES[`/${pathname.split('/')[1]}`] ?? { title: 'CPRa', crumb: 'Workspace' };
+  useEffect(() => { document.title = `${meta.title} · CPRa`; }, [meta.title]);
 
   const incidentCount = overview?.by_status?.incident ?? 0;
   const downCount = overview?.by_status?.down ?? 0;

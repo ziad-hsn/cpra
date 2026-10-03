@@ -1,5 +1,55 @@
 # Starting the management dashboard
 
+Optional external-job configuration requires a server and consumer built with
+`externaljobs`, explicit runtime enablement, retained JobTypes and separately
+provisioned worker grants. The [configuration procedure](implementation/external-configuration.md)
+covers API and file/URL collections, startup recovery and offline validation's
+unverified-contract count. A successful offline shape check does not establish
+that a stored JobType exists or authorize a worker to execute it.
+
+## Storage encryption for file-only monitoring
+
+A file-configured A2A intervention or notification needs an initialized wrapping
+key with Raft storage, even when the management API is disabled:
+
+```yaml
+storage:
+  mode: raft
+  directory: /var/lib/cpra
+  encryption:
+    backend: local
+    local:
+      active_key_file: /etc/cpra/private/wrapping.key
+      # Set this to the service's actual Unix group when using a root-owned key.
+      reader_group_id: 1001
+management:
+  enabled: false
+```
+
+The source descriptors and protection rules below apply to `storage.encryption`
+too. Configure either it or `management.encryption`, never both. Management may
+use the storage-level source; providing a key does not enable management APIs.
+File-only runs without A2A do not require a key unless their retained state still
+contains encrypted agent connections. Explicit memory mode can use an ephemeral
+key and does not recover those records after restart.
+
+The key stays outside the state directory and its backups. Provision it with
+`cpractl local encryption init --key-file /absolute/path/to/wrapping.key --data-dir /absolute/path/to/state`,
+using the same reader options as the runtime source. The
+[native key instructions](native-installation.md#initialize-a-local-encryption-key)
+cover user and service ownership, inspection, and interrupted initialization.
+Application startup only loads existing keys. A new active key can be configured with the older
+paths in `previous_key_files`. Keep those previous keys while retained connections
+still reference them. Startup verifies retained connections even after the monitor
+has been removed from the file. Missing or wrong keys stop admission.
+
+The original connection is encrypted before an A2A action starts. After restart,
+CPRa may read that original task; it never resends an ambiguous action or uses a
+new target from an edited manifest. An observed terminal task does not automatically
+resolve a held unknown action. See [A2A recovery](implementation/a2a-jobs.md#reading-retained-tasks-after-restart).
+
+## Enabling management
+
 Management is an explicit runtime setting. When enabled, the normal `cpra`
 application uses the encrypted durable catalog as the configuration source and
 exposes the authenticated management API used by the dashboard and SDK. Existing
@@ -154,5 +204,7 @@ the original source file, write-only secret recovery, and disabled-monitor
 non-dispatch. This evidence is for the tested Linux process boundary. Native
 service identities, additional platforms, provider accounts, packaging, and the
 million-monitor endurance campaign retain their separate release gates.
-The current macOS protected-file adapter fails closed pending native ACL support;
-the Linux example does not establish macOS support or production KMS certification.
+The local macOS protected-file adapter now inspects native ACLs and uses exclusive
+file publication. Its native permission, crash and administration checks remain
+unqualified; see the [macOS checkpoint](implementation/macos-protected-files.md).
+The Linux example does not establish macOS support or production KMS certification.

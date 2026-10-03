@@ -511,8 +511,10 @@ type Intervention struct {
 	Action      string             `yaml:"action" json:"action"`
 	Retries     int                `yaml:"retries" json:"retries"`
 	MaxFailures int                `yaml:"max_failures" json:"max_failures"`
+	MaxAttempts int                `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
 }
 type rawIntervention struct {
+	MaxAttempts int    `yaml:"max_attempts"`
 	MaxFailures int    `yaml:"max_failures"`
 	Action      string `yaml:"action"`
 	Retries     int    `yaml:"retries"`
@@ -530,8 +532,15 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 		Action:      temp.Action,
 		Retries:     temp.Retries,
 		MaxFailures: temp.MaxFailures,
+		MaxAttempts: temp.MaxAttempts,
 	}
 	switch temp.Action {
+	case "a2a":
+		t := &InterventionTargetA2A{}
+		if err := temp.Target.Decode(t); err != nil {
+			return err
+		}
+		i.Target = t
 	case "docker":
 		var t = &InterventionTargetDocker{} // FIX: Allocate on the heap
 		if err := temp.Target.Decode(t); err != nil {
@@ -572,6 +581,7 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 func (i *Intervention) UnmarshalJSON(data []byte) error {
 	var temp struct {
 		Action      string          `json:"action"`
+		MaxAttempts int             `json:"max_attempts"`
 		MaxFailures int             `json:"max_failures"`
 		Target      json.RawMessage `json:"target"`
 		Retries     int             `json:"retries"`
@@ -585,36 +595,43 @@ func (i *Intervention) UnmarshalJSON(data []byte) error {
 		Action:      temp.Action,
 		Retries:     temp.Retries,
 		MaxFailures: temp.MaxFailures,
+		MaxAttempts: temp.MaxAttempts,
 	}
 
 	switch temp.Action {
+	case "a2a":
+		t := &InterventionTargetA2A{}
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
+			return err
+		}
+		i.Target = t
 	case "docker":
 		var t = &InterventionTargetDocker{}
-		if err := decodeInterventionTargetJSON(temp.Target, t); err != nil {
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
 			return err
 		}
 		i.Target = t
 	case "kubernetes":
 		var t = &InterventionTargetKubernetes{}
-		if err := decodeInterventionTargetJSON(temp.Target, t); err != nil {
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
 			return err
 		}
 		i.Target = t
 	case "webhook":
 		var t = &InterventionTargetWebhook{}
-		if err := decodeInterventionTargetJSON(temp.Target, t); err != nil {
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
 			return err
 		}
 		i.Target = t
 	case "systemd":
 		var t = &InterventionTargetSystemd{}
-		if err := decodeInterventionTargetJSON(temp.Target, t); err != nil {
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
 			return err
 		}
 		i.Target = t
 	case "aws":
 		var t = &InterventionTargetAWS{}
-		if err := decodeInterventionTargetJSON(temp.Target, t); err != nil {
+		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
 			return err
 		}
 		i.Target = t
@@ -626,23 +643,25 @@ func (i *Intervention) UnmarshalJSON(data []byte) error {
 
 // JSON recovery durations accept the same strings as YAML, while retaining
 // numeric nanoseconds for callers of the existing JSON representation.
-func decodeInterventionTargetJSON(data []byte, target any) error {
+func decodeDriverDurationsJSON(data []byte, target any) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-	if raw := fields["timeout"]; len(raw) > 0 && raw[0] == '"' {
-		var text string
-		if err := json.Unmarshal(raw, &text); err != nil {
-			return err
-		}
-		duration, err := time.ParseDuration(text)
-		if err != nil {
-			return fmt.Errorf("invalid recovery timeout: %w", err)
-		}
-		fields["timeout"], err = json.Marshal(int64(duration))
-		if err != nil {
-			return err
+	for _, field := range []string{"timeout", "request_timeout", "task_timeout", "poll_interval"} {
+		if raw := fields[field]; len(raw) > 0 && raw[0] == '"' {
+			var text string
+			if err := json.Unmarshal(raw, &text); err != nil {
+				return err
+			}
+			duration, err := time.ParseDuration(text)
+			if err != nil {
+				return fmt.Errorf("invalid duration field %s", field)
+			}
+			fields[field], err = json.Marshal(int64(duration))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	normalized, err := json.Marshal(fields)
@@ -772,6 +791,7 @@ func (c *CodeNotificationOpsgenie) IsCodeNotification() {
 }
 
 type CodeConfig struct {
+	Trigger     string           `yaml:"trigger,omitempty" json:"trigger,omitempty"`
 	Config      CodeNotification `yaml:"config" json:"config"`
 	Notify      string           `yaml:"notify" json:"notify"`
 	NotifyGroup string           `yaml:"notify_group" json:"notify_group"`
@@ -781,6 +801,7 @@ type CodeConfig struct {
 type Codes map[string]CodeConfig
 
 type rawCodes struct {
+	Trigger     string `yaml:"trigger" json:"trigger"`
 	Dispatch    *bool  `yaml:"dispatch" json:"dispatch"` // Pointer to detect omitted field
 	Notify      string `yaml:"notify" json:"notify"`
 	NotifyGroup string `yaml:"notify_group" json:"notify_group"`
@@ -810,6 +831,7 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 			Dispatch:    dispatch,
 			Notify:      temp.Notify,
 			NotifyGroup: temp.NotifyGroup,
+			Trigger:     temp.Trigger,
 		}
 		if temp.NotifyGroup == "" {
 			cfg, err := decodeCodeNotificationYAML(temp.Notify, temp.Config)
@@ -830,6 +852,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 		Dispatch    *bool           `json:"dispatch"` // Pointer to detect omitted field
 		Notify      string          `json:"notify"`
 		NotifyGroup string          `json:"notify_group"`
+		Trigger     string          `json:"trigger"`
 		Config      json.RawMessage `json:"config"`
 	}
 
@@ -849,6 +872,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 			Dispatch:    dispatch,
 			Notify:      config.Notify,
 			NotifyGroup: config.NotifyGroup,
+			Trigger:     config.Trigger,
 		}
 		if config.NotifyGroup == "" {
 			cfg, err := decodeCodeNotificationJSON(config.Notify, config.Config)

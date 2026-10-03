@@ -2,16 +2,20 @@ GO ?= go
 PNPM ?= pnpm
 PYTHON ?= python3
 BUILD_TAGS ?=
-# The full management race suite includes the measured large encrypted-input
-# fixture. Its combined runtime exceeds Go's default ten-minute package limit.
-GO_TEST_TIMEOUT ?= 20m
+# The full management and persistence suites exceed twenty minutes with race
+# detection on the verified WSL host. Match the release runner's finite budget.
+GO_TEST_TIMEOUT ?= 45m
 ALL_DRIVER_TAGS = redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio
 BUILD_DIR ?= bin
 RELEASE_DIR ?= dist/release
+QUALIFICATION_CONFIG ?=
+QUALIFICATION_OUT ?= evidence/local/private-qualification.json
 # Development builds use Go's native module/VCS metadata. Official release
 # identities and source dates come only from the checked RELEASE.json recipe.
 VERSION ?= v0.0.0-dev
 RELEASE_GO ?= $(GO)
+RELEASE_DEPENDENCIES ?=
+RELEASE_DEPENDENCY_FLAGS = $(if $(strip $(RELEASE_DEPENDENCIES)),--dependencies "$(RELEASE_DEPENDENCIES)",)
 GORELEASER ?= bin/release-tools/goreleaser
 NFPM ?= bin/release-tools/nfpm
 VERSION_FLAGS ?=
@@ -23,7 +27,7 @@ DEV_GOWORK = $(if $(strip $(GOWORK)),$(GOWORK),$(abspath $(BUILD_DIR)/cpra-sdk.w
 DEV_GO = GOWORK="$(DEV_GOWORK)" $(GO)
 
 .DEFAULT_GOAL := all
-.PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean release-prepare release-build release-build-goreleaser release-package release-check release-tools
+.PHONY: all build build-ctl dashboard-build dashboard-check fmt-check vet test check test-all-drivers release clean release-prepare release-build release-build-goreleaser release-package release-check release-assess release-tools
 
 all: build build-ctl
 
@@ -76,10 +80,10 @@ release-prepare:
 	$(PYTHON) -B scripts/release/release.py prepare --version "$(VERSION)" --out "$(RELEASE_DIR)" $(RELEASE_CANDIDATE)
 
 release-build:
-	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --out "$(RELEASE_DIR)"
+	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --out "$(RELEASE_DIR)" $(RELEASE_DEPENDENCY_FLAGS)
 
 release-build-goreleaser:
-	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --goreleaser "$(GORELEASER)" --out "$(RELEASE_DIR)"
+	$(PYTHON) -B scripts/release/release.py build --go "$(RELEASE_GO)" --goreleaser "$(GORELEASER)" --out "$(RELEASE_DIR)" $(RELEASE_DEPENDENCY_FLAGS)
 
 release-package:
 	$(PYTHON) -B scripts/release/release.py pack --out "$(RELEASE_DIR)"
@@ -88,6 +92,10 @@ release-package:
 release-check:
 	$(PYTHON) -B -m unittest discover -s scripts/release -p 'test_*.py'
 	$(GO) test ./internal/version
+
+release-assess:
+	@test -n "$(QUALIFICATION_CONFIG)" || { echo 'Set QUALIFICATION_CONFIG to a private evidence configuration file.' >&2; exit 2; }
+	$(PYTHON) -B scripts/release/qualification.py --release "$(RELEASE_DIR)/RELEASE.json" --config "$(QUALIFICATION_CONFIG)" --out "$(QUALIFICATION_OUT)"
 
 release-tools:
 	$(PYTHON) -B scripts/release/install_tools.py
@@ -148,6 +156,9 @@ sdk-reference-check: | dev-workspace
 	GOWORK="$(DEV_GOWORK)" $(PYTHON) scripts/sdk/reference.py --go "$(GO)" --check
 	$(PYTHON) scripts/sdk/sync_guides.py --check
 
-.PHONY: docs-check
+.PHONY: docs-check docs-references
+docs-references:
+	$(PYTHON) -B scripts/docs/references.py
+
 docs-check:
 	$(PYTHON) -B scripts/docs/check.py

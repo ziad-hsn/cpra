@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
@@ -35,9 +36,24 @@ func workerAssignmentIdentity(in persistence.WorkerExecutionIntent) (string, err
 		in.Category, in.ActionID, in.Generation, in.Source, in.SourceUID, in.SourceRevision,
 		in.JobType, in.Guard, in.Scheduled, in.Deadline}
 	h := sha256.New()
-	_, _ = h.Write([]byte("cpra/worker/assignment-identity/v1\x00"))
+	if in.Schedule == nil {
+		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v1\x00"))
+	} else {
+		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v2\x00"))
+	}
 	if err := json.NewEncoder(h).Encode(value); err != nil {
 		return "", persistence.ErrWorkerExecutionInvalid
+	}
+	if in.Schedule != nil {
+		// Keep the versioned identity independent of future live ticket fields.
+		ticket := struct {
+			OwnerEpoch string `json:"owner_epoch"`
+			Epoch      int64  `json:"epoch"`
+			Sequence   uint64 `json:"sequence"`
+		}{in.Schedule.OwnerEpoch, in.Schedule.Epoch, in.Schedule.Sequence}
+		if err := json.NewEncoder(h).Encode(ticket); err != nil {
+			return "", persistence.ErrWorkerExecutionInvalid
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
@@ -71,11 +87,24 @@ func (c *Catalog) PrepareWorkerExecution(ctx context.Context, intent persistence
 		}
 	}
 	slot := map[string]string{"check": "check", "recovery": "recovery", "notification": "endpoint"}[intent.Category]
-	if slot == "" || intent.Category == "notification" && intent.Source.Kind != "NotificationEndpoint" || intent.Category != "notification" && (intent.Source != (persistence.CatalogKey{Kind: "Monitor", ID: intent.MonitorID}) || intent.SourceUID != intent.MonitorUID) {
+	monitorSource := intent.Source == (persistence.CatalogKey{Kind: "Monitor", ID: intent.MonitorID}) && intent.SourceUID == intent.MonitorUID
+	if slot == "" || intent.Category == "notification" && intent.Source.Kind != "NotificationEndpoint" && !monitorSource || intent.Category != "notification" && !monitorSource {
 		return fail(persistence.ErrWorkerExecutionInvalid)
 	}
 	if err := c.readyContext(ctx); err != nil {
 		return fail(err)
+	}
+	if intent.Category == "notification" && monitorSource {
+		monitor, ok, err := c.store.GetContext(ctx, intent.MonitorID)
+		if err != nil {
+			return fail(workerPreparationError(ctx, err))
+		}
+		action, exists := monitor.Actions[intent.ActionID]
+		if !ok || monitor.Removed || monitor.CatalogUID != intent.MonitorUID || monitor.Revision != intent.MonitorRevision || monitor.CatalogRevision != intent.SourceRevision ||
+			!exists || action.Kind != "code" || action.State != persistence.Queued || action.CatalogUID != intent.MonitorUID || action.Revision != intent.MonitorRevision || !action.NotBefore.Equal(intent.Scheduled) {
+			return fail(persistence.ErrWorkerExecutionConflict)
+		}
+		slot = "notifications." + action.Color
 	}
 	intent = intent.Clone()
 	view, err := c.store.CatalogSnapshotContext(ctx)
@@ -227,9 +256,12 @@ func (c *Catalog) openWorkerExecution(ctx context.Context, record persistence.Wo
 	return descriptor, nil
 }
 
-func workerPreparationError(ctx context.Context, _ error) error {
+func workerPreparationError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if persistence.IsLeadershipUnavailable(err) {
+		return errors.Join(ErrUnavailable, err)
 	}
 	return ErrUnavailable
 }

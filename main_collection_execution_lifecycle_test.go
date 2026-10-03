@@ -20,17 +20,23 @@ import (
 )
 
 type mainRuntimeCollectionOwner struct {
-	done    chan struct{}
-	failure error
-	ready   atomic.Bool
-	stopped atomic.Bool
-	wait    func(context.Context) error
+	done      chan struct{}
+	failure   error
+	ready     atomic.Bool
+	stopped   atomic.Bool
+	wait      func(context.Context) error
+	readiness func(context.Context) bool
 }
 
 func (o *mainRuntimeCollectionOwner) Done() <-chan struct{} { return o.done }
 func (o *mainRuntimeCollectionOwner) Err() error            { return o.failure }
-func (o *mainRuntimeCollectionOwner) Ready() bool           { return o.ready.Load() }
-func (o *mainRuntimeCollectionOwner) BeginStop()            { o.stopped.Store(true); o.ready.Store(false) }
+func (o *mainRuntimeCollectionOwner) ReadyContext(ctx context.Context) bool {
+	if o.readiness != nil {
+		return o.readiness(ctx)
+	}
+	return o.ready.Load() && ctx.Err() == nil
+}
+func (o *mainRuntimeCollectionOwner) BeginStop() { o.stopped.Store(true); o.ready.Store(false) }
 func (o *mainRuntimeCollectionOwner) Wait(ctx context.Context) error {
 	if o.wait != nil {
 		return o.wait(ctx)
@@ -46,6 +52,48 @@ func mainRuntimeOwner() *mainRuntimeCollectionOwner {
 	o := &mainRuntimeCollectionOwner{done: make(chan struct{})}
 	o.ready.Store(true)
 	return o
+}
+
+func TestMainCollectionReadinessPreservesCancellation(t *testing.T) {
+	for _, role := range []string{"validation", "execution", "reselection"} {
+		t.Run(role, func(t *testing.T) {
+			for _, cancelBefore := range []bool{true, false} {
+				t.Run(map[bool]string{true: "before-read", false: "during-read"}[cancelBefore], func(t *testing.T) {
+					validation, execution, reselection := mainRuntimeOwner(), mainRuntimeOwner(), mainRuntimeOwner()
+					owners := runtimeCollectionOwners{validation: validation, execution: execution, reselection: reselection}
+					target := validation
+					if role == "execution" {
+						target = execution
+					} else if role == "reselection" {
+						target = reselection
+					}
+					ctx, cancel := context.WithCancel(t.Context())
+					defer cancel()
+					if cancelBefore {
+						cancel()
+					} else {
+						target.readiness = func(observed context.Context) bool {
+							if observed != ctx {
+								t.Error("collection owner lost the observation context")
+							}
+							cancel()
+							return false
+						}
+					}
+					if err := owners.Failure(ctx); !errors.Is(err, context.Canceled) {
+						t.Fatal("interrupted readiness was reported as an owner failure", err)
+					}
+					if owners.Ready(ctx) || target.stopped.Load() || target.Err() != nil {
+						t.Fatal("interrupted observation stopped or readied an owner")
+					}
+					target.readiness = nil
+					if !owners.Ready(t.Context()) || owners.Failure(t.Context()) != nil {
+						t.Fatal("interrupted observation prevented later readiness")
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestMainCollectionOwnersStopAllBeforeSharedJoin(t *testing.T) {
@@ -75,7 +123,7 @@ func TestMainCollectionOwnersStopAllBeforeSharedJoin(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 			defer cancel()
 			joined, err := owners.Join(ctx)
-			if joined == held || !errors.Is(err, failure) || seen != 2 || owners.Ready() {
+			if joined == held || !errors.Is(err, failure) || seen != 2 || owners.Ready(t.Context()) {
 				t.Fatal("lost owner failure/join boundary", joined, err, seen)
 			}
 			if held && !errors.Is(err, context.DeadlineExceeded) {
@@ -89,7 +137,7 @@ func TestMainCollectionOwnersReadinessAndSupervision(t *testing.T) {
 		t.Run(failed, func(t *testing.T) {
 			validation, execution, reselection := mainRuntimeOwner(), mainRuntimeOwner(), mainRuntimeOwner()
 			owners := runtimeCollectionOwners{validation: validation, execution: execution, reselection: reselection}
-			if !owners.Ready() || owners.Failure() != nil {
+			if !owners.Ready(t.Context()) || owners.Failure(t.Context()) != nil {
 				t.Fatal("healthy owners unavailable")
 			}
 			o := validation
@@ -103,7 +151,7 @@ func TestMainCollectionOwnersReadinessAndSupervision(t *testing.T) {
 			o.failure = failure
 			o.ready.Store(false)
 			close(o.done)
-			if owners.Ready() || !errors.Is(owners.Failure(), failure) {
+			if owners.Ready(t.Context()) || !errors.Is(owners.Failure(t.Context()), failure) {
 				t.Fatal("failed owner remained ready")
 			}
 			if err := owners.Supervise(t.Context()); !errors.Is(err, failure) || !strings.Contains(err.Error(), failed) {
@@ -120,7 +168,7 @@ func TestMainCollectionOwnersReadinessAndSupervision(t *testing.T) {
 
 // Public activation remains absent. This stopped fixture uses the actual
 // authenticated validation coordinator and the private durable admission only.
-func seedMainCollectionExecution(t *testing.T, f mainManagementFixture) persistence.CollectionState {
+func seedMainCollectionExecution(t *testing.T, f *mainManagementFixture) persistence.CollectionState {
 	t.Helper()
 	original := seedMainCollectionValidation(t, f, false)
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -326,6 +374,7 @@ func TestMainCollectionExecutionJoinsBothOnListenerFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
+	fixture.options.webAddr = listener.Addr().String()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	err = runCPRa(ctx, fixture.options, func() { t.Error("failed listener announced ready") })

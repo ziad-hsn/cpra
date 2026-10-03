@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ziad-hsn/cpra/internal/cpractl/cli"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
@@ -18,6 +20,119 @@ import (
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 )
+
+func TestObservationRequestsReceiveBoundedContext(t *testing.T) {
+	const token = "read-deadline-fixture-token"
+	for _, path := range []string{"/api/v1/readyz", "/api/v2/readyz", "/api/v1/state", "/api/v2/state", "/metrics"} {
+		t.Run(path, func(t *testing.T) {
+			server := New(ServerConfig{AuthToken: token, ReadTimeout: time.Second}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+			handler := server.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				deadline, ok := r.Context().Deadline()
+				if !ok || time.Until(deadline) > time.Second {
+					t.Error("observation handler did not receive the configured deadline")
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			request.Header.Set("Authorization", "Bearer "+token)
+			handler.ServeHTTP(httptest.NewRecorder(), request)
+
+			ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+			defer cancel()
+			want, _ := ctx.Deadline()
+			handler = server.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got, ok := r.Context().Deadline(); !ok || !got.Equal(want) {
+					t.Error("observation replaced the caller's earlier deadline")
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			handler.ServeHTTP(httptest.NewRecorder(), request.WithContext(ctx))
+		})
+	}
+}
+
+func TestObservationDeadlineDoesNotShortenWorkerPolls(t *testing.T) {
+	server := New(ServerConfig{AuthToken: "read-deadline-fixture-token", ReadTimeout: time.Millisecond}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	handler := server.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.Context().Deadline(); ok {
+			t.Error("read deadline applied to a worker poll")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	request := httptest.NewRequest(http.MethodPost, "/api/v2/external-workers/poll", nil)
+	request.Header.Set("Authorization", "Bearer read-deadline-fixture-token")
+	handler.ServeHTTP(httptest.NewRecorder(), request)
+}
+
+func TestReadinessUsesRequestContext(t *testing.T) {
+	for _, scenario := range []struct {
+		name, path string
+		management bool
+	}{
+		{"token-v1", "/api/v1/readyz", false},
+		{"token-v2", "/api/v2/readyz", false},
+		{"managed-readiness", "/api/v2/readyz", true},
+		{"managed-state", "/api/v2/state", true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			server := New(ServerConfig{AuthToken: "request-context-token"}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+			token := "request-context-token"
+			if scenario.management {
+				fixture := newManagementFixture(t, true)
+				server, token = fixture.server, managementReaderToken
+			}
+			type requestKey struct{}
+			key := requestKey{}
+			ctx, cancel := context.WithCancel(context.WithValue(t.Context(), key, "request-context"))
+			seen, done, release := make(chan context.Context, 1), make(chan struct{}), make(chan struct{})
+			server.cfg.Ready = func(ctx context.Context) bool {
+				seen <- ctx
+				select {
+				case <-ctx.Done():
+				case <-release:
+				}
+				return false
+			}
+			t.Cleanup(func() {
+				cancel()
+				close(release)
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Error("request did not exit after readiness was released")
+				}
+			})
+			request := httptest.NewRequest(http.MethodGet, "https://cpra.example"+scenario.path, nil).WithContext(ctx)
+			request.Header.Set("Authorization", "Bearer "+token)
+			response := httptest.NewRecorder()
+			handler := server.authMiddleware(apiMux(server))
+			go func() {
+				defer close(done)
+				handler.ServeHTTP(response, request)
+			}()
+			var observed context.Context
+			select {
+			case observed = <-seen:
+				if observed.Value(key) != "request-context" {
+					t.Fatal("readiness lost request context values")
+				}
+			case <-done:
+				t.Fatalf("request exited before readiness: %d %s", response.Code, response.Body.String())
+			case <-time.After(time.Second):
+				t.Fatal("request did not reach readiness")
+			}
+			cancel()
+			select {
+			case <-done:
+				if !errors.Is(observed.Err(), context.Canceled) || response.Code != http.StatusServiceUnavailable {
+					t.Fatal("request cancellation did not stop readiness", observed.Err(), response.Code)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("readiness outlived request cancellation")
+			}
+		})
+	}
+}
 
 func TestTokenOnlyV2ProbesSDKAndCLI(t *testing.T) {
 	for _, committed := range []bool{false, true} {
@@ -35,7 +150,7 @@ func TestTokenOnlyV2ProbesSDKAndCLI(t *testing.T) {
 			t.Cleanup(func() { _ = store.Close() })
 			var ready atomic.Bool
 			ready.Store(true)
-			cfg := ServerConfig{Store: store, AuthToken: token, Ready: ready.Load}
+			cfg := ServerConfig{Store: store, AuthToken: token, Ready: func(context.Context) bool { return ready.Load() }}
 			if committed {
 				digest := sha256.Sum256([]byte(token))
 				cfg.AuthToken = "must-not-authorize"
@@ -122,7 +237,7 @@ func TestTokenOnlyV2ProbesRequireExistingAuthentication(t *testing.T) {
 }
 
 func TestTokenOnlyV2ProbesAreNarrowReadRoutes(t *testing.T) {
-	server := New(ServerConfig{AuthToken: "probe-token", Ready: func() bool { return true }}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	server := New(ServerConfig{AuthToken: "probe-token", Ready: func(context.Context) bool { return true }}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	handler := server.authMiddleware(apiMux(server))
 	for _, tc := range []struct {
 		method, path string

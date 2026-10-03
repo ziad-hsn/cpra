@@ -202,6 +202,31 @@ func (s *Store) LookupJobTypeVersion(ctx context.Context, id, version string) (J
 		return JobTypeVersionView{}, false, err
 	}
 	defer unlock()
+	return s.lookupJobTypeVersionLocked(ctx, id, version)
+}
+
+// LookupBootstrapJobTypeVersion reads only immutable contracts for an initial
+// import. It does not expose the partially seeded catalog or permit execution.
+// During seeding, the caller must identify the original bootstrap stage.
+func (s *Store) LookupBootstrapJobTypeVersion(ctx context.Context, stageID, id, version string) (JobTypeVersionView, bool, error) {
+	if !catalogIdentifier(stageID, 128) || !catalogIdentifier(id, 256) || !jobTypeSelector(version) {
+		return JobTypeVersionView{}, false, ErrJobTypeInvalid
+	}
+	unlock, err := s.lockStateContext(ctx, false)
+	if err != nil {
+		return JobTypeVersionView{}, false, err
+	}
+	defer unlock()
+	if s.err != nil || s.fsm.err != nil {
+		return JobTypeVersionView{}, false, errCatalogUnavailable
+	}
+	if s.fsm.bootstrapPending() && s.fsm.image.Bootstrap.Manifest.StageID != stageID {
+		return JobTypeVersionView{}, false, ErrBootstrapConflict
+	}
+	return s.lookupJobTypeVersionLocked(ctx, id, version)
+}
+
+func (s *Store) lookupJobTypeVersionLocked(ctx context.Context, id, version string) (JobTypeVersionView, bool, error) {
 	if s.fsm.image.JobTypes == nil {
 		return JobTypeVersionView{}, false, nil
 	}

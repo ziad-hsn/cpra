@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -17,11 +18,27 @@ type DiskUsage struct {
 // Usage walks only the store's bounded file catalog on an HTTP goroutine.
 // It does not hold the FSM or controller lock while obtaining file metadata.
 func (s *Store) Usage() DiskUsage {
+	usage, _ := s.UsageContext(context.Background())
+	return usage
+}
+
+// UsageContext checks cancellation between metadata operations. Native
+// filesystem calls must return before cancellation can be observed.
+func (s *Store) UsageContext(ctx context.Context) (DiskUsage, error) {
+	if ctx == nil {
+		return DiskUsage{}, context.Canceled
+	}
+	if err := ctx.Err(); err != nil {
+		return DiskUsage{}, err
+	}
 	u := DiskUsage{Available: true}
 	if s.config.Storage.Mode == "memory" {
-		return u
+		return u, nil
 	}
 	err := filepath.WalkDir(s.config.Storage.Directory, func(path string, e fs.DirEntry, err error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}
@@ -45,6 +62,9 @@ func (s *Store) Usage() DiskUsage {
 		}
 		return nil
 	})
+	if err == nil {
+		err = ctx.Err()
+	}
 	u.Available = err == nil
-	return u
+	return u, err
 }

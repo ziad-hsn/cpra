@@ -94,7 +94,13 @@ func TestMainManagementRecoveryReviewBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	evidenceDir := filepath.Join(root, "bin/verification/main-browser-actions")
+	evidenceDir := os.Getenv("CPRA_BROWSER_EVIDENCE_DIR")
+	if evidenceDir == "" {
+		evidenceDir = filepath.Join(root, "bin/verification/main-browser-actions")
+	}
+	if !filepath.IsAbs(evidenceDir) {
+		t.Fatal("browser evidence directory must be absolute")
+	}
 	if err := os.MkdirAll(evidenceDir, 0700); err != nil {
 		t.Fatal(err)
 	}

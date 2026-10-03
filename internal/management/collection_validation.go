@@ -85,8 +85,8 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
-	if !c.Ready() {
-		return result, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return result, err
 	}
 	if len(inputs) > maxValidationGraph {
 		return result, ErrGraphLimit
@@ -174,7 +174,7 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 			v.result.Items[i].Change = "create"
 		}
 		r.Status = nil
-		if validateDesired(&r) != nil {
+		if v.catalog.options.validateDesired(&r) != nil {
 			v.result.Items[i].Issue = "invalidResource"
 			continue
 		}
@@ -231,9 +231,9 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 	}
 	// Fresh immutable reads reject already-stale validation; the returned original
 	// guards still remain necessary for every later activation.
-	current, err := c.store.CatalogSnapshot()
+	current, err := c.store.CatalogSnapshotContext(ctx)
 	if err != nil {
-		return v.result, ErrUnavailable
+		return v.result, errors.Join(ErrUnavailable, err)
 	}
 	for _, key := range collectionKeys(v.records) {
 		if err := ctx.Err(); err != nil {
@@ -259,8 +259,8 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 			v.result.CreateAbsent = append(v.result.CreateAbsent, key)
 		}
 	}
-	if !c.Ready() {
-		return v.result, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return v.result, err
 	}
 	v.result.Valid, v.result.Order = true, order
 	return v.result, nil
@@ -430,12 +430,14 @@ func (v *collectionValidator) expand(ctx context.Context) error {
 		}
 		seen[key] = true
 		record := v.records[key]
-		dependents, guard, err := v.catalog.store.CatalogDependents(key, maxValidationGraph)
+		dependents, guard, err := v.catalog.store.CatalogDependentsContext(ctx, key, maxValidationGraph)
 		if err != nil {
 			if errors.Is(err, persistence.ErrCatalogNotFound) {
 				err = persistence.ErrCatalogConflict
-			} else if !v.catalog.Ready() {
-				err = ErrUnavailable
+			} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				// Keep cancellation distinct from a graph-size rejection.
+			} else if healthErr := v.catalog.readyContext(ctx); healthErr != nil {
+				err = healthErr
 			} else {
 				err = ErrGraphLimit
 			}

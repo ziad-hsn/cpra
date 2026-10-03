@@ -181,6 +181,8 @@ export interface DurableStateResponse {
   revision?: string;
 }
 export interface MonitorEvent {
+  agentReceipt?: import('./generated').AgentReceipt;
+  recoveryFailure?: import('./generated').RecoveryFailure;
   id: string;
   monitor_id: string;
   revision: string;

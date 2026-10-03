@@ -47,8 +47,24 @@ func (*sessionResponseRecorder) SetReadDeadline(time.Time) error { return nil }
 
 func newWorkerSessionFixture(t *testing.T) *workerSessionFixture {
 	t.Helper()
+	return newWorkerSessionFixtureForCategory(t, "check")
+}
+
+func newWorkerSessionFixtureForCategory(t *testing.T, category string, automaticFinalization ...bool) *workerSessionFixture {
+	t.Helper()
+	kind := "Monitor"
+	if category == "notification" {
+		kind = "NotificationEndpoint"
+	}
+	return newWorkerSessionFixtureWithSource(t, category, kind, automaticFinalization...)
+}
+
+func newWorkerSessionFixtureWithSource(t *testing.T, category, kind string, automaticFinalization ...bool) *workerSessionFixture {
+	t.Helper()
 	f, store, directory := newJobTypeHTTPFixture(t)
-	job, err := f.sdk.JobTypes().Create(t.Context(), httpJobType("session-check"))
+	spec := httpJobType("session-check")
+	spec.Spec.Kind = category
+	job, err := f.sdk.JobTypes().Create(t.Context(), spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +77,14 @@ func newWorkerSessionFixture(t *testing.T) *workerSessionFixture {
 		t.Fatal(err)
 	}
 	grantsPath, tokenPath := filepath.Join(private, "grants.json"), filepath.Join(private, "worker.token")
+	id := "monitor-one"
+	if kind == "NotificationEndpoint" {
+		id = "endpoint-one"
+	}
 	grants, err := json.Marshal(struct {
 		Grants []persistence.WorkerGrant `json:"grants"`
 	}{
-		Grants: []persistence.WorkerGrant{{JobTypeID: "session-check", JobTypeUID: job.Data.Metadata.UID, Version: "v1", Category: "check", ResourceKind: "Monitor", ResourceIDs: []string{"monitor-one"}}},
+		Grants: []persistence.WorkerGrant{{JobTypeID: "session-check", JobTypeUID: job.Data.Metadata.UID, Version: "v1", Category: category, ResourceKind: kind, ResourceIDs: []string{id}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +105,12 @@ func newWorkerSessionFixture(t *testing.T) *workerSessionFixture {
 	defer clear(token)
 	cfg := runtimeconfig.Default()
 	cfg.Storage.Directory = directory
+	if len(automaticFinalization) == 1 && automaticFinalization[0] {
+		cfg.ExternalJobs.Enabled = true
+		cfg.Management.Enabled = true
+		cfg.Management.TrustedProxy = &runtimeconfig.ManagementProxy{PublicOrigin: "https://fixture.example"}
+		cfg.Management.Encryption = &runtimeconfig.ManagementEncryption{Local: &runtimeconfig.ManagementLocalKeys{ActiveKeyFile: filepath.Join(private, "wrapping.key")}}
+	}
 	store, err = persistence.Open(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -115,9 +141,13 @@ func newWorkerSessionFixture(t *testing.T) *workerSessionFixture {
 			return fn()
 		},
 	}
+	// Adapter fixtures deliberately share their injected callbacks. Production
+	// wiring and its separate shutdown barriers are exercised by route tests.
+	handler.completionReady = func(ctx context.Context) error { return handler.ready(ctx) }
+	handler.complete = func(ctx context.Context, fn func() error) error { return handler.admit(ctx, fn) }
 	return &workerSessionFixture{handler: handler, store: store, dir: directory, token: strings.TrimSpace(string(token)), uid: report.Workers[0].UID,
 		request: api.PollRequest{WorkerID: "worker-one", ServerID: report.ProtocolServerID, ClientSessionID: uuid.NewString(), PollSequence: 1,
-			Capacity: 1, Limit: 1, Capabilities: []api.WorkerCapability{{JobTypeID: "session-check", Version: "v1", Kind: "check"}},
+			Capacity: 1, Limit: 1, Capabilities: []api.WorkerCapability{{JobTypeID: "session-check", Version: "v1", Kind: category}},
 		},
 	}
 }
@@ -146,7 +176,8 @@ func workerSessionProblem(t *testing.T, response *httptest.ResponseRecorder, sta
 
 func TestWorkerSessionHTTPRaftReplayAndSDK(t *testing.T) {
 	f := newWorkerSessionFixture(t)
-	// This mux qualifies only the session adapter; startup exposes no worker routes.
+	// This mux qualifies only the session adapter; production registration has
+	// separate tests covering runtime enablement and shutdown.
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v2/external-workers/poll", f.handler.poll)
 	server := httptest.NewTLSServer(mux)

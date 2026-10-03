@@ -50,9 +50,13 @@ decoded source bytes, or the original input configuration.
 
 ## Local keys
 
-The active file contains exactly 32 random bytes. Provisioning is a separate,
-explicit `secureconfig.GenerateLocalKeyFile` operation; `Open` only loads existing
-files. `previous_key_files` supplies historical wrapping keys needed to read
+The active file contains exactly 32 random bytes. Provision it explicitly with
+`cpractl local encryption init --key-file /absolute/path/to/wrapping.key --data-dir /absolute/path/to/state`.
+The CLI uses `secureconfig.GenerateLocalKeyFile`; `Open` only loads existing files.
+`cpractl local encryption inspect` with the same paths and reader options reports
+only the non-secret key identity and never repairs or replaces an existing file.
+The commands do not open Raft, contact a server, or activate configuration.
+`previous_key_files` supplies historical wrapping keys needed to read
 existing envelopes, while new writes use `active_key_file`. Duplicate key material
 under distinct file names is rejected by the immutable key ring.
 
@@ -65,8 +69,8 @@ Files and their containing directory must meet the native protection policy:
   Unix group options on Windows and Windows SID options on Unix are rejected.
 - Safe projected-secret aliases can be read, but state-directory aliases,
   hard-linked sources, changed file identities, and unsupported native ACL
-  verification fail explicitly. The current non-Linux Unix ACL adapter fails
-  closed; a macOS build is not evidence of native key-file support.
+  verification fail explicitly. The macOS adapter inspects native extended ACLs;
+  other Unix platforms fail closed. A cross-build is not native qualification.
 
 Keep previous keys while any retained catalog, staging, snapshot, or backup needs
 them. Selecting a new key does not re-encrypt existing records. Key identity is

@@ -6,10 +6,24 @@ on:
         description: Release version; stable tag is created only after verification
         required: true
         default: v0.1.0-rc.1
+      worker_version:
+        description: Reviewed worker module version for private dependency preparation
+        required: true
+        default: v0.1.0-rc.1
       docs_ref:
         description: Documentation ref whose source-version.json matches this candidate exactly
         required: true
         default: gh-pages
+      previous_run_id:
+        description: Completed private release-workflow run with the reviewed previous artifacts; empty keeps upgrade qualification pending
+        required: false
+        type: string
+        default: ''
+      previous_publication_run_id:
+        description: Completed run of this exact source to resume OCI/module progress; empty starts new journals
+        required: false
+        type: string
+        default: ''
       publish:
         description: Unavailable until the complete private qualification gate is implemented
         type: boolean
@@ -21,7 +35,17 @@ concurrency:
   cancel-in-progress: false
 env:
   GOTOOLCHAIN: local
+  GOWORK: 'off'
+  GOENV: 'off'
+  GOFLAGS: ''
+  GOEXPERIMENT: ''
+  GOPROXY: https://proxy.golang.org
+  GOSUMDB: sum.golang.org
+  GOPRIVATE: ''
+  GONOPROXY: ''
+  GONOSUMDB: ''
   RELEASE_VERSION: ${{ inputs.version }}
+  WORKER_VERSION: ${{ inputs.worker_version }}
 jobs:
   private-staging:
     runs-on: ubuntu-24.04
@@ -40,7 +64,7 @@ jobs:
             exit 1
           fi
           if [ "$CPRA_PUBLISH_REQUESTED" != false ]; then
-            echo 'Publication is locked until the complete management, SDK, platform, provider and endurance gate is implemented and passes.' >&2
+            echo 'Publication is locked until the complete management, SDK, platform, provider and performance gate is implemented and passes.' >&2
             exit 1
           fi
 
@@ -57,6 +81,35 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.21.0'
+      - name: Prepare frozen source and private dependency cache
+        run: |
+          make release-prepare VERSION="$RELEASE_VERSION"
+          python3 scripts/release/release.py source
+          python3 scripts/release/dependencies.py --source "dist/release/cpra-$RELEASE_VERSION-source.tar.gz" --go "$(command -v go)" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/cpra-dependencies"
+          cp "$RUNNER_TEMP/cpra-dependencies/dependencies.json" dist/release/dependencies.json
+          printf 'GOMODCACHE=%s\nGOPATH=%s\n' "$RUNNER_TEMP/cpra-dependencies/modules" "$RUNNER_TEMP/cpra-dependencies/go-path" >> "$GITHUB_ENV"
+      - name: Retain dependency preparation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-preparation-build
+          path: |
+            ${{ runner.temp }}/cpra-dependencies/*.json
+            ${{ runner.temp }}/cpra-dependencies/*.log
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/@v/*.info
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/@v/*.mod
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/@v/*.zip
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/worker/@v/*.info
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/worker/@v/*.mod
+            ${{ runner.temp }}/cpra-dependencies/modules/cache/download/github.com/ziad-hsn/cpra/sdk/go/worker/@v/*.zip
+            ${{ runner.temp }}/cpra-dependencies/source/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.sum
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Verify generated assets and release inputs
         run: |
           npm install --global pnpm@11.22.0
@@ -78,14 +131,27 @@ jobs:
           fi
       - name: Build exact recorded recipe and package outputs
         run: |
-          make release-prepare VERSION="$RELEASE_VERSION"
-          make release-build-goreleaser
+          make release-build-goreleaser RELEASE_DEPENDENCIES="$RUNNER_TEMP/cpra-dependencies"
           make release-package
           python3 scripts/release/sbom.py --syft bin/release-tools/syft
           python3 scripts/release/release.py verify
+      - name: Build provider verifier from frozen release inputs
+        run: python3 -B scripts/release/provider_evidence.py build --manifest dist/release/RELEASE.json --go "$(command -v go)" --dependencies "$RUNNER_TEMP/cpra-dependencies" --out "$RUNNER_TEMP/cpra-provider-build"
+      - name: Retain source-bound provider executable and build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: provider-verifier-build
+          path: |
+            ${{ runner.temp }}/cpra-provider-build/report.json
+            ${{ runner.temp }}/cpra-provider-build/cpra-verify
+            ${{ runner.temp }}/cpra-provider-build/*.stdout
+            ${{ runner.temp }}/cpra-provider-build/*.stderr
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Rebuild from distributed source without Git
         run: |
-          python3 scripts/release/source_rebuild.py --source "dist/release/cpra-$RELEASE_VERSION-source.tar.gz" --stage dist/release --go "$(command -v go)" --nfpm "$PWD/bin/release-tools/nfpm" --out dist/release/reproducibility.json
+          python3 scripts/release/source_rebuild.py --source "dist/release/cpra-$RELEASE_VERSION-source.tar.gz" --stage dist/release --go "$(command -v go)" --nfpm "$PWD/bin/release-tools/nfpm" --dependencies "$RUNNER_TEMP/cpra-dependencies" --out dist/release/reproducibility.json
           python3 scripts/release/release.py checksums
       - name: Upload release assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -98,6 +164,13 @@ jobs:
             dist/release/*.rpm
             dist/release/*.json
             dist/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload frozen release metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-metadata
+          path: dist/release/RELEASE.json
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -163,12 +236,35 @@ jobs:
       - name: Install checksum-pinned native compiler
         shell: bash
         run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-go"
-      - name: Native storage and platform correctness
-        run: go test -p=2 ./internal/installpath ./internal/localadmin ./internal/persistence
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-assets
           path: source-assets
+      - name: Prepare native private dependency cache
+        shell: bash
+        run: |
+          python3 scripts/release/dependencies.py --source "source-assets/cpra-$RELEASE_VERSION-source.tar.gz" --go "$(command -v go)" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/cpra-dependencies"
+          mkdir -p evidence
+          cp "$RUNNER_TEMP/cpra-dependencies/dependencies.json" "evidence/dependencies-${{ matrix.target }}.json"
+          printf 'GOMODCACHE=%s\nGOPATH=%s\n' "$RUNNER_TEMP/cpra-dependencies/modules" "$RUNNER_TEMP/cpra-dependencies/go-path" >> "$GITHUB_ENV"
+      - name: Retain native dependency preparation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-preparation-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/cpra-dependencies/*.json
+            ${{ runner.temp }}/cpra-dependencies/*.log
+            ${{ runner.temp }}/cpra-dependencies/source/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.sum
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Native storage and platform correctness
+        run: go test -p=2 ./internal/installpath ./internal/secureconfig ./internal/localadmin ./internal/persistence
       - name: Versioned source installation outside a checkout
         shell: bash
         run: python3 scripts/release/go_install.py --source "source-assets/cpra-$RELEASE_VERSION-source.tar.gz" --go "$(command -v go)" --out "evidence/go-install-${{ matrix.target }}.json"
@@ -191,6 +287,96 @@ jobs:
             evidence/*.json
             evidence/*.log
           if-no-files-found: error
+
+  storage-upgrade:
+    needs: [private-staging, build]
+    if: inputs.previous_run_id != ''
+    name: Native storage upgrade (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux_amd64, runner: ubuntu-24.04}
+          - {target: linux_arm64, runner: ubuntu-24.04-arm}
+    env:
+      CPRA_PREVIOUS_RUN_ID: ${{ inputs.previous_run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Record the previous run before downloading executable artifacts
+        run: |
+          python3 -c 'import os,re; value=os.environ["CPRA_PREVIOUS_RUN_ID"]; assert re.fullmatch(r"[1-9][0-9]{0,19}",value), "Invalid previous run ID"'
+          mkdir -p evidence/previous
+          gh api --method GET -H 'X-GitHub-Api-Version: 2026-03-10' "repos/$GITHUB_REPOSITORY/actions/runs/$CPRA_PREVIOUS_RUN_ID" > evidence/previous-run.json
+          gh api --method GET -H 'X-GitHub-Api-Version: 2026-03-10' "repos/$GITHUB_REPOSITORY/actions/runs/$CPRA_PREVIOUS_RUN_ID/jobs?filter=latest&per_page=100" > evidence/previous-jobs.json
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: candidate-distribution
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: stage-${{ matrix.target }}
+          path: candidate-stage
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: previous-distribution
+          run-id: ${{ inputs.previous_run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: stage-${{ matrix.target }}
+          path: previous-stage
+          run-id: ${{ inputs.previous_run_id }}
+          github-token: ${{ github.token }}
+      - name: Validate both frozen artifacts before invoking an owner
+        run: |
+          chmod +x candidate-stage/cpra candidate-stage/cpractl previous-stage/cpra previous-stage/cpractl
+          python3 -B scripts/release/storage_evidence.py --check-executables --release candidate-stage/RELEASE.json --previous-release previous-stage/RELEASE.json --distribution candidate-distribution --previous-distribution previous-distribution --candidate-stage candidate-stage --previous-stage previous-stage --previous-run evidence/previous-run.json --previous-jobs evidence/previous-jobs.json --previous-run-id "$CPRA_PREVIOUS_RUN_ID" --repository "$GITHUB_REPOSITORY" --out evidence/upgrade-inputs.json
+      - name: Run log replay, snapshot recovery and stopped restore
+        env:
+          CPRA_UPGRADE_TARGET: ${{ matrix.target }}
+        run: |
+          CPRA_UPGRADE_WORK=$(mktemp -d "$RUNNER_TEMP/cpra-upgrade.XXXXXXXX")
+          trap 'rm -rf -- "$CPRA_UPGRADE_WORK"' EXIT
+          python3 -B scripts/native/upgrade.py --previous-binary "$PWD/previous-stage/cpra" --previous-cli "$PWD/previous-stage/cpractl" --candidate-binary "$PWD/candidate-stage/cpra" --candidate-cli "$PWD/candidate-stage/cpractl" --work-dir "$CPRA_UPGRADE_WORK/fixtures" --out "$PWD/evidence/upgrade-$CPRA_UPGRADE_TARGET.json"
+          python3 -B scripts/release/storage_evidence.py --release candidate-stage/RELEASE.json --previous-release previous-stage/RELEASE.json --distribution candidate-distribution --previous-distribution previous-distribution --campaign "$PWD/evidence/upgrade-$CPRA_UPGRADE_TARGET.json" --out evidence/upgrade-assessment.json
+      - name: Retain only the previous metadata and matching archive
+        if: always()
+        env:
+          CPRA_UPGRADE_TARGET: ${{ matrix.target }}
+        run: |
+          python3 -B - <<'PY'
+          import os,shutil,sys
+          from pathlib import Path
+          sys.path.insert(0,str(Path('scripts/release').absolute()))
+          import release,storage_evidence
+          from evidence import read_report
+          path=Path('previous-distribution/RELEASE.json')
+          if path.is_file():
+              manifest=read_report(path)
+              release.evidence_identity(manifest)
+              name=storage_evidence.archive_name(manifest,os.environ['CPRA_UPGRADE_TARGET'])
+              shutil.copyfile(path,'evidence/previous/RELEASE.json')
+              archive=Path('previous-distribution')/name
+              if archive.is_file():
+                  storage_evidence.require(archive.resolve()==archive.absolute() and archive.stat().st_size<=1024**3,'invalid previous archive')
+                  shutil.copyfile(archive,Path('evidence/previous')/name)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: storage-upgrade-${{ matrix.target }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
 
   packages:
     needs: build
@@ -264,15 +450,96 @@ jobs:
           path: tested-image-*.tar*
           if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: container-evidence-${{ matrix.arch }}
           path: |
             evidence/*.json
             evidence/*.log
+            evidence/*.tar
           if-no-files-found: error
 
+  private-assembly:
+    needs: [private-staging, build, containers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-metadata
+          path: ${{ runner.temp }}/cpra-assembly-metadata
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: container-evidence-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/cpra-assembly-images
+      - name: Install reviewed chart and inventory prerequisites
+        run: |
+          python3 -B scripts/release/install_tools.py helm4 syft
+          python3 -m pip install -r scripts/packaging/requirements.txt
+      - name: Assemble exact retained OCI blobs without a registry or Docker import
+        run: |
+          python3 -B scripts/release/oci_assembly.py --release "$RUNNER_TEMP/cpra-assembly-metadata/RELEASE.json" --reports "$RUNNER_TEMP/cpra-assembly-images" --out "$RUNNER_TEMP/cpra-private-oci"
+          python3 -B scripts/release/oci_assembly.py --verify --release "$RUNNER_TEMP/cpra-assembly-metadata/RELEASE.json" --reports "$RUNNER_TEMP/cpra-assembly-images" --out "$RUNNER_TEMP/cpra-private-oci"
+      - name: Inventory and verify each exact platform before publication
+        run: |
+          python3 -B scripts/release/image_sbom.py --release "$RUNNER_TEMP/cpra-assembly-metadata/RELEASE.json" --assembly "$RUNNER_TEMP/cpra-private-oci" --reports "$RUNNER_TEMP/cpra-assembly-images" --out "$RUNNER_TEMP/cpra-private-image-sboms" --syft bin/release-tools/syft
+          python3 -B scripts/release/image_sbom.py --verify --release "$RUNNER_TEMP/cpra-assembly-metadata/RELEASE.json" --assembly "$RUNNER_TEMP/cpra-private-oci" --reports "$RUNNER_TEMP/cpra-assembly-images" --out "$RUNNER_TEMP/cpra-private-image-sboms"
+      - name: Package frozen chart source against the private index digest
+        run: |
+          mkdir "$RUNNER_TEMP/cpra-private-chart"
+          cp "$RUNNER_TEMP/cpra-assembly-metadata/RELEASE.json" "$RUNNER_TEMP/cpra-private-chart/RELEASE.json"
+          digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["digest"])' "$RUNNER_TEMP/cpra-private-oci/OCI.json")
+          python3 -B scripts/release/chart.py --out "$RUNNER_TEMP/cpra-private-chart" --helm bin/release-tools/helm4 --image-digest "$digest" --report "$RUNNER_TEMP/cpra-private-chart/chart-package.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: private-oci-assembly
+          path: ${{ runner.temp }}/cpra-private-oci
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: private-chart-package
+          path: ${{ runner.temp }}/cpra-private-chart
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: private-image-sboms
+          path: ${{ runner.temp }}/cpra-private-image-sboms
+          if-no-files-found: error
+          retention-days: 14
+
+  private-assessment:
+    needs: [private-staging, build, compatibility, native, storage-upgrade, packages, containers, charts, documentation, sdk-consumer-evidence, worker-evidence, browser-evidence, private-assembly]
+    if: ${{ !cancelled() && needs['private-staging'].result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: ${{ runner.temp }}/cpra-assessment-inputs
+          merge-multiple: false
+      - name: Inspect original private inputs and record outstanding requirements
+        run: |
+          python3 -B scripts/release/qualification.py --release "$RUNNER_TEMP/cpra-assessment-inputs/release-metadata/RELEASE.json" --artifacts "$RUNNER_TEMP/cpra-assessment-inputs" --stage "$RUNNER_TEMP/cpra-assessment-stage" --out "$RUNNER_TEMP/cpra-assessment-result.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: private-release-assessment
+          path: |
+            ${{ runner.temp }}/cpra-assessment-result.json
+            ${{ runner.temp }}/cpra-assessment-stage/qualification.json
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
-    needs: [build, compatibility, native, packages, containers, charts, documentation]
+    needs: [build, compatibility, native, packages, containers, charts, documentation, private-assembly, private-assessment]
     # Unreachable while private-staging requires publish=false. Replace that
     # lock only with the reviewed aggregate gate, before any public action.
     if: inputs.publish && github.ref == 'refs/heads/main'
@@ -285,6 +552,10 @@ jobs:
       id-token: write
       attestations: write
       packages: write
+      actions: read
+    timeout-minutes: 45
+    env:
+      CPRA_PREVIOUS_PUBLICATION_RUN: ${{ inputs.previous_publication_run_id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -293,100 +564,427 @@ jobs:
           path: dist/release
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
+          name: dependency-preparation-build
+          path: private/dependencies
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: private-chart-package
+          path: private/chart
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
           pattern: '*-evidence-*'
           merge-multiple: true
           path: dist/release
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: image-*
-          merge-multiple: true
-          path: images
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+          name: private-oci-assembly
+          path: private/oci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Verify assembled assets and record executed evidence
+          name: private-image-sboms
+          path: private/image-sboms
+      - name: Install the recorded compiler and reviewed publication tools
         run: |
-          python3 scripts/release/release.py verify
-          python3 scripts/release/release.py checksums
-          python3 scripts/release/install_tools.py cosign helm4 syft
-      - name: Refuse existing application or chart version tags
+          python3 -B scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-publish-go"
+          python3 -B scripts/release/install_tools.py cosign helm4 oras
+      - name: Verify and stage the privately assembled payloads
+        run: |
+          python3 -B scripts/release/oci_assembly.py --verify --release dist/release/RELEASE.json --reports dist/release --out private/oci
+          python3 -B scripts/release/image_sbom.py --verify --release dist/release/RELEASE.json --assembly private/oci --reports dist/release --out private/image-sboms
+          python3 -B - <<'PYTHON'
+          import json,shutil,sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release')
+          import release
+          from module_publication import require
+          manifest = json.loads(Path('dist/release/RELEASE.json').read_text())
+          subjects = json.loads(Path('private/oci/OCI.json').read_text())
+          record = json.loads(Path('private/chart/chart-package.json').read_text())
+          require(record['release_identity'] == release.evidence_identity(manifest), 'chart source identity differs')
+          require(record['image_digest'] == subjects['digest'], 'chart image index differs')
+          require(release.valid_version('v' + manifest['chart_version']), 'invalid chart version')
+          require(record['chart_version'] == manifest['chart_version'], 'chart version differs')
+          name = 'cpra-chart-' + manifest['chart_version'] + '.tgz'
+          require(record['archive'] == name, 'chart filename differs')
+          path = Path('private/chart', name)
+          require(path.is_file() and not path.is_symlink(), 'chart package must be a regular file')
+          require(path.stat().st_size == record['size'] and release.sha(path) == record['sha256'], 'chart bytes differ')
+          for source in [path, Path('private/oci/OCI.json'),
+                         Path('private/image-sboms/cpra-image-linux-amd64.spdx.json'),
+                         Path('private/image-sboms/cpra-image-linux-arm64.spdx.json')]:
+              destination = Path('dist/release', source.name)
+              if destination.exists():
+                  require(not destination.is_symlink() and release.sha(destination) == release.sha(source), 'staged payload bytes differ')
+              else:
+                  with source.open('rb') as reader, destination.open('xb') as writer:
+                      shutil.copyfileobj(reader, writer, 1024*1024)
+          PYTHON
+          python3 -B scripts/release/release.py checksums
+          python3 -B scripts/release/release.py verify
+      - name: Record authenticated workflow identities before restoring progress
+        id: resume
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/release/registry.py
-      - name: Publish the tested image bytes and multiarch manifest
-        id: image
         run: |
-          cd images
-          sha256sum --check tested-image-amd64.tar.sha256
-          sha256sum --check tested-image-arm64.tar.sha256
-          cd ..
-          for arch in amd64 arm64; do
-            docker load -i "images/tested-image-$arch.tar"
-            docker tag "cpra:tested-$arch" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch"
-            docker push "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch"
-            docker buildx imagetools inspect "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-$arch" --format '{{json .Manifest.Digest}}' > "images/$arch.digest.json"
-            platform_digest=$(python3 -c "import json; print(json.load(open('images/$arch.digest.json')))")
-            bin/release-tools/cosign sign --yes "ghcr.io/ziad-hsn/cpra@$platform_digest"
-            bin/release-tools/cosign verify --certificate-identity https://github.com/ziad-hsn/cpra/.github/workflows/release.yml@refs/heads/main --certificate-oidc-issuer https://token.actions.githubusercontent.com "ghcr.io/ziad-hsn/cpra@$platform_digest"
-          done
-          docker buildx imagetools create -t "ghcr.io/ziad-hsn/cpra:candidate-$RELEASE_VERSION-$GITHUB_SHA" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-amd64" "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION-$GITHUB_SHA-arm64"
-          digest=$(docker buildx imagetools inspect "ghcr.io/ziad-hsn/cpra:candidate-$RELEASE_VERSION-$GITHUB_SHA" --format '{{json .Manifest.Digest}}' | tr -d '"')
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          export CPRA_INDEX_DIGEST="$digest"
-          python3 -c 'import json,os; from pathlib import Path; data={"image":"ghcr.io/ziad-hsn/cpra","digest":os.environ["CPRA_INDEX_DIGEST"],"version":os.environ["RELEASE_VERSION"],"commit":os.environ["GITHUB_SHA"],"platforms":{arch:json.loads(Path("images",arch+".digest.json").read_text()) for arch in ("amd64","arm64")}}; Path("dist/release/OCI.json").write_text(json.dumps(data,indent=2)+"\n")'
-          python3 scripts/release/image_sbom.py --syft bin/release-tools/syft
-          bin/release-tools/cosign sign --yes "ghcr.io/ziad-hsn/cpra@$digest"
-          bin/release-tools/cosign verify --certificate-identity "https://github.com/ziad-hsn/cpra/.github/workflows/release.yml@refs/heads/main" --certificate-oidc-issuer https://token.actions.githubusercontent.com "ghcr.io/ziad-hsn/cpra@$digest"
-          python3 scripts/release/release.py checksums
-      - name: Attest published multiarch digest
+          install -d -m 0700 "$RUNNER_TEMP/cpra-publish-work"
+          printf 'DOCKER_CONFIG=%s\nHELM_REGISTRY_CONFIG=%s\nXDG_CACHE_HOME=%s\n' "$RUNNER_TEMP/cpra-publish-work/registry" "$RUNNER_TEMP/cpra-publish-work/helm-registry.json" "$RUNNER_TEMP/cpra-publish-work/cache" >> "$GITHUB_ENV"
+          gh api --method GET -H 'X-GitHub-Api-Version: 2022-11-28' "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/cpra-publish-work/current-run.json"
+          if [ -n "$CPRA_PREVIOUS_PUBLICATION_RUN" ]; then
+            python3 -c 'import os,re,sys; sys.exit(0 if re.fullmatch(r"[1-9][0-9]{0,19}",os.environ["CPRA_PREVIOUS_PUBLICATION_RUN"]) else "Invalid previous publication run")'
+            gh api --method GET -H 'X-GitHub-Api-Version: 2022-11-28' "repos/$GITHUB_REPOSITORY/actions/runs/$CPRA_PREVIOUS_PUBLICATION_RUN" > "$RUNNER_TEMP/cpra-publish-work/previous-run.json"
+          fi
+          python3 -B - <<'PYTHON'
+          import json,os,sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release')
+          import publish
+          from module_publication import require
+          root = Path(os.environ['RUNNER_TEMP'], 'cpra-publish-work')
+          manifest = json.loads(Path('dist/release/RELEASE.json').read_text())
+          current = json.loads((root/'current-run.json').read_text())
+          owner = publish.progress_owner(manifest, current)
+          require(str(owner['run_id']) == os.environ['GITHUB_RUN_ID'], 'current workflow run differs')
+          require(owner['repository'] == os.environ['GITHUB_REPOSITORY'], 'current workflow repository differs')
+          require(manifest['commit'] == os.environ['GITHUB_SHA'], 'current workflow source differs')
+          if os.environ['CPRA_PREVIOUS_PUBLICATION_RUN']:
+              previous = json.loads((root/'previous-run.json').read_text())
+              prior = publish.progress_owner(manifest, previous)
+              require(str(prior['run_id']) == os.environ['CPRA_PREVIOUS_PUBLICATION_RUN'], 'previous workflow run differs')
+              require(previous['status'] == 'completed' and prior['run_id'] != owner['run_id'], 'previous workflow must be completed and distinct')
+              require(all(prior[key] == owner[key] for key in ('repository','repository_id','workflow_id','release_identity')), 'previous workflow identity differs')
+              attempt = previous['run_attempt']
+              require(type(attempt) is int and attempt > 0, 'invalid previous workflow attempt')
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                  output.write('artifact=publication-progress-' + str(prior['run_id']) + '-' + str(attempt) + '\n')
+          PYTHON
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.previous_publication_run_id != ''
+        with:
+          name: ${{ steps.resume.outputs.artifact }}
+          run-id: ${{ inputs.previous_publication_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/cpra-publication-restore
+      - name: Prepare private journals for this exact release graph
+        run: |
+          restore=()
+          if [ -n "$CPRA_PREVIOUS_PUBLICATION_RUN" ]; then
+            restore=(--restore "$RUNNER_TEMP/cpra-publication-restore" --previous-run-record "$RUNNER_TEMP/cpra-publish-work/previous-run.json")
+          fi
+          python3 -B scripts/release/publish.py --phase prepare --out dist/release --run-record "$RUNNER_TEMP/cpra-publish-work/current-run.json" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" "${restore[@]}"
+      - name: Restore original checksum and provenance bytes before resuming
+        id: signing
+        run: |
+          python3 -B scripts/release/publish.py --phase restore-signing --out dist/release --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" > "$RUNNER_TEMP/cpra-publish-work/signing-state.json"
+          python3 -B - <<'PYTHON'
+          import json,os
+          from pathlib import Path
+          value = json.loads(Path(os.environ['RUNNER_TEMP'], 'cpra-publish-work/signing-state.json').read_text())
+          if type(value.get('reused')) is not bool or type(value.get('inputs_ready')) is not bool:
+              raise ValueError('Invalid signing restoration result')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('reused=' + str(value['reused']).lower() + '\n')
+              output.write('inputs_ready=' + str(value['inputs_ready']).lower() + '\n')
+          PYTHON
+      - name: Transfer and read back original OCI blobs and index
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: |
+          python3 -B scripts/release/publish.py --phase images --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+          python3 -c 'import json,os; value=json.load(open("dist/release/OCI.json")); open(os.environ["GITHUB_OUTPUT"],"a").write("digest="+value["digest"]+"\n")'
+      - name: Generate and seal original image signature bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: |
+          python3 -B scripts/release/publish.py --phase image-signatures --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+      - name: Prepare original image provenance generation
+        id: image_provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: |
+          python3 -B scripts/release/publish.py --phase image-provenance-prepare --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work" > "$RUNNER_TEMP/cpra-publish-work/image-provenance-state.json"
+          python3 -B - <<'PYTHON'
+          import json,os
+          from pathlib import Path
+          value = json.loads(Path(os.environ['RUNNER_TEMP'], 'cpra-publish-work/image-provenance-state.json').read_text())
+          if type(value.get('generate')) is not bool:
+              raise ValueError('Invalid original attestation generation state')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('generate=' + str(value['generate']).lower() + '\n')
+          PYTHON
+      - name: Generate original multiarch provenance bundle
+        id: image_provenance_bundle
+        if: steps.image_provenance.outputs.generate == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-name: ghcr.io/ziad-hsn/cpra
           subject-digest: ${{ steps.image.outputs.digest }}
-          push-to-registry: true
-      - name: Prepare the chart against the tested immutable image digest
+          push-to-registry: false
+          create-storage-record: false
+      - name: Seal original multiarch provenance before registry writes
+        if: steps.image_provenance.outputs.generate == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+          IMAGE_PROVENANCE_BUNDLE: ${{ steps.image_provenance_bundle.outputs.bundle-path }}
         run: |
-          python3 -m pip install -r scripts/packaging/requirements.txt
-          python3 scripts/release/chart.py --helm bin/release-tools/helm4 --image-digest "${{ steps.image.outputs.digest }}"
+          python3 -B scripts/release/publish.py --phase image-provenance-capture --bundle "$IMAGE_PROVENANCE_BUNDLE" --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+      - name: Transfer and verify original image signatures and provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: |
+          python3 -B scripts/release/publish.py --phase image-attestations --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+      - name: Record offline trust roots alongside the already tested chart
+        if: steps.signing.outputs.inputs_ready != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
           gh attestation trusted-root > dist/release/trusted_root.jsonl
-          python3 scripts/release/release.py checksums
+          python3 -B scripts/release/release.py checksums
+      - name: Preserve original inputs and prepare asset provenance generation
+        id: asset_provenance
+        run: |
+          python3 -B scripts/release/publish.py --phase asset-provenance-prepare --out dist/release --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" > "$RUNNER_TEMP/cpra-publish-work/asset-provenance-state.json"
+          python3 -B - <<'PYTHON'
+          import json,os
+          from pathlib import Path
+          value = json.loads(Path(os.environ['RUNNER_TEMP'], 'cpra-publish-work/asset-provenance-state.json').read_text())
+          if type(value.get('generate')) is not bool:
+              raise ValueError('Invalid original asset provenance state')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('generate=' + str(value['generate']).lower() + '\n')
+          PYTHON
       - name: Attest checksummed release assets
         id: provenance
+        if: steps.asset_provenance.outputs.generate == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-checksums: dist/release/SHA256SUMS
+          push-to-registry: false
+          create-storage-record: false
+      - name: Preserve original asset provenance before checksum signing
+        if: always() && steps.asset_provenance.outputs.generate == 'true' && steps.provenance.outputs.bundle-path != ''
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          python3 -B scripts/release/publish.py --phase asset-provenance-capture --bundle "$PROVENANCE_BUNDLE" --out dist/release --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress"
+      - name: Generate and preserve the original checksum signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
+        run: |
+          python3 -B scripts/release/publish.py --phase asset-signature --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+      - name: Preserve original signed bytes before release operations
+        run: |
+          python3 -B scripts/release/publish.py --phase capture-signing --out dist/release --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress"
       - name: Sign, stage, download, verify and publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ADMIN_READ_TOKEN: ${{ secrets.RELEASE_ADMIN_READ_TOKEN }}
-          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
         run: |
-          cp "$PROVENANCE_BUNDLE" dist/release/provenance.sigstore.json
-          bin/release-tools/cosign sign-blob --yes --bundle dist/release/SHA256SUMS.sigstore.json dist/release/SHA256SUMS
-          python3 scripts/release/publish.py --cosign "$PWD/bin/release-tools/cosign"
-          python3 scripts/release/registry.py
-          docker buildx imagetools create -t "ghcr.io/ziad-hsn/cpra:$RELEASE_VERSION" "ghcr.io/ziad-hsn/cpra@${{ steps.image.outputs.digest }}"
-          bin/release-tools/helm4 push "dist/release/cpra-chart-$(python3 -c 'import json; print(json.load(open("dist/release/RELEASE.json"))["chart_version"])').tgz" oci://ghcr.io/ziad-hsn/charts
+          python3 -B scripts/release/publish.py --phase release --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+          python3 -B scripts/release/publish.py --phase image-tag --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+          python3 -B scripts/release/publish.py --phase chart --cosign "$PWD/bin/release-tools/cosign" --dependencies "$PWD/private/dependencies" --go "$(command -v go)" --image-assembly "$PWD/private/oci" --oras "$PWD/bin/release-tools/oras" --progress-dir "$RUNNER_TEMP/cpra-publish-work/progress" --work "$RUNNER_TEMP/cpra-publish-work"
+      - name: Retain source-bound progress after success or interruption
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publication-progress-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cpra-publish-work/progress
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Remove publisher-local credentials and caches
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/cpra-publish-work" "$RUNNER_TEMP/cpra-publication-restore" "$RUNNER_TEMP/cpra-publish-go"
 
   compatibility:
-    needs: private-staging
+    needs: [private-staging, build]
     runs-on: ubuntu-24.04
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         compiler: [go1.25.0, go1.27.1]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install the release compiler for dependency preparation
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-bootstrap-go"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/source-assets
+      - name: Prepare compatibility dependencies from the frozen source
+        run: |
+          python3 scripts/release/dependencies.py --source "$RUNNER_TEMP/source-assets/cpra-$RELEASE_VERSION-source.tar.gz" --go "$RUNNER_TEMP/cpra-bootstrap-go/bin/go" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/cpra-dependencies"
+          printf 'GOMODCACHE=%s\nGOPATH=%s\n' "$RUNNER_TEMP/cpra-dependencies/modules" "$RUNNER_TEMP/cpra-dependencies/go-path" >> "$GITHUB_ENV"
+      - name: Retain compatibility dependency evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-preparation-${{ matrix.compiler }}
+          path: |
+            ${{ runner.temp }}/cpra-dependencies/*.json
+            ${{ runner.temp }}/cpra-dependencies/*.log
+            ${{ runner.temp }}/cpra-dependencies/source/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/go.sum
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.mod
+            ${{ runner.temp }}/cpra-dependencies/source/sdk/go/worker/go.sum
+          if-no-files-found: ignore
+          retention-days: 14
       - run: python3 scripts/release/install_go.py --version "${{ matrix.compiler }}" --out "$RUNNER_TEMP/cpra-go"
-      - run: |
-          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -timeout=20m ./...
-          GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS='' GOEXPERIMENT='' go test -p=2 -race -timeout=20m -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: matrix.compiler == 'go1.27.1'
+        with:
+          node-version: '24.21.0'
+      - name: Install pinned frontend package manager
+        if: matrix.compiler == 'go1.27.1'
+        run: npm install --global pnpm@11.22.0
+      - name: Install pinned vulnerability scanner with the release compiler
+        if: matrix.compiler == 'go1.27.1'
+        run: GOBIN="$RUNNER_TEMP/cpra-security-tools" GOWORK=off GOENV=off GOFLAGS= GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+      - name: Record complete frozen module, tag and race matrix
+        run: |
+          python3 -B scripts/release/build_campaign.py --release "$RUNNER_TEMP/source-assets/RELEASE.json" --source-dir "$RUNNER_TEMP/cpra-dependencies/source" --dependencies "$RUNNER_TEMP/cpra-dependencies" --go "$(command -v go)" --security --govulncheck "$RUNNER_TEMP/cpra-security-tools/govulncheck" --a2a-reference-go "$RUNNER_TEMP/cpra-bootstrap-go/bin/go" --out "$RUNNER_TEMP/build-evidence/build-${{ matrix.compiler }}.json"
+      - name: Retain original build, generation, dashboard and A2A results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-evidence-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/build-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Consume exact private SDK and worker module versions
+        run: |
+          SDK_VERSION=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["private_modules"]["github.com/ziad-hsn/cpra/sdk/go"]["Version"])' "$RUNNER_TEMP/cpra-dependencies/dependencies.json")
+          python3 scripts/sdk/verify.py --go "$(command -v go)" --sdk-version "$SDK_VERSION" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/sdk-consumers/consumer-${{ matrix.compiler }}.json"
+      - name: Retain private consumer reports and module payloads
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-consumer-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/sdk-consumers/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  browser-evidence:
+    needs: [private-staging, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {compiler: go1.25.0, tags: '', variant: default, race: '--no-race'}
+          - {compiler: go1.25.0, tags: externaljobs, variant: externaljobs, race: '--no-race'}
+          - {compiler: go1.27.1, tags: '', variant: default, race: '--race'}
+          - {compiler: go1.27.1, tags: externaljobs, variant: externaljobs, race: '--race'}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install release compiler for dependency preparation
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-browser-bootstrap-go"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/browser-source
+      - name: Prepare unchanged extracted source and private dependencies
+        run: python3 scripts/release/dependencies.py --source "$RUNNER_TEMP/browser-source/cpra-$RELEASE_VERSION-source.tar.gz" --go "$RUNNER_TEMP/cpra-browser-bootstrap-go/bin/go" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/cpra-browser-dependencies"
+      - name: Install selected checksum-pinned compiler
+        run: python3 scripts/release/install_go.py --version "${{ matrix.compiler }}" --out "$RUNNER_TEMP/cpra-browser-go"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.21.0'
+      - name: Install locked browser and accessibility tools from frozen source
+        working-directory: ${{ runner.temp }}/cpra-browser-dependencies/source/scripts/dashboard/browser
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Record actual server, browser and accessibility execution
+        run: |
+          BROWSER_MODULE="$RUNNER_TEMP/cpra-browser-dependencies/source/scripts/dashboard/browser/node_modules/playwright"
+          BROWSER=$(node -e 'process.stdout.write(require(process.argv[1]).chromium.executablePath())' "$BROWSER_MODULE")
+          python3 -B scripts/release/browser_record.py --release "$RUNNER_TEMP/browser-source/RELEASE.json" --source-dir "$RUNNER_TEMP/cpra-browser-dependencies/source" --dependencies "$RUNNER_TEMP/cpra-browser-dependencies" --go "$RUNNER_TEMP/cpra-browser-go/bin/go" --node "$(command -v node)" --module "$BROWSER_MODULE" --browser "$BROWSER" --tags "${{ matrix.tags }}" ${{ matrix.race }} --out "$RUNNER_TEMP/browser-evidence/browser-${{ matrix.compiler }}-${{ matrix.variant }}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: browser-evidence-${{ matrix.compiler }}-${{ matrix.variant }}
+          path: ${{ runner.temp }}/browser-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  worker-evidence:
+    needs: [private-staging, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [go1.25.0, go1.27.1]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install release compiler for dependency preparation
+        run: python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-bootstrap-go"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/worker-source
+      - name: Prepare unchanged frozen source and private dependencies
+        run: python3 scripts/release/dependencies.py --source "$RUNNER_TEMP/worker-source/cpra-$RELEASE_VERSION-source.tar.gz" --go "$RUNNER_TEMP/cpra-bootstrap-go/bin/go" --worker-version "$WORKER_VERSION" --out "$RUNNER_TEMP/cpra-worker-dependencies"
+      - name: Install selected checksum-pinned compiler
+        run: python3 scripts/release/install_go.py --version "${{ matrix.compiler }}" --out "$RUNNER_TEMP/cpra-worker-go"
+      - name: Record original worker process and five-minute load evidence
+        run: |
+          python3 -B scripts/release/worker_campaign.py --release "$RUNNER_TEMP/worker-source/RELEASE.json" --source-dir "$RUNNER_TEMP/cpra-worker-dependencies/source" --dependencies "$RUNNER_TEMP/cpra-worker-dependencies" --go "$RUNNER_TEMP/cpra-worker-go/bin/go" --out "$RUNNER_TEMP/worker-evidence/worker-${{ matrix.compiler }}.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: worker-evidence-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/worker-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  sdk-consumer-evidence:
+    needs: [private-staging, build, compatibility]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-metadata
+          path: ${{ runner.temp }}/sdk-evidence/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dependency-preparation-build
+          path: ${{ runner.temp }}/sdk-evidence/dependencies
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-consumer-go1.25.0
+          path: ${{ runner.temp }}/sdk-evidence/consumers
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-consumer-go1.27.1
+          path: ${{ runner.temp }}/sdk-evidence/consumers
+      - name: Inspect retained payloads against frozen source and dependencies
+        run: |
+          python3 scripts/release/sdk_evidence.py --release "$RUNNER_TEMP/sdk-evidence/release/RELEASE.json" --dependencies "$RUNNER_TEMP/sdk-evidence/dependencies" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.25.0.json" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.27.1.json" --out "$RUNNER_TEMP/sdk-evidence/sdk-consumer-evidence.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: sdk-consumer-evidence
+          path: ${{ runner.temp }}/sdk-evidence/sdk-consumer-evidence.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   documentation:
-    needs: private-staging
+    needs: [private-staging, build]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -394,13 +992,29 @@ jobs:
         with:
           ref: ${{ inputs.docs_ref }}
           path: docs-site
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-metadata
+          path: release-metadata
       - name: Verify source identity, strict build and local links
         run: |
           python3 -c 'import json,os; assert json.load(open("docs-site/_sources/source-version.json"))["source_commit"] == os.environ["GITHUB_SHA"], "Documentation is not bound to this source candidate"'
           python3 -m pip install -r docs-site/_sources/requirements.txt
           python3 docs-site/_sources/rebuild.py --output "$RUNNER_TEMP/rendered-docs"
           mkdir -p evidence
-          python3 -c 'import json,os,subprocess; print(json.dumps({"status":"pass","commit":os.environ["GITHUB_SHA"],"docs_commit":subprocess.check_output(["git","-C","docs-site","rev-parse","HEAD"],text=True).strip(),"scope":"strict site build, links, assets, source metadata"}))' > evidence/documentation.json
+          PYTHONPATH=scripts/release python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          from release import encoded, evidence_identity
+          manifest = json.loads(Path('release-metadata/RELEASE.json').read_text())
+          if manifest['commit'] != os.environ['GITHUB_SHA']:
+              raise ValueError('Release metadata belongs to a different source commit')
+          report = {'status': 'pass', 'commit': manifest['commit'],
+                    'release_identity': evidence_identity(manifest),
+                    'docs_commit': subprocess.check_output(['git', '-C', 'docs-site', 'rev-parse', 'HEAD'], text=True).strip(),
+                    'scope': 'strict site build, links, assets, source metadata'}
+          Path('evidence/documentation.json').write_bytes(encoded(report))
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: documentation-evidence-site
@@ -433,12 +1047,12 @@ jobs:
           kind create cluster --name cpra-packaging-test --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0 --wait 180s
           kind load docker-image cpra:tested-amd64 --name cpra-packaging-test
           python3 scripts/packaging/install_csi_fixture.py --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test
-      - name: Native Helm 3 to 4 and Helm 4 operations with RWOP fencing
+      - name: Native read-only and managed Helm 3 to 4 and Helm 4 operations with RWOP fencing
         env:
           KUBECONFIG: ${{ runner.temp }}/cpra-kubeconfig
         run: |
-          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm3 --upgrade-helm bin/release-tools/helm4 --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm3-to-4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm3-to-4.json
-          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm4 --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm4.json
+          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm3 --upgrade-helm bin/release-tools/helm4 --management --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm3-to-4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm3-to-4.json
+          python3 scripts/packaging/live_helm.py --image cpra:tested-amd64 --helm bin/release-tools/helm4 --management --kubeconfig "$KUBECONFIG" --context kind-cpra-packaging-test --namespace cpra-helm4 --access-mode ReadWriteOncePod --storage-class cpra-csi-hostpath --out evidence/chart-helm4.json
       - name: Delete only the dedicated fixture cluster
         if: always()
         run: bin/release-tools/kind delete cluster --name cpra-packaging-test

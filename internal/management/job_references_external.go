@@ -55,6 +55,12 @@ func (c *Catalog) authenticateJobTypeReferences(ctx context.Context, resource ap
 }
 
 func (c *Catalog) resourceJobTypeReferences(ctx context.Context, resource api.Resource, preparing bool) ([]persistence.JobTypeReference, error) {
+	return c.lookupJobTypeReferences(ctx, resource, preparing, c.store.LookupJobTypeVersion)
+}
+
+type jobTypeVersionLookup func(context.Context, string, string) (persistence.JobTypeVersionView, bool, error)
+
+func (c *Catalog) lookupJobTypeReferences(ctx context.Context, resource api.Resource, preparing bool, lookup jobTypeVersionLookup) ([]persistence.JobTypeReference, error) {
 	if ctx == nil {
 		return nil, ErrValidation
 	}
@@ -66,48 +72,52 @@ func (c *Catalog) resourceJobTypeReferences(ctx context.Context, resource api.Re
 		if driver.Type != "external" {
 			return nil
 		}
-		config, err := externalDriverConfig(*driver)
+		ref, err := c.externalJobTypeReference(ctx, category, *driver, preparing, lookup)
 		if err != nil {
 			return err
 		}
-		selected, ok, err := c.store.LookupJobTypeVersion(ctx, config.JobTypeID, config.Version)
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return ErrUnavailable
-		}
-		if !ok || selected.Version.Category != category {
-			return persistence.ErrCatalogDependency
-		}
-		retained := selected.Version
-		if preparing && (selected.CurrentRemoved || selected.CurrentUID != retained.Record.UID) {
-			return persistence.ErrCatalogDependency
-		}
-		contract, err := c.openJobType(ctx, retained)
-		if err != nil {
-			return err
-		}
-		compiled, err := compileJobType(ctx, contract)
-		if err != nil {
-			return err
-		}
-		if err := compiled.parameters.validate(ctx, config.Parameters); err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return errors.Join(ErrValidation, err)
-		}
-		refs = append(refs, persistence.JobTypeReference{
-			JobTypeID: config.JobTypeID, JobTypeUID: retained.Record.UID,
-			Version: config.Version, Revision: retained.Record.Revision, Category: category,
-		})
+		refs = append(refs, ref)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	return persistence.CanonicalJobTypeReferences(refs)
+}
+
+func (c *Catalog) externalJobTypeReference(ctx context.Context, category string, driver api.DriverConfig, preparing bool, lookup jobTypeVersionLookup) (persistence.JobTypeReference, error) {
+	var ref persistence.JobTypeReference
+	config, err := externalDriverConfig(driver)
+	if err != nil {
+		return ref, err
+	}
+	selected, ok, err := lookup(ctx, config.JobTypeID, config.Version)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ref, ctx.Err()
+		}
+		return ref, ErrUnavailable
+	}
+	if !ok || selected.Version.Category != category || preparing && (selected.CurrentRemoved || selected.CurrentUID != selected.Version.Record.UID) {
+		return ref, persistence.ErrCatalogDependency
+	}
+	retained := selected.Version
+	contract, err := c.openJobType(ctx, retained)
+	if err != nil {
+		return ref, err
+	}
+	compiled, err := compileJobType(ctx, contract)
+	if err != nil {
+		return ref, err
+	}
+	if err := compiled.parameters.validate(ctx, config.Parameters); err != nil {
+		if ctx.Err() != nil {
+			return ref, ctx.Err()
+		}
+		return ref, errors.Join(ErrValidation, err)
+	}
+	return persistence.JobTypeReference{JobTypeID: config.JobTypeID, JobTypeUID: retained.Record.UID,
+		Version: config.Version, Revision: retained.Record.Revision, Category: category}, nil
 }
 
 func externalDriverConfig(driver api.DriverConfig) (api.ExternalConfig, error) {

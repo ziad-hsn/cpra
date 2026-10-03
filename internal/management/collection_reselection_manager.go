@@ -211,12 +211,19 @@ func (m *CollectionReselectionManager) Err() error {
 }
 
 func (m *CollectionReselectionManager) Ready() bool {
-	if m == nil || m.collectionReselectionManagerState == nil || m.mu == nil {
+	return m.ReadyContext(context.Background())
+}
+
+// ReadyContext bounds acquisition of the manager's process-state mutex.
+func (m *CollectionReselectionManager) ReadyContext(ctx context.Context) bool {
+	if m == nil || m.collectionReselectionManagerState == nil || m.mu == nil || ctx == nil {
 		return false
 	}
-	m.mu.Lock()
+	if err := m.lockAttempt(ctx, m.mu); err != nil {
+		return false
+	}
 	defer m.mu.Unlock()
-	return !m.closing && m.ctx.Err() == nil
+	return !m.closing && m.ctx.Err() == nil && ctx.Err() == nil
 }
 
 func (a *collectionReselectionAttempt) close() error {

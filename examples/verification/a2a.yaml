@@ -1,0 +1,68 @@
+# Choose an unused absolute directory in an existing private parent per campaign.
+# Existing state is retained and cannot be reused to start another campaign.
+# On Windows, replace this placeholder with an absolute Windows path.
+state_directory: /private/REPLACE_WITH_campaign_state
+manifest:
+  monitors:
+    - id: agent-recovery
+      name: Designated agent recovery
+      enabled: true
+      # The verification runner supplies synthetic incident context; this check
+      # is never invoked. Replace it before using the monitor in ordinary CPRa.
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config:
+          url: https://REPLACE_WITH_designated_target/health
+      intervention:
+        action: a2a
+        target:
+          url: https://REPLACE_WITH_recovery_agent
+          token: REPLACE_WITH_recovery_only_token
+          request_timeout: 10s
+          task_timeout: 60s
+          poll_interval: 5s
+    - id: agent-notification
+      name: Designated agent investigation
+      enabled: true
+      pulse_check:
+        type: http
+        interval: 60s
+        timeout: 5s
+        config:
+          url: https://REPLACE_WITH_designated_target/health
+      codes:
+        red:
+          notify: a2a
+          config:
+            url: https://REPLACE_WITH_investigation_agent
+            token: REPLACE_WITH_notification_only_token
+            request_timeout: 10s
+            timeout: 30s
+cases:
+  - kind: intervention
+    driver: a2a
+    configured: false
+    monitor_id: agent-recovery
+    evidence_type: live_account
+    observation_boundary: effect
+    timeout: 3m
+    observer:
+      - python3
+      - scripts/verification/observe_agent.py
+      - intervention
+      - /private/REPLACE_WITH_independent_recovery_receipts.jsonl
+  - kind: code
+    driver: a2a
+    configured: false
+    monitor_id: agent-notification
+    color: red
+    evidence_type: live_account
+    observation_boundary: effect
+    timeout: 2m
+    observer:
+      - python3
+      - scripts/verification/observe_agent.py
+      - notification
+      - /private/REPLACE_WITH_independent_notification_receipts.jsonl

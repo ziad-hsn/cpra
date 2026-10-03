@@ -322,7 +322,7 @@ func TestCancelledGrantAndResolverCannotInvokeHandler(t *testing.T) {
 
 func TestStartResponseEchoesAndDisposition(t *testing.T) {
 	q := api.StartRequest{ServerID: "server-epoch-1", SessionID: "session-1", Mode: api.StartModeReconcile, ExecutionID: "one", ExecutionRevision: "rev", LeaseID: "lease"}
-	for _, field := range []string{"server", "worker", "session", "execution", "revision", "lease", "grant", "deadline", "receipt", "reconcile-granted", "unknown-disposition"} {
+	for _, field := range []string{"server", "worker", "session", "execution", "revision", "lease", "grant", "deadline", "receipt", "unknown-receipt", "reconcile-granted", "unknown-disposition"} {
 		t.Run(field, func(t *testing.T) {
 			reply := startReply(q, api.StartDispositionStarted)
 			switch field {
@@ -344,6 +344,8 @@ func TestStartResponseEchoesAndDisposition(t *testing.T) {
 				reply.Deadline = time.Time{}
 			case "receipt":
 				reply.ReceiptID = "unexpected"
+			case "unknown-receipt":
+				reply.Disposition, reply.ReceiptID = api.StartDispositionUnknown, "unexpected"
 			case "reconcile-granted":
 				reply.Disposition = api.StartDispositionGranted
 			case "unknown-disposition":
@@ -564,6 +566,75 @@ func TestHeartbeatRejectsChangedExecutionEcho(t *testing.T) {
 			r.heartbeat(ctx, a, "grant", cancel, func(err error) { failure = err })
 			if !errors.Is(failure, ErrIdentity) || ctx.Err() == nil {
 				t.Fatal("changed heartbeat did not stop execution")
+			}
+		})
+	}
+}
+
+func TestUnknownActionRetainsTerminalReceiptAcrossRestart(t *testing.T) {
+	for _, kind := range []string{"recovery", "notification"} {
+		t.Run(kind, func(t *testing.T) {
+			c := testConfig(t)
+			f := c.Client.(*fakeProtocol)
+			r, err := New(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if r != nil {
+					_ = r.Close()
+				}
+			}()
+			a := assignment("held", kind)
+			calls := 0
+			handler := func(context.Context, Job) (api.Outcome, error) {
+				calls++
+				return api.Outcome{Status: "unknown"}, nil
+			}
+			r.execute(t.Context(), a, handler, func(err error) { t.Fatal(err) })
+			rec, found, err := r.journal.record(a.ExecutionID)
+			if err != nil || !found || rec.State != "outcome" || calls != 1 {
+				t.Fatal("unknown handler outcome was not persisted", err)
+			}
+			if err = r.deliver(t.Context(), rec); err != nil {
+				t.Fatal(err)
+			}
+			original, found, err := r.journal.record(a.ExecutionID)
+			if err != nil || !found || original.State != "unknown" || original.ReceiptID == "" {
+				t.Fatal("unknown receipt was not retained", err)
+			}
+			if err = r.Close(); err != nil {
+				t.Fatal(err)
+			}
+			r, err = New(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				if err = r.deliverInactive(t.Context(), a.ExecutionID); err != nil {
+					t.Fatal("terminal reconciliation", err)
+				}
+			}
+			f.receipts[a.ExecutionID].ReceiptID = "different-receipt"
+			if err = r.deliverInactive(t.Context(), a.ExecutionID); !errors.Is(err, ErrIdentity) {
+				t.Fatal("terminal reconciliation replaced the original receipt", err)
+			}
+			f.receipts[a.ExecutionID].ReceiptID = original.ReceiptID
+			rec, found, err = r.journal.record(a.ExecutionID)
+			if err != nil || !found || !reflect.DeepEqual(rec, original) {
+				t.Fatal("terminal reconciliation changed the held outcome", err)
+			}
+			e := api.LateEvidenceRequest{ExecutionID: a.ExecutionID, OriginalReceiptID: original.ReceiptID, EvidenceID: "observation"}
+			if err = r.QueueLateEvidence(t.Context(), e); err != nil {
+				t.Fatal(err)
+			}
+			if err = r.deliverInactive(t.Context(), a.ExecutionID); err != nil {
+				t.Fatal(err)
+			}
+			r.execute(t.Context(), a, handler, func(err error) { t.Fatal(err) })
+			rec, found, err = r.journal.record(a.ExecutionID)
+			if err != nil || !found || !reflect.DeepEqual(rec, original) || calls != 1 || len(f.evidence) != 1 {
+				t.Fatal("late evidence or duplicate assignment released the unknown action", err)
 			}
 		})
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"github.com/ziad-hsn/cpra/internal/management"
 	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
 var errMonitorPreparation = errors.New("monitor job preparation failed; review driver configuration")
@@ -37,6 +38,7 @@ type catalogProjection struct {
 // identities only, for removal reconciliation after an explicit change-stream gap.
 type catalogRuntime struct {
 	catalog   *management.Catalog
+	config    runtimeconfig.Config
 	store     *persistence.Store
 	mapper    *entities.EntityManager
 	cursor    persistence.CatalogCursor
@@ -60,9 +62,11 @@ func (s *DurableSystem) LoadCatalog(ctx context.Context, catalog *management.Cat
 	if err != nil {
 		return err
 	}
-	r := &catalogRuntime{catalog: catalog, store: s.store, mapper: mapper, cursor: view.ChangeCursor(), known: map[string]bool{}, updates: make(chan catalogProjection, 1), done: make(chan struct{})}
+	r := &catalogRuntime{catalog: catalog, config: s.config, store: s.store, mapper: mapper, cursor: view.ChangeCursor(), known: map[string]bool{}, updates: make(chan catalogProjection, 1), done: make(chan struct{})}
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	s.catalogRuntime = r
+	s.agentObserver = newAgentObserver(catalog, s.store)
+	s.initWorkerDispatch(catalog)
 	s.managed = make(map[string]managedMonitor)
 	if err := s.loadCatalogBatches(ctx, view); err != nil {
 		r.cancel()
@@ -78,7 +82,7 @@ func (r *catalogRuntime) prepare(ctx context.Context, view management.ReadView, 
 	if err != nil {
 		return catalogProjection{}, err
 	}
-	prepared, err := entities.PrepareMonitor(p.Monitor, p.Endpoints, p.NotificationGroups)
+	prepared, err := prepareCatalogMonitor(p, r.config)
 	if err != nil {
 		return catalogProjection{}, errMonitorPreparation
 	}
@@ -379,8 +383,10 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 	for color, c := range p.Monitor.Codes {
 		if c.Dispatch {
 			policy.Endpoints[color] = len(p.NotificationTargets[color])
+			setRecoveryNotification(&policy, color, c.Trigger, p.Monitor.Intervention.Action)
 		}
 	}
+	configureCatalogNotifications(&policy, p)
 	m := persistence.Monitor{ID: id, Name: p.Monitor.Name, Revision: p.ExecutionRevision, CatalogUID: p.MonitorUID, Policy: policy}
 	return persistence.Command{Kind: "configure", MonitorID: id, Revision: m.Revision, Config: &m, Guard: &guard, At: time.Now().UTC()}
 }

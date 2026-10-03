@@ -221,5 +221,5 @@ func collectionExecutionSummariesEqual(a, b *CollectionExecutionSummary) bool {
 }
 
 func collectionExecutionPublicationStorageFormat(version int) bool {
-	return version == CollectionExecutionPublicationFormatVersion || version == CollectionExecutionRetirementFormatVersion || version == CollectionExecutionSourceRetirementFormatVersion || version == CollectionReselectionFormatVersion || externalStorageFormat(version)
+	return version == CollectionExecutionPublicationFormatVersion || version == CollectionExecutionRetirementFormatVersion || version == CollectionExecutionSourceRetirementFormatVersion || version == CollectionReselectionFormatVersion || agentActionStorageFormat(version) || externalStorageFormat(version)
 }

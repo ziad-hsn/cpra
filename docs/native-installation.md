@@ -3,6 +3,11 @@
 CPRa provides a Go installation route, native server/client archives, and Linux
 DEB/RPM packages. The service installer copies the chosen executable to a stable
 location. Updating a developer's `GOBIN` does not replace a running service.
+Installation and update first copy the candidate into a private temporary
+directory under the managed configuration directory. The installer validates
+and installs that same copy, so a change to the original path cannot replace
+the validated executable. It removes the temporary copy on completion or
+failure and reports cleanup errors.
 The [release recipe](release-engineering.md) defines artifact identity and
 verification; the [container and Helm guide](container-helm.md) covers volumes
 and Kubernetes ownership.
@@ -66,6 +71,73 @@ startup refuses to select a new empty store. Continue using it with
 `-data-dir /absolute/path/cpra-data`, or stop the old owner and migrate the
 complete directory using the backup/restore procedure below.
 
+## Initialize a local encryption key
+
+Persistent management and file-configured A2A actions require a wrapping source.
+For the local backend, create a new key with `cpractl local encryption init`.
+Both the key path and the state-directory boundary must be explicit and absolute.
+Use `cpractl local paths` to identify the installation's actual locations.
+
+For a Linux user installation using the default XDG locations, initialize its
+configuration directory first, then create and inspect the key:
+
+```sh
+cpractl local init
+cpractl local encryption init \
+  --key-file "$HOME/.config/cpra/keys/wrapping.key" \
+  --data-dir "$HOME/.local/state/cpra"
+cpractl local encryption inspect \
+  --key-file "$HOME/.config/cpra/keys/wrapping.key" \
+  --data-dir "$HOME/.local/state/cpra"
+```
+
+When XDG paths are overridden, use the absolute locations returned by
+`local paths`. The immediate key directory may be created; its parent must exist and
+satisfy the native ownership checks. On Linux and macOS, user keys are owner-only
+files in private directories. Existing keys, directories, permissions and
+configuration are never replaced or repaired. Key generation rejects symlink
+paths and keys inside the state directory, including aliases of that directory.
+
+For an installed Linux system service, provision as an administrator with the
+service's actual group. The `cpra` account must already exist:
+
+```sh
+sudo cpractl local encryption init \
+  --key-file /etc/cpra/keys/wrapping.key \
+  --data-dir /var/lib/cpra \
+  --reader-group-id "$(id -g cpra)"
+sudo cpractl local encryption inspect \
+  --key-file /etc/cpra/keys/wrapping.key \
+  --data-dir /var/lib/cpra \
+  --reader-group-id "$(id -g cpra)"
+```
+
+The shared Unix policy creates a root-owned key readable by that group; the
+service cannot write it. For a macOS system service, select its actual service
+group and the macOS paths instead. On Windows, use the paths returned by
+`local paths --scope system` and pass `--reader-sid` with the registered service SID
+from `sc.exe showsid CPRa`, in an elevated terminal. Windows creates protected
+DACLs with service read access. User foreground installations omit both reader
+options. `--scope` does not infer a reader identity, and reader options for the
+wrong operating system are rejected. Native platform qualification remains a
+separate release gate.
+
+Both commands emit JSON containing only `key_id`, a non-secret identity. They
+never print the 32 binary key bytes, contact a CPRa API, open Raft, or activate
+runtime settings. If initialization is interrupted or returns an output error,
+use `inspect` with the same paths and reader options. Preserve any existing key;
+initialization never overwrites it. Successful inspection validates the file's
+contents and protection, not its ability to decrypt an existing store.
+
+Configure the generated path under `storage.encryption.local.active_key_file`
+or `management.encryption.local.active_key_file`, with the same reader policy.
+Configure exactly one source, as described in [management startup](management-startup.md).
+Changing the active wrapping key is an explicit configuration change: generate a
+new file, retain old paths in `previous_key_files`, then validate and restart.
+Selecting a new active key does not re-encrypt earlier records. Keep old keys
+while retained state or backups need them, and back up keys separately from the
+state directory.
+
 ## Initialize and install a service
 
 ```sh
@@ -100,6 +172,21 @@ User services use `~/.local/lib/cpra/cpra` and the XDG systemd user unit directo
 ```sh
 systemctl --user enable --now cpra.service
 ```
+
+Linux initialization and stopped service installation/update repair the modes of
+managed objects while preserving their contents. User configuration, state, log,
+and executable directories use `0700`; starter configuration and token files use
+`0600`, the executable uses `0700`, and the user unit uses `0600`. System state
+belongs to the service account with `0700` directories and `0600` files.
+Administrator-owned system configuration uses `0750`/`0640`, the executable
+directory and binary use `0755`, and the system unit uses `0644`.
+
+Existing stores must be stopped and exclusively locked before permission repair.
+Linked managed paths and non-regular state entries are rejected. The installer
+changes only its managed configuration/executable objects and state/log trees;
+provider helper scripts retain their modes and shared parent directories remain
+under operator administration. Ordinary application startup does not recursively
+change ownership or permissions.
 
 User lingering is an explicit system administration decision. It is not enabled
 by the installer. Units use `Type=notify`, bounded restart frequency,
@@ -185,6 +272,16 @@ Both destination directories must be absent and their parents must exist.
 Backup retains the exclusive database lock, validates storage format and
 history, copies every state file, and records SHA-256 hashes in `BACKUP.json`.
 Format 2 authenticates the complete inventory and its metadata with HMAC-SHA256.
+New inventories record `state_format`, reconstructed from the committed snapshot
+and subsequent Raft commands. It is distinct from `storage_format`, which
+identifies the base storage container, and from the maximum format supported by
+the executable. Restore rejects an authenticated `state_format` that disagrees
+with the backed-up state before publishing a destination. Existing authenticated
+format-2 inventories without this field still undergo complete offline validation.
+The field is covered by the manifest MAC; removing it does not bypass authentication.
+Older administration tools may reject the additional field. Retain the matching
+tool and pre-upgrade backup. This metadata does not establish rollback compatibility:
+the candidate must validate the complete logs, snapshots and retained history.
 Provision a separate cryptographically random 32-byte binary authentication key
 through your secret-management arrangement. Its path must be absolute and outside
 both the state and backup/destination directories, including aliases. The key is
@@ -192,8 +289,12 @@ never copied into the backup. Keep it with independent access controls and retai
 the matching key for every backup you need to restore; use a separate key from
 management encryption keys. File access uses the native protected-file policy:
 owner-only files/directories on Linux and a protected owner/administrator DACL on
-Windows. Other Unix platforms currently reject this key access until their native
-ACL checks are qualified.
+Windows. The unreleased macOS adapter retains the Unix owner/mode policy, permits
+deny-only ACLs, and rejects grants or unavailable extended-permission metadata.
+Its native compilation, permission, crash and backup/restore checks remain pending;
+macOS protected backup support is not yet qualified. See the
+[macOS implementation checkpoint](implementation/macos-protected-files.md).
+Other Unix platforms still reject protected key access.
 
 Restore requires that independently trusted key before reading or publishing state.
 Changing data and recomputing the file hashes cannot authenticate a replacement
@@ -222,6 +323,26 @@ owner while stopped. Resume with matching configuration and explicit data path;
 check readiness, history and unknown outcomes. A backup may still contain a
 started action: recovery conservatively marks it unknown.
 
+Restore also starts a new authentication epoch. Keep the owner stopped, inspect
+the restored policy, and provision fresh operator access before starting it:
+
+```sh
+cpractl local auth list --data-dir /absolute/path/restored-state
+cpractl local auth reprovision oncall --role operator --data-dir /absolute/path/restored-state --token-output /absolute/path/operator-access/new.token
+```
+
+The token output must be a new protected file outside the state directory. Check
+that the command reports a committed revision and that a subsequent `auth list`
+observes that revision with `resetRequired: false`. An uncertain commit requires
+inspection of its original revision and token file; do not issue another token
+automatically. The previous named tokens and startup read token must not regain
+access. See [local authentication](local-authentication.md).
+
+Retain the matching runtime configuration, TLS sources and encryption wrapping
+key separately from the complete state backup. Service installation repairs
+restored state ownership while the owner is stopped. Verify the fresh principal
+over authenticated TLS after startup, as well as readiness and recovered state.
+
 Local installer upgrades validate and retain the backup authentication key before
 running the candidate or stopping the old service, then take a complete sibling
 backup when state exists, replace its managed executable,
@@ -244,10 +365,55 @@ Reinstalling an older package or using Helm rollback does not reverse committed
 state or external interventions. Native crash/restart tests establish the
 tested OS/filesystem boundary; they do not claim universal power-loss durability.
 
+The current candidate writes state format 38 for built-in check observations,
+and format 39 for observations from optional external workers. The recorded
+format determines replay behavior: earlier commands retain their original
+transition semantics. The candidate can read the preceding formats, but an
+older executable must reject a state format it does not understand. Restore
+the previous stopped backup with a compatible administration tool before
+attempting such a rollback. Do not delete the newer store or silently replace
+it with an empty directory.
+
 ## Verification boundary
 
 The release workflow distinguishes native execution from cross compilation and
 emulation. A platform is release-qualified only after its native artifact and
 service lifecycle gates pass. Refer to the candidate's evidence for OS versions,
 architectures, filesystems and tool versions. Production provider accounts and
-the one-million-monitor, 24-hour campaign remain separate evidence gates.
+comparative performance remain separate evidence gates. The 24-hour endurance
+test is outside the requested work and is not a mandatory completion gate.
+
+The separate two-version storage fixture uses different server and CLI
+executables, real committed logs, snapshots and stopped backups. It verifies
+delivery preservation, unknown-action holds, acknowledged incident ownership,
+retained history, independent provider request counts and authentication reset
+after restore. Its Linux foreground result is separate from native service
+and package lifecycle evidence. The report names the exact tested executable
+hashes; development builds remain unqualified for release.
+
+The service lifecycle fixture uses an isolated OpenSSL certificate, verified TLS,
+and a named operator from its first start. It records the OpenSSL version and
+executable hash; `--openssl` can select that fixture tool explicitly. Tests preserve
+protected configuration through running/stopped updates and removal, then verify
+a new authentication epoch and principal after restore and HTTP 401 rejection of
+both old credential sources. The fixture contains no monitors and performs no
+provider operations. Python fixture tests do not qualify native supervisors;
+the actual staged release must complete this flow on each claimed platform.
+
+The fixture also offers an explicit Linux `--local-user` mode for private
+verification with an existing user service manager. It refuses existing CPRa
+resources and never enables lingering or provisions a user session. Linux runs
+exercise forced process termination and systemd recovery in addition to the
+installation/update/removal and authenticated restore sequence. Unfrozen input
+reports remain diagnostic and cannot qualify a release. From the source checkout,
+with an unused CPRa installation and matching staged executables/metadata:
+
+```sh
+python3 scripts/native/service_lifecycle.py \
+  --stage /absolute/path/to/stage --scope user --local-user \
+  --allow-system-changes --out /absolute/path/to/evidence/service-user.json
+```
+
+The report and adjacent log must be new paths. The fixture tests and removes only
+the integration, configuration, state, backups and temporary sources it creates.
+The source file `scripts/native/README.md` describes the CI and platform modes.

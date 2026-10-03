@@ -146,8 +146,6 @@ func TestMainManagementCollectionPreflightDoesNotActivate(t *testing.T) {
 	}
 	assertMainPreflightUnchanged(t, client, created.Data, before.Data.Items[0].ID)
 	stop()
-
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	assertMainPreflightUnchanged(t, restarted, created.Data, before.Data.Items[0].ID)
 	stopRestarted()

@@ -16,12 +16,15 @@ type serverConfigExtensions struct {
 }
 
 type managementExtensions struct {
-	jobTypesEnabled       bool
-	jobTypeSnapshotBytes  atomic.Int64
-	jobTypePrincipalBytes map[string]*atomic.Int64
+	jobTypesEnabled          bool
+	jobTypeSnapshotBytes     atomic.Int64
+	jobTypePrincipalBytes    map[string]*atomic.Int64
+	workerSnapshotCount      atomic.Int32
+	workerPrincipalSnapshots map[string]*atomic.Int32
 }
 
 type snapshotExtensions struct {
+	workers            *workerStatusSnapshot
 	jobTypes           snapshotPageView[api.JobType]
 	jobTypeReservation *jobTypeSnapshotReservation
 }
@@ -44,6 +47,9 @@ func (s *Server) validateExtensions() error {
 	if s.cfg.Management == nil || s.cfg.ManagementAuth == nil || s.cfg.Store == nil || s.cfg.Store.Status().Mode != "raft" {
 		return errors.New("external jobs require authenticated management and Raft storage")
 	}
+	if s.cfg.WriteTimeout < workerPollWriteTimeout {
+		return errors.New("external jobs require an HTTP write timeout of at least 40 seconds")
+	}
 	return nil
 }
 
@@ -63,6 +69,10 @@ func (s *Server) registerManagementExtensions(mux *http.ServeMux, m *managementH
 	for _, route := range jobTypeOperations {
 		mux.HandleFunc(route.method+" "+route.path, func(w http.ResponseWriter, r *http.Request) { m.handleJobType(w, r, route.operation) })
 	}
+	s.registerWorkerRoutes(mux)
+	mux.HandleFunc("GET /api/v2/external-workers", func(w http.ResponseWriter, r *http.Request) {
+		m.handleWorkerList(w, r, s.cfg.Store)
+	})
 }
 
 func (m *managementHTTP) discoverExtensions(result *api.Capabilities) {
@@ -70,6 +80,8 @@ func (m *managementHTTP) discoverExtensions(result *api.Capabilities) {
 		return
 	}
 	result.Resources = append(result.Resources, "JobType")
+	result.Resources = append(result.Resources, "ExternalWorker")
+	result.ResourceOperations["ExternalWorker"] = []string{"ListWorkers"}
 	for _, route := range jobTypeOperations {
 		result.ResourceOperations["JobType"] = append(result.ResourceOperations["JobType"], route.operation)
 	}
@@ -79,12 +91,16 @@ func (m *managementHTTP) extensionPermissions(supported map[string]bool) {
 	if !m.jobTypesEnabled {
 		return
 	}
+	supported["ListWorkers"] = true
 	for _, route := range jobTypeOperations {
 		supported[route.operation] = true
 	}
 }
 
 func (m *managementHTTP) reserveSnapshotExtension(kind, principal string) (snapshotExtensions, error) {
+	if kind == "ExternalWorker" {
+		return m.reserveWorkerSnapshot(principal)
+	}
 	if kind != "JobType" {
 		return snapshotExtensions{}, nil
 	}
@@ -121,11 +137,15 @@ func (m *managementHTTP) reserveSnapshotExtension(kind, principal string) (snaps
 }
 
 func (s snapshotExtensions) retain() {
+	if s.workers != nil {
+		s.workers.refs.Add(1)
+	}
 	if s.jobTypeReservation != nil {
 		s.jobTypeReservation.refs.Add(1)
 	}
 }
 func (s snapshotExtensions) release() {
+	s.workers.release()
 	if r := s.jobTypeReservation; r != nil && r.refs.Add(-1) == 0 {
 		r.budget.Add(-r.bytes.Load())
 		r.principalBudget.Add(-r.bytes.Load())

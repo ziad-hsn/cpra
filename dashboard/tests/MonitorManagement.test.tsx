@@ -7,8 +7,51 @@ import { fixture, resource } from './managementFixture';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it('saves A2A recovery settings through the monitor editor with separate recovery authority', async () => {
+  const original = resource('monitors', 'agent-recovery', basic());
+  const { writes } = await fixture('monitors', 'agent-recovery', { initial: [original] });
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit monitor' }));
+  fireEvent.click(screen.getByLabelText('Configure recovery'));
+  await screen.findByRole('option', { name: 'a2a' });
+  fireEvent.change(screen.getByLabelText('Recovery driver'), { target: { value: 'a2a' } });
+  for (const [label, id] of [['Agent endpoint', 'agent-url'], ['Agent bearer token', 'agent-recovery-token']]) {
+    fireEvent.change(screen.getByLabelText(`Specific ${label.toLowerCase()} secret ID`), { target: { value: id } });
+    fireEvent.click(within(screen.getByRole('group', { name: `${label} secret` })).getByRole('button', { name: 'Use ID' }));
+  }
+  fireEvent.change(screen.getByLabelText('Task timeout'), { target: { value: '60s' } });
+  fireEvent.change(screen.getByLabelText('Poll interval'), { target: { value: '5s' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].body?.spec).toMatchObject({ recovery: { driver: { type: 'a2a', config: { taskTimeout: '60s', pollInterval: '5s' }, credentialRefs: { url: 'agent-url', token: 'agent-recovery-token' } } } });
+});
+
 const capabilities: Capabilities = { apiVersions: ['cpra.io/v2'], drivers: { check: Object.keys(checkFields), recovery: Object.keys(recoveryFields), notification: Object.keys(notificationFields) }, resources: [], patchTypes: [] };
 const basic = () => ({ check: { driver: { type: 'tcp', config: { host: 'localhost', port: 443 } }, interval: '60s', timeout: '5s' } });
+
+it('preserves recovery escalation when changing notification routing', async () => {
+  const spec = { ...basic(), recovery: { driver: { type: 'docker', config: { container: 'designated-test' } }, maxAttempts: 2 }, notifications: { red: { driver: { type: 'log', config: {} }, trigger: 'recovery_exhausted' } } };
+  const { writes } = await fixture('monitors', 'escalation', { initial: [resource('monitors', 'escalation', spec)] });
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit monitor' }));
+  expect(screen.getByLabelText('Code red trigger')).toHaveValue('recovery_exhausted');
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Use typed recipients for Code red' }));
+  await waitFor(() => expect(screen.getByLabelText('Code red notification type')).not.toBeDisabled());
+  fireEvent.change(screen.getByLabelText('Code red notification type'), { target: { value: 'a2a' } });
+  fireEvent.change(screen.getByLabelText('Specific code red recipients ID'), { target: { value: 'investigator' } });
+  fireEvent.click(within(screen.getByRole('group', { name: 'Code red recipients' })).getByRole('button', { name: 'Use ID' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].body?.spec).toMatchObject({ notifications: { red: { trigger: 'recovery_exhausted', notifyType: 'a2a', recipientRefs: ['investigator'] } } });
+});
+
+it('rejects recovery triggers without a red rule and recovery configuration', () => {
+  const rule = { trigger: 'recovery_exhausted', notifyType: 'a2a', recipientRefs: ['investigator'] };
+  expect(validateMonitorDraft({ ...basic(), notifications: { red: rule } }, capabilities)).toMatch(/configured recovery/);
+  const spec = { ...basic(), recovery: { driver: { type: 'docker', config: { container: 'test' } } } };
+  expect(validateMonitorDraft({ ...spec, notifications: { yellow: rule } }, capabilities)).toMatch(/Code red/);
+  expect(validateMonitorDraft({ ...spec, notifications: { red: { ...rule, trigger: 'unknown' } } }, capabilities)).toMatch(/unsupported notification trigger/);
+  expect(validateMonitorDraft({ ...spec, notifications: { red: rule } }, capabilities)).toBeUndefined();
+});
 function driverSpec(driver: string, category: DriverCategory) {
   const config: Record<string, unknown> = {};
   const credentialRefs: Record<string, string> = {};

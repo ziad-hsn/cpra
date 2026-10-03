@@ -4,7 +4,7 @@
   "files": {
     "DEPENDENCIES.json": {
       "bytes": 1710,
-      "sha256": "1cc84e4ee3b29a46b409baffafe45f19a7d29fe62ed136cf01a61bb3592718ad"
+      "sha256": "a1057a076092027a68fb0ccf2ff4d50309cd8cc122141bec0a4fc7f80184a13c"
     },
     "GO-LICENSE.txt": {
       "bytes": 1453,
@@ -15,8 +15,8 @@
       "sha256": "244d43c5b9dcad05949ec414f6687d1db22210e6273cf289f3d022b7d2882076"
     },
     "collection-parser.wasm": {
-      "bytes": 8210262,
-      "sha256": "e8a91342a5679052f453d34aa5dd383035801e091590c44a33c01cf854673e37"
+      "bytes": 8222119,
+      "sha256": "8bf07ceb8893c0661d437ecf129c3e2e5a192d6d07e08e033e6cb5a4aabc19f2"
     },
     "wasm_exec.js": {
       "bytes": 16992,
@@ -59,6 +59,6 @@
     "-tags=",
     "-ldflags="
   ],
-  "sdk_source_sha256": "3da61563c367cdc5427a2f9d3ac7cb15060d6d77d569475f24491e180d0cfef4",
+  "sdk_source_sha256": "e6acc9f8531b8d043b0359e173733e8b11148beb40ac4880322281ce066de88b",
   "target": "js/wasm"
 }

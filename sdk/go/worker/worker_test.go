@@ -61,7 +61,7 @@ func (f *fakeProtocol) Start(_ context.Context, request api.StartRequest) (*api.
 		f.startFail = false
 		return nil, errors.New("start response was lost")
 	}
-	if receipt := f.receipts[request.ExecutionID]; receipt != nil && receipt.Disposition == "finalized" {
+	if receipt := f.receipts[request.ExecutionID]; receipt != nil {
 		reply := startReply(request, api.StartDispositionTerminal)
 		reply.ServerID, reply.ReceiptID = f.server, receipt.ReceiptID
 		return reply, nil
@@ -110,7 +110,7 @@ func (f *fakeProtocol) LateEvidence(_ context.Context, evidence api.LateEvidence
 	return &api.Receipt{ServerID: f.server, WorkerUID: "worker-uid-1", ExecutionID: evidence.ExecutionID, ReceiptID: "evidence-receipt-" + evidence.EvidenceID, Disposition: "accepted"}, nil
 }
 
-func testConfig(t *testing.T) Config {
+func testConfig(t testing.TB) Config {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -238,9 +238,13 @@ func TestLostStartNeverInvokesHandlerAndPreservesUnknown(t *testing.T) {
 		t.Fatal("late evidence automatically cleared unknown")
 	}
 	f.mu.Lock()
-	f.receipts["ambiguous"].Disposition = "finalized"
+	starts := f.starts
 	f.mu.Unlock()
-	eventually(t, func() bool { s, _ := r.Status(); return s.Records == 0 })
+	eventually(t, func() bool { f.mu.Lock(); defer f.mu.Unlock(); return f.starts > starts })
+	s, _ = r.Status()
+	if s.UnknownActions != 1 || calls.Load() != 0 {
+		t.Fatal("terminal receipt cleared or repeated the unknown action")
+	}
 }
 
 func TestLostReceiptRetriesIdenticalOutcome(t *testing.T) {
@@ -540,7 +544,12 @@ func TestJournalRejectsPathsAndMissingKey(t *testing.T) {
 				_ = os.Symlink(c.WrappingKeyPath, link)
 				c.WrappingKeyPath = link
 			case "public-state":
-				_ = os.Mkdir(c.StateDir, 0755)
+				if err := os.Mkdir(c.StateDir, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(c.StateDir, 0755); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if j, err := openJournal(c); err == nil {
 				_ = j.close()

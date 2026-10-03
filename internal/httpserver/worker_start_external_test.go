@@ -105,6 +105,9 @@ func workerHTTPClient(t *testing.T, f *workerSessionFixture) *cpra.WorkerClient 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v2/external-workers/poll", f.handler.poll)
 	mux.HandleFunc("POST /api/v2/external-workers/start", f.handler.start)
+	mux.HandleFunc("POST /api/v2/external-workers/result", f.handler.result)
+	mux.HandleFunc("POST /api/v2/external-workers/heartbeat", f.handler.heartbeat)
+	mux.HandleFunc("POST /api/v2/external-workers/late-evidence", f.handler.evidence)
 	httpServer := httptest.NewTLSServer(mux)
 	t.Cleanup(httpServer.Close)
 	client, err := cpra.NewWorkerClient(cpra.Config{BaseURL: httpServer.URL, AuthToken: f.token, HTTPClient: httpServer.Client()})
@@ -393,7 +396,7 @@ func TestWorkerAssignmentProjectionRechecksControlsAndCancellation(t *testing.T)
 func TestWorkerProtocolReadinessHonorsRequestCancellation(t *testing.T) {
 	f := newWorkerSessionFixture(t)
 	f.handler.ready = func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }
-	for _, operation := range []string{"poll", "start"} {
+	for _, operation := range []string{"poll", "start", "result"} {
 		t.Run(operation, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
 			defer cancel()
@@ -405,10 +408,13 @@ func TestWorkerProtocolReadinessHonorsRequestCancellation(t *testing.T) {
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				if operation == "poll" {
+				switch operation {
+				case "poll":
 					f.handler.poll(&sessionResponseRecorder{w}, r)
-				} else {
+				case "start":
 					f.handler.start(&sessionResponseRecorder{w}, r)
+				case "result":
+					f.handler.result(&sessionResponseRecorder{w}, r)
 				}
 			}()
 			select {
@@ -417,7 +423,7 @@ func TestWorkerProtocolReadinessHonorsRequestCancellation(t *testing.T) {
 				t.Fatal("readiness ignored request cancellation")
 			}
 			workerSessionProblem(t, w, 503, "requestInterrupted")
-			if body.reads.Load() != 0 || f.handler.starting != 0 || len(f.handler.polls) != 0 {
+			if body.reads.Load() != 0 || f.handler.starting != 0 || f.handler.resulting != 0 || len(f.handler.polls) != 0 {
 				t.Fatal("readiness failure read body or retained admission")
 			}
 		})

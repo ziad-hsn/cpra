@@ -230,4 +230,6 @@ The release workflow distinguishes native execution from cross compilation and
 emulation. A platform is release-qualified only after its native artifact and
 service lifecycle gates pass. Refer to the candidate's evidence for OS versions,
 architectures, filesystems and tool versions. Production provider accounts and
-the one-million-monitor, 24-hour campaign remain separate evidence gates.
+comparative performance remain separate evidence gates. The 24-hour endurance
+test was removed from the requested work on 1 October 2026 and is not a mandatory
+completion gate; that scope correction also applies to this earlier snapshot.

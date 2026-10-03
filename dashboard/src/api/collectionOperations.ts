@@ -1,5 +1,5 @@
 import { collectionIdentityFormat, type WorkerCollectionSummary } from './collectionInventory';
-import { operationID } from './operations';
+import { operationID, operationResultsPending } from './operations';
 import { object } from './value';
 import { executionObservation } from './executionResults';
 import { DashboardSession, ManagementError, type APIResponse, type CollectionRequestOperation } from './session';
@@ -119,6 +119,8 @@ export async function readCollection(session: DashboardSession, expected: Collec
 export const collectionMutable = (operation?: Operation) => !!operation && ['pending', 'staging', 'uploading', 'validating', 'validated', 'rejected'].includes(operation.state);
 export const collectionCancelable = (operation?: Operation) => collectionMutable(operation) || operation?.state === 'applying';
 export const collectionTerminal = (operation?: Operation) => !!operation && ['completed', 'partial', 'failed', 'rejected', 'interrupted', 'canceled', 'cancelled', 'expired', 'invalidated'].includes(operation.state);
+export const collectionProgressPending = (operation: Operation) => collectionStates.has(operation.state) && operation.state !== 'validated' &&
+  (!collectionTerminal(operation) || operationResultsPending(operation));
 export function collectionDelay(response: APIResponse<Operation>): number { return Math.max(5000, Math.min(86400000, response.retryAfterMs || 0), (response.data.retryAfterSeconds ?? 0) * 1000); }
 
 /** A retained observation is not an activation grant. Unknown vocabulary is

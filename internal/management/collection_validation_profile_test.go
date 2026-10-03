@@ -33,7 +33,7 @@ func TestCollectionValidationProfileCanonicalOwned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.GOOS != runtime.GOOS || len(first.Drivers) != 33 || len(first.Resources) != 5 {
+	if first.GOOS != runtime.GOOS || len(first.Drivers) != 35 || len(first.Resources) != 5 {
 		t.Fatal("incorrect build inventory")
 	}
 	originalResources := slices.Clone(resources)
@@ -156,10 +156,11 @@ func TestCollectionValidationProfileIdentitySensitivity(t *testing.T) {
 	})
 }
 
-func TestCollectionValidationProfileAll33ModelMappings(t *testing.T) {
+func TestCollectionValidationProfileAll35ModelMappings(t *testing.T) {
 	// Independent contract table: neither factory reflection nor OpenAPI describes
 	// which concrete model the API driver's category/type dispatcher must select.
 	expected := map[string]string{
+		"recovery/a2a": "InterventionTargetA2A", "notification/a2a": "CodeNotificationA2A",
 		"check/http": "PulseHTTPConfig", "check/tcp": "PulseTCPConfig", "check/udp": "PulseUDPConfig", "check/dns": "PulseDNSConfig", "check/icmp": "PulseICMPConfig", "check/grpc": "PulseGRPCConfig", "check/docker": "PulseDockerConfig", "check/tls": "PulseTLSConfig", "check/redis": "PulseRedisConfig", "check/postgres": "PulsePostgresConfig", "check/mysql": "PulseMySQLConfig", "check/mongo": "PulseMongoConfig", "check/rabbitmq": "PulseRabbitMQConfig", "check/kafka": "PulseKafkaConfig",
 		"recovery/docker": "InterventionTargetDocker", "recovery/webhook": "InterventionTargetWebhook", "recovery/kubernetes": "InterventionTargetKubernetes", "recovery/aws": "InterventionTargetAWS", "recovery/systemd": "InterventionTargetSystemd",
 		"notification/log": "CodeNotificationLog", "notification/email": "CodeNotificationEmail", "notification/webhook": "CodeNotificationWebhook", "notification/pagerduty": "CodeNotificationPagerDuty", "notification/slack": "CodeNotificationSlack", "notification/telegram": "CodeNotificationTelegram", "notification/discord": "CodeNotificationDiscord", "notification/opsgenie": "CodeNotificationOpsgenie", "notification/teams": "CodeNotificationTeams", "notification/mattermost": "CodeNotificationMattermost", "notification/pushover": "CodeNotificationPushover", "notification/twilio": "CodeNotificationTwilio", "notification/datadog": "CodeNotificationDatadog", "notification/victorops": "CodeNotificationVictorOps",
@@ -168,7 +169,7 @@ func TestCollectionValidationProfileAll33ModelMappings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(expected) != 33 || len(profile.Drivers) != len(expected) {
+	if len(expected) != 35 || len(profile.Drivers) != len(expected) {
 		t.Fatal("incomplete reviewed driver inventory")
 	}
 	var contract struct {
@@ -197,7 +198,7 @@ func TestCollectionValidationProfileAll33ModelMappings(t *testing.T) {
 			}
 			// Null tests field admission and inert mapping without inventing sample
 			// secrets or constructing a provider. Existing full-value runtime mapping
-			// tests independently exercise all 33 configurations and duration handling.
+			// tests independently exercise all 35 configurations and duration handling.
 			properties := map[string]any{}
 			for name := range model.Properties {
 				properties[name] = nil

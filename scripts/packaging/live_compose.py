@@ -23,6 +23,21 @@ import time
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/release'))
+from release import check_manifest, evidence_identity
+
+
+def source_evidence(manifest, diagnostic=False):
+    """Keep pre-freeze executions separate from frozen release qualification."""
+    if diagnostic:
+        if manifest.get('candidate') is not True or manifest.get('source_files') != {}:
+            raise ValueError('diagnostic runs require explicitly prepared candidate metadata')
+        check_manifest(manifest)
+        return {'evidence_class': 'working_tree_container', 'release_qualified': False,
+                'release_gate_passed': False,
+                'scope': 'private pre-freeze Compose execution; not release qualification'}
+    return {'evidence_class': 'frozen_container', 'release_qualified': False,
+            'release_gate_passed': False, 'release_identity': evidence_identity(manifest)}
 
 
 def read_history(port, token):
@@ -51,16 +66,21 @@ def main():
     parser.add_argument('--target-image', default='busybox:1.37.0@sha256:9db7b59979c38555a39def84a31fb98b5296952f9e3afd4f6f11f05b07adfab0')
     parser.add_argument('--release-dir', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--diagnostic', action='store_true',
+                        help='execute private candidate artifacts without qualifying a frozen release')
     a = parser.parse_args()
     if a.out.exists():
         parser.error('evidence exists; use a new path to preserve failed attempts')
     a.out.parent.mkdir(parents=True, exist_ok=True)
     name = 'cpra-compose-' + secrets.token_hex(4)
     volume = name + '-data'
+    rotation_volume = name + '-tokens'
+    rotation_created = False
     token_values = [secrets.token_urlsafe(32), secrets.token_urlsafe(32)]
     report = {'started': datetime.now(timezone.utc).isoformat(), 'image': a.image,
               'target_image': a.target_image, 'project': name, 'status': 'incomplete', 'checks': [],
               'source': json.loads((a.release_dir/'RELEASE.json').read_text())}
+    report.update(source_evidence(report['source'], a.diagnostic))
 
     def run(cmd, check=True, timeout=120, env=None):
         r = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, env=env)
@@ -95,6 +115,9 @@ def main():
             'codes': {'red': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}},
                       'green': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}}}}]}))
         manifest.chmod(0o444)
+        runtime = tmp/'runtime.yaml'
+        runtime.write_bytes((ROOT/'docker/runtime.yaml').read_bytes())
+        runtime.chmod(0o444)
         token_files = [tmp/'token-v1', tmp/'token-v2']
         for path, token in zip(token_files, token_values):
             path.write_text(token)
@@ -108,6 +131,7 @@ def main():
                        'read_only': True, 'tmpfs': ['/tmp:rw,size=16m,uid=1001,gid=1001'],
                        'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true']}}}))
         env = {**os.environ, 'CPRA_IMAGE': a.image, 'CPRA_MANIFEST_FILE': str(manifest),
+               'CPRA_RUNTIME_FILE': str(runtime),
                'CPRA_TOKEN_FILE': str(token_files[0]), 'CPRA_DATA_VOLUME': volume, 'CPRA_PORT': '0'}
         base = ['docker', 'compose', '-p', name, '-f', str(ROOT/'docker/docker-compose.yml'), '-f', str(override)]
 
@@ -121,15 +145,18 @@ def main():
             return run(['docker', 'exec', cid(), '/usr/local/bin/cpractl', *args, '--server', 'http://127.0.0.1:8060', '--allow-insecure-http',
                         '--token-file', '/run/secrets/cpra_api_token', '--request-timeout', '2s'], check=check, timeout=15)
 
-        def history():
+        def api_port():
             bindings = json.loads(run(['docker', 'inspect', cid()], timeout=15).stdout)[0]['NetworkSettings']['Ports']['8060/tcp']
             if len(bindings) != 1 or bindings[0]['HostIp'] != '127.0.0.1':
                 raise RuntimeError('fixture API must have one loopback port binding')
             port = int(bindings[0]['HostPort'])
             if not 0 < port < 65536:
                 raise RuntimeError('fixture API port is invalid')
+            return port
+
+        def history():
             token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
-            return read_history(port, token)
+            return read_history(api_port(), token)
 
         try:
             report['docker_server_version'] = run(['docker', 'version', '--format', '{{.Server.Version}}']).stdout.strip()
@@ -171,11 +198,46 @@ def main():
             assert ids <= {event['id'] for event in history()}
             assert run(['docker', 'exec', cid(), 'cat', '/var/lib/cpra/identity.json']).stdout == identity
             record('restart_recovers_identity_and_history')
+            # Startup files cannot overwrite committed access. Rotate using the
+            # actual stopped-store CLI and a separate private token volume.
+            compose('stop', 'cpra', timeout=75)
+            run(['docker', 'volume', 'create', rotation_volume])
+            rotation_created = True
+            run(['docker', 'run', '--rm', '--network', 'none', '--user', '0:0',
+                 '--read-only', '--volume', rotation_volume+':/out', '--entrypoint', '/bin/sh',
+                 a.image, '-c', 'mkdir -m 700 /out/tokens && chown 1001:1001 /out/tokens'])
+            rotated = json.loads(run(['docker', 'run', '--rm', '--network', 'none', '--user', '1001:1001',
+                '--read-only', '--tmpfs', '/tmp:rw,size=64m,uid=1001,gid=1001,mode=0700',
+                '--volume', volume+':/var/lib/cpra', '--volume', rotation_volume+':/out',
+                '--entrypoint', '/usr/local/bin/cpractl', a.image,
+                'local', 'auth', 'rotate-read-token', '--data-dir', '/var/lib/cpra',
+                '--token-output', '/out/tokens/api.token']).stdout)
+            if rotated.get('outcome') != 'committed' or not rotated.get('revision') \
+                    or rotated['revision'] != rotated.get('intendedRevision'):
+                raise RuntimeError('token rotation was not confirmed; retain the original attempt')
+            token = run(['docker', 'run', '--rm', '--network', 'none', '--user', '1001:1001',
+                         '--read-only', '--volume', rotation_volume+':/out:ro',
+                         '--entrypoint', '/bin/cat', a.image, '/out/tokens/api.token']).stdout.strip()
+            if not token or token in token_values:
+                raise RuntimeError('rotation did not generate a fresh token')
+            token_values.append(token)
+            token_files[1].chmod(0o600)
+            token_files[1].write_text(token)
+            token_files[1].chmod(0o444)
             env['CPRA_TOKEN_FILE'] = str(token_files[1])
             compose('up', '-d', '--force-recreate', '--wait', '--wait-timeout', '120', 'cpra', timeout=150)
             ctl('ready')
             assert ids <= {event['id'] for event in history()}
-            record('versioned_token_file_rotation')
+            connection = http.client.HTTPConnection('127.0.0.1', api_port(), timeout=2)
+            try:
+                connection.request('GET', '/api/v2/readyz', headers={'Authorization': 'Bearer '+token_values[0]})
+                response = connection.getresponse()
+                if response.status != 401:
+                    raise RuntimeError('rotated service accepted the old token')
+                response.read(1 << 20)
+            finally:
+                connection.close()
+            record('versioned_token_file_rotation', committed_revision=rotated['revision'], old_token_status=401)
             compose('down', timeout=90)
             run(['docker', 'volume', 'inspect', volume])
             compose('up', '-d', '--wait', '--wait-timeout', '120', timeout=150)
@@ -190,6 +252,11 @@ def main():
         finally:
             run(['docker', 'rm', '-f', name+'-duplicate'], check=False)
             cleanup = compose('down', '--volumes', '--remove-orphans', check=False, timeout=90)
+            if rotation_created:
+                token_cleanup = run(['docker', 'volume', 'rm', rotation_volume], check=False)
+                if token_cleanup.returncode:
+                    report['status'] = 'fail'
+                    report['rotation_cleanup'] = token_cleanup.stderr
             report['cleanup'] = 'pass' if cleanup.returncode == 0 else cleanup.stderr
             if cleanup.returncode:
                 report['status'] = 'fail'

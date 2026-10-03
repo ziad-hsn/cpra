@@ -47,8 +47,21 @@ func TestTwilioAcceptanceBoundaryNeverClaimsDelivery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			row := r.Records[len(r.Records)-1]
-			if requests.Load() != 1 || row.Observed || r.Complete || row.ObservationBoundary != BoundaryAPIAcceptance || row.EvidenceType != EvidenceProviderSandbox {
+			var row Record
+			found := false
+			for _, record := range r.Records {
+				if record.Kind != "code" || record.Name != "twilio" {
+					continue
+				}
+				if found {
+					t.Fatal("duplicate Twilio verification record")
+				}
+				row, found = record, true
+			}
+			if !found {
+				t.Fatal("Twilio verification record is missing")
+			}
+			if requests.Load() != 1 || !row.Configured || !row.Invoked || row.Observed || r.Complete || row.ObservationBoundary != BoundaryAPIAcceptance || row.EvidenceType != EvidenceProviderSandbox {
 				t.Fatal(row, requests.Load())
 			}
 			if status == http.StatusCreated {

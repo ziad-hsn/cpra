@@ -8,13 +8,47 @@ import (
 	"slices"
 )
 
-// WorkerNotificationSource pins one external endpoint at its original color and
-// ordinal. A zero entry represents a built-in endpoint; inline external targets
-// are not covered by NotificationEndpoint worker grants.
+const WorkerNotificationFormatVersion = 28
+const workerNotificationSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-28\n"
+
+// WorkerNotificationSource pins a notification's configuration at its original
+// color and ordinal. A zero entry represents a built-in notification. An omitted
+// kind retains the endpoint identity used by format 20; inline sources name the
+// owning Monitor explicitly and require a separate Monitor grant.
 type WorkerNotificationSource struct {
+	Kind     string `json:"kind,omitempty"`
 	ID       string `json:"id"`
 	UID      string `json:"uid"`
 	Revision string `json:"revision"`
+}
+
+func (s *WorkerNotificationSource) UnmarshalJSON(raw []byte) error {
+	type wire WorkerNotificationSource
+	var value wire
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&value); err != nil {
+		return err
+	}
+	var presence struct {
+		Kind json.RawMessage `json:"kind"`
+	}
+	if err := json.Unmarshal(raw, &presence); err != nil {
+		return err
+	}
+	if len(presence.Kind) != 0 && value.Kind != "Monitor" && value.Kind != "NotificationEndpoint" {
+		return ErrWorkerExecutionInvalid
+	}
+	*s = WorkerNotificationSource(value)
+	return nil
+}
+
+func (s WorkerNotificationSource) matches(in WorkerExecutionIntent) bool {
+	kind := s.Kind
+	if kind == "" {
+		kind = "NotificationEndpoint"
+	}
+	return in.Source == (CatalogKey{Kind: kind, ID: s.ID}) && in.SourceUID == s.UID && in.SourceRevision == s.Revision
 }
 
 type policyExtensions struct {
@@ -52,7 +86,7 @@ func validatePolicyExtensions(p Policy) error {
 			if source == (WorkerNotificationSource{}) {
 				continue
 			}
-			if !catalogIdentifier(source.ID, 256) || !catalogIdentifier(source.UID, 256) || !catalogIdentifier(source.Revision, 256) {
+			if source.Kind != "" && source.Kind != "Monitor" && source.Kind != "NotificationEndpoint" || !catalogIdentifier(source.ID, 256) || !catalogIdentifier(source.UID, 256) || !catalogIdentifier(source.Revision, 256) {
 				return ErrWorkerExecutionInvalid
 			}
 		}
@@ -60,6 +94,13 @@ func validatePolicyExtensions(p Policy) error {
 	return nil
 }
 func policyMinimumFormat(p Policy) int {
+	for _, sources := range p.WorkerNotificationSources {
+		for _, source := range sources {
+			if source.Kind != "" {
+				return WorkerNotificationFormatVersion
+			}
+		}
+	}
 	if p.workerNotificationSourcesPresent || len(p.WorkerNotificationSources) != 0 {
 		return WorkerExecutionFormatVersion
 	}

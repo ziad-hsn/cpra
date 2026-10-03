@@ -131,7 +131,7 @@ func TestAuthenticationRealStoppedLifecycleAndProcessLock(t *testing.T) {
 }
 
 func TestAuthenticationNonBootstrapNeverInitializesState(t *testing.T) {
-	for _, action := range []string{"list", "issue", "rotate", "revoke", "reprovision"} {
+	for _, action := range []string{"list", "issue", "rotate", "rotate-read-token", "revoke", "reprovision"} {
 		for _, incomplete := range []bool{false, true} {
 			t.Run(action+map[bool]string{false: "/empty", true: "/incomplete"}[incomplete], func(t *testing.T) {
 				directory, output := authTestPaths(t)
@@ -143,7 +143,7 @@ func TestAuthenticationNonBootstrapNeverInitializesState(t *testing.T) {
 					}
 				}
 				request := AuthenticationRequest{Action: action, DataDirectory: directory}
-				if action != "list" {
+				if action != "list" && action != "rotate-read-token" {
 					request.PrincipalID = "operator"
 				}
 				if action == "issue" || action == "reprovision" {
@@ -240,5 +240,55 @@ func TestAuthenticationRealRestoreNeedsCurrentEpochProvision(t *testing.T) {
 	listed, err := AdministerAuthentication(t.Context(), AuthenticationRequest{Action: "list", DataDirectory: restored})
 	if err != nil || listed.Revision != provisioned.Revision || strings.Contains(listed.Principals[0].ID, "old") {
 		t.Fatal("reopen resurrected restored old grant", err)
+	}
+}
+
+func TestReadTokenRotationPersistsInRealStoreAndRequiresStoppedOwner(t *testing.T) {
+	directory, output := authTestPaths(t)
+	config := runtimeconfig.Default()
+	config.Storage.Directory = directory
+	owner, err := persistence.OpenAdministrative(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = owner.Close() })
+	before, err := owner.CommitAuthentication(t.Context(), persistence.AuthenticationCommand{
+		Version: persistence.AuthenticationLifecycleFormatVersion, Mode: "bootstrap", Epoch: "read-epoch", Revision: "read-revision", Actor: "test", At: time.Now().UTC(), LegacyTokenSHA256: strings.Repeat("a", 64),
+	})
+	if err != nil {
+		t.Fatal("read-only bootstrap failed", err)
+	}
+	request := AuthenticationRequest{Action: "rotate-read-token", DataDirectory: directory, TokenOutput: output}
+	if _, err := AdministerAuthentication(t.Context(), request); err == nil {
+		t.Fatal("read-token rotation admitted a second owner")
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatal("locked rotation published a token")
+	}
+	if err := owner.Close(); err != nil {
+		t.Fatal(err)
+	}
+	report, err := AdministerAuthentication(t.Context(), request)
+	if err != nil || report.Outcome != "committed" || report.Epoch != before.Epoch || report.Revision == before.Revision {
+		t.Fatal("stopped rotation failed", err)
+	}
+	reopened, err := persistence.OpenAdministrative(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := reopened.Authentication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := assertAuthToken(t, output, after.LegacyTokenSHA256)
+	clear(token)
+	if after.Revision != report.Revision || after.LegacyTokenSHA256 == before.LegacyTokenSHA256 || len(after.Principals) != 0 || after.AnonymousLoopback {
+		t.Fatal("rotation lost its exact policy across reopen")
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AdministerAuthentication(t.Context(), request); !errors.Is(err, ErrAuthenticationInput) {
+		t.Fatal("existing private output was overwritten", err)
 	}
 }

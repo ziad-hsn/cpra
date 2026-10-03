@@ -106,8 +106,8 @@ func (c *Catalog) PrepareCollection(ctx context.Context, req api.CollectionPrepa
 	if err := ctx.Err(); err != nil {
 		return api.CollectionAdmission{}, err
 	}
-	if !c.Ready() {
-		return api.CollectionAdmission{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return api.CollectionAdmission{}, err
 	}
 	key, source, digest, err := collectionRequestIdentity(req, c.storeID, actor)
 	clear(key[:])
@@ -196,8 +196,8 @@ func (c *Catalog) CreateCollection(ctx context.Context, req api.OperationCreateR
 	if err := ctx.Err(); err != nil {
 		return api.Operation{}, err
 	}
-	if !c.Ready() {
-		return api.Operation{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return api.Operation{}, err
 	}
 	identity := api.CollectionPrepareRequest{ContentDigest: req.ContentDigest, IdentityFormat: api.CollectionPrepareRequestIdentityFormat(req.IdentityFormat),
 		IdentityKey: req.IdentityKey, SourceFingerprint: req.SourceFingerprint, ItemCount: req.ItemCount, NormalizationProfile: req.NormalizationProfile}

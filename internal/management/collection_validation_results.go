@@ -17,8 +17,8 @@ func (c *Catalog) CollectionValidationResultView(ctx context.Context, id, actor 
 	if err := ctx.Err(); err != nil {
 		return nil, persistence.CollectionValidationResultStatus{}, err
 	}
-	if !c.Ready() {
-		return nil, persistence.CollectionValidationResultStatus{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return nil, persistence.CollectionValidationResultStatus{}, err
 	}
 	return c.store.CollectionValidationResultView(ctx, id, actor, at)
 }

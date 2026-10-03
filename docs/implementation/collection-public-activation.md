@@ -73,7 +73,7 @@ disabled monitors cause no provider requests. These tests do not certify a
 provider account or the million-monitor workload.
 
 Current targeted regression commands and source hashes are recorded in the
-[private verification manifest](../../bin/verification/collection-public-activation-2026-09-24/result.json).
+[private verification manifest](../review/local-evidence.md#record-04ba10aaa68c9d837c466030).
 The required browser campaign includes
 `TestMainManagementCollectionActivationBrowser`; a missing harness or skipped
 required test fails that campaign.

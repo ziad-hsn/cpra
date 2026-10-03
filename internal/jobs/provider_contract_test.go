@@ -3,10 +3,12 @@ package jobs
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -122,5 +124,46 @@ func TestDockerDefaultStopGrace(t *testing.T) {
 	}
 	if got == "0" {
 		t.Errorf("omitted operation timeout sends t=0, forcing immediate SIGKILL instead of default container grace")
+	}
+}
+
+func TestDockerRecoveryRejectionBoundary(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusInternalServerError, 0} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			var calls atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/containers/designated-test/restart") {
+					t.Error("unexpected Docker operation")
+					w.WriteHeader(400)
+					return
+				}
+				calls.Add(1)
+				if status == 0 {
+					c, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					_ = c.Close()
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(`{"message":"token=provider-secret"}`))
+			}))
+			defer srv.Close()
+			t.Setenv("DOCKER_HOST", srv.URL)
+			t.Setenv("DOCKER_API_VERSION", "1.52")
+			t.Setenv("DOCKER_TLS_VERIFY", "")
+			t.Setenv("DOCKER_CERT_PATH", "")
+			job := &InterventionDockerJob{Container: "designated-test", Timeout: time.Second, Retries: 4}
+			result := job.Execute()
+			if result.Err == nil || errors.Is(result.Err, ErrInterventionRejected) != (status == http.StatusNotFound) || calls.Load() != 1 {
+				t.Fatal("incorrect rejection classification or repeated recovery", result.Err, calls.Load())
+			}
+			if strings.Contains(result.Err.Error(), "provider-secret") {
+				t.Fatal("provider credential exposed")
+			}
+		})
 	}
 }

@@ -121,6 +121,7 @@ it('keeps a conflicting draft and does not adopt a newer version or retry it', a
   fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Checked with the owner' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
   await screen.findByRole('alert');
+  expect(within(dialog).getByRole('alert')).toHaveTextContent(/The saved state changed/);
   expect(writes).toHaveLength(1);
   expect(writes[0].match).toBe('"attention-1"');
   expect(within(dialog).getByLabelText('Reason')).toHaveValue('Checked with the owner');
@@ -131,6 +132,7 @@ it('does not allow resubmission after an uncertain response', async () => {
   const dialog = await openDialog('Acknowledge');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Acknowledge' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/Inspect the operation or current state/);
+  expect(within(dialog).getByRole('alert')).toHaveTextContent(/Inspect the operation or current state/);
   expect(within(dialog).getByRole('button', { name: 'Acknowledge' })).toBeDisabled();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeDisabled();

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	StageFormatVersion  = 1
+	StageFormatVersion  = 2
 	stageFileName       = "bootstrap.db"
 	stageMetadataBudget = 128 << 10
 	stageMaxEntryBytes  = 4 << 20
@@ -61,21 +61,25 @@ type StageOptions struct {
 	StageID         string
 	MaxResources    uint64
 	MaxEncodedBytes uint64
+	Validation      CatalogOptions
+	Catalog         *Catalog
 }
 
 // StageInfo contains no source paths, provider parameters or secret digests.
 // Digest commits to the append sequence of exact encrypted and stamped records.
 type StageInfo struct {
-	Format          int    `json:"format"`
-	StoreID         string `json:"storeID"`
-	StageID         string `json:"stageID"`
-	Phase           string `json:"phase"`
-	Count           uint64 `json:"count"`
-	EncodedBytes    uint64 `json:"encodedBytes"`
-	MaxResources    uint64 `json:"maxResources"`
-	MaxEncodedBytes uint64 `json:"maxEncodedBytes"`
-	Digest          string `json:"digest"`
-	CatalogDigest   string `json:"catalogDigest,omitempty"`
+	Format            int    `json:"format"`
+	StoreID           string `json:"storeID"`
+	StageID           string `json:"stageID"`
+	Phase             string `json:"phase"`
+	Count             uint64 `json:"count"`
+	EncodedBytes      uint64 `json:"encodedBytes"`
+	MaxResources      uint64 `json:"maxResources"`
+	MaxEncodedBytes   uint64 `json:"maxEncodedBytes"`
+	Digest            string `json:"digest"`
+	CatalogDigest     string `json:"catalogDigest,omitempty"`
+	ValidationProfile string `json:"validationProfile"`
+	CatalogValidation bool   `json:"catalogValidation"`
 }
 
 // Stage is isolated from the active catalog. It cannot activate resources or
@@ -88,6 +92,15 @@ type Stage struct {
 	sealer   *secureconfig.Sealer
 	info     StageInfo
 	failed   bool
+	options  CatalogOptions
+	catalog  *Catalog
+}
+
+func (s *Stage) validateResolvedDriver(ctx context.Context, category string, driver api.DriverConfig) error {
+	if handled, err := s.validateResolvedDriverExtension(ctx, category, driver); handled {
+		return err
+	}
+	return ValidateResolvedDriver(category, driver)
 }
 
 func (s *Stage) String() string   { return "encrypted bootstrap staging (private configuration omitted)" }
@@ -121,6 +134,13 @@ func openStage(ctx context.Context, o StageOptions, sealer *secureconfig.Sealer,
 		return nil, ErrValidation
 	}
 	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if o.Catalog != nil && (o.Catalog.storeID != o.StoreID || o.Catalog.options != o.Validation) {
+		return nil, ErrValidation
+	}
+	_, profile, err := o.Validation.validationProfile()
+	if err != nil {
 		return nil, err
 	}
 	directory, err := os.Lstat(o.Directory)
@@ -173,7 +193,7 @@ func openStage(ctx context.Context, o StageOptions, sealer *secureconfig.Sealer,
 			return nil, ErrStageUnavailable
 		}
 	}
-	s := &Stage{db: db, path: path, sealer: sealer}
+	s := &Stage{db: db, path: path, sealer: sealer, options: o.Validation, catalog: o.Catalog}
 	ok := false
 	defer func() {
 		if !ok {
@@ -186,7 +206,8 @@ func openStage(ctx context.Context, o StageOptions, sealer *secureconfig.Sealer,
 	}
 	if create {
 		s.info = StageInfo{Format: StageFormatVersion, StoreID: o.StoreID, StageID: o.StageID, Phase: "loading",
-			EncodedBytes: stageMetadataBudget, MaxResources: o.MaxResources, MaxEncodedBytes: o.MaxEncodedBytes, Digest: stageInitialDigest()}
+			EncodedBytes: stageMetadataBudget, MaxResources: o.MaxResources, MaxEncodedBytes: o.MaxEncodedBytes, Digest: stageInitialDigest(),
+			ValidationProfile: profile, CatalogValidation: o.Catalog != nil}
 		meta, err := s.encodeInfo(ctx, s.info)
 		if err != nil {
 			return nil, err
@@ -236,6 +257,7 @@ func openStage(ctx context.Context, o StageOptions, sealer *secureconfig.Sealer,
 			defer clear(plain)
 			var info StageInfo
 			if api.StrictDecode(plain, &info) != nil || info.Format != StageFormatVersion || info.StoreID != o.StoreID || info.StageID != o.StageID ||
+				info.ValidationProfile != profile || info.CatalogValidation != (o.Catalog != nil) ||
 				info.MaxResources != o.MaxResources || info.MaxEncodedBytes != o.MaxEncodedBytes || info.Count > info.MaxResources ||
 				info.EncodedBytes < stageMetadataBudget || info.EncodedBytes > info.MaxEncodedBytes || (info.Phase != "loading" && info.Phase != "frozen") {
 				return ErrStageUnavailable
@@ -382,7 +404,7 @@ func (s *Stage) Add(ctx context.Context, input api.Resource) error {
 			return ErrValidation
 		}
 	}
-	if err := validateDesired(&resource); err != nil {
+	if err := s.options.validateDesired(&resource); err != nil {
 		return ErrValidation
 	}
 	key := persistence.CatalogKey{Kind: resource.Kind, ID: resource.Metadata.ID}
@@ -401,6 +423,9 @@ func (s *Stage) Add(ctx context.Context, input api.Resource) error {
 	record.References, err = directReferences(resource)
 	if err != nil {
 		return ErrValidation
+	}
+	if err := s.prepareDriverReferences(ctx, resource, &record); err != nil {
+		return err
 	}
 	slices.SortFunc(record.References, func(a, b persistence.CatalogKey) int { return strings.Compare(a.Kind+"\x00"+a.ID, b.Kind+"\x00"+b.ID) })
 	plain, err := json.Marshal(resource)
@@ -497,6 +522,9 @@ func (s *Stage) readEntry(ctx context.Context, key, raw []byte) (stageEntry, api
 	slices.SortFunc(refs, func(a, b persistence.CatalogKey) int { return strings.Compare(a.Kind+"\x00"+a.ID, b.Kind+"\x00"+b.ID) })
 	if err != nil || !slices.Equal(refs, record.References) {
 		return entry, api.Resource{}, ErrStageUnavailable
+	}
+	if err := s.authenticateDriverReferences(ctx, resource, record); err != nil {
+		return entry, api.Resource{}, err
 	}
 	return entry, resource, nil
 }
@@ -660,7 +688,7 @@ func (s *Stage) validateClosure(ctx context.Context, tx *bolt.Tx, root []byte) e
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if validateMetadata(r.Metadata) != nil || validateDesired(&r) != nil {
+		if validateMetadata(r.Metadata) != nil || s.options.validateDesired(&r) != nil {
 			return ErrValidation
 		}
 		switch r.Kind {
@@ -693,7 +721,7 @@ func (s *Stage) validateClosure(ctx context.Context, tx *bolt.Tx, root []byte) e
 			if err := resolveDriver(driver, category, resources); err != nil {
 				return ErrValidation
 			}
-			return ValidateResolvedDriver(category, *driver)
+			return s.validateResolvedDriver(ctx, category, *driver)
 		}); err != nil {
 			return ErrValidation
 		}

@@ -88,3 +88,16 @@ func (c *Client) Workers(ctx context.Context, opts ListOptions) (*Response[api.W
 	resp, err := c.generated.ListWorkers(ctx, &transport.ListWorkersParams{Cursor: ptr(opts.Cursor), Limit: ptr(opts.limit()), Selector: ptr(opts.Selector), MonitorID: ptr(opts.MonitorID)})
 	return response[api.WorkerObservationList](c, resp, err, false)
 }
+
+// IterateWorkers lazily reads one immutable worker observation snapshot. It
+// retains one page, preserves the caller's filters, and never polls in background.
+func (c *Client) IterateWorkers(opts ListOptions) *Iterator[api.WorkerObservation] {
+	return &Iterator[api.WorkerObservation]{next: opts.Cursor, fetch: func(ctx context.Context, cursor string) ([]api.WorkerObservation, string, error) {
+		opts.Cursor = cursor
+		response, err := c.Workers(ctx, opts)
+		if err != nil {
+			return nil, "", err
+		}
+		return response.Data.Items, response.Data.NextCursor, nil
+	}}
+}

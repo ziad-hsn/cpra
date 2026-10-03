@@ -115,7 +115,10 @@ func newReselectionSpoolRoot(ctx context.Context, parent string, options reselec
 			return nil, errReselectionSpool
 		}
 	}
-	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 25 * time.Millisecond, NoSync: false, NoGrowSync: false,
+	// bbolt retries a contended Unix lock every 50 ms. Allow bounded retries
+	// when an exiting owner briefly retains it; a live owner still prevents
+	// opening the database and cleaning its encrypted staging files.
+	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 250 * time.Millisecond, NoSync: false, NoGrowSync: false,
 		OpenFile: func(name string, flags int, mode os.FileMode) (*os.File, error) {
 			if before == nil {
 				flags |= os.O_CREATE | os.O_EXCL

@@ -21,7 +21,7 @@ func TestUnconfiguredInventoryNeverPasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Complete || r.AllConfiguredPassed || r.AllDriversTested || r.AllDriversPassed || r.ConfiguredCases != 0 || r.NotConfiguredCases != 33 || len(r.Records) != 33 {
+	if r.Complete || r.AllConfiguredPassed || r.AllDriversTested || r.AllDriversPassed || r.ConfiguredCases != 0 || r.NotConfiguredCases != 35 || len(r.Records) != 35 {
 		t.Fatal(r)
 	}
 	counts := map[string]int{}
@@ -31,7 +31,7 @@ func TestUnconfiguredInventoryNeverPasses(t *testing.T) {
 			t.Fatal(row)
 		}
 	}
-	if counts["pulse"] != 14 || counts["intervention"] != 5 || counts["code"] != 14 {
+	if counts["pulse"] != 14 || counts["intervention"] != 6 || counts["code"] != 15 {
 		t.Fatal(counts)
 	}
 }
@@ -46,7 +46,7 @@ func TestEvidenceSummariesCannotCertifyMocksOrSandboxes(t *testing.T) {
 			// Even one non-live case must keep the full-provider gate closed.
 			r.Records[0].EvidenceType = evidenceType
 			r.summarize()
-			if r.Complete != (evidenceType == EvidenceLiveAccount) || !r.AllConfiguredPassed || !r.AllDriversTested || !r.AllDriversPassed || r.PassedCases != 33 {
+			if r.Complete != (evidenceType == EvidenceLiveAccount) || !r.AllConfiguredPassed || !r.AllDriversTested || !r.AllDriversPassed || r.PassedCases != 35 {
 				t.Fatal(r)
 			}
 			r.Records[0].Status = "fail"
@@ -94,7 +94,7 @@ func TestLocalAndMockEvidenceUsesProductionDriverAndIndependentObserver(t *testi
 			if count.Load() != 1 || row.Status != "pass" || !row.Accepted || !row.Observed || !row.Invoked || row.EvidenceType != evidenceType || row.ObservationBoundary != BoundaryEffect {
 				t.Fatal(row, count.Load())
 			}
-			if r.Complete || !r.AllConfiguredPassed || r.AllDriversTested || r.PassedCases != 1 || r.NotConfiguredCases != 32 || r.PassedByEvidenceType[evidenceType] != 1 {
+			if r.Complete || !r.AllConfiguredPassed || r.AllDriversTested || r.PassedCases != 1 || r.NotConfiguredCases != len(Inventory())-1 || r.PassedByEvidenceType[evidenceType] != 1 {
 				t.Fatal(r)
 			}
 			data, err := os.ReadFile(filepath.Join(dir, row.EvidenceRef))

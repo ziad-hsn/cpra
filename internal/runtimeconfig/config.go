@@ -14,12 +14,13 @@ import (
 )
 
 type Storage struct {
-	Mode             string        `yaml:"mode"`
-	Directory        string        `yaml:"directory"`
-	BatchDelay       time.Duration `yaml:"batch_delay"`
-	BatchSize        int           `yaml:"batch_size"`
-	SnapshotInterval time.Duration `yaml:"snapshot_interval"`
-	SnapshotRetain   int           `yaml:"snapshot_retain"`
+	Encryption       *ManagementEncryption `yaml:"encryption,omitempty" json:"-"`
+	Mode             string                `yaml:"mode"`
+	Directory        string                `yaml:"directory"`
+	BatchDelay       time.Duration         `yaml:"batch_delay"`
+	BatchSize        int                   `yaml:"batch_size"`
+	SnapshotInterval time.Duration         `yaml:"snapshot_interval"`
+	SnapshotRetain   int                   `yaml:"snapshot_retain"`
 }
 
 type History struct {

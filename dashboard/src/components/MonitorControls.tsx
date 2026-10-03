@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { useManagementMutation } from '../hooks/mutations';
@@ -8,6 +8,7 @@ import { object } from '../api/value';
 import type { Incident, Monitor } from '../api/generated';
 import { MutationReceipt, OperationLink } from './OperationReceipt';
 import { formatDateTime } from '../lib/format';
+import { Dialog } from './Dialog';
 
 type Action = 'acknowledge' | 'dismiss' | 'reopen' | 'snooze' | 'unsnooze' | 'disable' | 'enable' | 'recover';
 const actions = {
@@ -89,6 +90,11 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
       await queries.invalidateQueries({ queryKey: ['durable-state', draft.monitorID] });
     } catch { /* Keep the frozen request and explicit error. Never retry or update its version. */ }
   };
+  const feedback = <>
+    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The saved state changed. Close this draft and inspect the latest state before making another change.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the operation or current state before taking another action.' : ''}</p>}
+    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted operation" />}
+    {mutation.response && <MutationReceipt response={mutation.response} />}
+  </>;
   return <section className="card" aria-labelledby={`controls-${monitorID}`}>
     <h2 id={`controls-${monitorID}`} className="card-title">Monitor controls</h2>
     {resource.isPending && <p role="status">Loading saved control state…</p>}
@@ -105,41 +111,27 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
       </div>
       {!monitor.status?.controlRevision && <p className="muted">Snooze is unavailable until the controller publishes a control version.</p>}
     </>}
-    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The saved state changed. Close this draft and inspect the latest state before making another change.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the operation or current state before taking another action.' : ''}</p>}
-    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted operation" />}
-    {mutation.response && <MutationReceipt response={mutation.response} />}
-    {draft && <ControlDialog key={`${draft.action}/${draft.revision}`} draft={draft} pending={mutation.pending} unconfirmed={mutation.error?.reason === 'unconfirmed'} onCancel={() => setDraft(undefined)} onConfirm={submit} />}
+    {!draft && feedback}
+    {draft && <ControlDialog key={`${draft.action}/${draft.revision}`} draft={draft} pending={mutation.pending} unconfirmed={mutation.error?.reason === 'unconfirmed'} onCancel={() => setDraft(undefined)} onConfirm={submit}>{feedback}</ControlDialog>}
   </section>;
 }
 
-function ControlDialog({ draft, pending, unconfirmed, onCancel, onConfirm }: { draft: FrozenControl; pending: boolean; unconfirmed: boolean; onCancel: () => void; onConfirm: (input: { reason: string; note: string; duration: string }) => Promise<void> }) {
+function ControlDialog({ draft, pending, unconfirmed, children, onCancel, onConfirm }: { draft: FrozenControl; pending: boolean; unconfirmed: boolean; children: ReactNode; onCancel: () => void; onConfirm: (input: { reason: string; note: string; duration: string }) => Promise<void> }) {
   const heading = useId();
-  const root = useRef<HTMLDivElement>(null);
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [duration, setDuration] = useState('30m');
   const needsReason = draft.action === 'dismiss' || draft.action === 'snooze' || draft.action === 'recover';
   const durationValid = draft.action !== 'snooze' || validSnoozeDuration(duration);
   const textValid = [reason, note].every(text => new TextEncoder().encode(text).byteLength <= 4096 && !text.includes('\0') && !text.includes('\r'));
-  useEffect(() => {
-    const previous = document.activeElement;
-    root.current?.querySelector<HTMLElement>('input,textarea,button')?.focus();
-    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
-  }, []);
-  return <div ref={root} className="management-modal" role="dialog" aria-modal="true" aria-labelledby={heading} onKeyDown={event => {
-    if (event.key === 'Escape' && !pending) onCancel();
-    if (event.key !== 'Tab') return;
-    const controls = root.current?.querySelectorAll<HTMLElement>('input:not(:disabled),textarea:not(:disabled),button:not(:disabled)');
-    if (!controls?.length) { event.preventDefault(); return; }
-    if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus(); }
-    else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus(); }
-  }}><form className="card" onSubmit={event => { event.preventDefault(); if (textValid && durationValid && (!needsReason || reason.trim())) void onConfirm({ reason, note, duration }); }}>
+  return <Dialog labelledBy={heading} pending={pending} onCancel={onCancel}><form className="card" onSubmit={event => { event.preventDefault(); if (!pending && !unconfirmed && textValid && durationValid && (!needsReason || reason.trim())) void onConfirm({ reason, note, duration }); }}>
     <h2 id={heading}>{actions[draft.action].title}</h2><p>{actions[draft.action].description}</p>
     {draft.incidentID && <p className="muted">Applies to this incident only: <span className="mono">{draft.incidentID}</span></p>}
     {draft.action === 'acknowledge' && <label className="management-field">Note (optional)<textarea className="input" value={note} maxLength={4096} disabled={pending} onChange={event => setNote(event.target.value)} /></label>}
     {needsReason && <label className="management-field">Reason<textarea className="input" required value={reason} maxLength={4096} disabled={pending} onChange={event => setReason(event.target.value)} /></label>}
     {draft.action === 'snooze' && <label className="management-field">Duration<input className="input" aria-describedby={`${heading}-duration`} aria-invalid={!durationValid} required value={duration} disabled={pending} onChange={event => setDuration(event.target.value)} placeholder="30m" /><span id={`${heading}-duration`} className="muted">For example, 15m, 2h or 24h. Use a positive duration of at most 30 days (720h).</span></label>}
     {!textValid && <p role="alert">Notes and reasons must each fit within 4,096 UTF-8 bytes and contain no null or carriage-return characters.</p>}
+    {children}
     <div className="row" style={{ gap: 8 }}><button type="button" className="btn" disabled={pending} onClick={onCancel}>Cancel</button><button type="submit" className="btn" disabled={pending || unconfirmed || !textValid || !durationValid || (needsReason && !reason.trim())}>{pending ? 'Submitting…' : actions[draft.action].title}</button></div>
-  </form></div>;
+  </form></Dialog>;
 }

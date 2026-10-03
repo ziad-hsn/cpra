@@ -19,7 +19,7 @@ import (
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
-func TestRuntimeAll33DriverFieldMappings(t *testing.T) {
+func TestRuntimeAll35DriverFieldMappings(t *testing.T) {
 	tests := []struct {
 		category, kind, input string
 		want                  any
@@ -38,6 +38,8 @@ func TestRuntimeAll33DriverFieldMappings(t *testing.T) {
 		{"check", "rabbitmq", `{"url":"amqps://user:secret@host/vhost","retries":2}`, &manifest.PulseRabbitMQConfig{URL: "amqps://user:secret@host/vhost", Retries: 2}},
 		{"check", "kafka", `{"brokers":["one:9092","two:9092"],"retries":2}`, &manifest.PulseKafkaConfig{Brokers: []string{"one:9092", "two:9092"}, Retries: 2}},
 		{"check", "tls", `{"host":"host","port":443,"serverName":"sni","warnDays":30,"criticalDays":7,"insecureSkipVerify":true,"retries":2}`, &manifest.PulseTLSConfig{Host: "host", Port: 443, ServerName: "sni", WarnDays: 30, CriticalDays: 7, InsecureSkipVerify: true, Retries: 2}},
+		{"recovery", "a2a", `{"url":"https://agent.example.test","token":"secret","tenant":"ops","requestTimeout":"2s","taskTimeout":"3s","pollInterval":"1s","allowInsecureHttp":false}`, &manifest.InterventionTargetA2A{URL: "https://agent.example.test", Token: "secret", Tenant: "ops", RequestTimeout: 2 * time.Second, TaskTimeout: 3 * time.Second, PollInterval: time.Second}},
+		{"notification", "a2a", `{"url":"http://agent.example.test","token":"notify-secret","tenant":"alerts","requestTimeout":"2s","timeout":"3s","allowInsecureHttp":true}`, &manifest.CodeNotificationA2A{URL: "http://agent.example.test", Token: "notify-secret", Tenant: "alerts", RequestTimeout: 2 * time.Second, Timeout: 3 * time.Second, AllowInsecureHTTP: true}},
 		{"recovery", "docker", `{"type":"docker","container":"container","timeout":"9s"}`, &manifest.InterventionTargetDocker{Type: "docker", Container: "container", Timeout: 9 * time.Second}},
 		{"recovery", "kubernetes", `{"type":"kubernetes","kubeconfigPath":"/not/read","namespace":"test","kind":"deployment","name":"worker","replicas":0,"timeout":"12s"}`, &manifest.InterventionTargetKubernetes{Type: "kubernetes", KubeconfigPath: "/not/read", Namespace: "test", Kind: "deployment", Name: "worker", Replicas: api.Pointer(0), Timeout: 12 * time.Second}},
 		{"recovery", "webhook", `{"type":"webhook","url":"https://example.test/recover","method":"PATCH","headers":{"X-Custom_Header":"untouched"},"body":"body","timeout":"7s"}`, &manifest.InterventionTargetWebhook{Type: "webhook", URL: "https://example.test/recover", Method: "PATCH", Headers: map[string]string{"X-Custom_Header": "untouched"}, Body: "body", Timeout: 7 * time.Second}},
@@ -58,7 +60,7 @@ func TestRuntimeAll33DriverFieldMappings(t *testing.T) {
 		{"notification", "datadog", `{"apiKey":"secret","appKey":"app","site":"datadoghq.eu","tags":["service:api"],"url":"https://example.test/datadog"}`, &manifest.CodeNotificationDatadog{APIKey: "secret", AppKey: "app", Site: "datadoghq.eu", Tags: []string{"service:api"}, URL: "https://example.test/datadog"}},
 		{"notification", "victorops", `{"restEndpointKey":"secret","routingKey":"team","messageType":"RECOVERY","entityId":"monitor","url":"https://example.test/victorops"}`, &manifest.CodeNotificationVictorOps{RestEndpointKey: "secret", RoutingKey: "team", MessageType: "RECOVERY", EntityID: "monitor", URL: "https://example.test/victorops"}},
 	}
-	if len(tests) != 33 || len(runtimeDriverFactories) != len(tests) {
+	if len(tests) != 35 || len(runtimeDriverFactories) != len(tests) {
 		t.Fatal("driver inventory is incomplete")
 	}
 	for _, test := range tests {

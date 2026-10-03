@@ -26,6 +26,7 @@ func (s *Server) StopAdmission(ctx context.Context) error {
 	}
 	done := s.mutationsDrained
 	s.mutationMu.Unlock()
+	s.stopExtensionAdmission()
 	select {
 	case <-done:
 		return nil
@@ -44,10 +45,18 @@ func mutationUnavailable() error {
 	return managementFailure(http.StatusServiceUnavailable, "admissionUnavailable", "Management is not accepting writes. This request was not admitted.")
 }
 
-func (s *Server) mutationReady() bool {
-	s.mutationMu.Lock()
-	defer s.mutationMu.Unlock()
-	return !s.mutationStopped && (s.cfg.Ready == nil || s.cfg.Ready())
+func (s *Server) mutationReady(ctx context.Context) bool {
+	if ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(ctx, s.observationTimeout())
+	defer cancel()
+	// Readiness may wait on storage. It must not hold the admission mutex and
+	// prevent StopAdmission from closing the barrier while that check waits.
+	if s.admissionStopped() || s.cfg.Ready != nil && !s.cfg.Ready(ctx) {
+		return false
+	}
+	return ctx.Err() == nil && !s.admissionStopped()
 }
 
 // withMutationAdmission orders the commit against StopAdmission without holding
@@ -57,8 +66,19 @@ func (s *Server) withMutationAdmission(ctx context.Context, commit func() error)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	ready := s.mutationReady(ctx)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !ready {
+		return mutationUnavailable()
+	}
 	s.mutationMu.Lock()
-	if s.mutationStopped || s.cfg.Ready != nil && !s.cfg.Ready() {
+	if err := ctx.Err(); err != nil {
+		s.mutationMu.Unlock()
+		return err
+	}
+	if s.mutationStopped {
 		s.mutationMu.Unlock()
 		return mutationUnavailable()
 	}

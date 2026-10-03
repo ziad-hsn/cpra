@@ -13,11 +13,13 @@ import (
 // These are wire-format fixtures, not driver executions or provider evidence.
 // Every documented built-in variant passes through the production collection
 // loader and retains representative optional values and provider parameters.
-func TestAll33ManifestDriverVariants(t *testing.T) {
+func TestAll35ManifestDriverVariants(t *testing.T) {
 	cases := []struct {
 		category, kind, config, key string
 		value                       any
 	}{
+		{"recovery", "a2a", `{"url":"https://agent.example.test","request_timeout":"2s","task_timeout":"3s","poll_interval":1000000000,"allow_insecure_http":false}`, "pollInterval", "1s"},
+		{"notification", "a2a", `{"url":"https://agent.example.test","request_timeout":2000000000,"timeout":"3s","allow_insecure_http":false}`, "requestTimeout", "2s"},
 		{"check", "http", `{"url":"https://example.test","expected_status":[200,204],"insecure_skip_verify":false,"headers":{"X_Trace_ID":"keep"}}`, "insecureSkipVerify", false},
 		{"check", "tcp", `{"host":"db.internal","port":5432}`, "port", float64(5432)},
 		{"check", "icmp", `{"host":"router","ignore_privilege":false}`, "ignorePrivilege", false},
@@ -52,7 +54,7 @@ func TestAll33ManifestDriverVariants(t *testing.T) {
 		{"notification", "datadog", `{"api_key":"fixture-key","app_key":"fixture-app","tags":["test"]}`, "appKey", "fixture-app"},
 		{"notification", "victorops", `{"rest_endpoint_key":"fixture-endpoint","routing_key":"fixture-routing","entity_id":"fixture-id"}`, "entityId", "fixture-id"},
 	}
-	if len(cases) != 33 {
+	if len(cases) != 35 {
 		t.Fatal("variant inventory changed")
 	}
 	for _, test := range cases {
@@ -111,5 +113,21 @@ func TestAll33ManifestDriverVariants(t *testing.T) {
 				t.Fatal("manifest default/group normalization lost")
 			}
 		})
+	}
+}
+
+func TestManifestRecoveryEscalation(t *testing.T) {
+	input := `{"monitors":[{"id":"test","name":"test","pulse_check":{"type":"http","interval":"60s","timeout":"5s","config":{"url":"https://test.example"}},"intervention":{"action":"docker","max_attempts":2,"target":{"container":"designated-test"}},"codes":{"red":{"trigger":"recovery_exhausted","notify":"log","config":{}}}}]}`
+	frozen := freezeTest(t, input)
+	item, err := frozen.Item(context.Background(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec api.MonitorSpec
+	if err = json.Unmarshal(item.Resource.Spec, &spec); err != nil {
+		t.Fatal(err)
+	}
+	if spec.Recovery == nil || spec.Recovery.MaxAttempts == nil || *spec.Recovery.MaxAttempts != 2 || spec.Notifications == nil || (*spec.Notifications)["red"].Trigger == nil || *(*spec.Notifications)["red"].Trigger != "recovery_exhausted" {
+		t.Fatal("collection discarded escalation policy")
 	}
 }

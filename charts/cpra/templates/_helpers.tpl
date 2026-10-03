@@ -32,12 +32,44 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 {{ required "serviceAccount.name is required when serviceAccount.create=false" .Values.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+{{- define "cpra.apiScheme" -}}
+{{- ternary "https" "http" .Values.management.enabled -}}
+{{- end -}}
+{{- define "cpra.readTokenPath" -}}
+{{- ternary "/etc/cpra/management/read-token" "/run/secrets/cpra/token" .Values.management.enabled -}}
+{{- end -}}
+{{- define "cpra.immutableSecret" -}}
+{{- $secret := lookup "v1" "Secret" .namespace .name -}}
+{{- if $secret -}}
+{{- if not $secret.immutable -}}{{ fail "CPRa bootstrap Secrets must be immutable; rotate through a new Secret reference" }}{{- end -}}
+{{- range .keys -}}
+{{- if not (hasKey ($secret.data | default dict) .) -}}{{ fail "CPRa bootstrap Secret is missing a required key" }}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- define "cpra.validate" -}}
 {{- if .Values.api.enabled -}}
 {{- $auth := required "auth.existingSecret must reference an immutable, versioned API-token Secret" .Values.auth.existingSecret -}}
-{{- $secret := lookup "v1" "Secret" .Release.Namespace $auth -}}
-{{- if and $secret (not $secret.immutable) -}}{{ fail "API-token Secret must be immutable; rotate through a new Secret name" }}{{- end -}}
+{{- include "cpra.immutableSecret" (dict "namespace" .Release.Namespace "name" $auth "keys" (list .Values.auth.key)) -}}
 {{- else if .Values.ingress.enabled -}}{{ fail "ingress requires api.enabled=true" }}{{- end -}}
+{{- if .Values.management.enabled -}}
+{{- if or (not .Values.api.enabled) (not .Values.persistence.enabled) (ne .Values.storage.mode "raft") -}}{{ fail "management requires an enabled API and persistent Raft storage" }}{{- end -}}
+{{- if .Values.ingress.enabled -}}{{ fail "management requires verified HTTPS to CPRa; use an operator-managed TLS backend and leave chart ingress disabled" }}{{- end -}}
+{{- $policy := required "management.policy.existingSecret is required" .Values.management.policy.existingSecret -}}
+{{- $encryption := required "management.encryption.existingSecret is required" .Values.management.encryption.existingSecret -}}
+{{- $tls := required "management.tls.existingSecret is required" .Values.management.tls.existingSecret -}}
+{{- include "cpra.immutableSecret" (dict "namespace" .Release.Namespace "name" $policy "keys" (list .Values.management.policy.key)) -}}
+{{- include "cpra.immutableSecret" (dict "namespace" .Release.Namespace "name" $encryption "keys" (list .Values.management.encryption.key)) -}}
+{{- include "cpra.immutableSecret" (dict "namespace" .Release.Namespace "name" $tls "keys" (list .Values.management.tls.keys.certificate .Values.management.tls.keys.privateKey .Values.management.tls.keys.ca)) -}}
+{{- if or (eq .Values.management.tls.keys.certificate .Values.management.tls.keys.privateKey) (eq .Values.management.tls.keys.ca .Values.management.tls.keys.privateKey) -}}{{ fail "TLS private-key selector must differ from certificate and CA selectors" }}{{- end -}}
+{{- $previous := dict (printf "%s/%s" $encryption .Values.management.encryption.key) true -}}
+{{- range .Values.management.encryption.previous -}}
+{{- $identity := printf "%s/%s" .existingSecret .key -}}
+{{- if hasKey $previous $identity -}}{{ fail "management encryption keys must use distinct Secret/key references" }}{{- end -}}
+{{- $_ := set $previous $identity true -}}
+{{- include "cpra.immutableSecret" (dict "namespace" $.Release.Namespace "name" .existingSecret "keys" (list .key)) -}}
+{{- end -}}
+{{- end -}}
 {{- $sources := 0 -}}
 {{- $envNames := dict -}}
 {{- range .Values.providerEnv -}}

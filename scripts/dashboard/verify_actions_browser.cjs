@@ -1,6 +1,7 @@
 'use strict';
 const { chromium } = require(process.env.CPRA_BROWSER_MODULE);
 const path = require('node:path');
+const { auditAccessibility } = require('./accessibility.cjs');
 const origin = process.env.CPRA_BROWSER_ORIGIN;
 const operator = 'main-operator-fixture-012345678901234567890123456789';
 const reader = 'main-reader-fixture-012345678901234567890123456789';
@@ -13,7 +14,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
     const page = await context.newPage();
     page.setDefaultTimeout(20_000);
-    const errors = [], writes = [], operationHandles = [], checkpoints = [], reads = [], metricsRequests = [], keyboardSteps = [];
+    const errors = [], writes = [], operationHandles = [], checkpoints = [], reads = [], metricsRequests = [], keyboardSteps = [], accessibility = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => {
       const url = new URL(request.url());
@@ -119,6 +120,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     const actions = page.getByRole('region', { name: 'Action outcomes', exact: true });
     await controls.getByRole('button', { name: 'Request recovery', exact: true }).click();
     const recovery = page.getByRole('dialog', { name: 'Request recovery', exact: true });
+    await auditAccessibility(page, 'guarded-recovery', accessibility);
     check(await recovery.getByRole('button', { name: 'Request recovery', exact: true }).isDisabled(), 'recovery accepted without a reason');
     await recovery.getByLabel('Reason', { exact: true }).fill('Investigated the local target before requesting recovery');
     await recovery.getByRole('button', { name: 'Request recovery', exact: true }).click();
@@ -136,6 +138,7 @@ function check(value, message) { if (!value) throw new Error(message); }
       await dialog.getByLabel('Reason', { exact: true }).fill(reason);
       await dialog.getByLabel('Note (optional)', { exact: true }).fill('Operator browser qualification note');
       await dialog.getByLabel(/^Evidence references \(optional\)/).fill('local-fixture-receipt-1');
+      await auditAccessibility(page, `unknown-review-${resolution}`, accessibility);
       await dialog.getByRole('button', { name: 'Record review', exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
       await actions.getByText('Saved durably and applied by the controller.', { exact: true }).waitFor();
@@ -181,6 +184,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(operationPage.items.every(operation => operation.items.every(item => item.id === 'browser-recovery')), 'exact monitor operation filter included another resource');
     await page.getByRole('link', { name: reviewedHandle, exact: true }).waitFor();
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-operations.png'), fullPage: true });
+    await auditAccessibility(page, 'reader-operations', accessibility);
     await page.getByRole('link', { name: reviewedHandle, exact: true }).click();
     await page.getByRole('heading', { name: 'Completed', exact: true }).waitFor();
     check((await counts()).recoveries === 1, 'reading operation list or detail repeated recovery');
@@ -199,6 +203,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     await actions.getByText(/Operator review: accepted · team\/oncall/).waitFor();
     check(await page.getByRole('button', { name: /^(Review action |Request recovery|Acknowledge|Dismiss|Snooze|Disable|Enable|check now)/i }).count() === 0, 'stable-ID reader view exposed a write control');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-monitor-state.png'), fullPage: true });
+    await auditAccessibility(page, 'reader-monitor-state', accessibility);
     checkpoints.push('saved configuration navigates to stable-ID monitor observations, history and existing action evidence');
 
     const [incidentResponse] = await Promise.all([
@@ -216,6 +221,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     check((await page.getByLabel('Incident page counts', { exact: true }).textContent()).includes('page counts, not fleet totals'), 'incident page counts implied fleet totals');
     check(!(await incidentRegion.textContent()).includes('0001'), 'Go zero incident timestamps appeared as actual observations');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-incidents.png'), fullPage: true });
+    await auditAccessibility(page, 'reader-incidents', accessibility);
     await incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }).click();
     await savedIdentity.waitFor();
     check(new URL(page.url()).pathname === '/monitors/by-id/browser-recovery', 'incident link lost stable monitor identity');
@@ -250,6 +256,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     await metricOutput.waitFor();
     check((await metricOutput.textContent()).includes('cpra_'), 'metrics viewer did not render actual CPRa exposition');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-metrics.png'), fullPage: true });
+    await auditAccessibility(page, 'reader-metrics', accessibility);
     await page.getByRole('button', { name: 'Hide metrics', exact: true }).click();
     check(await metricOutput.count() === 0, 'hide retained displayed metrics');
     await page.waitForTimeout(1100);
@@ -264,6 +271,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     await incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }).waitFor();
     await checkMobileOverflow('Incidents');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'mobile-reader-incidents.png'), fullPage: true });
+    await auditAccessibility(page, 'mobile-reader-incidents', accessibility);
     await keyboardActivate(incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }), 'Stable monitor identity');
     await savedIdentity.waitFor();
     check(new URL(page.url()).pathname === '/monitors/by-id/browser-recovery', 'mobile keyboard incident navigation lost stable identity');
@@ -276,6 +284,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     check((await metricOutput.textContent()).includes('cpra_'), 'mobile keyboard metrics did not show actual exposition');
     await checkMobileOverflow('Mobile metrics');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'mobile-reader-metrics.png'), fullPage: true });
+    await auditAccessibility(page, 'mobile-reader-metrics', accessibility);
     await keyboardActivate(page.getByRole('button', { name: 'Hide metrics', exact: true }), 'Hide metrics');
     check(await metricOutput.count() === 0, 'mobile keyboard hide retained displayed metrics');
     check(metricsRequests.length === 3 && metricsRequests.every(request => request.method === 'GET' && request.readerBearer && request.queryEmpty), 'metrics did not use exactly three explicit authenticated reads');
@@ -296,7 +305,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(writes.length === 3 && writes[0].path.endsWith('/recover') && writes.slice(1).every(write => write.path.endsWith('/review')), 'unexpected write or hidden retry');
     check(errors.length === 0, `uncaught browser errors: ${JSON.stringify(errors)}`);
     checkpoints.push('reader remains observational; three explicit writes, no hidden retries or token storage');
-    console.log(JSON.stringify({ scope: 'normal main, embedded SPA, TLS, encrypted Raft, actual local HTTP/webhook targets; no production-account certification', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checkpoints, writes, metricsRequests, keyboardSteps }));
+    console.log(JSON.stringify({ scope: 'normal main, embedded SPA, TLS, encrypted Raft, actual local HTTP/webhook targets; no production-account certification', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checkpoints, writes, metricsRequests, keyboardSteps, accessibility }));
     await context.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

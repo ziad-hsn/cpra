@@ -18,8 +18,34 @@ import (
 // JobTypeFormatVersion adds encrypted immutable JobType versions, not worker
 // enrollment, execution permission, or an external runtime adapter.
 const JobTypeFormatVersion = 15
-const LatestFormatVersion = WorkerOfferFormatVersion
+const AgentWorkerFormatVersion = 32
+const RecoveryNotificationWorkerFormatVersion = 34
+const AgentObservationWorkerFormatVersion = 36
+const NotificationWorkerFormatVersion = 39
+const LatestFormatVersion = NotificationWorkerFormatVersion
+const notificationWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-39\n"
+const agentObservationWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-36\n"
+const recoveryNotificationWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-34\n"
+const agentWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-32\n"
 const jobTypeSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-15\n"
+
+// Format 31 is readable without externaljobs. Combining it with any optional
+// state uses a distinct format so a default binary cannot discard worker data.
+func joinStorageFormat(a, b int) int {
+	if max(a, b) == NotificationFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return NotificationWorkerFormatVersion
+	}
+	if max(a, b) == AgentObservationFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return AgentObservationWorkerFormatVersion
+	}
+	if max(a, b) == RecoveryNotificationFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return RecoveryNotificationWorkerFormatVersion
+	}
+	if max(a, b) == AgentActionFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return AgentWorkerFormatVersion
+	}
+	return max(a, b)
+}
 
 const (
 	MaxJobTypes          = 1024
@@ -38,25 +64,42 @@ var (
 )
 
 type commandExtensions struct {
-	WorkerStart       *WorkerStartCommand         `json:"worker_start,omitempty"`
-	WorkerExecution   *WorkerExecutionCommand     `json:"worker_execution,omitempty"`
-	WorkerSession     *WorkerSessionCommand       `json:"worker_session,omitempty"`
-	WorkerPolicy      *WorkerPolicyCommand        `json:"worker_policy,omitempty"`
-	JobType           *JobTypeCommand             `json:"job_type,omitempty"`
-	JobTypeAllocation *JobTypeOperationAllocation `json:"job_type_allocation,omitempty"`
+	WorkerSchedule      *WorkerScheduleCommand      `json:"worker_schedule,omitempty"`
+	WorkerExpire        *WorkerExpireCommand        `json:"worker_expire,omitempty"`
+	WorkerCheckAllocate *WorkerCheckAllocateCommand `json:"worker_check_allocate,omitempty"`
+	WorkerCheckRetire   *WorkerCheckRetireCommand   `json:"worker_check_retire,omitempty"`
+	WorkerRequeue       *WorkerRequeueCommand       `json:"worker_requeue,omitempty"`
+	WorkerObservation   *WorkerObservationCommand   `json:"worker_observation,omitempty"`
+	WorkerFinalize      *WorkerFinalizeCommand      `json:"worker_finalize,omitempty"`
+	WorkerEvidence      *WorkerEvidenceCommand      `json:"worker_evidence,omitempty"`
+	WorkerHeartbeat     *WorkerHeartbeatCommand     `json:"worker_heartbeat,omitempty"`
+	WorkerResult        *WorkerResultCommand        `json:"worker_result,omitempty"`
+	WorkerStart         *WorkerStartCommand         `json:"worker_start,omitempty"`
+	WorkerExecution     *WorkerExecutionCommand     `json:"worker_execution,omitempty"`
+	WorkerSession       *WorkerSessionCommand       `json:"worker_session,omitempty"`
+	WorkerPolicy        *WorkerPolicyCommand        `json:"worker_policy,omitempty"`
+	JobType             *JobTypeCommand             `json:"job_type,omitempty"`
+	JobTypeAllocation   *JobTypeOperationAllocation `json:"job_type_allocation,omitempty"`
 }
 type imageExtensions struct {
+	WorkerChecks     *workerCheckImage     `json:"worker_checks,omitempty"`
+	WorkerSLO        *workerSLOImage       `json:"worker_slo,omitempty"`
 	WorkerExecutions *workerExecutionImage `json:"worker_executions,omitempty"`
 	WorkerSessions   *workerSessionImage   `json:"worker_sessions,omitempty"`
 	WorkerPolicy     *WorkerPolicyState    `json:"worker_policy,omitempty"`
 	JobTypes         *jobTypeImage         `json:"job_types,omitempty"`
 }
 type resultExtensions struct {
-	WorkerExecution *WorkerExecutionRecord
-	WorkerStart     *WorkerStartResponse
-	WorkerPoll      *WorkerPollResponse
-	JobType         *JobTypeState
-	WorkerPolicy    *WorkerPolicyState
+	WorkerCheckID       string
+	WorkerChecksRetired int
+	WorkerEvidence      *WorkerReceipt
+	WorkerHeartbeat     *WorkerHeartbeatResponse
+	WorkerResult        *WorkerReceipt
+	WorkerExecution     *WorkerExecutionRecord
+	WorkerStart         *WorkerStartResponse
+	WorkerPoll          *WorkerPollResponse
+	JobType             *JobTypeState
+	WorkerPolicy        *WorkerPolicyState
 }
 
 // JobTypeVersion contains only encrypted resource bytes and non-secret exact
@@ -167,6 +210,117 @@ func (c JobTypeCommand) validate(at time.Time) error {
 }
 
 func validateCommandExtensions(c Command) (bool, error) {
+	if c.Kind == "worker_schedule" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerSchedule = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerSchedule == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerSchedule.validate(c.At)
+	}
+	if c.WorkerSchedule != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_expire" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerExpire = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerExpire == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerExpire.validate(c.At)
+	}
+	if c.WorkerExpire != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_check_allocate" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerCheckAllocate = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerCheckAllocate == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerCheckAllocate.validate(c.At)
+	}
+	if c.WorkerCheckAllocate != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_check_retire" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerCheckRetire = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerCheckRetire == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerCheckRetire.validate(c.At)
+	}
+	if c.WorkerCheckRetire != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_requeue" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerRequeue = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerRequeue == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerRequeue.validate(c.At)
+	}
+	if c.WorkerRequeue != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+
+	if c.Kind == "worker_observation" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerObservation = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerObservation == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerObservation.validate(c.At)
+	}
+	if c.WorkerObservation != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_finalize" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerFinalize = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerFinalize == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerFinalize.validate(c.At)
+	}
+	if c.WorkerFinalize != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_evidence" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerEvidence = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerEvidence == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerEvidence.validate(c.At)
+	}
+	if c.WorkerEvidence != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_heartbeat" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerHeartbeat = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerHeartbeat == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerHeartbeat.validate(c.At)
+	}
+	if c.WorkerHeartbeat != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
+	if c.Kind == "worker_result" {
+		extra := c
+		extra.Kind, extra.At, extra.WorkerResult = "", time.Time{}, nil
+		if extra != (Command{}) || c.WorkerResult == nil {
+			return true, ErrWorkerExecutionInvalid
+		}
+		return true, c.WorkerResult.validate(c.At)
+	}
+	if c.WorkerResult != nil {
+		return true, ErrWorkerExecutionInvalid
+	}
 	if c.Kind == "worker_start" {
 		extra := c
 		extra.Kind, extra.At, extra.WorkerStart = "", time.Time{}, nil
@@ -244,9 +398,46 @@ func validateCommandExtensions(c Command) (bool, error) {
 	return true, c.JobType.validate(c.At)
 }
 func hasCommandExtensions(c Command) bool {
-	return c.WorkerStart != nil || c.WorkerExecution != nil || c.JobType != nil || c.JobTypeAllocation != nil || c.WorkerPolicy != nil || c.WorkerSession != nil
+	return c.WorkerSchedule != nil || c.WorkerExpire != nil || c.WorkerCheckAllocate != nil || c.WorkerCheckRetire != nil || c.WorkerRequeue != nil || c.WorkerObservation != nil || c.WorkerFinalize != nil || c.WorkerEvidence != nil || c.WorkerHeartbeat != nil || c.WorkerResult != nil || c.WorkerStart != nil || c.WorkerExecution != nil || c.JobType != nil || c.JobTypeAllocation != nil || c.WorkerPolicy != nil || c.WorkerSession != nil
 }
 func commandExtensionMinimumFormat(c Command) int {
+	if c.WorkerSession != nil && c.WorkerSession.SelectionVersion != 0 {
+		return WorkerQueueFormatVersion
+	}
+	if c.WorkerSchedule != nil || c.Kind == "worker_schedule" || c.WorkerExecution != nil && c.WorkerExecution.Intent.Schedule != nil {
+		return WorkerScheduleFormatVersion
+	}
+	if c.Kind == "worker_expire" || c.WorkerExpire != nil {
+		return WorkerExpiryFormatVersion
+	}
+	if c.WorkerExecution != nil && c.WorkerExecution.Intent.minimumFormat() == WorkerNotificationFormatVersion || c.Config != nil && policyMinimumFormat(c.Config.Policy) == WorkerNotificationFormatVersion {
+		return WorkerNotificationFormatVersion
+	}
+	if c.WorkerPolicy != nil {
+		for _, grant := range c.WorkerPolicy.Worker.Grants {
+			if grant.minimumFormat() == WorkerNotificationFormatVersion {
+				return WorkerNotificationFormatVersion
+			}
+		}
+	}
+	if c.Kind == "worker_check_allocate" || c.WorkerCheckAllocate != nil || c.Kind == "worker_check_retire" || c.WorkerCheckRetire != nil || c.WorkerExecution != nil && c.WorkerExecution.CheckReserved {
+		return WorkerCheckRetentionFormatVersion
+	}
+	if c.Kind == "worker_requeue" || c.WorkerRequeue != nil || c.WorkerExecution != nil && c.WorkerExecution.SchedulingVersion != 0 {
+		return WorkerSchedulingFormatVersion
+	}
+	if c.Kind == "worker_observation" || c.WorkerObservation != nil || c.WorkerExecution != nil && c.WorkerExecution.ResultTarget != 0 {
+		return WorkerSLOFormatVersion
+	}
+	if c.Kind == "worker_finalize" || c.WorkerFinalize != nil {
+		return WorkerFinalizationFormatVersion
+	}
+	if c.Kind == "worker_heartbeat" || c.WorkerHeartbeat != nil || c.Kind == "worker_evidence" || c.WorkerEvidence != nil {
+		return WorkerLifecycleFormatVersion
+	}
+	if c.Kind == "worker_result" || c.WorkerResult != nil {
+		return WorkerResultFormatVersion
+	}
 	if c.Kind == "worker_start" || c.WorkerStart != nil || c.WorkerSession != nil && len(c.WorkerSession.ProposedLeaseIDs) > 0 {
 		return WorkerOfferFormatVersion
 	}
@@ -275,9 +466,67 @@ func commandExtensionMinimumFormat(c Command) int {
 	return FormatVersion
 }
 func externalStorageFormat(version int) bool {
-	return version == WorkerOfferFormatVersion || version == WorkerExecutionFormatVersion || version == JobTypeFormatVersion || version == JobTypeOperationFormatVersion || version == WorkerPolicyFormatVersion || version == CatalogJobTypeFormatVersion || version == WorkerSessionFormatVersion
+	if version == NotificationWorkerFormatVersion {
+		return true
+	}
+	if version == WorkerQueueFormatVersion {
+		return true
+	}
+	if version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion {
+		return true
+	}
+	return version == WorkerScheduleFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerSLOFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerResultFormatVersion || version == WorkerOfferFormatVersion || version == WorkerExecutionFormatVersion || version == JobTypeFormatVersion || version == JobTypeOperationFormatVersion || version == WorkerPolicyFormatVersion || version == CatalogJobTypeFormatVersion || version == WorkerSessionFormatVersion
+}
+func commandExtensionWriteFormat(c Command) int {
+	version := commandExtensionMinimumFormat(c)
+	if c.Kind == "worker_result" {
+		return joinStorageFormat(version, NotificationFormatVersion)
+	}
+	return version
 }
 func externalSnapshotMagic(version int) string {
+	if version == NotificationWorkerFormatVersion {
+		return notificationWorkerSnapshotMagic
+	}
+	if version == WorkerQueueFormatVersion {
+		return workerQueueSnapshotMagic
+	}
+	if version == AgentObservationWorkerFormatVersion {
+		return agentObservationWorkerSnapshotMagic
+	}
+	if version == RecoveryNotificationWorkerFormatVersion {
+		return recoveryNotificationWorkerSnapshotMagic
+	}
+	if version == AgentWorkerFormatVersion {
+		return agentWorkerSnapshotMagic
+	}
+	if version == WorkerScheduleFormatVersion {
+		return workerScheduleSnapshotMagic
+	}
+	if version == WorkerExpiryFormatVersion {
+		return workerExpirySnapshotMagic
+	}
+	if version == WorkerNotificationFormatVersion {
+		return workerNotificationSnapshotMagic
+	}
+	if version == WorkerCheckRetentionFormatVersion {
+		return workerCheckRetentionSnapshotMagic
+	}
+	if version == WorkerSchedulingFormatVersion {
+		return workerSchedulingSnapshotMagic
+	}
+	if version == WorkerSLOFormatVersion {
+		return workerSLOSnapshotMagic
+	}
+	if version == WorkerFinalizationFormatVersion {
+		return workerFinalizationSnapshotMagic
+	}
+	if version == WorkerLifecycleFormatVersion {
+		return workerLifecycleSnapshotMagic
+	}
+	if version == WorkerResultFormatVersion {
+		return workerResultSnapshotMagic
+	}
 	if version == WorkerOfferFormatVersion {
 		return workerOfferSnapshotMagic
 	}
@@ -302,6 +551,48 @@ func externalSnapshotMagic(version int) string {
 	return ""
 }
 func externalSnapshotVersion(prefix []byte) (int, int) {
+	if bytes.HasPrefix(prefix, []byte(notificationWorkerSnapshotMagic)) {
+		return NotificationWorkerFormatVersion, len(notificationWorkerSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerQueueSnapshotMagic)) {
+		return WorkerQueueFormatVersion, len(workerQueueSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(agentObservationWorkerSnapshotMagic)) {
+		return AgentObservationWorkerFormatVersion, len(agentObservationWorkerSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(recoveryNotificationWorkerSnapshotMagic)) {
+		return RecoveryNotificationWorkerFormatVersion, len(recoveryNotificationWorkerSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(agentWorkerSnapshotMagic)) {
+		return AgentWorkerFormatVersion, len(agentWorkerSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerScheduleSnapshotMagic)) {
+		return WorkerScheduleFormatVersion, len(workerScheduleSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerExpirySnapshotMagic)) {
+		return WorkerExpiryFormatVersion, len(workerExpirySnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerNotificationSnapshotMagic)) {
+		return WorkerNotificationFormatVersion, len(workerNotificationSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerCheckRetentionSnapshotMagic)) {
+		return WorkerCheckRetentionFormatVersion, len(workerCheckRetentionSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerSchedulingSnapshotMagic)) {
+		return WorkerSchedulingFormatVersion, len(workerSchedulingSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerSLOSnapshotMagic)) {
+		return WorkerSLOFormatVersion, len(workerSLOSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerFinalizationSnapshotMagic)) {
+		return WorkerFinalizationFormatVersion, len(workerFinalizationSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerLifecycleSnapshotMagic)) {
+		return WorkerLifecycleFormatVersion, len(workerLifecycleSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerResultSnapshotMagic)) {
+		return WorkerResultFormatVersion, len(workerResultSnapshotMagic)
+	}
 	if bytes.HasPrefix(prefix, []byte(workerOfferSnapshotMagic)) {
 		return WorkerOfferFormatVersion, len(workerOfferSnapshotMagic)
 	}
@@ -327,7 +618,11 @@ func externalSnapshotVersion(prefix []byte) (int, int) {
 }
 
 func cloneImageExtensions(i image) imageExtensions {
-	extensions := imageExtensions{WorkerExecutions: i.WorkerExecutions.clone(), WorkerSessions: i.WorkerSessions.clone()}
+	extensions := imageExtensions{WorkerChecks: i.WorkerChecks.clone(), WorkerExecutions: i.WorkerExecutions.clone(), WorkerSessions: i.WorkerSessions.clone()}
+	if i.WorkerSLO != nil {
+		copy := *i.WorkerSLO
+		extensions.WorkerSLO = &copy
+	}
 	if i.WorkerPolicy != nil {
 		copy := i.WorkerPolicy.Clone()
 		extensions.WorkerPolicy = &copy
@@ -384,6 +679,30 @@ func sameJobTypeSelectors(a, b JobTypeVersion) bool {
 }
 
 func validateImageExtensions(i image) error {
+	if i.Version == AgentActionFormatVersion || i.Version == RecoveryNotificationFormatVersion {
+		if i.imageExtensions != (imageExtensions{}) {
+			return ErrJobTypeInvalid
+		}
+		for _, m := range i.Monitors {
+			if policyMinimumFormat(m.Policy) != FormatVersion {
+				return ErrWorkerExecutionInvalid
+			}
+		}
+		for _, r := range i.Catalog {
+			if catalogRecordMinimumFormat(r) != FormatVersion {
+				return ErrJobTypeInvalid
+			}
+		}
+	}
+	if err := validateWorkerExpiryImage(i); err != nil {
+		return err
+	}
+	if err := validateWorkerChecks(i); err != nil {
+		return err
+	}
+	if err := validateWorkerSLO(i); err != nil {
+		return err
+	}
 	if err := validateWorkerExecutionImage(i); err != nil {
 		return err
 	}
@@ -394,7 +713,7 @@ func validateImageExtensions(i image) error {
 		return err
 	}
 	for _, r := range i.OperationReservations {
-		if r.CommandKind == "job_type" && i.Version != JobTypeOperationFormatVersion && i.Version != WorkerPolicyFormatVersion && i.Version != CatalogJobTypeFormatVersion && i.Version != WorkerSessionFormatVersion && i.Version != WorkerExecutionFormatVersion && i.Version != WorkerOfferFormatVersion {
+		if r.CommandKind == "job_type" && (i.Version < JobTypeOperationFormatVersion || !externalStorageFormat(i.Version)) {
 			return ErrJobTypeInvalid
 		}
 	}
@@ -443,7 +762,37 @@ func jobTypeCommandDigest(c JobTypeCommand, at time.Time) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (f *machine) applyCommandExtensions(command Command, index uint64) (Result, bool) {
+func (f *machine) applyCommandExtensions(command Command, index uint64, version int) (Result, bool) {
+	if command.Kind == "worker_schedule" {
+		return f.applyWorkerSchedule(*command.WorkerSchedule, command.At), true
+	}
+	if command.Kind == "worker_expire" {
+		return f.applyWorkerExpiry(*command.WorkerExpire, command.At), true
+	}
+	if command.Kind == "worker_check_allocate" {
+		return f.applyWorkerCheckAllocation(*command.WorkerCheckAllocate, command.At, index), true
+	}
+	if command.Kind == "worker_check_retire" {
+		return f.applyWorkerCheckRetirement(*command.WorkerCheckRetire, command.At), true
+	}
+	if command.Kind == "worker_requeue" {
+		return f.applyWorkerRequeue(*command.WorkerRequeue, command.At), true
+	}
+	if command.Kind == "worker_observation" {
+		return f.applyWorkerObservation(*command.WorkerObservation, command.At, index), true
+	}
+	if command.Kind == "worker_finalize" {
+		return f.applyWorkerFinalization(*command.WorkerFinalize, command.At, index), true
+	}
+	if command.Kind == "worker_evidence" {
+		return f.applyWorkerEvidence(*command.WorkerEvidence, command.At, index), true
+	}
+	if command.Kind == "worker_heartbeat" {
+		return f.applyWorkerHeartbeat(*command.WorkerHeartbeat, command.At), true
+	}
+	if command.Kind == "worker_result" {
+		return f.applyWorkerResult(*command.WorkerResult, command.At, index, version), true
+	}
 	if command.Kind == "worker_start" {
 		return f.applyWorkerStart(*command.WorkerStart, command.At), true
 	}

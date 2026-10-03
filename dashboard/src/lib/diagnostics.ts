@@ -6,6 +6,7 @@ const conditions: Record<string, string> = {
   downstream_limited: 'Target execution is too slow for the latency target',
   controller_limited: 'Controller progress limits latency; more workers may not help',
   coverage_gap: 'Measurement coverage is incomplete',
+  timing_unavailable: 'Some latency measurements are unavailable',
   disabled: 'Latency feedback is disabled',
 };
 export function conditionLabel(value?: string): string {

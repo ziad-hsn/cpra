@@ -33,10 +33,12 @@ func TestCatalogJobTypeDefaultExclusion(t *testing.T) {
 	if _, ok := reflect.TypeFor[CatalogRecord]().FieldByName("JobTypeReferences"); ok {
 		t.Fatal("default exposed record metadata")
 	}
-	if _, ok := reflect.TypeFor[*Store]().MethodByName("LookupJobTypeVersion"); ok {
-		t.Fatal("default exposed version lookup")
+	for _, method := range []string{"LookupJobTypeVersion", "LookupBootstrapJobTypeVersion"} {
+		if _, ok := reflect.TypeFor[*Store]().MethodByName(method); ok {
+			t.Fatal("default exposed version lookup", method)
+		}
 	}
-	if supportedFormat(18) || LatestFormatVersion != 14 {
+	if supportedFormat(18) || LatestFormatVersion != NotificationFormatVersion {
 		t.Fatal("default enabled external reference format")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-18\n{}"), ""); err == nil {

@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package secureconfig
 
@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -227,6 +228,9 @@ func TestKeyFileReaderPolicyValidation(t *testing.T) {
 }
 
 func TestKeyFileRejectsExtendedReaderACL(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux POSIX ACL encoding; macOS has separate native ACL tests")
+	}
 	opts := testKeyFileOptions(t)
 	if _, err := GenerateLocalKeyFile(context.Background(), opts); err != nil {
 		t.Fatal(err)

@@ -15,8 +15,8 @@ import (
 )
 
 func TestWorkerExecutionNativeRestartEncryptedIdentity(t *testing.T) {
-	for _, snapshot := range []bool{false, true} {
-		t.Run(fmt.Sprint(snapshot), func(t *testing.T) {
+	for _, mode := range []struct{ snapshot, inline bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		t.Run(fmt.Sprintf("snapshot=%t/inline=%t", mode.snapshot, mode.inline), func(t *testing.T) {
 			config := testConfig(t)
 			s, err := Open(t.Context(), config)
 			if err != nil {
@@ -27,13 +27,18 @@ func TestWorkerExecutionNativeRestartEncryptedIdentity(t *testing.T) {
 					_ = s.Close()
 				}
 			}()
-			in, _ := workerExecutionFixture(t, s, "notification")
+			var in WorkerExecutionIntent
+			if mode.inline {
+				in, _ = inlineNotificationFixture(t, s)
+			} else {
+				in, _ = workerExecutionFixture(t, s, "notification")
+			}
 			saved, err := s.CommitWorkerExecution(t.Context(), in)
 			if err != nil {
 				t.Fatal(err)
 			}
 			before, _ := s.Get(in.MonitorID)
-			if snapshot {
+			if mode.snapshot {
 				if err = s.Snapshot(); err != nil {
 					t.Fatal(err)
 				}
@@ -109,7 +114,7 @@ func TestWorkerExecutionSnapshotIsolationCorruptionAndFormat(t *testing.T) {
 	if err = snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(workerExecutionSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(workerSchedulingSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
 		t.Fatal("format/secrecy")
 	}
 	saved, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -168,10 +173,10 @@ func TestWorkerExecutionSnapshotIsolationCorruptionAndFormat(t *testing.T) {
 		})
 	}
 	c := Command{Kind: "worker_execution", At: time.Now().UTC(), commandExtensions: commandExtensions{WorkerExecution: &WorkerExecutionCommand{Intent: in, OwnerEpoch: s.executorSession}}}
-	for version := 1; version <= WorkerExecutionFormatVersion+1; version++ {
+	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion) {
+		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion) {
 			t.Fatal("command format", version, err)
 		}
 	}
@@ -215,7 +220,7 @@ func TestWorkerExecutionPolicyStrictFormatAndBounds(t *testing.T) {
 	}
 	s := openCatalogMemory(t)
 	_, _ = workerExecutionFixture(t, s, "notification")
-	if s.fsm.image.Version != 20 || s.fsm.image.WorkerExecutions != nil {
+	if s.fsm.image.Version != NotificationWorkerFormatVersion || s.fsm.image.WorkerExecutions != nil {
 		t.Fatal("policy-only format advancement missing")
 	}
 	data := captureSnapshotBytes(t, s.fsm)
@@ -224,7 +229,7 @@ func TestWorkerExecutionPolicyStrictFormatAndBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != 20 {
+	if i.Version != NotificationWorkerFormatVersion {
 		t.Fatal("policy snapshot downgraded")
 	}
 }
@@ -290,13 +295,36 @@ func TestWorkerExecutionFrozenDigestProjection(t *testing.T) {
 		t.Fatalf("frozen v1 digest changed: %s", got)
 	}
 	live, frozen := reflect.TypeFor[WorkerExecutionIntent](), reflect.TypeFor[workerExecutionIntentDigestV1]()
-	if live.NumField() != frozen.NumField() {
+	if live.NumField() != frozen.NumField()+1 || live.Field(0).Name != "Schedule" || live.Field(0).Type != reflect.TypeFor[*WorkerScheduleTicket]() || live.Field(0).Tag != `json:"schedule,omitempty"` {
 		t.Fatal("new intent field requires explicit identity review")
+	}
+	for n := 0; n < frozen.NumField(); n++ {
+		a, b := live.Field(n+1), frozen.Field(n)
+		if a.Name != b.Name || a.Type != b.Type || a.Tag != b.Tag {
+			t.Fatal("intent projection not reviewed", a.Name)
+		}
+	}
+	live, frozen = reflect.TypeFor[WorkerScheduleTicket](), reflect.TypeFor[workerScheduleTicketDigestV2]()
+	if live.NumField() != frozen.NumField() {
+		t.Fatal("new schedule field requires explicit identity review")
 	}
 	for n := 0; n < live.NumField(); n++ {
 		a, b := live.Field(n), frozen.Field(n)
 		if a.Name != b.Name || a.Type != b.Type || a.Tag != b.Tag {
-			t.Fatal("intent projection not reviewed", a.Name)
+			t.Fatal("schedule projection not reviewed", a.Name)
 		}
+	}
+	in.Schedule = &WorkerScheduleTicket{OwnerEpoch: "owner", Epoch: workerSLOEpoch(at), Sequence: 4}
+	v2 := workerExecutionDigest(in)
+	if v2 == expected || v2 != workerExecutionDigest(in.Clone()) {
+		t.Fatal("schedule digest is not distinct and deterministic")
+	}
+	in.Schedule.Sequence++
+	if workerExecutionDigest(in) == v2 {
+		t.Fatal("schedule sequence was omitted from identity")
+	}
+	in.Schedule = nil
+	if workerExecutionDigest(in) != expected {
+		t.Fatal("v1 identity was not preserved")
 	}
 }

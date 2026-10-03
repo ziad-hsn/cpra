@@ -302,17 +302,19 @@ func validateCatalogImage(i image) error {
 
 // CatalogGet returns a private copy of one active committed resource.
 func (s *Store) CatalogGet(key CatalogKey) (CatalogRecord, bool, error) {
+	return s.CatalogGetContext(context.Background(), key)
+}
+
+// CatalogGetContext reads one committed resource within the caller's deadline.
+func (s *Store) CatalogGetContext(ctx context.Context, key CatalogKey) (CatalogRecord, bool, error) {
 	if err := key.validate(); err != nil {
 		return CatalogRecord{}, false, err
 	}
-	s.fsm.mu.RLock()
-	defer s.fsm.mu.RUnlock()
-	if s.fsm.bootstrapPending() {
-		return CatalogRecord{}, false, ErrBootstrapPending
+	unlock, err := s.lockCatalogReadState(ctx, false)
+	if err != nil {
+		return CatalogRecord{}, false, err
 	}
-	if s.fsm.err != nil {
-		return CatalogRecord{}, false, errors.New("durable catalog unavailable")
-	}
+	defer unlock()
 	record, ok := s.fsm.image.Catalog[key.indexKey()]
 	if !ok || record.Removed {
 		return CatalogRecord{}, false, nil

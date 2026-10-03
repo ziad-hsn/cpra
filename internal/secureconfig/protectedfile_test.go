@@ -73,7 +73,7 @@ func TestProtectedFileBoundsOwnershipAndExactKeySeparation(t *testing.T) {
 }
 
 func TestProtectedFilePermissionsAndExternalAliases(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("Unix permissions and symlink scenario")
 	}
 	keys := testKeyFileOptions(t)

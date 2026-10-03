@@ -21,6 +21,9 @@ import (
 type OfflineLock struct {
 	db     *bolt.DB
 	NodeID string
+	// StateFormat identifies the reconstructed committed application state.
+	// Complete-store validation also checks retained logs, snapshots and history.
+	StateFormat int
 }
 
 func (l *OfflineLock) Close() error { return l.db.Close() }
@@ -194,7 +197,7 @@ func LockOffline(dir string) (_ *OfflineLock, err error) {
 			newest, newestIndex = &state, meta.Index
 		}
 	}
-	if err = validateOfflineBootstrapWithCollections(db, newest, newestIndex, catalog.Index, marker, newestCollections, validationDir); err != nil {
+	if l.StateFormat, err = offlineStateFormat(db, newest, newestIndex, catalog.Index, marker, newestCollections, validationDir); err != nil {
 		return nil, err
 	}
 	return l, nil

@@ -4,7 +4,7 @@ description: SDK candidate · SDK example verification for the reviewed CPRa sou
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # SDK example verification
 

@@ -11,6 +11,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"log"
 	"math"
 	"os"
@@ -96,6 +97,7 @@ type Controller struct {
 // Config holds all configuration for the controller.
 type Config struct {
 	Catalog         *management.Catalog
+	Encryption      *secureconfig.Sealer
 	Store           *persistence.Store
 	Runtime         runtimeconfig.Config
 	Debug           bool
@@ -313,6 +315,11 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	}
 	if c.config.Catalog != nil {
 		return errors.New("managed configuration must load from its durable catalog")
+	}
+	if c.durableSystem != nil {
+		if err := c.durableSystem.LoadAgentConnections(ctx, c.config.Encryption); err != nil {
+			return fmt.Errorf("recover agent connections: %w", err)
+		}
 	}
 	loader := loader.NewStreamingLoader(filename, c.world, c.config.StreamingConfig)
 	stats, err := loader.Load(ctx)
@@ -554,7 +561,25 @@ func (c *Controller) run() {
 
 // Ready reports process admission readiness without reading mutable ECS state.
 func (c *Controller) Ready() bool {
-	return c.initializedState.Load() && !c.stoppingState.Load() && (c.durableSystem == nil || c.durableSystem.AdmissionReady()) && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second && (c.config.Store == nil || c.config.Store.Status().Ready)
+	return c.ReadyContext(context.Background())
+}
+
+// ReadyContext also bounds the storage observation by the caller's lifetime.
+func (c *Controller) ReadyContext(ctx context.Context) bool {
+	if ctx == nil || ctx.Err() != nil || !c.processReady() {
+		return false
+	}
+	if c.config.Store != nil {
+		status, err := c.config.Store.StatusContext(ctx)
+		if err != nil || !status.Ready {
+			return false
+		}
+	}
+	return ctx.Err() == nil && c.processReady()
+}
+
+func (c *Controller) processReady() bool {
+	return c.initializedState.Load() && !c.stoppingState.Load() && (c.durableSystem == nil || c.durableSystem.AdmissionReady()) && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second
 }
 
 func (c *Controller) WaitReady(ctx context.Context) error {
@@ -566,7 +591,10 @@ func (c *Controller) WaitReady(ctx context.Context) error {
 	}
 	select {
 	case <-initialized:
-		if !c.Ready() {
+		if !c.ReadyContext(ctx) {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			return fmt.Errorf("controller unavailable after initialization")
 		}
 		return nil

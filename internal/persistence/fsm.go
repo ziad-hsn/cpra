@@ -42,6 +42,9 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+			return batch, errors.New("optional commands require their own storage format")
+		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
 			return batch, errors.New("collection execution requires an isolated execution log entry")
 		}
@@ -148,6 +151,9 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.At.After(at) {
 			at = c.At
 		}
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion {
+			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
+		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
 			results = append(results, Result{Err: ErrCatalogFormatDowngrade})
 			continue
@@ -183,7 +189,21 @@ func (f *machine) Apply(log *raft.Log) any {
 			results = append(results, Result{Err: ErrBootstrapPending})
 			continue
 		}
-		if r, handled := f.applyCommandExtensions(c, log.Index); handled {
+		if r, handled := f.applyCommandExtensions(c, log.Index, batch.Version); handled {
+			results = append(results, r)
+			events = append(events, r.Events...)
+			continue
+		}
+		if c.Kind == "agent_receipt" || c.Kind == "agent_observation" {
+			var r Result
+			if c.Kind == "agent_observation" {
+				r = f.applyAgentObservation(c)
+			} else {
+				r = f.applyAgentReceipt(c)
+			}
+			if r.Monitor != nil {
+				events = append(events, f.installMonitor(f.image.Monitors[c.MonitorID], *r.Monitor, c.At)...)
+			}
 			results = append(results, r)
 			events = append(events, r.Events...)
 			continue
@@ -276,7 +296,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			}
 			slices.Sort(ids)
 			for _, id := range ids {
-				r := transition(f.image.Monitors[id], c)
+				r := transitionAtFormat(f.image.Monitors[id], c, batch.Version)
 				events = append(events, f.installMonitor(f.image.Monitors[id], *r.Monitor, c.At)...)
 				events = append(events, r.Events...)
 			}
@@ -307,7 +327,13 @@ func (f *machine) Apply(log *raft.Log) any {
 				}
 			}
 		}
-		r := transition(f.image.Monitors[c.MonitorID], c)
+		r := transitionAtFormat(f.image.Monitors[c.MonitorID], c, batch.Version)
+		if c.Kind == "pulse" && r.Monitor != nil && notificationStorageFormat(batch.Version) {
+			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
+		}
+		if c.Kind == "start" && c.Driver == "a2a" && r.Allowed {
+			f.image.Version = joinStorageFormat(f.image.Version, commandMinimumFormat(c))
+		}
 		if r.Monitor != nil {
 			events = append(events, f.installMonitor(f.image.Monitors[c.MonitorID], *r.Monitor, c.At)...)
 		}
@@ -473,6 +499,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 		}
 		if err := m.Policy.Validate(); err != nil {
 			return i, err
+		}
+		if recoveryNotificationPolicyFormat(m.Policy) != FormatVersion && !recoveryNotificationStorageFormat(i.Version) {
+			return i, ErrRecoveryNotificationInvalid
 		}
 		if m.InterventionAttempts < 0 || m.InterventionAttempts > math.MaxInt32 {
 			return i, errors.New("invalid durable recovery attempt count")

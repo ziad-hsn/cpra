@@ -8,21 +8,29 @@ cpra_scope: docs
 
 ## Current development source
 
-Updated **24 September 2026**. The `codex/dashboard-finalization` checkpoint
-[`4c6baf5`](https://github.com/ziad-hsn/cpra/commit/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f)
-includes persistence, encrypted management CRUD, operator controls, dashboard
-forms, and SDK/CLI collection validation, Apply and upload recovery. The merge
-with `fc4edb4` brings in the shared light/dark theme and documentation sources.
+Updated **1 October 2026**. The committed `codex/dashboard-finalization` source
+[`fd2169c`](https://github.com/ziad-hsn/cpra/commit/fd2169c1a13a5e0c25f5ff0ae8fa9a45731f4f43)
+was merged into `main` as
+[`b293f34`](https://github.com/ziad-hsn/cpra/commit/b293f34dd57ee61c78371643de6d0ebaa75c626e).
+Their source trees match. It includes persistence, encrypted management CRUD,
+operator controls, dashboard forms, and SDK/CLI collection validation, Apply and
+upload recovery. Current private qualification work also contains uncommitted
+worker, A2A, provider-verification and release-tool changes; the parent commit
+alone does not identify those later inputs.
 Current [API](reference/api-reference.md), [CLI](reference/cli.md),
 [driver](reference/jobs-reference.md) and [SDK](sdk/index.md) references describe
 this development source.
 
-The unreleased SDK compatibility client has been removed. External-worker offers
-and Start have scoped tests, while normal-startup worker routes, controller
-dispatch, result processing and full interoperability remain incomplete.
+The unreleased SDK compatibility client has been removed. The private worker
+candidate has executed normal-startup server/SDK-worker process tests covering
+dispatch, result processing, all handler categories, crashes and capacity limits.
+Frozen qualification and independent review remain open. Local A2A and provider
+effects likewise do not establish operator-account or deployed-agent evidence.
 [Implementation progress](implementation/dashboard-implementation-progress.md)
 records the precise boundary. [Release gates](implementation/dashboard-shipping-plan.md)
-remain open; a pushed development branch is not a qualified release.
+remain open; neither a source merge nor a private passing result qualifies a
+release. Candidates remain private until the agreed gates pass. The 24-hour
+endurance test is outside the requested work and is not a completion gate.
 
 ## Historical documentation review: 13 September 2026
 
@@ -66,10 +74,12 @@ describe implemented recipes; their `VERSION` examples require a verified
 release. No application or SDK version tags were present in the remote repository
 when this review checked it.
 
-Provider-account qualification, native platform and publication gates, matched
-capacity comparisons and the million-monitor 24-hour campaign remain separate
-from documentation verification. See [candidate changes](candidate/release-notes.md)
-and [verification requirements](candidate/validation.md).
+Provider-account qualification, native platform and publication gates, and
+matched capacity comparisons remain separate from documentation verification.
+The 1 October scope correction removes the 24-hour endurance test from the
+requested work, including the earlier candidate's completion requirements. See
+[candidate changes](candidate/release-notes.md) and current
+[verification requirements](validation.md).
 
 ## Historical SDK and management review
 

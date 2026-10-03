@@ -64,7 +64,7 @@ type managementSnapshot struct {
 }
 type managementHTTP struct {
 	managementExtensions
-	ready                 func() bool
+	ready                 func(context.Context) bool
 	admit                 func(context.Context, func() error) error
 	mutations             chan struct{}
 	validationReads       chan struct{}
@@ -337,7 +337,7 @@ func (m *managementHTTP) handleResource(w http.ResponseWriter, r *http.Request, 
 		writeManagementJSON(w, http.StatusOK, resource)
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeManagementError(w, mutationUnavailable())
 		return
 	}
@@ -498,7 +498,7 @@ func (m *managementHTTP) handleList(w http.ResponseWriter, r *http.Request, rout
 	err = m.withSnapshotRead(r, operation, route.kind, query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.Snapshot()
+			view, err := m.catalog.SnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

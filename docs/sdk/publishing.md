@@ -4,7 +4,7 @@ description: SDK candidate · Prepare the SDK for Go packages and publication fo
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # Prepare the SDK for Go packages and publication
 
@@ -15,8 +15,9 @@ public module downloads and hosted documentation that require published tags.
 **Current status:** both SDK modules are unpublished candidates. The private
 working branch has real TLS/Raft integration for v2 resource management,
 controls, action review, operation reads and observations. Resumable collection
-application and external-worker server integration remain unfinished. See the
-[implementation progress record](../implementation/dashboard-implementation-progress.md)
+application and external-worker server integration are implemented and locally
+tested. Frozen module installation and complete release qualification remain
+open. See the [current implementation status](../implementation/STATUS.md)
 for the exact executed scope. Earlier published servers are not qualified by
 working-branch tests. Candidates stay private until every agreed gate passes;
 improving a README or passing a fixture does not complete that gate.
@@ -121,11 +122,53 @@ they are absent from the selected packages and exported APIs, not hidden source.
 The server must independently require its build tag, runtime enablement, and
 authorization. See [Go build constraints](https://pkg.go.dev/cmd/go#hdr-Build_constraints).
 
+## Prepare dependency changes before freezing source
+
+The application and worker must resolve the exact SDK module bytes that will
+ship. A development workspace can hide missing checksums or module declarations.
+Prepare those declarations before selecting the final release commit:
+
+```bash
+CPRA_PREPARATION=/absolute/path/to/a/new-private-directory
+python3 scripts/sdk/prepare_dependencies.py \
+  --go /absolute/path/to/go \
+  --worker-version v0.1.0-rc.1 \
+  --out "$CPRA_PREPARATION"
+
+python3 scripts/sdk/verify.py \
+  --go /absolute/path/to/go \
+  --sdk-version v0.1.0-rc.1 \
+  --worker-version v0.1.0-rc.1 \
+  --prepared "$CPRA_PREPARATION" \
+  --out "$CPRA_PREPARATION/consumer-release.json"
+```
+
+Select versions explicitly and repeat consumer verification with Go 1.25 using
+a different output name. The preparer captures current tracked and nonignored
+source files into a private directory outside the checkout. It rejects links,
+private dotenv inputs, changed source, module replacements and version drift.
+Go resolves dependencies and generates the proposed `go.mod` and `go.sum` edits;
+`module-files.diff`, command logs, original input hashes and canonical module
+payloads remain available for review. The checkout is not changed by this command.
+
+Apply reviewed proposals only while their original file hashes still match.
+Any subsequent SDK source change requires new dependency preparation because
+module checksums cover its complete selected payload. The preparation report is
+`working_tree_dependency_preparation`; consumer reports made with `--prepared`
+are `working_tree_module_archive`. Neither is accepted as frozen release or
+public-download evidence. `--prepared` cannot be combined with `--published`.
+
+Go versions may compress identical module contents into different ZIP bytes.
+The consumer verifier requires matching Go content and `go.mod` hashes across
+compilers, matching ZIP bytes under the same compiler recipe, and exact agreement
+between each staged ZIP and its corresponding download.
+
 ## Verify the distribution before publishing
 
-The archive verifier stages the candidate modules in a private temporary proxy,
+From a clean committed checkout, the archive verifier stages the candidate modules in a private temporary proxy,
 then creates an external consumer with `GOWORK=off`, no `replace`, and a fresh
-module cache. It checks:
+module cache. Source selection uses the commit archive and Go's upstream module
+ZIP implementation, with each nested module staged separately. The verifier checks:
 
 - Every downloaded name and byte matches the selected candidate module payload.
 - README, license, package overviews, and executable example sources are included.
@@ -149,8 +192,46 @@ checks, and vet. The generator check rebuilds outputs in two independent source
 roots. It includes the postprocessing that gives the public `api` package one
 handwritten overview while preserving generated-code markers.
 
-A private proxy proves consumption of the selected local payload. It does not
-prove Git selected the same files, a public proxy accepted the tag, pkg.go.dev
+With `--out`, the consumer verifier creates the report exclusively and retains
+its module inputs in an adjacent directory, such as
+`sdk-consumer.json.modules/`. For each module it keeps both the source-derived
+and Go-downloaded `.zip`, `.mod`, and `.info` files, with byte counts and SHA256
+digests in the report. On Unix the report and payload files are mode `0600`, and
+the payload directory is mode `0700`. Failed verification retains the failure
+report and any payloads already copied. Choose a fresh output name for a new
+campaign; existing reports or payload directories are never adopted or replaced.
+
+After preparing the private dependency cache and completing both compiler runs
+for the same clean source and explicitly selected SDK/worker versions, inspect
+their retained inputs:
+
+```bash
+python3 scripts/release/sdk_evidence.py \
+  --release /absolute/private-release/RELEASE.json \
+  --dependencies /absolute/private-dependencies \
+  --consumer /absolute/private-evidence/consumer-go1.25.0.json \
+  --consumer /absolute/private-evidence/consumer-go1.27.1.json \
+  --out /absolute/private-evidence/sdk-consumer-evidence.json
+```
+
+The reader checks both compiler identities, the frozen source inventory, the
+application/worker dependency versions, downloaded Go-reported checksums,
+documentation/example coverage, and every retained payload. ZIP compression may
+differ, but distributed filenames and file contents must match. Input sizes are
+bounded, unsafe/duplicate paths are rejected, and inputs are hashed again before
+the consistency result is issued. The archive limits follow the
+[Go module ZIP contract](https://pkg.go.dev/golang.org/x/mod@v0.38.0/zip).
+
+Its successful result is `consistent_pending_review`, with
+`release_gate_passed: false`. It does not qualify server interoperability, replace
+the full SDK/worker tests and generation checks, establish public downloads, or
+open the publication gate. The private release workflow retains the payloads
+and runs this reader after both compiler jobs. Those workflow paths and reader
+fixtures are locally tested; execution against the final frozen candidate
+remains required.
+
+A completed private-proxy run proves consumption of the selected committed payload. It does not
+prove a public proxy accepted the tag, pkg.go.dev
 rendered it, or a real v2 server honored the contract. Preserve those boundaries
 in [verification reports](verification.md).
 
@@ -187,9 +268,12 @@ fail while they remain unpublished:
 python3 scripts/sdk/verify.py --published --go /path/to/go --out evidence/local/sdk-published.json
 ```
 
-The verifier currently checks `v0.1.0-rc.1` for each module. A later release must
-update its selected versions and consumer requirements deliberately before
-verification; substituting `@latest` could test a different candidate.
+The verifier defaults to `v0.1.0-rc.1` for each module. Set `--sdk-version` and
+`--worker-version` explicitly when qualifying other versions; the worker's
+dependency must match the selected SDK version. Select versions and consumer
+requirements before verification; substituting `@latest` could test a different
+candidate. The [current archive checkpoint](../implementation/go-sdk-status.md#module-archive-checkpoint)
+records unexecuted Go-tool and consumer gates for the latest local implementation.
 
 After publication, a new consumer project can add the library as follows:
 

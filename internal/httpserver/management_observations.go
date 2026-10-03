@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -38,7 +39,7 @@ func (s *Server) registerManagementObservations(mux *http.ServeMux, m *managemen
 					if err != nil {
 						return err
 					}
-					result, err = s.observationPage(m, query, route.kind, access.PrincipalID, generation)
+					result, err = s.observationPage(r.Context(), m, query, route.kind, access.PrincipalID, generation)
 					return err
 				}
 				if r.URL.RawQuery != "" {
@@ -47,13 +48,22 @@ func (s *Server) registerManagementObservations(mux *http.ServeMux, m *managemen
 				now := time.Now().UTC()
 				switch route.operation {
 				case "GetState":
-					result = s.managementState(now)
+					state, err := s.managementState(r.Context(), now)
+					result = state
+					return err
 				case "GetSLO":
-					result = s.managementSLO(now)
+					view, err := s.managementSLO(r.Context(), now)
+					result = view
+					return err
 				case "GetConfig":
-					result = s.managementRuntimeConfig()
+					config, err := s.managementRuntimeConfig(r.Context())
+					result = config
+					return err
 				case "GetReady":
-					ready, _, _, reason := s.observationReadiness(now)
+					ready, _, _, reason := s.observationReadiness(r.Context(), now)
+					if err := r.Context().Err(); err != nil {
+						return err
+					}
 					if !ready {
 						return managementFailure(503, "notReady", reason)
 					}
@@ -61,7 +71,9 @@ func (s *Server) registerManagementObservations(mux *http.ServeMux, m *managemen
 				case "GetLive":
 					result = api.Health{Available: true, GeneratedAt: now}
 				case "GetMetrics":
-					result = s.managementMetrics(now)
+					metrics, err := s.managementMetrics(r.Context(), now)
+					result = metrics
+					return err
 				}
 				return nil
 			})
@@ -89,22 +101,29 @@ func durationMeasurement(value time.Duration) api.Measurement {
 
 // observationReadiness keeps progress/admission separate from projection age.
 // A provider outage never changes liveness or readiness on its own.
-func (s *Server) observationReadiness(now time.Time) (ready, projectionFresh, controllerReady bool, reason string) {
+func (s *Server) observationReadiness(ctx context.Context, now time.Time) (ready, projectionFresh, controllerReady bool, reason string) {
 	snapshot := s.holder.Get()
 	projectionFresh = snapshot != nil && !snapshot.Generated.IsZero() && !snapshot.Generated.After(now) && now.Sub(snapshot.Generated) <= 30*time.Second
 	ready = projectionFresh && (s.cfg.AllowEmpty || snapshot.Total > 0)
 	reason = "Controller initialization or progress is unavailable."
 	if s.cfg.Ready != nil {
-		controllerReady = s.cfg.Ready()
+		controllerReady = s.cfg.Ready(ctx)
 		ready = controllerReady
 	}
-	if s.cfg.Management != nil && !s.cfg.Management.Ready() {
+	if s.cfg.Management != nil && !s.cfg.Management.ReadyContext(ctx) {
 		ready = false
 		reason = "The durable management catalog is unavailable."
 	}
-	if s.cfg.Store != nil && !s.cfg.Store.Status().Ready {
+	if s.cfg.Store != nil {
+		status, err := s.cfg.Store.StatusContext(ctx)
+		if err != nil || !status.Ready {
+			ready = false
+			reason = "Durable storage is unavailable."
+		}
+	}
+	if ctx.Err() != nil {
 		ready = false
-		reason = "Durable storage is unavailable."
+		reason = "Readiness observation was interrupted."
 	}
 	if s.admissionStopped() {
 		ready = false
@@ -116,8 +135,11 @@ func (s *Server) observationReadiness(now time.Time) (ready, projectionFresh, co
 	return
 }
 
-func (s *Server) managementState(now time.Time) api.State {
-	ready, fresh, controllerReady, reason := s.observationReadiness(now)
+func (s *Server) managementState(ctx context.Context, now time.Time) (api.State, error) {
+	ready, fresh, controllerReady, reason := s.observationReadiness(ctx, now)
+	if err := ctx.Err(); err != nil {
+		return api.State{}, err
+	}
 	result := api.State{GeneratedAt: now, Ready: ready, Live: true, ControllerAvailable: s.cfg.Ready != nil, ControllerReady: controllerReady, ReadinessReason: reason,
 		ProjectionFresh: fresh, Storage: api.StorageState{Mode: "unavailable", CommitLatency: unavailableMeasurement("not_recorded"), SnapshotDuration: unavailableMeasurement("not_recorded")}}
 	if s.cfg.Ready == nil {
@@ -130,10 +152,20 @@ func (s *Server) managementState(now time.Time) api.State {
 		result.ProjectionAgeMS = float64(now.Sub(snapshot.Generated)) / float64(time.Millisecond)
 	}
 	if s.cfg.Store != nil {
-		status, settings := s.cfg.Store.Status(), s.cfg.Store.ObservationConfig()
+		status, err := s.cfg.Store.StatusContext(ctx)
+		if err != nil {
+			return api.State{}, err
+		}
+		settings, err := s.cfg.Store.ObservationConfigContext(ctx)
+		if err != nil {
+			return api.State{}, err
+		}
 		result.Storage = api.StorageState{Available: status.Ready, Mode: status.Mode, FormatVersion: int64(settings.SnapshotFormat),
 			CommitIndex: int64(status.CommittedIndex), AppliedIndex: int64(status.CommittedIndex), SingleNode: status.SingleNode, Error: status.Error,
 			CommitLatency: unavailableMeasurement("not_recorded"), SnapshotDuration: unavailableMeasurement("not_recorded")}
+		if !status.Ready {
+			result.Ready, result.ReadinessReason = false, "Durable storage is unavailable."
+		}
 		if status.CommitLatencyMS > 0 {
 			result.Storage.CommitLatency = observationMeasurement(status.CommitLatencyMS)
 		}
@@ -143,7 +175,7 @@ func (s *Server) managementState(now time.Time) api.State {
 	}
 	// No fleet-wide scan is justified to fill an unavailable aggregate. Actions
 	// have their separate indexed, bounded ListActions endpoint.
-	return result
+	return result, nil
 }
 
 func queueObservation(name string, source queue.Queue) api.Queue {
@@ -243,12 +275,18 @@ func attainment(value *float64) api.Measurement {
 	}
 	return observationMeasurement(*value)
 }
-func (s *Server) managementSLO(now time.Time) api.SLOView {
+func (s *Server) managementSLO(ctx context.Context, now time.Time) (api.SLOView, error) {
+	if err := ctx.Err(); err != nil {
+		return api.SLOView{}, err
+	}
 	result := api.SLOView{GeneratedAt: now, Window: "0s", CoverageGap: true, Reports: []api.SLOReport{}}
 	if s.cfg.Store == nil {
-		return result
+		return result, nil
 	}
-	view := s.cfg.Store.SLOView(now)
+	view, err := s.cfg.Store.SLOViewContext(ctx, now)
+	if err != nil {
+		return api.SLOView{}, err
+	}
 	result.Available, result.Window, result.CoverageGap = true, api.Duration((time.Duration(view.WindowSeconds) * time.Second).String()), !view.CoverageComplete
 	result.QueueTargetMS, result.ResultTargetMS = view.QueueTargetMS, view.ResultTargetMS
 	if !view.GapStart.IsZero() {
@@ -258,31 +296,45 @@ func (s *Server) managementSLO(now time.Time) api.SLOView {
 		result.GapEnd = &view.GapEnd
 	}
 	for _, source := range view.Reports {
+		queueAttainment := attainment(source.QueueAttainment)
+		if source.QueueAttainment == nil && source.Expected > 0 {
+			queueAttainment = unavailableMeasurement("timing_unavailable")
+		}
 		result.Reports = append(result.Reports, api.SLOReport{Pipeline: "pulse", Driver: source.Driver, Samples: int64(source.Samples), Expected: int64(source.Expected),
 			Missed: int64(source.Missed), Timeouts: int64(source.Timeouts), Overdue: int64(source.Overdue), Pending: int64(source.Pending),
 			QueueDelay: sloPercentiles(source.Queue), Execution: sloPercentiles(source.Execution), TotalLatency: sloPercentiles(source.Result),
 			QueueThresholdPassed: int64(source.QueueMet), TotalThresholdPassed: int64(source.ResultMet), Attainment: attainment(source.ResultAttainment),
-			QueueAttainment: attainment(source.QueueAttainment), ResultAttainment: attainment(source.ResultAttainment), Condition: source.Condition,
+			QueueAttainment: queueAttainment, ResultAttainment: attainment(source.ResultAttainment), Condition: source.Condition,
 			PausedMonitors: int64(source.PausedMonitors), PausedMonitorSeconds: source.PausedMonitorSeconds})
 	}
-	return result
+	return result, ctx.Err()
 }
 
-func (s *Server) managementRuntimeConfig() api.RuntimeConfig {
+func (s *Server) managementRuntimeConfig(ctx context.Context) (api.RuntimeConfig, error) {
+	if err := ctx.Err(); err != nil {
+		return api.RuntimeConfig{}, err
+	}
 	result := api.RuntimeConfig{QueueCapacity: int64(s.publicConfig.QueueCapacity), ReadOnly: s.cfg.Management == nil}
 	if s.cfg.Store == nil {
-		return result
+		return result, nil
 	}
-	config := s.cfg.Store.ObservationConfig()
+	config, err := s.cfg.Store.ObservationConfigContext(ctx)
+	if err != nil {
+		return api.RuntimeConfig{}, err
+	}
 	result.Available, result.StorageMode = true, config.StorageMode
 	result.HistoryRetention = api.Duration((time.Duration(config.HistoryRetentionDays) * 24 * time.Hour).String())
 	result.SloWindow, result.QueueTarget, result.ResultTarget = api.Duration(config.SLOWindow.String()), api.Duration(config.QueueTarget.String()), api.Duration(config.ResultTarget.String())
-	return result
+	return result, nil
 }
-func (s *Server) managementMetrics(now time.Time) api.Metrics {
+func (s *Server) managementMetrics(ctx context.Context, now time.Time) (api.Metrics, error) {
+	view, err := s.managementSLO(ctx, now)
+	if err != nil {
+		return api.Metrics{}, err
+	}
 	systems, available := s.managementSystems()
-	return api.Metrics{GeneratedAt: now, Queues: s.managementQueues(), Pools: s.managementPools(), Systems: systems, SLO: s.managementSLO(now),
-		QueuesAvailable: s.pulseQueue != nil && s.intervQueue != nil && s.codeQueue != nil, PoolsAvailable: s.pulsePool != nil && s.intervPool != nil && s.codePool != nil, SystemsAvailable: available}
+	return api.Metrics{GeneratedAt: now, Queues: s.managementQueues(), Pools: s.managementPools(), Systems: systems, SLO: view,
+		QueuesAvailable: s.pulseQueue != nil && s.intervQueue != nil && s.codeQueue != nil, PoolsAvailable: s.pulsePool != nil && s.intervPool != nil && s.codePool != nil, SystemsAvailable: available}, ctx.Err()
 }
 
 func observationQuery(r *http.Request) (url.Values, error) {
@@ -343,7 +395,7 @@ func (s *Server) observationRows(kind string) ([]json.RawMessage, bool, error) {
 
 // Fixed pipeline/system snapshots share the same principal-bound quota and TTL
 // as resource/history cursors. They never retain a fleet or query live ECS state.
-func (s *Server) observationPage(m *managementHTTP, query url.Values, kind, principal string, generation uint64) (observationList, error) {
+func (s *Server) observationPage(ctx context.Context, m *managementHTTP, query url.Values, kind, principal string, generation uint64) (observationList, error) {
 	limit := 0
 	if value := query.Get("limit"); value != "" {
 		n, err := strconv.Atoi(value)
@@ -352,7 +404,26 @@ func (s *Server) observationPage(m *managementHTTP, query url.Values, kind, prin
 		}
 		limit = n
 	}
-	m.mu.Lock()
+	if ctx == nil {
+		return observationList{}, management.ErrValidation
+	}
+	if err := ctx.Err(); err != nil {
+		return observationList{}, err
+	}
+	// Capture and encode fixed observations without owning cursor metadata.
+	// Cleanup of another request must not wait for a stats producer.
+	var rows []json.RawMessage
+	var available bool
+	if query.Get("cursor") == "" {
+		var err error
+		rows, available, err = s.observationRows(kind)
+		if err != nil {
+			return observationList{}, err
+		}
+	}
+	if err := m.lockSnapshots(ctx); err != nil {
+		return observationList{}, err
+	}
 	defer m.mu.Unlock()
 	if !m.cursorReady {
 		return observationList{}, management.ErrUnavailable
@@ -383,10 +454,6 @@ func (s *Server) observationPage(m *managementHTTP, query url.Values, kind, prin
 	} else {
 		if limit == 0 {
 			limit = 100
-		}
-		rows, available, err := s.observationRows(kind)
-		if err != nil {
-			return observationList{}, err
 		}
 		entry = managementSnapshot{observations: rows, observationsAvailable: available, principal: principal, generation: generation, kind: "Observation/" + kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
 		cursor.View = uuid.NewString()

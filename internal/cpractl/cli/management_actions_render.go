@@ -44,6 +44,20 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 		} else {
 			rows = append(rows, [2]string{"Operator assertion", "not reviewed"})
 		}
+		if f := a.RecoveryFailure; f != nil {
+			rows = append(rows, [2]string{"Failed recovery action", managementDisplay(f.ActionID)}, [2]string{"Failed recovery driver", managementDisplay(f.Driver)}, [2]string{"Recovery attempt", fmt.Sprintf("%d of %d", f.Attempt, f.MaxAttempts)}, [2]string{"Notification trigger", managementDisplay(string(f.Trigger))}, [2]string{"Recovery failed at", managementObservedTime(f.FailedAt)})
+		}
+		if r := a.AgentReceipt; r != nil {
+			rows = append(rows, [2]string{"Agent receipt sequence", managementDisplay(r.Sequence)}, [2]string{"Agent observed at", managementObservedTime(r.ObservedAt)})
+			for _, field := range []struct {
+				name  string
+				value *string
+			}{{"Agent task", r.TaskID}, {"Agent context", r.ContextID}, {"Agent message", r.MessageID}, {"Agent task state", r.State}} {
+				if field.value != nil {
+					rows = append(rows, [2]string{field.name, managementDisplay(*field.value)})
+				}
+			}
+		}
 		for _, evidence := range []struct {
 			name string
 			data *api.ActionEvidence

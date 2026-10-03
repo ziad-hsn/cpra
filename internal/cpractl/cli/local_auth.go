@@ -11,23 +11,25 @@ import (
 
 func newLocalAuthCommand() *cobra.Command {
 	root := &cobra.Command{Use: "auth", Short: "Administer named access in an exclusively locked, stopped local store"}
-	for _, action := range []string{"list", "bootstrap", "issue", "rotate", "revoke", "reprovision"} {
+	for _, action := range []string{"list", "bootstrap", "issue", "rotate", "rotate-read-token", "revoke", "reprovision"} {
 		request := localadmin.AuthenticationRequest{Action: action}
 		var expiry string
 		command := &cobra.Command{Use: action + " PRINCIPAL", Short: localAuthDescription(action), Args: cobra.ExactArgs(1)}
-		if action == "list" {
-			command.Use, command.Args = "list", cobra.NoArgs
+		if action == "list" || action == "rotate-read-token" {
+			command.Use, command.Args = action, cobra.NoArgs
 		}
 		command.Flags().StringVar(&request.DataDirectory, "data-dir", "", "required absolute path to the stopped state directory")
 		if action != "list" && action != "revoke" {
 			command.Flags().StringVar(&request.TokenOutput, "token-output", "", "required absent absolute file outside state; receives the bearer once with protected permissions")
-			command.Flags().StringVar(&expiry, "expires-at", "", "explicit RFC3339 expiry, or never; omitted rotation preserves expiry, omitted issuance has none")
+			if action != "rotate-read-token" {
+				command.Flags().StringVar(&expiry, "expires-at", "", "explicit RFC3339 expiry, or never; omitted rotation preserves expiry, omitted issuance has none")
+			}
 		}
 		if action == "bootstrap" || action == "issue" || action == "reprovision" {
 			command.Flags().StringVar(&request.Role, "role", "", "required role: reader or operator")
 		}
 		command.RunE = func(cmd *cobra.Command, args []string) error {
-			if action != "list" {
+			if action != "list" && action != "rotate-read-token" {
 				request.PrincipalID = args[0]
 			}
 			if cmd.Flags().Changed("expires-at") {
@@ -66,6 +68,8 @@ func localAuthDescription(action string) string {
 		return "Issue one fresh token for an absent principal, with no implicit expiry"
 	case "rotate":
 		return "Replace one principal's verifier without overlap, preserving role and any existing expiry"
+	case "rotate-read-token":
+		return "Rotate an existing read-only API token in the stopped store without restoring revoked access"
 	case "revoke":
 		return "Revoke one principal in the authoritative durable policy"
 	default:

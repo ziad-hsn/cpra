@@ -29,7 +29,7 @@ function frozen(count = 1) {
   vi.spyOn(BrowserCollection, 'prepare').mockResolvedValue(value as unknown as BrowserCollection);
   return value;
 }
-async function fixture(options: { supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; operationRead?: (url: URL, operation: Operation) => unknown } = {}) {
+async function fixture(options: { supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; activationState?: string; operationRead?: (url: URL, operation: Operation) => unknown } = {}) {
   const supported = options.supported ?? steps, count = options.count ?? 1;
   const writes: { path: string; method: string; body?: Record<string, unknown>; match: string | null }[] = [];
   const operation: Operation = { ...identity, itemCount: count, id: 'original-1', state: 'uploading', uploaded: 0, committed: 0, applied: 0 };
@@ -66,7 +66,7 @@ async function fixture(options: { supported?: string[]; reader?: boolean; lostCr
     if (url.pathname.endsWith('/validate')) { operation.state = 'validating'; if (options.lostValidation) throw new Error('lost private response'); return response(operation, 202, { 'Retry-After': '5', 'X-Operation-ID': operation.id }); }
     if (url.pathname.endsWith('/preflight')) return response({ ...identity, itemCount: count, valid: !options.invalidValidation, items: [{ id: 'Monitor/monitor-1', outcome: options.invalidValidation ? 'invalid' : 'create', message: 'private-server-message', oldVersion: 'rv-1', committed: false, applied: false }] });
     if (url.pathname.endsWith('/activate')) {
-      operation.state = 'applying'; operation.executionResult = { state: 'pending' };
+      operation.state = options.activationState ?? 'applying'; operation.executionResult = { state: 'pending' };
       if (options.lostActivation) throw new Error('private activation response lost');
       return response(operation, 200, { 'X-Operation-ID': options.activationHeader ?? operation.id, 'Retry-After': '5' });
     }
@@ -208,7 +208,7 @@ it('an ephemeral preview cannot replace durable whole-collection validation befo
   await click('Read original progress');
   await click('Review activation');
   expect(screen.getByRole('button', { name: 'Keep reviewing' })).toHaveFocus();
-  fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' }); expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  fireEvent(screen.getByRole('alertdialog'), new Event('cancel', { cancelable: true })); expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 });
 
 it('sign-out aborts a still-running parser and closes even a late worker result without API mutation', async () => {
@@ -424,6 +424,41 @@ function partialImportResult(operation: Operation, cursor: string | null): Opera
     }], nextCursor: cursor ? undefined : 'result-next',
   };
 }
+
+it.each(['applying', 'partial'])('keeps reading pending results after activation returns %s without repeating writes', async activationState => {
+  const collection = frozen(2);
+  const options: { count: number; activationState: string; operationRead?: (url: URL, operation: Operation) => unknown } = { count: 2, activationState };
+  const { writes } = await fixture(options); await reviewCollection();
+  let reads = 0;
+  options.operationRead = (_url, operation) => ++reads === 1
+    ? { ...operation, state: 'partial', committed: 1, executionResult: { state: 'pending' } }
+    : partialImportResult(operation, null);
+  await click('Review activation');
+  vi.useFakeTimers();
+  try {
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirm activation' })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(reads).toBe(1);
+    expect(collection.close).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Stop waiting' })).toBeEnabled();
+    expect(screen.getByText('Resource results are pending. An operation can stop before its accepted changes finish applying.')).toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop waiting' })); });
+    expect(screen.getByRole('button', { name: 'Wait for progress' })).toBeEnabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(reads).toBe(1);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Wait for progress' })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(reads).toBe(2);
+    expect(screen.getByText('Resource results are retained and ready to read.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Application resource results' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wait for progress' })).toBeDisabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(reads).toBe(2);
+    expect(writes.filter(write => write.path.endsWith('/activate'))).toHaveLength(1);
+    expect(writes.filter(write => write.path.endsWith('/validate'))).toHaveLength(1);
+    expect(collection.close).toHaveBeenCalledTimes(1);
+  } finally { vi.useRealTimers(); }
+});
 
 it('connects partial application results to bounded source-attributed pages without repeating activation', async () => {
   const collection = frozen(2);

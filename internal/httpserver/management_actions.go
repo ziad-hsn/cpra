@@ -43,7 +43,7 @@ func (m *managementHTTP) handleActionControl(w http.ResponseWriter, r *http.Requ
 		writeManagementError(w, err)
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeManagementError(w, mutationUnavailable())
 		return
 	}
@@ -123,7 +123,7 @@ func (m *managementHTTP) handleActions(w http.ResponseWriter, r *http.Request) {
 	err = m.withSnapshotRead(r, "ListActions", "Action", query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.ActionSnapshot()
+			view, err := m.catalog.ActionSnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

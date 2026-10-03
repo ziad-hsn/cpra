@@ -1,0 +1,11 @@
+{% block announce %}
+  {% if page and page.file and page.file.src_uri.startswith('candidate/') %}
+    Historical candidate guides · <a href="{{ config.repo_url }}/commit/{{ config.extra.historical_candidate_commit }}">{{ config.extra.historical_candidate_commit[:7] }}</a> · <a href="{{ 'versions/' | url }}">versions and availability</a>
+  {% elif page and page.file and page.file.src_uri.startswith('sdk/') %}
+    Unreleased SDK working source · <a href="{{ 'versions/' | url }}">source identity and qualification</a>
+  {% elif page and page.file and page.file.src_uri.startswith('implementation/') %}
+    Implementation plans and verification records · <a href="{{ 'implementation/STATUS/' | url }}">current status</a>
+  {% else %}
+    Development and historical guides · <a href="{{ 'versions/' | url }}">versions and availability</a>
+  {% endif %}
+{% endblock %}

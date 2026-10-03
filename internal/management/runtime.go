@@ -31,7 +31,8 @@ import (
 // AbsoluteMaintenance and per-monitor recovery overrides require corresponding
 // owner-loop support; their presence must never be silently discarded.
 type RuntimePreparation struct {
-	// PreparationBytes bounds the encrypted inputs whose private copies are held.
+	runtimePreparationExtensions
+	// PreparationBytes bounds retained inputs, including detached worker bindings.
 	PreparationBytes      int
 	Monitor               manifest.Monitor
 	Endpoints             map[string]manifest.Endpoint
@@ -65,6 +66,8 @@ func (p RuntimePreparation) GoString() string { return p.String() }
 // provider libraries and executable job implementations remain in jobs' build
 // matrix. No constructor, file, socket, resolver, or provider call is used here.
 var runtimeDriverFactories = map[string]func() any{
+	"recovery/a2a":            func() any { return &manifest.InterventionTargetA2A{} },
+	"notification/a2a":        func() any { return &manifest.CodeNotificationA2A{} },
 	"check/http":              func() any { return &manifest.PulseHTTPConfig{} },
 	"check/tcp":               func() any { return &manifest.PulseTCPConfig{} },
 	"check/icmp":              func() any { return &manifest.PulseICMPConfig{} },
@@ -180,6 +183,10 @@ func ValidateResolvedDriver(category string, driver api.DriverConfig) error {
 	}
 	valid := true
 	switch cfg := config.(type) {
+	case *manifest.InterventionTargetA2A:
+		valid = cfg.Validate() == nil
+	case *manifest.CodeNotificationA2A:
+		valid = cfg.Validate() == nil
 	case *manifest.PulseHTTPConfig:
 		valid = httpTarget(cfg.Url, cfg.Method, cfg.Headers)
 		for _, status := range cfg.ExpectedStatus {
@@ -500,9 +507,29 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 	if err := ValidateMonitorSettings(spec); err != nil {
 		return out, err
 	}
-	resolve := func(category string, driver api.DriverConfig) (any, error) {
+	out.PreparationBytes = bytes
+	type runtimeSlot struct {
+		source persistence.CatalogKey
+		slot   string
+	}
+	var resolvedSlots map[runtimeSlot]any
+	resolve := func(category string, source persistence.CatalogKey, slot string, driver api.DriverConfig) (any, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
+		}
+		selected := runtimeSlot{source, slot}
+		if value, ok := resolvedSlots[selected]; ok {
+			return value, nil
+		}
+		value, handled, err := out.resolveRuntimeExtension(ctx, resources[source], records[source], slot, category, driver.Type)
+		if err != nil || handled {
+			if err == nil {
+				if resolvedSlots == nil {
+					resolvedSlots = make(map[runtimeSlot]any)
+				}
+				resolvedSlots[selected] = value
+			}
+			return value, err
 		}
 		if jobs.ValidateDriver(category, driver.Type) != nil {
 			return nil, runtimeInvalid("selected driver is not compiled into this server")
@@ -515,7 +542,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		}
 		return decodeRuntimeDriver(category, driver)
 	}
-	config, err := resolve("check", spec.Check.Driver)
+	config, err := resolve("check", key, "check", spec.Check.Driver)
 	if err != nil {
 		return out, err
 	}
@@ -556,10 +583,14 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		presentRetries = presentRetries || referenced
 	}
 	if !presentRetries && spec.Check.Retries != nil {
-		reflect.ValueOf(config).Elem().FieldByName("Retries").SetInt(*spec.Check.Retries)
+		// Worker markers carry no local retry loop. Keep the monitor's retry
+		// setting in Pulse without trying to mutate an executable driver config.
+		if retries := reflect.ValueOf(config).Elem().FieldByName("Retries"); retries.IsValid() {
+			retries.SetInt(*spec.Check.Retries)
+		}
 	}
 	if spec.Recovery != nil {
-		target, err := resolve("recovery", spec.Recovery.Driver)
+		target, err := resolve("recovery", key, "recovery", spec.Recovery.Driver)
 		if err != nil {
 			return out, err
 		}
@@ -612,11 +643,14 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 				return RuntimePreparation{}, errors.Join(ErrValidation, err)
 			}
 			code := manifest.CodeConfig{Dispatch: true}
+			if rule.Trigger != nil {
+				code.Trigger = string(*rule.Trigger)
+			}
 			if rule.Dispatch != nil {
 				code.Dispatch = *rule.Dispatch
 			}
 			if resolved.InlineDriver != nil {
-				config, err := resolve("notification", *resolved.InlineDriver)
+				config, err := resolve("notification", key, "notifications."+color, *resolved.InlineDriver)
 				if err != nil {
 					return RuntimePreparation{}, err
 				}
@@ -630,7 +664,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 				group := make([]string, 0, len(resolved.Targets))
 				for _, endpoint := range resolved.Targets {
 					driver := notifications.Endpoints[endpoint.EndpointID].Spec
-					config, err := resolve("notification", driver)
+					config, err := resolve("notification", persistence.CatalogKey{Kind: "NotificationEndpoint", ID: endpoint.EndpointID}, "endpoint", driver)
 					if err != nil {
 						return RuntimePreparation{}, err
 					}
@@ -656,7 +690,6 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		}
 		return strings.Compare(a.Key.ID, b.Key.ID)
 	})
-	out.PreparationBytes = bytes
 	// Resource versions also change when credentials are rewrapped or metadata
 	// changes without changing executable content. Result correlation must retain
 	// this preparation identity separately from the legacy execution fingerprint.
@@ -666,8 +699,11 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 	}
 	preparationHash := sha256.Sum256(append([]byte("cpra-runtime-projection-v1\x00"), identity...))
 	out.ProjectionVersion = hex.EncodeToString(preparationHash[:])
-	out.ExecutionRevision, err = manifest.ConfigurationRevision(monitor, out.Endpoints, out.NotificationGroups)
+	out.ExecutionRevision, err = out.configurationRevision(ctx, resources, records)
 	if err != nil {
+		if ctx.Err() != nil {
+			return RuntimePreparation{}, ctx.Err()
+		}
 		return RuntimePreparation{}, ErrUnavailable
 	}
 	// Preserve the legacy content fingerprint when no new execution settings

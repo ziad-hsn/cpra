@@ -46,7 +46,7 @@ func installation(l installpath.Layout) (Installation, error) {
 
 // Install maintains a stable service executable separate from GOBIN. Updates
 // preserve the supervisor's enabled state and restart only a running service.
-func Install(ctx context.Context, l installpath.Layout, source, account string, update bool, authenticationKeyFile string) error {
+func Install(ctx context.Context, l installpath.Layout, source, account string, update bool, authenticationKeyFile string) (returnErr error) {
 	if runtime.GOOS == "windows" && l.Scope != "system" {
 		return fmt.Errorf("Windows user mode is foreground-only; SCM installation requires --scope system")
 	}
@@ -122,10 +122,26 @@ func Install(ctx context.Context, l installpath.Layout, source, account string, 
 			return err
 		}
 	}
+	// The caller's executable can change during validation or shutdown. Freeze
+	// it in the installer-managed configuration directory and use that copy
+	// for both validation and publication, without reopening the source path.
+	stage, err := os.MkdirTemp(l.ConfigDir, ".cpra-candidate-")
+	if err != nil {
+		return fmt.Errorf("stage candidate executable: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(stage); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("remove staged candidate executable: %w", err))
+		}
+	}()
+	candidate := filepath.Join(stage, filepath.Base(binaryPath(l)))
+	if err = copyExecutable(source, candidate); err != nil {
+		return fmt.Errorf("stage candidate executable: %w", err)
+	}
 	// Validation uses the candidate's compiled capabilities and creates no
 	// storage or provider clients. Never print its configuration or token.
 	args := append(serviceArgs(l), "-validate")
-	if err = runCommand(ctx, source, args...); err != nil {
+	if err = runCommand(ctx, candidate, args...); err != nil {
 		return fmt.Errorf("candidate configuration validation: %w", err)
 	}
 	wasRunning := false
@@ -148,7 +164,7 @@ func Install(ctx context.Context, l installpath.Layout, source, account string, 
 	if err = os.MkdirAll(l.BinDir, 0755); err != nil {
 		return err
 	}
-	if err = copyExecutable(source, binaryPath(l)); err != nil {
+	if err = copyExecutable(candidate, binaryPath(l)); err != nil {
 		return err
 	}
 	if l.ServiceFile != "" {

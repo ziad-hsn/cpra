@@ -86,6 +86,17 @@ def main():
         # These fixture entrypoints complete their checked cleanup before exit.
         state['cleanup_status'] = 'confirmed_by_fixture_exit' if completed.returncode == 0 else 'unconfirmed'
         state['status'] = 'pass' if completed.returncode == 0 and passing_report(report) else 'fail'
+        environment = pathlib.Path(str(report) + '.environment.json')
+        if environment.exists():
+            details = json.loads(environment.read_text())
+            state['environment_sha256'] = hashlib.sha256(environment.read_bytes()).hexdigest()
+            if state['cached_images'] and details.get('image_id') not in {image['image_id'] for image in state['cached_images']}:
+                raise ValueError('fixture used a different image than the recorded cached input')
+            if completed.returncode != 0 and details.get('cleanup_confirmed') is True:
+                state['cleanup_status'] = 'confirmed_by_environment'
+            if details.get('cleanup_confirmed') is not True or details.get('preflight', {}).get('ready') is not True:
+                state['status'] = 'fail'
+                state['cleanup_status'] = 'unconfirmed'
         if report.exists():
             state['report_sha256'] = hashlib.sha256(report.read_bytes()).hexdigest()
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

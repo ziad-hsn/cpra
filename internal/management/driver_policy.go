@@ -25,6 +25,8 @@ var protectedDriverFields = map[string][]string{
 	"check/redis": {"password"}, "check/postgres": {"dsn", "password"},
 	"check/mysql": {"dsn", "password"}, "check/mongo": {"uri"}, "check/rabbitmq": {"url"},
 	"recovery/webhook":   {"url", "headers", "body"},
+	"recovery/a2a":       {"url", "token"},
+	"notification/a2a":   {"url", "token"},
 	"notification/email": {"server"}, "notification/webhook": {"url", "headers"},
 	"notification/pagerduty": {"routingKey", "url"}, "notification/slack": {"hook"},
 	"notification/telegram": {"botToken", "url"}, "notification/discord": {"webhookUrl"},

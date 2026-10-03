@@ -13,18 +13,25 @@ type HistoryView struct {
 }
 
 func (c *Catalog) HistorySnapshot() (HistoryView, error) {
-	if !c.Ready() {
-		return HistoryView{}, ErrUnavailable
+	return c.HistorySnapshotContext(context.Background())
+}
+
+func (c *Catalog) HistorySnapshotContext(ctx context.Context) (HistoryView, error) {
+	if err := c.readyContext(ctx); err != nil {
+		return HistoryView{}, err
 	}
-	view, err := c.store.History().Snapshot()
+	view, err := c.store.History().SnapshotContext(ctx)
 	return HistoryView{view: view, catalog: c}, err
 }
 
 // Page projects only public audit fields. Operation internals, provider outcome
 // payloads and configuration records are not serialized into the v2 timeline.
 func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Event, string, error) {
-	if v.catalog == nil || !v.catalog.Ready() {
+	if v.catalog == nil {
 		return nil, "", ErrUnavailable
+	}
+	if err := v.catalog.readyContext(ctx); err != nil {
+		return nil, "", err
 	}
 	if !validID(monitorID) {
 		return nil, "", ErrValidation
@@ -40,6 +47,8 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 			actor = e.Operation.Actor
 		}
 		event := api.Event{ID: e.ID, MonitorID: e.MonitorID, Kind: e.Type, Time: e.At, Actor: actor, Reason: e.Reason, Note: e.Note, IncidentID: e.IncidentID, ActionID: e.ActionID, Outcome: e.Outcome, ControlRevision: e.ControlRevision, EvidenceRefs: append([]string(nil), e.EvidenceRefs...)}
+		event.AgentReceipt = agentReceiptView(e.AgentReceipt)
+		event.RecoveryFailure = recoveryFailureView(e.RecoveryFailure)
 		if e.Operation == nil {
 			event.ExecutionRevision = e.Revision
 		} else {

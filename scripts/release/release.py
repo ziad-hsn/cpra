@@ -7,7 +7,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
@@ -59,6 +59,51 @@ def encoded(value):
     return (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
 
 
+def evidence_identity(manifest):
+    """Bind a report to frozen release inputs, including both nested modules.
+
+    This identifies the supplied metadata; it does not prove that a command ran,
+    that an artifact came from these inputs, or that a qualification gate passed.
+    Report readers must still check outcomes, scope and actual artifact digests.
+    """
+    if not isinstance(manifest, dict) or type(manifest.get('schema_version')) is not int \
+            or manifest['schema_version'] != 1:
+        raise ValueError('Unsupported release metadata for evidence')
+    if manifest.get('candidate') is not False or manifest.get('dirty') is not False:
+        raise ValueError('Release evidence requires explicitly clean, frozen source')
+    if not valid_version(manifest.get('version')) or not isinstance(manifest.get('commit'), str) \
+            or not re.fullmatch('[a-f0-9]{40}', manifest['commit']):
+        raise ValueError('Release evidence requires a version and full source commit')
+    files = manifest.get('source_files')
+    if not isinstance(files, dict) or not files:
+        raise ValueError('Release evidence requires a complete source inventory')
+    for name, record in files.items():
+        if not isinstance(name, str) or not name or name == '.' or '\\' in name or ':' in name \
+                or PurePosixPath(name).is_absolute() or '..' in PurePosixPath(name).parts \
+                or str(PurePosixPath(name)) != name:
+            raise ValueError('Unsafe source inventory path in release evidence')
+        if not isinstance(record, dict) or record.get('mode') not in ('100644', '100755', '120000') \
+                or not isinstance(record.get('sha256'), str) or not re.fullmatch('[a-f0-9]{64}', record['sha256']):
+            raise ValueError('Invalid source inventory record in release evidence')
+    for name in ('go.mod', 'sdk/go/go.mod', 'sdk/go/worker/go.mod'):
+        if name not in files or files[name]['mode'] not in ('100644', '100755'):
+            raise ValueError('Release evidence source inventory omits a module: ' + name)
+    recipe = manifest.get('recipe')
+    archives = manifest.get('toolchain_archives')
+    if not isinstance(recipe, dict) or not isinstance(recipe.get('go_version'), str) \
+            or not recipe['go_version'] or not isinstance(archives, dict) or not archives:
+        raise ValueError('Release evidence requires a compiler recipe and archive pins')
+
+    def fingerprint(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'),
+                                         allow_nan=False).encode()).hexdigest()
+
+    return {'schema_version': 1, 'commit': manifest['commit'], 'version': manifest['version'],
+            'release_manifest_sha256': fingerprint(manifest),
+            'source_inventory_sha256': fingerprint(files), 'recipe_sha256': fingerprint(recipe),
+            'go_version': recipe['go_version'], 'toolchain_archives_sha256': fingerprint(archives)}
+
+
 def sha(path):
     digest = hashlib.sha256()
     with path.open('rb') as stream:
@@ -71,10 +116,12 @@ def run(args, *, env=None, cwd=ROOT):
     return subprocess.check_output([str(x) for x in args], cwd=cwd, env=env, text=True).strip()
 
 
-def environment(go, manifest, target=None):
+def environment(go, manifest, target=None, dependency_paths=None):
     # Do not inherit compiler, module policy, workspace, experiment or VCS flags.
     keep = ('PATH','HOME','USERPROFILE','SYSTEMROOT','SystemRoot','WINDIR','TEMP','TMP','TMPDIR','GOCACHE','GOMODCACHE')
     env = {key: os.environ[key] for key in keep if key in os.environ}
+    if dependency_paths:
+        env.update({key: dependency_paths[key] for key in ('GOMODCACHE', 'GOPATH')})
     env.update(manifest['recipe']['environment'])
     env['PATH'] = str(Path(go).resolve().parent) + os.pathsep + env.get('PATH','')
     env['SOURCE_DATE_EPOCH'] = str(manifest['source_date_epoch'])
@@ -217,11 +264,15 @@ def validate_toolchain(go, manifest):
         raise ValueError(f"Expected {manifest['recipe']['go_version']}; selected toolchain is {version}")
 
 
-def build(go, manifest, out, targets, goreleaser=None):
+def build(go, manifest, out, targets, goreleaser=None, dependency_dir=None):
     check_manifest(manifest)
+    dependency_paths = None
+    if dependency_dir:
+        from dependencies import cache_environment
+        dependency_paths = cache_environment(dependency_dir, manifest)
     validate_toolchain(go,manifest)
     before = {name:sha(ROOT/name) for name in ('go.mod','go.sum')}
-    env = environment(go,manifest)
+    env = environment(go,manifest,dependency_paths=dependency_paths)
     subprocess.run([go,'mod','download'],cwd=ROOT,env=env,check=True)
     subprocess.run([go,'mod','verify'],cwd=ROOT,env=env,check=True)
     if goreleaser:
@@ -248,15 +299,15 @@ def build(go, manifest, out, targets, goreleaser=None):
                 dest.parent.mkdir(parents=True,exist_ok=True)
                 subprocess.run([go,'build',*RECIPE['build_flags'],'-tags',' '.join(RECIPE['build_tags']),
                                 '-ldflags',ldflags(manifest),'-o',str(dest.resolve()),main],
-                               cwd=ROOT,env=environment(go,manifest,target),check=True)
+                               cwd=ROOT,env=environment(go,manifest,target,dependency_paths),check=True)
     if before != {name:sha(ROOT/name) for name in before}:
         raise ValueError('Build modified go.mod or go.sum; release input is not immutable')
     for target in targets:
-        stage(go,manifest,out,target)
+        stage(go,manifest,out,target,dependency_paths)
     (out/'RELEASE.json').write_bytes(encoded(manifest))
 
 
-def stage(go, manifest, out, target):
+def stage(go, manifest, out, target, dependency_paths=None):
     destination=out/target
     # Preserve binaries, but never retain old notices/docs from a previous run.
     for child in destination.iterdir():
@@ -264,7 +315,7 @@ def stage(go, manifest, out, target):
             if child.is_dir(): shutil.rmtree(child)
             else: child.unlink()
     binaries=[destination/(name+('.exe' if target.startswith('windows_') else '')) for name in RECIPE['binaries']]
-    inventory,notices=package.dependency_inventory(' '.join(RECIPE['build_tags']),binaries,go,environment(go,manifest,target))
+    inventory,notices=package.dependency_inventory(' '.join(RECIPE['build_tags']),binaries,go,environment(go,manifest,target,dependency_paths))
     for name in ('LICENSE','README.md','go.mod','LICENSES/dashboard.txt','brand/BRANDING.md',
                  'brand/fonts/LICENSE.txt','brand/dist/svg/cpra-horizontal-dark.svg','brand/dist/svg/cpra-horizontal-color.svg'):
         path=destination/name
@@ -371,16 +422,19 @@ def verify(out):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command',choices=['prepare','build','pack','checksums','verify'])
+    parser.add_argument('command',choices=['prepare','source','build','pack','checksums','verify'])
     parser.add_argument('--out',type=Path,default=ROOT/'dist/release')
     parser.add_argument('--manifest',type=Path)
     parser.add_argument('--version')
     parser.add_argument('--candidate',action='store_true')
     parser.add_argument('--go',default=os.environ.get('GO','go'))
     parser.add_argument('--goreleaser')
+    parser.add_argument('--dependencies',type=Path,help='qualified private dependency directory from dependencies.py')
     parser.add_argument('--targets',nargs='+',choices=RECIPE['targets'],default=RECIPE['targets'])
     parser.add_argument('--no-source',action='store_true')
     args=parser.parse_args()
+    if args.dependencies and args.command != 'build':
+        parser.error('--dependencies applies only to build')
     args.out=args.out.resolve()
     go=shutil.which(args.go) or args.go
     if args.command=='prepare':
@@ -391,7 +445,11 @@ def main():
     else:
         path=args.manifest or (ROOT/'RELEASE.json' if (ROOT/'RELEASE.json').is_file() else args.out/'RELEASE.json')
         manifest=json.loads(path.read_text())
-        if args.command=='build': build(go,manifest,args.out,args.targets,args.goreleaser)
+        if args.command=='source':
+            check_manifest(manifest)
+            args.out.mkdir(parents=True,exist_ok=True)
+            print(source_archive(manifest,args.out))
+        elif args.command=='build': build(go,manifest,args.out,args.targets,args.goreleaser,args.dependencies)
         else: pack(manifest,args.out,args.targets,not args.no_source)
 
 if __name__=='__main__':

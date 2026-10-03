@@ -303,6 +303,17 @@ RFC 9457 details and field errors. Its printable message deliberately omits raw
 server detail. `ErrAmbiguous` indicates an outcome that cannot be determined;
 inspect the operation handle rather than issuing a fresh mutation.
 
+Use `errors.As(err, &ambiguous)` with a `*cpra.AmbiguousError` to read its
+`OperationID`. A failed response body can still leave a received operation
+handle available in that error and in the non-nil response. If the reply was
+lost before its headers arrived, the handle is empty. An empty handle does not
+prove the write was rejected. Read the known resource ID and compare its
+configuration and version before deciding what an operator should do; a current
+read alone may not establish which concurrent write committed. Do not issue a
+replacement create, enable a disabled monitor, or retry a recovery because an
+admission request timed out. Configuration admission uncertainty and an unknown
+external action outcome are separate states.
+
 Authenticated v2 connections require HTTPS unless the caller explicitly permits
 HTTP for the configured origin. Redirects are disabled, including when supplying
 an HTTP client. Ordinary calls default to ten seconds; context deadlines can be
@@ -330,8 +341,41 @@ requires authenticated management and Raft. Creation uses an absence preconditio
 replacement/deletion use the resource version returned by a read. Registration
 stores a declarative contract; it does not start a handler. Scoped worker grants
 are provisioned through [stopped local administration](../../docs/worker-authentication.md).
-Poll/start/result integration remains unfinished, so the worker methods are not
-yet qualified against a completed server.
+Production protocol routes have scoped integration tests. Controller dispatch
+and complete worker-runner interoperability remain unfinished, so the worker
+methods are not yet qualified against a completed execution system.
+
+`Workers` reads an operator-authorized page; `IterateWorkers` lazily traverses
+the same immutable snapshot. Use management credentials, not a worker execution
+token. Compile consumers of either method with `-tags externaljobs`:
+
+```go
+workers := client.IterateWorkers(cpra.ListOptions{Limit: 100})
+for workers.Next(ctx) {
+    worker := workers.Value()
+    fmt.Printf("%s: session=%s outstanding=%d unknown=%d\n",
+        worker.WorkerID, worker.SessionStatus, worker.Active, worker.UnknownActions)
+    if worker.CapacityAvailable {
+        fmt.Printf("  last advertised free result capacity: %d\n", worker.Capacity)
+    }
+    if worker.LastSeenAt != nil {
+        fmt.Printf("  last committed poll: %s\n", worker.LastSeenAt)
+    }
+}
+if err := workers.Err(); err != nil {
+    return err
+}
+```
+
+`active` counts outstanding committed Start grants, not observed running
+handlers. `unknownActions` counts retained original unknown outcomes, including
+operator-reviewed actions. Read action status for the current hold and review;
+this observation path does not retry actions.
+Absent `lastSeenAt` means no retained poll observation. Capacity becomes
+unavailable when a session expires or belongs to the previous server owner.
+Pages share `generatedAt`; new polls and results appear only in a new query.
+The endpoint exposes no provider secrets or worker-local journal data. See the
+[observation contract](../../docs/implementation/worker-status.md) for bounds.
 
 The worker runner lives in its own module:
 `github.com/ziad-hsn/cpra/sdk/go/worker`. It is absent from this module's dependency

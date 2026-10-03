@@ -255,7 +255,6 @@ func TestMainManagementRealCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture.options.allowEmpty = false
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	cli.origin = "https://" + fixture.options.webAddr
 	restored := decodeMainCLI[api.Monitor](t, cli.success(t, nil, "get", "monitor/cli-managed", "-o", "json").stdout)
@@ -458,7 +457,22 @@ func buildMainCLI(t *testing.T) (string, string) {
 	path := filepath.Join(t.TempDir(), "cpractl")
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, filepath.Join(runtime.GOROOT(), "bin", "go"), "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-o", path, "./cmd/cpractl")
+	goBinary := filepath.Join(runtime.GOROOT(), "bin", "go")
+	if runtime.GOROOT() == "" {
+		var err error
+		goBinary, err = exec.LookPath("go")
+		if err != nil {
+			t.Fatalf("locate compiler for native CLI: %v", err)
+		}
+	}
+	inspect := exec.CommandContext(ctx, goBinary, "env", "GOVERSION")
+	inspect.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+	version, err := inspect.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(version)) != runtime.Version() {
+		t.Fatalf("native CLI compiler %q must match parent %s: %v", strings.TrimSpace(string(version)), runtime.Version(), err)
+	}
+	command := exec.CommandContext(ctx, goBinary, "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-pgo=off",
+		"-tags="+os.Getenv("CPRA_CLI_BUILD_TAGS"), "-o", path, "./cmd/cpractl")
 	command.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=local", "GOFLAGS=-p=2", "GOEXPERIMENT=", "GOAMD64=v1", "GOARM64=v8.0")
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -469,6 +483,7 @@ func buildMainCLI(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(binary)
+	t.Logf("Native CLI helper uses %s; build tags: %q", strings.TrimSpace(string(version)), os.Getenv("CPRA_CLI_BUILD_TAGS"))
 	return path, hex.EncodeToString(digest[:])
 }
 

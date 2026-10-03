@@ -1083,9 +1083,9 @@ sources, and the separate documentation checkout.
 
 #### Out of scope
 
-Treating this work as production-account certification or completion of the
-separate one-million-monitor 24-hour endurance gate; automatic stable publication
-before its applicable gates pass.
+A 24-hour endurance run is outside the requested work and is not a completion
+gate. This work does not establish production-account certification or authorize
+automatic stable publication before the applicable gates pass.
 
 #### Depends on
 

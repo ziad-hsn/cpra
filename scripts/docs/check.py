@@ -6,6 +6,9 @@ import argparse
 import json
 import re
 
+import references
+import sync
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -75,6 +78,8 @@ def check(candidate: Path | None = None):
     errors = []
     local_evidence = []
     pages = sorted(docs.rglob("*.md"))
+    reference_inventory = references.prepare(ROOT, check=True)
+    _, navigation_pages = sync.navigation(docs)
     required = ["versions.md", "review/latest-changes.md", "maintaining-docs.md",
                 "candidate/reference/runtime-config.md", "candidate/durability.md",
                 "candidate/native-installation.md", "candidate/container-helm.md",
@@ -127,7 +132,8 @@ def check(candidate: Path | None = None):
     if (ROOT / "brand/dist/palette.css").read_bytes() != (docs / "assets/stylesheets/palette.css").read_bytes():
         errors.append("canonical documentation palette differs from brand output")
     result = {"markdown_pages": len(pages), "source_contracts": contracts,
-              "local_evidence_links": local_evidence, "errors": errors}
+              "local_evidence_links": local_evidence, "reference_inventory": reference_inventory,
+              "navigation_pages": len(navigation_pages), "errors": errors}
     print(json.dumps(result, indent=2))
     if errors:
         raise SystemExit(1)

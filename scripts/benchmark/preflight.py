@@ -12,8 +12,11 @@ POWERSHELL = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
 
 def inspect(required_fixture_bytes=0):
     result = {'required_host_free_bytes': MINIMUM_HOST_FREE,
-              'required_fixture_headroom_bytes': required_fixture_bytes,
-              'platform': platform.platform(), 'ready': False}
+              'required_fixture_headroom_bytes': None, 'platform': None, 'ready': False}
+    if type(required_fixture_bytes) is not int or required_fixture_bytes < 0:
+        result['reason'] = 'Fixture headroom must be a non-negative integer byte count.'
+        return result
+    result.update(required_fixture_headroom_bytes=required_fixture_bytes, platform=platform.platform())
     if not pathlib.Path(POWERSHELL).exists():
         result['reason'] = 'The agreed Windows/WSL host could not be inspected.'
         return result
@@ -28,6 +31,6 @@ def inspect(required_fixture_bytes=0):
             result['reason'] = 'Physical C: free space is below the 30 GiB minimum plus fixture headroom.'
         else:
             result['ready'] = True
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, OverflowError) as error:
         result['reason'] = 'Physical host disk inspection failed: ' + type(error).__name__
     return result

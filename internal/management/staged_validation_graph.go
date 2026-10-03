@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
@@ -76,15 +75,19 @@ func (v *stagedValidator) expand(ctx context.Context) error {
 		key := queue[0]
 		queue = queue[1:]
 		old := v.live[key]
-		dependents, guard, err := v.catalog.store.CatalogDependents(key, maxValidationGraph)
+		dependents, guard, err := v.catalog.store.CatalogDependentsContext(ctx, key, maxValidationGraph)
 		if err != nil || guard != old.dependentsVersion {
 			switch {
 			case errors.Is(err, persistence.ErrCatalogNotFound), err == nil:
 				err = persistence.ErrCatalogConflict
-			case !v.catalog.Ready():
-				err = ErrUnavailable
+			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+				// Preserve the original context cause.
 			default:
-				err = ErrGraphLimit
+				if healthErr := v.catalog.readyContext(ctx); healthErr != nil {
+					err = healthErr
+				} else {
+					err = ErrGraphLimit
+				}
 			}
 			_, err = v.reject(v.cause[key], err)
 			return err
@@ -316,7 +319,7 @@ func (v *stagedValidator) validateSet(ctx context.Context, selected map[persiste
 func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resource *api.Resource, lookup resourceLookup) error {
 	driver := func(category string, input api.DriverConfig) error {
 		defer clear(input.Config)
-		if jobs.ValidateDriver(category, input.Type) != nil || validateProtectedDriver(category, input) != nil {
+		if v.source.catalog.options.validateDriver(category, input) != nil {
 			return ErrValidation
 		}
 		release, err := resolveDriverWithLookup(ctx, &input, category, lookup, v.source.reserve)
@@ -325,15 +328,15 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 		}
 		defer release()
 		defer clear(input.Config)
-		if err := ValidateResolvedDriver(category, input); err != nil {
-			return ErrValidation
+		if err := v.source.catalog.validateResolvedDriver(ctx, category, input); err != nil {
+			return stagedValidationError(err)
 		}
 		return ctx.Err()
 	}
 	switch resource.Kind {
 	case "Credential":
 		copy := *resource
-		if validateDesired(&copy) != nil {
+		if v.source.catalog.options.validateDesired(&copy) != nil {
 			return ErrValidation
 		}
 	case "NotificationEndpoint":

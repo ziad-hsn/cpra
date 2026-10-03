@@ -8,40 +8,17 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import tarfile
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/release'))
+from release import evidence_identity
+from oci import copy_transport, docker_config_digest, read_image
 
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
-
-
-def inventory(path):
-    files = {}
-    config_digests = []
-    with tarfile.open(path) as archive:
-        for member in archive:
-            if member.isdir():
-                continue
-            if not member.isfile() or member.name in files:
-                raise ValueError('OCI transport contains a duplicate or non-regular payload entry')
-            contents = archive.extractfile(member).read()
-            value = digest(contents)
-            if member.name.startswith('blobs/sha256/') and member.name.rsplit('/', 1)[1] != value:
-                raise ValueError('OCI blob content does not match its digest')
-            files[member.name] = {'sha256': value, 'size': len(contents)}
-            if len(contents) < 1024 * 1024:
-                try:
-                    obj = json.loads(contents)
-                    if isinstance(obj, dict) and obj.get('config', {}).get('mediaType') == 'application/vnd.oci.image.config.v1+json':
-                        config_digests.append(obj['config']['digest'])
-                except (ValueError, UnicodeError):
-                    pass
-    if 'index.json' not in files or 'oci-layout' not in files:
-        raise ValueError('build output is not a complete OCI layout')
-    return files, sorted(config_digests)
 
 
 def main():
@@ -57,7 +34,8 @@ def main():
     target = 'linux_' + args.arch
     metadata = json.loads((args.release_dir / target / 'RELEASE.json').read_text())
     report = {'status': 'incomplete', 'platform': 'linux/' + args.arch,
-              'started': datetime.now(timezone.utc).isoformat(), 'source': metadata, 'builds': []}
+              'started': datetime.now(timezone.utc).isoformat(), 'source': metadata, 'builds': [],
+              'release_identity': evidence_identity(metadata)}
     args.out.write_text(json.dumps(report, indent=2) + '\n')
     try:
         reference = json.loads(subprocess.check_output(['docker', 'image', 'inspect', args.reference_image]))[0]
@@ -68,11 +46,10 @@ def main():
             # config rather than assuming either representation from inspect.
             saved = Path(tmp) / 'reference.tar'
             subprocess.run(['docker', 'image', 'save', '-o', str(saved), args.reference_image], check=True, timeout=120)
-            with tarfile.open(saved) as archive:
-                manifest = json.load(archive.extractfile('manifest.json'))
-                if len(manifest) != 1:
-                    raise ValueError('reference must contain exactly one platform image')
-                reference_config = 'sha256:' + digest(archive.extractfile(manifest[0]['Config']).read())
+            retained = args.out.parent / (args.out.stem + '-reference.docker.tar')
+            report['reference_image']['archive'] = copy_transport(saved, retained)
+            args.out.write_text(json.dumps(report, indent=2) + '\n')
+            reference_config = docker_config_digest(retained, report['platform'])
             report['reference_image']['config_digest'] = reference_config
             for number in range(2):
                 root = Path(tmp) / str(number)
@@ -99,13 +76,18 @@ def main():
                 result = subprocess.run(cmd, text=True, capture_output=True, timeout=600)
                 if result.returncode:
                     raise RuntimeError(result.stderr[-5000:])
-                files, configs = inventory(output)
-                if configs != [reference_config]:
+                retained = args.out.parent / (args.out.stem + f'-build-{number}.oci.tar')
+                transport = copy_transport(output, retained)
+                report['builds'].append({'archive': transport, 'input_mtime': input_mtime})
+                args.out.write_text(json.dumps(report, indent=2) + '\n')
+                image = read_image(retained, report['platform'])
+                files = image['oci_payload']
+                if image['config_digest'] != reference_config:
                     raise ValueError('rebuilt OCI config does not match the image used for runtime tests')
-                report['builds'].append({'oci_payload': files,
-                                         'input_mtime': input_mtime,
-                                         'config_digests': configs,
-                                         'payload_sha256': digest(json.dumps(files, sort_keys=True).encode())})
+                report['builds'][-1].update(oci_payload=files,
+                    config_digests=[image['config_digest']], manifest_digest=image['manifest_digest'],
+                    expanded_bytes=image['expanded_bytes'],
+                    payload_sha256=digest(json.dumps(files, sort_keys=True).encode()))
                 args.out.write_text(json.dumps(report, indent=2) + '\n')
             if report['builds'][0]['oci_payload'] != report['builds'][1]['oci_payload']:
                 raise ValueError('OCI layout or blob bytes differ between independent builds')

@@ -149,5 +149,7 @@ accept an optional full operation `url` for designated test endpoints. Existing
 production defaults and URL/SSRF/redirect policies remain in effect. Existing
 webhook-configurable drivers already accept local test URLs.
 
-Sandbox/mock results do not complete account-backed, comparative-performance or
-24-hour endurance gates. See [validation](validation.md) for those requirements.
+Sandbox/mock results do not complete account-backed or comparative-performance
+gates. The 24-hour endurance test was removed from the requested work on 1 October
+2026 and is not a mandatory completion gate; that scope correction also applies
+to this earlier snapshot. See [validation](../validation.md) for current requirements.

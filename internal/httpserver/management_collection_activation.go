@@ -27,7 +27,7 @@ func (m *managementHTTP) handleCollectionActivation(w http.ResponseWriter, r *ht
 		writeManagementError(w, managementFailure(400, "invalidQuery", "Activation accepts only its original operation path."))
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeManagementError(w, mutationUnavailable())
 		return
 	}

@@ -16,3 +16,20 @@ data:
       snapshot_retain: 3
     history:
       retention_days: 30
+    {{- if .Values.management.enabled }}
+    management:
+      enabled: true
+      policy_file: /etc/cpra/management/policy.yaml
+      tls:
+        cert_file: /etc/cpra/management/tls.crt
+        key_file: /etc/cpra/management/tls.key
+      encryption:
+        local:
+          active_key_file: /etc/cpra/management/wrapping.key
+          {{- with .Values.management.encryption.previous }}
+          previous_key_files:
+            {{- range $index, $_ := . }}
+            - /etc/cpra/management/previous/{{ $index }}.key
+            {{- end }}
+          {{- end }}
+    {{- end }}

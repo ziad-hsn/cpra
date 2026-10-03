@@ -2,6 +2,7 @@
 package slo
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"slices"
@@ -245,7 +246,16 @@ type View struct {
 }
 
 func (r *Recorder) View(at time.Time, duration time.Duration, minSamples uint64) View {
-	r.mu.Lock()
+	v, _ := r.ViewContext(context.Background(), at, duration, minSamples)
+	return v
+}
+
+// ViewContext bounds aggregation and recorder lock waits by the reader's
+// context. Cancellation never publishes a partially aggregated report.
+func (r *Recorder) ViewContext(ctx context.Context, at time.Time, duration time.Duration, minSamples uint64) (View, error) {
+	if err := r.lockView(ctx); err != nil {
+		return View{}, err
+	}
 	defer r.mu.Unlock()
 	r.flushPauses(at)
 	s := r.state
@@ -254,9 +264,15 @@ func (r *Recorder) View(at time.Time, duration time.Duration, minSamples uint64)
 	epoch := at.UnixNano() / int64(SlotDuration)
 	slots := int64(duration / SlotDuration)
 	for driver, window := range s.ByDriver {
+		if err := ctx.Err(); err != nil {
+			return View{}, err
+		}
 		var total Bucket
 		var overdue, pending uint64
 		for _, b := range window {
+			if err := ctx.Err(); err != nil {
+				return View{}, err
+			}
 			if b.Epoch > epoch || b.Epoch <= epoch-slots {
 				continue
 			}
@@ -313,7 +329,35 @@ func (r *Recorder) View(at time.Time, duration time.Duration, minSamples uint64)
 		}
 		return 0
 	})
-	return v
+	if err := ctx.Err(); err != nil {
+		return View{}, err
+	}
+	return v, nil
+}
+
+func (r *Recorder) lockView(ctx context.Context) error {
+	if ctx == nil {
+		return context.Canceled
+	}
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if r.mu.TryLock() {
+			if err := ctx.Err(); err != nil {
+				r.mu.Unlock()
+				return err
+			}
+			return nil
+		}
+		timer := time.NewTimer(time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 // Validate rejects corrupt aggregate snapshots before they can reach readers.

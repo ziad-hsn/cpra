@@ -5,12 +5,13 @@ import { useAccess, useDashboardSession } from '../auth/SessionBoundary';
 import { BrowserCollection, CollectionImportError, type ImportProgress } from '../import/collection';
 import { collectionFileSources } from '../import/files';
 import type { WorkerCollectionItemSummary, WorkerCollectionSummary } from '../api/collectionInventory';
-import { collectionCall, collectionDelay, collectionMutable, collectionCancelable, collectionPermissions, collectionTerminal, prepareCollection, readCollection, readCollectionValidation, collectionValidationPendingDelay, collectionValidationMessage, type CollectionValidationPage } from '../api/collectionOperations';
+import { collectionCall, collectionDelay, collectionMutable, collectionCancelable, collectionPermissions, collectionTerminal, collectionProgressPending, prepareCollection, readCollection, readCollectionValidation, collectionValidationPendingDelay, collectionValidationMessage, type CollectionValidationPage } from '../api/collectionOperations';
 import { ManagementError, type APIResponse, type CollectionRequestOperation } from '../api/session';
 import type { ApplyResult, Operation, Preflight } from '../api/generated';
 import { operationID } from '../api/operations';
 import { DirtyDraftGuard } from '../components/DirtyDraftGuard';
 import { CollectionExecution } from '../components/CollectionExecution';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type PreviewItem = WorkerCollectionItemSummary & { sourceName: string };
 type PrivateImport = { collection?: BrowserCollection; ticket?: string; expiresAt?: string; createAttempted: boolean; validationAttempted?: boolean; activationAttempted?: boolean; sourceNames?: readonly string[]; operation?: Operation; busy: boolean; active: boolean; generation: number; controller?: AbortController };
@@ -39,7 +40,6 @@ export default function CollectionImport() {
   const [cursor, setCursor] = useState('');
   const [resultPage, setResultPage] = useState<ApplyResult[]>([]);
   const waitAbort = useRef<AbortController>();
-  const confirmKeep = useRef<HTMLButtonElement>(null);
   const capabilities = useQuery({ queryKey: ['management', 'import-capabilities'], queryFn: ({ signal }) => session.get<unknown>('/api/v2/discovery', { signal }), enabled: access.phase === 'authenticated' && session.can('GetCapabilities'), retry: false });
   const allowed = collectionPermissions(session, capabilities.data?.data);
   const operator = access.phase === 'authenticated' && access.access?.role === 'operator';
@@ -56,7 +56,6 @@ export default function CollectionImport() {
     const unsubscribe = session.onReset(close);
     return () => { unsubscribe(); close(); };
   }, [session]);
-  useEffect(() => { if (confirm) confirmKeep.current?.focus(); }, [confirm]);
 
   const storeOperation = (value: Operation) => {
     const observation = { ...value };
@@ -212,7 +211,7 @@ export default function CollectionImport() {
         waitDelay.current = collectionDelay(response as APIResponse<Operation>); setWaitKind('validation'); setWaiting(true);
       } else {
         setFeedback(action === 'ActivateOperation' ? 'Activation was requested. Saved changes and controller application are reported separately; partial results are possible.' : 'Cancellation was requested for the original operation. Existing committed changes are not rolled back.');
-        if (action === 'ActivateOperation' && !collectionTerminal(response.data as Operation) && (response.data as Operation).state !== 'unrecognized') { setWaitKind('progress'); waitDelay.current = collectionDelay(response as APIResponse<Operation>); setWaiting(true); }
+        if (action === 'ActivateOperation' && collectionProgressPending(response.data as Operation)) { setWaitKind('progress'); waitDelay.current = collectionDelay(response as APIResponse<Operation>); setWaiting(true); }
       }
     });
   }
@@ -251,7 +250,7 @@ export default function CollectionImport() {
         const response: APIResponse<Operation> = await readCollection(session, summary, operation.id, controller.signal);
         if (!lifetime.current.active || controller.signal.aborted) return;
         storeOperation(response.data);
-        if (collectionTerminal(response.data) || response.data.state === 'unrecognized' || response.data.state === 'validated') { setWaiting(false); return; }
+        if (!collectionProgressPending(response.data)) { setWaiting(false); return; }
         schedule(collectionDelay(response));
       } catch (error) {
         if (controller.signal.aborted || !lifetime.current.active) return;
@@ -276,7 +275,7 @@ export default function CollectionImport() {
   }
   const validationWait = !validation && (lifetime.current.validationAttempted || operation?.state === 'validating');
   const canWait = !!operation && (validationWait ? allowed.has('GetOperationValidation') : allowed.has('GetOperation')) &&
-    !collectionTerminal(operation) && operation.state !== 'unrecognized' && operation.state !== 'validated';
+    collectionProgressPending(operation);
   const pendingDraft = !!summary && !collectionTerminal(operation);
   return <main className="page">
     <DirtyDraftGuard dirty={pendingDraft || !!busy} />
@@ -335,11 +334,12 @@ export default function CollectionImport() {
         {collectionTerminal(operation) && <p>This operation is terminal. The private file worker and admission ticket have been closed. Committed changes are not undone.</p>}
       </>}
     </section>}
-    {confirm && <div className="management-modal" role="alertdialog" aria-modal="true" aria-labelledby="collection-confirm-title" onKeyDown={event => {
-      if (event.key === 'Escape') setConfirm(undefined);
-      if (event.key === 'Tab') { const buttons = event.currentTarget.querySelectorAll('button'); if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons[buttons.length - 1].focus(); } else if (!event.shiftKey && document.activeElement === buttons[buttons.length - 1]) { event.preventDefault(); buttons[0].focus(); } }
-    }}><div className="card"><h2 id="collection-confirm-title">{confirm === 'activate' ? 'Activate this collection?' : 'Cancel this original operation?'}</h2>
+    {confirm && <ConfirmDialog title={confirm === 'activate' ? 'Activate this collection?' : 'Cancel this original operation?'} pending={!!busy}
+      cancelLabel="Keep reviewing" confirmLabel={confirm === 'activate' ? 'Confirm activation' : 'Confirm cancellation'} pendingLabel="Submitting…"
+      confirmDisabled={confirm === 'activate' && (!canStep('ActivateOperation') || !activationReady(operation))} onCancel={() => setConfirm(undefined)}
+      onConfirm={() => { void control(confirm === 'activate' ? 'ActivateOperation' : 'CancelOperation'); }}>
       {confirm === 'activate' && <p>Apply the {summary?.itemCount} resources reviewed for operation <span className="mono">{operation?.id}</span>, using sealed validation result <span className="mono">{validation?.summary.resultID}</span>.</p>}
-      <p>{confirm === 'activate' ? 'This changes active configuration and can affect monitoring, recovery and notification delivery. Each resource is conditional; conflicts or dependency failures can produce partial results.' : 'Cancellation is a separate server request. It does not roll back changes already committed or reverse external actions.'}</p><button ref={confirmKeep} className="btn" onClick={() => setConfirm(undefined)}>Keep reviewing</button>{' '}<button className="btn" disabled={!!busy || (confirm === 'activate' && (!canStep('ActivateOperation') || !activationReady(operation)))} onClick={() => { void control(confirm === 'activate' ? 'ActivateOperation' : 'CancelOperation'); }}>{confirm === 'activate' ? 'Confirm activation' : 'Confirm cancellation'}</button></div></div>}
+      <p>{confirm === 'activate' ? 'This changes active configuration and can affect monitoring, recovery and notification delivery. Each resource is conditional; conflicts or dependency failures can produce partial results.' : 'Cancellation is a separate server request. It does not roll back changes already committed or reverse external actions.'}</p>
+    </ConfirmDialog>}
   </main>;
 }

@@ -38,13 +38,13 @@ func TestLocalExecutorLeadershipRecoveryDoesNotReinvokeProvider(t *testing.T) {
 		return jobs.Result{}
 	}}, ecs.Entity{}, "intervention", "", 1, 0)
 	var handle *LocalExecution
-	dispatch.Authorize = func(ctx context.Context) (func() error, error) {
+	dispatch.Authorize = func(ctx context.Context) (jobs.ActionExecution, error) {
 		var err error
 		handle, err = s.BeginLocalAction(ctx, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, Guard: guard, At: at})
 		if handle == nil {
-			return nil, err
+			return jobs.ActionExecution{}, err
 		}
-		return func() error { return handle.Finish(context.Background()) }, err
+		return jobs.ActionExecution{Finish: func() error { return handle.Finish(context.Background()) }}, err
 	}
 	result := dispatch.Execute()
 	if called != 1 || result.Err != nil || !IsLeadershipUnavailable(result.FinalizationErr) || result.ExecutionStart.IsZero() {

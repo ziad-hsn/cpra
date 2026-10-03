@@ -1,6 +1,13 @@
 # JobType persistence and validation
 
-This is the private implementation boundary as of 2026-09-24. Tagged storage,
+The [30 September configuration checkpoint](external-configuration.md) connects
+retained JobTypes to conditional API changes, file/URL collection validation and
+bootstrap. Its focused tests pass on both compilers. The
+[worker integration record](external-worker-server-next-steps.md) tracks the later
+execution protocol and process campaigns; independent review and final candidate
+qualification remain open.
+
+The foundation boundary below records the implementation as of 2026-09-24. Tagged storage,
 management preparation, five JobType HTTP operations, configuration receipts and
 runtime opt-in are implemented. [Stopped worker provisioning and scoped grants](../worker-authentication.md)
 are also implemented. Assignment, execution, worker result receipts and external
@@ -32,8 +39,10 @@ The registered operations are:
 Create requires `If-None-Match: *`; replace/delete require the exact strong
 `If-Match` resource version. All five return 200 on success. The current tagged
 SDK contract has no JobType PATCH operation. Runtime-disabled or untagged
-servers do not register or advertise these routes. Enabling them registers no
-worker polling, start, heartbeat or result route.
+servers do not register or advertise these routes. The foundation originally
+registered no worker execution routes; later explicitly enabled
+[worker HTTP registration](worker-http.md) adds polling, Start, heartbeat and
+results with separate worker authorization.
 
 Mutation preparation compiles schemas and seals the resource before admission.
 Admission allocates an authenticated operation handle bound to the frozen
@@ -221,14 +230,14 @@ Focused tests cover schema semantics and limits, exact-number preservation,
 concurrent version conflicts, immutable ciphertext, authority expiry during key
 wrapping, stopped revocation and native Raft reopen, startup contract comparison,
 tag exclusion, historical digests, quotas and snapshot isolation. The
-[foundation evidence directory](../../bin/verification/job-type-foundation-2026-09-24)
+[foundation evidence directory](../review/local-evidence.md#record-6ad247fcfcc6a143209d5fd3)
 keeps the initial scoped checkpoint. The
-[HTTP evidence directory](../../bin/verification/job-type-http-2026-09-24)
+[HTTP evidence directory](../review/local-evidence.md#record-ad8c47194ca3fba719f91f62)
 records the subsequent API, cursor, audit and compatibility checks, including
 the real SDK over TLS/Raft, lost-response reconciliation and restart. The
-[runtime qualification](../../bin/verification/externaljobs-runtime-2026-09-24/qualification.json)
+[runtime qualification](../review/local-evidence.md#record-fddb88c7a25ff7d99414c9bd)
 covers strict configuration, default/all-built-in exclusion and normal startup.
-The [configuration-reference checkpoint](../../bin/verification/job-type-references-2026-09-24/result.json)
+The [configuration-reference checkpoint](../review/local-evidence.md#record-6230515b95343857e49f0f4a)
 records the subsequent storage-format, encrypted-reference, deletion, retained
 read and credential-separation checks. Its private fixtures do not qualify
 public external configuration activation or worker execution.

@@ -130,7 +130,6 @@ func TestMainCollectionAdmissionSurvivesRestartWithoutActivation(t *testing.T) {
 	}
 	assertValidatedInactive(client, id)
 	stop()
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	assertValidatedInactive(restarted, id)
 	// Reconcile the original ticket through the real Create endpoint. A retry
@@ -154,7 +153,6 @@ func TestMainCollectionAdmissionSurvivesRestartWithoutActivation(t *testing.T) {
 	}
 	assertIdentity(canceled.Data)
 	stopRestarted()
-	fixture.options.webAddr = availableLocalAddress(t)
 	afterCancel, stopAfterCancel := startMainManagement(t, fixture)
 	receipt, err := afterCancel.Operations.Get(t.Context(), id)
 	if err != nil || receipt.Data.State != "canceled" || receipt.Data.Committed == nil || *receipt.Data.Committed != 0 {

@@ -3,13 +3,97 @@
 package management
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"slices"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
+
+type runtimePreparationExtensions struct {
+	ExternalBindings []manifest.ExternalRuntimeBinding
+}
+
+// resolveRuntimeExtension selects only authenticated inert input. It does not
+// construct a local job, admit an execution, or enable public configuration.
+func (p *RuntimePreparation) resolveRuntimeExtension(ctx context.Context, resource api.Resource, record persistence.CatalogRecord, slot, category, driverType string) (any, bool, error) {
+	if driverType != "external" {
+		return nil, false, nil
+	}
+	bindings, err := externalRuntimeBindings(ctx, resource, record)
+	if err != nil {
+		return nil, true, err
+	}
+	for _, binding := range bindings {
+		if binding.Key.Slot != slot || binding.Key.JobType.Category != category {
+			continue
+		}
+		var marker any
+		switch category {
+		case "check":
+			marker = &manifest.ExternalPulseConfig{Key: binding.Key}
+		case "recovery":
+			marker = &manifest.ExternalInterventionConfig{Key: binding.Key}
+		case "notification":
+			marker = &manifest.ExternalNotificationConfig{Key: binding.Key}
+		default:
+			return nil, true, ErrValidation
+		}
+		parameters := binding.Descriptor.Parameters()
+		cost := len(parameters) + len(binding.Descriptor.CredentialProfile()) + 4096
+		clear(parameters)
+		if len(p.ExternalBindings) >= maxValidationGraph || cost > (32<<20)-p.PreparationBytes {
+			return nil, true, ErrGraphLimit
+		}
+		p.PreparationBytes += cost
+		p.ExternalBindings = append(p.ExternalBindings, binding)
+		return marker, true, nil
+	}
+	return nil, true, ErrValidation
+}
+
+// Worker markers retain exact source revisions for later admission guards.
+// Execution identity instead hashes configuration content and incarnations:
+// changing a display name or rewrapping ciphertext must not reset an incident.
+// This projection is private and contains no ciphertext, resource versions or
+// mutable JobType metadata. The separate Conditions retain the exact revisions.
+func (p RuntimePreparation) configurationRevision(ctx context.Context, resources map[persistence.CatalogKey]api.Resource, records map[persistence.CatalogKey]persistence.CatalogRecord) (string, error) {
+	if len(p.ExternalBindings) == 0 {
+		return manifest.ConfigurationRevision(p.Monitor, p.Endpoints, p.NotificationGroups)
+	}
+	hash := sha256.New()
+	_, _ = hash.Write([]byte("cpra-runtime-worker-content-v1\x00"))
+	encoder := json.NewEncoder(hash)
+	// Conditions have already been sorted by kind and ID. Retain numeric JSON
+	// values exactly; converting custom parameters to float64 loses integers.
+	for _, condition := range p.Conditions {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		resource, record := resources[condition.Key], records[condition.Key]
+		var spec any
+		decoder := json.NewDecoder(bytes.NewReader(resource.Spec))
+		decoder.UseNumber()
+		if err := decoder.Decode(&spec); err != nil {
+			return "", ErrUnavailable
+		}
+		content := struct {
+			Key      persistence.CatalogKey
+			UID      string
+			Spec     any
+			JobTypes []persistence.JobTypeReference
+		}{condition.Key, record.UID, spec, record.JobTypeReferences}
+		if err := encoder.Encode(content); err != nil {
+			return "", ErrUnavailable
+		}
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
 
 // externalRuntimeBindings converts an already authenticated Catalog.open result.
 // It performs no storage reads, schema compilation, provider calls or admission.

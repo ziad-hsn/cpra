@@ -1,0 +1,16 @@
+# Rendering fixture: names only. No Secret contents or ready-to-install credentials.
+auth:
+  existingSecret: cpra-api-v1
+manifest:
+  existingConfigMap: cpra-monitors-v1
+management:
+  enabled: true
+  policy:
+    existingSecret: cpra-policy-v1
+  encryption:
+    existingSecret: cpra-key-v1
+    previous:
+      - existingSecret: cpra-key-v0
+        key: wrapping.key
+  tls:
+    existingSecret: cpra-tls-v1

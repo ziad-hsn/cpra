@@ -57,7 +57,9 @@ class DashboardParserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'dashboard').mkdir()
-            with patch.dict(os.environ, {'NODE_OPTIONS': '--require /private/preload.js'}), \
+            caches = {name: str(root / name) for name in (
+                'GOCACHE', 'GOMODCACHE', 'GOPATH', 'npm_config_cache', 'npm_config_store_dir')}
+            with patch.dict(os.environ, {'NODE_OPTIONS': '--require /private/preload.js', **caches}), \
                  patch('sys.argv', ['dashboard_build.py']), \
                  patch.object(dashboard_build.release, 'ROOT', root), \
                  patch.object(dashboard_build.subprocess, 'check_output', side_effect=version), \
@@ -66,13 +68,18 @@ class DashboardParserTests(unittest.TestCase):
                 observed.extend(call.kwargs['env'] for call in run.call_args_list)
         self.assertGreater(len(observed), 2)
         self.assertTrue(all('NODE_OPTIONS' not in environment for environment in observed))
+        for environment in observed:
+            for name, value in caches.items():
+                self.assertEqual(environment.get(name), value, name)
 
     def test_parser_environment_excludes_ambient_execution_and_credentials(self):
+        caches = {name: '/private/' + name for name in ('GOCACHE', 'GOMODCACHE', 'GOPATH')}
         with patch.dict(os.environ, {
             'NODE_OPTIONS': '--require /private/inject.js', 'GODEBUG': 'something=1',
             'GOFLAGS': '-tags=externaljobs', 'GOWORK': '/private/go.work',
             'GOEXPERIMENT': 'something', 'GOOS': 'linux', 'GOARCH': 'amd64',
             'AWS_SECRET_ACCESS_KEY': 'must-not-be-a-build-input', 'VITE_TOKEN': 'private',
+            **caches,
         }):
             environment = parser_build.build_environment()
         for name in ('NODE_OPTIONS', 'GODEBUG', 'AWS_SECRET_ACCESS_KEY', 'VITE_TOKEN'):
@@ -82,6 +89,8 @@ class DashboardParserTests(unittest.TestCase):
         self.assertEqual(environment['GOEXPERIMENT'], '')
         self.assertEqual(environment['GOOS'], 'js')
         self.assertEqual(environment['GOARCH'], 'wasm')
+        for name, value in caches.items():
+            self.assertEqual(environment.get(name), value, name)
 
     def test_unshipped_foundation_is_not_reported_as_embedded(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(package, 'ROOT', Path(directory)):

@@ -93,7 +93,7 @@ export function CollectionExecution({ id, identity, observation, sourceNames }: 
         : availability?.state === 'pending' ? 'Resource results are pending. An operation can stop before its accepted changes finish applying.'
           : availability?.state === 'expired' ? 'Retained resource results have expired. Committed changes were not reversed.'
             : availability ? 'This server reports a result availability the dashboard cannot interpret.' : 'No application results are reported for this operation.'}</p>
-      {counts && <div aria-label="Application counts">
+      {counts && <div role="group" aria-label="Application counts">
         <p>Decided: {formatNumber(counts.processed)} · Committed changes: {formatNumber(counts.accepted)} · Already up to date: {formatNumber(counts.unchanged)}</p>
         <p>Conflicts: {formatNumber(counts.conflicts)} · Dependency blocked: {formatNumber(counts.dependencyBlocked)} · Not attempted: {formatNumber(counts.unattempted)}</p>
         <p>Controller applied: {formatNumber(counts.childApplied)} · Failed: {formatNumber(counts.childFailed)} · Superseded: {formatNumber(counts.childSuperseded)} · Restore invalidated: {formatNumber(counts.childInvalidated)} · Pending: {formatNumber(counts.childPending)}</p>

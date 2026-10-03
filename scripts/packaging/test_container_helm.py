@@ -4,18 +4,50 @@ import copy
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
+import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/packaging'))
+import live_compose
+import live_helm
 CHART = ROOT / 'charts/cpra'
 HELM = os.environ.get('HELM_BIN', 'helm')
 BASE = {'auth': {'existingSecret': 'cpra-api-v1'},
         'manifest': {'existingConfigMap': 'cpra-monitors-v1'}}
+MANAGEMENT = {'enabled': True,
+              'policy': {'existingSecret': 'cpra-policy-v1'},
+              'encryption': {'existingSecret': 'cpra-key-v1'},
+              'tls': {'existingSecret': 'cpra-tls-v1'}}
+
+
+class ComposeEvidenceContract(unittest.TestCase):
+    def test_pre_freeze_execution_cannot_become_frozen_release_evidence(self):
+        import release
+        with tempfile.TemporaryDirectory(prefix='cpra-compose-source-') as tmp:
+            manifest = release.prepare('v0.1.0-rc.1', Path(tmp), candidate=True)
+        for reader, evidence_class in ((live_compose.source_evidence, 'working_tree_container'),
+                                       (live_helm.chart_source_evidence, 'working_tree_chart')):
+            with self.subTest(evidence_class=evidence_class):
+                with self.assertRaisesRegex(ValueError, 'clean, frozen'):
+                    reader(manifest)
+                report = reader(manifest, diagnostic=True)
+                self.assertEqual(report['evidence_class'], evidence_class)
+                self.assertIs(report['release_qualified'], False)
+                self.assertIs(report['release_gate_passed'], False)
+                self.assertNotIn('release_identity', report)
+                for change in ({'candidate': False}, {'source_files': {'unapproved': {}}}):
+                    with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'candidate metadata'):
+                        reader({**manifest, **change}, diagnostic=True)
+                with self.assertRaisesRegex(ValueError, 'recipe'):
+                    reader({**manifest, 'recipe': {}}, diagnostic=True)
 
 
 def render(values=None, kube='1.35.0', succeeds=True):
@@ -51,6 +83,121 @@ class ChartContract(unittest.TestCase):
         for version in ('1.31.0', '1.37.0'):
             with self.subTest(version=version):
                 self.assertIn('kubeVersion', render(kube=version, succeeds=False))
+
+    def test_management_bootstrap_keeps_secrets_out_of_runtime_and_raft(self):
+        objects = render({**BASE, 'management': MANAGEMENT})
+        pod = kind(objects, 'StatefulSet')['spec']['template']['spec']
+        init = pod['initContainers'][0]
+        owner = pod['containers'][0]
+        self.assertEqual(init['image'], owner['image'])
+        self.assertEqual(pod['securityContext']['runAsUser'], 1001)
+        self.assertFalse(init['securityContext']['allowPrivilegeEscalation'])
+        self.assertTrue(init['securityContext']['readOnlyRootFilesystem'])
+        self.assertEqual(init['securityContext']['capabilities']['drop'], ['ALL'])
+        self.assertNotIn('state', [mount['name'] for mount in init['volumeMounts']])
+        self.assertNotIn('management-inputs', [mount['name'] for mount in owner['volumeMounts']])
+        mount = next(mount for mount in owner['volumeMounts'] if mount['name'] == 'management-bootstrap')
+        self.assertTrue(mount['readOnly'])
+        self.assertEqual(mount['subPath'], 'protected')
+        self.assertEqual(mount['mountPath'], '/etc/cpra/management')
+        volume = next(volume for volume in pod['volumes'] if volume['name'] == 'management-bootstrap')
+        self.assertEqual(volume['emptyDir'], {'medium': 'Memory', 'sizeLimit': '16Mi'})
+        projection = next(volume for volume in pod['volumes'] if volume['name'] == 'management-inputs')['projected']
+        self.assertEqual(projection['defaultMode'], 0o440)
+        self.assertEqual({source['secret']['name'] for source in projection['sources']},
+                         {'cpra-api-v1', 'cpra-policy-v1', 'cpra-key-v1', 'cpra-tls-v1'})
+        runtime = yaml.safe_load(kind(objects, 'ConfigMap')['data']['runtime.yaml'])
+        self.assertTrue(runtime['management']['enabled'])
+        self.assertEqual(runtime['management']['policy_file'], '/etc/cpra/management/policy.yaml')
+        self.assertEqual(runtime['management']['encryption']['local']['active_key_file'],
+                         '/etc/cpra/management/wrapping.key')
+        self.assertNotIn('reader_group_id', runtime['management']['tls'])
+        self.assertNotIn('policy_reader_group_id', runtime['management'])
+        self.assertFalse(any(object['kind'] == 'Secret' for object in objects))
+
+    def test_management_probes_and_test_job_use_verified_https(self):
+        objects = render({**BASE, 'management': MANAGEMENT})
+        owner = kind(objects, 'StatefulSet')['spec']['template']['spec']['containers'][0]
+        for field in ('startupProbe', 'readinessProbe', 'livenessProbe'):
+            command = owner[field]['exec']['command']
+            self.assertEqual(command[:1], ['/usr/local/bin/cpractl'])
+            self.assertEqual(command[command.index('--server') + 1], 'https://127.0.0.1:8060')
+            self.assertEqual(command[command.index('--ca-file') + 1], '/etc/cpra/management/ca.crt')
+            self.assertEqual(command[command.index('--token-file') + 1], '/etc/cpra/management/read-token')
+            self.assertNotIn('--allow-insecure-http', command)
+        services = [object for object in objects if object['kind'] == 'Service']
+        self.assertTrue(all(service['spec']['ports'][0]['name'] == 'https' for service in services))
+        job = kind(objects, 'Job')['spec']['template']['spec']
+        args = job['containers'][0]['args']
+        self.assertEqual(args[0], 'ready')
+        self.assertEqual(args[args.index('--server') + 1], 'https://contract-cpra.default.svc:8060')
+        self.assertIn('--ca-file', args)
+        self.assertNotIn('--allow-insecure-http', args)
+        self.assertEqual({volume['name'] for volume in job['volumes']}, {'auth', 'ca'})
+        ca = next(volume for volume in job['volumes'] if volume['name'] == 'ca')['secret']
+        self.assertEqual(ca['items'], [{'key': 'ca.crt', 'path': 'ca.crt'}])
+
+    def test_management_requires_complete_references_and_durable_api(self):
+        invalid = [
+            {**BASE, 'management': {'enabled': True}},
+            {**BASE, 'api': {'enabled': False}, 'management': MANAGEMENT},
+            {**BASE, 'storage': {'mode': 'memory'}, 'persistence': {'enabled': False}, 'management': MANAGEMENT},
+            {**BASE, 'management': {**MANAGEMENT, 'enabled': False}},
+            {**BASE, 'management': {**MANAGEMENT, 'token': 'literal-credentials-are-forbidden'}},
+            {**BASE, 'management': {**MANAGEMENT, 'tls': {'existingSecret': 'cpra-tls-v1', 'keys': {'privateKey': '../escape'}}}},
+            {**BASE, 'management': MANAGEMENT, 'ingress': {'enabled': True, 'host': 'cpra.example', 'tlsSecret': 'ingress-v1'}},
+        ]
+        for values in invalid:
+            with self.subTest(values=values):
+                render(values, succeeds=False)
+
+    def test_management_previous_keys_are_bounded_and_keep_original_sources(self):
+        previous = [{'existingSecret': 'cpra-key-v0', 'key': 'wrapping.key'}]
+        management = {**MANAGEMENT, 'encryption': {**MANAGEMENT['encryption'], 'previous': previous}}
+        objects = render({**BASE, 'management': management})
+        runtime = yaml.safe_load(kind(objects, 'ConfigMap')['data']['runtime.yaml'])
+        self.assertEqual(runtime['management']['encryption']['local']['previous_key_files'],
+                         ['/etc/cpra/management/previous/0.key'])
+        pod = kind(objects, 'StatefulSet')['spec']['template']['spec']
+        projection = next(volume for volume in pod['volumes'] if volume['name'] == 'management-inputs')['projected']
+        self.assertIn({'secret': {'name': 'cpra-key-v0', 'items': [{'key': 'wrapping.key', 'path': 'previous/0.key'}]}},
+                      projection['sources'])
+        for keys in (previous * 2, [{'existingSecret': 'cpra-key-v1', 'key': 'wrapping.key'}],
+                     [{'existingSecret': 'cpra-key-' + str(n), 'key': 'wrapping.key'} for n in range(33)]):
+            with self.subTest(previous=keys):
+                render({**BASE, 'management': {**MANAGEMENT, 'encryption': {**MANAGEMENT['encryption'], 'previous': keys}}}, succeeds=False)
+
+    def test_management_init_copies_projected_sources_privately_and_retries(self):
+        objects = render({**BASE, 'management': MANAGEMENT})
+        init = kind(objects, 'StatefulSet')['spec']['template']['spec']['initContainers'][0]
+        self.assertEqual(init['command'], ['/bin/sh', '-ec'])
+        with tempfile.TemporaryDirectory(prefix='cpra management files ') as temporary:
+            root = Path(temporary)
+            inputs, work = root / 'input', root / 'work'
+            inputs.mkdir(); work.mkdir()
+            payloads = {'read-token': b'read-only-fixture-token', 'policy.yaml': b'principals: []\n',
+                        'wrapping.key': bytes(range(32)), 'tls.crt': b'certificate fixture',
+                        'tls.key': b'private-key-fixture', 'ca.crt': b'CA fixture'}
+            projected = inputs / '..payload'; projected.mkdir()
+            for name, data in payloads.items():
+                (projected / name).write_bytes(data)
+                (projected / name).chmod(0o440)
+                (inputs / name).symlink_to(Path('..payload') / name)
+            script = init['args'][0].replace('/input/', shlex.quote(str(inputs)) + '/').replace('/work/', shlex.quote(str(work)) + '/')
+            for attempt in range(2):
+                if attempt:
+                    (work / 'protected').chmod(0o770)
+                    for name in payloads:
+                        (work / 'protected' / name).chmod(0o660)
+                result = subprocess.run(['/bin/sh', '-ec', script], text=True, capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(result.stdout)
+                self.assertEqual(stat.S_IMODE((work / 'protected').stat().st_mode), 0o700)
+                for name, data in payloads.items():
+                    target = work / 'protected' / name
+                    self.assertFalse(target.is_symlink())
+                    self.assertEqual(target.read_bytes(), data)
+                    self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
 
     def test_single_owner_and_retention(self):
         objs = render()
@@ -176,8 +323,11 @@ class ComposeContract(unittest.TestCase):
             token.write_text('fixture-secret-must-not-appear-in-config')
             monitors = Path(tmp) / 'monitors.yaml'
             monitors.write_text('monitors: []\n')
+            runtime = Path(tmp) / 'runtime.yaml'
+            runtime.write_text('storage: {mode: raft, directory: /var/lib/cpra}\n')
             env = {**os.environ, 'CPRA_IMAGE': 'cpra:fixture', 'CPRA_MANIFEST_FILE': str(monitors),
-                   'CPRA_TOKEN_FILE': str(token), 'CPRA_DATA_VOLUME': 'cpra-contract-data'}
+                   'CPRA_TOKEN_FILE': str(token), 'CPRA_RUNTIME_FILE': str(runtime),
+                   'CPRA_DATA_VOLUME': 'cpra-contract-data'}
             result = subprocess.run(['docker', 'compose', '-f', str(ROOT/'docker/docker-compose.yml'),
                                      'config', '--format', 'json'], env=env, text=True,
                                     capture_output=True, check=True, timeout=30)
@@ -187,6 +337,10 @@ class ComposeContract(unittest.TestCase):
             self.assertTrue(service['read_only'])
             self.assertEqual(service['ports'][0]['host_ip'], '127.0.0.1')
             self.assertEqual(config['volumes']['cpra-data']['name'], 'cpra-contract-data')
+            mount = next(x for x in service['volumes'] if x['target'] == '/etc/cpra/runtime.yaml')
+            self.assertEqual(mount['source'], str(runtime))
+            self.assertTrue(mount['read_only'])
+            self.assertFalse(mount['bind'].get('create_host_path', False))
             self.assertEqual(service['logging']['options']['max-file'], '3')
             self.assertIn('ready', service['healthcheck']['test'])
             self.assertIn('--allow-insecure-http', service['healthcheck']['test'])

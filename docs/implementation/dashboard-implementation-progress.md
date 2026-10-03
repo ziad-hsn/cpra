@@ -4,6 +4,129 @@ Updated: 2026-09-20. Local branch: `codex/dashboard-finalization`.
 Base commit: `410fbfb0092d01277b3884cd04151c27443a4226` plus preserved and ongoing
 uncommitted work. This is an implementation log, not a qualified release report.
 
+Latest release-status check: [30 September checkpoint](STATUS.md#release-checkpoint-2026-09-30).
+The opening date and base above identify the original log; later dated entries
+record subsequent source and verification boundaries.
+
+## 30 September: journal capacity across server and worker restart
+
+The [capacity campaign](../review/local-evidence.md#record-febb2e072dd75016224a10c1)
+passes all 37 separate-process scenarios on both compilers, with both child
+processes race-instrumented on Go 1.27.1. Ten new cases cover reserved/live bytes,
+actual bbolt allocation growth, and unknown actions retaining byte or record
+capacity. Outcome digests, original receipts, stopped Raft inspection and
+independent target counts establish the restart boundary. Increasing only the
+exhausted limit permits another invocation without erasing or repeating the
+original action. All 38 worker-module tests pass on each compiler.
+
+CI retains the complete process selection with a ten-minute aggregate deadline;
+the expanded race campaign takes about six minutes on this host. The existing
+SDK worker guide now points to the current evidence, with its generated source
+copy synchronized. Configured-limit correctness does not qualify sustained
+deployment load, native artifacts, providers or the full release. Independent
+review and public external configuration remain open.
+
+## 30 September: committed worker queue order
+
+Worker assignment now selects the oldest eligible committed execution across
+JobTypes and within a type. A reproduced first-poll failure demonstrated that
+the previous fixed type/ID ordering could select a newer check before an older
+recovery. The replacement retains current scope, owner, control, deadline,
+capacity and byte limits. Private tagged format 37 records the new rule while
+preserving the replay order and retained replies of earlier commands.
+
+The [checkpoint](../review/local-evidence.md#record-e6f9d5f209b055d893d0668b)
+records continuous admission, same-entry ordering, large-payload batching,
+snapshot/log replay and five forced-process-restart cases. The current release
+compiler passes 198 selected storage tests with race detection; the minimum
+compiler passes the same selection. Both pass all 27 real server/SDK-worker
+scenarios after replacing the fixture's released-port lookup with the child's
+actual bound address. The combined commands failed a newly added HTTP test's
+missing logger setup. Its corrected checks pass all four compiler/tag
+combinations, with failed attempts preserved. Default boundary, static and
+exclusion checks also pass. Sustained end-to-end load, worker-journal byte pressure,
+independent review and public configuration admission remain open. No commit or
+publication was performed.
+
+## 30 September: local wrapping-key administration
+
+`cpractl local encryption init` provisions a protected, absent local key and
+`inspect` validates an existing key and prints its non-secret identity. Both use
+explicit paths and native reader policies without contacting the API or opening
+Raft. Runtime errors and operator documentation now point to the actual command.
+The native-service fixture uses these operations, and release report validation
+requires matching creation/inspection identity.
+
+The [record](../review/local-evidence.md#record-300bff1ad214fa06eb7afeca)
+contains passing default/tagged package tests on both compilers, six CLI platform
+builds, and compiled Linux/WSL startup/restart/backup/restore using a CLI-created
+key. Seven native Windows amd64 key scenarios pass on NTFS under a protected
+user-profile directory. The AppData attempt fails its ancestor ACL policy;
+that result and the corrected Windows fixture attempts remain preserved.
+No host ACLs or persistent environment settings were changed. Service identities,
+default Windows paths, macOS execution, final packaging and independent review
+remain unqualified. No source or artifacts were published.
+
+## 30 September: file-configured agent-task recovery
+
+The [file-only checkpoint](../review/local-evidence.md#record-ea5bfad2df183d61bf0d6870)
+adds storage-level encryption selection without enabling management. It shares
+the connection payload, authenticated binding, original-task observer and unknown
+outcome policy with managed runs. Missing keys fail manifest preflight or retained
+connection verification before admission; previous wrapping keys support recovery
+after rotation. The v1 state endpoint excludes internal connection envelopes.
+
+All four compiler/tag campaigns pass 50 selected tests each, with race detection
+on Go 1.27.1 and compatibility checks on Go 1.25.0. Six new process-kill/restart
+scenarios cover both roles, changed/removed configuration, snapshots and key
+rotation. Missing/wrong-key and confidentiality assertions use actual startup,
+Raft storage and production HTTP paths against local fixtures. The failed initial
+fixture attempts remain recorded. Actual configured-agent effects, independent
+review and full release qualification remain open; no publication occurred.
+
+## 30 September: managed agent-task observation after restart
+
+Managed runs retain an encrypted original A2A connection with the committed
+start, authenticate it at startup and read only the retained task after local
+execution has stopped. Configuration replacement/removal cannot redirect that
+read. Observation preserves unknown outcomes and operator reviews; terminal
+remote state requires a later explicit review. Polling is bounded and joined
+on shutdown. See the [implementation and limits](a2a-jobs.md#reading-retained-tasks-after-restart).
+
+The [record](../review/local-evidence.md#record-6a4aabd9ccf17f9b6965a542)
+contains passing default/tagged campaigns on both compilers, corrected format
+and fixture checks, and the failed/incomplete full persistence attempt. The
+collection test interrupted by its aggregate timeout passed individually.
+At that checkpoint, file-only runs still needed encrypted connection recovery;
+the later entry above records that implementation. Configured-agent effects and independent review remain open; the
+release remains private and unqualified.
+
+## 30 September: confirmed-failure escalation and agent verification
+
+The recovery-failure notification policy is connected through manifest/API
+configuration, Raft actions/history, SDK/CLI and dashboard views. Six normal
+application startup/restart scenarios pass on both compilers in default and
+`externaljobs` builds. The early-escalation test now holds later check replies
+until agent admission, proving escalation after exactly one failed recovery;
+the earlier failing runs remain in the
+[escalation record](../review/local-evidence.md#record-6d71220e33fdd57019a7cf45).
+The passing dashboard/browser/regression checks and the browser summary-wrapper
+failure retain their separate source and execution boundaries.
+
+Configured A2A provider verification now commits intent/start/receipts/results in
+an isolated Raft store. The runner refuses existing campaign state before any
+provider operation, retains unknown outcomes, and passes action identity to a
+separate observer. Recovery requires independently observed target recovery;
+notification requires independently observed incident receipt. An agent task
+status alone cannot satisfy the observer. Example configurations remain disabled.
+
+The [provider record](../review/local-evidence.md#record-ede657ded5f96f511b411110)
+includes 20 Go tests per compiler/tag combination, extra manifest example checks,
+48 Python verification tests, and actual full-driver CLI/observer/aggregator
+execution for both roles. These are local fixtures, not deployed-agent effects.
+Post-restart remote-task authority, configured effects, independent review and
+the broader release gates remain open. No commit or publication was performed.
+
 The active delivery is the complete [dashboard management plan](dashboard-management-plan.md),
 including its [API prerequisites](api-management-plan.md). Release publication
 remains private until every gate in the [shipping plan](dashboard-shipping-plan.md)
@@ -792,7 +915,7 @@ pinned Go/Node versions, isolates ambient build settings, and records linked
 module identities from the actual Wasm executable. This is parser reproducibility,
 not the whole release source-archive gate. See
 `bin/verification/browser-import-worker/reproducibility.json` and
-[the Worker contract](../../dashboard/src/import/README.md).
+[the Worker contract](../review/source/dashboard/src/import/README.md.txt).
 
 The combined sanitized dashboard build passed TypeScript, lint, generated-schema
 checks and all **306 tests in 23 files** (16.79 seconds for the test phase).
@@ -2121,7 +2244,7 @@ that cutoff. Natural history expiry retains its existing behavior.
 | Development `cpra` / `cpractl` builds and affected-package vet | PASS |
 
 Exact commands, logs, source hashes, earlier failures and corrected reruns are in
-[`bin/verification/collection-source-retirement-2026-09-24/result.json`](../../bin/verification/collection-source-retirement-2026-09-24/result.json).
+[`bin/verification/collection-source-retirement-2026-09-24/result.json`](../review/local-evidence.md#record-e166fe715432c4e1f8c7f609).
 Initial test expectations incorrectly treated a removed issued header as a nil
 result and assumed a list cursor survived committed final retention. Both were
 corrected and rerun. An accidental collision with an existing untracked HTTP
@@ -2213,7 +2336,7 @@ internal upload fence checks the original prefix and current authority in the
 same FSM step as the next append. It does not authorize configuration changes.
 
 The [normalization record](collection-normalization.md) links its new
-[private evidence manifest](../../bin/verification/collection-normalization-2026-09-24/result.json)
+[private evidence manifest](../review/local-evidence.md#record-84c62f895d631ff4129002d1)
 and selected source hashes. Existing normalizer and temporary-spool evidence
 remain separate records, and the earlier public-activation checkpoint is
 unchanged. Final executed evidence includes the format/prefix persistence race
@@ -2253,7 +2376,7 @@ recomputes that prefix's ciphertext digest and encoded byte total. Only the
 missing normalized suffix is retained in encrypted temporary frames. Proof and
 staging do not submit durable mutations or activate configuration.
 
-The [scoped evidence manifest](../../bin/verification/collection-reselection-proof-2026-09-24/result.json)
+The [scoped evidence manifest](../review/local-evidence.md#record-a75254847e9a6c7b37e6bc73)
 records an independent combined Go 1.27 race run (11.488 s), Go 1.25 combined
 tests (11.776 s), and applicable built-in-driver proof tests (9.421 s). Native
 Raft log/snapshot close-and-reopen tests preserve the original operation and
@@ -2316,7 +2439,7 @@ Executed final checks include:
   matrices and independent source review have separate linked evidence.
 
 The [runtime contract](collection-reselection-runtime.md) and
-[private checkpoint](../../bin/verification/collection-reselection-runtime-2026-09-24/result.json)
+[private checkpoint](../review/local-evidence.md#record-2de242041994c35cc00fd592)
 record source hashes, commands, failed attempts and their corrections. The
 initial TLS-report warning, ambiguous browser heading selector, obsolete staging
 test expectation, and reproduced stale-activation response failures are retained.
@@ -2377,7 +2500,7 @@ observed once each, with no validation or activation. Browser recovery requires
 token re-entry, clears private input and makes no implicit activation; explicit
 confirmation continues the original operation.
 
-The [combined checkpoint](../../bin/verification/collection-cli-reselection-2026-09-24/result.json)
+The [combined checkpoint](../review/local-evidence.md#record-ca59b6d8bcce1815a95136a0)
 records 625 selected source hashes, commands, logs, independent reviews and
 retained failures. During the native race invocation only an uncompiled backend
 test file changed; an exact `go list -race -deps -test` manifest confirms compiled
@@ -2414,7 +2537,7 @@ repository inputs remained unchanged. A default-build exclusion test added after
 compilation passed separately under race detection and is explicitly identified
 outside that compiled snapshot. Scoped default/tagged Go 1.27 and Go 1.25 checks,
 vet, and independent review also passed. The
-[performance qualification](../../bin/verification/staged-validation-performance-2026-09-24/qualification.json)
+[performance qualification](../review/local-evidence.md#record-4bbb94c843fa9efbfd1ea6f5)
 retains the original failure, profile data and final source boundaries.
 
 The `externaljobs` build now has a private JobType foundation: a dedicated
@@ -2448,7 +2571,7 @@ historical digests, schema budgets, corruption rejection and detached snapshots.
 Independent review found three preparation issues; authority checks, copied-value
 redaction and pre-marshal metadata bounds were corrected and requalified.
 
-The [private JobType checkpoint](../../bin/verification/job-type-foundation-2026-09-24/result.json)
+The [private JobType checkpoint](../review/local-evidence.md#record-e7620e8878e4111bd02b64dd)
 records 30 final affected-source hashes, commands, logs and preserved fixture
 failures. Native execution is Linux amd64 WSL. HTTP registration, runtime
 enablement, pinned monitor references, worker grants and execution remain open;
@@ -2504,7 +2627,7 @@ crosses the response byte limit and traverses two pages without losing or
 duplicating IDs. Blocked-page tests prove cancellation, revocation, expiry and
 concurrent reads preserve snapshot ownership and resource accounting.
 
-The [combined private checkpoint](../../bin/verification/job-type-http-2026-09-24/result.json)
+The [combined private checkpoint](../review/local-evidence.md#record-c42d0e762f3bfd4a68cbd05f)
 records 38 final affected-source hashes, commands, logs and independent review.
 Initial implementation/test fixture failures are retained. Two source captures
 included metadata for dependency tests that were not compiled into their tested
@@ -2549,7 +2672,7 @@ subsequent successful deletion.
 | Worker exclusion, both compilers | PASS; default and all-built-in builds reject tagged symbols; route, schema and CLI checks pass |
 | Affected vet, release Python tests and CI actionlint | PASS; 31 Python tests |
 
-The [private checkpoint](../../bin/verification/worker-policy-2026-09-24/result.json)
+The [private checkpoint](../review/local-evidence.md#record-ca34842fb9b20113939b486f)
 records commands, logs, source hashes, review and the preserved intermediate
 fixture failure. Verification uses native Linux amd64 WSL execution. The new CI
 steps are locally validated; a remote workflow run is not claimed. The
@@ -2578,7 +2701,7 @@ empty fields when enforcing older storage formats. Empty format-18 tombstones
 retain their format requirement without retaining an active dependency.
 Historical operation digest fixtures remain unchanged.
 
-The [private reference checkpoint](../../bin/verification/job-type-references-2026-09-24/result.json)
+The [private reference checkpoint](../review/local-evidence.md#record-6230515b95343857e49f0f4a)
 records scoped persistence, management, SDK/server regression, race, Go 1.25,
 vet and build-exclusion results. Independent review covered reference lifetime,
 credential separation, atomic deletion, retained pages and raw-format gates.
@@ -2625,7 +2748,7 @@ records or replacing the wrapping key.
 Review also fixed a stale flush-inventory race that could overwrite a newly
 saved handler outcome, expiry-renewal validation, duplicate-lease validation,
 escaped-identity reservation accounting and request-body deadline enforcement.
-The [checkpoint](../../bin/verification/worker-sessions-2026-09-24/result.json)
+The [checkpoint](../review/local-evidence.md#record-e9578c2b25a58ad474677365)
 links exact source manifests and completed Go 1.27.1 race, Go 1.25, generation,
 build-exclusion, SDK/example and tooling checks. Independent source reviews
 cover the HTTP, SDK, worker and persistence boundaries.
@@ -2669,7 +2792,7 @@ generic nil-slot compaction defect in JobStorage.Copy is corrected. Ordinary
 preparation and public configuration validation continue rejecting unsupported
 external execution.
 
-The [admission checkpoint](../../bin/verification/worker-admission-2026-09-24/result.json)
+The [admission checkpoint](../review/local-evidence.md#record-9a233417141c5b303c2be4d1)
 links focused Go 1.27.1 race and Go 1.25 storage/management checks, controller and
 schema checks, compiler exclusion probes, and the exact selected source hashes.
 Storage replay tests exercise actual Raft logs and completed snapshots followed
@@ -2699,7 +2822,7 @@ contract, including expired and previous-owner records. The private TLS adapter
 uses the actual SDK and Raft path for offer replay, pending/granted reconciliation
 and lost Start replies. Public route registration and controller dispatch remain
 closed. See [implementation details](worker-offers-and-start.md) and the
-[verification checkpoint](../../bin/verification/worker-offers-2026-09-24/result.json).
+[verification checkpoint](../review/local-evidence.md#record-d164d4ba0cf3121f2cc39063).
 
 Ticket 8 remains active. Heartbeats, authenticated result commits/receipts, late
 evidence, expiry/noData finalization, active dispatch and separate-process runner
@@ -2743,3 +2866,908 @@ records both roles, failure-versus-unknown handling, bounded task correlation,
 authorization and operator-control requirements, and integration/verification
 work. Protocol and build-placement decisions remain open. This is a planning
 addition only; implementation remains paused.
+
+### 2026-09-27 — Release audit and pending collection-result polling
+
+The source through `fd2169c` is now in `main` through merge commit `b293f34`
+(PR #21), with identical source trees. The current remaining-work inventory is
+in the [release checkpoint](STATUS.md#release-checkpoint-2026-09-30).
+
+A fresh required browser campaign passed seven cases but timed out in collection
+activation while waiting for retained execution results. Both import progress
+and operation-detail polling stopped on terminal operation state even when
+execution-result publication remained pending. Four regression cases reproduced
+that premature stop. Polling now continues for known execution states with
+pending results, without another activation request. Private input is still
+released when the operation becomes terminal. Explicit stop/resume, expired or
+unsupported observations, authorization errors, and retry delays retain their
+existing read-only boundaries.
+
+The local corrected source passed the pinned dashboard build, contract check,
+type check, lint, 497 tests in 32 files, asset freshness, and all eight required
+Chrome/TLS/Raft browser cases under Go 1.27.1 race instrumentation. The browser
+campaign's root package took 222.096 seconds. All 1,218 captured code and asset
+hashes remained unchanged during that campaign. Embedded index SHA-256:
+`371c6c5885fa4190bf0214a39950d085db7d7f66fa66b56765311af05272eb1d`.
+The correction and rebuilt assets are local and still require independent review
+and integration. Evidence: `bin/verification/dashboard-result-polling-2026-09-27/`.
+The initial failed browser run is preserved separately.
+
+The unchanged-source full default persistence race suite **did not complete**:
+Go reached its cumulative 20-minute package timeout after 466 top-level tests
+passed and one subprocess helper skipped. The active test had just started;
+there was no recorded assertion failure before timeout. This is not a full
+package pass. The evidence records the 1,652 unchanged tracked inputs, raw test
+output and separate inner-Go timeout diagnosis at
+`bin/verification/persistence-release-2026-09-27/`.
+
+The physical-host scale preflight also failed: approximately 7.9 GiB free on C:
+versus the 30 GiB minimum plus the harness's 5 GiB fixture reserve. No large
+campaign was started. No SDK/worker tags were present in the remote tag listing.
+No release, tag, image, chart or documentation publication was performed.
+
+### 2026-09-27 — Private worker result commits and receipts
+
+Tagged storage format 22 now commits the original encrypted worker report,
+receipt and check/action transition together. Authenticated ingress derives the
+contract from the original retained grant and immutable JobType. Current rotated
+credentials can deliver original work without new-work grants; revoked principals
+and stale credentials cannot read or mutate it. Identical reports return the
+original receipt/ciphertext, and conflicting reports leave both unchanged.
+Completed Start/reconciliation returns a terminal receipt rather than another
+execution grant. Unknown actions remain held, and missing checks preserve the
+last observed health without inventing execution latency.
+
+The real SDK/TLS/Raft adapter tests cover replay, conflicts, loss of a committed
+reply, snapshot/log restart, identity/schema rejection, bounded bodies and stalled
+read cleanup. Nine forced-process-termination cases cover check, recovery and
+notification state before result commit, after commit and after snapshot. They
+exercise the server persistence transition, not full worker-library execution.
+Encrypted-result startup verification checks the original contract and digest;
+cancellation remains retryable. Two new regressions caught and corrected altered
+receipt acceptance during snapshot validation and malformed worker-identity error
+classification.
+
+The exact selected worker/JobType/startup suite passed with Go 1.27.1 race
+instrumentation (136 top-level tests, one subprocess-helper skip; 120.189 seconds
+including build/package scheduling) and Go 1.25.0 (71.922 seconds). Default-build
+boundary checks, vet, the full default SDK suite, tagged SDK race suite and tagged
+worker race suite passed. The build-exclusion campaign completed 217 checks,
+including positive tagged consumers and exact negative compilation in default
+and all-built-in-driver builds. Source hashes remained unchanged throughout these
+checks. Canonical documentation checks passed across 138 pages. Evidence and
+command inventories: `bin/verification/worker-results-2026-09-27/result.json`.
+
+Result storage has a separate 256 KiB encoded slot for each of the existing 4,096
+execution reservations: at most 1 GiB additional encoded retention, without
+preallocation. This prevents a full intent namespace from losing an admitted
+completion. It is not a measured heap/RSS limit. Large retained outcomes now
+participate in the existing 4 MiB traversal limit. Terminal retirement and
+capacity measurements remain necessary before production execution opens.
+
+The [result contract](worker-result-receipts.md) records the implemented boundary.
+Ticket 8 remains active: heartbeat, late evidence, expiry/retention, missing-check
+SLO accounting, long polling, public external configuration, controller dispatch,
+worker observations and complete separate-process runner/server interoperability
+remain unfinished. Production execution routes remain absent. The changes are
+local and independent review remains pending; no source/artifact publication or
+full release qualification is claimed.
+
+### 2026-09-27 — Private worker heartbeats and append-only evidence
+
+Tagged storage format 23 now retains cooperative heartbeat decisions and encrypted
+late evidence. Heartbeats recheck the original execution, owner, configuration,
+controls, deadline and current authorization. They grant neither another invocation
+nor more time. A committed negative decision cannot revive that grant. Acknowledge
+does not interrupt work; dismissal concerns notification for the exact incident.
+
+Late evidence binds to the original unknown-action or noData-check receipt. An
+identical evidence ID/content replays its first receipt; conflicting content under
+that ID is rejected. New records preserve the original result, health, action and
+operator review. Startup verifies their encrypted content and original schema.
+Eight records per execution and a separate 64 MiB encoded namespace bound retention
+without consuming the original-result reservation. Recovery includes evidence
+within existing 4 MiB pages. Filling the evidence store blocks new records while
+preserving identical receipt replay. These are accounting limits, not measured
+memory limits or fleet-capacity evidence.
+
+The SDK/TLS/Raft tests cover check, recovery and notification adapters, restart,
+snapshot recovery, duplicate/conflicting evidence, credential rotation and
+revocation, unchanged operator reviews and stalled request cleanup. Twelve new
+process-kill cases cover each category after heartbeat commit, before evidence
+commit, after evidence commit and after snapshot. The nine earlier result-commit
+crash cases remain. These exercise committed persistence and HTTP adapters; they
+do not count actual handler invocations through production dispatch and
+`worker.Run`.
+
+The selected worker, JobType, command-validation and startup tests passed with
+Go 1.27.1 race instrumentation (159 top-level passes, one subprocess-helper skip;
+161.599 seconds including build/package scheduling) and Go 1.25.0 (159 passes,
+the same helper skip; 102.541 seconds). Thirteen selected default-build boundary
+tests, tagged vet and the three exclusion-oracle tests passed. The 1,059 captured
+Go/module/exclusion-tool inputs remained unchanged throughout the checks. Initial
+HTTP fixture failures were corrected to use Go 1.25-compatible field assignment,
+the original notification conditions and the required JSON content type; the
+passing reruns use those corrected fixtures.
+
+The build-exclusion campaign passed 262 checks, including positive tagged
+consumers and exact negative compilation in default and all-built-in-driver
+builds. A temporary wrapper initially replaced its detailed report with command
+metadata; the successful command record was retained and that campaign was rerun
+with separate output paths. The detailed report is now preserved. Canonical
+documentation checks passed across 139 pages with zero errors.
+
+Evidence: `bin/verification/worker-lifecycle-2026-09-27/result.json`. The
+[heartbeat and evidence contract](worker-heartbeats-and-evidence.md) describes
+the implemented scope. Production execution routes remain absent. Automatic
+expiry/noData finalization, missing-check SLO accounting, terminal retention,
+bounded long polling, worker observations, public external configuration,
+controller dispatch and complete separate-process runner/server qualification
+remain unfinished. Independent review is pending. No source or release artifact
+was published by this checkpoint.
+
+### 2026-09-28 — Automatic worker execution finalization
+
+Tagged format 24 adds an owner-fenced server finalization separate from worker
+results. The Store's existing maintenance loop processes at most 128 due records
+per pass when external jobs are explicitly enabled, bounded further by the commit
+batch size and a one-second context. Metadata selection releases read locks before
+Raft submission. Stopped administrative opens and default builds do not run it.
+
+Expired checks durably record missing/timeout classification and advance only
+the original generation/schedule watermark. Observed health, incidents, recovery
+verification and success/failure counters remain unchanged. Unstarted actions
+are canceled without claiming a provider effect or incrementing attempts;
+started actions remain held unknown. Result/finalizer races preserve whichever
+terminal record committed first. Late results return that receipt; separate late
+evidence can be retained without replacing it or an operator review.
+
+The finalization record uses the execution's already-reserved result capacity
+and is included in bounded recovery pages. The ordinary result and server
+finalization cannot coexist. Snapshot validation checks identities, reason, times,
+receipt, commit position and lifecycle relationships. Review found ambiguous
+slash-delimited receipt identity fields; the corrected encoding uses separators
+that identifiers cannot contain, with a regression covering two valid identity
+pairs in the same Raft batch.
+
+Focused tests passed for queued, offered and started work in all three categories,
+bounded passes, original-owner fencing, races, unchanged health/reviews and
+snapshot corruption. The SDK/TLS/Raft tests wait for the actual maintenance timer,
+then verify late evidence and original receipts across snapshot/restart. Nine
+additional process-kill cases cover before finalization, after its commit and
+after snapshot. The complete selected suite retains the earlier 21 process-kill
+cases. These tests qualify persistence and adapters, not actual provider-handler
+invocations through production dispatch and the complete worker runner.
+
+The initial receipt-encoding checks are preserved in
+`bin/verification/worker-finalization-2026-09-27-initial/`. The corrected source and
+final command reports are recorded separately in
+`bin/verification/worker-finalization-2026-09-27/`. See the
+[finalization contract](worker-finalization.md) for the implemented boundary.
+The corrected source passed 167 top-level tests with Go 1.27.1 race detection
+(175.425 seconds) and Go 1.25.0 (122.066 seconds), with one subprocess-helper
+skip in each parent run. All 30 process-kill subcases passed in both runs.
+The 13 default-build boundary tests, tagged vet, 277 build-exclusion checks and
+three exclusion-verifier tests passed. The final source inventory and hashes
+match all 1,062 recorded inputs. The
+[verification record](../review/local-evidence.md#record-98eeb241be203167d57a10ec)
+preserves commands and scope; no full-suite or worker-runner pass is implied.
+Aggregate SLO integration, controller dispatch/projection, terminal retention and
+eligible requeue, bounded long polling, worker observations, public external
+configuration and complete runner/server qualification remain unfinished.
+Independent review and broader release gates remain open. No source or release
+artifact was published.
+
+
+### 2026-09-28 — Committed worker monitor projection
+
+Worker Start, Result and automatic finalization now publish committed monitor
+changes through the existing bounded owner stream. This includes healthy results
+and missing-check watermarks when incident/control versions stay unchanged.
+Transitions that already publish a control hint are not doubled, and duplicate
+terminal reports publish no new hint. No worker handler or Raft goroutine writes
+Ark components.
+
+The owner reads current committed state and applies its existing incarnation and
+revision guards before changing ECS state, action scheduling or the dashboard
+index. A failed contextual read can be retried without repeating a health
+transition or adding an SLO sample. A rebuilt snapshot includes monitors named by
+the bounded retained execution namespace, so an expired cursor or restart cannot
+omit a healthy external monitor with its initial controls. This adds no persisted
+fields, command variants or public extension API; storage format remains 24 in
+tagged builds and 14 in default builds.
+
+Focused publisher tests cover results, missing outcomes, starts, unstarted
+cancellations, unknown actions, duplicates, immutable views, cursor invalidation
+and canceled index rebuild. Owner tests cover committed health without a changed
+control version, foreign incarnations and canceled reads. All thirty existing
+native process-kill cases now require the recovered monitor in the owner snapshot.
+These are persistence/owner boundary checks; they do not invoke an actual remote
+handler through the unfinished production dispatcher.
+
+Qualification commands and frozen source inputs are retained in
+the [projection verification record](../review/local-evidence.md#record-45369ee4f7bd29caa022ed4f).
+The selected suite passed 198 top-level tests with Go 1.27.1 race instrumentation
+(193.295 seconds) and Go 1.25.0 (142.375 seconds), with one subprocess-helper skip
+in each parent run. The 41 default-build tests, tagged vet, 277 build-exclusion
+checks and three verifier tests also passed. The source inventory and hashes
+match all 1,065 recorded inputs. Documentation checks cover 140 pages with no
+reported errors. These selected checks are not a full persistence/package suite.
+Independent review remains open.
+Aggregate external SLOs remain unfinished: the existing result `RecordedAt` comes
+from before Raft submission and is not a measured commit completion. The next
+implementation must capture confirmation after commit, retain idempotent
+measurement identities and report interrupted measurement coverage honestly.
+Remote grant time cannot supply a remote execution-start percentile.
+
+Remote admission and pending-execution tracking, terminal retention/requeue,
+bounded long polling, worker observations, public external configuration and
+complete runner/server interoperability remain required. No source or release
+artifact was published by this checkpoint.
+
+
+### 2026-09-28 — External-check result latency and SLO accounting
+
+Tagged format 25 adds a bounded aggregate for admitted external health checks and
+receipt-bound confirmation measurements. The result target is frozen at admission;
+its window identity changes when that target changes, including multiple changes
+inside one Raft batch. A check cannot be credited to a different target window.
+The controller's local SLO recorder and capacity feedback remain separate.
+
+The server captures confirmation after the original result commit and persists
+that timing separately. A duplicate delivery preserves the original receipt and
+cannot add a sample or manufacture a replacement measurement. A crash between the
+two commits leaves a known result with missing timing. Missing/noData checks,
+measured failures and deadline timeouts remain in their appropriate counters;
+pending checks become overdue after the complete scheduling bucket and target.
+Queue and remote handler-execution timing remain unavailable.
+
+The existing API, SDK and Prometheus paths expose the result distribution, exact
+threshold counts and availability. The dashboard now recognizes unavailable timing
+and no longer attributes every coverage gap solely to startup or recovery. A
+component regression keeps available result timing beside unavailable queue and
+execution values. See the [measurement and storage contract](worker-slo.md).
+
+The first broad race run found two snapshot tests still asserting pre-SLO format
+numbers. Its source inventory and failure output are preserved in
+`bin/verification/worker-slo-2026-09-28-initial/`. The updated cases check format 25,
+and a separate historical-admission case retains format-20 snapshot coverage.
+Default builds reject the new command/image fields and retain format 14.
+
+Scoped qualification is recorded in
+`bin/verification/worker-slo-2026-09-28/result.json`:
+
+| Check | Result |
+| --- | --- |
+| Go 1.27.1 selected worker, command, projection and SLO tests with race detection | 213 passed; one subprocess-helper skip |
+| Go 1.25.0 selected compatibility tests | 213 passed; one subprocess-helper skip |
+| Native process-kill boundaries within both selected suites | 36 passed per suite |
+| Default-build boundaries / SLO-window race tests | 46 / 6 passed |
+| Tagged vet / build exclusion / release-tool tests | Passed / 286 checks passed / 31 passed |
+| Pinned dashboard build, type checks, lint, generated API contract and asset freshness | Passed |
+| Dashboard component and transport tests | 498 passed |
+| Required embedded-browser campaign with Go race detection | All eight passed; no skips |
+
+The recorded 1,070 Go/module inputs, 24 release-tool inputs and 120 frontend
+inputs stayed unchanged during qualification. The browser campaign used the
+rebuilt embedded assets; their hashes also stayed unchanged. The first frontend
+test run failed a new assertion that expected `10.0ms` while the existing formatter
+returns `10ms`. Its failed log remains in `dashboard-tests.log`; correcting that
+expectation required no formatter change. The final complete run is recorded in
+`dashboard-build.log`. Earlier failed Go evidence remains separate.
+
+Independent review, dispatcher admission/missed-schedule and pause accounting,
+terminal retention/requeue, production route registration and complete separate
+worker-runner interoperability remain open. This checkpoint does not qualify a
+release or establish an external queue-delay guarantee.
+
+### 2026-09-28 — Worker scheduling and unstarted assignment recovery
+
+Tagged format 26 distinguishes active check/type capacity from retained receipts.
+A completed check releases its active slots so the next generation can be
+admitted. The previous receipt remains available and cannot apply another health
+observation on replay. Unknown actions retain their active capacity. Global
+retained-record and byte limits still apply; terminal-record retirement is open.
+
+Bounded maintenance requeues eligible unstarted offers and previous-owner queued
+work without changing its original identity, encrypted parameters, schedule,
+deadline or SLO admission. Old lease identities remain durably rejected, including
+when another worker receives the replacement. Started actions are never requeued.
+After eight retired offers, exhaustion finalizes without inventing execution or
+a target timeout. See the [scheduling contract](worker-scheduling.md).
+
+A new regression reproduced owner adoption before the previous retirement after
+clock rollback; the new guard rejects it. The first selected race run then
+reported six failures against unchanged inputs. Five current-format snapshot
+assertions needed format 26; their corruption/secrecy checks and historical
+admission coverage remain. The sixth exposed a concurrent Start bug: request
+timestamps could arrive at Raft out of order, rejecting a duplicate after its
+grant was committed. The correction returns the committed disposition without
+another executable grant or a backdated transition. A deterministic test covers
+offered, started, rejected, unknown and finalized states.
+
+The initial failed run is retained in
+`bin/verification/worker-scheduling-2026-09-28-initial/`. The corrected run is in
+the [partial qualification record](../review/local-evidence.md#record-ade7086c530331bcbf0ee95b):
+
+| Check | Result |
+| --- | --- |
+| Go 1.27.1 selected worker, command, projection and SLO tests with race detection | 229 passed; one subprocess-helper skip; 365.211 seconds |
+| Native process-kill boundaries within that suite | 45 passed, including nine requeue boundaries |
+| Default-build boundaries | 47 passed |
+| Tagged vet / release-tool tests | Passed / 31 passed |
+| Go 1.25 and full build-exclusion rerun | Not run; physical host disk headroom exhausted |
+
+The 1,075 Go/module inputs and 24 release-tool inputs stayed unchanged during
+the corrected checks. SDK/TLS/Raft tests completed two check generations and
+recovered both receipts through log replay and snapshots. A separate case
+completed 257 checks without exhausting the 256-active-execution per-type bound
+or deleting their original records. Tests also cover replacement workers, reused
+lease rejection, original reservation bytes, concurrent retirement commands,
+unknown-action preservation and exhausted offer limits.
+
+The 120 frontend inputs and 40 embedded asset files still match the earlier
+498-test/eight-browser-case checkpoint. No frontend rebuild or browser rerun was
+needed for these backend scheduling changes. That earlier browser evidence does
+not qualify external worker execution.
+
+Physical C: free space reached 73,883,648 bytes (about 70 MiB) after the completed
+checks. Further compiler runs are deferred; no cleanup or large campaign was
+performed. The selected passing checks do not establish minimum-compiler or full
+build-exclusion qualification for format 26. Independent review, terminal-record
+retirement, schedule/pending/missed accounting, production configuration and
+dispatch, worker observations and complete runner/server interoperability remain
+open. No source or release artifact was published.
+
+### 2026-09-28 — Monitor projection independent of retained check receipts
+
+The four persistence files changed after the scheduling checkpoint now have
+focused verification. A finalized external check is indexed from current monitor
+state and authenticated catalog references, without requiring a retained
+execution record. The regression covers healthy and no-data outcomes, initial
+controls, missing or replaced catalog incarnations, removed resources, built-in
+checks and generations that have not been observed. This is an index prerequisite
+for bounded check retention; no execution record is deleted by this change.
+
+| Check | Result |
+| --- | --- |
+| Tagged projection tests, Go 1.27.1 with race detection | 4 passed; 44.378 seconds including compilation |
+| Tagged projection tests, Go 1.25.0 | 4 passed; 23.824 seconds including compilation |
+| Related default-build projection/control tests, Go 1.27.1 with race detection | 4 passed; 32.104 seconds including compilation |
+| Formatting and diff checks | Passed |
+
+All 1,075 Go/module inputs stayed unchanged during each test command. The tests
+use the memory-store fixture and derived-index reconstruction. They do not prove
+Raft restoration after record deletion or qualify the full worker protocol.
+The [verification record](../review/local-evidence.md#record-91c5577d1b75267b89800f2c)
+preserves the commands, source hashes, raw test output and compiler-workspace
+implementation. The previous full scheduling report remains partial; this narrow
+Go 1.25 run does not replace its pending minimum-version/build-exclusion matrix.
+
+Physical C: space remained critically low, with 71,225,344 bytes free at the
+checkpoint. A temporary bounded RAM compiler workspace used the documented
+[Go cache helper protocol](https://go.dev/src/cmd/go/internal/cacheprog/cacheprog.go)
+to read existing artifacts without writing to or deleting the disk cache. New
+cache content was capped at 256 MiB; scratch usage and compiler-process RSS were
+monitored with stop limits. The highest observed scratch and process RSS were
+349,917,486 and 719,314,944 bytes respectively. Fixture paths remained under
+`/tmp`, and selected fixtures used memory storage. These are correctness checks,
+not storage, performance or endurance evidence.
+
+Record retirement must still provide an authoritative expired-execution result
+and safe handling of retained poll references. The worker currently retains its
+outbox on a missing/conflicting result; deleting a server record alone would
+strand that outcome. Unknown actions must remain retained. Production dispatch,
+the full current-source verification matrix, independent review and all other
+shipping gates remain open.
+
+### 2026-09-29 — Completed-check retention and explicit expiry
+
+Tagged format 27 now persists sequential check identities before assignment
+preparation. Retirement commits bounded batches, preserves monitor generations
+and SLO accounting, and never reuses a retired identity within the same store
+lineage. A live poll reply pins its referenced check; an expired reply is marked
+before its referenced records are removed. Unknown intervention/notification
+records and their late evidence remain retained. See the
+[retention contract](worker-check-retention.md).
+
+The private HTTP adapters return an explicit check-expiry disposition after
+authentication and server-identity validation. The tagged SDK classifies only
+that exact response. The encrypted worker journal drops only check replay records;
+generic errors and action outcomes remain held. This does not register production
+worker routes or implement controller dispatch.
+
+Initial crash assertions treated an empty map and its JSON-decoded nil value as
+different durable health. The corrected assertions compare every serialized
+monitor field and still compare SLO state. The HTTP fixture also now preserves
+its original JobType timeout. Review of retirement found an actual cleanup bug:
+late evidence on a completed check prevented retirement. Retirement now validates
+and reclaims the exact evidence charge in its atomic deletion. Tests cover both
+commit orders, snapshot validation and preserved uncertain-action evidence.
+The two-worker count test reauthenticates after policy provisioning, as a normal
+HTTP request does, rather than reusing an outdated observed policy revision.
+
+Final selected persistence/integration checks passed 240 tests on Go 1.27.1 with
+race detection and on Go 1.25.0. Each run includes 48 real process-kill cases and
+one subprocess helper skipped in its parent. All 235 tagged SDK/worker tests and
+48 default-boundary tests passed on both compilers. Tagged vet, 334 exclusion
+checks, two-root SDK regeneration, 31 release-tool tests and 27 SDK-tool tests
+passed. Generated SDK references and copied guides were refreshed. The 1,080
+Go/module inputs stayed unchanged during the final checks. Initial failed logs
+remain separate from passing evidence in
+`bin/verification/worker-check-retention-2026-09-29/`.
+
+Compiler output used a bounded RAM cache with read-only access to the existing
+disk cache; Raft and journal fixtures used ordinary temporary filesystem paths.
+Only completed task-owned RAM cache objects were removed between compiler phases.
+The host's 1.51 GiB of physical C: free space still does not satisfy the large
+campaign preflight. This change remains local and uncommitted. Independent review,
+production configuration/dispatch/routes, complete schedule accounting, worker
+observations, runner interoperability and the broader shipping gates remain open.
+
+### 2026-09-29 — Bounded polling and authenticated runtime preparation
+
+The tagged polling adapter now waits up to the requested 25 seconds outside
+mutation admission, under a global/per-worker reservation. Waiting checks
+committed authority and execution eligibility without writing an empty reply or
+reserving an assignment. Exact retries return their original reply immediately;
+cancellation, expiry, store shutdown and lost ownership end the wait. Committed
+allocation rechecks state after the availability read. See [worker polling](worker-polling.md).
+
+The final polling checkpoint passed 162 selected persistence tests and 26 worker
+HTTP tests on Go 1.27.1 with race detection. The persistence run includes 48 native
+process-kill cases and one subprocess helper skipped in its parent. Go 1.25 passed
+35 selected polling/session/offer/start tests. The HTTP coverage includes a real
+25-second empty wait through the SDK. Those reports bind the 1,083 Go/module inputs
+before the subsequent runtime conversion below; they are not evidence for later
+source changes or production route registration.
+
+Tagged runtime preparation now converts authenticated encrypted configuration
+into detached bindings and inert entity markers for all three worker categories.
+Repeated endpoints are shared, filtered destinations are omitted, and local and
+external notification positions stay aligned. Content fingerprints preserve
+display-name edits and immutable type contracts while distinguishing parameter
+changes and exact JSON integers. Admission guards still retain exact committed
+versions. Ordinary local-only fingerprints are unchanged. The
+[runtime preparation contract](worker-runtime.md) records ownership and bounds.
+
+All 24 selected runtime/reference/assignment tests passed on Go 1.27.1 with race
+detection and Go 1.25.0. Eleven default runtime/projection tests passed on both
+compilers. Tagged vet, all 340 build-exclusion checks and 31 release-tool tests
+passed. The 1,085 Go/module inputs stayed unchanged during these checks. Initial
+unsuccessful attempts remain separate in the
+[scoped report](../review/local-evidence.md#record-474ab2ba713337f08756a55d).
+
+This remains local, uncommitted work. Public external configuration, controller
+dispatch (including inline-notification identity and retry semantics), complete
+schedule accounting, production routes and shutdown admission, worker
+observations, actual worker-runner interoperability, independent review and all
+other release gates remain open. No storage format or wire schema was changed.
+
+### 2026-09-29 — Production worker HTTP and request shutdown ownership
+
+Explicitly enabled tagged servers now register Poll, Start, Heartbeat, Result
+and LateEvidence through normal startup. New work uses the controller admission
+barrier. Original results, evidence, heartbeats and reconciliation can still
+commit during controller drain. Stopping admission cancels long polls. The
+enabled listener reserves a 40-second write budget for the maximum 25-second
+poll and bounded authentication/commit work.
+
+Normal application tests provision a worker while the store is stopped, restart
+the same Raft directory, authenticate through the actual TLS listener and recover
+the original committed polling response. Production-listener tests additionally
+exercise known and uncertain outcomes for all three categories, receipt replay,
+late evidence and the full network poll wait. See [worker HTTP](worker-http.md).
+
+Review found an ownership gap after forced connection closure: a second shutdown
+could report success while a request was still preparing before its commit
+callback. A new TLS regression reproduced it. Every registered worker request
+now retains dependency ownership from entry through return. Repeated shutdown
+cannot close the store or encryption owner while that request remains active.
+The application also orders admitted completion writes before dependency closure.
+
+The corrected selected suite passed 53 tests on Go 1.27.1 with race detection
+and on Go 1.25.0, with no skips. Tagged vet and all 340 build-exclusion checks
+passed. All 1,087 recorded Go/module inputs stayed unchanged during the final
+checks. Earlier related default suites passed 17 tests on each compiler; only
+the two tagged HTTP files changed for the ownership fix. The
+[scoped report](../review/local-evidence.md#record-87b68dbb023c8247d2d76eec) preserves
+the failing regression and interrupted first exclusion attempt separately from
+passing results.
+
+CI now includes the complete worker HTTP family, runtime preparation and normal
+application startup. Its selected persistence race suite has a ten-minute
+package budget because an earlier selected run took more than five minutes.
+All 31 release-tool, 27 SDK-tool and seven documentation-tool tests passed;
+workflow syntax, copied guides and documentation checks passed.
+
+Public configuration admission and controller dispatch remain disconnected.
+Inline-notification authorization, complete scheduling/SLO accounting, worker
+observations, actual separate-process runner interoperability and independent
+review are still required. These checks do not qualify an application release
+or change the private-candidate publication rule.
+
+### 2026-09-29 — Bounded operator worker observations
+
+Explicitly enabled tagged servers now expose `GET /api/v2/external-workers`
+through management read authorization. The SDK supplies page reads and a lazy
+iterator. Provisioned workers are visible before their first poll. Session and
+capacity availability, original unknown-action receipts, outstanding Start
+grants and the last committed poll have separate meanings; no field claims
+physical handler liveness. Frozen pagination remains stable across concurrent
+polls and is bound to the reader, authorization generation, limit and expiry.
+Snapshot reservations remain charged while an expired view is actively read.
+
+The [scoped checkpoint](../review/local-evidence.md#record-d747aeae189b2c5d44d9fecf)
+records 25 selected integration checks and 238 SDK/worker tests passing on
+Go 1.27.1 with race detection and Go 1.25.0. Tagged vet, 232 negative compilation
+checks for 116 excluded symbols, two-root generation, 32 release-tool tests,
+27 SDK-tool tests and seven documentation-tool tests passed. All 1,096 recorded
+Go/module inputs remained unchanged. The report retains initial failures: a
+bounded RAM-cache exhaustion, an assertion that requested action acceptance
+without verified fencing, a stale response fixture, and a compiler-diagnostic
+oracle that did not yet recognize excluded client methods.
+
+See [worker observations](worker-status.md) for the contract. Controller dispatch,
+public external configuration, complete worker-runner interoperability and
+independent review remain open. No candidate was published.
+
+### 2026-09-29 — Controller preparation, notification pins and local pool demand
+
+The controller's startup and catalog reconciler now select the external entity
+preparer only with explicit external-job and management enablement in Raft mode.
+The owner retains inert check/recovery bindings and commits notification source
+kind, ID, incarnation and revision at their original color/endpoint positions.
+Mixed local/external destinations stay aligned. Inline sources name the monitor;
+non-dispatching colors create no notification intent. Worker parameters and
+credential-profile names remain outside the monitor policy and its Raft command.
+
+External checks no longer contribute to local pulse-worker sizing. Replacement
+updates the previous contribution, and repeated projection and snoozing preserve
+the count. The change uses the existing ownership handoff and adds no goroutine,
+provider operation or external start grant. CI now runs all tagged controller
+packages, and the exclusion verifier records the selected controller sources.
+
+The [scoped checkpoint](../review/local-evidence.md#record-ab6681e19b6cea4c39fc8984)
+records 69 tagged and 63 default tests passing on both Go 1.27.1 and Go 1.25.0;
+Go 1.27.1 used race detection. One subprocess-only helper skips in each parent
+run and is invoked by its owning tests. Default/tagged vet and 232 negative
+compilation checks for 116 symbols passed. All 1,099 recorded Go/module inputs
+remained unchanged. The new Raft restart and stale-preparation tests call no
+providers. The report also retains an initial fixture compilation error, fixed
+before the passing runs.
+
+Public external configuration remains closed. Bounded dispatch, pending-work
+reconciliation, pre-admission schedule/SLO accounting, actual separate-process
+runner interoperability and independent review remain required. This local
+checkpoint does not qualify a release.
+
+### 2026-09-29 — Bounded external assignment dispatch
+
+The [controller dispatcher](worker-dispatch.md) now connects stored external
+check, recovery and notification bindings to real committed assignments. Four
+preparation goroutines accept at most 16 requests and a charged 16 MiB metadata
+budget; remote checks use their own ready queue. Original-action/check lookup
+precedes allocation. Lost commit replies retain the same identity, time and
+ciphertext through FIFO settlement, including during shutdown. The ECS owner
+observes completion without releasing a replacement check's correlation token.
+
+Definite pre-admission misses and pauses merge with the durable admitted-check
+window into one external SLO report. Full ready/preparing-work accounting and
+durable expiry of unadmitted actions remain unfinished. Public configuration
+admission, separate-process worker/server interoperability, saturation
+qualification and independent review remain open. The
+[scoped report](../review/local-evidence.md#record-0c49e80b753b79967a16a33f)
+records verification of this local, uncommitted checkpoint.
+
+### 2026-09-29 — Unadmitted action expiry and original schedule accounting
+
+The [action-expiry transition](worker-expiry.md) commits cancellation of an
+original queued recovery or notification when its execution window expires before
+assignment admission. It creates one history event, preserves started and unknown
+actions, and cannot manufacture a confirmed provider failure. Its
+[scoped report](../review/local-evidence.md#record-a94a93fe3e551839da67cce1)
+records 250 distinct selected race-test passes, 65 minimum-compiler checks,
+23 default-boundary checks and nine native expiry process-kill cases per compiler.
+
+The subsequent [schedule-accounting change](worker-schedule-accounting.md)
+counts external checks while they are ready or preparing. One original ticket
+crosses the owner/preparer handoff; cumulative bucket watermarks reconcile
+admission and periodic checkpoints without adding a second obligation. Definite
+cancellation and shutdown count missed work, while a recovered window reports
+coverage gaps rather than assuming uncommitted observations survived.
+
+The selected release-compiler race run passed 281 tests. The Go 1.25 run passed
+71 selected tests, and default-build persistence/controller/SLO checks passed
+93 tests. The new storage-process cases kill before the checkpoint, after commit
+and after snapshot. These are storage-recovery cases; they do not execute the
+complete worker runner and production server as separate processes. The
+[schedule checkpoint](../review/local-evidence.md#record-2b3404e604e1337af5d0108a)
+retains exact source hashes, commands and unsuccessful attempts. An initial
+digest field-review guard required an explicit frozen projection for the new
+ticket; the fixed v1 digest remains unchanged. The first minimum-compiler attempt
+exhausted the task's bounded RAM cache; reclaiming completed RAM compiler output
+allowed the unchanged-source rerun to pass, without physical-cache cleanup.
+
+Public external configuration, sustained saturation/fairness, complete runner
+interoperability and independent review remain open. These changes are local
+and uncommitted, and no publication gate has been relaxed.
+
+### 2026-09-29 — Shared worker admission and quota pressure
+
+A Raft-backed regression reproduced incident-action starvation: two owner ticks
+admitted 32 health checks while the original recovery and notification remained
+queued. The owner now rotates which pipeline has first access to its shared
+preparation slots. The reverse case verifies check progress under an action
+backlog. A second regression reproduced immediate retry on the tick after a
+confirmed quota rejection.
+
+The [admission change](worker-admission.md) adds bounded JobType-incarnation
+backoff and a read of committed capacity before allocating check identities or
+sealing payloads. The Raft state machine remains the atomic admission authority.
+The new capacity tests commit 256 assignments and verify that a confirmed
+completion frees active capacity while a held unknown result does not. Temporary
+delays preserve original schedule tickets, action identities and execution
+deadlines; uncertain commits retain their existing reconciliation owner.
+
+The affected release-compiler suites passed 87 tagged controller race tests,
+18 selected persistence race tests and 63 default controller race tests. The
+Go 1.25 run passed 53 selected checks. Tagged vet passed. The
+[scoped report](../review/local-evidence.md#record-0ee7cfe1ea65fcc96293bc1d)
+also records build exclusion, source hashes and the two failing-before-fix
+regressions. Sustained global/observation-capacity pressure, actual separate
+server/worker process campaigns and independent review remain open. No public
+configuration boundary or release gate was opened.
+
+### 2026-09-29 — Worker observation capacity and expiry progress
+
+Two regression cases reproduced a shared-capacity failure: 4,096 retained owner
+observations prevented both action expiry and new preparation from entering the
+dispatcher. The owner now gives execution observations and accepted preparation
+separate bounds. At most 16 preparations, including completed results awaiting
+handoff, coexist with 4,096 observations. Cancellation and confirmed rejection
+finish before observation rotation; successful admissions keep their original
+identity until a tracking slot is available.
+
+Raft-backed controller fixtures cover expired recovery/notification actions,
+quota rejection without check-ID allocation, committed-check handoff, and
+shutdown accounting with full observation capacity. The retained observations
+represent completed checks whose records were already retired. A separate
+memory-state-machine case commits 4,096 actual execution records across 16 types,
+rejects a new type at both admission boundaries, and expires recovery, shared
+notification and inline notification without changing retained executions or
+other monitor fields. Neither fixture runs provider handlers.
+
+Go 1.27.1 race checks passed 90 tagged controller tests, 63 default controller
+tests and 20 distinct selected persistence tests. Go 1.25 passed 65 selected
+checks, including the full-record-capacity case. Tagged vet, 262 negative
+compilations for 131 excluded symbols, 32 release-tool tests and seven
+documentation-tool tests passed. The
+[scoped report](../review/local-evidence.md#record-092300638c755cddff2e1b06)
+preserves the two original failures, exact commands, source hashes and bounded
+resource measurements.
+
+Sustained saturation and repeated configuration changes, actual server/worker
+process failure campaigns, public configuration activation and independent
+review remain open. No storage format, public configuration gate or publication
+policy was changed.
+### 2026-09-29 — Worker reconfiguration preserves one execution observation
+
+Two failing regressions reproduced duplicate tracking after a monitor rename
+and retention of an obsolete token when preparation replies arrived in reverse
+order. The owner now keeps one observation per committed execution and transfers
+that slot to the current check token. Removal also updates the position of a
+moved observation. No persistent format or public configuration gate changes.
+
+Raft-backed checks cover those failures, completion followed by reuse of a moved
+slot, and 20 repeated metadata edits starting at full scalar-observation capacity.
+They preserve one original execution and count skipped scheduling obligations.
+The focused race run passed 25 tests; the full controller runs passed 94 tagged
+and 63 default tests with race detection. Another 32 selected tests passed on
+Go 1.25. The private report is
+`bin/verification/worker-reconfiguration-2026-09-29/result.json`.
+
+These tests do not run provider handlers or qualify sustained live worker load.
+Separate-process runner/server execution, independent review, and the broader
+release gates remain outstanding. The changes remain local and uncommitted.
+
+### 2026-09-29 — SDK worker and normal server process campaign
+
+`TestMainWorkerProcesses` starts normal application initialization in a separate
+test executable and builds the SDK worker-module helper independently. Production
+TLS, authentication, Raft, dispatch and runner/journal paths carry all work.
+JobTypes and worker credentials use their normal interfaces; encrypted monitor
+fixtures are installed while the server is stopped so public external resource
+admission stays closed. A local HTTP target counts each handler invocation by
+execution ID.
+
+Each category runs normal completion, interruption of the Start reply, a handler
+crash, a crash with a saved result, interruption of the result reply, and crashes
+of both server and worker. Native exit status must confirm SIGKILL at every crash
+boundary. Assertions compare original receipts, committed action state and worker
+journal records, and reject duplicate handler invocations. Unknown interventions
+and notifications retain their holds; interrupted checks produce no-data.
+
+The private [report](../review/local-evidence.md#record-9490a982f79b0dcdc2cf00b6)
+is partial. Earlier 18-case matrices passed on Go 1.25 and the release compiler,
+with race instrumentation for both executables in the latter. A stronger rerun
+failed an aggregate empty-journal assertion when a newer check was retained at
+shutdown. The corrected assertion matches each retained execution to the server;
+three repeated server-restart cases passed and identified the next check as the
+extra entry. The final complete rerun stopped before tests at the physical-disk
+safety gate. That interruption is not a test pass or a product failure.
+
+The current 27-case harness also adds three uncooperative-handler scenarios,
+two late-evidence delivery scenarios, three credential-revocation scenarios and
+one health-check outbox-capacity case. Shutdown requires visible deadline expiry,
+stopped admission and a real second-process bbolt lock rejection before SIGKILL.
+Late evidence must retain its original committed receipt after an interrupted
+reply, without changing the unknown action. Revocation requires actual HTTP 401
+rejections of polling and result delivery while preserving the known worker
+outcome. The one-record outbox limit must stop admission with no active handler;
+SLO reports and stopped-store inspection must account for later unstarted checks,
+and an outbox-only restart must deliver the saved result. These nine cases are
+written but unexecuted. CI invokes the entire suite on both test compilers;
+a current pass remains required.
+
+Sustained saturation, byte limits, unknown-action capacity, public configuration and
+independent review remain outstanding. Native release artifacts and provider
+accounts are separate qualification gates. All implementation remains local and
+uncommitted; no publication gate was opened.
+
+## macOS protected files — 29 September 2026
+
+The [macOS adapter](macos-protected-files.md) now queries native filesystem and ACL
+metadata, rejects unavailable or truncated permissions and extended grants, and
+publishes flushed files using exclusive rename. Shared key/protected-file and
+process-crash tests now select Darwin; dedicated cases cover actual ACLs,
+inherited permissions, malformed metadata and opened-file identity. Both native
+workflow matrices explicitly run the secure-configuration tests.
+
+These are local source changes. Go compilation, native macOS execution on both
+architectures, administrative backup/restore qualification and independent review
+remain pending. The linked checkpoint records the actual lightweight checks and
+keeps platform and overall release qualification false.
+
+## Packaging report outcomes — 29 September 2026
+
+A regression reproduced acceptance of a native `pass` report after deleting both
+restart observations. The publisher's packaging reader now validates required
+scenario records for all 34 reports, with the original source identity and artifact
+checks retained. Source rebuild inventories must contain all 23 unsigned payloads
+and match the final archive/program bytes; OCI rebuild inventories require matching
+content-addressed files and the reference image configuration. Native, service,
+package, source-install, Compose and Helm reports require their actual observation
+fields. Pending requirements, failed steps, contradictory identities, duplicate
+JSON fields and oversized reports reject validation.
+
+The tests use small synthetic reports and real small tar/ZIP/filesystem fixtures;
+they do not execute release artifacts or establish native/package/provider/scale
+qualification. The initial regression and subsequent test outputs are preserved in
+`bin/verification/packaging-outcomes-2026-09-29/`. Source installation now reports
+its native OS/architecture. The obsolete unconditional macOS backup warning was
+removed from the harness, but native tests and the fresh-authentication restore
+step remain outstanding. Independent review, final image/chart binding, rendered
+documentation and the full aggregate release gate are still required. Publication
+remains locked and all changes remain local.
+
+## Worker process qualification and native restore — 30 September 2026
+
+The complete 27-case server/worker campaign now passes on Go 1.27.1 with both
+processes race-instrumented and on Go 1.25.0. The first resumed minimum-compiler
+run found a test observation race: a successful short-lived journal-lock probe
+could exit before its result file was read. The parent now waits for successful
+probe completion before reading the observation. The original failed run remains
+preserved. All 201 tagged SDK tests and 38 worker tests pass on each compiler.
+The [current record](../review/local-evidence.md#record-9349625d7766f4e47d5aed84)
+identifies commands, unchanged source hashes and outstanding worker limits.
+Tagged vet and the default/full-driver exclusion campaign pass. The first
+exclusion attempt timed out compiling the full-driver graph; the rerun kept the
+same assertions and used a larger compiler memory budget. Both attempts remain
+recorded.
+Sustained saturation, fairness, byte/unknown-action capacity, independent review
+and public external configuration admission remain open.
+
+The native service fixture now starts with a named operator, verified local TLS
+and a protected wrapping key. It preserves these sources through updates and
+removal, requires the restored policy to have a new authentication epoch, and
+provisions one fresh operator before reinstall/start. It then observes that
+operator and HTTP 401 rejection of the original named token and startup token.
+The packaging evidence reader rejects missing or contradictory observations of
+these boundaries. All 83 release-tool tests pass, including isolated real TLS
+requests and negative authentication/restore evidence cases.
+
+An isolated Linux/WSL foreground run using newly compiled application and CLI
+binaries passed normal restart, authenticated stopped backup/restore, fresh-access
+provisioning, both old-token rejections and unchanged protected configuration.
+Node identity was preserved. No service was installed and no provider operation
+ran. The [scoped native record](../review/local-evidence.md#record-b72041f45b5d66c793882f1b)
+keeps native supervisor and official-artifact qualification false.
+The Linux secure-configuration and local-administration packages pass 56 top-level
+tests on each compiler, with race detection on Go 1.27.1. Their subprocess helper
+skips in the parent test process; the process tests invoke it separately.
+
+The macOS protected-file test binaries cross-compile for amd64 and arm64 using
+each compiler with cgo disabled. These Darwin binaries were not executed; native
+ACL, publication, crash and administration behavior still need platform evidence.
+All source changes remain local and uncommitted. Publication remains locked.
+
+## A2A transport and upstream interoperability — 30 September 2026
+
+The [A2A component record](a2a-jobs.md) selects A2A 1.0 HTTP+JSON for the
+intervention and notification drivers. The transport now sends one message,
+retains bounded correlation fields, and reads only the original task. It rejects
+redirects, ambiguous JSON and task IDs that could select another operation;
+it does not replay sends, fetch agent artifacts or cancel remote work when a
+local request ends. Agent acceptance remains distinct from task completion.
+
+The separately built reference server uses upstream `a2a-go/v2` v2.6.0 over
+verified local TLS. All seven protocol scenarios and independent invocation
+counts pass with the CPRa client compiled by Go 1.25 and Go 1.27.1. Both compiler
+runs pass all 50 top-level jobs tests, including 14 A2A tests; Go 1.27.1 runs
+with race instrumentation. Vet, dependency exclusion, missing-fixture rejection
+and six private-publication policy tests pass. The new CI job selects the
+interop tests explicitly and fails on a missing fixture, but has not run on
+GitHub. The [evidence](../review/local-evidence.md#record-d99bd72ce2a4027cdfb1181a)
+records the tested source and fixture executable.
+
+A2A is not yet registered as a configurable job. Durable task references,
+controller outcomes, confirmed-failure escalation, manifest/credential schemas,
+SDK/CLI/dashboard support, real configured agent effects and independent review
+remain unfinished. No existing release gate is closed by this component alone.
+
+## A2A persisted actions and receipts — 30 September 2026
+
+The existing persistence package now records an agent execution marker before
+submission and retains task/context or message correlation with conditional
+observation sequences. A local return does not fence remote work. Configuration
+replacement retains observations on the original action, and receipt replay
+does not send another message or resolve an unknown outcome. Snapshots and
+history freeze detached copies. The implementation uses common format 31 and
+combined agent/worker format 32; default builds still reject worker state.
+
+The [storage record](../review/local-evidence.md#record-a9ec5149c084a9b33e33ba6b)
+contains passing 66-test default and 82-test tagged persistence selections on
+Go 1.25 and Go 1.27.1, with race detection on the latter. Five process-kill
+boundaries pass in each combination. All 32 default and 60 tagged controller
+systems tests pass with race detection, as do vet, 83 release-tool tests, six
+publication-policy tests, default/all-built-in worker exclusion and CGO-free
+application/CLI compilation. Failed attempts and the tested source inventory
+are retained. Two regression cases caught and corrected uncertainty being
+overridden by a completed-task receipt and agent data entering through ordinary
+configuration. The command projection and release metadata were updated for
+the new formats; old operation digests remain unchanged.
+
+This is persisted action support. A2A is still not a registered driver, and
+complete controller/transport execution, failure escalation, consumer schemas
+and forms, configured agent effects and independent review remain required.
+The other eight release areas remain open. Changes are local and uncommitted;
+publication is still locked.
+
+
+## A2A controller execution — 30 September 2026
+
+A2A intervention and notification jobs now execute through committed starts and
+invocation-local receipt writers. The driver sends one bounded incident envelope,
+commits task references before polling, retains only changed observations and
+keeps local completion separate from remote quiescence. Notification acceptance
+does not claim recovery; completed interventions enter health-check verification.
+A receipt-write cancellation regression was reproduced and corrected: the action
+stays unknown without permanently poisoning otherwise usable storage.
+
+The [execution record](../review/local-evidence.md#record-ec9b4f3323df6787d2342d3d)
+contains passing jobs/controller suites on both Go 1.25 and Go 1.27.1, with race
+detection on the latter. Each compiler/build-tag combination passes all 58 jobs
+tests and 39 default or 67 tagged controller-system tests, including six actual
+process-kill boundaries and 21 upstream SDK server TLS scenarios. The selected
+agent/local-executor persistence race suites pass 23 default and 24 tagged tests;
+vet, local CGO-free application/CLI builds and private-publication policy tests
+also pass. Source hashes are unchanged during the recorded checks. These are
+local source builds and fixtures, not qualified distribution artifacts.
+
+A2A remains absent from the public driver factory and manifest schemas.
+Credential references, confirmed-failure escalation, SDK/CLI/dashboard contracts,
+configured agent effects and independent review remain open. The existing
+33-driver public inventory is unchanged. The nine release areas remain open;
+this checkpoint advances the A2A execution work within that scope. No commit,
+push, tag or publication was performed.

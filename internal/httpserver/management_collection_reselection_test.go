@@ -69,7 +69,7 @@ func newReselectionHTTPFixture(t *testing.T) *reselectionHTTPFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base.server = New(ServerConfig{Store: base.server.cfg.Store, Management: base.catalog, ManagementAuth: auth, Reselection: manager, AuthToken: managementLegacyToken, Ready: func() bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	base.server = New(ServerConfig{Store: base.server.cfg.Store, Management: base.catalog, ManagementAuth: auth, Reselection: manager, AuthToken: managementLegacyToken, Ready: func(context.Context) bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	mux := http.NewServeMux()
 	base.server.registerAPI(mux)
 	base.server.registerMetrics(mux)

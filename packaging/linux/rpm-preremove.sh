@@ -7,5 +7,5 @@ if command -v systemctl >/dev/null 2>&1; then
     if [ -d /run/systemd/system ]; then systemctl stop cpra.service; fi
     systemctl disable cpra.service || :
 fi
-rm -f /run/cpra-package/restart
+rm -f /run/cpra-package/restart /run/cpra-package/restart-ready
 fi

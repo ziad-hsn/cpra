@@ -6,6 +6,13 @@ storage:
   batch_size: 1000
   snapshot_interval: 5m
   snapshot_retain: 3
+  # A2A file manifests require an initialized wrapping backend in Raft mode.
+  # Use one source here or under management.encryption, never both.
+  # Keep keys outside the data directory and retain previous keys for old records.
+  # encryption:
+  #   backend: local
+  #   local:
+  #     active_key_file: /etc/cpra/private/wrapping.key
 history:
   retention_days: 30
 slo:

@@ -29,7 +29,9 @@ func (s *Store) BeginLocalAction(ctx context.Context, start Command) (*LocalExec
 	if ctx == nil || start.Kind != "start" || start.ExecutorSession != "" {
 		return nil, errors.New("local action requires an unstamped start command")
 	}
-	if err := validateCommand(start); err != nil {
+	checked := start
+	checked.ExecutorSession = s.executorSession
+	if err := validateCommand(checked); err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -213,7 +215,7 @@ func (f *machine) applyExecutorCommand(c Command) Result {
 	if !ok || a.ExecutorSession != c.ExecutorSession {
 		return Result{Allowed: true}
 	}
-	if a.ExecutorKind != "local" || a.Revision != c.Revision || a.StartedAt.IsZero() {
+	if (a.ExecutorKind != "local" && a.ExecutorKind != "agent") || a.Revision != c.Revision || a.StartedAt.IsZero() {
 		return Result{Err: ErrExecutorUnfenced}
 	}
 	if !a.ExecutorFinishedAt.IsZero() {
@@ -228,5 +230,9 @@ func (f *machine) applyExecutorCommand(c Command) Result {
 	return Result{Allowed: true, Monitor: &m}
 }
 func actionExecutorFenced(a Action, session string) bool {
-	return a.ExecutorKind == "local" && a.ExecutorSession != "" && session != "" && (!a.ExecutorFinishedAt.IsZero() || a.ExecutorSession != session)
+	localStopped := a.ExecutorSession != "" && session != "" && (!a.ExecutorFinishedAt.IsZero() || a.ExecutorSession != session)
+	if a.ExecutorKind == "agent" {
+		return localStopped && a.AgentReceipt != nil && a.AgentReceipt.TaskID != "" && agentTerminal(a.AgentReceipt.State)
+	}
+	return a.ExecutorKind == "local" && localStopped
 }

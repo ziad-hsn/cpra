@@ -52,7 +52,7 @@ func (g WorkerGrant) Validate() error {
 	if !catalogIdentifier(g.JobTypeID, 256) || !catalogIdentifier(g.JobTypeUID, 256) || !jobTypeSelector(g.Version) || len(g.ResourceIDs) == 0 || len(g.ResourceIDs) > MaxWorkerGrantResources {
 		return ErrWorkerPolicyInvalid
 	}
-	if (g.Category == "check" || g.Category == "recovery") && g.ResourceKind != "Monitor" || g.Category == "notification" && g.ResourceKind != "NotificationEndpoint" || g.Category != "check" && g.Category != "recovery" && g.Category != "notification" {
+	if (g.Category == "check" || g.Category == "recovery") && g.ResourceKind != "Monitor" || g.Category == "notification" && g.ResourceKind != "NotificationEndpoint" && g.ResourceKind != "Monitor" || g.Category != "check" && g.Category != "recovery" && g.Category != "notification" {
 		return ErrWorkerPolicyInvalid
 	}
 	seen := make(map[string]bool, len(g.ResourceIDs))
@@ -63,6 +63,13 @@ func (g WorkerGrant) Validate() error {
 		seen[id] = true
 	}
 	return nil
+}
+
+func (g WorkerGrant) minimumFormat() int {
+	if g.Category == "notification" && g.ResourceKind == "Monitor" {
+		return WorkerNotificationFormatVersion
+	}
+	return WorkerPolicyFormatVersion
 }
 
 type WorkerPrincipal struct {

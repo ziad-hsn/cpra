@@ -42,8 +42,8 @@ func createReferenceJobType(t *testing.T, c *Catalog, category string) api.JobTy
 	return commitTestJobType(t, c, j, "", true)
 }
 
-// The execution adapter is still absent. This fixture exercises the encrypted
-// catalog contract directly without enabling external public admission.
+// Retained-record fixture for read authentication and historical configurations.
+// Public admission is exercised separately through Prepare and startup.
 func prepareReferenceResource(t *testing.T, c *Catalog, input api.Resource) *PreparedChange {
 	t.Helper()
 	at := time.Now().UTC()
@@ -74,9 +74,13 @@ func TestJobTypeReferencesPinContractsAndProtectDeletion(t *testing.T) {
 			job := createReferenceJobType(t, c, tc.category)
 			input := externalReferenceResource(tc.category, tc.inline)
 			if _, err := c.Prepare(t.Context(), input, "", true); !errors.Is(err, ErrValidation) {
-				t.Fatal("external runtime admitted before execution support", err)
+				t.Fatal("external runtime admitted without opt-in", err)
 			}
-			prepared := prepareReferenceResource(t, c, input)
+			c = enabledReferenceCatalog(t, c)
+			prepared, err := c.Prepare(t.Context(), input, "", true)
+			if err != nil {
+				t.Fatal("enabled external configuration rejected", err)
+			}
 			refs := prepared.mutation.Record.JobTypeReferences
 			if len(refs) != 1 || refs[0].JobTypeUID != job.Metadata.UID || refs[0].Revision != job.Metadata.ResourceVersion || refs[0].Category != tc.category {
 				t.Fatal("immutable version not pinned or duplicate references retained", refs)

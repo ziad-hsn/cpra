@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/moby/moby/api/types/container"
@@ -24,6 +26,10 @@ import (
 )
 
 var icmpPingerSem = make(chan struct{}, 2048)
+
+// ErrInterventionRejected means the provider confirmed rejection before an effect.
+// It does not cover timeouts, lost replies or partial recovery failures.
+var ErrInterventionRejected = errors.New("intervention rejected before execution")
 
 // Job defines the interface for any executable task in the system.
 type Job interface {
@@ -158,6 +164,14 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 func CreateInterventionJob(interventionSchema manifest.Intervention, jobID ecs.Entity) (Job, error) {
 	retries := interventionSchema.Retries
 	switch interventionSchema.Action {
+	case "a2a":
+		t, ok := interventionSchema.Target.(*manifest.InterventionTargetA2A)
+		if !ok || t == nil {
+			return nil, fmt.Errorf("intervention 'a2a' requires an A2A target")
+		}
+		return NewA2AJob(A2AConfig{URL: t.URL, Token: t.Token, Tenant: t.Tenant,
+			RequestTimeout: t.RequestTimeout, TaskTimeout: t.TaskTimeout, PollInterval: t.PollInterval,
+			AllowInsecureHTTP: t.AllowInsecureHTTP}, "intervention")
 	case "docker":
 		return &InterventionDockerJob{
 			ID:        uuid.New(),
@@ -293,6 +307,13 @@ func CreateCodeJob(monitor string, config manifest.CodeConfig, jobID ecs.Entity,
 	monitorClone := monitor
 
 	switch config.Notify {
+	case "a2a":
+		cfg, ok := config.Config.(*manifest.CodeNotificationA2A)
+		if !ok || cfg == nil {
+			return nil, fmt.Errorf("code notification 'a2a' requires an A2A config")
+		}
+		return NewA2AJob(A2AConfig{URL: cfg.URL, Token: cfg.Token, Tenant: cfg.Tenant,
+			RequestTimeout: cfg.RequestTimeout, TaskTimeout: cfg.Timeout, AllowInsecureHTTP: cfg.AllowInsecureHTTP}, "code")
 	case "log":
 		cfg, ok := config.Config.(*manifest.CodeNotificationLog)
 		if !ok || cfg == nil {
@@ -986,6 +1007,9 @@ func (i *InterventionDockerJob) Execute() (result Result) {
 			restartOptions.Timeout = &timeout
 		}
 		err := cli.ContainerRestart(ctx, i.Container, restartOptions)
+		if errors.Is(err, errdefs.ErrNotFound) {
+			return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("%w: docker container not found", ErrInterventionRejected), Payload: payload}
+		}
 		if err == nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: nil, Payload: payload}
 		}

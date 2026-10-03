@@ -31,6 +31,9 @@ func controllerContextReads(s *Store, m Monitor, guard *CatalogGuard, cursor Con
 			_, _, err := s.CatalogRetainedContext(ctx, CatalogKey{Kind: "Monitor", ID: m.ID})
 			return err
 		}},
+		{"incident", func(ctx context.Context) error { _, _, err := s.IncidentContext(ctx, "missing-incident"); return err }},
+		{"incident snapshot", func(ctx context.Context) error { _, err := s.IncidentSnapshotContext(ctx); return err }},
+		{"action snapshot", func(ctx context.Context) error { _, err := s.ActionSnapshotContext(ctx); return err }},
 		{"action", func(ctx context.Context) error { _, _, err := s.ActionContext(ctx, "missing-action"); return err }},
 		{"control snapshot", func(ctx context.Context) error { _, err := s.ControlSnapshotContext(ctx); return err }},
 		{"control changes", func(ctx context.Context) error { _, err := s.ControlsChangedSinceContext(ctx, cursor, 10); return err }},
@@ -85,6 +88,80 @@ func TestControllerContextReadsHonorLockDeadlines(t *testing.T) {
 		t.Fatal("owner mark did not recover", err)
 	}
 	assertObserved(t, s, m.ID, 1)
+}
+
+func TestStatusContextHonorsLockDeadlinesWithoutChangingHealth(t *testing.T) {
+	s := openCatalogMemory(t)
+	before := s.Status()
+	settings := s.ObservationConfig()
+	for _, reader := range []struct {
+		name string
+		read func(context.Context) error
+	}{
+		{"status", func(ctx context.Context) error { _, err := s.StatusContext(ctx); return err }},
+		{"configuration", func(ctx context.Context) error { _, err := s.ObservationConfigContext(ctx); return err }},
+	} {
+		for _, blocked := range []string{"store", "fsm"} {
+			t.Run(reader.name+"/"+blocked, func(t *testing.T) {
+				var release func()
+				if blocked == "store" {
+					s.mu.Lock()
+					release = s.mu.Unlock
+				} else {
+					s.fsm.mu.Lock()
+					release = s.fsm.mu.Unlock
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+				defer cancel()
+				completed := make(chan error, 1)
+				go func() { completed <- reader.read(ctx) }()
+				select {
+				case err := <-completed:
+					release()
+					if !errors.Is(err, context.DeadlineExceeded) {
+						t.Fatal("diagnostic wait lost caller deadline", err)
+					}
+				case <-time.After(time.Second):
+					release()
+					<-completed
+					t.Fatal("diagnostic wait outlived its deadline")
+				}
+				status, err := s.StatusContext(t.Context())
+				if err != nil || !reflect.DeepEqual(status, before) {
+					t.Fatal("interrupted diagnostic changed health or committed state", status, err)
+				}
+				config, err := s.ObservationConfigContext(t.Context())
+				if err != nil || config != settings {
+					t.Fatal("interrupted diagnostic changed public configuration", config, err)
+				}
+			})
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if err := reader.read(ctx); !errors.Is(err, context.Canceled) {
+			t.Fatalf("canceled %s diagnostic returned data: %v", reader.name, err)
+		}
+		if err := reader.read(nil); !errors.Is(err, context.Canceled) {
+			t.Fatalf("%s diagnostic accepted a missing context: %v", reader.name, err)
+		}
+	}
+	s.MarkUnavailable(errors.New("private-path-and-storage-failure"))
+	status, err := s.StatusContext(t.Context())
+	if err != nil || status.Ready || status.Error != "durable storage unavailable; inspect local diagnostics" {
+		t.Fatal("diagnostic lost permanent failure or exposed its details", status, err)
+	}
+}
+
+func TestUsageContextCanceledBeforeMetadataScan(t *testing.T) {
+	s := openCatalogMemory(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if usage, err := s.UsageContext(ctx); !errors.Is(err, context.Canceled) || usage.Available {
+		t.Fatal("canceled accounting fabricated available measurements", usage, err)
+	}
+	if usage, err := s.UsageContext(t.Context()); err != nil || !usage.Available {
+		t.Fatal("request cancellation prevented later accounting", usage, err)
+	}
 }
 
 func TestControllerContextAdmissionCancellationSkipsProvider(t *testing.T) {

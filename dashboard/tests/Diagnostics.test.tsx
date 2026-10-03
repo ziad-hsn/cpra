@@ -67,7 +67,7 @@ it('shows all three latency distributions, exact attainment counts and recovery 
   vi.spyOn(api, 'getState').mockResolvedValue({ storage: { mode: 'raft', ready: true, committed_index: 42, commit_latency_ms: 2.5, snapshot_duration_ms: 0 }, actions: [] });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={client}><DurableStatus /></QueryClientProvider>);
-  expect(await screen.findByText(/incomplete coverage following startup/)).toBeInTheDocument();
+  expect(await screen.findByText(/incomplete coverage because of startup/)).toBeInTheDocument();
   const table = screen.getByRole('region', { name: 'Latency distributions and attainment' });
   expect(within(table).getByRole('columnheader', { name: 'Execution p50 / p95 / p99' })).toBeInTheDocument();
   expect(table).toHaveTextContent('1,000 / 1,020');
@@ -80,6 +80,31 @@ it('shows all three latency distributions, exact attainment counts and recovery 
   const pauses = screen.getByRole('list', { name: 'Intentional monitoring pauses' });
   expect(pauses).toHaveTextContent('Not reported currently paused');
   expect(pauses).toHaveTextContent('Not reported of pause time');
+  client.clear();
+});
+
+it('shows measured external results while preserving unavailable queue and execution timing', async () => {
+  const unavailable = { p50_ms: null, p95_ms: null, p99_ms: null };
+  const data: SLOResponse = { generated: '2026-09-28T00:00:00Z', window_seconds: 300, queue_target_ms: 250, result_target_ms: 5000, coverage_complete: false,
+    reports: [{ driver: 'external', samples: 1000, expected: 1001, missed: 1, overdue: 0, pending: 2, timeouts: 0,
+      scheduling_queue: unavailable, execution: unavailable, scheduled_result: { p50_ms: 10, p95_ms: 20, p99_ms: 30 },
+      queue_met: 0, result_met: 1000, queue_attainment: null, result_attainment: 1000 / 1001, condition: 'timing_unavailable' }] };
+  vi.spyOn(api, 'getSLO').mockResolvedValue(data);
+  vi.spyOn(api, 'getState').mockResolvedValue({ storage: { mode: 'raft', ready: true, committed_index: 42, commit_latency_ms: 2.5, snapshot_duration_ms: 0 }, actions: [] });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><DurableStatus /></QueryClientProvider>);
+  const condition = await screen.findByText('Some latency measurements are unavailable');
+  const row = condition.closest('tr')!;
+  const cells = within(row).getAllByRole('cell');
+  expect(cells[1]).toHaveTextContent('1,000 / 1,001');
+  expect(cells[2]).toHaveTextContent('Unavailable / Unavailable / Unavailable');
+  expect(cells[3]).toHaveTextContent('Unavailable / Unavailable / Unavailable');
+  expect(cells[4]).toHaveTextContent('10ms / 20ms / 30ms');
+  expect(cells[5]).toHaveTextContent('Unavailable (0 met)');
+  expect(cells[6]).toHaveTextContent('99.900% (1,000 met)');
+  expect(cells[7]).toHaveTextContent('1 / 0 / 0 / 2');
+  expect(screen.getByText(/incomplete coverage/)).toHaveTextContent('unavailable timing');
+  expect(screen.queryByText('Targets met in the measured window')).not.toBeInTheDocument();
   client.clear();
 });
 

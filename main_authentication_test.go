@@ -16,7 +16,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
-func mainAuthStatus(t *testing.T, f mainManagementFixture, path, token string, basic bool) int {
+func mainAuthStatus(t *testing.T, f *mainManagementFixture, path, token string, basic bool) int {
 	t.Helper()
 	r, err := http.NewRequest("GET", "https://"+f.options.webAddr+path, nil)
 	if err != nil {

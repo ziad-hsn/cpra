@@ -141,7 +141,6 @@ func TestMainManagementRealCLIDiff(t *testing.T) {
 	}
 	assertMainPreflightUnchanged(t, client, original, created.OperationID)
 	stop()
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	assertMainPreflightUnchanged(t, restarted, original, created.OperationID)
 	stopRestarted()

@@ -22,7 +22,7 @@ const (
 	// resolution, routing, prefix ordering or allocation/work accounting change
 	// accepted configurations or validation decisions. Schema and limit changes
 	// are also hashed, but cannot identify arbitrary Go implementation changes.
-	collectionValidationPolicyVersion = 2
+	collectionValidationPolicyVersion = 5
 	collectionProfileSchemaBytes      = 1 << 20
 	collectionProfileEncodedBytes     = 64 << 10
 	collectionProfileDriverCount      = 64
@@ -107,6 +107,25 @@ func collectionValidationProfile() (collectionValidationProfileData, string, err
 	profile.Resources = slices.Clone(profile.Resources)
 	profile.Drivers = slices.Clone(profile.Drivers)
 	return profile, result.digest, err
+}
+
+func (o CatalogOptions) validationProfile() (collectionValidationProfileData, string, error) {
+	profile, digest, err := collectionValidationProfile()
+	if err != nil || !o.extendValidationProfile(&profile) {
+		return profile, digest, err
+	}
+	raw, err := encodeCollectionValidationProfile(profile)
+	if err != nil {
+		return collectionValidationProfileData{}, "", err
+	}
+	h := sha256.New()
+	_, _ = h.Write([]byte(collectionProfileHashDomain))
+	_, _ = h.Write(raw)
+	return profile, hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func (c *Catalog) collectionValidationProfile() (collectionValidationProfileData, string, error) {
+	return c.options.validationProfile()
 }
 
 // These reviewed factories allocate only zero-valued legacy configuration

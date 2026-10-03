@@ -706,6 +706,8 @@ type ClientInterface interface {
 
 	// ListWorkers ListWorkers
 	//
+	// Operator-authenticated read-only snapshot of provisioned workers, including workers that have never polled. Requires the externaljobs build tag and runtime enablement. Worker credentials cannot read this operator endpoint. Pages retain one snapshot for five minutes with limits 100 by default and 500 maximum; filters are not implemented and fail explicitly. Counts describe committed protocol state, not worker-local journal or process telemetry.
+	//
 	// Corresponds with GET /api/v2/external-workers (the `ListWorkers` operationId).
 	ListWorkers(ctx context.Context, params *ListWorkersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1650,6 +1652,8 @@ func (c *Client) GetCapabilities(ctx context.Context, reqEditors ...RequestEdito
 }
 
 // ListWorkers ListWorkers
+//
+// Operator-authenticated read-only snapshot of provisioned workers, including workers that have never polled. Requires the externaljobs build tag and runtime enablement. Worker credentials cannot read this operator endpoint. Pages retain one snapshot for five minutes with limits 100 by default and 500 maximum; filters are not implemented and fail explicitly. Counts describe committed protocol state, not worker-local journal or process telemetry.
 //
 // Corresponds with GET /api/v2/external-workers (the `ListWorkers` operationId).
 func (c *Client) ListWorkers(ctx context.Context, params *ListWorkersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7825,6 +7829,8 @@ type ClientWithResponsesInterface interface {
 
 	// ListWorkersWithResponse ListWorkers
 	//
+	// Operator-authenticated read-only snapshot of provisioned workers, including workers that have never polled. Requires the externaljobs build tag and runtime enablement. Worker credentials cannot read this operator endpoint. Pages retain one snapshot for five minutes with limits 100 by default and 500 maximum; filters are not implemented and fail explicitly. Counts describe committed protocol state, not worker-local journal or process telemetry.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v2/external-workers (the `ListWorkers` operationId).
@@ -9360,6 +9366,8 @@ type WorkerResultResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *externalRef0.Receipt
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *externalRef0.Problem
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *externalRef0.Problem
 }
@@ -9367,6 +9375,11 @@ type WorkerResultResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r WorkerResultResponse) GetJSON200() *externalRef0.Receipt {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r WorkerResultResponse) GetApplicationproblemJSON410() *externalRef0.Problem {
+	return r.ApplicationproblemJSON410
 }
 
 // GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
@@ -9408,6 +9421,8 @@ type WorkerStartResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *externalRef0.StartResponse
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *externalRef0.Problem
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *externalRef0.Problem
 }
@@ -9415,6 +9430,11 @@ type WorkerStartResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r WorkerStartResponse) GetJSON200() *externalRef0.StartResponse {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r WorkerStartResponse) GetApplicationproblemJSON410() *externalRef0.Problem {
+	return r.ApplicationproblemJSON410
 }
 
 // GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
@@ -12717,6 +12737,8 @@ func (c *ClientWithResponses) GetCapabilitiesWithResponse(ctx context.Context, r
 
 // ListWorkersWithResponse ListWorkers
 //
+// Operator-authenticated read-only snapshot of provisioned workers, including workers that have never polled. Requires the externaljobs build tag and runtime enablement. Worker credentials cannot read this operator endpoint. Pages retain one snapshot for five minutes with limits 100 by default and 500 maximum; filters are not implemented and fail explicitly. Counts describe committed protocol state, not worker-local journal or process telemetry.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v2/external-workers (the `ListWorkers` operationId).
@@ -14594,6 +14616,13 @@ func ParseWorkerResultResponse(rsp *http.Response) (*WorkerResultResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest externalRef0.Problem
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -14626,6 +14655,13 @@ func ParseWorkerStartResponse(rsp *http.Response) (*WorkerStartResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest externalRef0.Problem

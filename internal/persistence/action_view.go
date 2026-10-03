@@ -11,6 +11,18 @@ import (
 )
 
 func (a Action) Clone() Action {
+	if a.AgentConnection != nil {
+		v := a.AgentConnection.Clone()
+		a.AgentConnection = &v
+	}
+	if a.RecoveryFailure != nil {
+		v := *a.RecoveryFailure
+		a.RecoveryFailure = &v
+	}
+	if a.AgentReceipt != nil {
+		v := *a.AgentReceipt
+		a.AgentReceipt = &v
+	}
 	if a.Review != nil {
 		r := *a.Review
 		r.EvidenceRefs = append([]string(nil), r.EvidenceRefs...)
@@ -37,6 +49,14 @@ func ActionReviewRevision(a Action) string {
 	return identity("action-observation/" + string(data))
 }
 func (e Event) Clone() Event {
+	if e.RecoveryFailure != nil {
+		v := *e.RecoveryFailure
+		e.RecoveryFailure = &v
+	}
+	if e.AgentReceipt != nil {
+		v := *e.AgentReceipt
+		e.AgentReceipt = &v
+	}
 	if e.CollectionExecutionHistory != nil {
 		v := e.CollectionExecutionHistory.clone()
 		e.CollectionExecutionHistory = &v
@@ -73,13 +93,29 @@ type ActionView struct {
 }
 
 func (f *machine) rebuildActionIndexes() {
+	_ = f.rebuildActionIndexesContext(context.Background())
+}
+
+func (f *machine) rebuildActionIndexesContext(ctx context.Context) (err error) {
 	f.actionIndex = btree.NewG(32, func(a, b actionItem) bool { return a.key < b.key })
 	f.actionsByMonitor = btree.NewG(32, func(a, b actionItem) bool { return a.key < b.key })
+	defer func() {
+		if err != nil {
+			f.actionIndex, f.actionsByMonitor = nil, nil
+		}
+	}()
 	for id, m := range f.image.Monitors {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		for _, a := range m.Actions {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			f.indexAction(id, a)
 		}
 	}
+	return ctx.Err()
 }
 func (f *machine) indexAction(id string, a Action) {
 	f.actionIndex.ReplaceOrInsert(actionItem{key: a.ID, monitorID: id, action: a})
@@ -103,20 +139,30 @@ func (f *machine) updateActionIndexes(previous, m Monitor) {
 	}
 }
 func actionRecord(item actionItem, session string) ActionRecord {
-	return ActionRecord{Action: item.action.Clone(), MonitorID: item.monitorID, ReviewRevision: ActionReviewRevision(item.action), Held: item.action.Held(), ExecutorFenced: actionExecutorFenced(item.action, session)}
+	a := item.action
+	return ActionRecord{Action: a.Clone(), MonitorID: item.monitorID, ReviewRevision: ActionReviewRevision(a), Held: a.Held(), ExecutorFenced: actionExecutorFenced(a, session),
+		LocalExecutorActive: (a.ExecutorKind == "local" || a.ExecutorKind == "agent") && a.ExecutorSession == session && a.ExecutorFinishedAt.IsZero()}
 }
 func (s *Store) ActionSnapshot() (ActionView, error) {
-	if err := s.controlReadReady(); err != nil {
+	return s.ActionSnapshotContext(context.Background())
+}
+func (s *Store) ActionSnapshotContext(ctx context.Context) (ActionView, error) {
+	unlock, err := s.lockControllerState(ctx, true)
+	if err != nil {
 		return ActionView{}, err
 	}
-	s.fsm.mu.Lock()
-	defer s.fsm.mu.Unlock()
+	defer unlock()
 	f := s.fsm
 	if f.err != nil {
 		return ActionView{}, f.err
 	}
 	if f.actionIndex == nil {
-		f.rebuildActionIndexes()
+		if err := f.rebuildActionIndexesContext(ctx); err != nil {
+			return ActionView{}, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return ActionView{}, err
 	}
 	return ActionView{tree: f.actionIndex.Clone(), byMonitor: f.actionsByMonitor.Clone(), session: f.image.LocalExecutorSession, Index: f.image.Index}, nil
 }

@@ -17,12 +17,12 @@ application workflow. Provider-account and endurance gates remain separate.
 
 | Layer | Implementation and boundary |
 | --- | --- |
-| Durable logical snapshot | [`ManagementOperationSnapshot`](../../internal/persistence/management_operation_view.go) captures bounded shared ordinary receipts and owned collection metadata at the same Store/FSM/history boundary. It uses the existing operation epoch, allocation high-water mark, history watermark, retention/index generations and segment set. |
-| Terminal collection iteration | [`management_operation_history.go`](../../internal/persistence/management_operation_history.go) merges ordered primary evidence and verifies the receipt indexes. It reads metadata only. |
-| Collection detail | [`CollectionOperationAs`](../../internal/persistence/collection_operation_access.go) checks the original actor and reads detached active or retained terminal metadata. It does not decrypt inputs or load validation-result rows. |
-| Management projection | [`ManagementOperationView`](../../internal/management/management_operation_observations.go) chooses the existing ordinary or collection DTO projection. [`OperationAs`](../../internal/management/operation_access.go) preserves shared ordinary reads while restricting collection detail. |
-| HTTP | [`management_operations.go`](../../internal/httpserver/management_operations.go) enforces current access, signed cursors, response limits, detached-read capacity and retained snapshot quotas. |
-| Dashboard | [`OperationsList`](../../dashboard/src/components/OperationsList.tsx) distinguishes collections; [`OperationDetail`](../../dashboard/src/pages/OperationDetail.tsx) exposes the separate, explicit [`CollectionValidation`](../../dashboard/src/components/CollectionValidation.tsx) reader. |
+| Durable logical snapshot | [`ManagementOperationSnapshot`](../review/source/internal/persistence/management_operation_view.go.txt) captures bounded shared ordinary receipts and owned collection metadata at the same Store/FSM/history boundary. It uses the existing operation epoch, allocation high-water mark, history watermark, retention/index generations and segment set. |
+| Terminal collection iteration | [`management_operation_history.go`](../review/source/internal/persistence/management_operation_history.go.txt) merges ordered primary evidence and verifies the receipt indexes. It reads metadata only. |
+| Collection detail | [`CollectionOperationAs`](../review/source/internal/persistence/collection_operation_access.go.txt) checks the original actor and reads detached active or retained terminal metadata. It does not decrypt inputs or load validation-result rows. |
+| Management projection | [`ManagementOperationView`](../review/source/internal/management/management_operation_observations.go.txt) chooses the existing ordinary or collection DTO projection. [`OperationAs`](../review/source/internal/management/operation_access.go.txt) preserves shared ordinary reads while restricting collection detail. |
+| HTTP | [`management_operations.go`](../review/source/internal/httpserver/management_operations.go.txt) enforces current access, signed cursors, response limits, detached-read capacity and retained snapshot quotas. |
+| Dashboard | [`OperationsList`](../review/source/dashboard/src/components/OperationsList.tsx.txt) distinguishes collections; [`OperationDetail`](../review/source/dashboard/src/pages/OperationDetail.tsx.txt) exposes the separate, explicit [`CollectionValidation`](../review/source/dashboard/src/components/CollectionValidation.tsx.txt) reader. |
 
 No new Raft snapshot format or persisted list snapshot was introduced. These are
 short-lived read views, not a durable execution plan or an authorization grant.

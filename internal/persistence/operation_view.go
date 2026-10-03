@@ -49,21 +49,37 @@ func operationReceiptBytes(r OperationReceipt) int64 {
 // OperationSnapshot checks maxBytes before copying live state. The HTTP owner
 // supplies its remaining global/principal budget, and charges EstimatedBytes.
 func (s *Store) OperationSnapshot(at time.Time, maxBytes int64) (OperationView, error) {
+	return s.OperationSnapshotContext(context.Background(), at, maxBytes)
+}
+
+// OperationSnapshotContext bounds metadata and history lock waits by ctx.
+func (s *Store) OperationSnapshotContext(ctx context.Context, at time.Time, maxBytes int64) (OperationView, error) {
+	if ctx == nil {
+		return OperationView{}, ErrOperationReservation
+	}
+	if err := ctx.Err(); err != nil {
+		return OperationView{}, err
+	}
 	if maxBytes < 512 {
 		return OperationView{}, ErrOperationSnapshotQuota
 	}
 	if at.IsZero() {
 		return OperationView{}, ErrOperationReservation
 	}
-	if !s.Status().Ready {
+	unlock, err := s.lockStateContext(ctx, false)
+	if err != nil {
+		return OperationView{}, errors.Join(ErrHistoryUnavailable, err)
+	}
+	defer unlock()
+	if !s.statusLocked().Ready {
 		return OperationView{}, ErrHistoryUnavailable
 	}
-	s.fsm.mu.RLock()
-	defer s.fsm.mu.RUnlock()
 	h := s.fsm.history
-	h.mu.RLock()
+	if err := collectionReadLock(ctx, &h.mu); err != nil {
+		return OperationView{}, err
+	}
 	defer h.mu.RUnlock()
-	return s.operationSnapshotLocked(context.Background(), at, maxBytes)
+	return s.operationSnapshotLocked(ctx, at, maxBytes)
 }
 
 // operationSnapshotLocked captures ordinary receipts while the caller holds the
@@ -124,7 +140,7 @@ func (s *Store) operationSnapshotLocked(ctx context.Context, at time.Time, maxBy
 	slices.SortFunc(v.live, func(a, b OperationReceipt) int { return strings.Compare(a.ID, b.ID) })
 	return v, nil
 }
-func (v OperationView) valid() error {
+func (v OperationView) valid(ctx context.Context) error {
 	if v.store == nil {
 		return ErrOperationCursorExpired
 	}
@@ -133,13 +149,16 @@ func (v OperationView) valid() error {
 		return ErrOperationCursorExpired
 	default:
 	}
-	v.store.fsm.mu.RLock()
+	unlock, err := v.store.lockStateContext(ctx, false)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	epoch := v.store.fsm.image.OperationEpoch
-	v.store.fsm.mu.RUnlock()
 	if epoch != v.epoch {
 		return ErrOperationCursorExpired
 	}
-	if !v.store.Status().Ready {
+	if !v.store.statusLocked().Ready {
 		return ErrHistoryUnavailable
 	}
 	return nil
@@ -154,7 +173,7 @@ func (v OperationView) Page(ctx context.Context, monitorID, after string, limit 
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	if err := v.valid(); err != nil {
+	if err := v.valid(ctx); err != nil {
 		return nil, "", err
 	}
 	phase, position := "l", ""
@@ -168,7 +187,9 @@ func (v OperationView) Page(ctx context.Context, monitorID, after string, limit 
 		}
 	}
 	h := v.store.fsm.history
-	h.mu.RLock()
+	if err := collectionReadLock(ctx, &h.mu); err != nil {
+		return nil, "", err
+	}
 	defer h.mu.RUnlock()
 	return v.pageLocked(ctx, h, monitorID, phase, position, limit)
 }

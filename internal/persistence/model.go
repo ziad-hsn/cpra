@@ -1,5 +1,5 @@
 // Package persistence implements Raft storage and deterministic state transitions.
-// Runtime jobs, provider configuration, clients and ECS entity IDs never enter it.
+// Runtime jobs, plaintext provider configuration, clients and ECS entity IDs never enter it.
 package persistence
 
 import (
@@ -33,14 +33,16 @@ const (
 // Policy is deliberately an allowlist of non-secret decision inputs.
 type Policy struct {
 	policyExtensions
-	Interval       time.Duration  `json:"interval"`
-	Unhealthy      int            `json:"unhealthy"`
-	Healthy        int            `json:"healthy"`
-	Intervention   bool           `json:"intervention"`
-	Enabled        bool           `json:"enabled"`
-	Cooldown       time.Duration  `json:"cooldown"`
-	RecoveryBypass bool           `json:"recovery_bypass"`
-	Endpoints      map[string]int `json:"endpoints,omitempty"`
+	Interval             time.Duration     `json:"interval"`
+	Unhealthy            int               `json:"unhealthy"`
+	Healthy              int               `json:"healthy"`
+	Intervention         bool              `json:"intervention"`
+	Enabled              bool              `json:"enabled"`
+	Cooldown             time.Duration     `json:"cooldown"`
+	RecoveryBypass       bool              `json:"recovery_bypass"`
+	Endpoints            map[string]int    `json:"endpoints,omitempty"`
+	NotificationTriggers map[string]string `json:"notification_triggers,omitempty"`
+	RecoveryDriver       string            `json:"recovery_driver,omitempty"`
 	// Zero retains the legacy one-attempt policy; cooldown applies only to a
 	// subsequent attempt after a confirmed recovery failure.
 	RecoveryCooldown    time.Duration       `json:"recovery_cooldown,omitempty"`
@@ -49,6 +51,9 @@ type Policy struct {
 }
 
 type Action struct {
+	AgentConnection     *AgentConnection    `json:"agent_connection,omitempty"`
+	RecoveryFailure     *RecoveryFailure    `json:"recovery_failure,omitempty"`
+	AgentReceipt        *AgentReceipt       `json:"agent_receipt,omitempty"`
 	ConflictingEvidence *LateActionEvidence `json:"conflicting_evidence,omitempty"`
 	OperationID         string              `json:"operation_id,omitempty"`
 	Manual              bool                `json:"manual,omitempty"`
@@ -140,6 +145,9 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	AgentConnection      *AgentConnection          `json:"agent_connection,omitempty"`
+	AgentObservation     *AgentObservationCommand  `json:"agent_observation,omitempty"`
+	AgentReceipt         *AgentReceiptCommand      `json:"agent_receipt,omitempty"`
 	CollectionExecute    *CollectionExecuteCommand `json:"collection_execute,omitempty"`
 	Collection           *CollectionCommand        `json:"collection,omitempty"`
 	OperationAllocation  *OperationAllocation      `json:"operation_allocation,omitempty"`
@@ -175,6 +183,8 @@ type Command struct {
 }
 
 type Event struct {
+	RecoveryFailure            *RecoveryFailure             `json:"recovery_failure,omitempty"`
+	AgentReceipt               *AgentReceipt                `json:"agent_receipt,omitempty"`
 	CollectionExecutionHistory *CollectionExecutionHistory  `json:"collection_execution_history,omitempty"`
 	CollectionExecution        *CollectionExecutionSummary  `json:"collection_execution,omitempty"`
 	CollectionValidation       *CollectionValidationHistory `json:"collection_validation,omitempty"`
@@ -226,8 +236,33 @@ func validateCommand(c Command) error {
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
 	}
+	if c.Config != nil {
+		for _, a := range c.Config.Actions {
+			if a.RecoveryFailure != nil {
+				return ErrRecoveryNotificationInvalid
+			}
+			if a.ExecutorKind == "agent" || a.AgentReceipt != nil || a.AgentConnection != nil {
+				return ErrAgentActionInvalid
+			}
+		}
+	}
 	if handled, err := validateCommandExtensions(c); handled || err != nil {
 		return err
+	}
+	if c.Kind == "agent_observation" {
+		return validateAgentObservationCommand(c)
+	}
+	if c.AgentObservation != nil || c.AgentConnection != nil && (c.Kind != "start" || c.Driver != "a2a") {
+		return ErrAgentActionInvalid
+	}
+	if c.Kind == "agent_receipt" {
+		return validateAgentReceiptCommand(c)
+	}
+	if c.AgentReceipt != nil {
+		return ErrAgentReceiptInvalid
+	}
+	if c.Kind == "start" && c.Driver == "a2a" {
+		return validateAgentStart(c)
 	}
 	if c.Kind == "collection_execute" {
 		extra := c

@@ -22,7 +22,10 @@ func (c *Catalog) RequestCollectionValidation(ctx context.Context, id, actor str
 	if err := ctx.Err(); err != nil {
 		return api.Operation{}, err
 	}
-	if !c.Ready() || c.validationStopping.Load() {
+	if err := c.readyContext(ctx); err != nil {
+		return api.Operation{}, err
+	}
+	if c.validationStopping.Load() {
 		return api.Operation{}, ErrUnavailable
 	}
 	var operation api.Operation
@@ -62,7 +65,7 @@ func (c *Catalog) RequestCollectionValidation(ctx context.Context, id, actor str
 		if err != nil {
 			return err
 		}
-		_, profile, err := collectionValidationProfile()
+		_, profile, err := c.collectionValidationProfile()
 		if err != nil {
 			return err
 		}
@@ -136,7 +139,7 @@ func (c *Catalog) runCollectionValidation(ctx context.Context, id, runID string,
 	if receipt.Phase != "validating" || request == nil || request.Claim != nil || request.Interruption != nil {
 		return persistence.CollectionState{}, persistence.ErrCollectionConflict
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := c.collectionValidationProfile()
 	if err != nil {
 		return persistence.CollectionState{}, err
 	}

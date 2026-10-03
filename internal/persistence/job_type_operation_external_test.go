@@ -425,7 +425,8 @@ func TestJobTypeOperationFormatAndLegacyDigest(t *testing.T) {
 		for version := 1; version <= LatestFormatVersion+1; version++ {
 			raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 			_, err := decodeEnvelope(raw)
-			if (err == nil) != (version == JobTypeOperationFormatVersion || version == WorkerPolicyFormatVersion || version == CatalogJobTypeFormatVersion || version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion) {
+			want := version >= 16 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion
+			if (err == nil) != want {
 				t.Fatal("operation format bypass", command.Kind, version, err)
 			}
 		}

@@ -6,6 +6,10 @@ import "errors"
 
 func driverTarget(category, kind string) any {
 	switch category + "/" + kind {
+	case "recovery/a2a":
+		return &InterventionTargetA2A{}
+	case "notification/a2a":
+		return &CodeNotificationA2A{}
 	case "check/http":
 		return &PulseHTTPConfig{}
 	case "check/tcp":

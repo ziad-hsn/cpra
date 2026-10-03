@@ -2,8 +2,6 @@ package management
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -38,11 +36,14 @@ type ActionResult struct {
 }
 
 func (c *Catalog) PrepareAction(ctx context.Context, action, id string, req api.ControlRequest) (*PreparedAction, error) {
+	if ctx == nil {
+		return nil, ErrValidation
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !c.Ready() {
-		return nil, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return nil, err
 	}
 	if !validID(id) || !validControlRevision(req.Revision) || !validControlText(req.Reason) || strings.TrimSpace(req.Reason) == "" || !validControlText(req.Note) || req.Duration != "" || req.IncidentID != "" {
 		return nil, persistence.ErrControlInvalid
@@ -54,7 +55,7 @@ func (c *Catalog) PrepareAction(ctx context.Context, action, id string, req api.
 		if req.Resolution != "accepted" && req.Resolution != "rejected" && req.Resolution != "inconclusive" || !validEvidenceRefs(req.EvidenceRefs) {
 			return nil, persistence.ErrControlInvalid
 		}
-		a, ok, err := c.store.Action(id)
+		a, ok, err := c.store.ActionContext(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +107,7 @@ func validEvidenceRefs(refs []string) bool {
 // recoveryGuard reads only encrypted record identities and reference edges. A
 // rotated target or credential invalidates admission without decrypting secrets.
 func (c *Catalog) recoveryGuard(ctx context.Context, id string) (persistence.CatalogGuard, string, error) {
-	view, err := c.store.CatalogSnapshot()
+	view, err := c.store.CatalogSnapshotContext(ctx)
 	if err != nil {
 		return persistence.CatalogGuard{}, "", err
 	}
@@ -145,14 +146,14 @@ func (c *Catalog) recoveryGuard(ctx context.Context, id string) (persistence.Cat
 	return guard, uid, nil
 }
 func (c *Catalog) CommitActionAs(ctx context.Context, p *PreparedAction, actor string) (ActionResult, error) {
-	if p == nil || p.catalog != c || !p.used.CompareAndSwap(false, true) || actor == "" || len(actor) > 128 || !utf8.ValidString(actor) || strings.ContainsAny(actor, "\x00\r\n") {
+	if ctx == nil || p == nil || p.catalog != c || !p.used.CompareAndSwap(false, true) || actor == "" || len(actor) > 128 || !utf8.ValidString(actor) || strings.ContainsAny(actor, "\x00\r\n") {
 		return ActionResult{}, persistence.ErrControlInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return ActionResult{}, err
 	}
-	if !c.Ready() {
-		return ActionResult{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return ActionResult{}, err
 	}
 	var results []persistence.Result
 	var err error
@@ -172,13 +173,7 @@ func (c *Catalog) CommitActionAs(ctx context.Context, p *PreparedAction, actor s
 		results, err = c.store.Submit(ctx, []persistence.Command{p.command})
 	}
 	if err != nil {
-		if errors.Is(err, persistence.ErrCommitUnconfirmed) {
-			return ActionResult{}, fmt.Errorf("%w: %w", ErrOutcomeUnconfirmed, err)
-		}
-		if !c.store.Status().Ready {
-			return ActionResult{}, ErrUnavailable
-		}
-		return ActionResult{}, err
+		return ActionResult{}, c.submissionError(ctx, err)
 	}
 	if len(results) != 1 {
 		return ActionResult{}, ErrOutcomeUnconfirmed
@@ -200,7 +195,7 @@ func (c *Catalog) CommitActionAs(ctx context.Context, p *PreparedAction, actor s
 			return ActionResult{}, ErrOutcomeUnconfirmed
 		}
 		out.Action = actionView(persistence.ActionRecord{Action: a, MonitorID: p.command.MonitorID, ReviewRevision: persistence.ActionReviewRevision(a), Held: a.Held()})
-		current, found, err := c.store.Action(a.ID)
+		current, found, err := c.store.ActionContext(ctx, a.ID)
 		if err == nil && found && current.ReviewRevision == out.Action.ReviewRevision {
 			out.Action.ExecutorFenced = current.ExecutorFenced
 		}

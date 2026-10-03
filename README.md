@@ -190,7 +190,7 @@ does not include the nested modules; use `make sdk-check` with the source
 workspace above. Official releases keep `GOWORK=off` and require the SDK versions
 to be published first.
 
-The durable implementation is a release candidate. Full-provider verification and the one-million-monitor 24-hour endurance gate require completed evidence before a full release-readiness claim. User-configured live verification covers 33 driver types and never passes a missing configuration. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
+The implementation is still undergoing release qualification. Full-provider verification and comparative million-monitor performance require completed evidence before a full release-readiness claim. The 24-hour endurance test is outside the requested work and is not a mandatory completion gate. The current verification inventory contains 35 driver roles, including the local A2A additions. Configured A2A provider-evidence integration is still pending; missing configuration never passes. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
 
 [Provider test environments](docs/provider-testing.md) cover local services,
 notification contract mocks, the Moto EC2 emulator and optional provider sandboxes.

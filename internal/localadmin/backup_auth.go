@@ -94,6 +94,9 @@ func authenticateBackupManifest(m BackupManifest, key []byte) error {
 	if m.Version != 2 || m.StorageFormat != persistence.FormatVersion || m.NodeID == "" || m.Created.IsZero() || m.Artifact == "" || len(m.Files) == 0 {
 		return errors.New("incompatible or empty backup inventory")
 	}
+	if m.StateFormat < 0 || m.StateFormat > persistence.LatestFormatVersion {
+		return errors.New("incompatible backup state format")
+	}
 	if len(key) != 32 || m.Authentication.Algorithm != "hmac-sha256" || m.Authentication.KeyID != backupKeyID(key) {
 		return errors.New("backup manifest authentication failed")
 	}

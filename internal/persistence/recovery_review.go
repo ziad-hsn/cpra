@@ -58,10 +58,11 @@ type ActionReview struct {
 
 type ActionRecord struct {
 	Action
-	MonitorID      string
-	ReviewRevision string
-	Held           bool
-	ExecutorFenced bool
+	LocalExecutorActive bool
+	MonitorID           string
+	ReviewRevision      string
+	Held                bool
+	ExecutorFenced      bool
 }
 
 // RequestRecovery copies the deployment's limits into the committed command.

@@ -2,7 +2,10 @@
 
 Status: implementation in progress on the private local branch
 `codex/dashboard-finalization`; implementation and release gates remain open.
-Updated: 2026-09-24 (A2A remaining-work addition).
+Updated: 2026-10-01 (24-hour endurance test removed from the requested work).
+The user removed the 24-hour test from the agent's task and mandatory completion
+checks. Comparative performance and fault evidence remain separate work; this
+plan no longer requires a 24-hour run or permits an unperformed endurance claim.
 Source inspected: `/home/ziad/cpra-durable`, `codex/go-sdk`,
 `410fbfb0092d01277b3884cd04151c27443a4226`, with existing uncommitted work.
 No implementation, campaign or publication is performed by saving this plan.
@@ -23,8 +26,10 @@ native packages/services, OCI/Compose/Helm, CI, documentation and OSS release.
 API/SDK/packaging tickets remain the implementation definitions; this document
 orders them with dashboard completion and publication. Large foundation and
 campaign tickets have the explicit work packages referenced below.
-The A2A addition below is also remaining work; its implementation tickets and
-dependencies must be defined before candidate qualification.
+The A2A addition below remains open. Its [implementation contract](a2a-jobs.md)
+now includes transport, persisted receipts, controller execution, public configuration
+and consumer observations. Confirmed-failure escalation is being qualified;
+post-restart remote-task authority and configured-agent effects remain open.
 
 ## Authority and preserved decisions
 
@@ -38,7 +43,8 @@ dependencies must be defined before candidate qualification.
   package, container and chart contracts.
 - This plan owns execution order and the user's 2026-09-14 decision:
   **keep candidates private until all gates pass**. It adds no public beta
-  exception and does not waive provider, endurance, native or SDK gates.
+  exception. Provider, comparative performance, native and SDK gates remain;
+  the user's 2026-10-01 instruction removes the 24-hour endurance requirement.
 
 The implementation scope is API first, followed by SDK, CLI and dashboard
 management. Preserve existing read-only compatibility while adding authorized
@@ -62,8 +68,12 @@ command, force bypass or automatic replay of uncertain actions.
 
 ## Remaining addition: A2A agent intervention and notifications
 
-Requested on 2026-09-24. **Planned, not implemented.** Add A2A (agent-to-agent)
-integration in two roles:
+Requested on 2026-09-24. **Release qualification remains unfinished.** The
+[30 September implementation checkpoints](a2a-jobs.md) include both configured
+drivers, encrypted references, persisted task receipts and consumer observations.
+The confirmed-failure policy now has application integration tests; the current
+checkpoint records their results without claiming configured-agent effects.
+Add A2A (agent-to-agent) integration in two roles:
 
 - [ ] An intervention job type that delegates a configured investigation or
   recovery task to an external agent, with explicit limits on authorized actions.
@@ -640,9 +650,11 @@ qualified as it will ship; publishing an RC first does not authorize changing
 the application from RC dependencies to stable dependencies after the campaign.
 Commit the selected dependency declarations and genuinely computed checksums
 before the source freeze. Use canonical Go module ZIP selection, including
-exclusion of nested modules from their parent's module archive; update the root
-source-install harness, which currently copies essentially the whole source
-archive, to test the real multi-module distribution boundary.
+exclusion of nested modules from their parent's module archive, and qualify the
+root source-install harness against the real multi-module distribution boundary.
+The [local archive-tool change](go-sdk-status.md#module-archive-checkpoint)
+replaces whole-source copying and extension filtering; its Go execution and
+downloaded-consumer gates remain pending.
 
 Implement a separate, explicit bootstrap command that fills an isolated module
 cache from the immutable private module proxy and verified public dependencies.
@@ -655,6 +667,13 @@ isolated cache. Record cache provenance and demonstrate that clean source
 rebuilds work without hidden workspace or dependency changes. This establishes
 private/offline qualification, not prior public-proxy or sumdb verification.
 
+The local [dependency-preparation implementation](go-sdk-status.md#private-dependency-cache-checkpoint)
+now provides this command and connects it to builds, source rebuilds, native tests
+and compiler-compatibility jobs. Its Python fixtures exercise source changes,
+permissions, cache identities, failed verification and workflow policy. Actual Go
+preparation, downloaded consumers, frozen versions and independent review remain
+required before this ticket can close.
+
 #### Where
 
 dashboard browser tests; repository-level integration harness; scripts/sdk/; CI; scripts/release/ candidate/evidence validation.
@@ -666,7 +685,7 @@ dashboard browser tests; repository-level integration harness; scripts/sdk/; CI;
 - [ ] All applicable Go/compiler/tag/race/vulnerability and dashboard type/lint/test/browser gates pass; generated assets and notices reproduce exactly.
 - [ ] Evidence rejects missing/failed/stale/wrong-digest reports; clean-source private builds use no local module replacements or invented checksums.
 - [ ] Intended module versions, application/worker requirements and genuine
-  dependency hashes are frozen before final runtime/native/endurance tests;
+  dependency hashes are frozen before final runtime/native/performance tests;
   publication cannot rewrite the qualified dependency graph.
 
 #### Out of scope
@@ -755,7 +774,7 @@ The user requires private candidates until all gates pass. Production-provider e
 
 #### What to implement
 
-Use two separately recorded work packages: provider qualification and scale/endurance. Run actual configured scenarios for all 33 drivers with independent effect evidence, preserving local_integration/mock_contract/provider_sandbox/live_account classifications. On the agreed WSL machine, pass fresh physical C: space and fixture-headroom preflight, then compare baseline a370969b041b399c0778318d8915ce059fd74294 with the frozen candidate at 10k/100k/1m monitors, 60-second cadence, five-minute warmup and fifteen-minute measurement, three repetitions per build. Run burst/slow/outage/recovery/crash scenarios and an uninterrupted 24-hour million-monitor soak with durability, history, SLOs and representative dashboard reads active.
+Use two separately recorded work packages: provider qualification and comparative performance. Run actual configured scenarios for every documented driver with independent effect evidence, preserving local_integration/mock_contract/provider_sandbox/live_account classifications. On the agreed WSL machine, pass fresh physical C: space and fixture-headroom preflight, then compare baseline a370969b041b399c0778318d8915ce059fd74294 with the frozen candidate at 10k/100k/1m monitors, 60-second cadence, five-minute warmup and fifteen-minute measurement, three repetitions per build. Retain burst/slow/outage/recovery/crash evidence with durability, history, SLOs and representative dashboard reads active. A 24-hour endurance run is outside the requested work and is not a completion gate.
 
 #### Where
 
@@ -766,12 +785,12 @@ cmd/cpra-verify/; internal/drivertest/; examples/verification/; scripts/verifica
 - [ ] Every required configured driver has passing actual-operation/effect evidence; missing accounts remain not verified and block full qualification.
 - [ ] Healthy windows sustain approximately 16,667 checks/second with five-minute p99 scheduling-plus-queue <=250 ms and scheduled-to-committed-result <=5 s, with misses/timeouts/coverage honestly counted.
 - [ ] Counts/digests reconcile accepted actions and results; no unintended duplicate intervention or unexplained loss is hidden, and resource/queue trends stabilize outside declared faults.
-- [ ] The full 24 hours include snapshot/history activity and preserved progress; sleep, saturation, interruption or reduced load fails or leaves the run incomplete.
+- [ ] Documentation states that no 24-hour endurance test was performed; comparative or short-run evidence is not presented as endurance qualification.
 - [ ] Reports bind exact candidate binaries and environment; no new public release is allowed while either work package is incomplete.
 
 #### Out of scope
 
-Creating or buying accounts, cleaning the user's disk, cloud-host substitution, simulated time, mock-derived certification or universal SLA claims.
+Creating or buying accounts, cleaning the user's disk, a 24-hour endurance run, cloud-host substitution, simulated time, mock-derived certification or universal SLA claims.
 
 #### Depends on
 
@@ -779,7 +798,7 @@ Tickets 13–14 for final artifact evidence. Fixture configuration and harness f
 
 #### Technical notes
 
-The harness requires 30 GiB physical C: free plus fixture headroom. Its fresh check found about 2.21 GiB on 2026-09-14; remeasure before any campaign. The 18 matched runs take six hours, plus the 24-hour soak: at least 30 hours of runtime before separate faults, setup and reruns. If target failures occur, preserve measured limits and keep the release gate open rather than silently reducing the target.
+The large-workload harness requires 30 GiB physical C: free plus fixture headroom. Its historical check found about 2.21 GiB on 2026-09-14; remeasure before any large run. The 18 matched runs take six hours before separate faults, setup and reruns. Do not start an endurance run as part of this work. If target failures occur, preserve measured limits rather than silently reducing the target.
 
 #### Definition of done
 
@@ -796,7 +815,7 @@ The existing publisher checks packaging evidence but can push candidate images b
 
 #### What to implement
 
-Add a fail-closed gate covering management, SDK/worker, native packages/services, container/chart, security, docs, all-provider and endurance evidence before the first public action. Keep candidate builds, module proxies, OCI storage and reports access-controlled; public-repository CI artifacts and public candidate tags are not private staging. Prepare strict source/generated docs, installation/upgrade/restore examples, support/security/contribution guidance, existing license notices, and donation information without subscription features. Freeze one source/artifact identity; stage, download, verify and sign exact outputs. After all private gates pass, publish the already-planned nested SDK prerelease, verify public downloads, promote the qualified SDK versions, then release the application, image aliases, OCI chart and matching main/gh-pages documentation in dependency order.
+Add a fail-closed gate covering management, SDK/worker, native packages/services, container/chart, security, docs, all-provider and comparative performance evidence before the first public action. Keep candidate builds, module proxies, OCI storage and reports access-controlled; public-repository CI artifacts and public candidate tags are not private staging. Prepare strict source/generated docs, installation/upgrade/restore examples, support/security/contribution guidance, existing license notices, and donation information without subscription features. Freeze one source/artifact identity; stage, download, verify and sign exact outputs. After all private gates pass, publish the already-planned nested SDK prerelease, verify public downloads, promote the qualified SDK versions, then release the application, image aliases, OCI chart and matching main/gh-pages documentation in dependency order.
 
 Publish only the versioned dependency graph frozen in ticket 13: core SDK before
 the worker version that requires it, then the application with its already-fixed

@@ -4,15 +4,44 @@ package management
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/raft"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 )
+
+func TestWorkerPreparationPreservesTemporaryLeadershipErrors(t *testing.T) {
+	for _, cause := range []error{raft.ErrNotLeader, raft.ErrLeadershipLost, raft.ErrLeadershipTransferInProgress} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			err := workerPreparationError(t.Context(), fmt.Errorf("owner read: %w", cause))
+			if !errors.Is(err, ErrUnavailable) || !errors.Is(err, cause) || !persistence.IsLeadershipUnavailable(err) {
+				t.Fatalf("temporary ownership change became permanent unavailability: %v", err)
+			}
+		})
+	}
+}
+
+func TestWorkerPreparationKeepsPermanentErrorsPrivate(t *testing.T) {
+	for _, cause := range []error{raft.ErrRaftShutdown, errors.New("private store diagnostics /private/raft.db")} {
+		err := workerPreparationError(t.Context(), cause)
+		if !errors.Is(err, ErrUnavailable) || persistence.IsLeadershipUnavailable(err) || strings.Contains(err.Error(), cause.Error()) {
+			t.Fatalf("permanent preparation failure exposed diagnostics or allowed ownership recovery: %v", err)
+		}
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := workerPreparationError(ctx, raft.ErrNotLeader); !errors.Is(err, context.Canceled) || persistence.IsLeadershipUnavailable(err) {
+		t.Fatalf("canceled preparation retained execution recovery authority: %v", err)
+	}
+}
 
 func workerAssignmentFixture(t *testing.T) (*Catalog, *persistence.Store, persistence.WorkerExecutionIntent) {
 	t.Helper()
@@ -76,6 +105,42 @@ func TestWorkerAssignmentPreparationCommitAndOpen(t *testing.T) {
 	}
 	if _, err := c.PrepareWorkerExecution(t.Context(), prepared); !errors.Is(err, persistence.ErrWorkerExecutionInvalid) {
 		t.Fatal("prepared ciphertext was silently replaced", err)
+	}
+}
+
+func TestWorkerScheduleCiphertextAuthenticatesTicket(t *testing.T) {
+	for _, field := range []string{"owner", "sequence", "removed"} {
+		t.Run(field, func(t *testing.T) {
+			c, store, intent := workerAssignmentFixture(t)
+			ticket, err := store.ScheduleWorkerCheck(intent.Scheduled)
+			if err != nil {
+				t.Fatal(err)
+			}
+			intent.Schedule = &ticket
+			prepared, err := c.PrepareWorkerExecution(t.Context(), intent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := store.CommitWorkerExecution(t.Context(), prepared)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.OpenWorkerExecution(t.Context(), record); err != nil {
+				t.Fatal(err)
+			}
+			changed := record.Clone()
+			switch field {
+			case "owner":
+				changed.Intent.Schedule.OwnerEpoch = "different-owner"
+			case "sequence":
+				changed.Intent.Schedule.Sequence++
+			case "removed":
+				changed.Intent.Schedule = nil
+			}
+			if _, err := c.OpenWorkerExecution(t.Context(), changed); err == nil {
+				t.Fatal("changed ticket authenticated")
+			}
+		})
 	}
 }
 

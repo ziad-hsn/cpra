@@ -2,9 +2,20 @@
 
 package persistence
 
+import (
+	"context"
+	"time"
+
+	"github.com/ziad-hsn/cpra/internal/slo"
+)
+
+type storeExtensions struct{}
+
 // LatestFormatVersion is the highest application storage format supported by
 // this build. Optional external state is deliberately unreadable here.
-const LatestFormatVersion = CollectionReselectionFormatVersion
+const LatestFormatVersion = NotificationFormatVersion
+
+func joinStorageFormat(a, b int) int { return max(a, b) }
 
 type commandExtensions struct{}
 type imageExtensions struct{}
@@ -12,13 +23,14 @@ type resultExtensions struct{}
 
 func validateCommandExtensions(Command) (bool, error) { return false, nil }
 func commandExtensionMinimumFormat(Command) int       { return FormatVersion }
+func commandExtensionWriteFormat(Command) int         { return FormatVersion }
 func hasCommandExtensions(Command) bool               { return false }
 func externalStorageFormat(int) bool                  { return false }
 func externalSnapshotMagic(int) string                { return "" }
 func externalSnapshotVersion([]byte) (int, int)       { return 0, 0 }
 func cloneImageExtensions(image) imageExtensions      { return imageExtensions{} }
 func validateImageExtensions(image) error             { return nil }
-func (*machine) applyCommandExtensions(Command, uint64) (Result, bool) {
+func (*machine) applyCommandExtensions(Command, uint64, int) (Result, bool) {
 	return Result{}, false
 }
 
@@ -40,3 +52,11 @@ func validatePolicyExtensions(Policy) error         { return nil }
 func policyMinimumFormat(Policy) int { return FormatVersion }
 
 func validExternalActionExecutor(image, Action) bool { return false }
+
+func (*Store) maintainExtensions(time.Time) error { return nil }
+
+func (*machine) indexExtensionMonitors(ctx context.Context) error { return ctx.Err() }
+
+func (*machine) hasWorkerCheckState(Monitor) bool { return false }
+
+func (*Store) extendSLOView(ctx context.Context, _ *slo.View) error { return ctx.Err() }

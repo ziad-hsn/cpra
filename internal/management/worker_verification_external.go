@@ -21,6 +21,20 @@ func (c *Catalog) verifyWorkerExecutions(ctx context.Context) error {
 				c.fail()
 				return ErrUnavailable
 			}
+			if err := c.verifyWorkerOutcome(ctx, record); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				c.fail()
+				return ErrUnavailable
+			}
+			if err := c.verifyWorkerEvidence(ctx, record); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				c.fail()
+				return ErrUnavailable
+			}
 		}
 		if !page.More {
 			return ctx.Err()

@@ -113,6 +113,9 @@ function CodeFields({ color, rule, onChange, readOnly }: { color: string; rule: 
   const update = (key: string, value: unknown) => onChange(setField(rule, key, value));
   return <fieldset className="management-field"><legend>Code {color}</legend>
     <ValueField label={`Code ${color} dispatch`} type="boolean" value={rule.dispatch} onChange={value => update('dispatch', value)} readOnly={readOnly} hint="The default remains omitted. Selecting No explicitly disables dispatch for this Code without changing observed health." />
+    {color === 'red' && <label className="management-field"><span>Code red trigger</span>{readOnly ? <span>{rule.trigger ?? 'state_change'}</span> : <select className="input" aria-label="Code red trigger" value={rule.trigger ?? ''} onChange={event => update('trigger', event.target.value || undefined)}>
+      <option value="">Health transition (default)</option><option value="state_change">Health transition</option><option value="recovery_failed">After a confirmed failed recovery attempt</option><option value="recovery_exhausted">After all recovery attempts fail</option>
+    </select>}<span className="muted">Recovery triggers require a recovery action. Unknown outcomes stay held. A queued, active or unknown notification keeps its original failure context.</span></label>}
     {typed ? <>
       <label className="management-field"><span>Code {color} notification type</span>{readOnly ? <span>{rule.notifyType}</span> : <select className="input" required disabled={!capabilities.data} value={rule.notifyType} onChange={event => update('notifyType', event.target.value)}>
         <option value="">Choose a compiled notification driver…</option>{rule.notifyType && !drivers.includes(rule.notifyType) && <option value={rule.notifyType}>{rule.notifyType} — unavailable in this server</option>}
@@ -122,7 +125,7 @@ function CodeFields({ color, rule, onChange, readOnly }: { color: string; rule: 
     </> : <><p className="muted">Legacy destinations are preserved. An inline notification driver beside a group retains its original behavior; it is not treated as a recipient type filter.</p>
       {rule.driver && <DriverFields key={`notification-${rule.driver.type}`} category="notification" spec={rule.driver} onChange={driver => update('driver', driver)} readOnly={readOnly} />}
       {rule.endpointRefs !== undefined && <ReferencePicker type="endpoints" label={`Code ${color} endpoints`} values={rule.endpointRefs} onChange={refs => update('endpointRefs', refs)} readOnly={readOnly} />}
-      {!readOnly && <button className="btn" type="button" onClick={() => { if (window.confirm('Replace these legacy destinations with a notification type and recipient/group selection? Existing inline settings and direct endpoint references will be removed from this draft.')) onChange({ ...(rule.dispatch === undefined ? {} : { dispatch: rule.dispatch }), ...(rule.groupRef === undefined ? {} : { groupRef: rule.groupRef }), notifyType: '', recipientRefs: [] }); }}>Use typed recipients for Code {color}</button>}
+      {!readOnly && <button className="btn" type="button" onClick={() => { if (window.confirm('Replace these legacy destinations with a notification type and recipient/group selection? Existing inline settings and direct endpoint references will be removed from this draft.')) onChange({ ...(rule.dispatch === undefined ? {} : { dispatch: rule.dispatch }), ...(rule.trigger === undefined ? {} : { trigger: rule.trigger }), ...(rule.groupRef === undefined ? {} : { groupRef: rule.groupRef }), notifyType: '', recipientRefs: [] }); }}>Use typed recipients for Code {color}</button>}
     </>}
     <ReferencePicker type="groups" label={`Code ${color} group`} single values={rule.groupRef === undefined ? [] : [rule.groupRef]} onChange={refs => update('groupRef', refs.length ? refs[0] : undefined)} readOnly={readOnly} />
     {!readOnly && <button className="btn ghost" type="button" onClick={() => { if (window.confirm(`Remove Code ${color} from this draft?`)) onChange(undefined); }}>Remove Code {color}</button>}
@@ -148,6 +151,8 @@ export function validateMonitorDraft(spec: Record<string, unknown>, capabilities
   if (spec.recovery) { const failure = validateDriver('recovery', record(spec.recovery).driver); if (failure) return failure; }
   for (const [color, value] of Object.entries(record(spec.notifications))) {
     const rule = record(value);
+    if (rule.trigger !== undefined && !['state_change', 'recovery_failed', 'recovery_exhausted'].includes(String(rule.trigger))) return `Code ${color} has an unsupported notification trigger.`;
+    if (rule.trigger !== undefined && rule.trigger !== 'state_change' && (color !== 'red' || !spec.recovery)) return 'Recovery notification triggers require Code red and a configured recovery action.';
     if (rule.notifyType !== undefined) {
       if (typeof rule.notifyType !== 'string' || !capabilities?.drivers.notification?.includes(rule.notifyType) || !fieldsFor(rule.notifyType)) return `Code ${color} needs a notification type compiled into this server.`;
       if (!strings(rule.recipientRefs).length && !(typeof rule.groupRef === 'string' && rule.groupRef)) return `Code ${color} needs at least one recipient or a group.`;

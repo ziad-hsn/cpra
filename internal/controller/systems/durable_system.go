@@ -13,21 +13,28 @@ import (
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/management"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/secureconfig"
 )
 
 // DurableSystem owns the live projection and all scheduling. The Raft goroutine
 // sees only copied commands. Workers see private jobs and immutable identities.
 type checkSchedule struct {
+	checkScheduleExtensions
 	next, ready int64
 	arrivalRate float64
 }
 
 type DurableSystem struct {
+	systemExtensions
 	catalogRuntime      *catalogRuntime
+	agentObserver       *agentObserver
+	agentSealer         *secureconfig.Sealer
+	agentStoreID        string
 	managed             map[string]managedMonitor
 	checks              []checkSchedule
 	pulseArrivalRate    float64
@@ -86,6 +93,19 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 	q := f.Query()
 	for q.Next() {
 		m := q.Get()
+		if stored := s.jobs.Get(q.Entity()); stored != nil && s.agentSealer == nil {
+			_, requiresKey := jobs.A2AConnection(stored.InterventionJob)
+			for _, group := range stored.CodeJobs {
+				for _, job := range group {
+					_, agent := jobs.A2AConnection(job)
+					requiresKey = requiresKey || agent
+				}
+			}
+			if requiresKey {
+				q.Close()
+				return errors.New("A2A file configuration requires storage.encryption before monitoring starts")
+			}
+		}
 		if _, ok := s.entities[m.MonitorID]; ok {
 			q.Close()
 			return fmt.Errorf("duplicate effective monitor id %q", m.MonitorID)
@@ -108,6 +128,11 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 		cfg := s.configs.Get(ent)
 		js := s.jobs.Get(ent)
 		policy := persistence.Policy{Interval: cfg.Interval, Unhealthy: cfg.UnhealthyThreshold, Healthy: cfg.HealthyThreshold, Enabled: s.disabled.Get(ent) == nil, Intervention: s.interventions.Get(ent) != nil, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
+		recoveryDriver := ""
+		if recovery := s.interventions.Get(ent); recovery != nil {
+			recoveryDriver = recovery.Action
+			policy.RecoveryMaxAttempts = recovery.MaxAttempts
+		}
 		if policy.Healthy <= 0 {
 			policy.Healthy = 2
 		}
@@ -115,6 +140,7 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 			for color, c := range cc.Configs {
 				if c.Dispatch {
 					policy.Endpoints[color] = len(js.CodeJobs[color])
+					setRecoveryNotification(&policy, color, c.Trigger, recoveryDriver)
 				}
 			}
 		}
@@ -179,10 +205,14 @@ func (s *DurableSystem) Initialize(*ecs.World) {
 		}
 		s.catalogRuntime.start()
 	}
+	if s.agentObserver != nil {
+		s.agentObserver.start()
+	}
+	s.startWorkerDispatch()
 	s.ownerInitialized = true
 }
 
-// PulseArrivalRate returns owner-maintained scheduled demand in checks/second.
+// PulseArrivalRate returns scheduled local-worker demand in checks/second.
 // Read only on the owner loop after initialization.
 func (s *DurableSystem) PulseArrivalRate() float64 { return s.pulseArrivalRate }
 
@@ -190,6 +220,7 @@ func (s *DurableSystem) setPulseDemand(ent ecs.Entity, interval time.Duration) {
 	if int(ent.ID()) >= len(s.checks) {
 		return
 	}
+	interval = localPulseInterval(s.jobs.Get(ent), interval)
 	slot := &s.checks[ent.ID()]
 	rate := 0.0
 	if interval > 0 {
@@ -212,6 +243,7 @@ func (s *DurableSystem) setPulseDemand(ent ecs.Entity, interval time.Duration) {
 }
 
 func (s *DurableSystem) resetCheckSchedule(ent ecs.Entity) {
+	s.cancelWorkerCheck(ent)
 	s.setPulseDemand(ent, 0)
 	if int(ent.ID()) < len(s.checks) {
 		s.checks[ent.ID()] = checkSchedule{}
@@ -223,8 +255,12 @@ func (s *DurableSystem) AdmissionReady() bool { return !s.stopping.Load() && !s.
 
 func (s *DurableSystem) StopAdmission() {
 	s.stopping.Store(true)
+	s.stopWorkerDispatch()
 	if s.catalogRuntime != nil {
 		s.catalogRuntime.cancel()
+	}
+	if s.agentObserver != nil {
+		s.agentObserver.cancel()
 	}
 }
 
@@ -233,6 +269,10 @@ func (s *DurableSystem) StopAdmission() {
 // cannot flush an arbitrary buffered tail. Commit every available outcome
 // before recording the final SLO window and closing durable storage.
 func (s *DurableSystem) Finalize(*ecs.World) {
+	s.finishWorkerDispatch()
+	if s.agentObserver != nil {
+		s.agentObserver.stop()
+	}
 	if s.catalogRuntime != nil {
 		s.catalogRuntime.cancel()
 		// Initialization may have failed before starting reconciliation. Join
@@ -300,6 +340,10 @@ func (s *DurableSystem) Update(*ecs.World) {
 	if !s.drain() {
 		return
 	}
+	s.receiveWorkerDispatch()
+	if s.lastError != nil {
+		return
+	}
 	s.receiveCatalogProjection()
 	if s.pendingWrite != nil || s.lastError != nil {
 		return
@@ -340,8 +384,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 		cancel()
 		s.recovering.Store(false)
 	}
-	s.dispatchChecks(now)
-	s.dispatchActions(now)
+	s.dispatchReady(now)
 }
 
 func (s *DurableSystem) fail(err error) {
@@ -358,7 +401,8 @@ func (s *DurableSystem) fail(err error) {
 }
 func (s *DurableSystem) persistSLO(now time.Time) {
 	state := s.store.SLO().Snapshot(now)
-	s.beginOwnerWrite(&ownerWrite{kind: sloWrite, commands: []persistence.Command{{Kind: "slo", At: now, SLO: &state}}})
+	commands := []persistence.Command{{Kind: "slo", At: now, SLO: &state}}
+	s.beginOwnerWrite(&ownerWrite{kind: sloWrite, commands: s.checkpointWorkerSchedules(commands, now)})
 }
 
 func (s *DurableSystem) drain() bool {
@@ -476,7 +520,7 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 						outcome = "failure"
 					}
 					var rejection *jobs.DeliveryError
-					definite := errors.As(r.Err, &rejection)
+					definite := errors.As(r.Err, &rejection) || r.Type == "intervention" && errors.Is(r.Err, jobs.ErrInterventionRejected)
 					if r.Err != nil && !definite {
 						s.releaseResult(r)
 						continue
@@ -531,8 +575,8 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 				c.Generation++
 			}
 			var rejection *jobs.DeliveryError
-			definite := errors.As(r.Err, &rejection)
-			c.Retryable = definite && rejection.Retryable
+			definite := errors.As(r.Err, &rejection) || r.Type == "intervention" && errors.Is(r.Err, jobs.ErrInterventionRejected)
+			c.Retryable = rejection != nil && rejection.Retryable
 			c.Ambiguous = r.Err != nil && !definite
 		}
 		commands = append(commands, c)
@@ -668,11 +712,14 @@ func (s *DurableSystem) dispatchChecks(now time.Time) {
 		}
 		s.store.SLO().Missed(cfg.Type, now, elapsed)
 		state.MissedChecks += elapsed
-		s.store.SLO().Expect(cfg.Type, latest)
+		if !s.expectCheck(ent, latest) {
+			return
+		}
 		slot.ready = latest.UnixNano()
-		s.scheduler.EnqueueReady([]ecs.Entity{ent})
+		s.enqueueCheck(ent)
 		s.publishCheckAdmission(ent)
 	}
+	s.dispatchWorkerChecks()
 	budget := min(s.config.Storage.BatchSize, s.queues["pulse"].Stats().Capacity-s.queues["pulse"].Stats().QueueDepth)
 	if budget <= 0 {
 		return
@@ -799,6 +846,9 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				continue
 			}
 			js := s.jobs.Get(ent)
+			if s.dispatchWorkerAction(ent, a) {
+				continue
+			}
 			prototype := js.InterventionJob
 			if a.Kind == "code" {
 				list := js.CodeJobs[a.Color]
@@ -814,8 +864,15 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			}
 			d := jobs.NewDispatch(prototype, ent, a.Kind, a.Color, 0, a.Endpoint)
 			d.MonitorID, d.Revision, d.ActionID = m.ID, a.Revision, id
+			d.IncidentID, d.CatalogUID, d.Attempt = a.IncidentID, a.CatalogUID, a.Attempt
 			d.Scheduled = a.NotBefore
+			if f := a.RecoveryFailure; f != nil {
+				d.RecoveryFailure = &jobs.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: f.Trigger, FailedAt: f.FailedAt, Outcome: "failure"}
+			}
 			monitorID, revision, actionID := m.ID, a.Revision, id
+			driver := d.Driver
+			agentConfig, isAgent := jobs.A2AConnection(d.Job)
+			originalAction := persistence.ActionRecord{MonitorID: m.ID, Action: a.Clone()}
 			var guard *persistence.CatalogGuard
 			if projection, ok := s.managed[m.ID]; ok {
 				g := projection.guard.Clone()
@@ -823,23 +880,56 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				d.ProjectionVersion = projection.version
 			}
 			maintenance := slices.Clone(state.Maintenance)
-			d.Authorize = func(ctx context.Context) (func() error, error) {
+			d.Authorize = func(ctx context.Context) (jobs.ActionExecution, error) {
 				if s.stopping.Load() {
-					return nil, persistence.ErrControlConflict
+					return jobs.ActionExecution{}, persistence.ErrControlConflict
 				}
 				if s.recovering.Load() {
-					return nil, errAdmissionRecovering
+					return jobs.ActionExecution{}, errAdmissionRecovering
 				}
 				if manifest.InMaintenance(maintenance, time.Now()) {
-					return nil, fmt.Errorf("action deferred during maintenance")
+					return jobs.ActionExecution{}, fmt.Errorf("action deferred during maintenance")
 				}
-				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, At: time.Now().UTC(), Guard: guard})
+				var connection *persistence.AgentConnection
+				if driver == "a2a" && s.catalogRuntime != nil {
+					if guard == nil {
+						return jobs.ActionExecution{}, persistence.ErrCatalogDependency
+					}
+					var err error
+					connection, err = s.catalogRuntime.catalog.PrepareAgentConnection(ctx, monitorID, actionID, revision, *guard)
+					if err != nil {
+						return jobs.ActionExecution{}, err
+					}
+				} else if driver == "a2a" {
+					if !isAgent || originalAction.CatalogUID != "" {
+						return jobs.ActionExecution{}, persistence.ErrAgentActionInvalid
+					}
+					var err error
+					connection, err = management.SealAgentConnection(ctx, s.agentSealer, s.agentStoreID, originalAction, agentConfig)
+					if err != nil {
+						return jobs.ActionExecution{}, err
+					}
+				}
+				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: time.Now().UTC(), Guard: guard, AgentConnection: connection})
 				if handle == nil {
-					return nil, err
+					return jobs.ActionExecution{}, err
 				}
 				// Always retain the reserved claim, including an uncertain start.
 				// Execute invokes this only once its provider/Before path returned.
-				return func() error { return handle.Finish(context.Background()) }, err
+				execution := jobs.ActionExecution{Finish: func() error { return handle.Finish(context.Background()) }}
+				if err == nil && driver == "a2a" {
+					var sequence uint64
+					execution.RecordAgentReceipt = func(ctx context.Context, receipt jobs.A2AReceipt) error {
+						err := handle.RecordAgentReceipt(ctx, persistence.AgentReceiptCommand{ExpectedSequence: sequence,
+							Receipt: persistence.AgentReceipt{Sequence: sequence + 1, TaskID: receipt.TaskID,
+								ContextID: receipt.ContextID, MessageID: receipt.MessageID, State: receipt.State, ObservedAt: time.Now().UTC()}})
+						if err == nil {
+							sequence++
+						}
+						return err
+					}
+				}
+				return execution, err
 			}
 			if err := s.queues[a.Kind].Enqueue(d); err != nil {
 				continue
@@ -954,4 +1044,15 @@ func (s *DurableSystem) publishCheckAdmission(ent ecs.Entity) {
 		s.checkAdmission(ent, &summary)
 		s.index.Put(summary)
 	}
+}
+
+func setRecoveryNotification(policy *persistence.Policy, color, trigger, driver string) {
+	if trigger == "" || trigger == "state_change" {
+		return
+	}
+	if policy.NotificationTriggers == nil {
+		policy.NotificationTriggers = make(map[string]string)
+	}
+	policy.NotificationTriggers[color] = trigger
+	policy.RecoveryDriver = driver
 }

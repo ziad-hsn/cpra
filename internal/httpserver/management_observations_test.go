@@ -233,15 +233,15 @@ func TestManagementObservationReadinessAgreesWithLegacy(t *testing.T) {
 		generated  time.Time
 		total      int
 		allowEmpty bool
-		ownerReady func() bool
+		ownerReady func(context.Context) bool
 		want       int
 	}{
 		{"uninitialized", time.Time{}, 0, false, nil, 503},
 		{"future_projection", time.Now().Add(time.Hour), 1, false, nil, 503},
 		{"empty_not_allowed", time.Now(), 0, false, nil, 503},
 		{"explicit_empty", time.Now(), 0, true, nil, 200},
-		{"owner_progress_with_stale_projection", time.Now().Add(-time.Hour), 1000000, false, func() bool { return true }, 200},
-		{"owner_stalled_with_fresh_projection", time.Now(), 1000000, false, func() bool { return false }, 503},
+		{"owner_progress_with_stale_projection", time.Now().Add(-time.Hour), 1000000, false, func(context.Context) bool { return true }, 200},
+		{"owner_stalled_with_fresh_projection", time.Now(), 1000000, false, func(context.Context) bool { return false }, 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f.server.cfg.Ready, f.server.cfg.AllowEmpty = tc.ownerReady, tc.allowEmpty

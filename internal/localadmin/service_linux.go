@@ -60,20 +60,26 @@ func nativePrepare(l installpath.Layout, account string) (string, error) {
 }
 
 func nativeSecure(l installpath.Layout, account string) error {
-	if l.Scope == "user" {
-		return nil
-	}
-	u, err := user.Lookup(account)
-	if err != nil {
-		return err
-	}
-	uid, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(u.Gid)
-	if err != nil {
-		return err
+	uid, gid := os.Geteuid(), os.Getegid()
+	configUID, executableUID, executableGID := uid, uid, gid
+	configDirMode, configFileMode := fs.FileMode(0700), fs.FileMode(0600)
+	executableDirMode, executableFileMode, serviceFileMode := fs.FileMode(0700), fs.FileMode(0700), fs.FileMode(0600)
+	if l.Scope == "system" {
+		u, err := user.Lookup(account)
+		if err != nil {
+			return err
+		}
+		uid, err = strconv.Atoi(u.Uid)
+		if err != nil {
+			return err
+		}
+		gid, err = strconv.Atoi(u.Gid)
+		if err != nil {
+			return err
+		}
+		configUID, executableUID, executableGID = 0, 0, 0
+		configDirMode, configFileMode = 0750, 0640
+		executableDirMode, executableFileMode, serviceFileMode = 0755, 0755, 0644
 	}
 	for _, dir := range []string{l.StateDir, l.LogDir} {
 		if dir == "" {
@@ -82,7 +88,7 @@ func nativeSecure(l installpath.Layout, account string) error {
 		// Installer operations hold the stopped-store lock. Repair ownership
 		// after an administrator restores a private backup; normal starts do
 		// not walk or change the data directory.
-		err = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}
@@ -105,35 +111,41 @@ func nativeSecure(l installpath.Layout, account string) error {
 			return err
 		}
 	}
-	if err = os.Chown(l.ConfigDir, 0, gid); err != nil {
-		return err
-	}
-	if err = os.Chmod(l.ConfigDir, 0750); err != nil {
-		return err
-	}
-	for _, name := range []string{"monitors.yaml", "runtime.yaml", "auth.token"} {
-		path := filepath.Join(l.ConfigDir, name)
-		if _, err = os.Lstat(path); os.IsNotExist(err) {
+	// Repair only managed configuration/executable objects. Operator helpers
+	// retain their modes; shared parent directories are not modified.
+	for _, entry := range []struct {
+		path      string
+		uid, gid  int
+		mode      fs.FileMode
+		directory bool
+	}{
+		{l.ConfigDir, configUID, gid, configDirMode, true},
+		{filepath.Join(l.ConfigDir, "monitors.yaml"), configUID, gid, configFileMode, false},
+		{filepath.Join(l.ConfigDir, "runtime.yaml"), configUID, gid, configFileMode, false},
+		{filepath.Join(l.ConfigDir, "auth.token"), configUID, gid, configFileMode, false},
+		{l.BinDir, executableUID, executableGID, executableDirMode, true},
+		{binaryPath(l), executableUID, executableGID, executableFileMode, false},
+		{l.ServiceFile, executableUID, executableGID, serviceFileMode, false},
+	} {
+		if entry.path == "" {
+			continue
+		}
+		if err := rejectSymlinkAncestors(entry.path); err != nil {
+			return err
+		}
+		info, err := os.Lstat(entry.path)
+		if os.IsNotExist(err) {
 			continue
 		} else if err != nil {
 			return err
 		}
-		if err = os.Chown(path, 0, gid); err != nil {
+		if entry.directory && !info.IsDir() || !entry.directory && !info.Mode().IsRegular() {
+			return fmt.Errorf("managed path has an unexpected file type: %s", entry.path)
+		}
+		if err = os.Chown(entry.path, entry.uid, entry.gid); err != nil {
 			return err
 		}
-		if err = os.Chmod(path, 0640); err != nil {
-			return err
-		}
-	}
-	// Only administrator-managed executable and service paths are changed;
-	// never recursively chown an existing data directory during restart.
-	for _, path := range []string{l.BinDir, binaryPath(l), l.ServiceFile} {
-		if _, err = os.Lstat(path); os.IsNotExist(err) {
-			continue
-		} else if err != nil {
-			return err
-		}
-		if err = os.Chown(path, 0, 0); err != nil {
+		if err = os.Chmod(entry.path, entry.mode); err != nil {
 			return err
 		}
 	}

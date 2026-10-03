@@ -104,21 +104,7 @@ func (c *Catalog) PrepareWorkerOutcome(ctx context.Context, binding WorkerOutcom
 	if err := c.readyContext(ctx); err != nil {
 		return out, err
 	}
-	selected, ok, err := c.store.LookupJobTypeVersion(ctx, binding.JobType.JobTypeID, binding.JobType.Version)
-	if err != nil {
-		if ctx.Err() != nil {
-			return out, ctx.Err()
-		}
-		return out, ErrUnavailable
-	}
-	if !ok {
-		return out, persistence.ErrCatalogDependency
-	}
-	version := selected.Version
-	if version.Record.UID != binding.JobType.JobTypeUID || version.Record.Revision != binding.JobType.Revision || version.Category != binding.JobType.Category {
-		return out, persistence.ErrCatalogDependency
-	}
-	contract, err := c.openJobType(ctx, version)
+	contract, err := c.workerOutcomeContract(ctx, binding)
 	if err != nil {
 		return out, err
 	}
@@ -137,13 +123,35 @@ func (c *Catalog) PrepareWorkerOutcome(ctx context.Context, binding WorkerOutcom
 	if err := ctx.Err(); err != nil {
 		return out, err
 	}
+	return PreparedWorkerOutcome{binding: binding, disposition: disposition, digest: workerOutcomeDigest(binding, encoded), payload: payload}, nil
+}
+
+func (c *Catalog) workerOutcomeContract(ctx context.Context, binding WorkerOutcomeBinding) (api.JobType, error) {
+	selected, ok, err := c.store.LookupJobTypeVersion(ctx, binding.JobType.JobTypeID, binding.JobType.Version)
+	if err != nil {
+		if ctx.Err() != nil {
+			return api.JobType{}, ctx.Err()
+		}
+		return api.JobType{}, ErrUnavailable
+	}
+	if !ok {
+		return api.JobType{}, persistence.ErrCatalogDependency
+	}
+	version := selected.Version
+	if version.Record.UID != binding.JobType.JobTypeUID || version.Record.Revision != binding.JobType.Revision || version.Category != binding.JobType.Category {
+		return api.JobType{}, persistence.ErrCatalogDependency
+	}
+	return c.openJobType(ctx, version)
+}
+
+func workerOutcomeDigest(binding WorkerOutcomeBinding, encoded []byte) string {
 	identity, _ := json.Marshal(binding)
 	hash := sha256.New()
 	_, _ = hash.Write([]byte("cpra/worker/outcome/v1\x00"))
 	_, _ = hash.Write(identity)
 	_, _ = hash.Write([]byte{0})
 	_, _ = hash.Write(encoded)
-	return PreparedWorkerOutcome{binding: binding, disposition: disposition, digest: hex.EncodeToString(hash.Sum(nil)), payload: payload}, nil
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func workerOutcomeText(value string, limit int) bool {

@@ -30,7 +30,7 @@ func TestWorkerPolicyDefaultExclusion(t *testing.T) {
 	if _, ok := reflect.TypeFor[Command]().FieldByName("WorkerPolicy"); ok {
 		t.Fatal("default exposed policy field")
 	}
-	if supportedFormat(17) || LatestFormatVersion != 14 {
+	if supportedFormat(17) || LatestFormatVersion != NotificationFormatVersion {
 		t.Fatal("default enabled worker format")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-17\n{}"), ""); err == nil {

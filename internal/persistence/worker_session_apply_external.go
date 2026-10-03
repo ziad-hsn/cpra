@@ -24,17 +24,19 @@ func workerSessionRecordCost(key string, r workerSessionRecord) (int64, error) {
 // it bounds canonical encoded bytes without re-encoding the complete namespace.
 const workerSessionImageOverhead int64 = 4 << 10
 
-func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
+// inspectWorkerSession is shared by waiting and committed polling. It borrows
+// retained records under the FSM lock and never changes a session or its expiry.
+func (f *machine) inspectWorkerSession(c WorkerSessionCommand, at time.Time) (workerSessionRecord, bool, bool, error) {
 	if err := f.checkWorkerPollAuthority(c.Authority, c.Request, at); err != nil {
-		return Result{Err: err}
+		return workerSessionRecord{}, false, false, err
 	}
 	if c.OwnerEpoch != f.image.LocalExecutorSession {
-		return Result{Err: ErrWorkerSessionExpired}
+		return workerSessionRecord{}, false, false, ErrWorkerSessionExpired
 	}
 	request := c.Request
 	old := f.image.WorkerSessions
 	if old != nil && (old.NodeID != c.NodeID || old.PolicyEpoch != c.Authority.Epoch) {
-		return Result{Err: ErrWorkerSessionIdentity}
+		return workerSessionRecord{}, false, false, ErrWorkerSessionIdentity
 	}
 	var previous workerSessionRecord
 	exists := false
@@ -44,45 +46,59 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
 	digest := workerPollDigest(request)
 	opening := request.SessionID == ""
 	if !opening && (!exists || request.SessionID != previous.Response.SessionID) {
-		return Result{Err: ErrWorkerSessionExpired}
+		return workerSessionRecord{}, false, false, ErrWorkerSessionExpired
 	}
 	if exists {
-		live := previous.OwnerEpoch == c.OwnerEpoch && at.Before(previous.Response.SessionExpiresAt)
+		live := previous.ReplyExpiredAt == nil && previous.OwnerEpoch == c.OwnerEpoch && at.Before(previous.Response.SessionExpiresAt)
 		sameNonce := previous.Response.ClientSessionID == request.ClientSessionID
 		if sameNonce && !live {
-			return Result{Err: ErrWorkerSessionExpired}
+			return workerSessionRecord{}, false, false, ErrWorkerSessionExpired
 		}
 		if opening && !sameNonce {
 			if live {
-				return Result{Err: ErrWorkerSessionConflict}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionConflict
 			}
 		} else {
 			if !sameNonce {
-				return Result{Err: ErrWorkerSessionConflict}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionConflict
 			}
 			if !opening && request.SessionID != previous.Response.SessionID {
-				return Result{Err: ErrWorkerSessionExpired}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionExpired
 			}
 			if request.PollSequence == previous.Response.PollSequence {
 				if digest != previous.RequestDigest {
-					return Result{Err: ErrWorkerSessionConflict}
+					return workerSessionRecord{}, false, false, ErrWorkerSessionConflict
 				}
-				response := previous.Response.clone()
-				return Result{Allowed: true, resultExtensions: resultExtensions{WorkerPoll: &response}}
+				return previous, exists, true, nil
 			}
 			if opening || previous.Response.PollSequence == math.MaxInt64 || request.PollSequence != previous.Response.PollSequence+1 {
-				return Result{Err: ErrWorkerSessionSequence}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionSequence
 			}
 			if at.Before(previous.UpdatedAt) {
-				return Result{Err: ErrWorkerSessionConflict}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionConflict
 			}
 			if !sameWorkerCapabilities(request.Capabilities, previous.Request.Capabilities) {
-				return Result{Err: ErrWorkerSessionConflict}
+				return workerSessionRecord{}, false, false, ErrWorkerSessionConflict
 			}
 		}
 	} else if !opening {
-		return Result{Err: ErrWorkerSessionExpired}
+		return workerSessionRecord{}, false, false, ErrWorkerSessionExpired
 	}
+	return previous, exists, false, nil
+}
+
+func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
+	previous, exists, replay, err := f.inspectWorkerSession(c, at)
+	if err != nil {
+		return Result{Err: err}
+	}
+	if replay {
+		response := previous.Response.clone()
+		return Result{Allowed: true, resultExtensions: resultExtensions{WorkerPoll: &response}}
+	}
+	request, old := c.Request, f.image.WorkerSessions
+	opening := request.SessionID == ""
+	digest := workerPollDigest(request)
 	if opening && old != nil {
 		for _, existing := range old.Sessions {
 			if existing.Response.SessionID == c.ProposedSessionID {
@@ -127,7 +143,7 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
 		f.image.WorkerSessions = old
 	}
 	for _, r := range updates {
-		f.image.WorkerExecutions.Records[r.Intent.ID] = r
+		f.image.WorkerExecutions.replaceRecord(r)
 	}
 	if len(updates) > 0 {
 		f.image.WorkerExecutions.EncodedBytes += delta
@@ -138,6 +154,9 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
 	if len(c.ProposedLeaseIDs) > 0 {
 		f.image.Version = max(f.image.Version, WorkerOfferFormatVersion)
 	}
+	if c.SelectionVersion == 1 {
+		f.image.Version = max(f.image.Version, WorkerQueueFormatVersion)
+	}
 	response = record.Response.clone()
 	return Result{Allowed: true, resultExtensions: resultExtensions{WorkerPoll: &response}}
 }
@@ -147,12 +166,15 @@ func validateWorkerSessionImage(i image) error {
 	if state == nil {
 		return nil
 	}
-	if (i.Version != WorkerSessionFormatVersion && i.Version != WorkerExecutionFormatVersion && i.Version != WorkerOfferFormatVersion) || state.Version != 1 || !catalogIdentifier(state.NodeID, 256) || !validAuthenticationID(state.PolicyEpoch) || state.Sessions == nil || len(state.Sessions) > MaxWorkerSessions || i.WorkerPolicy == nil || state.PolicyEpoch != i.WorkerPolicy.Epoch || i.WorkerPolicy.ResetRequired {
+	if (i.Version < WorkerSessionFormatVersion || !externalStorageFormat(i.Version)) || state.Version != 1 || !catalogIdentifier(state.NodeID, 256) || !validAuthenticationID(state.PolicyEpoch) || state.Sessions == nil || len(state.Sessions) > MaxWorkerSessions || i.WorkerPolicy == nil || state.PolicyEpoch != i.WorkerPolicy.Epoch || i.WorkerPolicy.ResetRequired {
 		return ErrWorkerSessionInvalid
 	}
 	used := workerSessionImageOverhead
 	identities := make(map[string]bool, len(state.Sessions))
 	for key, r := range state.Sessions {
+		if r.ReplyExpiredAt != nil && (i.Version < WorkerCheckRetentionFormatVersion || r.ReplyExpiredAt.Before(r.Response.SessionExpiresAt) || r.ReplyExpiredAt.Year() > 9998 || len(r.Response.Offers) != 0) {
+			return ErrWorkerSessionInvalid
+		}
 		worker, ok := i.WorkerPolicy.Workers[r.WorkerID]
 		request, response := r.Request, r.Response
 		if !ok || worker.UID != key || r.WorkerUID != key || request.WorkerID != r.WorkerID || !catalogIdentifier(r.OwnerEpoch, 256) || request.validate() != nil || r.RequestDigest != workerPollDigest(request) || r.OpenedAt.IsZero() || r.OpenedAt.Year() < 1 || r.UpdatedAt.Before(r.OpenedAt) || r.UpdatedAt.Year() > 9998 || !response.SessionExpiresAt.Equal(r.UpdatedAt.Add(WorkerSessionLifetime)) || response.ServerID != workerProtocolServerID(state.NodeID, state.PolicyEpoch) || response.ServerID != request.ServerID || response.WorkerUID != key || response.ClientSessionID != request.ClientSessionID || response.PollSequence != request.PollSequence || !catalogIdentifier(response.SessionID, 256) || request.SessionID != "" && response.SessionID != request.SessionID || request.SessionID == "" && !r.OpenedAt.Equal(r.UpdatedAt) {
@@ -171,7 +193,8 @@ func validateWorkerSessionImage(i image) error {
 			}
 			seenOffers[offer.ExecutionID] = true
 			execution, ok := i.WorkerExecutions.Records[offer.ExecutionID]
-			if !ok || execution.Lifecycle == nil || workerRecordOffer(execution) != offer || execution.Lifecycle.WorkerUID != key || execution.Lifecycle.SessionID != response.SessionID || execution.Lifecycle.OwnerEpoch != r.OwnerEpoch || execution.Lifecycle.ServerID != response.ServerID {
+			lease, _ := workerLease(execution, offer.LeaseID)
+			if !ok || lease == nil || execution.Intent.Revision != offer.ExecutionRevision || !execution.Intent.Deadline.Equal(offer.Deadline) || lease.WorkerUID != key || lease.SessionID != response.SessionID || lease.OwnerEpoch != r.OwnerEpoch || lease.ServerID != response.ServerID {
 				return ErrWorkerSessionInvalid
 			}
 		}

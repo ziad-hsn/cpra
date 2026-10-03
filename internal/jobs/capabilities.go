@@ -36,11 +36,11 @@ func buildCapabilities() []Capability {
 		drivers []string
 	}{
 		{"check", []string{"http", "tcp", "udp", "dns", "icmp", "grpc", "docker", "tls", "redis", "postgres", "mysql", "mongo", "rabbitmq", "kafka"}},
-		{"recovery", []string{"docker", "webhook", "kubernetes", "aws", "systemd"}},
-		{"notification", []string{"log", "email", "webhook", "pagerduty", "slack", "telegram", "discord", "opsgenie", "teams", "mattermost", "pushover", "twilio", "datadog", "victorops"}},
+		{"recovery", []string{"docker", "webhook", "kubernetes", "aws", "systemd", "a2a"}},
+		{"notification", []string{"log", "email", "webhook", "pagerduty", "slack", "telegram", "discord", "opsgenie", "teams", "mattermost", "pushover", "twilio", "datadog", "victorops", "a2a"}},
 	}
 	optional := map[string]bool{"redis": true, "postgres": true, "mysql": true, "mongo": true, "rabbitmq": true, "kafka": true, "kubernetes": true, "aws": true, "systemd": true, "teams": true, "twilio": true}
-	out := make([]Capability, 0, 33)
+	out := make([]Capability, 0, 35)
 	for _, group := range groups {
 		for _, driver := range group.drivers {
 			c := Capability{Kind: group.kind, Driver: driver, Available: true}

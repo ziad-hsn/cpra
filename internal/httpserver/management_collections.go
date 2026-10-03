@@ -274,7 +274,7 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 	if len(result.Errors) > 0 {
 		return result, nil
 	}
-	view, err := m.catalog.Snapshot()
+	view, err := m.catalog.SnapshotContext(ctx)
 	if err != nil {
 		return result, err
 	}

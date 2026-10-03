@@ -33,7 +33,7 @@ type Driver struct {
 
 func Inventory() []Driver {
 	var out []Driver
-	for _, group := range []struct{ kind, names string }{{"pulse", "http tcp icmp dns udp grpc docker tls redis postgres mysql mongo rabbitmq kafka"}, {"intervention", "docker webhook kubernetes aws systemd"}, {"code", "log slack pagerduty email webhook telegram discord opsgenie mattermost victorops pushover datadog teams twilio"}} {
+	for _, group := range []struct{ kind, names string }{{"pulse", "http tcp icmp dns udp grpc docker tls redis postgres mysql mongo rabbitmq kafka"}, {"intervention", "docker webhook kubernetes aws systemd a2a"}, {"code", "log slack pagerduty email webhook telegram discord opsgenie mattermost victorops pushover datadog teams twilio a2a"}} {
 		for _, name := range strings.Fields(group.names) {
 			out = append(out, Driver{group.kind, name})
 		}
@@ -64,8 +64,9 @@ const (
 )
 
 type Config struct {
-	Manifest manifest.Manifest `yaml:"manifest"`
-	Cases    []Case            `yaml:"cases"`
+	StateDirectory string            `yaml:"state_directory"`
+	Manifest       manifest.Manifest `yaml:"manifest"`
+	Cases          []Case            `yaml:"cases"`
 }
 type Record struct {
 	Driver
@@ -75,6 +76,9 @@ type Record struct {
 	Observed            bool      `json:"observed"`
 	Invoked             bool      `json:"operation_invoked"`
 	HTTPStatus          int       `json:"http_status,omitempty"` // Typed HTTP rejection only; zero for transport/setup failures.
+	MonitorID           string    `json:"monitor_id,omitempty"`
+	ActionID            string    `json:"action_id,omitempty"`
+	ActionState         string    `json:"action_state,omitempty"`
 	Started             time.Time `json:"started,omitempty"`
 	DurationMS          float64   `json:"duration_ms"`
 	EvidenceRef         string    `json:"evidence_ref,omitempty"`
@@ -86,6 +90,7 @@ type Record struct {
 }
 type Report struct {
 	RunID                string         `json:"run_id"`
+	BinarySHA256         string         `json:"binary_sha256,omitempty"`
 	Version              string         `json:"version"`
 	GoVersion            string         `json:"go_version"`
 	Generated            time.Time      `json:"generated"`
@@ -160,6 +165,20 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 		}
 		monitors[id] = m
 	}
+	for _, c := range cases {
+		m, exists := monitors[c.MonitorID]
+		if c.Configured && c.Driver == "a2a" && exists && caseConfigured(c, m, cfg.Manifest) {
+			// A reused directory must never create fresh external actions after
+			// an interrupted campaign. Retain the previous store for inspection.
+			if !filepath.IsAbs(cfg.StateDirectory) {
+				return report, errors.New("A2A verification requires an unused absolute state_directory")
+			}
+			if err := os.Mkdir(cfg.StateDirectory, 0700); err != nil {
+				return report, errors.New("cannot create A2A verification state: choose an unused directory in an existing private parent")
+			}
+			break
+		}
+	}
 	for _, driver := range Inventory() {
 		record := Record{Driver: driver, Status: "not_configured", Operation: driver.Kind, EvidenceType: EvidenceLiveAccount, ObservationBoundary: BoundaryEffect, Reason: "not verified: no enabled user configuration"}
 		c, exists := cases[driver.Kind+"/"+driver.Name]
@@ -173,7 +192,7 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 			if !ok || !caseConfigured(c, m, cfg.Manifest) {
 				record.Reason = "not verified: selected target, test credentials, or independent observer is not configured"
 			} else {
-				record = runCase(ctx, report.RunID, driver, c, m, cfg.Manifest)
+				record = runCase(ctx, report.RunID, driver, c, m, cfg.Manifest, cfg.StateDirectory)
 			}
 		}
 		report.Records = append(report.Records, record)
@@ -195,6 +214,9 @@ func normalizeCase(c Case) (Case, error) {
 	}
 	if c.ObservationBoundary == "" {
 		c.ObservationBoundary = BoundaryEffect
+	}
+	if c.Driver == "a2a" && c.Kind == "code" && c.Color != "red" {
+		return c, errors.New("the A2A notification verification scenario requires color red")
 	}
 	switch c.ObservationBoundary {
 	case BoundaryEffect:
@@ -284,7 +306,7 @@ func (r *Report) summarize() {
 	r.Complete = len(r.Records) == len(Inventory()) && liveEffects == len(Inventory())
 }
 
-func runCase(parent context.Context, runID string, driver Driver, c Case, m manifest.Monitor, configuration manifest.Manifest) (r Record) {
+func runCase(parent context.Context, runID string, driver Driver, c Case, m manifest.Monitor, configuration manifest.Manifest, stateDirectory string) (r Record) {
 	r = Record{Driver: driver, Status: "fail", Operation: driver.Kind, Configured: true, EvidenceType: c.EvidenceType, ObservationBoundary: c.ObservationBoundary, Started: time.Now().UTC()}
 	defer func() { r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond) }()
 	timeout := c.Timeout
@@ -299,9 +321,24 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 		r.Reason = "driver or selected monitor configuration is unavailable in this build"
 		return r
 	}
+	var agent *agentCase
+	if driver.Name == "a2a" {
+		agent, err = prepareAgentCase(ctx, stateDirectory, runID, c.MonitorID, driver.Kind)
+		if err != nil {
+			r.Reason = "cannot commit the isolated A2A verification intent; no agent operation was invoked"
+			return r
+		}
+		defer func() {
+			if err := agent.close(); err != nil {
+				r.Status = "fail"
+				r.Reason = "A2A verification storage could not close; retain the state directory for review"
+			}
+		}()
+		r.MonitorID, r.ActionID = agent.monitor.ID, agent.action.ID
+	}
 	var before []byte
 	if c.ObservationBoundary != BoundaryAPIAcceptance {
-		before, err = observe(ctx, c.Observer, runID, "before", nil)
+		before, err = observe(ctx, c.Observer, runID, "before", nil, r)
 		if err != nil {
 			r.Reason = "independent baseline observation failed; operation was not invoked"
 			return r
@@ -309,10 +346,20 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 	}
 	d := jobs.NewDispatch(job, ecs.Entity{}, driver.Kind, c.Color, 1, c.Endpoint)
 	d.SetContext(ctx)
-	r.Invoked = true
+	if agent != nil {
+		agent.bind(d)
+	}
 	result := d.Execute()
+	r.Invoked = !result.ExecutionStart.IsZero()
 	r.Accepted = result.Err == nil
 	r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond)
+	if agent != nil {
+		r.ActionState, err = agent.finish(result)
+		if err != nil || agent.close() != nil {
+			r.Reason = "A2A outcome commit or storage shutdown was not confirmed; retain the action for review"
+			return r
+		}
+	}
 	if result.Err != nil {
 		var rejection *jobs.DeliveryError
 		if errors.As(result.Err, &rejection) {
@@ -329,7 +376,7 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 		retainEvidence(&r, runID, nil, nil)
 		return r
 	}
-	after, err := observe(ctx, c.Observer, runID, "after", before)
+	after, err := observe(ctx, c.Observer, runID, "after", before, r)
 	if err != nil {
 		r.Reason = "provider accepted operation; independent effect observation failed"
 		return r
@@ -349,6 +396,9 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 
 func retainEvidence(r *Record, runID string, before, after []byte) {
 	row := map[string]any{"run_id": runID, "kind": r.Kind, "driver": r.Name, "evidence_type": r.EvidenceType, "observation_boundary": r.ObservationBoundary, "accepted": r.Accepted, "observed": r.Observed}
+	if r.ActionID != "" {
+		row["monitor_id"], row["action_id"], row["action_state"] = r.MonitorID, r.ActionID, r.ActionState
+	}
 	if before != nil {
 		row["before"] = redactedObservation(before)
 	}
@@ -433,9 +483,10 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 	b.data = append(b.data, p...)
 	return len(p), nil
 }
-func observe(ctx context.Context, args []string, runID, phase string, before []byte) ([]byte, error) {
+func observe(ctx context.Context, args []string, runID, phase string, before []byte, record Record) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	cmd.Env = append(os.Environ(), "CPRA_VERIFY_RUN_ID="+runID, "CPRA_VERIFY_PHASE="+phase)
+	cmd.Env = append(os.Environ(), "CPRA_VERIFY_RUN_ID="+runID, "CPRA_VERIFY_PHASE="+phase,
+		"CPRA_VERIFY_MONITOR_ID="+record.MonitorID, "CPRA_VERIFY_ACTION_ID="+record.ActionID)
 	cmd.Stdin = bytes.NewReader(before)
 	stdout := &boundedOutput{limit: 64 << 10}
 	cmd.Stdout = stdout

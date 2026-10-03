@@ -203,14 +203,21 @@ func TestJobTypeHTTPGatesAndDiscovery(t *testing.T) {
 		if slices.Contains(discovery.Resources, "JobType") != enabled || len(discovery.ResourceOperations["JobType"]) != map[bool]int{true: 5, false: 0}[enabled] {
 			t.Fatal("discovery gate", discovery)
 		}
-		for _, path := range []string{"/api/v2/external-workers", "/api/v2/external-workers/poll", "/api/v2/external-workers/start"} {
+		for _, path := range []string{"/api/v2/external-workers", "/api/v2/external-workers/poll", "/api/v2/external-workers/start", "/api/v2/external-workers/result", "/api/v2/external-workers/heartbeat", "/api/v2/external-workers/late-evidence"} {
 			method := "POST"
 			if path == "/api/v2/external-workers" {
 				method = "GET"
 			}
 			response, _ := f.request(t, method, path, managementOperatorToken, []byte(`{}`), nil)
-			if response.StatusCode != 404 {
-				t.Fatal("unimplemented worker route", path, response.StatusCode)
+			want := http.StatusNotFound
+			if enabled {
+				want = http.StatusOK // Operators may read worker observations.
+				if method == http.MethodPost {
+					want = http.StatusUnauthorized // Operator credentials confer no worker authority.
+				}
+			}
+			if response.StatusCode != want {
+				t.Fatal("worker route authority gate", path, response.StatusCode, want)
 			}
 		}
 	}

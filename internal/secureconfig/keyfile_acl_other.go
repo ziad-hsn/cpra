@@ -1,4 +1,4 @@
-//go:build !linux && !windows
+//go:build !linux && !windows && !darwin
 
 package secureconfig
 
@@ -8,9 +8,7 @@ import (
 )
 
 func checkKeyAccessACL(_ *os.File, _ string) error {
-	// Mode bits alone cannot rule out a named-user ACL on macOS/BSD. Keep the
-	// key boundary closed until a native ACL adapter and execution evidence are
-	// available; cross-compilation is not proof of filesystem access semantics.
+	// Mode bits alone cannot rule out a named-user ACL on this platform.
 	return fmt.Errorf("%w: native key ACL verification is not yet supported on this OS", ErrKeyFile)
 }
 

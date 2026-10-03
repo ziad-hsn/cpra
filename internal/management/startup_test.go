@@ -143,7 +143,14 @@ func makeStartupStage(t *testing.T, store *persistence.Store, sealer *secureconf
 	if _, err := createStartupDirectory(directory); err != nil {
 		t.Fatal(err)
 	}
-	stage := createTestStage(t, startupStageOptions(options, directory, store.Status().NodeID), sealer)
+	stageOptions := startupStageOptions(options, directory, store.Status().NodeID)
+	if options.Catalog.requiresCatalogValidation() {
+		stageOptions.Catalog, err = NewCatalog(store, sealer, options.Catalog)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	stage := createTestStage(t, stageOptions, sealer)
 	if freeze {
 		if _, err := fillStartupStage(context.Background(), stage, options); err != nil {
 			t.Fatal(err)

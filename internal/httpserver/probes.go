@@ -7,6 +7,13 @@ import (
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
+func (s *Server) observationTimeout() time.Duration {
+	if s.cfg.ReadTimeout > 0 {
+		return s.cfg.ReadTimeout
+	}
+	return 10 * time.Second
+}
+
 // registerProbes provides the current SDK's probes in token-only deployments.
 // The outer authentication middleware remains authoritative. A configured
 // management pair registers these paths with its own scoped authorization.
@@ -27,7 +34,11 @@ func (s *Server) registerProbes(mux *http.ServeMux) {
 			}
 			now := time.Now().UTC()
 			if endpoint == "readyz" {
-				ready, _, _, reason := s.observationReadiness(now)
+				ready, _, _, reason := s.observationReadiness(r.Context(), now)
+				if err := r.Context().Err(); err != nil {
+					writeManagementError(w, err)
+					return
+				}
 				if !ready {
 					writeManagementError(w, managementFailure(http.StatusServiceUnavailable, "notReady", reason))
 					return

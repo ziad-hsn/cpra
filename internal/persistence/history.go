@@ -1,7 +1,6 @@
 package persistence
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -431,17 +430,25 @@ func (h *HistoryStore) Expire(at time.Time) error {
 }
 
 func (h *HistoryStore) Page(monitorID, cursor string, limit int) (HistoryPage, error) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	return h.PageContext(context.Background(), monitorID, cursor, limit)
+}
+
+// PageContext preserves the v1 cursor envelope and reads with bounded memory.
+// Empty pages can carry a continuation when the bounded scan has more work.
+func (h *HistoryStore) PageContext(ctx context.Context, monitorID, cursor string, limit int) (HistoryPage, error) {
 	p := HistoryPage{Events: []Event{}, RetentionDays: 30}
+	if err := collectionReadLock(ctx, &h.mu); err != nil {
+		return p, err
+	}
+	defer h.mu.RUnlock()
 	if h.closed {
 		return p, ErrHistoryUnavailable
 	}
 	if h.err != nil {
 		return p, fmt.Errorf("%w: %w", ErrHistoryUnavailable, h.err)
 	}
-	if monitorID == "" || strings.ContainsRune(monitorID, 0) {
-		return p, fmt.Errorf("monitor_id is required")
+	if monitorID == "" || len(monitorID) > 256 || strings.ContainsRune(monitorID, 0) {
+		return p, fmt.Errorf("invalid monitor_id")
 	}
 	if limit == 0 {
 		limit = 100
@@ -449,61 +456,25 @@ func (h *HistoryStore) Page(monitorID, cursor string, limit int) (HistoryPage, e
 	if limit < 1 || limit > 500 {
 		return p, fmt.Errorf("history limit must be between 1 and 500")
 	}
-	c := historyCursor{MonitorID: monitorID, Upper: fmt.Sprintf("%020d:%08d", h.catalog.Index, 99999999)}
+	upper := fmt.Sprintf("%020d:%08d", h.catalog.Index, 99999999)
+	c := historyCursor{MonitorID: monitorID, Upper: upper}
 	if cursor != "" {
+		if len(cursor) > 2731 {
+			return p, fmt.Errorf("invalid history cursor")
+		}
 		data, err := base64.RawURLEncoding.DecodeString(cursor)
-		if err != nil || len(data) > 2048 || json.Unmarshal(data, &c) != nil || c.MonitorID != monitorID {
+		if err != nil || len(data) > 2048 || json.Unmarshal(data, &c) != nil || c.MonitorID != monitorID || !validHistoryPosition(c.Upper) || c.Upper > upper || (c.After != "" && (!validHistoryPosition(c.After) || c.After > c.Upper)) {
 			return p, fmt.Errorf("invalid history cursor")
 		}
 	}
-	accept := func(e Event) {
-		if e.MonitorID == monitorID && e.ID > c.After && e.ID <= c.Upper && !e.At.Before(h.catalog.Cutoff) {
-			e = e.Clone()
-			p.Events = append(p.Events, e)
-		}
+	view := HistoryView{store: h, upper: c.Upper, cutoff: h.catalog.Cutoff, retentionGeneration: h.retentionGeneration}
+	events, after, err := view.pageLocked(ctx, monitorID, c.After, limit)
+	if err != nil {
+		return p, err
 	}
-	if h.dir == "" {
-		for _, e := range h.memory {
-			accept(e)
-		}
-	} else {
-		prefix := []byte(monitorID + "\x00")
-		for day, db := range h.databases {
-			if _, err := os.Stat(filepath.Join(h.dir, day+".db")); err != nil {
-				return p, fmt.Errorf("%w: segment %s", ErrHistoryUnavailable, day)
-			}
-			err := db.View(func(tx *bolt.Tx) error {
-				b := tx.Bucket([]byte("events"))
-				if b == nil {
-					return ErrHistoryUnavailable
-				}
-				cur := b.Cursor()
-				count := 0
-				for k, v := cur.Seek(append(bytes.Clone(prefix), []byte(c.After)...)); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-					var e Event
-					if err := json.Unmarshal(v, &e); err != nil {
-						return err
-					}
-					before := len(p.Events)
-					accept(e)
-					if len(p.Events) > before {
-						count++
-					}
-					if count > limit {
-						break
-					}
-				}
-				return nil
-			})
-			if err != nil {
-				return p, fmt.Errorf("%w: %w", ErrHistoryUnavailable, err)
-			}
-		}
-	}
-	slices.SortFunc(p.Events, func(a, b Event) int { return strings.Compare(a.ID, b.ID) })
-	if len(p.Events) > limit {
-		p.Events = p.Events[:limit]
-		c.After = p.Events[len(p.Events)-1].ID
+	p.Events = events
+	if after != "" {
+		c.After = after
 		data, _ := json.Marshal(c)
 		p.NextCursor = base64.RawURLEncoding.EncodeToString(data)
 	}

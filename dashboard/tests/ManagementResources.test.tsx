@@ -7,6 +7,26 @@ import { fixture, resource } from './managementFixture';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it('creates an A2A notification with secret references and no task polling fields', async () => {
+  const { writes } = await fixture('endpoints', 'new');
+  const form = await screen.findByRole('form', { name: 'Create notification endpoint' });
+  fireEvent.change(screen.getByLabelText('Stable ID'), { target: { value: 'agent-investigator' } });
+  await screen.findByRole('option', { name: 'a2a' });
+  fireEvent.change(screen.getByLabelText('Notification driver'), { target: { value: 'a2a' } });
+  for (const [label, id] of [['Agent endpoint', 'agent-url'], ['Agent bearer token', 'agent-notification-token']]) {
+    fireEvent.change(screen.getByLabelText(`Specific ${label.toLowerCase()} secret ID`), { target: { value: id } });
+    fireEvent.click(within(screen.getByRole('group', { name: `${label} secret` })).getByRole('button', { name: 'Use ID' }));
+  }
+  fireEvent.change(screen.getByLabelText('Request timeout'), { target: { value: '2s' } });
+  fireEvent.change(screen.getByLabelText('Timeout'), { target: { value: '3s' } });
+  fireEvent.change(screen.getByLabelText('Allow HTTP on a trusted network'), { target: { value: 'false' } });
+  expect(screen.queryByLabelText('Poll interval')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Agent bearer token')).not.toBeInTheDocument();
+  fireEvent.submit(form);
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].body?.spec).toEqual({ type: 'a2a', config: { requestTimeout: '2s', timeout: '3s', allowInsecureHttp: false }, credentialRefs: { url: 'agent-url', token: 'agent-notification-token' } });
+});
+
 it('creates a write-only secret with the canonical envelope and clears the input without displaying the echoed value', async () => {
   const storage = vi.spyOn(Storage.prototype, 'setItem');
   const { writes, session } = await fixture('credentials', 'new');
@@ -92,7 +112,7 @@ it('uses generated notification fields and secret references while preserving ex
   fireEvent.submit(form);
   await waitFor(() => expect(writes).toHaveLength(1));
   expect(writes[0].body?.spec).toEqual({ type: 'pushover', config: { priority: 0 }, credentialRefs: { appToken: 'pushover-app' } });
-  expect(Object.keys(notificationFields)).toHaveLength(14);
+  expect(Object.keys(notificationFields)).toHaveLength(15);
   expect(fieldsFor('telegram')?.find(field => field.key === 'botToken')).toMatchObject({ protected: true });
   expect(fieldsFor('email')?.find(field => field.key === 'server')).toMatchObject({ protected: true });
 });

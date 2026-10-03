@@ -54,7 +54,7 @@ func newCollectionCandidatePreparation(ctx context.Context, c *Catalog, id, acto
 	if !c.verified.Load() || c.failed.Load() {
 		return nil, ErrUnavailable
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := c.collectionValidationProfile()
 	if err != nil {
 		return nil, ErrUnavailable
 	}
@@ -102,7 +102,7 @@ func (p *collectionCandidatePreparation) check(ctx context.Context) error {
 	if p == nil || p.closed || p.catalog == nil || !p.catalog.verified.Load() || p.catalog.failed.Load() {
 		return ErrUnavailable
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := p.catalog.collectionValidationProfile()
 	if err != nil || profile != p.profile {
 		return persistence.ErrCollectionConflict
 	}
@@ -255,7 +255,7 @@ func (p *collectionCandidatePreparation) prepare(ctx context.Context, ordinal ui
 		return persistence.CollectionPreparedItem{}, false, persistence.ErrCollectionConflict
 	}
 	originalSpec := resource.Spec
-	err = validateDesired(&resource)
+	err = p.catalog.options.validateDesired(&resource)
 	if resource.Kind == "Monitor" || resource.Kind == "NotificationEndpoint" {
 		clear(originalSpec)
 	}

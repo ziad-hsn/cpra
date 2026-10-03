@@ -23,6 +23,11 @@ func validateOfflineBootstrapWithRestore(db *bolt.DB, snapshot *image, snapshotI
 }
 
 func validateOfflineBootstrapWithCollections(db *bolt.DB, snapshot *image, snapshotIndex, committed uint64, marker *RestoreMarker, collections *collectionLedger, collectionDirectory string) error {
+	_, err := offlineStateFormat(db, snapshot, snapshotIndex, committed, marker, collections, collectionDirectory)
+	return err
+}
+
+func offlineStateFormat(db *bolt.DB, snapshot *image, snapshotIndex, committed uint64, marker *RestoreMarker, collections *collectionLedger, collectionDirectory string) (int, error) {
 	history := &HistoryStore{catalog: historyCatalog{Version: FormatVersion, Index: committed}}
 	f := &machine{image: image{Version: FormatVersion, Monitors: make(map[string]Monitor)}, history: history, collections: collections, collectionDirectory: collectionDirectory}
 	defer func() {
@@ -32,12 +37,12 @@ func validateOfflineBootstrapWithCollections(db *bolt.DB, snapshot *image, snaps
 	}()
 	if snapshot != nil {
 		if snapshot.Index > snapshotIndex || snapshot.Index > committed {
-			return fmt.Errorf("snapshot exceeds committed application state; restore a complete backup")
+			return 0, fmt.Errorf("snapshot exceeds committed application state; restore a complete backup")
 		}
 		f.image = *snapshot
 		recovery, err := recoverCollectionExecution(f.image, collections)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		f.installCollectionExecutionRecovery(recovery)
 		f.rebuildOperationIndex()
@@ -79,35 +84,35 @@ func validateOfflineBootstrapWithCollections(db *bolt.DB, snapshot *image, snaps
 			}
 		})
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 	if f.image.Index != committed {
-		return fmt.Errorf("committed application state does not reach history watermark; restore a complete backup")
+		return 0, fmt.Errorf("committed application state does not reach history watermark; restore a complete backup")
 	}
 	if collectionFormat(f.image.Version) {
 		view, err := f.collectionSnapshotView()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		err = validateCollectionRows(f.image, view)
 		closeErr := view.Close()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if closeErr != nil {
-			return closeErr
+			return 0, closeErr
 		}
 	}
 	if f.bootstrapPending() {
-		return ErrBootstrapPending
+		return 0, ErrBootstrapPending
 	}
 	if marker != nil {
 		if f.image.Restore == nil || f.image.Restore.Marker != *marker || f.restorePending() {
-			return ErrRestorePending
+			return 0, ErrRestorePending
 		}
 	} else if f.image.Restore != nil {
-		return ErrRestoreInvalid
+		return 0, ErrRestoreInvalid
 	}
-	return nil
+	return f.image.Version, nil
 }

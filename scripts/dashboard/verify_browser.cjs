@@ -8,6 +8,8 @@ const operator = 'operator-fixture-012345678901234567890123456';
 const reader = 'reader-fixture-012345678901234567890123456789';
 const secret = 'https://example.test/browser-fixture-private-value';
 const checks = [];
+const { auditAccessibility } = require('./accessibility.cjs');
+const accessibility = [];
 const record = name => checks.push(name);
 function check(condition, label) { if (!condition) throw new Error(label); }
 
@@ -34,6 +36,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
     });
     async function signIn(token = operator) {
       await page.getByRole('heading', { name: 'Sign in to CPRa' }).waitFor();
+      await auditAccessibility(page, 'sign-in', accessibility);
       await page.getByLabel('Bearer token').fill(token);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       await page.getByRole('button', { name: 'Sign out', exact: true }).waitFor();
@@ -60,6 +63,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
       }, { method, path, data, version, token });
     }
     await visit('/secrets?create=1');
+    await auditAccessibility(page, 'secret-editor', accessibility);
     await page.getByLabel('Stable ID', { exact: true }).fill('browser-secret');
     await page.getByLabel('New secret value', { exact: true }).fill(secret);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -141,6 +145,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
     check(await page.getByLabel('Name', { exact: true }).inputValue() === 'My isolated draft', 'conflict overwrote draft');
     await page.getByRole('button', { name: 'Compare latest resource', exact: true }).click();
     await page.getByRole('region', { name: 'Latest resource comparison' }).waitFor();
+    await auditAccessibility(page, 'monitor-conflict', accessibility);
     check(writes.length === countBefore + 1, 'conflicting mutation retried automatically');
     page.once('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Cancel editing', exact: true }).click();
@@ -148,6 +153,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
 
     await visit('/notification-endpoints/browser-log');
     await page.getByRole('button', { name: 'Delete notification endpoint', exact: true }).click();
+    await auditAccessibility(page, 'delete-confirmation', accessibility);
     await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: 'reference prevents' }).waitFor();
     check((await api('GET', '/api/v2/notification-endpoints/browser-log')).status === 200, 'referenced endpoint deleted');
@@ -155,6 +161,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
 
     await visit('/monitor-configurations/browser-monitor', reader);
     await page.getByRole('heading', { name: 'Another operator', exact: true }).waitFor();
+    await auditAccessibility(page, 'reader-monitor', accessibility);
     check(await page.getByRole('button', { name: /^(Edit|Delete|Save|Check now)/ }).count() === 0, 'reader mutation controls exposed');
     const denied = await api('DELETE', '/api/v2/monitors/browser-monitor', undefined, replaced.body.metadata.resourceVersion, reader);
     check(denied.status === 403, 'reader write not rejected by server');
@@ -178,7 +185,7 @@ function check(condition, label) { if (!condition) throw new Error(label); }
     check(errors.length === 0, `uncaught browser errors occurred: ${JSON.stringify(errors)}`);
     record('tokens absent from browser storage, secret-free GETs and URLs, no page errors');
     console.log(JSON.stringify({ browser: browser.version(), node: process.version, playwright: playwrightVersion,
-      scope: 'real TLS API + Raft catalog; no main/controller/provider execution', checks }, null, 2));
+      scope: 'real TLS API + Raft catalog; no main/controller/provider execution', checks, accessibility }, null, 2));
     await context.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

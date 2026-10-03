@@ -244,9 +244,9 @@ func stagedValidationError(err error) error {
 }
 
 func (v *stagedValidator) finish(ctx context.Context, order []persistence.CatalogKey) error {
-	current, err := v.catalog.store.CatalogSnapshot()
+	current, err := v.catalog.store.CatalogSnapshotContext(ctx)
 	if err != nil {
-		_, err = v.reject(0, ErrUnavailable)
+		_, err = v.reject(0, errors.Join(ErrUnavailable, err))
 		return err
 	}
 	for _, key := range collectionKeys(v.live) {
@@ -382,7 +382,7 @@ func (v *stagedValidator) normalized(ctx context.Context, key persistence.Catalo
 			observe(&r, old != nil)
 		}
 		original := r.Spec
-		err = validateDesired(&r)
+		err = v.source.catalog.options.validateDesired(&r)
 		// Credential validation does not replace Spec; clearing that still-owned
 		// slice would erase the value before comparison or driver resolution.
 		if r.Kind == "Monitor" || r.Kind == "NotificationEndpoint" {

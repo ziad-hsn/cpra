@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 -B -m unittest discover -s scripts/docs -p 'test_*.py' -v
       - run: python3 scripts/docs/check.py
   go:
     runs-on: ubuntu-latest
@@ -39,21 +40,89 @@ jobs:
       - run: make test-all-drivers
       - name: Verify worker implementation is excluded from default and built-in builds
         run: python3 scripts/release/verify_worker_exclusion.py --workspace "$RUNNER_TEMP/cpra-sdk.work" --out evidence/local/worker-exclusion.json
-      - name: Verify tagged worker admission, preparation, and authentication
+      - name: Verify tagged worker persistence, HTTP lifecycle, and application startup
         run: |
           go test -race -count=1 -timeout=5m -tags=externaljobs ./internal/httpauth ./internal/localadmin ./internal/cpractl/cli
-          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(Worker|JobType|CatalogJobType|Authentication|DigestV1)' ./internal/persistence
-          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|ExternalRuntime|WorkerOutcome|WorkerAssignment|WorkerPreparation|WorkerExecutionStartup)' ./internal/management
-          go test -race -count=1 -timeout=5m -tags=externaljobs ./internal/manifest ./internal/controller/components ./internal/controller/entities
-          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|WorkerSession|WorkerStart|WorkerAssignment)' ./internal/httpserver
-      - name: Execute collection apply and upload recovery through the native CLI
+          go test -race -count=1 -timeout=10m -tags=externaljobs -run '^Test(Worker|JobType|CatalogJobType|Authentication|DigestV1)' ./internal/persistence
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|ExternalRuntime|Runtime|WorkerOutcome|WorkerAssignment|WorkerPreparation|WorkerExecutionStartup)' ./internal/management
+          go test -race -count=1 -timeout=5m -tags=externaljobs ./internal/manifest ./internal/controller/...
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(JobType|Worker|ManagementAdmission|ManagementReadiness|ManagementCommitBoundary|ManagementServerTLS|ServerStartFailsClosed|ServerReportsBoundAddress|ExplicitAnonymous|DrainingChangesReadiness)' ./internal/httpserver
+          go test -race -count=1 -timeout=5m -tags=externaljobs -run '^Test(MainExternal|MainManagedTLSWritesRecoverAuthoritativeCatalog|MainCollection.*(Stop|Shutdown|Initialization)|MainManagementTransport|MainLegacyAndAnonymous)' .
+      - name: Execute the server and SDK worker in separate processes
+        env:
+          CPRA_WORKER_PROCESS_RACE: '1'
+        run: go test -race -count=1 -timeout=10m -tags=externaljobs -run '^TestMainWorkerProcesses$' .
+      - name: Sustain mixed worker load at default limits
+        env:
+          CPRA_WORKER_LOAD: '1'
+          CPRA_WORKER_PROCESS_RACE: '1'
+        run: go test -race -count=1 -timeout=10m -tags=externaljobs -run '^TestMainWorkerLoad$' .
+      - name: Execute management, diff, collection apply and upload recovery through the native CLI
         env:
           CPRA_RUN_CLI_INTEGRATION: '1'
-        run: go test -race -count=1 -timeout=5m -run '^TestMainManagementCollection(ApplyCLI|ReselectionCLI|ReselectionCLILostReplies)$' .
+        run: go test -race -count=1 -timeout=10m -run '^TestMainManagement(RealCLI(Diff)?|Collection(ApplyCLI|ReselectionCLI|ReselectionCLILostReplies))$' .
+      - name: Execute the native CLI against an externaljobs server build
+        env:
+          CPRA_RUN_CLI_INTEGRATION: '1'
+        run: go test -race -count=1 -timeout=10m -tags=externaljobs -run '^TestMainManagement(RealCLI(Diff)?|Collection(ApplyCLI|ReselectionCLI|ReselectionCLILostReplies))$' .
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
         if: matrix.go == '1.27.1'
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
         if: matrix.go == '1.27.1'
+  a2a:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOENV: 'off'
+    strategy:
+      matrix:
+        go: ['1.25.0', '1.27.1']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+      - name: Prepare the CPRa source workspace
+        run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
+      - name: Install the separate upstream fixture compiler
+        # Keep the selected CPRa compiler on PATH, including Go 1.25.
+        run: GITHUB_PATH= python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-a2a-go"
+      - name: Build the pinned upstream A2A server
+        working-directory: internal/jobs/testdata/a2aagent
+        env:
+          GOWORK: 'off'
+          GOFLAGS: ''
+          CGO_ENABLED: '0'
+        run: |
+          "$RUNNER_TEMP/cpra-a2a-go/bin/go" mod verify
+          "$RUNNER_TEMP/cpra-a2a-go/bin/go" build -mod=readonly -trimpath -buildvcs=false -o "$RUNNER_TEMP/cpra-a2a-agent" .
+          git diff --exit-code -- go.mod go.sum
+      - name: Check upstream fixture dependencies
+        if: matrix.go == '1.27.1'
+        working-directory: internal/jobs/testdata/a2aagent
+        env:
+          GOWORK: 'off'
+          GOFLAGS: ''
+        run: |
+          "$RUNNER_TEMP/cpra-a2a-go/bin/go" vet ./...
+          "$RUNNER_TEMP/cpra-a2a-go/bin/go" run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+      - name: Verify A2A execution, crash recovery and upstream interoperability
+        env:
+          CPRA_A2A_AGENT: ${{ runner.temp }}/cpra-a2a-agent
+        run: |
+          go test -race -count=1 -timeout=4m -tags=a2ainterop -run '^TestA2A' ./internal/jobs ./internal/controller/systems
+          go test -race -count=1 -timeout=4m -run '^TestMainA2AConfiguredActionsSurviveRestart$' .
+          go test -race -count=1 -timeout=4m -run '^TestMainA2A(ObservesOriginalTaskAfterRestart|File)' .
+          go test -race -count=1 -timeout=4m -run '^TestMainA2ARecoveryEscalation$' .
+      - name: Verify monitor admission with lost replies
+        run: |
+          go test -race -count=1 -timeout=4m -run '^TestMainA2AMonitorAdmissionLostReply$' .
+          go test -race -count=1 -timeout=4m -tags=externaljobs -run '^TestMainA2AMonitorAdmissionLostReply$' .
+      - name: Verify configured-agent admission and independent evidence
+        run: |
+          go test -race -count=1 -timeout=4m -run '^TestA2AVerification' ./internal/drivertest
+          python3 -B -m unittest discover -s scripts/verification -p 'test_*.py'
   dashboard:
     runs-on: ubuntu-latest
     steps:
@@ -75,12 +144,27 @@ jobs:
         run: |
           npm ci --ignore-scripts
           node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify frontend accessibility and native dialog behavior
+        timeout-minutes: 5
+        run: node scripts/dashboard/accessibility_campaign.cjs --out "$RUNNER_TEMP/browser/frontend-accessibility"
       - name: Run required browser security and normal startup campaigns
+        timeout-minutes: 180
         env:
           GOTOOLCHAIN: local
         run: |
           python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work" --no-github-env
-          GOWORK="$RUNNER_TEMP/cpra-sdk.work" python3 scripts/dashboard/browser_campaign.py
+          GITHUB_PATH= python3 scripts/release/install_go.py --version go1.25.0 --out "$RUNNER_TEMP/cpra-browser-minimum-go"
+          export GOWORK="$RUNNER_TEMP/cpra-sdk.work"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --out "$RUNNER_TEMP/browser/go1.27.1-default.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --tags externaljobs --out "$RUNNER_TEMP/browser/go1.27.1-externaljobs.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --out "$RUNNER_TEMP/browser/go1.25.0-default.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --tags externaljobs --out "$RUNNER_TEMP/browser/go1.25.0-externaljobs.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && github.event.repository.private == true && github.event.repository.visibility == 'private'
+        with:
+          name: dashboard-browser
+          path: ${{ runner.temp }}/browser/
+          if-no-files-found: warn
 
   native-go:
     name: Native correctness (${{ matrix.runner }})
@@ -100,7 +184,7 @@ jobs:
         shell: bash
         run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
       - name: Native platform, preflight, administration and persistence tests
-        run: go test ./internal/version ./internal/installpath ./internal/manifestcheck ./internal/localadmin ./internal/persistence
+        run: go test -timeout=45m ./internal/version ./internal/installpath ./internal/manifestcheck ./internal/secureconfig ./internal/localadmin ./internal/persistence
       - name: Compile all advertised drivers for native platform
         run: go build -mod=readonly -tags="redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio" ./...
       - name: Native SDK transport and private collection storage
@@ -119,10 +203,15 @@ jobs:
       - run: |
           python3 -m pip install -r scripts/packaging/requirements.txt
           python3 -m unittest discover -s scripts/packaging -p test_release_policy.py -v
-          python3 scripts/release/install_tools.py helm3 helm4 actionlint
+          python3 -m unittest discover -s scripts/packaging -p test_helm_management.py -v
+          python3 -B -m unittest discover -s scripts/release -p 'test_*.py' -v
+          python3 scripts/release/install_tools.py helm3 helm4 actionlint oras distribution cosign
           bin/release-tools/actionlint
+          python3 -B scripts/release/test_registry.py --integration --image-signatures --tools "$PWD/bin/release-tools" --work "$RUNNER_TEMP/cpra-registry-fixture"
           HELM_BIN="$PWD/bin/release-tools/helm3" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
           HELM_BIN="$PWD/bin/release-tools/helm4" python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
+          bin/release-tools/helm3 lint charts/cpra -f charts/cpra/ci/management-values.yaml --strict
+          bin/release-tools/helm4 lint charts/cpra -f charts/cpra/ci/management-values.yaml --strict
 
   sdk:
     name: SDK modules (Go ${{ matrix.go }})
@@ -162,6 +251,7 @@ jobs:
           go vet -tags=externaljobs ./...
       - name: Module archive and excluded-feature consumer contracts
         run: |
+          (cd tools/modulezip && GOWORK=off go test -race ./...)
           python3 -m unittest discover -s scripts/sdk -p 'test_*.py'
           go test ./scripts/sdk/doccheck
           python3 scripts/sdk/verify.py --out evidence/local/sdk-consumer.json
@@ -186,6 +276,7 @@ jobs:
           name: sdk-consumer-${{ matrix.go }}
           path: |
             evidence/local/sdk-consumer.json
+            evidence/local/sdk-consumer.json.modules/
             evidence/local/sdk-generation.json
             evidence/local/sdk-examples.json
           if-no-files-found: warn

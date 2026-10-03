@@ -88,7 +88,7 @@ func (c *Catalog) validateGraph(ctx context.Context, view persistence.CatalogVie
 			if current != key {
 				observed = graph.records[current]
 			}
-			dependents, guard, err := c.store.CatalogDependents(current, maxValidationGraph)
+			dependents, guard, err := c.store.CatalogDependentsContext(ctx, current, maxValidationGraph)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -152,7 +152,7 @@ func (c *Catalog) validateGraph(ctx context.Context, view persistence.CatalogVie
 			if err := resolveDriver(driver, category, graph.resources); err != nil {
 				return err
 			}
-			return ValidateResolvedDriver(category, *driver)
+			return c.validateResolvedDriver(ctx, category, *driver)
 		}); err != nil {
 			return nil, nil, err
 		}

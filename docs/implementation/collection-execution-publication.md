@@ -112,7 +112,7 @@ directly with one of these reserved prefixes loses access through this route.
 
 The canonical API model has independent parent state and
 `executionResult.state`, optional live counts and a sealed summary. The
-[management projection](../../internal/management/collection_execution_results.go)
+[management projection](../review/source/internal/management/collection_execution_results.go.txt)
 reports committed catalog mutations from `accepted` and applied children from
 `childApplied`. A failed child never subtracts an accepted mutation. Unchanged
 decisions remain successful with no new mutation or controller child. An
@@ -128,7 +128,7 @@ monotonic cutoff produces expired availability without replacing the parent
 outcome. Operation lists contain metadata only and suppress duplicate older
 terminal receipts.
 
-The [HTTP result adapter](../../internal/httpserver/management_collection_execution.go)
+The [HTTP result adapter](../review/source/internal/httpserver/management_collection_execution.go.txt)
 uses the existing operation-detail endpoint with bounded execution cursors.
 Cursors bind the original operation/result, named principal, current access
 generation, page limit and frozen history watermark. They expire at the earlier
@@ -140,16 +140,16 @@ removal; operation listing retains its existing source-header requirement for
 execution observations.
 
 Per-item catalog decisions and child dispositions remain separate. The
-[SDK result methods](../../sdk/go/operation_execution.go) provide bounded result
+[SDK result methods](../review/source/sdk/go/operation_execution.go.txt) provide bounded result
 pages, a lazy iterator and waiting for retained results.
 Waiting continues for a canceled parent whose results are pending; canceling the
 caller's context does not cancel the operation. Absent/unknown availability and
 explicit expiry are distinguishable.
 
-The [dashboard decoder](../../dashboard/src/api/executionResults.ts) retains only
+The [dashboard decoder](../review/source/dashboard/src/api/executionResults.ts.txt) retains only
 contract metadata, preserves bounded unknown observations, and pins collection
 identity, immutable summary and input order across pages. Its
-[result reader](../../dashboard/src/components/CollectionExecution.tsx) supports
+[result reader](../review/source/dashboard/src/components/CollectionExecution.tsx.txt) supports
 explicit reading, waiting and page navigation, retaining one detached page.
 Failed or invalidated reads cannot restore an older ready observation when a
 wait or retry stops. Reading or canceling a read does not mutate the operation.
@@ -163,9 +163,9 @@ the already implemented read interfaces.
 
 The registered private format-12 retirement command now performs bounded paired
 outcome/terminal deletion and refunds the child charge only with that pair. Its
-[checkpoint](../../internal/persistence/collection_execution_retirement_checkpoint.go)
+[checkpoint](../review/source/internal/persistence/collection_execution_retirement_checkpoint.go.txt)
 persists cumulative commitments and a bounded terminal frontier. The
-[prefix tree](../../internal/persistence/collection_execution_retirement_tree.go)
+[prefix tree](../review/source/internal/persistence/collection_execution_retirement_tree.go.txt)
 reconstructs terminal proofs from that frontier. Partial-prefix recovery verifies
 the original commitments using this progress and the surviving execution records,
 rejecting incomplete accepted-outcome/terminal pairs.
@@ -186,7 +186,7 @@ current command, recovery and retained-read verification scope.
 
 The new interface implementation and verification records are being assembled at
 [collection-execution-interfaces.md](collection-execution-interfaces.md) and
-[bin/verification/collection-execution-interfaces-2026-09-23/result.json](../../bin/verification/collection-execution-interfaces-2026-09-23/result.json).
+[bin/verification/collection-execution-interfaces-2026-09-23/result.json](../review/local-evidence.md#record-3d3ab9b9e2ab961d82c924f3).
 They record the projection, HTTP/SDK/dashboard reads, independent reviews and
 post-review retention checks without treating those interfaces as activation or
 cleanup qualification. The full package runs preceded the last atomic-cutoff

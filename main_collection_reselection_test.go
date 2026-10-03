@@ -147,7 +147,6 @@ func TestMainCollectionReselectionRecoversOriginalUpload(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	f.options.webAddr = availableLocalAddress(t)
 	client, stop = startMainManagement(t, f)
 	_, err = client.Operations.GetReselection(t.Context(), id, attempt.Data.ID)
 	var problem *cpra.Error

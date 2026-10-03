@@ -2,12 +2,14 @@ package httpserver
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 )
 
@@ -34,6 +36,38 @@ func mkHolder() *fleetview.Holder {
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	return New(ServerConfig{Addr: "localhost:0"}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{QueueCapacity: 65536})
+}
+
+func TestServerReportsBoundAddress(t *testing.T) {
+	previous := controller.SystemLogger
+	controller.SystemLogger = controller.NewLogger("server-test", false)
+	t.Cleanup(func() { controller.SystemLogger = previous })
+	s := New(ServerConfig{Addr: "127.0.0.1:0"}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	if s.Address() != "" {
+		t.Fatal("reported an address before binding")
+	}
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Stop)
+	host, port, err := net.SplitHostPort(s.Address())
+	if err != nil || host != "127.0.0.1" || port == "" || port == "0" {
+		t.Fatal("reported configured address instead of actual listener", s.Address(), err)
+	}
+	client := &http.Client{Timeout: time.Second}
+	t.Cleanup(client.CloseIdleConnections)
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+s.Address()+"/metrics", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatal("bound-address discovery bypassed authentication", response.StatusCode)
+	}
 }
 
 // apiMux builds a ServeMux with only the API routes registered (avoids needing

@@ -8,7 +8,9 @@ import (
 )
 
 func TestWorkerExecutionsReadDefaultExclusion(t *testing.T) {
-	if _, ok := reflect.TypeFor[*Store]().MethodByName("WorkerExecutions"); ok {
-		t.Fatal("default build exposes external execution traversal")
+	for _, name := range []string{"WorkerExecutions", "WorkerResultExecution", "CommitWorkerResult", "CommitWorkerHeartbeat", "WorkerEvidenceExecution", "CommitWorkerEvidence", "FinalizeWorkerExecutions"} {
+		if _, ok := reflect.TypeFor[*Store]().MethodByName(name); ok {
+			t.Fatal("default build exposes external execution operation", name)
+		}
 	}
 }

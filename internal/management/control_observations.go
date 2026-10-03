@@ -30,13 +30,13 @@ func (c *Catalog) Incident(ctx context.Context, id string) (api.Incident, error)
 	if err := ctx.Err(); err != nil {
 		return api.Incident{}, err
 	}
-	if !c.Ready() {
-		return api.Incident{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return api.Incident{}, err
 	}
 	if !validID(id) {
 		return api.Incident{}, ErrValidation
 	}
-	record, ok, err := c.store.Incident(id)
+	record, ok, err := c.store.IncidentContext(ctx, id)
 	if err != nil {
 		return api.Incident{}, err
 	}
@@ -54,10 +54,14 @@ type IncidentView struct {
 }
 
 func (c *Catalog) IncidentSnapshot() (IncidentView, error) {
-	if !c.Ready() {
-		return IncidentView{}, ErrUnavailable
+	return c.IncidentSnapshotContext(context.Background())
+}
+
+func (c *Catalog) IncidentSnapshotContext(ctx context.Context) (IncidentView, error) {
+	if err := c.readyContext(ctx); err != nil {
+		return IncidentView{}, err
 	}
-	view, err := c.store.IncidentSnapshot()
+	view, err := c.store.IncidentSnapshotContext(ctx)
 	return IncidentView{view: view, catalog: c}, err
 }
 
@@ -65,8 +69,11 @@ func (v IncidentView) Page(ctx context.Context, monitorID, after string, limit i
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	if v.catalog == nil || !v.catalog.Ready() {
+	if v.catalog == nil {
 		return nil, "", ErrUnavailable
+	}
+	if err := v.catalog.readyContext(ctx); err != nil {
+		return nil, "", err
 	}
 	if limit < 1 || limit > 500 || (monitorID != "" && !validID(monitorID)) {
 		return nil, "", ErrValidation

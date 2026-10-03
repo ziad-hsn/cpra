@@ -104,7 +104,7 @@ python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
 HELM_BIN=/path/to/helm3 python3 -m unittest discover -s scripts/packaging -p test_container_helm.py -v
 ```
 
-The live harnesses under `scripts/packaging` accept explicit candidate images and designated test environments and write JSON evidence. Each evidence file names the storage access mode and observation boundary. Rendering, server-side API validation, native execution, restart recovery, and CSI fencing are separate gates; a missing runtime or provisioner remains not verified. Publishing a chart or image does not satisfy the million-monitor or 24-hour endurance gate.
+The live harnesses under `scripts/packaging` accept explicit candidate images and designated test environments and write JSON evidence. Each evidence file names the storage access mode and observation boundary. Rendering, server-side API validation, native execution, restart recovery, and CSI fencing are separate gates; a missing runtime or provisioner remains not verified. Publishing a chart or image does not establish comparative performance. The 24-hour endurance test was removed from the requested work on 1 October 2026 and is not a mandatory completion gate; that scope correction also applies to this earlier snapshot.
 
 ```sh
 python3 scripts/packaging/live_compose.py --image cpra:candidate \

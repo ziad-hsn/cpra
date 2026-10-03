@@ -112,6 +112,12 @@ func (c *CodeNotificationWebhook) IsCodeNotification() {}
 // helper shared by Codes and Endpoint.
 func decodeCodeNotificationYAML(notifyType string, node yaml.Node) (CodeNotification, error) {
 	switch notifyType {
+	case "a2a":
+		var t CodeNotificationA2A
+		if err := node.Decode(&t); err != nil {
+			return nil, err
+		}
+		return &t, nil
 	case "log":
 		var t CodeNotificationLog
 		if err := node.Decode(&t); err != nil {
@@ -206,6 +212,12 @@ func decodeCodeNotificationYAML(notifyType string, node yaml.Node) (CodeNotifica
 // decode helper shared by Codes and Endpoint.
 func decodeCodeNotificationJSON(notifyType string, raw json.RawMessage) (CodeNotification, error) {
 	switch notifyType {
+	case "a2a":
+		var t CodeNotificationA2A
+		if err := decodeDriverDurationsJSON(raw, &t); err != nil {
+			return nil, err
+		}
+		return &t, nil
 	case "log":
 		var t CodeNotificationLog
 		if err := json.Unmarshal(raw, &t); err != nil {

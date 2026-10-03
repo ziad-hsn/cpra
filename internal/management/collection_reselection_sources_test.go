@@ -167,7 +167,13 @@ func TestReselectionSourcesRetryAuthenticatesOriginalCiphertext(t *testing.T) {
 	sources, spool := reselectionTestSources(t, 1, 128)
 	reselectionAppendPart(t, sources, 1, 0, true, []byte("private"))
 	ref := sources.last.ref
-	if _, err := spool.file.WriteAt([]byte{0xff}, ref.offset+reselectionFrameHeader+12); err != nil {
+	var corrupted [1]byte
+	offset := ref.offset + reselectionFrameHeader + 12
+	if _, err := spool.file.ReadAt(corrupted[:], offset); err != nil {
+		t.Fatal(err)
+	}
+	corrupted[0] ^= 0xff
+	if _, err := spool.file.WriteAt(corrupted[:], offset); err != nil {
 		t.Fatal(err)
 	}
 	if replayed, err := sources.append(t.Context(), 1, 0, true, []byte("private")); err == nil || replayed {
@@ -258,7 +264,13 @@ func TestReselectionSourcesReaderCorruptionAndCancellation(t *testing.T) {
 	}
 	borrowed := reader.scratch
 	ref := sources.frames[0][1]
-	if _, err := spool.file.WriteAt([]byte{0xee}, ref.offset+reselectionFrameHeader+12); err != nil {
+	var corrupted [1]byte
+	offset := ref.offset + reselectionFrameHeader + 12
+	if _, err := spool.file.ReadAt(corrupted[:], offset); err != nil {
+		t.Fatal(err)
+	}
+	corrupted[0] ^= 0xff
+	if _, err := spool.file.WriteAt(corrupted[:], offset); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := reader.Read(make([]byte, 4)); n != 4 || err != nil {

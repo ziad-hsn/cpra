@@ -1,5 +1,5 @@
 // Package encryptionsetup constructs process-owned encryption dependencies before
-// management admission. It never provisions or replaces persistent keys, opens a
+// configuration or action admission. It never provisions or replaces persistent keys, opens a
 // Raft store, or invokes monitor providers. Remote backend initialization does
 // contact the explicitly selected wrapping service to verify its key contract.
 package encryptionsetup
@@ -35,7 +35,7 @@ func (Options) String() string     { return "encryptionsetup.Options{sources:red
 func (o Options) GoString() string { return o.String() }
 
 // Handle owns the Sealer's wrapping adapters. Close releases owned idle
-// transports after management users stop; it does not interrupt in-flight calls
+// transports after all encryption users stop; it does not interrupt in-flight calls
 // or promise erasure of Go cipher schedules. It is safe to call concurrently.
 type Handle struct {
 	sealer     *secureconfig.Sealer

@@ -73,6 +73,7 @@ func TestBackupManifestAuthenticationRejectsReplacement(t *testing.T) {
 		{"artifact", func(m *BackupManifest) { m.Artifact = "attacker-build" }},
 		{"configuration", func(m *BackupManifest) { m.ConfigurationDigest = strings.Repeat("a", 64) }},
 		{"storage-format", func(m *BackupManifest) { m.StorageFormat++ }},
+		{"state-format", func(m *BackupManifest) { m.StateFormat++ }},
 		{"size", func(m *BackupManifest) { m.Files[0].Size++ }},
 		{"path", func(m *BackupManifest) { m.Files[0].Path = "replacement" }},
 		{"algorithm", func(m *BackupManifest) { m.Authentication.Algorithm = "sha256" }},

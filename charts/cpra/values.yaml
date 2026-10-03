@@ -14,6 +14,22 @@ auth:
   # Supply an immutable, versioned Secret. Never put credentials into Helm values.
   existingSecret: ""
   key: token
+management:
+  enabled: false
+  # Immutable, versioned Secret references only. Never put policy or key contents in values.
+  policy:
+    existingSecret: ""
+    key: policy.yaml
+  encryption:
+    existingSecret: ""
+    key: wrapping.key # Exactly 32 raw bytes, provisioned once and kept outside Raft backups.
+    previous: [] # [{existingSecret: cpra-key-v0, key: wrapping.key}], at most 32.
+  tls:
+    existingSecret: ""
+    keys:
+      certificate: tls.crt
+      privateKey: tls.key
+      ca: ca.crt
 manifest:
   # Set exactly one existing source. Secret/ConfigMap objects are limited to 1 MiB.
   existingSecret: ""

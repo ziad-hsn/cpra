@@ -2,10 +2,11 @@
 
 Status: **partially implemented private contract, 2026-09-24**. Tagged SDK
 messages, worker journal format 2, and Raft session ownership are implemented.
-The HTTP session adapter is exercised through a dedicated test mux; normal
-startup still registers no worker execution routes. [Assignment and Start admission](worker-offers-and-start.md)
-now have private TLS/SDK integration. Heartbeat, result and late-evidence server
-handlers remain outstanding.
+The original HTTP session adapter was exercised through a dedicated test mux.
+Later checkpoints add [assignment and Start admission](worker-offers-and-start.md),
+results, heartbeats and late evidence. Normal startup now registers the explicitly
+enabled [worker HTTP routes](worker-http.md); controller dispatch and complete
+runner/server qualification remain unfinished.
 This document refines the [approved worker lifecycle](api-management-plan.md#worker-identity-and-execution-lifecycle)
 and [remaining server work](external-worker-server-next-steps.md). It does not
 complete shipping Ticket 8 or establish worker/server interoperability.
@@ -25,14 +26,14 @@ principal; none of the request identifiers independently grants permission.
 | `sessionID` | Server-issued identifier bound to worker UID, client nonce, server identity, owner epoch, frozen capabilities and expiry. |
 | `executionID`, `executionRevision`, `leaseID`, `grantID` | Scheduled execution, pinned configuration identity, exact offered attempt and committed start respectively. |
 
-[Restore preserves NodeID](../../internal/persistence/restore_reset.go), so NodeID
+[Restore preserves NodeID](../review/source/internal/persistence/restore_reset.go.txt), so NodeID
 alone cannot be the protocol `serverID`. The worker must pin the expected server
 identity and provisioned UID; local provisioning reports `protocolServerID` and
 the worker UID. The protocol identity hashes NodeID and worker-policy epoch with
 a versioned domain separator; it is not the node ID alone.
 Changing configuration must not silently rebind an existing journal.
 
-[Store startup](../../internal/persistence/store.go) already commits a process
+[Store startup](../review/source/internal/persistence/store.go.txt) already commits a process
 session before opening completes. Reuse that ownership pattern where appropriate;
 do not treat a changed server epoch as proof that remote I/O stopped. Old remote
 handlers may remain active after CPRa restarts and cannot be physically fenced by
@@ -41,7 +42,7 @@ a lease, heartbeat failure or server-side state transition.
 ## Private wire contract
 
 Retain the five existing execution operation IDs and routes in the tagged
-[OpenAPI overlay](../../api/openapi/externaljobs.json). Poll establishes or resumes
+[OpenAPI overlay](../review/source/api/openapi/externaljobs.json.txt). Poll establishes or resumes
 a session within existing grants; it does not enroll a principal. No new endpoint
 is required for registration or reconciliation.
 
@@ -68,7 +69,7 @@ and pin the JobType UID from committed grants and the original execution record.
 
 ## Polling and reconnect
 
-Authenticate with [AuthorizeWorker](../../internal/httpauth/worker_external.go)
+Authenticate with [AuthorizeWorker](../review/source/internal/httpauth/worker_external.go.txt)
 before reading a bounded body. Resolve scopes from committed policy; advertisements
 and capacity never enlarge them. Freeze the capability set for a session.
 
@@ -96,14 +97,14 @@ returns bounded committed offers immediately. This is not a long-poll dispatcher
 
 The [offer allocator](worker-offers-and-start.md) bounds retained offers globally
 and per worker/type and limits response bytes and advertised capacity. The
-dispatcher must still implement the approved 25-second wait. Replay must not extend an offer's
+HTTP adapter implements the [bounded 25-second wait](worker-polling.md). Replay must not extend an offer's
 deadline. An expired response is not an executable offer.
 
 ## Start and reconciliation
 
 The SDK and worker enforce these dispositions. Server-side Start admission is
-implemented in the private adapter; full outcome handling is still required
-before execution routes can be registered.
+implemented in the private adapter and now connected to [normal HTTP startup](worker-http.md).
+Complete controller/runner integration remains required.
 
 `begin` verifies the original assignment ownership, current owner epoch, policy,
 target UID, execution revision, JobType UID/version, controls, dependencies,
@@ -131,7 +132,7 @@ commit. Keep `pending` until an authoritative commit/finalization or fully recov
 old-owner fence establishes the outcome. In particular, a delayed grant reply
 must not escape local cancellation or revive a reconciled journal entry.
 
-The [runner recovery path](../../sdk/go/worker/runner.go) persists and sends only
+The [runner recovery path](../review/source/sdk/go/worker/runner.go.txt) persists and sends only
 `reconcile` requests. It preserves pending reservations and never invokes an
 interrupted handler. Only the original live path sends `begin`.
 
@@ -142,7 +143,7 @@ and late-evidence paths instead require eligible current credentials for the
 **original worker UID**, original server identity and exact execution/grant.
 Do not require the old credential/grant revision or a current polling session to
 deliver an existing outbox. This preserves the distinction already stated by
-[WorkerAuthority](../../internal/persistence/worker_authority_external.go).
+[WorkerAuthority](../review/source/internal/persistence/worker_authority_external.go.txt).
 
 On ordinary server restart, invalidate unstarted offers, finish recovery before
 admission, and hold uncertain committed actions as unknown. Old remote work may
@@ -159,8 +160,8 @@ reject and preserve the old journal instead of adopting the restored server.
 
 ## Compatibility and implementation boundary
 
-The current [JobType validator](../../internal/management/job_types_external.go)
-and [stored version validator](../../internal/persistence/job_type_external.go)
+The current [JobType validator](../review/source/internal/management/job_types_external.go.txt)
+and [stored version validator](../review/source/internal/persistence/job_type_external.go.txt)
 accept only `ProtocolVersion == "1"`. There is no registered server execution
 protocol to preserve yet. Proposed decision: finish this unpublished protocol-1
 contract before qualification, regenerate both tagged clients together, and reject
@@ -168,7 +169,7 @@ older requests missing the required fields. Do not silently accept a second shap
 or relabel immutable stored JobType versions. Any later published incompatible
 protocol requires an explicit new protocol version and compatibility policy.
 
-The separate [worker journal](../../sdk/go/worker/journal.go) uses format 2.
+The separate [worker journal](../review/source/sdk/go/worker/journal.go.txt) uses format 2.
 Worker UID is bound into authenticated metadata/AAD, and replay records retain
 original session identities with reconciliation-only Start requests. Format-1
 records fail explicitly without deleting pending records or replacing a key.

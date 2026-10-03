@@ -2,8 +2,6 @@ package management
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -39,11 +37,14 @@ type ControlResult struct {
 // PrepareControl validates an operator request without changing durable state.
 // The authenticated actor is supplied separately at the commit boundary.
 func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api.ControlRequest) (*PreparedControl, error) {
+	if ctx == nil {
+		return nil, ErrValidation
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !c.Ready() {
-		return nil, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return nil, err
 	}
 	if !validID(id) || !validControlRevision(req.Revision) || len(req.EvidenceRefs) != 0 || req.Resolution != "" ||
 		!validControlText(req.Note) || !validControlText(req.Reason) {
@@ -58,7 +59,7 @@ func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api
 		if req.Duration != "" || (req.IncidentID != "" && req.IncidentID != id) || (action == "dismiss" && strings.TrimSpace(req.Reason) == "") {
 			return nil, persistence.ErrControlInvalid
 		}
-		incident, ok, err := c.store.Incident(id)
+		incident, ok, err := c.store.IncidentContext(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +80,7 @@ func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api
 		} else if req.Duration != "" {
 			return nil, persistence.ErrControlInvalid
 		}
-		status, ok, err := c.store.MonitorStatus(id)
+		status, ok, err := c.store.MonitorStatusContext(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +93,7 @@ func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api
 	}
 	// A state record from a deleted/recreated Monitor never grants control over
 	// its replacement, even if it remains available in incident history.
-	record, ok, err := c.store.CatalogGet(persistence.CatalogKey{Kind: "Monitor", ID: monitorID})
+	record, ok, err := c.store.CatalogGetContext(ctx, persistence.CatalogKey{Kind: "Monitor", ID: monitorID})
 	if err != nil {
 		return nil, err
 	}
@@ -123,15 +124,15 @@ func validControlRevision(value string) bool {
 // CommitControlAs commits one prepared control with the authenticated actor.
 // It reports durable admission, never completion of the owner-loop projection.
 func (c *Catalog) CommitControlAs(ctx context.Context, p *PreparedControl, actor string) (ControlResult, error) {
-	if p == nil || p.catalog != c || !p.used.CompareAndSwap(false, true) || actor == "" || len(actor) > 128 ||
+	if ctx == nil || p == nil || p.catalog != c || !p.used.CompareAndSwap(false, true) || actor == "" || len(actor) > 128 ||
 		!utf8.ValidString(actor) || strings.ContainsAny(actor, "\x00\r\n") {
 		return ControlResult{}, persistence.ErrControlInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return ControlResult{}, err
 	}
-	if !c.Ready() {
-		return ControlResult{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return ControlResult{}, err
 	}
 	p.command.Control.Actor = actor
 	id, err := c.reserveCommand(ctx, &p.command)
@@ -141,13 +142,7 @@ func (c *Catalog) CommitControlAs(ctx context.Context, p *PreparedControl, actor
 	p.operationID.Store(&id)
 	results, err := c.store.Submit(ctx, []persistence.Command{p.command})
 	if err != nil {
-		if errors.Is(err, persistence.ErrCommitUnconfirmed) {
-			return ControlResult{}, fmt.Errorf("%w: %w", ErrOutcomeUnconfirmed, err)
-		}
-		if !c.store.Status().Ready {
-			return ControlResult{}, ErrUnavailable
-		}
-		return ControlResult{}, err
+		return ControlResult{}, c.submissionError(ctx, err)
 	}
 	if len(results) != 1 {
 		return ControlResult{}, ErrOutcomeUnconfirmed

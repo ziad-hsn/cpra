@@ -4,7 +4,7 @@ description: SDK candidate · Build integrations with the CPRa Go SDK for the re
 cpra_scope: sdk
 ---
 
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#go-sdk-and-approved-management-plan).
+> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # Build integrations with the CPRa Go SDK
 

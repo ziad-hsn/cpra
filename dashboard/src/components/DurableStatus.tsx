@@ -23,7 +23,7 @@ export function DurableStatus() {
     </p>}
     {slo.isError ? <p role='alert'>Latency measurements unavailable.</p> : !slo.data ? <p>Loading measurements…</p> : <>
       <p className='muted'>Measured {formatNumber(slo.data.window_seconds)}-second health-check window: p99 scheduling and queue delay ≤{formatMs(slo.data.queue_target_ms)}; scheduled to committed result ≤{formatMs(slo.data.result_target_ms)}.</p>
-      {!slo.data.coverage_complete && <p role='status'>This window has incomplete coverage following startup or recovery. It cannot establish target attainment for the full five minutes.</p>}
+      {!slo.data.coverage_complete && <p role='status'>This window has incomplete coverage because of startup, recovery, or unavailable timing. It cannot establish both targets for the full five minutes.</p>}
       {(slo.data.gap_start || slo.data.gap_end) && <p className='muted'>Reported coverage gap: {slo.data.gap_start || 'Start not reported'} to {slo.data.gap_end || 'End not reported'}.</p>}
       <div style={{ overflowX: 'auto' }} role='region' aria-label='Latency distributions and attainment' tabIndex={0}><table className='data-table'>
         <thead><tr><th>Driver</th><th>Samples / expected</th><th>Scheduling + queue p50 / p95 / p99</th><th>Execution p50 / p95 / p99</th><th>Scheduled to result p50 / p95 / p99</th><th>Queue attainment</th><th>Result attainment</th><th>Missed / timeouts / overdue / pending</th><th>Condition</th></tr></thead>

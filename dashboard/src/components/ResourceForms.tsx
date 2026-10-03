@@ -79,6 +79,9 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
         {drivers.filter(value => fieldsFor(value, category)).sort().map(value => <option key={value} value={value}>{value}</option>)}
       </select>}
     </label>
+    {driver === 'a2a' && <p className="muted">{category === 'recovery'
+      ? 'The agent performs its configured intervention. CPRa waits for task completion and then verifies the monitored service. An unconfirmed outcome requires review.'
+      : 'The agent receives incident context for investigation. Delivery records agent acceptance; checks determine whether the monitored service has recovered. Use a notification credential with only the intended agent permissions.'}</p>}
     {!readOnly && capabilities.isError && <p role="alert">Compiled {category} drivers are unavailable. Restore server access before saving.</p>}
     {!readOnly && driver && capabilities.data && !drivers.includes(driver) && <p role="alert">This driver is not compiled into the current server. The server will reject activation.</p>}
     {fields?.map(field => {

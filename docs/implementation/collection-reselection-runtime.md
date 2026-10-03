@@ -118,7 +118,7 @@ identity cannot silently redirect or merge the transfer.
 ## Remaining qualification and scope
 
 The component, HTTP/SDK and runtime tests have separate evidence records. The
-[combined runtime/browser record](../../bin/verification/collection-reselection-runtime-2026-09-24/result.json)
+[combined runtime/browser record](../review/local-evidence.md#record-2de242041994c35cc00fd592)
 includes commands, logs and selected source hashes. Chrome checks run
 against the embedded dashboard and the normal TLS/Raft application. They require
 token re-entry after refresh, reselect real files including an empty source, lose
@@ -211,7 +211,7 @@ and can continue through activation; it is not used by `resume-upload`. Validati
 and activation after recovered upload require separate explicit operator actions.
 CLI correctness/race and Go 1.25 checks have a separate private evidence directory,
 `bin/verification/collection-reselection-cli-2026-09-24`. The subsequent
-[native CLI checkpoint](../../bin/verification/collection-cli-reselection-2026-09-24/result.json)
+[native CLI checkpoint](../review/local-evidence.md#record-ca59b6d8bcce1815a95136a0)
 records an actual CLI process kill after 256 of 300 resources committed, followed
 by a graceful server restart, rejection of changed original input, and recovery
 of only the 44 missing resources. Previously committed ciphertext remains exact.

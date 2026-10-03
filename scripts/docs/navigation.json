@@ -1,0 +1,537 @@
+[
+  {
+    "Home": "index.md"
+  },
+  {
+    "Get started": [
+      {
+        "Quickstart": "tutorials/quickstart.md"
+      },
+      {
+        "Installation": "tutorials/getting-started.md"
+      },
+      {
+        "Current changes": "release-notes.md"
+      }
+    ]
+  },
+  {
+    "Guides": [
+      {
+        "Persistence and recovery": "durability.md"
+      },
+      {
+        "Measured latency": "slo.md"
+      },
+      {
+        "Verification campaigns": "validation.md"
+      },
+      {
+        "Deployment": "how-to/deploy-to-production.md"
+      },
+      {
+        "Native installation": "native-installation.md"
+      },
+      {
+        "Compose and Helm": "container-helm.md"
+      },
+      {
+        "Release engineering": "release-engineering.md"
+      },
+      {
+        "Troubleshooting": "how-to/common-tasks.md"
+      },
+      {
+        "Capacity and diagnostics": "how-to/performance-tuning.md"
+      },
+      {
+        "Check execution and admission": "check-execution.md"
+      },
+      {
+        "Encrypted collection persistence": "collection-persistence.md"
+      },
+      {
+        "Bounded collection preflight": "collection-preflight.md"
+      },
+      {
+        "Guarded recovery and action review with cpractl": "cpractl-actions.md"
+      },
+      {
+        "Incident attention and monitor controls with cpractl": "cpractl-controls.md"
+      },
+      {
+        "Manage configuration with cpractl": "cpractl-management.md"
+      },
+      {
+        "Stopped local authentication administration": "local-authentication.md"
+      },
+      {
+        "Monitor and incident controls": "management-controls.md"
+      },
+      {
+        "Management API observations": "management-observations.md"
+      },
+      {
+        "Operation observations": "management-operations.md"
+      },
+      {
+        "Starting the management dashboard": "management-startup.md"
+      },
+      {
+        "Provider test environments": "provider-testing.md"
+      },
+      {
+        "Versions and availability": "versions.md"
+      },
+      {
+        "Local worker authentication": "worker-authentication.md"
+      }
+    ]
+  },
+  {
+    "Go SDK": [
+      {
+        "Start with the SDK": "sdk/index.md"
+      },
+      {
+        "Queue registration": "sdk/queue-registration.md"
+      },
+      {
+        "AWS deregistration": "sdk/elb-deregistration.md"
+      },
+      {
+        "Kubernetes Services": "sdk/kubernetes-services.md"
+      },
+      {
+        "DAO and internal SMS": "sdk/dao-sms.md"
+      },
+      {
+        "HTTP operations": "sdk/api-reference.md"
+      },
+      {
+        "Wire types": "sdk/wire-types.md"
+      },
+      {
+        "Go declarations": "sdk/go-reference.md"
+      },
+      {
+        "Verification": "sdk/verification.md"
+      },
+      {
+        "Package documentation and publication": "sdk/publishing.md"
+      },
+      {
+        "Guide maintenance": "sdk/writing-guide.md"
+      },
+      {
+        "SDK candidate · Configuration collections": "sdk/collections.md"
+      },
+      {
+        "SDK candidate · CPRa SDK examples": "sdk/examples.md"
+      },
+      {
+        "SDK candidate · CPRa Go SDK": "sdk/module-overview.md"
+      },
+      {
+        "SDK candidate · CPRa SDK contract sources": "sdk/openapi.md"
+      },
+      {
+        "SDK candidate · CPRa external worker library": "sdk/worker-library.md"
+      }
+    ]
+  },
+  {
+    "Concepts": [
+      {
+        "Architecture": "explanation/architecture-overview.md"
+      },
+      {
+        "Incident lifecycle": "explanation/incident-lifecycle.md"
+      },
+      {
+        "Worker sizing": "explanation/queueing-theory.md"
+      }
+    ]
+  },
+  {
+    "Reference": [
+      {
+        "Monitor configuration": "reference/config-schema.md"
+      },
+      {
+        "Drivers and fields": "reference/jobs-reference.md"
+      },
+      {
+        "HTTP API and dashboard": "reference/api-reference.md"
+      },
+      {
+        "CLI": "reference/cli.md"
+      }
+    ]
+  },
+  {
+    "FAQ": "faq.md"
+  },
+  {
+    "Contribute": [
+      {
+        "Development": "developer-guide.md"
+      },
+      {
+        "Add a driver": "how-to/adding-new-jobs.md"
+      },
+      {
+        "Maintain the docs": "maintaining-docs.md"
+      },
+      {
+        "License and scope": "legal/disclaimer.md"
+      },
+      {
+        "Provider test endpoints, sandboxes and local verification": "provider-testing-research.md"
+      },
+      {
+        "Referenced implementation sources": "review/implementation-sources.md"
+      },
+      {
+        "Historical documentation review": "review/latest-changes.md"
+      },
+      {
+        "Private verification references": "review/local-evidence.md"
+      }
+    ]
+  },
+  {
+    "Pinned candidate": [
+      {
+        "Guides": [
+          {
+            "Candidate · Containers and Helm": "candidate/container-helm.md"
+          },
+          {
+            "Candidate · Development guide": "candidate/developer-guide.md"
+          },
+          {
+            "Candidate · Persistence and restart recovery": "candidate/durability.md"
+          },
+          {
+            "Candidate · Frequently asked questions": "candidate/faq.md"
+          },
+          {
+            "Candidate · CPRa documentation": "candidate/index.md"
+          },
+          {
+            "Candidate · License and project scope": "candidate/legal/disclaimer.md"
+          },
+          {
+            "Maintain candidate documentation": "candidate/maintaining-docs.md"
+          },
+          {
+            "Candidate · Native installation and durable service operations": "candidate/native-installation.md"
+          },
+          {
+            "Candidate · Provider test endpoints, sandboxes and local verification": "candidate/provider-testing-research.md"
+          },
+          {
+            "Candidate · Provider test environments": "candidate/provider-testing.md"
+          },
+          {
+            "Candidate · Release engineering": "candidate/release-engineering.md"
+          },
+          {
+            "Candidate · Durable CPRa candidate": "candidate/release-notes.md"
+          },
+          {
+            "Candidate · Measured latency targets": "candidate/slo.md"
+          },
+          {
+            "Candidate · Installation and builds": "candidate/tutorials/getting-started.md"
+          },
+          {
+            "Candidate · Quickstart": "candidate/tutorials/quickstart.md"
+          },
+          {
+            "Candidate · Release evidence and live verification": "candidate/validation.md"
+          }
+        ]
+      },
+      {
+        "Concepts": [
+          {
+            "Candidate · Architecture": "candidate/explanation/architecture-overview.md"
+          },
+          {
+            "Candidate · Incident lifecycle": "candidate/explanation/incident-lifecycle.md"
+          },
+          {
+            "Candidate · Worker sizing and queueing": "candidate/explanation/queueing-theory.md"
+          }
+        ]
+      },
+      {
+        "Operations": [
+          {
+            "Candidate · Add a check or action": "candidate/how-to/adding-new-jobs.md"
+          },
+          {
+            "Candidate · Troubleshooting": "candidate/how-to/common-tasks.md"
+          },
+          {
+            "Candidate · Deploy a CPRa instance": "candidate/how-to/deploy-to-production.md"
+          },
+          {
+            "Candidate · Capacity and diagnostics": "candidate/how-to/performance-tuning.md"
+          }
+        ]
+      },
+      {
+        "Reference": [
+          {
+            "Candidate · HTTP API and dashboard": "candidate/reference/api-reference.md"
+          },
+          {
+            "Candidate · Command-line reference": "candidate/reference/cli.md"
+          },
+          {
+            "Candidate · Monitor configuration": "candidate/reference/config-schema.md"
+          },
+          {
+            "Candidate · Checks, recovery and notifications": "candidate/reference/jobs-reference.md"
+          },
+          {
+            "Candidate · Candidate runtime configuration": "candidate/reference/runtime-config.md"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "Engineering records": [
+      {
+        "Storage, incidents and qualification": [
+          {
+            "Plan and status · 01-storage: Establish durable Raft storage": "implementation/01-storage.md"
+          },
+          {
+            "Plan and status · 02-incidents: Integrate crash-safe incident processing": "implementation/02-incidents.md"
+          },
+          {
+            "Plan and status · 03-history: Retain monitor event history": "implementation/03-history.md"
+          },
+          {
+            "Plan and status · 04-slo: Add percentile SLO control": "implementation/04-slo.md"
+          },
+          {
+            "Plan and status · 05-interfaces: Update operator interfaces": "implementation/05-interfaces.md"
+          },
+          {
+            "Plan and status · 06-live-providers: Build configuration-driven live verification": "implementation/06-live-providers.md"
+          },
+          {
+            "Plan and status · 07-scale-evidence: Validate million-monitor operation": "implementation/07-scale-evidence.md"
+          },
+          {
+            "Plan and status · 08-release: Publish evidence-backed release documentation": "implementation/08-release.md"
+          },
+          {
+            "Plan and status · CPRa implementation status": "implementation/STATUS.md"
+          },
+          {
+            "Audit checkpoint: 2026-09-23": "implementation/audit-findings-2026-09-23.md"
+          },
+          {
+            "Plan and status · Candidate author review": "implementation/review.md"
+          }
+        ]
+      },
+      {
+        "Collections": [
+          {
+            "Private collection activation admission": "implementation/collection-activation-admission.md"
+          },
+          {
+            "Durable collection activation boundary": "implementation/collection-activation.md"
+          },
+          {
+            "Encrypted collection admission": "implementation/collection-admission.md"
+          },
+          {
+            "Collection reselection after a browser refresh": "implementation/collection-browser-reselection.md"
+          },
+          {
+            "Inactive collection cancellation boundary": "implementation/collection-cancellation.md"
+          },
+          {
+            "Private collection execution finalization": "implementation/collection-execution-finalization.md"
+          },
+          {
+            "Private collection execution and storage format 9": "implementation/collection-execution-integration.md"
+          },
+          {
+            "Collection execution result interfaces": "implementation/collection-execution-interfaces.md"
+          },
+          {
+            "Collection execution records and completion capacity": "implementation/collection-execution-ledger.md"
+          },
+          {
+            "Private collection execution results": "implementation/collection-execution-publication.md"
+          },
+          {
+            "Collection execution results: terminalization, publication and cleanup": "implementation/collection-execution-results-next-steps.md"
+          },
+          {
+            "Collection execution retirement": "implementation/collection-execution-retirement.md"
+          },
+          {
+            "Private collection executor: next implementation boundary": "implementation/collection-executor-next-steps.md"
+          },
+          {
+            "Collection generation cleanup: implementation handoff": "implementation/collection-generation-cleanup.md"
+          },
+          {
+            "Collection identity and preflight": "implementation/collection-identity-contract.md"
+          },
+          {
+            "Collection file normalization and upload fencing": "implementation/collection-normalization.md"
+          },
+          {
+            "Collection operations in the ordinary operation list": "implementation/collection-operation-listing.md"
+          },
+          {
+            "Private collection plan artifact": "implementation/collection-plan-artifact.md"
+          },
+          {
+            "Inactive plan snapshots, format 5": "implementation/collection-plan-snapshots.md"
+          },
+          {
+            "Inactive collection plan staging": "implementation/collection-plan-staging.md"
+          },
+          {
+            "Public collection activation": "implementation/collection-public-activation.md"
+          },
+          {
+            "Encrypted source staging and original-input verification": "implementation/collection-reselection-proof.md"
+          },
+          {
+            "Original collection upload recovery": "implementation/collection-reselection-runtime.md"
+          },
+          {
+            "Bounded validation of encrypted staged collections": "implementation/collection-staged-validation.md"
+          },
+          {
+            "Retained terminal collection receipts": "implementation/collection-terminal-receipts.md"
+          },
+          {
+            "Public collection validation coordinator": "implementation/collection-validation-coordinator.md"
+          },
+          {
+            "Inactive collection validation results": "implementation/collection-validation-staging.md"
+          }
+        ]
+      },
+      {
+        "External workers": [
+          {
+            "External-job configuration admission": "implementation/external-configuration.md"
+          },
+          {
+            "External-worker server: next implementation boundary": "implementation/external-worker-server-next-steps.md"
+          },
+          {
+            "JobType persistence and validation": "implementation/job-types.md"
+          },
+          {
+            "External-worker admission fairness and quota backoff": "implementation/worker-admission.md"
+          },
+          {
+            "External-check receipt retention": "implementation/worker-check-retention.md"
+          },
+          {
+            "External-worker controller dispatch": "implementation/worker-dispatch.md"
+          },
+          {
+            "External execution admission": "implementation/worker-execution-admission.md"
+          },
+          {
+            "Worker action expiry before dispatch": "implementation/worker-expiry.md"
+          },
+          {
+            "Automatic worker execution finalization": "implementation/worker-finalization.md"
+          },
+          {
+            "Worker heartbeats and late evidence": "implementation/worker-heartbeats-and-evidence.md"
+          },
+          {
+            "Worker HTTP routes and shutdown": "implementation/worker-http.md"
+          },
+          {
+            "External notification sources": "implementation/worker-notifications.md"
+          },
+          {
+            "Worker offers and Start authorization": "implementation/worker-offers-and-start.md"
+          },
+          {
+            "Worker polling": "implementation/worker-polling.md"
+          },
+          {
+            "Worker result commits and receipts": "implementation/worker-result-receipts.md"
+          },
+          {
+            "External-worker runtime preparation": "implementation/worker-runtime.md"
+          },
+          {
+            "External-check scheduling accounting": "implementation/worker-schedule-accounting.md"
+          },
+          {
+            "External check generations and unstarted assignment recovery": "implementation/worker-scheduling.md"
+          },
+          {
+            "Worker session and execution protocol": "implementation/worker-session-protocol.md"
+          },
+          {
+            "External-check result latency and accounting": "implementation/worker-slo.md"
+          },
+          {
+            "External-worker observations": "implementation/worker-status.md"
+          }
+        ]
+      },
+      {
+        "Management and platform contracts": [
+          {
+            "A2A jobs implementation": "implementation/a2a-jobs.md"
+          },
+          {
+            "Plan and status · CPRa management API, batch configuration, and external workers": "implementation/api-management-plan.md"
+          },
+          {
+            "Durable principal lifecycle and operator observations": "implementation/authentication-lifecycle.md"
+          },
+          {
+            "Catalog mutation format 4": "implementation/catalog-mutation-format.md"
+          },
+          {
+            "Controller recovery after temporary Raft leadership loss": "implementation/controller-leadership-recovery.md"
+          },
+          {
+            "Dashboard management implementation progress": "implementation/dashboard-implementation-progress.md"
+          },
+          {
+            "CPRa management dashboard, recipients, groups, and secrets": "implementation/dashboard-management-plan.md"
+          },
+          {
+            "Plan: Finalize the CPRa dashboard and ship the qualified release": "implementation/dashboard-shipping-plan.md"
+          },
+          {
+            "Plan and status · Go SDK implementation and qualification": "implementation/go-sdk-status.md"
+          },
+          {
+            "Plan and status · Go SDK implementation verification": "implementation/go-sdk-verification.md"
+          },
+          {
+            "macOS protected files": "implementation/macos-protected-files.md"
+          }
+        ]
+      }
+    ]
+  }
+]

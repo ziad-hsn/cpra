@@ -80,7 +80,6 @@ func TestMainManagementCollectionExecutionBrowser(t *testing.T) {
 	}
 	t.Logf("normal execution browser evidence: %s", output)
 	stop()
-	f.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, f)
 	after, err := restarted.Operations.ExecutionResult(ctx, original.ID, cpra.ExecutionResultPageOptions{})
 	if err != nil || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {

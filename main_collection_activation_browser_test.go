@@ -113,7 +113,6 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 		t.Fatal("cross-file credential dependency was not created", err)
 	}
 	stop()
-	f.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, f)
 	after, err := restarted.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
 	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v1" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {

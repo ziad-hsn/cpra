@@ -447,7 +447,7 @@
         "workerUID"
       ],
       "additionalProperties": false,
-      "description": "Only granted from the original live begin permits invocation. Reconcile never grants. Other dispositions report original attempt state with conditional grant and receipt fields."
+      "description": "Only granted from the original live begin permits invocation. Reconcile never grants. A committed receipt always returns terminal with its receiptID and empty grantID and deadline, including an unknown action outcome. Unknown without a receipt retains the original grant for outcome correlation only. A matching terminal receipt does not resolve an unknown action held in the worker journal."
     },
     "HeartbeatRequest": {
       "type": "object",
@@ -691,26 +691,54 @@
       "properties": {
         "workerID": {
           "type": "string",
-          "x-go-name": "WorkerID"
+          "x-go-name": "WorkerID",
+          "description": "Provisioned stable worker ID. Reading observations does not enroll or authorize a worker."
         },
         "capacity": {
           "type": "integer",
-          "format": "int64"
+          "format": "int64",
+          "minimum": 0,
+          "description": "Free result capacity advertised by the last committed poll. Use only when capacityAvailable is true; this is not total concurrency or a current measurement."
         },
         "active": {
           "type": "integer",
-          "format": "int64"
+          "format": "int64",
+          "minimum": 0,
+          "description": "Committed Start grants without a terminal receipt, including grants awaiting timeout finalization. Not a measurement of running remote handlers."
         },
         "lastSeenAt": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Time of the last committed poll, when a session exists. Replayed polls do not refresh it. Absence means no retained poll observation; it is not a fabricated zero timestamp."
+        },
+        "workerUID": {
+          "type": "string",
+          "x-go-name": "WorkerUID",
+          "description": "Provisioned worker incarnation; distinct from a session ID."
+        },
+        "capacityAvailable": {
+          "type": "boolean",
+          "description": "True only for a current unexpired session and eligible worker credentials at generatedAt."
+        },
+        "unknownActions": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0,
+          "description": "Retained recovery or notification executions whose original terminal outcome was unknown, including operator-reviewed actions. Counted separately from active grants. Query action status for the current hold and review."
+        },
+        "sessionStatus": {
+          "type": "string",
+          "description": "Session and credential observation: no_session, current, expired, previous_owner, clock_regression, reset_required, revoked, or credential_expired. Clients preserve unknown future values."
         }
       },
       "required": [
         "workerID",
+        "workerUID",
         "capacity",
+        "capacityAvailable",
         "active",
-        "lastSeenAt"
+        "unknownActions",
+        "sessionStatus"
       ],
       "additionalProperties": false
     },
@@ -726,10 +754,16 @@
         "nextCursor": {
           "type": "string",
           "x-go-type-skip-optional-pointer": true
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Capture time shared by all pages of this immutable observation snapshot."
         }
       },
       "required": [
-        "items"
+        "items",
+        "generatedAt"
       ],
       "additionalProperties": false
     },
@@ -841,6 +875,16 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "An authenticated workerCheckExpired problem identifies an issued health-check record that has been retired. It grants no execution permission and never expires recovery or notification outcomes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -912,6 +956,16 @@
           },
           "default": {
             "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "An authenticated workerCheckExpired problem identifies an issued health-check record that has been retired. It grants no execution permission and never expires recovery or notification outcomes.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1271,7 +1325,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "description": "Operator-authenticated read-only snapshot of provisioned workers, including workers that have never polled. Requires the externaljobs build tag and runtime enablement. Worker credentials cannot read this operator endpoint. Pages retain one snapshot for five minutes with limits 100 by default and 500 maximum; filters are not implemented and fail explicitly. Counts describe committed protocol state, not worker-local journal or process telemetry."
       }
     }
   }

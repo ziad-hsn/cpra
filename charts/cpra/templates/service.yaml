@@ -8,9 +8,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: http
+    - name: {{ include "cpra.apiScheme" . }}
       port: {{ .Values.service.port }}
-      targetPort: http
+      targetPort: {{ include "cpra.apiScheme" . }}
+      appProtocol: {{ include "cpra.apiScheme" . }}
   selector:
     {{- include "cpra.selectorLabels" . | nindent 4 }}
 ---
@@ -23,9 +24,10 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    - name: http
+    - name: {{ include "cpra.apiScheme" . }}
       port: 8060
-      targetPort: http
+      targetPort: {{ include "cpra.apiScheme" . }}
+      appProtocol: {{ include "cpra.apiScheme" . }}
   selector:
     {{- include "cpra.selectorLabels" . | nindent 4 }}
 {{- end }}

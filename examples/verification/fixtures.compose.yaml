@@ -1,14 +1,34 @@
 # Actual servers. Run one profile at a time with a unique project name.
 # These are disposable fixture credentials, never production credentials.
+x-fixture: &fixture
+  cpus: 1
+  mem_limit: 1g
+  memswap_limit: 1g
+  pids_limit: 256
+  labels:
+    cpra.verification: disposable
+  logging:
+    driver: json-file
+    options:
+      max-size: "1m"
+      max-file: "2"
 services:
   redis:
+    <<: *fixture
     profiles: [redis]
     image: redis:7.4
+    mem_limit: 256m
+    memswap_limit: 256m
+    tmpfs: ["/data:rw,nosuid,size=64m", "/tmp:rw,nosuid,size=16m"]
     ports: ["127.0.0.1:16379:6379"]
     command: ["redis-server", "--requirepass", "cpra-disposable", "--save", ""]
   postgres:
+    <<: *fixture
     profiles: [postgres]
     image: postgres:17
+    mem_limit: 512m
+    memswap_limit: 512m
+    tmpfs: ["/var/lib/postgresql/data:rw,nosuid,size=256m", "/tmp:rw,nosuid,size=32m"]
     ports: ["127.0.0.1:15432:5432"]
     environment:
       POSTGRES_USER: cpra
@@ -16,8 +36,10 @@ services:
       POSTGRES_DB: cpra
     command: ["postgres", "-c", "log_connections=on", "-c", "log_disconnections=on"]
   mysql:
+    <<: *fixture
     profiles: [mysql]
     image: mysql:8.4
+    tmpfs: ["/var/lib/mysql:rw,nosuid,size=512m", "/tmp:rw,nosuid,size=32m"]
     ports: ["127.0.0.1:13306:3306"]
     environment:
       MYSQL_ROOT_PASSWORD: cpra-disposable
@@ -26,28 +48,38 @@ services:
       MYSQL_DATABASE: cpra
     command: ["--general-log=ON", "--log-output=TABLE"]
   mongo:
+    <<: *fixture
     profiles: [mongo]
     image: mongo:8.0
+    tmpfs: ["/data/db:rw,nosuid,size=512m", "/data/configdb:rw,nosuid,size=16m", "/tmp:rw,nosuid,size=32m"]
     ports: ["127.0.0.1:17017:27017"]
     command: ["mongod", "--bind_ip_all", "--setParameter", "logComponentVerbosity={command: {verbosity: 2}}"]
   rabbitmq:
+    <<: *fixture
     profiles: [rabbitmq]
     image: rabbitmq:4.1-management
+    tmpfs: ["/var/lib/rabbitmq:rw,nosuid,size=256m", "/tmp:rw,nosuid,size=32m"]
     ports: ["127.0.0.1:15672:5672", "127.0.0.1:15673:15672"]
     environment:
       RABBITMQ_DEFAULT_USER: cpra
       RABBITMQ_DEFAULT_PASS: cpra-disposable
   kafka:
+    <<: *fixture
     profiles: [kafka]
     image: apache/kafka:3.9.1
-    ports: ["127.0.0.1:19092:9092"]
+    tmpfs: ["/var/lib/kafka/data:rw,nosuid,size=256m,mode=1777", "/tmp:rw,nosuid,size=32m,mode=1777"]
+    ports: ["127.0.0.1:19092:19092"]
     environment:
       KAFKA_NODE_ID: 1
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx256m"
+      JAVA_TOOL_OPTIONS: "-XX:ActiveProcessorCount=1"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:19092
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:19092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1

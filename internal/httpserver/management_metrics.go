@@ -1,6 +1,9 @@
 package httpserver
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 func boolMetric(value bool) float64 {
 	if value {
@@ -40,11 +43,14 @@ func (s *Server) writeSystemMetrics(b *metricWriter) {
 	}
 }
 
-func (s *Server) writeSLOMetrics(b *metricWriter, now time.Time) {
-	view := s.managementSLO(now)
+func (s *Server) writeSLOMetrics(ctx context.Context, b *metricWriter, now time.Time) error {
+	view, err := s.managementSLO(ctx, now)
+	if err != nil {
+		return err
+	}
 	writeGauge(b, "cpra_slo_measurements_available", "Whether rolling health-check SLO measurements are available.", nil, boolMetric(view.Available))
 	if !view.Available {
-		return
+		return nil
 	}
 	window, _ := time.ParseDuration(string(view.Window))
 	writeGauge(b, "cpra_slo_window_seconds", "Rolling SLO measurement window in seconds.", nil, window.Seconds())
@@ -94,4 +100,5 @@ func (s *Server) writeSLOMetrics(b *metricWriter, now time.Time) {
 			}
 		}
 	}
+	return ctx.Err()
 }

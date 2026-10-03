@@ -74,7 +74,7 @@ func newManagementFixture(t *testing.T, verified bool) *managementFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := New(ServerConfig{Store: store, Management: catalog, ManagementAuth: auth, AuthToken: managementLegacyToken, Ready: func() bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	server := New(ServerConfig{Store: store, Management: catalog, ManagementAuth: auth, AuthToken: managementLegacyToken, Ready: func(context.Context) bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	mux := http.NewServeMux()
 	server.registerAPI(mux)
 	server.registerMetrics(mux)

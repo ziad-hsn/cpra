@@ -49,8 +49,8 @@ func (c *Catalog) Operation(ctx context.Context, id string) (api.Operation, erro
 	if err := ctx.Err(); err != nil {
 		return api.Operation{}, err
 	}
-	if !c.Ready() {
-		return api.Operation{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return api.Operation{}, err
 	}
 	if !validID(id) {
 		return api.Operation{}, persistence.ErrOperationNotFound

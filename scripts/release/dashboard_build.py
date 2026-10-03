@@ -14,7 +14,8 @@ def main():
     parser.add_argument('--go', default='go', help='exact release compiler for the shared browser parser')
     parser.add_argument('--check', action='store_true', help='require regenerated assets and notices to match committed outputs')
     args = parser.parse_args()
-    env = {key: os.environ[key] for key in ('PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'SystemRoot', 'TEMP', 'TMP', 'TMPDIR') if key in os.environ}
+    env = {key: os.environ[key] for key in ('PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'SystemRoot', 'TEMP', 'TMP', 'TMPDIR',
+           'GOCACHE', 'GOMODCACHE', 'GOPATH', 'npm_config_cache', 'npm_config_store_dir') if key in os.environ}
     env.update(CI='true', TZ='UTC')
     if subprocess.check_output(['node', '--version'], env=env, text=True).strip() != release.RECIPE['frontend']['node_version']:
         parser.error('Use the exact Node version recorded in scripts/release/recipe.json')

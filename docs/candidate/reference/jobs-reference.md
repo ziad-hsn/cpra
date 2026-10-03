@@ -280,6 +280,22 @@ Build: `systemd`, Linux only. [Schema](https://github.com/ziad-hsn/cpra/blob/410
 | `mode` | string |
 | `timeout` | duration, such as 10s |
 
+### a2a
+
+Build: default in the local, unreleased candidate. Uses an explicitly configured A2A 1.0 HTTP+JSON interface. This addition has not been published to main. See [A2A implementation and evidence](../../implementation/a2a-jobs.md).
+
+| Field | Meaning |
+| --- | --- |
+| `url` | Agent interface base URL; HTTPS required by default. Management resources use a secret reference. |
+| `token` | Optional dedicated agent bearer token; management resources use a secret reference. |
+| `tenant` | Optional tenant, at most 256 bytes without control characters. |
+| `request_timeout` | Per-request deadline, default `10s`, at most `5m`. |
+| `task_timeout` | Overall intervention deadline, including polling and receipt commits; default `60s`, range `1s`–`5m`. |
+| `poll_interval` | Task observation interval, `1s`–`30s`, no greater than task timeout. Default is the smaller of `5s` and task timeout. |
+| `allow_insecure_http` | Explicitly permit HTTP to this trusted endpoint; default false. |
+
+The smaller of the remaining overall deadline and the request deadline applies to each call. CPRa sends one message, records the task reference before polling, and verifies monitor health after reported task completion. A lost response or expired deadline holds the outcome as unknown. Agent output cannot request another CPRa operation. Automatic escalation after another recovery driver's failure remains under implementation.
+
 ## Notifications
 
 A rule uses `notify` plus `config`, or references a reusable `notify_group`. Endpoint objects use `type` plus `config`. See the [group example](config-schema.md#alert-destinations-and-groups).
@@ -439,3 +455,18 @@ Build: `twilio`. [Schema](https://github.com/ziad-hsn/cpra/blob/410fbfb0092d0127
 | `from` | string |
 | `to` | string |
 | `url` | optional full operation URL for a designated test endpoint |
+
+### a2a
+
+Build: default in the local, unreleased candidate. Delivers bounded incident context for investigation. A received message or accepted task records delivery acceptance; it does not establish recovery. Notifications never poll or cancel a remote task. Use a credential with only the intended notification/investigation authority.
+
+| Field | Meaning |
+| --- | --- |
+| `url` | Explicit A2A HTTP+JSON base URL; management resources use a secret reference. |
+| `token` | Optional notification-specific bearer token; management resources use a secret reference. |
+| `tenant` | Optional tenant, at most 256 bytes without control characters. |
+| `request_timeout` | Per-request deadline, default `10s`, at most `5m`. |
+| `timeout` | Overall delivery/receipt deadline, default `60s`, range `1s`–`5m`. |
+| `allow_insecure_http` | Explicitly permit HTTP to this trusted endpoint; default false. |
+
+For both A2A roles, manifests use the snake_case names above. SDK/API fields use `requestTimeout`, `taskTimeout`, `pollInterval`, and `allowInsecureHttp`. The API's driver `credentialRefs.url` and `credentialRefs.token` select separately stored encrypted secrets. URL userinfo, queries, fragments, redirects, and ambient proxies are unsupported.

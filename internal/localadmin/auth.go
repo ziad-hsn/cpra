@@ -156,7 +156,11 @@ func administerAuthentication(ctx context.Context, request AuthenticationRequest
 		defer clear(bearer)
 		base64.RawURLEncoding.Encode(bearer, entropy[:])
 		digest := sha256.Sum256(bearer)
-		command.Principals[index].TokenSHA256 = hex.EncodeToString(digest[:])
+		if request.Action == "rotate-read-token" {
+			command.LegacyTokenSHA256 = hex.EncodeToString(digest[:])
+		} else {
+			command.Principals[index].TokenSHA256 = hex.EncodeToString(digest[:])
+		}
 		output := make([]byte, len(bearer)+1)
 		defer clear(output)
 		copy(output, bearer)
@@ -198,7 +202,11 @@ func validateAuthenticationRequest(r AuthenticationRequest, at time.Time) error 
 		}
 		return nil
 	}
-	if !validAuthenticationPrincipal(r.PrincipalID) {
+	if r.Action == "rotate-read-token" {
+		if r.PrincipalID != "" || r.Role != "" || r.ExpiresAt != nil {
+			return ErrAuthenticationInput
+		}
+	} else if !validAuthenticationPrincipal(r.PrincipalID) {
 		return &authenticationError{"principal ID must contain 1..128 printable UTF-8 bytes without whitespace", ErrAuthenticationInput}
 	}
 	if r.PrincipalID == "legacy-read" && r.Action != "revoke" {
@@ -213,6 +221,9 @@ func validateAuthenticationRequest(r AuthenticationRequest, at time.Time) error 
 		if r.Role != "" {
 			return &authenticationError{"rotation preserves the principal role", ErrAuthenticationInput}
 		}
+	case "rotate-read-token":
+		// The read-only credential has no named role or expiry. It must already
+		// exist; this operation cannot reopen anonymous or revoked access.
 	case "revoke":
 		if r.Role != "" || r.TokenOutput != "" || r.ExpiresAt != nil {
 			return ErrAuthenticationInput
@@ -263,6 +274,12 @@ func prepareAuthenticationCommand(current persistence.AuthenticationState, reque
 	}
 	if !current.BootstrapConsumed || current.Epoch == "" || current.ResetRequired {
 		return command, -1, &authenticationError{"policy needs explicit bootstrap or post-restore reprovisioning before individual changes", ErrAuthenticationState}
+	}
+	if request.Action == "rotate-read-token" {
+		if current.LegacyTokenSHA256 == "" || current.AnonymousLoopback {
+			return command, -1, &authenticationError{"no active read-only token to rotate; provision a named identity explicitly", ErrAuthenticationState}
+		}
+		return command, -1, nil
 	}
 	if request.PrincipalID == "legacy-read" {
 		if request.Action != "revoke" || current.LegacyTokenSHA256 == "" {

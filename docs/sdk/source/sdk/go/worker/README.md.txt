@@ -6,15 +6,58 @@ Importing this package without the tag fails at compile time. The separate SDK
 contains the tagged low-level protocol client; normal SDK applications do not
 depend on this module or bbolt.
 
-**Qualification:** the tests exercise protocol fixtures and real worker-process
-termination. CPRa's management/external-worker server contracts are a release
-prerequisite; fixture success is not evidence of production-server integration,
-provider certification, or a published module version.
+**Qualification:** the private process harness exercises the real SDK runner and
+CPRa startup in separate Linux processes. The current 37-case campaign passes on
+Go 1.25.0 and Go 1.27.1, with both processes race-instrumented on the latter. It
+covers normal checks/recovery/notifications, interrupted Start replies, handler
+crashes, saved outcomes, lost receipts, combined restart, uncooperative shutdown,
+late evidence and revocation. Ten capacity cases distinguish reserved/live bytes
+from allocated database space and retain unknown actions across restart. Raising
+an exhausted limit permits new work without repeating the original action. The
+[process report](../../../docs/implementation/worker-dispatch.md#separate-process-verification)
+records exact sources and earlier failed attempts. Those cases use small
+configured limits. A separate [five-minute mixed-load test](../../../docs/implementation/worker-dispatch.md#sustained-mixed-worker-load)
+passes on both compilers at the default limits after the
+[journal-accounting correction](../../../docs/implementation/worker-dispatch.md#journal-accounting-under-load).
+The Go 1.27.1 race run records 2,143 independently observed invocations; Go 1.25
+records 2,188. Both complete five measurement minutes, reach 16 active handlers,
+drain the journal, preserve original outcome/receipt identities and report zero
+unknown actions, repeated invocations or unreconciled outcomes. Retired checks
+receive the specific expired-check response after restart. Earlier load failures
+and the first outer report-writer failure remain recorded. The refreshed 37-case
+crash campaign also passes on both compilers against the accounting change. Final qualification and independent review remain open.
+Test executables and local network targets do not establish published artifact
+or provider-account qualification.
 
 The private server now implements JobType registration and
 [stopped worker credential provisioning](../../../docs/worker-authentication.md).
-Assignment, start, heartbeat, result and late-evidence routes remain unfinished;
-provisioning a token does not make this runner usable against those routes yet.
+Private adapters for assignment, Start, result receipts, heartbeats and late
+evidence have SDK/TLS/Raft coverage. Automatic server finalization also preserves
+original receipts across expiry and restart. Normal startup now exposes explicitly
+enabled [worker HTTP routes](../../../docs/implementation/worker-http.md), with
+separate new-work and completion barriers during shutdown.
+Private [external-check SLO accounting](../../../docs/implementation/worker-slo.md)
+now measures server confirmation after result commits and preserves missing timing.
+Controller dispatch and pre-admission schedule accounting are connected. The
+[public configuration checkpoint](../../../docs/implementation/external-configuration.md)
+now accepts external check, recovery and notification configuration through the
+API, collection validation and bootstrap when explicitly enabled. Its focused
+tests pass on both compilers; the ordinary process/crash cases now create monitors
+through the public SDK, and all 37 refreshed scenarios pass. Capacity and load fixtures still
+seed encrypted configuration in the stopped store. Provisioning a token alone
+does not enable external monitors. The sustained-load campaign has local passing
+evidence; the final candidate and independent review still require qualification. See the
+[server integration status](../../../docs/implementation/external-worker-server-next-steps.md).
+
+The private [check-retention contract](../../../docs/implementation/worker-check-retention.md)
+allows the server to expire completed check receipts. When Start reconciliation
+or check Result returns the exact HTTP 410 `workerCheckExpired` problem, the SDK
+reports `cpra.ErrWorkerCheckExpired` and the runner removes that check's replay
+record. It does not invoke the handler again. Generic conflicts, missing records,
+network failures and unavailable storage do not authorize removal. Intervention
+and notification outcomes, including unknown actions and their evidence, remain
+retained. Scoped checks pass against the private server adapters and journal;
+production worker integration and independent review remain open.
 
 ## Add the module to your worker application
 
@@ -174,9 +217,11 @@ A lost start reply, `started`, or `unknown` never invokes a handler. Journal
 recovery sends `reconcile`; `pending` retains the reservation until the server
 reports an authoritative state. `started` records an interrupted outcome without
 invocation. An authoritative `rejected` releases only an unstarted reservation;
-`terminal` confirms the retained receipt. Uncertain recovery and notification
-entries remain held after an unknown-result receipt. No local timeout or missing
-response releases that hold.
+`terminal` confirms the retained receipt and carries no executable grant or
+deadline. Uncertain recovery and notification entries remain held after an
+unknown-result receipt, including across restart and repeated matching terminal
+responses. A different receipt is an identity error. No local timeout or missing
+response releases that hold; late evidence remains attached to the original receipt.
 
 Each `Run` creates a fresh client session nonce. One poll is outstanding at a
 time; its exact nonce, session, sequence, capabilities, capacity, and limit remain
@@ -190,8 +235,8 @@ must match their original identities. Poll offers do not authorize execution.
 An outbox result or late evidence uses the journal's original server ID and worker
 UID and does not require a current polling session or new-work grant. A rotated
 credential for the same UID can deliver it; a different UID or restored server ID
-cannot silently adopt the journal. This is a client boundary, not a claim that
-server execution routes or provider-side fencing are implemented.
+cannot silently adopt the journal. These checks do not fence a remote provider
+or establish complete controller/runner interoperability.
 
 `QueueLateEvidence` appends evidence using the original receipt and a stable new
 evidence identity. It does not replace the result, clear the hold, or re-enable
@@ -225,6 +270,14 @@ still alive**. A supervisor must terminate an uncooperative process. Lease expir
 does not fence an external process, and this library cannot sandbox hostile Go
 code. Use a separate service account, process/container resource limits, network
 policy, and provider credentials; never mount the CPRa server state or key paths.
+
+To deliver retained outcomes without accepting new assignments, pass an empty
+`NewRegistry()` to `New` with the original journal, key, worker UID and server
+identity. `Run` skips polling when no handlers are registered, while its journal
+delivery and reconciliation loop continues. It requires current credentials;
+authentication rejection leaves saved outcomes pending. Cancel its context to
+stop it. A zero `PendingOutcomes` count does not mean every record was retired:
+inspect `Records` and `UnknownActions`, since unknown actions retain their holds.
 
 ## Verification and versioning
 

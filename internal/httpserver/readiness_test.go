@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,7 @@ func TestDrainingChangesReadinessNotLiveness(t *testing.T) {
 	s := newTestServer(t)
 	var ready atomic.Bool
 	ready.Store(true)
-	s.cfg.Ready = ready.Load
+	s.cfg.Ready = func(context.Context) bool { return ready.Load() }
 	for _, state := range []bool{true, false} {
 		ready.Store(state)
 		for _, endpoint := range []string{"readyz", "healthz"} {
@@ -49,7 +50,7 @@ func TestExplicitEmptyRuntimeCanBeReady(t *testing.T) {
 
 func TestReadinessDoesNotDependOnDashboardProjection(t *testing.T) {
 	s := newTestServer(t)
-	s.cfg.Ready = func() bool { return true }
+	s.cfg.Ready = func(context.Context) bool { return true }
 	s.holder.Set(&fleetview.StatsSnapshot{Generated: time.Now().Add(-time.Hour)})
 	w := httptest.NewRecorder()
 	s.handleReadyz(w, httptest.NewRequest("GET", "/api/v1/readyz", nil))

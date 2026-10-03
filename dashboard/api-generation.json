@@ -98,6 +98,18 @@
         "routingKey",
         "url"
       ]
+    },
+    "a2a": {
+      "schema": "CodeNotificationA2A",
+      "protected": [
+        "url",
+        "token"
+      ],
+      "labels": {
+        "url": "Agent endpoint",
+        "token": "Agent bearer token",
+        "allowInsecureHttp": "Allow HTTP on a trusted network"
+      }
     }
   },
   "checkDrivers": {
@@ -200,6 +212,18 @@
     "docker": {
       "schema": "InterventionTargetDocker",
       "protected": []
+    },
+    "a2a": {
+      "schema": "InterventionTargetA2A",
+      "protected": [
+        "url",
+        "token"
+      ],
+      "labels": {
+        "url": "Agent endpoint",
+        "token": "Agent bearer token",
+        "allowInsecureHttp": "Allow HTTP on a trusted network"
+      }
     }
   },
   "monitorShapes": [

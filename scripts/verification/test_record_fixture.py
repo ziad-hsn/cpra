@@ -9,6 +9,24 @@ import record_fixture
 
 
 class FixtureRecordingTests(unittest.TestCase):
+    def test_startup_failure_keeps_failed_status_even_when_cleanup_is_confirmed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary, output = pathlib.Path(directory) / 'verifier', pathlib.Path(directory) / 'report.json'
+            binary.write_bytes(b'verifier')
+            def failed_fixture(_command, **_kwargs):
+                pathlib.Path(str(output)+'.environment.json').write_text(json.dumps({
+                    'preflight': {'ready': True}, 'cleanup_confirmed': True,
+                    'native_client_ready': False, 'failure': 'native_client_readiness_deadline'}))
+                return SimpleNamespace(returncode=1)
+            arguments = ['record_fixture.py', '--binary', str(binary), '--out', str(output), '--',
+                         'python3', 'fixture.py', '--binary', str(binary), '--out', str(output)]
+            with mock.patch('sys.argv', arguments), mock.patch.object(record_fixture.subprocess, 'run', side_effect=failed_fixture):
+                self.assertEqual(record_fixture.main(), 1)
+            sidecar = json.loads(pathlib.Path(str(output)+'.fixture.json').read_text())
+            self.assertEqual(sidecar['status'], 'fail')
+            self.assertEqual(sidecar['cleanup_status'], 'confirmed_by_environment')
+            self.assertFalse(output.exists())
+
     def test_declared_binding_is_unique_and_matches_child_command(self):
         binary, report = pathlib.Path('/tmp/verifier'), pathlib.Path('/tmp/report.json')
         command = ['python3', 'fixture.py', '--binary', str(binary), '--out', str(report)]

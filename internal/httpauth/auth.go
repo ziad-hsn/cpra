@@ -5,6 +5,7 @@
 package httpauth
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -174,12 +175,18 @@ func (a *Authorizer) Generation() uint64 {
 // credentials. Role never authorizes a worker execution route. Returned slices
 // are owned by the caller. Recheck at admission if work is delayed after this call.
 func (a *Authorizer) Authorize(r *http.Request, operationID string) (api.AccessInfo, error) {
-	if a == nil {
+	if a == nil || r == nil {
 		return api.AccessInfo{}, unauthorized()
 	}
-	a.mu.RLock()
+	if err := a.readLock(r.Context()); err != nil {
+		return api.AccessInfo{}, err
+	}
 	defer a.mu.RUnlock()
-	return authorize(a.current, r, operationID, a.now())
+	access, err := authorize(a.current, r, operationID, a.now())
+	if contextErr := r.Context().Err(); contextErr != nil {
+		return api.AccessInfo{}, contextErr
+	}
+	return access, err
 }
 
 // WithAdmission holds the policy read lock through a synchronous admission/commit
@@ -197,16 +204,45 @@ func (a *Authorizer) WithAdmission(r *http.Request, operationID string, admit fu
 // read cursors to bind to the authorization used for that snapshot. Its callback
 // has the same synchronous, non-reentrant restrictions as WithAdmission.
 func (a *Authorizer) WithPolicyAdmission(r *http.Request, operationID string, admit func(api.AccessInfo, uint64) error) error {
-	if a == nil || admit == nil {
+	if a == nil || r == nil || admit == nil {
 		return unauthorized()
 	}
-	a.mu.RLock()
+	if err := a.readLock(r.Context()); err != nil {
+		return err
+	}
 	defer a.mu.RUnlock()
 	access, err := authorize(a.current, r, operationID, a.now())
 	if err != nil {
 		return err
 	}
+	if err := r.Context().Err(); err != nil {
+		return err
+	}
 	return admit(access, a.generation)
+}
+
+// readLock bounds policy acquisition by the request lifetime. The caller keeps
+// the lock through its admitted callback so replacement still waits for commits.
+func (a *Authorizer) readLock(ctx context.Context) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if a.mu.TryRLock() {
+			if err := ctx.Err(); err != nil {
+				a.mu.RUnlock()
+				return err
+			}
+			return nil
+		}
+		timer := time.NewTimer(time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 func compile(config Config) (*policy, error) {

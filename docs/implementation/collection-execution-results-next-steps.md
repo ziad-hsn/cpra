@@ -16,7 +16,7 @@ See the [implemented publication boundary](collection-execution-publication.md)
 and the [interface implementation record](collection-execution-interfaces.md).
 The [retirement contract](collection-execution-retirement.md) describes
 the current retirement and retained-read checkpoint. The earlier
-[interface verification record](../../bin/verification/collection-execution-interfaces-2026-09-23/result.json)
+[interface verification record](../review/local-evidence.md#record-3d3ab9b9e2ab961d82c924f3)
 keeps its original scope. The sections below preserve the full
 agreed contract; implemented result reads do not enable the remaining mutation
 or cleanup paths.
@@ -29,15 +29,15 @@ not change the approved path-only `POST /api/v2/operations/{id}/activate` reques
 
 | Existing source | Implemented contract | Remaining extension |
 | --- | --- | --- |
-| [Execution records](../../internal/persistence/collection_execution_records.go), [progress](../../internal/persistence/collection_execution_progress.go), [publication](../../internal/persistence/collection_execution_publication.go) | Immutable original conditional decisions and child terminals; summary/anchor in format 10, joined items/seal in format 11, execution retirement in format 12, source retirement in format 13 | Qualify the connected lifecycle before public activation |
-| [Child commit hooks](../../internal/persistence/collection_child_commit.go), [paired retirement](../../internal/persistence/collection_execution_ledger_retire.go) | Persist terminal disposition before removing a pending child; reserve 4,096 bytes per accepted child and refund it only with paired outcome/terminal retirement | Connected lifecycle qualification |
-| [Execution ledger](../../internal/persistence/collection_execution_ledger.go), [snapshot audit](../../internal/persistence/collection_execution_snapshot.go) | Atomic prepared-slot consumption, bounded warm execution/source deletion and verified partial-prefix recovery | Maximum-size cold-audit latency and connected Apply qualification |
-| [Execution history reader](../../internal/persistence/collection_execution_publication_read.go), [retained lookup](../../internal/persistence/collection_execution_retained_read.go) | Original anchor/seal owner authority, exact identities, one retention cohort and primary/index validation; points/pages/lists survive header removal | Connected Apply acceptance |
-| [Protected result view](../../internal/persistence/collection_execution_result_view.go), [HTTP result reads](../../internal/httpserver/management_collection_execution.go) | Owner check before rows; immutable watermark; bounded detail cursors; fresh authorization, epoch/high-water, health and retention checks after I/O and response-admission waits | Qualify connected Apply alongside reads |
-| [Cancellation](../../internal/persistence/collection_cancel.go), [cleanup](../../internal/persistence/collection_cleanup.go), [retirement checkpoint](../../internal/persistence/collection_execution_retirement_checkpoint.go) | Separate decision-stop/result-finalization milestones and automatic retirement; distinct source-prefix commitments before header removal | Public activation and connected application |
+| [Execution records](../review/source/internal/persistence/collection_execution_records.go.txt), [progress](../review/source/internal/persistence/collection_execution_progress.go.txt), [publication](../review/source/internal/persistence/collection_execution_publication.go.txt) | Immutable original conditional decisions and child terminals; summary/anchor in format 10, joined items/seal in format 11, execution retirement in format 12, source retirement in format 13 | Qualify the connected lifecycle before public activation |
+| [Child commit hooks](../review/source/internal/persistence/collection_child_commit.go.txt), [paired retirement](../review/source/internal/persistence/collection_execution_ledger_retire.go.txt) | Persist terminal disposition before removing a pending child; reserve 4,096 bytes per accepted child and refund it only with paired outcome/terminal retirement | Connected lifecycle qualification |
+| [Execution ledger](../review/source/internal/persistence/collection_execution_ledger.go.txt), [snapshot audit](../review/source/internal/persistence/collection_execution_snapshot.go.txt) | Atomic prepared-slot consumption, bounded warm execution/source deletion and verified partial-prefix recovery | Maximum-size cold-audit latency and connected Apply qualification |
+| [Execution history reader](../review/source/internal/persistence/collection_execution_publication_read.go.txt), [retained lookup](../review/source/internal/persistence/collection_execution_retained_read.go.txt) | Original anchor/seal owner authority, exact identities, one retention cohort and primary/index validation; points/pages/lists survive header removal | Connected Apply acceptance |
+| [Protected result view](../review/source/internal/persistence/collection_execution_result_view.go.txt), [HTTP result reads](../review/source/internal/httpserver/management_collection_execution.go.txt) | Owner check before rows; immutable watermark; bounded detail cursors; fresh authorization, epoch/high-water, health and retention checks after I/O and response-admission waits | Qualify connected Apply alongside reads |
+| [Cancellation](../review/source/internal/persistence/collection_cancel.go.txt), [cleanup](../review/source/internal/persistence/collection_cleanup.go.txt), [retirement checkpoint](../review/source/internal/persistence/collection_execution_retirement_checkpoint.go.txt) | Separate decision-stop/result-finalization milestones and automatic retirement; distinct source-prefix commitments before header removal | Public activation and connected application |
 
 The collection projection in
-[collectionOperationView](../../internal/management/collection_admission.go)
+[collectionOperationView](../review/source/internal/management/collection_admission.go.txt)
 now reports authoritative `committed = accepted` and `applied = childApplied`
 counts. Protected point/list observations retain original identity and parent
 state, including canceled parents whose earlier cancellation receipt expired.
@@ -62,9 +62,9 @@ execution observations omits unavailable counters instead of inventing zeroes.
    state alone.
 
 `Operation.state` and `ApplyResult.outcome` are currently unrestricted strings in
-the [authoritative schema](../../api/openapi/models.base.json), not schema enums.
-The [SDK result wait helper](../../sdk/go/operation_execution.go) and
-[dashboard decoder](../../dashboard/src/api/collectionOperations.ts) nevertheless
+the [authoritative schema](../review/source/api/openapi/models.base.json.txt), not schema enums.
+The [SDK result wait helper](../review/source/sdk/go/operation_execution.go.txt) and
+[dashboard decoder](../review/source/dashboard/src/api/collectionOperations.ts.txt) nevertheless
 recognize explicit sets. Extend the schema documentation, generated models and
 both consumers together; do not infer compatibility from Go's string type.
 
@@ -93,7 +93,7 @@ future wire values may be displayed read-only without being rewritten into a
 known current outcome.
 
 The private coordinator already exposes bounded scalar
-[status observations](../../internal/management/collection_execution_coordinator.go):
+[status observations](../review/source/internal/management/collection_execution_coordinator.go.txt):
 for example `capabilitiesChanged`, `authorityUnavailable`, `clockBeforeProgress`,
 `backpressure`, `commitUnconfirmed`, `sequenceExhausted` and `awaitingCompletion`.
 They are ephemeral execution/admission observations and are not yet wired to the
@@ -213,7 +213,7 @@ absence alone; this is not tamper-proof storage.
 
 The approved operation-detail endpoint now dispatches protected collection
 execution-result pagination through the
-[execution read adapter](../../internal/httpserver/management_collection_execution.go).
+[execution read adapter](../review/source/internal/httpserver/management_collection_execution.go.txt).
 Ordinary operation visibility, cursor-type separation and existing
 `GetOperationValidation` remain intact. This read interface adds no activation
 request body and does not enable public Activate.
@@ -252,9 +252,9 @@ prevents retention advancement during those waits from returning stale rows.
 Native cutoff observations publish only after the catalog save succeeds and are
 initialized from successful recovery.
 
-The [SDK result methods](../../sdk/go/operation_execution.go) provide a bounded
+The [SDK result methods](../review/source/sdk/go/operation_execution.go.txt) provide a bounded
 page read, lazy iterator and separate wait for execution-result readiness. The
-[dashboard reader](../../dashboard/src/components/CollectionExecution.tsx)
+[dashboard reader](../review/source/dashboard/src/components/CollectionExecution.tsx.txt)
 provides explicit read, wait and page navigation while preserving one detached
 page and original identity/summary. Failed or invalidated reads cannot revive an
 older ready observation. CLI `get operation ID --results` reads one SDK page;
@@ -281,9 +281,9 @@ Do not claim physical space reclamation from logical expiry.
 ## Cleanup requires its own verifiable progress
 
 The format-12 private `retire` transition now persists the
-[retirement checkpoint](../../internal/persistence/collection_execution_retirement_checkpoint.go)
+[retirement checkpoint](../review/source/internal/persistence/collection_execution_retirement_checkpoint.go.txt)
 and uses its bounded
-[prefix tree](../../internal/persistence/collection_execution_retirement_tree.go).
+[prefix tree](../review/source/internal/persistence/collection_execution_retirement_tree.go.txt).
 It pairs each accepted outcome with its terminal, retains cumulative retired
 commitments and a bounded terminal frontier, and rejects proofs or insertions
 inside the retired prefix. Partial-prefix snapshots and recovery validate those

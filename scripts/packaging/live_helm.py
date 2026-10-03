@@ -26,9 +26,20 @@ import time
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/release'))
+from live_compose import source_evidence
+from helm_management import ManagedChart
 
 
-def read_history(kubectl, token):
+def chart_source_evidence(manifest, diagnostic=False):
+    record = source_evidence(manifest, diagnostic)
+    record['evidence_class'] = 'working_tree_chart' if diagnostic else 'frozen_chart'
+    record['scope'] = ('private pre-freeze Helm execution; not release qualification'
+                       if diagnostic else 'frozen chart runtime scenarios; aggregate review pending')
+    return record
+
+
+def read_history(kubectl, token, expect_unauthorized=False):
     """Own a loopback tunnel for one bounded, authenticated history read."""
     with tempfile.TemporaryDirectory(prefix='cpra-history-') as directory, (Path(directory) / 'forward.log').open('w+b') as log:
         forward = subprocess.Popen(kubectl + ['port-forward', '--address', '127.0.0.1',
@@ -58,6 +69,10 @@ def read_history(kubectl, token):
                                    headers={'Authorization': 'Bearer ' + token})
                 response = connection.getresponse()
                 body = response.read((2 << 20) + 1)
+                if expect_unauthorized:
+                    if response.status != 401 or len(body) > 2 << 20:
+                        raise RuntimeError('old fixture token was not explicitly rejected')
+                    return True
                 if response.status != 200 or len(body) > 2 << 20:
                     raise RuntimeError('fixture history response was unavailable or oversized')
                 events = json.loads(body)['events']
@@ -89,7 +104,11 @@ def main():
     p.add_argument('--namespace', required=True)
     p.add_argument('--access-mode', choices=['ReadWriteOncePod', 'ReadWriteOnce'], default='ReadWriteOncePod')
     p.add_argument('--storage-class')
+    p.add_argument('--management', action='store_true',
+                   help='also require protected TLS, encrypted writes, rotation and stopped restore; mandatory for release evidence')
     p.add_argument('--out', required=True)
+    p.add_argument('--diagnostic', action='store_true',
+                   help='execute private candidate artifacts without qualifying a frozen release')
     a = p.parse_args()
     if not a.namespace.startswith('cpra-') or not (a.context.startswith('kind-cpra-') or a.context.startswith('cpra-')):
         p.error('context and namespace must identify a dedicated cpra- test environment')
@@ -101,6 +120,7 @@ def main():
     report = {'started': datetime.now(timezone.utc).isoformat(), 'image': a.image,
               'target_image': a.target_image, 'context': a.context, 'namespace': a.namespace, 'access_mode': a.access_mode,
               'status': 'incomplete', 'checks': [],
+              'management_enabled': a.management,
               'csi_rwop_fencing': 'not_verified' if a.access_mode == 'ReadWriteOnce' else 'not_exercised'}
     created = False
     k = ['kubectl', '--kubeconfig', a.kubeconfig, '--context', a.context, '-n', a.namespace]
@@ -162,7 +182,7 @@ def main():
         report['kubernetes'] = json.loads(run(k + ['version', '-o', 'json']).stdout)
         report['helm'] = run([a.helm, 'version', '--short']).stdout.strip()
         report['storage_classes'] = json.loads(run(k + ['get', 'storageclasses', '-o', 'json']).stdout)
-        for i, token in enumerate(tokens, 1):
+        for i, token in enumerate(tokens[:1], 1):
             apply({'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': f'cpra-api-v{i}'},
                    'immutable': True, 'type': 'Opaque', 'stringData': {'token': token}})
         manifest = {'monitors': [{'id': 'packaging-fixture', 'name': 'packaging-fixture', 'enabled': True,
@@ -223,6 +243,7 @@ exec httpd -f -p 8080 -h /tmp/www
             current = json.loads(run(k + ['get', 'pod', 'cpra-fixture-0', '-o', 'json']).stdout)
             report['image_id'] = current['status']['containerStatuses'][0]['imageID']
             report['source'] = json.loads(run(k + ['exec', 'cpra-fixture-0', '--', 'cat', '/usr/share/cpra/RELEASE.json']).stdout)
+            report.update(chart_source_evidence(report['source'], a.diagnostic))
             report['cpra_version'] = run(k + ['exec', 'cpra-fixture-0', '--', '/usr/local/bin/cpra', '-version']).stdout.strip()
             report['binary_sha256'] = run(k + ['exec', 'cpra-fixture-0', '--', 'sha256sum', '/usr/local/bin/cpra', '/usr/local/bin/cpractl']).stdout.strip()
             record('install_readiness_nonroot_readonly')
@@ -294,11 +315,42 @@ exec httpd -f -p 8080 -h /tmp/www
             assert ids <= {event['id'] for event in history()}
             assert run(k + ['exec', 'cpra-fixture-0', '--', 'cat', '/var/lib/cpra/identity.json']).stdout == identity
             record('restart_restores_node_identity_and_history')
+            # Bootstrap Secret replacement cannot overwrite committed access.
+            # Release the sole owner before administrative rotation, and remove
+            # that administrative pod before the StatefulSet reclaims RWOP.
+            values['maintenance'] = True
+            deploy()
+            run(k + ['wait', '--for=delete', 'pod/cpra-fixture-0', '--timeout=90s'])
+            apply({'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': 'cpra-rotate-token'},
+                   'spec': {'restartPolicy': 'Never', 'automountServiceAccountToken': False,
+                            'securityContext': {'runAsUser': 1001, 'runAsGroup': 1001, 'fsGroup': 1001},
+                            'containers': [{'name': 'rotate', 'image': a.image, 'imagePullPolicy': 'Never',
+                                'command': ['/bin/sh', '-ec'],
+                                'args': ['umask 077; mkdir /tmp/cpra-tokens; /usr/local/bin/cpractl local auth rotate-read-token --data-dir /var/lib/cpra --token-output /tmp/cpra-tokens/api.token > /tmp/cpra-tokens/result.json; exec sleep 3600'],
+                                'securityContext': {'readOnlyRootFilesystem': True, 'allowPrivilegeEscalation': False, 'capabilities': {'drop': ['ALL']}},
+                                'volumeMounts': [{'name': 'state', 'mountPath': '/var/lib/cpra'}, {'name': 'tmp', 'mountPath': '/tmp'}]}],
+                            'volumes': [{'name': 'state', 'persistentVolumeClaim': {'claimName': 'state-cpra-fixture-0'}},
+                                        {'name': 'tmp', 'emptyDir': {'sizeLimit': '64Mi'}}]}})
+            run(k + ['wait', '--for=condition=Ready', 'pod/cpra-rotate-token', '--timeout=120s'])
+            rotated = until(lambda: json.loads(run(k + ['exec', 'cpra-rotate-token', '--', 'cat',
+                                                       '/tmp/cpra-tokens/result.json']).stdout), 'committed token rotation')
+            if rotated.get('outcome') != 'committed' or not rotated.get('revision') \
+                    or rotated['revision'] != rotated.get('intendedRevision'):
+                raise RuntimeError('token rotation was not confirmed; retain the original attempt')
+            token = run(k + ['exec', 'cpra-rotate-token', '--', 'cat', '/tmp/cpra-tokens/api.token']).stdout.strip()
+            if not token or token in tokens:
+                raise RuntimeError('rotation did not generate a fresh token')
+            tokens[1] = token
+            apply({'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'cpra-api-v2'},
+                   'immutable': True, 'type': 'Opaque', 'stringData': {'token': token}})
+            run(k + ['delete', 'pod', 'cpra-rotate-token', '--wait=true', '--timeout=90s'])
             values['auth']['existingSecret'] = 'cpra-api-v2'
+            values['maintenance'] = False
             deploy()
             wait_ready()
             assert ids <= {event['id'] for event in history()}
-            record('immutable_secret_rotation_rollout')
+            read_history(k, tokens[0], expect_unauthorized=True)
+            record('immutable_secret_rotation_rollout', committed_revision=rotated['revision'], stopped_owner=True, old_token_status=401)
             values['auth']['existingSecret'] = 'cpra-api-intentionally-missing'
             failed = deploy(timeout='20s', check=False)
             assert failed.returncode != 0, 'missing token unexpectedly passed upgrade readiness'
@@ -395,6 +447,8 @@ exec httpd -f -p 8080 -h /tmp/www
             run(h + ['uninstall', 'cpra', '--wait', '--timeout', '90s'])
             run(k + ['get', 'pvc', source, 'cpra-restored'])
             record('uninstall_preserves_restored_and_original_claims')
+        if a.management:
+            ManagedChart(a, k, run, record, target_count, tokens, image_values, report['binary_sha256']).execute()
         report['status'] = 'pass'
     except Exception as exc:
         report['status'] = 'fail'
@@ -403,6 +457,9 @@ exec httpd -f -p 8080 -h /tmp/www
             report['pods'] = redact(run(k + ['get', 'pods', '-o', 'wide'], check=False).stdout)
             report['controller_logs'] = redact(run(k + ['logs', 'cpra-fixture-0', '--tail=100'], check=False).stdout)
             report['copy_logs'] = redact(run(k + ['logs', 'cpra-offline-copy', '--tail=30'], check=False).stdout)
+            if a.management:
+                report['managed_controller_logs'] = redact(run(k + ['logs', 'cpra-managed-0', '--tail=100'], check=False).stdout)
+                report['managed_init_logs'] = redact(run(k + ['logs', 'cpra-managed-0', '-c', 'management-bootstrap', '--tail=30'], check=False).stdout)
             report['events'] = redact(run(k + ['get', 'events', '--sort-by=.metadata.creationTimestamp'], check=False).stdout[-12000:])
     finally:
         if created:

@@ -9,6 +9,10 @@ import (
 // transition is pure. All timestamps and identities derive from the command
 // and the preceding committed record. No clock, random source or I/O is used.
 func transition(previous Monitor, c Command) Result {
+	return transitionAtFormat(previous, c, NotificationFormatVersion)
+}
+
+func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	if c.Kind == "late_result" {
 		return applyLateResult(previous, c)
 	}
@@ -20,6 +24,10 @@ func transition(previous Monitor, c Command) Result {
 	emit := func(kind string, a *Action) {
 		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident()}
 		if a != nil {
+			if a.RecoveryFailure != nil {
+				v := *a.RecoveryFailure
+				e.RecoveryFailure = &v
+			}
 			e.ActionID, e.Kind, e.Color, e.Endpoint, e.Outcome = a.ID, a.Kind, a.Color, a.Endpoint, a.Outcome
 			e.Revision = a.Revision
 			e.CatalogUID = a.CatalogUID
@@ -139,6 +147,9 @@ func transition(previous Monitor, c Command) Result {
 			return Result{}
 		}
 		if c.Kind == "start" {
+			if c.AgentConnection != nil && c.AgentConnection.CatalogUID != a.CatalogUID {
+				return Result{Err: ErrAgentActionInvalid}
+			}
 			if a.State != Queued || a.CatalogUID != m.CatalogUID || c.At.Before(a.NotBefore) || !m.Policy.Enabled ||
 				c.Maintenance || m.Policy.InMaintenance(c.At) || m.snoozed(c.At) || m.suppressedNotification(a) {
 				return Result{}
@@ -150,6 +161,13 @@ func transition(previous Monitor, c Command) Result {
 			a.State, a.StartedAt = Started, c.At
 			if c.ExecutorSession != "" {
 				a.ExecutorKind, a.ExecutorSession = "local", c.ExecutorSession
+				if c.Driver == "a2a" {
+					a.ExecutorKind = "agent"
+					if c.AgentConnection != nil {
+						connection := c.AgentConnection.Clone()
+						a.AgentConnection = &connection
+					}
+				}
 			}
 			m.Actions[a.ID] = a
 			emit("action_started", &a)
@@ -166,6 +184,9 @@ func transition(previous Monitor, c Command) Result {
 				a.State, a.Outcome = Unknown, "external_outcome_unknown"
 			}
 		}
+		if a.ExecutorKind == "agent" && (c.Ambiguous || c.Outcome != "success" || !agentSuccess(a)) {
+			a.State, a.Outcome = Unknown, "external_outcome_unknown"
+		}
 		m.Actions[a.ID] = a
 		emit("action_"+string(a.State), &a)
 		if a.Kind == "intervention" {
@@ -180,6 +201,7 @@ func transition(previous Monitor, c Command) Result {
 					m.LastInterventionFailure = c.At
 				}
 				m.openIncident(c.At, emit)
+				m.queueRecoveryFailure(a, c.At, emit)
 			}
 		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && m.Policy.Enabled && !m.snoozed(c.At) && !m.suppressedNotification(a) {
 			delete(m.Actions, a.ID)
@@ -213,7 +235,7 @@ func transition(previous Monitor, c Command) Result {
 		}
 		return r // Actual in-flight observation retained; no new incident/action/schedule.
 	}
-	previousWarning := m.Warning
+	previousWarning, previousRecovering := m.Warning, m.Recovering
 	m.Warning = c.Warning
 	if c.Outcome != "success" {
 		m.beginIncident(c.At)
@@ -224,7 +246,7 @@ func transition(previous Monitor, c Command) Result {
 			m.VerifyRemaining = 0
 			m.openIncident(c.At, emit)
 		} else if m.VerifyRemaining == 0 {
-			if m.PulseFailures == 1 && !m.Incident {
+			if m.PulseFailures == 1 && !m.Incident && (!notificationStorageFormat(version) || !previousRecovering) {
 				m.queueColor("yellow", c.At, emit)
 			}
 			if m.PulseFailures >= max(1, m.Policy.Unhealthy) && !c.Maintenance {
@@ -333,6 +355,13 @@ func (m *Monitor) recovered(at time.Time, emit func(string, *Action)) {
 }
 
 func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Action)) {
+	if m.Policy.NotificationTriggers[color] != "" {
+		return
+	}
+	m.queueNotification(color, at, nil, emit)
+}
+
+func (m *Monitor) queueNotification(color string, at time.Time, failure *RecoveryFailure, emit func(string, *Action)) {
 	if !m.Policy.Enabled || m.snoozed(at) || (m.Dismissed && m.notificationIncident() != "") {
 		return
 	}
@@ -348,7 +377,7 @@ func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Acti
 		due = last.Add(m.Policy.Cooldown)
 	}
 	for n := 0; n < count; n++ {
-		m.queueAction("code", color, n, due, emit)
+		m.queueActionWithFailure("code", color, n, due, failure, emit)
 	}
 	if m.Cooldowns == nil {
 		m.Cooldowns = make(map[string]time.Time)
@@ -357,6 +386,10 @@ func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Acti
 }
 
 func (m *Monitor) queueAction(kind, color string, endpoint int, at time.Time, emit func(string, *Action)) {
+	m.queueActionWithFailure(kind, color, endpoint, at, nil, emit)
+}
+
+func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at time.Time, failure *RecoveryFailure, emit func(string, *Action)) {
 	for id, a := range m.Actions {
 		if a.Kind != kind || a.Color != color || a.Endpoint != endpoint || a.CatalogUID != m.CatalogUID {
 			continue
@@ -374,6 +407,10 @@ func (m *Monitor) queueAction(kind, color string, endpoint int, at time.Time, em
 		id = identity(m.CatalogUID + "/" + id)
 	}
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
+	if failure != nil {
+		v := *failure
+		a.RecoveryFailure = &v
+	}
 	if kind == "intervention" {
 		a.Attempt = max(1, m.recoveryAttempts())
 	}

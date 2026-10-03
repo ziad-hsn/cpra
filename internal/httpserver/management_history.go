@@ -31,7 +31,7 @@ func (m *managementHTTP) handleHistoryV2(w http.ResponseWriter, r *http.Request)
 	err = m.withSnapshotRead(r, "GetHistory", "History", query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.HistorySnapshot()
+			view, err := m.catalog.HistorySnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

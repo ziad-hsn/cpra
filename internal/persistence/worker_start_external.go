@@ -75,6 +75,9 @@ func workerStartResponse(r WorkerExecutionRecord, disposition string) WorkerStar
 		out.GrantID = l.GrantID
 		out.Deadline = r.Intent.Deadline
 	}
+	if receipt, terminal := r.TerminalReceipt(); terminal {
+		out.ReceiptID = receipt.ReceiptID
+	}
 	return out
 }
 func (f *machine) workerStartRecord(c WorkerStartCommand, at time.Time) (WorkerExecutionRecord, error) {
@@ -84,17 +87,26 @@ func (f *machine) workerStartRecord(c WorkerStartCommand, at time.Time) (WorkerE
 	if c.OwnerEpoch != f.image.LocalExecutorSession {
 		return WorkerExecutionRecord{}, ErrWorkerSessionExpired
 	}
+	if f.workerCheckExpired(c.Request.ExecutionID) {
+		return WorkerExecutionRecord{}, ErrWorkerCheckExpired
+	}
 	state := f.image.WorkerExecutions
 	if state == nil {
 		return WorkerExecutionRecord{}, ErrWorkerExecutionConflict
 	}
 	r, ok := state.Records[c.Request.ExecutionID]
-	l := r.Lifecycle
+	l, retired := workerLease(r, c.Request.LeaseID)
 	if !ok || l == nil || r.Intent.Revision != c.Request.ExecutionRevision || l.WorkerUID != c.Authority.WorkerUID || l.WorkerID != c.Authority.WorkerID || l.ServerID != c.Request.ServerID || l.SessionID != c.Request.SessionID || l.LeaseID != c.Request.LeaseID {
 		return WorkerExecutionRecord{}, ErrWorkerExecutionConflict
 	}
-	if at.Before(l.UpdatedAt) {
+	if l.Phase == "offered" && at.Before(l.UpdatedAt) {
 		return WorkerExecutionRecord{}, ErrWorkerExecutionConflict
+	}
+	if retired {
+		// This detached view can only yield rejected. Do not expose a successor
+		// worker's grant or terminal receipt to the previous lease holder.
+		r.OwnerEpoch, r.Lifecycle = l.OwnerEpoch, l
+		r.Result, r.Finalization, r.Observation = nil, nil, nil
 	}
 	return r, nil
 }
@@ -108,7 +120,7 @@ func (f *machine) workerOfferEligible(c WorkerStartCommand, r WorkerExecutionRec
 		return ErrWorkerSessionExpired
 	}
 	session, ok := sessions.Sessions[l.WorkerUID]
-	if !ok || session.OwnerEpoch != l.OwnerEpoch || session.Response.SessionID != l.SessionID || !at.Before(session.Response.SessionExpiresAt) {
+	if !ok || session.ReplyExpiredAt != nil || session.OwnerEpoch != l.OwnerEpoch || session.Response.SessionID != l.SessionID || !at.Before(session.Response.SessionExpiresAt) {
 		return ErrWorkerSessionExpired
 	}
 	if err := f.checkWorkerAuthority(c.Authority, workerExecutionScope(r.Intent), at); err != nil {
@@ -123,6 +135,10 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
 	}
 	r := old.Clone()
 	l := r.Lifecycle
+	if _, terminal := r.TerminalReceipt(); terminal {
+		response := workerStartResponse(r, "terminal")
+		return Result{Allowed: true, resultExtensions: resultExtensions{WorkerStart: &response}}
+	}
 	disposition := l.Phase
 	var monitor *Monitor
 	var events []Event
@@ -160,7 +176,10 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
 			}
 		}
 	case "started":
-		if l.OwnerEpoch != f.image.LocalExecutorSession || !at.Before(r.Intent.Deadline) {
+		// Concurrent callers timestamp requests before Raft orders them. An
+		// earlier duplicate may read the committed grant but cannot backdate a
+		// state transition or receive another executable grant.
+		if !at.Before(l.UpdatedAt) && (l.OwnerEpoch != f.image.LocalExecutorSession || !at.Before(r.Intent.Deadline)) {
 			l.Phase = "unknown"
 			disposition = "unknown"
 		} else {
@@ -200,10 +219,12 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
 		if newCost-oldCost > MaxWorkerExecutionBytes-state.EncodedBytes {
 			return Result{Err: ErrWorkerExecutionQuota}
 		}
-		state.Records[r.Intent.ID] = r
+		state.replaceRecord(r)
 		state.EncodedBytes += newCost - oldCost
 		if monitor != nil {
-			events = append(events, f.installMonitor(f.image.Monitors[monitor.ID], *monitor, at)...)
+			previous := f.image.Monitors[monitor.ID]
+			events = append(events, f.installMonitor(previous, *monitor, at)...)
+			f.publishWorkerMonitor(previous, *monitor)
 		}
 		f.image.Version = max(f.image.Version, WorkerOfferFormatVersion)
 	}

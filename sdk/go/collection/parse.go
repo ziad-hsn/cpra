@@ -805,6 +805,8 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 			case "action", "target":
 			case "retries":
 				recovery[key] = value
+			case "max_attempts":
+				recovery["maxAttempts"] = value
 			case "max_failures":
 				recovery["maxFailures"] = value
 			default:
@@ -831,12 +833,15 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 			}
 			for key := range code {
 				switch key {
-				case "dispatch", "notify", "notify_group", "config":
+				case "dispatch", "notify", "notify_group", "config", "trigger":
 				default:
 					return api.Resource{}, fmt.Errorf("unknown manifest code field")
 				}
 			}
 			rule := make(map[string]any)
+			if trigger, exists := code["trigger"]; exists {
+				rule["trigger"] = trigger
+			}
 			if dispatch, exists := code["dispatch"]; exists {
 				rule["dispatch"] = dispatch
 			}

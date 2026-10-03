@@ -595,6 +595,135 @@
       "required": [
         "enabled"
       ]
+    },
+    "management": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+              "maxLength": 253
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+            }
+          },
+          "required": [
+            "existingSecret",
+            "key"
+          ]
+        },
+        "encryption": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+              "maxLength": 253
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+            },
+            "previous": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "existingSecret": {
+                    "type": "string",
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+                    "maxLength": 253,
+                    "minLength": 1
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 253,
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+                  }
+                },
+                "required": [
+                  "existingSecret",
+                  "key"
+                ]
+              }
+            }
+          },
+          "required": [
+            "existingSecret",
+            "key",
+            "previous"
+          ]
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+              "maxLength": 253
+            },
+            "keys": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "certificate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+                },
+                "privateKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+                },
+                "ca": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+                }
+              },
+              "required": [
+                "certificate",
+                "privateKey",
+                "ca"
+              ]
+            }
+          },
+          "required": [
+            "existingSecret",
+            "keys"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "policy",
+        "encryption",
+        "tls"
+      ]
     }
   },
   "required": [
@@ -625,7 +754,8 @@
     "test",
     "providerFiles",
     "providerEnv",
-    "api"
+    "api",
+    "management"
   ],
   "allOf": [
     {
@@ -770,6 +900,108 @@
             "properties": {
               "enabled": {
                 "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "management": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "api": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "storage": {
+            "properties": {
+              "mode": {
+                "const": "raft"
+              }
+            }
+          },
+          "persistence": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "ingress": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          },
+          "management": {
+            "properties": {
+              "policy": {
+                "properties": {
+                  "existingSecret": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "encryption": {
+                "properties": {
+                  "existingSecret": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "tls": {
+                "properties": {
+                  "existingSecret": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "management": {
+            "properties": {
+              "policy": {
+                "properties": {
+                  "existingSecret": {
+                    "const": ""
+                  }
+                }
+              },
+              "tls": {
+                "properties": {
+                  "existingSecret": {
+                    "const": ""
+                  }
+                }
+              },
+              "encryption": {
+                "properties": {
+                  "existingSecret": {
+                    "const": ""
+                  },
+                  "previous": {
+                    "maxItems": 0
+                  }
+                }
               }
             }
           }

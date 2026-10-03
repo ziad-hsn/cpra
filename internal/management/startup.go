@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -42,6 +41,7 @@ var (
 // removes it before returning; any failed memory startup requires discarding that
 // disposable Store. It never creates a plaintext spool or persists a wrapping key.
 type StartupOptions struct {
+	Catalog         CatalogOptions
 	DataDirectory   string
 	OpenSource      func(context.Context) (io.ReadCloser, error)
 	Decode          collection.DecodeOptions
@@ -59,8 +59,9 @@ type StartupResult struct {
 // credentials. It describes input validity and compiled driver support, never
 // provider connectivity or controller readiness.
 type StartupValidation struct {
-	Resources uint64
-	Monitors  uint64
+	Resources                    uint64
+	Monitors                     uint64
+	UnverifiedContractReferences uint64
 }
 
 // StartupCatalog restores an authoritative catalog or completes exactly one
@@ -90,7 +91,7 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 			result.Bootstrap.Phase = "active"
 			result.Bootstrap.CatalogActivated = true
 		}
-		return verifyStartupCatalog(ctx, store, sealer, result)
+		return verifyStartupCatalog(ctx, store, sealer, result, options.Catalog)
 	}
 	if hasBootstrap && (state.Phase != "seeding" || state.Manifest.StageID != startupStageIdentity) {
 		return result, errors.Join(ErrStartupStage, persistence.ErrBootstrapConflict)
@@ -136,6 +137,12 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 		return result, ErrValidation
 	}
 	stageOptions := startupStageOptions(options, directory, store.Status().NodeID)
+	if options.Catalog.requiresCatalogValidation() {
+		stageOptions.Catalog, err = NewCatalog(store, sealer, options.Catalog)
+		if err != nil {
+			return result, err
+		}
+	}
 	var stage *Stage
 	if created {
 		stage, err = CreateStage(ctx, stageOptions, sealer)
@@ -183,11 +190,11 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 		}
 		return result, err
 	}
-	return verifyStartupCatalog(ctx, store, sealer, result)
+	return verifyStartupCatalog(ctx, store, sealer, result, options.Catalog)
 }
 
-func verifyStartupCatalog(ctx context.Context, store *persistence.Store, sealer *secureconfig.Sealer, result StartupResult) (StartupResult, error) {
-	catalog, err := NewCatalog(store, sealer)
+func verifyStartupCatalog(ctx context.Context, store *persistence.Store, sealer *secureconfig.Sealer, result StartupResult, options CatalogOptions) (StartupResult, error) {
+	catalog, err := NewCatalog(store, sealer, options)
 	if err != nil {
 		return result, err
 	}
@@ -282,7 +289,7 @@ func normalizeStartupOptions(options StartupOptions) (StartupOptions, error) {
 
 func startupStageOptions(options StartupOptions, directory, storeID string) StageOptions {
 	return StageOptions{Directory: directory, StoreID: storeID, StageID: startupStageIdentity,
-		MaxResources: options.MaxResources, MaxEncodedBytes: options.MaxEncodedBytes}
+		MaxResources: options.MaxResources, MaxEncodedBytes: options.MaxEncodedBytes, Validation: options.Catalog}
 }
 
 func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions) (StartupValidation, error) {
@@ -310,7 +317,7 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 					clear(credential.Spec)
 				}
 			}()
-			if err := startupCapabilities(resource); err != nil {
+			if err := options.Catalog.startupCapabilities(resource); err != nil {
 				return err
 			}
 			for _, credential := range credentials {
@@ -320,6 +327,9 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 			}
 			if err := stage.Add(ctx, resource); err != nil {
 				return err
+			}
+			if stage.catalog == nil {
+				result.UnverifiedContractReferences += options.Catalog.contractReferenceCount(resource)
 			}
 			if resource.Kind == "Monitor" {
 				result.Monitors++
@@ -345,9 +355,9 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 	return result, nil
 }
 
-func startupCapabilities(resource api.Resource) error {
+func (o CatalogOptions) startupCapabilities(resource api.Resource) error {
 	check := func(kind, driver string) error {
-		if jobs.ValidateDriver(kind, driver) != nil {
+		if o.validateDriverType(kind, driver) != nil {
 			return ErrStartupDriver
 		}
 		return nil
@@ -394,7 +404,7 @@ func safeStartupError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, ErrValidation, ErrStageUnavailable, ErrStageExists, ErrStageMissing, ErrStageLocked, ErrStageQuota, ErrStageDuplicate, ErrStartupDriver} {
+	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, ErrValidation, ErrStageUnavailable, ErrStageExists, ErrStageMissing, ErrStageLocked, ErrStageQuota, ErrStageDuplicate, ErrStartupDriver, persistence.ErrCatalogDependency} {
 		if errors.Is(err, safe) {
 			return safe
 		}

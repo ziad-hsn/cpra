@@ -26,7 +26,10 @@ func mutatesCatalog(c Command) bool {
 // commandWriteFormat upgrades new catalog writes while retaining their original
 // format-2/3 replay contract.
 func commandWriteFormat(c Command) int {
-	version := commandMinimumFormat(c)
+	version := joinStorageFormat(commandMinimumFormat(c), commandExtensionWriteFormat(c))
+	if c.Kind == "pulse" {
+		version = joinStorageFormat(version, NotificationFormatVersion)
+	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
 	if c.Collection != nil && c.Collection.Action == "cleanup" && c.Collection.Cleanup != nil && c.Collection.Cleanup.Activation != nil {
@@ -46,6 +49,15 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.AgentConnection != nil || c.AgentObservation != nil || c.Kind == "agent_observation" {
+		return joinStorageFormat(AgentObservationFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Config != nil && recoveryNotificationPolicyFormat(c.Config.Policy) != FormatVersion {
+		return joinStorageFormat(RecoveryNotificationFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.AgentReceipt != nil || c.Kind == "agent_receipt" || c.Kind == "start" && c.Driver == "a2a" {
+		return AgentActionFormatVersion
+	}
 	if version := commandExtensionMinimumFormat(c); version != FormatVersion {
 		return version
 	}

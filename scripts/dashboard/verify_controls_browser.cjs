@@ -5,6 +5,8 @@ const origin = process.env.CPRA_BROWSER_ORIGIN;
 const operator = 'main-operator-fixture-012345678901234567890123456789';
 const reader = 'main-reader-fixture-012345678901234567890123456789';
 const checks = [];
+const { auditAccessibility } = require('./accessibility.cjs');
+const accessibility = [];
 function check(value, message) { if (!value) throw new Error(message); }
 
 (async () => {
@@ -43,6 +45,7 @@ function check(value, message) { if (!value) throw new Error(message); }
       await page.getByRole('button', { name: label, exact: true }).click();
       const dialog = page.getByRole('dialog', { name: label, exact: true });
       for (const [field, value] of Object.entries(fields)) await dialog.getByLabel(field, { exact: field !== 'Duration' }).fill(value);
+      await auditAccessibility(page, `control-${label.toLowerCase().replaceAll(' ', '-')}`, accessibility);
       await dialog.getByRole('button', { name: label, exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
       await applied();
@@ -102,7 +105,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(errors.length === 0, `uncaught browser errors: ${JSON.stringify(errors)}`);
     check(writes.length === 7, `expected seven explicit control writes, got ${writes.length}`);
     checks.push('reader remains observational; no token storage, hidden retries or page errors');
-    console.log(JSON.stringify({ scope: 'normal main startup, embedded SPA, TLS, encrypted Raft, owner loop, actual local HTTP target', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checks, writes }, null, 2));
+    console.log(JSON.stringify({ scope: 'normal main startup, embedded SPA, TLS, encrypted Raft, owner loop, actual local HTTP target', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checks, writes, accessibility }, null, 2));
     await context.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

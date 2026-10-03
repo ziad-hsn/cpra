@@ -12,11 +12,27 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 	var command Command
 	c := reflect.ValueOf(&command).Elem()
 	frozen := reflect.TypeFor[operationCommandDigestV1]()
-	if c.NumField() != frozen.NumField()+1 {
+	if c.NumField() != frozen.NumField()+4 {
 		t.Fatal("Command gained a field without a reviewed legacy projection")
 	}
 	for n := 0; n < c.NumField(); n++ {
 		field := c.Type().Field(n)
+		if field.Name == "AgentConnection" || field.Name == "AgentObservation" {
+			want, tag := reflect.TypeFor[*AgentConnection](), "agent_connection,omitempty"
+			if field.Name == "AgentObservation" {
+				want, tag = reflect.TypeFor[*AgentObservationCommand](), "agent_observation,omitempty"
+			}
+			if field.Type != want || field.Tag.Get("json") != tag {
+				t.Fatal("unreviewed agent observation shape")
+			}
+			continue
+		}
+		if field.Name == "AgentReceipt" {
+			if field.Type != reflect.TypeFor[*AgentReceiptCommand]() || field.Tag.Get("json") != "agent_receipt,omitempty" {
+				t.Fatal("unreviewed agent receipt shape")
+			}
+			continue
+		}
 		if field.Name == "commandExtensions" {
 			if !field.Anonymous || field.IsExported() || field.Type != reflect.TypeFor[commandExtensions]() {
 				t.Fatal("unreviewed extension shape")

@@ -30,6 +30,27 @@ func (e ActionReviewResolution) Valid() bool {
 	}
 }
 
+// Defines values for AlertRuleTrigger.
+const (
+	AlertRuleTriggerRecoveryExhausted AlertRuleTrigger = "recovery_exhausted"
+	AlertRuleTriggerRecoveryFailed    AlertRuleTrigger = "recovery_failed"
+	AlertRuleTriggerStateChange       AlertRuleTrigger = "state_change"
+)
+
+// Valid indicates whether the value is a known member of the AlertRuleTrigger enum.
+func (e AlertRuleTrigger) Valid() bool {
+	switch e {
+	case AlertRuleTriggerRecoveryExhausted:
+		return true
+	case AlertRuleTriggerRecoveryFailed:
+		return true
+	case AlertRuleTriggerStateChange:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CollectionPrepareRequestIdentityFormat.
 const (
 	CollectionPrepareRequestIdentityFormatCpraCollectionHmacSha256JsonBytesV1 CollectionPrepareRequestIdentityFormat = "cpra.collection.hmac-sha256-json-bytes.v1"
@@ -192,6 +213,39 @@ func (e ReceiptDisposition) Valid() bool {
 	}
 }
 
+// Defines values for RecoveryFailureOutcome.
+const (
+	Failure RecoveryFailureOutcome = "failure"
+)
+
+// Valid indicates whether the value is a known member of the RecoveryFailureOutcome enum.
+func (e RecoveryFailureOutcome) Valid() bool {
+	switch e {
+	case Failure:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RecoveryFailureTrigger.
+const (
+	RecoveryFailureTriggerRecoveryExhausted RecoveryFailureTrigger = "recovery_exhausted"
+	RecoveryFailureTriggerRecoveryFailed    RecoveryFailureTrigger = "recovery_failed"
+)
+
+// Valid indicates whether the value is a known member of the RecoveryFailureTrigger enum.
+func (e RecoveryFailureTrigger) Valid() bool {
+	switch e {
+	case RecoveryFailureTriggerRecoveryExhausted:
+		return true
+	case RecoveryFailureTriggerRecoveryFailed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StartDisposition.
 const (
 	StartDispositionGranted  StartDisposition = "granted"
@@ -252,6 +306,9 @@ type AccessInfo struct {
 
 // Action defines model for Action.
 type Action struct {
+	// AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
+	AgentReceipt *AgentReceipt `json:"agentReceipt,omitempty"`
+
 	// ConflictingEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
@@ -273,10 +330,13 @@ type Action struct {
 	MonitorID    string          `json:"monitorID,omitempty"`
 
 	// Outcome Recorded provider outcome classification, unchanged by operator review.
-	Outcome   string        `json:"outcome,omitempty"`
-	Reason    string        `json:"reason,omitempty"`
-	ReceiptID string        `json:"receiptID,omitempty"`
-	Review    *ActionReview `json:"review,omitempty"`
+	Outcome   string `json:"outcome,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	ReceiptID string `json:"receiptID,omitempty"`
+
+	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
+	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
+	Review          *ActionReview    `json:"review,omitempty"`
 
 	// ReviewRevision Opaque action observation version required for a conditional operator review.
 	ReviewRevision string     `json:"reviewRevision,omitempty"`
@@ -317,6 +377,20 @@ type ActionReview struct {
 // ActionReviewResolution defines model for ActionReview.Resolution.
 type ActionReviewResolution string
 
+// AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
+type AgentReceipt struct {
+	ContextID  *string   `json:"contextID,omitempty"`
+	MessageID  *string   `json:"messageID,omitempty"`
+	ObservedAt time.Time `json:"observedAt"`
+
+	// Sequence Decimal uint64 receipt sequence. String encoding preserves ordering identities for JavaScript clients.
+	Sequence string `json:"sequence"`
+
+	// State A2A task state at this receipt; omitted for message acceptance. Future states remain observational.
+	State  *string `json:"state,omitempty"`
+	TaskID *string `json:"taskID,omitempty"`
+}
+
 // AlertRule defines model for AlertRule.
 type AlertRule struct {
 	Dispatch     *bool         `json:"dispatch,omitempty"`
@@ -327,7 +401,13 @@ type AlertRule struct {
 	// NotifyType Actual notification driver key selected by the Code. Requires recipientRefs or groupRef, and excludes inline driver and direct endpointRefs.
 	NotifyType    *string   `json:"notifyType,omitempty"`
 	RecipientRefs *[]string `json:"recipientRefs,omitempty"`
+
+	// Trigger Omission or state_change uses health transitions. Red rules may select recovery_failed after a confirmed failed intervention or recovery_exhausted after the configured attempt limit. Requires recovery. Unknown outcomes never trigger escalation; an endpoint with queued, started or unknown delivery retains its original action.
+	Trigger *AlertRuleTrigger `json:"trigger,omitempty"`
 }
+
+// AlertRuleTrigger Omission or state_change uses health transitions. Red rules may select recovery_failed after a confirmed failed intervention or recovery_exhausted after the configured attempt limit. Requires recovery. Unknown outcomes never trigger escalation; an endpoint with queued, started or unknown delivery retains its original action.
+type AlertRuleTrigger string
 
 // ApplyItem defines model for ApplyItem.
 type ApplyItem struct {
@@ -455,6 +535,27 @@ type CheckSpec struct {
 	// Timeout Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
 	Timeout            Duration `json:"timeout"`
 	UnhealthyThreshold *int64   `json:"unhealthyThreshold,omitempty"`
+}
+
+// CodeNotificationA2A defines model for CodeNotificationA2A.
+type CodeNotificationA2A struct {
+	// AllowInsecureHTTP Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false.
+	AllowInsecureHTTP *bool `json:"allowInsecureHttp,omitempty"`
+
+	// RequestTimeout Deadline for one HTTP request; defaults to 10s, at most 5m.
+	RequestTimeout *Duration `json:"requestTimeout,omitempty"`
+
+	// Tenant Optional A2A tenant. Must not contain control characters.
+	Tenant *string `json:"tenant,omitempty"`
+
+	// Timeout Overall delivery deadline including the acceptance receipt commit; defaults to 60s, range 1s to 5m. Notifications do not poll remote tasks.
+	Timeout *Duration `json:"timeout,omitempty"`
+
+	// Token Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.
+	Token *string `json:"token,omitempty"`
+
+	// URL Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.
+	URL *string `json:"url,omitempty"`
 }
 
 // CodeNotificationDatadog defines model for CodeNotificationDatadog.
@@ -685,6 +786,9 @@ type Event struct {
 	ActionKind string `json:"actionKind,omitempty"`
 	Actor      string `json:"actor,omitempty"`
 
+	// AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
+	AgentReceipt *AgentReceipt `json:"agentReceipt,omitempty"`
+
 	// Color Original notification Code, when applicable.
 	Color string `json:"color,omitempty"`
 
@@ -708,9 +812,12 @@ type Event struct {
 	Note string `json:"note,omitempty"`
 
 	// Outcome Recorded safe outcome classification; never a provider response body.
-	Outcome string    `json:"outcome,omitempty"`
-	Reason  string    `json:"reason,omitempty"`
-	Time    time.Time `json:"time"`
+	Outcome string `json:"outcome,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+
+	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
+	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
+	Time            time.Time        `json:"time"`
 }
 
 // EventList defines model for EventList.
@@ -920,6 +1027,30 @@ type IncidentList struct {
 	Items       []Incident `json:"items"`
 	NextCursor  string     `json:"nextCursor,omitempty"`
 	Snapshot    string     `json:"snapshot,omitempty"`
+}
+
+// InterventionTargetA2A defines model for InterventionTargetA2A.
+type InterventionTargetA2A struct {
+	// AllowInsecureHTTP Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false.
+	AllowInsecureHTTP *bool `json:"allowInsecureHttp,omitempty"`
+
+	// PollInterval Task observation interval, 1s to 30s and no greater than taskTimeout. Defaults to the smaller of 5s and taskTimeout.
+	PollInterval *Duration `json:"pollInterval,omitempty"`
+
+	// RequestTimeout Deadline for one HTTP request; defaults to 10s, at most 5m.
+	RequestTimeout *Duration `json:"requestTimeout,omitempty"`
+
+	// TaskTimeout Overall intervention deadline including task polling and receipt commits; defaults to 60s, range 1s to 5m. Expiry holds an unknown outcome without resending or canceling the task.
+	TaskTimeout *Duration `json:"taskTimeout,omitempty"`
+
+	// Tenant Optional A2A tenant. Must not contain control characters.
+	Tenant *string `json:"tenant,omitempty"`
+
+	// Token Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.
+	Token *string `json:"token,omitempty"`
+
+	// URL Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.
+	URL *string `json:"url,omitempty"`
 }
 
 // InterventionTargetAWS defines model for InterventionTargetAWS.
@@ -1528,6 +1659,23 @@ type RecipientSpec struct {
 	EndpointRefs []string `json:"endpointRefs"`
 }
 
+// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
+type RecoveryFailure struct {
+	ActionID    string                 `json:"actionID"`
+	Attempt     int                    `json:"attempt"`
+	Driver      string                 `json:"driver"`
+	FailedAt    time.Time              `json:"failedAt"`
+	MaxAttempts int                    `json:"maxAttempts"`
+	Outcome     RecoveryFailureOutcome `json:"outcome"`
+	Trigger     RecoveryFailureTrigger `json:"trigger"`
+}
+
+// RecoveryFailureOutcome defines model for RecoveryFailure.Outcome.
+type RecoveryFailureOutcome string
+
+// RecoveryFailureTrigger defines model for RecoveryFailure.Trigger.
+type RecoveryFailureTrigger string
+
 // RecoverySpec defines model for RecoverySpec.
 type RecoverySpec struct {
 	// Cooldown Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
@@ -1626,7 +1774,7 @@ type StartRequest struct {
 	SessionID         string    `json:"sessionID"`
 }
 
-// StartResponse Only granted from the original live begin permits invocation. Reconcile never grants. Other dispositions report original attempt state with conditional grant and receipt fields.
+// StartResponse Only granted from the original live begin permits invocation. Reconcile never grants. A committed receipt always returns terminal with its receiptID and empty grantID and deadline, including an unknown action outcome. Unknown without a receipt retains the original grant for outcome correlation only. A matching terminal receipt does not resolve an unknown action held in the worker journal.
 type StartResponse struct {
 	Deadline          time.Time        `json:"deadline"`
 	Disposition       StartDisposition `json:"disposition"`
@@ -1773,14 +1921,35 @@ type WorkerCapability struct {
 
 // WorkerObservation defines model for WorkerObservation.
 type WorkerObservation struct {
-	Active     int64     `json:"active"`
-	Capacity   int64     `json:"capacity"`
-	LastSeenAt time.Time `json:"lastSeenAt"`
-	WorkerID   string    `json:"workerID"`
+	// Active Committed Start grants without a terminal receipt, including grants awaiting timeout finalization. Not a measurement of running remote handlers.
+	Active int64 `json:"active"`
+
+	// Capacity Free result capacity advertised by the last committed poll. Use only when capacityAvailable is true; this is not total concurrency or a current measurement.
+	Capacity int64 `json:"capacity"`
+
+	// CapacityAvailable True only for a current unexpired session and eligible worker credentials at generatedAt.
+	CapacityAvailable bool `json:"capacityAvailable"`
+
+	// LastSeenAt Time of the last committed poll, when a session exists. Replayed polls do not refresh it. Absence means no retained poll observation; it is not a fabricated zero timestamp.
+	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
+
+	// SessionStatus Session and credential observation: no_session, current, expired, previous_owner, clock_regression, reset_required, revoked, or credential_expired. Clients preserve unknown future values.
+	SessionStatus string `json:"sessionStatus"`
+
+	// UnknownActions Retained recovery or notification executions whose original terminal outcome was unknown, including operator-reviewed actions. Counted separately from active grants. Query action status for the current hold and review.
+	UnknownActions int64 `json:"unknownActions"`
+
+	// WorkerID Provisioned stable worker ID. Reading observations does not enroll or authorize a worker.
+	WorkerID string `json:"workerID"`
+
+	// WorkerUID Provisioned worker incarnation; distinct from a session ID.
+	WorkerUID string `json:"workerUID"`
 }
 
 // WorkerObservationList defines model for WorkerObservationList.
 type WorkerObservationList struct {
-	Items      []WorkerObservation `json:"items"`
-	NextCursor string              `json:"nextCursor,omitempty"`
+	// GeneratedAt Capture time shared by all pages of this immutable observation snapshot.
+	GeneratedAt time.Time           `json:"generatedAt"`
+	Items       []WorkerObservation `json:"items"`
+	NextCursor  string              `json:"nextCursor,omitempty"`
 }

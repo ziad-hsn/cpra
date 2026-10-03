@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"runtime/metrics"
@@ -33,9 +34,9 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	page, err := s.cfg.Store.History().Page(monitorID, r.URL.Query().Get("cursor"), limit)
+	page, err := s.cfg.Store.History().PageContext(r.Context(), monitorID, r.URL.Query().Get("cursor"), limit)
 	if err != nil {
-		if errors.Is(err, persistence.ErrHistoryUnavailable) {
+		if errors.Is(err, persistence.ErrHistoryUnavailable) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			writeErr(w, http.StatusServiceUnavailable, "event history unavailable")
 		} else {
 			writeErr(w, http.StatusBadRequest, "invalid history request")
@@ -44,29 +45,49 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, page)
 }
-func (s *Server) handleSLO(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleSLO(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.Store == nil {
 		writeErr(w, 503, "SLO measurements unavailable")
 		return
 	}
-	writeJSON(w, 200, s.cfg.Store.SLOView(time.Now()))
+	view, err := s.cfg.Store.SLOViewContext(r.Context(), time.Now())
+	if err != nil {
+		writeErr(w, http.StatusServiceUnavailable, "SLO measurements unavailable")
+		return
+	}
+	writeJSON(w, 200, view)
 }
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.Store == nil {
 		writeErr(w, 503, "durable state unavailable")
 		return
 	}
+	status, err := s.cfg.Store.StatusContext(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusServiceUnavailable, "durable state unavailable")
+		return
+	}
+	usage, usageErr := s.cfg.Store.UsageContext(r.Context())
+	if usageErr != nil && r.Context().Err() != nil {
+		writeErr(w, http.StatusServiceUnavailable, "durable state unavailable")
+		return
+	}
 	measurements := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}, {Name: "/sched/goroutines:goroutines"}}
 	metrics.Read(measurements)
-	response := map[string]any{"storage": s.cfg.Store.Status(), "storage_usage": s.cfg.Store.Usage(), "process": map[string]uint64{"heap_bytes": measurements[0].Value.Uint64(), "goroutines": measurements[1].Value.Uint64()}, "actions": []persistence.Action{}}
+	response := map[string]any{"storage": status, "storage_usage": usage, "process": map[string]uint64{"heap_bytes": measurements[0].Value.Uint64(), "goroutines": measurements[1].Value.Uint64()}, "actions": []persistence.Action{}}
 	if id := r.URL.Query().Get("monitor_id"); id != "" {
-		m, ok := s.cfg.Store.Get(id)
+		m, ok, err := s.cfg.Store.GetContext(r.Context(), id)
+		if err != nil {
+			writeErr(w, http.StatusServiceUnavailable, "durable state unavailable")
+			return
+		}
 		if !ok {
 			writeErr(w, 404, "monitor not found")
 			return
 		}
 		actions := make([]persistence.Action, 0, len(m.Actions))
 		for _, a := range m.Actions {
+			a.AgentConnection = nil // Internal ciphertext and key identities are not an observation API.
 			actions = append(actions, a)
 		}
 		slices.SortFunc(actions, func(a, b persistence.Action) int { return strings.Compare(a.ID, b.ID) })

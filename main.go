@@ -37,6 +37,7 @@ type runOptions struct {
 	runtimeFile, manifest, dataDir, webAddr, webCors, webAuth, webAuthFile, pprofAddr string
 	debug, pprof, web, ssrfProtect, allowEmpty, validate                              bool
 	shutdownTimeout                                                                   time.Duration
+	webStarted                                                                        func(string)
 }
 type shutdownLimitKey struct{}
 
@@ -102,13 +103,15 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if err = settings.ResolveStorageDirectory(o.dataDir); err != nil {
 		return err
 	}
-	if settings.Management.Enabled {
+	if settings.Management.Enabled || settings.EncryptionSource() != nil {
 		if err = resolveManagementDirectory(&settings, o.dataDir); err != nil {
 			return err
 		}
-		if err = settings.Management.ValidateDataDirectory(settings.Storage.Directory); err != nil {
+		if err = settings.Validate(); err != nil {
 			return err
 		}
+	}
+	if settings.Management.Enabled {
 		if !o.web {
 			return errors.New("management requires the authenticated web API; enable -web")
 		}
@@ -128,7 +131,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		return errors.New("pprof.addr must be a loopback address")
 	}
 	if !settings.Management.Enabled {
-		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty); err != nil {
+		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil); err != nil {
 			return fmt.Errorf("manifest validation: %w", err)
 		}
 	}
@@ -137,16 +140,20 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			return err
 		}
 		if settings.Management.Enabled {
-			if _, err := management.ValidateStartupSource(ctx, managementStartupOptions(settings, o)); err != nil {
+			validation, err := management.ValidateStartupSource(ctx, managementStartupOptions(settings, o))
+			if err != nil {
 				return fmt.Errorf("management manifest validation: %w", err)
 			}
+			if validation.UnverifiedContractReferences != 0 {
+				fmt.Printf("configuration shape valid; %d stored job contract references require validation during startup or Apply\n", validation.UnverifiedContractReferences)
+			}
 		}
-		fmt.Println("configuration valid; provider access, persistent storage and committed authentication were not tested")
+		fmt.Println("configuration valid; provider access, persistent storage, committed authentication and stored job contracts were not tested")
 		return nil
 	}
 	var encryption *encryptionsetup.Handle
-	if settings.Management.Enabled {
-		encryption, err = encryptionsetup.Open(ctx, encryptionsetup.Options{StorageMode: settings.Storage.Mode, DataDirectory: settings.Storage.Directory, Encryption: settings.Management.Encryption})
+	if settings.Management.Enabled || settings.EncryptionSource() != nil || settings.Storage.Mode == "memory" {
+		encryption, err = encryptionsetup.Open(ctx, encryptionsetup.Options{StorageMode: settings.Storage.Mode, DataDirectory: settings.Storage.Directory, Encryption: settings.EncryptionSource()})
 		if err != nil {
 			return err
 		}
@@ -161,6 +168,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	}
 	config := controller.DefaultConfig()
 	config.Debug, config.Store, config.Runtime = o.debug, store, settings
+	config.Encryption = encryption.Sealer()
 	// Leave part of the process budget for publishing cancellation results and
 	// flushing storage. Each operation retains its own configured deadline.
 	config.WorkerConfig.DrainTimeout = o.shutdownTimeout * 2 / 3
@@ -219,7 +227,11 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		}
 		// The process owns this goroutine until completion or process termination.
 		// Never report a successful shutdown or close loggers on deadline expiry.
-		finished := make(chan error, 1)
+		type shutdownResult struct {
+			err    error
+			closed bool
+		}
+		finished := make(chan shutdownResult, 1)
 		go func() {
 			if oc != nil {
 				oc.Stop()
@@ -229,19 +241,31 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 				closeErr = errors.New("durable storage unavailable during shutdown; final outcomes may not have committed")
 			}
 			if webSrv != nil {
-				closeErr = errors.Join(closeErr, webSrv.StopContext(shutdownCtx))
+				if err := webSrv.StopContext(shutdownCtx); err != nil {
+					finished <- shutdownResult{err: errors.Join(closeErr, fmt.Errorf("HTTP completion shutdown deadline exceeded; storage and encryption remain owned until process exit: %w", err))}
+					return
+				}
+				// Completion requests remain available during controller drain.
+				// Their canceled waits may leave admitted writes unconfirmed; order
+				// all of them after the HTTP join before closing their dependencies.
+				if err := store.Flush(shutdownCtx); err != nil {
+					finished <- shutdownResult{err: errors.Join(closeErr, fmt.Errorf("HTTP completion flush deadline exceeded; storage and encryption remain owned until process exit: %w", err))}
+					return
+				}
 			}
 			if profiling != nil {
 				_ = profiling.Close()
 				<-profileDone
 			}
 			closeErr = errors.Join(closeErr, store.Close())
-			finished <- errors.Join(closeErr, encryption.Close())
+			finished <- shutdownResult{err: errors.Join(closeErr, encryption.Close()), closed: true}
 		}()
 		select {
-		case e := <-finished:
-			resultErr = errors.Join(resultErr, e)
-			controller.CloseLoggers()
+		case stopped := <-finished:
+			resultErr = errors.Join(resultErr, stopped.err)
+			if stopped.closed {
+				controller.CloseLoggers()
+			}
 		case <-shutdownCtx.Done():
 			if oc != nil {
 				oc.CancelWork()
@@ -318,8 +342,8 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		if oc.UseAdaptiveQueue() {
 			queueType = "adaptive"
 		}
-		admissionReady := func() bool {
-			return oc.Ready() && collections.Ready()
+		admissionReady := func(ctx context.Context) bool {
+			return oc.ReadyContext(ctx) && collections.Ready(ctx)
 		}
 		webConfig := httpserver.ServerConfig{Addr: o.webAddr, Store: store, Ready: admissionReady, AllowEmpty: o.allowEmpty, CORSAllowOrigins: splitCSV(o.webCors), AuthenticationRequired: !authority.AnonymousLoopback, AllowAnonymousLoopback: authority.AnonymousLoopback, LegacyTokenSHA256: authority.LegacyTokenSHA256, Management: config.Catalog, ManagementAuth: auth, Reselection: reselection}
 		configureExternalJobsServer(&webConfig, settings)
@@ -331,6 +355,9 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			httpserver.PublicConfig{QueueCapacity: uint64(oc.PulseQueue().Stats().Capacity), BatchSize: config.BatchSize, AlertCooldown: config.AlertCooldown, RecoveryBypass: config.RecoveryBypass, UseAdaptive: oc.UseAdaptiveQueue(), QueueType: queueType})
 		if err = webSrv.Start(); err != nil {
 			return err
+		}
+		if o.webStarted != nil {
+			o.webStarted(webSrv.Address())
 		}
 	}
 	if o.pprof {
@@ -351,10 +378,10 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if err = ctx.Err(); err != nil {
 		return err
 	}
-	if !oc.Ready() {
+	if !oc.ReadyContext(ctx) {
 		return errors.New("controller became unavailable before application readiness")
 	}
-	if err = collections.Failure(); err != nil {
+	if err = collections.Failure(ctx); err != nil {
 		return err
 	}
 	ready()
@@ -366,7 +393,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 type runtimeCollectionObserver interface {
 	Done() <-chan struct{}
 	Err() error
-	Ready() bool
+	ReadyContext(context.Context) bool
 }
 
 // Collection process owners share one shutdown deadline and Store/key lifetime.
@@ -395,21 +422,33 @@ func (owners runtimeCollectionOwners) BeginStop() {
 	}
 }
 
-func (owners runtimeCollectionOwners) Ready() bool {
-	return (owners.validation == nil || owners.validation.Ready()) && (owners.execution == nil || owners.execution.Ready()) && (owners.reselection == nil || owners.reselection.Ready())
+func (owners runtimeCollectionOwners) Ready(ctx context.Context) bool {
+	return ctx.Err() == nil && (owners.validation == nil || owners.validation.ReadyContext(ctx)) && (owners.execution == nil || owners.execution.ReadyContext(ctx)) && (owners.reselection == nil || owners.reselection.ReadyContext(ctx))
 }
 
-func (owners runtimeCollectionOwners) Failure() error {
-	if owners.validation != nil && !owners.validation.Ready() {
+func (owners runtimeCollectionOwners) Failure(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if owners.validation != nil && !owners.validation.ReadyContext(ctx) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return fmt.Errorf("validation owner: %w", runtimeCollectionFailure(owners.validation))
 	}
-	if owners.execution != nil && !owners.execution.Ready() {
+	if owners.execution != nil && !owners.execution.ReadyContext(ctx) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return fmt.Errorf("execution owner: %w", runtimeCollectionFailure(owners.execution))
 	}
-	if owners.reselection != nil && !owners.reselection.Ready() {
+	if owners.reselection != nil && !owners.reselection.ReadyContext(ctx) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return fmt.Errorf("reselection owner: %w", runtimeCollectionFailure(owners.reselection))
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (owners runtimeCollectionOwners) Join(ctx context.Context) (bool, error) {
@@ -510,7 +549,10 @@ func waitRuntimeInitialization(ctx context.Context, waitController func(context.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if !coordinator.Ready() {
+	if !coordinator.ReadyContext(ctx) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return runtimeCollectionFailure(coordinator)
 	}
 	return nil
@@ -585,6 +627,7 @@ func validateManagementTLS(ctx context.Context, source runtimeconfig.ManagementT
 func managementStartupOptions(settings runtimeconfig.Config, o runOptions) management.StartupOptions {
 	options := management.StartupOptions{DataDirectory: settings.Storage.Directory, AllowEmpty: o.allowEmpty,
 		Decode: collection.DecodeOptions{SourceName: "startup manifest"}}
+	configureCatalogOptions(&options.Catalog, settings)
 	if o.manifest != "" {
 		options.OpenSource = func(ctx context.Context) (io.ReadCloser, error) {
 			if err := ctx.Err(); err != nil {

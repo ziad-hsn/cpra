@@ -94,8 +94,10 @@ func (s *DurableSystem) advanceOwnerWrite(ctx context.Context) error {
 			return err
 		}
 	case sloWrite:
-		if p.results[0].Err != nil {
-			return p.results[0].Err
+		for _, result := range p.results {
+			if result.Err != nil {
+				return result.Err
+			}
 		}
 		s.lastSLO = p.commands[0].At
 	case catalogWrite:

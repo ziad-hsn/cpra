@@ -92,7 +92,7 @@ func TestManagementBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(ServerConfig{Management: catalog, ManagementAuth: auth, Store: store, Ready: func() bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	s := New(ServerConfig{Management: catalog, ManagementAuth: auth, Store: store, Ready: func(context.Context) bool { return true }}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	mux := http.NewServeMux()
 	s.registerAPI(mux)
 	s.registerMetrics(mux)

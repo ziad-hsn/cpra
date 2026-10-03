@@ -55,7 +55,7 @@ func TestManagementExplicitActivationAndNoSourceIO(t *testing.T) {
 		t.Fatal("loading runtime created key files", err)
 	}
 	parsed.Management.Encryption = nil
-	if err := parsed.Validate(); err == nil || !strings.Contains(err.Error(), "cpractl encryption init") {
+	if err := parsed.Validate(); err == nil || !strings.Contains(err.Error(), "cpractl local encryption init") {
 		t.Fatal("durable management silently generated key", err)
 	}
 	parsed.Storage.Mode = "memory"

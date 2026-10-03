@@ -376,7 +376,7 @@ func TestCollectionValidationRoutingWorkAndCancellationAreBounded(t *testing.T) 
 		r.Spec, _ = json.Marshal(spec)
 		resources[persistence.CatalogKey{Kind: r.Kind, ID: r.Metadata.ID}] = r
 	}
-	validator := collectionValidator{}
+	validator := collectionValidator{catalog: &Catalog{}}
 	_, err := validator.validateSet(context.Background(), resources)
 	if !errors.Is(err, ErrGraphLimit) || validator.visits != collectionValidationVisits+1 {
 		t.Fatal("expanded routing escaped the work bound", validator.visits, err)
@@ -420,7 +420,7 @@ func TestCollectionValidationFinalMonitorFailureDoesNotRepeatSharedValidation(t 
 		}
 		resources[persistence.CatalogKey{Kind: r.Kind, ID: r.Metadata.ID}] = r
 	}
-	validator := collectionValidator{}
+	validator := collectionValidator{catalog: &Catalog{}}
 	key, err := validator.validateSet(context.Background(), resources)
 	if !errors.Is(err, ErrValidation) || key.ID != "monitor-199" || validator.visits > 1000 {
 		t.Fatal("final invalid monitor repeated shared validation", key, validator.visits, err)

@@ -18,6 +18,7 @@ import linux_packages
 import publish
 import registry
 import sbom
+from test_evidence import manifest_fixture
 
 
 class ReleaseTests(unittest.TestCase):
@@ -38,7 +39,17 @@ class ReleaseTests(unittest.TestCase):
     def test_storage_recipe_matches_current_reader(self):
         self.assertEqual(release.storage_format(release.RECIPE['build_tags']), release.RECIPE['storage_format_version'])
         self.assertNotIn('externaljobs', release.RECIPE['build_tags'])
-        self.assertEqual(release.storage_format(['externaljobs']), 21)
+        self.assertEqual(release.storage_format(['externaljobs']), 39)
+
+    def test_manifest_rejects_previous_storage_format_even_with_matching_recipe(self):
+        manifest = manifest_fixture()
+        manifest['candidate'] = True
+        manifest['recipe']['storage_format_version'] = 35
+        manifest['storage_format_version'] = 35
+        with patch.object(release, 'RECIPE', manifest['recipe']), \
+                patch.object(release, 'tree_digest', return_value=manifest['dashboard_sha256']):
+            with self.assertRaisesRegex(ValueError, 'Storage implementation differs'):
+                release.check_manifest(manifest)
 
     def test_storage_recipe_rejects_ambiguous_or_cyclic_format(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -164,17 +175,18 @@ class ReleaseTests(unittest.TestCase):
     def test_missing_native_evidence_cannot_satisfy_publication_gate(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
-            with self.assertRaises(FileNotFoundError):publish.evidence(root, {'commit':'a'*40})
+            manifest=manifest_fixture()
+            with self.assertRaises(FileNotFoundError):publish.evidence(root, manifest)
             (root/'reproducibility.json').write_text('{"status":"incomplete"}')
             with self.assertRaisesRegex(ValueError,'did not pass'):
-                publish.evidence(root, {'commit':'a'*40})
+                publish.evidence(root, manifest)
 
     def test_stale_source_evidence_cannot_satisfy_publication_gate(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
             (root/'reproducibility.json').write_text(json.dumps({'status':'pass','commit':'b'*40}))
             with self.assertRaisesRegex(ValueError,'different source'):
-                publish.evidence(root, {'commit':'a'*40})
+                publish.evidence(root, manifest_fixture())
 
     def test_vendored_font_identity_and_license_are_observed(self):
         font=release.package.bundled_font_inventory()
@@ -197,7 +209,7 @@ class ReleaseTests(unittest.TestCase):
             root=Path(directory);manifest={'version':'v1.2.3','commit':'a'*40}
             binaries={'cpra':b'controller','cpractl':b'client'}
             entries={name:(data,True) for name,data in binaries.items()}
-            entries['DEPENDENCIES.json']=(release.encoded({'binaries':{name:hashlib.sha256(data).hexdigest() for name,data in binaries.items()}}),False)
+            entries['DEPENDENCIES.json']=(release.encoded({'target':'linux_amd64','binaries':{name:hashlib.sha256(data).hexdigest() for name,data in binaries.items()}}),False)
             entries['RELEASE.json']=(release.encoded(manifest),False)
             archive=root/'cpra-v1.2.3-linux-amd64.tar.gz'
             release.package.archive(archive,entries,1234567890)
@@ -245,7 +257,10 @@ class ReleaseTests(unittest.TestCase):
             for uid,gid in ((0,999),(999,998)):
                 tool.write_text('#!/bin/sh\ncase "$1" in passwd) echo cpra:x:'+str(uid)+':'+str(gid)+'::/var/lib/cpra:/usr/sbin/nologin ;; group) echo cpra:x:999: ;; esac\n');tool.chmod(0o755)
                 for hook in ('deb-preinstall.sh','rpm-preinstall.sh'):
-                    result=subprocess.run(['sh',str(release.ROOT/'packaging/linux'/hook),'install' if hook.startswith('deb') else '1'],env=dict(os.environ,PATH=str(root)+':'+os.environ['PATH']),capture_output=True,text=True)
+                    text=(release.ROOT/'packaging/linux'/hook).read_text()
+                    for prefix in ('/etc/cpra', '/var/lib/cpra', '/run/cpra-package', '/run/systemd/system'):
+                        text=text.replace(prefix,str(root/prefix.lstrip('/')))
+                    result=subprocess.run(['sh','-s','--','install' if hook.startswith('deb') else '1'],input=text,env=dict(os.environ,PATH=str(root)+':'+os.environ['PATH']),capture_output=True,text=True)
                     self.assertNotEqual(result.returncode,0)
                     self.assertIn('refusing existing identity',result.stderr)
 
@@ -265,5 +280,212 @@ class ReleaseTests(unittest.TestCase):
                 text=text.replace('/etc/cpra',str(root/'etc/cpra')).replace('/var/lib/cpra',str(root/'var/lib/cpra')).replace('/run/cpra-package',str(root/'run/cpra-package'))
                 subprocess.run(['sh','-s','--',arg],input=text,text=True,env=env,check=True)
             self.assertFalse(log.exists(),'fresh install or removal of old RPM must not alter running state')
+
+class PackageHookTests(unittest.TestCase):
+    """Actual hook programs with private paths and controlled supervisor/identity tools.
+
+    The filesystem and shell are real. Account creation and supervisor execution
+    remain separate native/package qualification requirements.
+    """
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='cpra-package-hook-')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.tools = self.root / 'tools'; self.tools.mkdir()
+        self.calls = self.root / 'calls'
+        self.state = self.root / 'service-state'; self.state.write_text('inactive')
+        self.config = self.root / 'etc/cpra'; self.config.mkdir(parents=True)
+        self.markers = self.root / 'run/cpra-package'
+        self.boot = self.root / 'run/systemd/system'; self.boot.mkdir(parents=True)
+        for name in ('auth.token', 'runtime.yaml', 'monitors.yaml'):
+            (self.config / name).write_text('operator fixture ' + name + '\n')
+            (self.config / name).chmod(0o640)
+        scripts = {
+            'getent': 'case "$1" in passwd) echo cpra:x:999:999::/var/lib/cpra:/usr/sbin/nologin ;; group) echo cpra:x:999: ;; esac',
+            'useradd': 'echo "unexpected account creation" >&2; exit 99',
+            'groupadd': 'echo "unexpected account creation" >&2; exit 99',
+            'systemctl': '''printf '%s\\n' "$*" >> "$CPRA_TEST_CALLS"
+case "$1" in
+    show) [ "${CPRA_TEST_QUERY_FAILURE:-0}" = 0 ] || exit 1; cat "$CPRA_TEST_STATE" ;;
+    stop) [ "${CPRA_TEST_STOP_FAILURE:-0}" = 0 ] || exit 1; printf 'inactive\\n' > "$CPRA_TEST_STATE" ;;
+    start) [ "${CPRA_TEST_START_FAILURE:-0}" = 0 ] || exit 1; printf 'active\\n' > "$CPRA_TEST_STATE" ;;
+    daemon-reload) [ "${CPRA_TEST_RELOAD_FAILURE:-0}" = 0 ] || exit 1 ;;
+    *) echo "unexpected supervisor operation" >&2; exit 99 ;;
+esac''',
+        }
+        for name, body in scripts.items():
+            path = self.tools / name; path.write_text('#!/bin/sh\nset -eu\n' + body + '\n'); path.chmod(0o700)
+        # Keep real installation/mode changes, translating only privileged
+        # ownership to the test runner. No command can create host identities.
+        install = self.tools / 'install'
+        install.write_text('#!/usr/bin/python3\nimport subprocess,sys\n'
+                           'args=[]; source=iter(sys.argv[1:])\n'
+                           'for arg in source:\n'
+                           '    if arg in ("-o","-g"): next(source)\n'
+                           '    else: args.append(arg)\n'
+                           'raise SystemExit(subprocess.call(["/usr/bin/install",*args]))\n')
+        install.chmod(0o700)
+        chown = self.tools / 'chown'
+        chown.write_text('#!/bin/sh\nset -eu\nshift\nexec /usr/bin/chown ' + str(os.geteuid()) + ':' + str(os.getegid()) + ' "$@"\n')
+        chown.chmod(0o700)
+        self.env = {'PATH': str(self.tools) + ':/usr/bin:/bin', 'LANG': 'C',
+                    'CPRA_TEST_CALLS': str(self.calls), 'CPRA_TEST_STATE': str(self.state)}
+
+    def hook(self, name, argument, *, expected=0, **environment):
+        text = (release.ROOT / 'packaging/linux' / name).read_text()
+        for prefix in ('/etc/cpra', '/var/lib/cpra', '/run/cpra-package', '/run/systemd/system', '/var/backups/cpra'):
+            text = text.replace(prefix, str(self.root / prefix.lstrip('/')))
+        result = subprocess.run(['sh', '-s', '--', argument], input=text, text=True,
+                                env=dict(self.env, **environment), capture_output=True, timeout=5)
+        if expected == 0: self.assertEqual(result.returncode, 0, result.stderr)
+        else: self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result
+
+    def observed(self):
+        return self.calls.read_text().splitlines() if self.calls.exists() else []
+
+    def stale_intent(self):
+        self.markers.mkdir(parents=True, exist_ok=True)
+        for name in ('restart', 'restart-ready'):
+            (self.markers / name).write_text('previous interrupted attempt')
+
+    def complete(self, format):
+        self.hook(format + '-postinstall.sh', 'configure' if format == 'deb' else '2')
+        if format == 'rpm': self.hook('rpm-posttrans.sh', '2')
+
+    def test_upgrade_discards_restart_intent_from_an_inactive_earlier_attempt(self):
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                self.stale_intent(); self.state.write_text('inactive')
+                self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2')
+                self.assertFalse((self.markers / 'restart').exists())
+                self.assertFalse((self.markers / 'restart-ready').exists())
+                self.complete(format)
+                self.assertNotIn('start cpra.service', self.observed())
+
+    def test_fresh_install_does_not_inherit_a_previous_restart_marker(self):
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                self.stale_intent()
+                self.hook(format + '-preinstall.sh', 'install' if format == 'deb' else '1')
+                self.complete(format)
+                self.assertNotIn('start cpra.service', self.observed())
+
+    def test_upgrade_rejects_failed_or_unknown_service_state_queries(self):
+        for format in ('deb', 'rpm'):
+            for value, failure in (('inactive', '1'), ('', '0'), ('unknown-state', '0')):
+                with self.subTest(format=format, value=value, query_failure=failure):
+                    self.state.write_text(value)
+                    self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2',
+                              expected=1, CPRA_TEST_QUERY_FAILURE=failure)
+                    self.assertFalse(any(line.startswith(('stop ', 'start ')) for line in self.observed()))
+
+    def test_running_upgrade_resumes_only_after_successful_stop_and_configuration(self):
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                if self.calls.exists(): self.calls.unlink()
+                self.state.write_text('active')
+                self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2')
+                self.assertEqual(self.state.read_text().strip(), 'inactive')
+                self.assertTrue((self.markers / 'restart').is_file())
+                self.hook(format + '-postinstall.sh', 'configure' if format == 'deb' else '2')
+                if format == 'rpm':
+                    self.hook('rpm-preremove.sh', '1'); self.hook('rpm-postremove.sh', '1')
+                    self.assertNotIn('start cpra.service', self.observed())
+                    self.assertTrue((self.markers / 'restart-ready').is_file())
+                    self.hook('rpm-posttrans.sh', '2')
+                calls = self.observed()
+                self.assertEqual(calls.count('stop cpra.service'), 1)
+                self.assertEqual(calls.count('start cpra.service'), 1)
+                self.assertLess(calls.index('stop cpra.service'), calls.index('start cpra.service'))
+                self.assertFalse((self.markers / 'restart').exists())
+                self.assertFalse((self.markers / 'restart-ready').exists())
+
+    def test_failed_stop_cannot_authorize_a_later_restart(self):
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                self.state.write_text('active')
+                self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2',
+                          expected=1, CPRA_TEST_STOP_FAILURE='1')
+                self.assertFalse((self.markers / 'restart').exists())
+                self.complete(format)
+                self.assertNotIn('start cpra.service', self.observed())
+
+    def test_failed_rpm_configuration_cannot_authorize_posttrans_restart(self):
+        self.state.write_text('active')
+        self.hook('rpm-preinstall.sh', '2')
+        self.hook('rpm-postinstall.sh', '2', expected=1, CPRA_TEST_RELOAD_FAILURE='1')
+        self.hook('rpm-posttrans.sh', '2')
+        self.assertNotIn('start cpra.service', self.observed())
+        self.assertTrue((self.markers / 'restart').exists())
+        self.assertFalse((self.markers / 'restart-ready').exists())
+        self.hook('rpm-postinstall.sh', '2'); self.hook('rpm-posttrans.sh', '2')
+        self.assertEqual(self.observed().count('start cpra.service'), 1)
+
+    def test_existing_configuration_modes_are_repaired_without_changing_contents(self):
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                before = {name: (self.config / name).read_bytes() for name in ('auth.token', 'monitors.yaml', 'runtime.yaml')}
+                for name in before: (self.config / name).chmod(0o666)
+                self.hook(format + '-postinstall.sh', 'configure' if format == 'deb' else '1')
+                for name, contents in before.items():
+                    self.assertEqual((self.config / name).stat().st_mode & 0o777, 0o640)
+                    self.assertEqual((self.config / name).read_bytes(), contents)
+
+    def test_absent_systemd_manager_cannot_reuse_a_previous_restart_intent(self):
+        self.boot.rmdir()
+        for format in ('deb', 'rpm'):
+            with self.subTest(format=format):
+                self.stale_intent(); self.state.write_text('active')
+                self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2')
+                self.complete(format)
+                self.assertEqual(self.observed(), [])
+
+    def test_configuration_links_are_rejected_before_generating_or_writing_files(self):
+        for format in ('deb', 'rpm'):
+            for name in ('auth.token', 'runtime.yaml', 'monitors.yaml', 'install.json'):
+                for present in (False, True):
+                    with self.subTest(format=format, path=name, target_present=present):
+                        path = self.config / name
+                        original = path.read_bytes() if path.is_file() else None
+                        path.unlink(missing_ok=True)
+                        target = self.root / ('protected-' + name)
+                        if present: target.write_bytes(b'outside managed configuration\n')
+                        path.symlink_to(target)
+                        try:
+                            self.hook(format + '-postinstall.sh', 'configure' if format == 'deb' else '1', expected=1)
+                            self.assertTrue(path.is_symlink())
+                            if present: self.assertEqual(target.read_bytes(), b'outside managed configuration\n')
+                            else: self.assertFalse(target.exists(), 'the hook must not create a dangling link target')
+                        finally:
+                            path.unlink(); target.unlink(missing_ok=True)
+                            if original is not None:
+                                path.write_bytes(original); path.chmod(0o640)
+
+    def test_restart_intent_paths_cannot_traverse_symbolic_links(self):
+        for format in ('deb', 'rpm'):
+            for name in ('directory', 'restart', 'restart-ready'):
+                with self.subTest(format=format, path=name):
+                    self.markers.mkdir(parents=True, exist_ok=True)
+                    target = self.root / 'outside'; target.mkdir(exist_ok=True)
+                    protected = target / 'protected'; protected.write_text('outside the marker directory')
+                    link = self.markers / name
+                    if name == 'directory':
+                        self.markers.rmdir(); self.markers.symlink_to(target, target_is_directory=True); link = self.markers
+                    else: link.symlink_to(protected)
+                    self.state.write_text('active')
+                    try:
+                        self.hook(format + '-preinstall.sh', 'upgrade' if format == 'deb' else '2', expected=1)
+                        self.assertEqual(protected.read_text(), 'outside the marker directory')
+                    finally:
+                        link.unlink()
+                        for marker in ('restart', 'restart-ready'):
+                            (self.markers / marker).unlink(missing_ok=True)
+
+    def test_debian_account_tools_are_declared_before_unpacking(self):
+        manifest = manifest_fixture()
+        config = linux_packages.config(manifest, self.root, 'linux_amd64', 'deb')
+        self.assertIn('passwd', config.get('deb', {}).get('predepends', []))
+
 
 if __name__=='__main__':unittest.main()

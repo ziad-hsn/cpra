@@ -212,7 +212,7 @@ func TestWorkerProtocolStartDispositions(t *testing.T) {
 					r.GrantID = ""
 					r.Deadline = time.Time{}
 				}
-				if disposition == api.StartDispositionTerminal || disposition == api.StartDispositionUnknown {
+				if disposition == api.StartDispositionTerminal {
 					r.ReceiptID = "receipt"
 				}
 				var calls atomic.Int32
@@ -244,6 +244,14 @@ func TestWorkerProtocolStartDispositions(t *testing.T) {
 			}
 		})
 	}
+	t.Run("unknown/terminal-receipt", func(t *testing.T) {
+		r := workerProtocolReply("WorkerStart").(api.StartResponse)
+		r.Disposition, r.ReceiptID = api.StartDispositionUnknown, "receipt"
+		c := &WorkerClient{fixture(t, func(w http.ResponseWriter, _ *http.Request) { _ = json.NewEncoder(w).Encode(r) }, nil)}
+		if _, err := c.Start(context.Background(), workerProtocolRequest("WorkerStart").(api.StartRequest)); !errors.Is(err, ErrAmbiguous) {
+			t.Fatal("receipt accepted with a nonterminal start disposition", err)
+		}
+	})
 }
 
 func TestWorkerProtocolPollOwnershipAndBounds(t *testing.T) {
@@ -317,6 +325,41 @@ func TestWorkerProtocolSessionExpiryIsExplicit(t *testing.T) {
 				t.Fatal(err, calls.Load())
 			}
 		})
+	}
+}
+
+func TestWorkerProtocolCheckExpiryIsExplicit(t *testing.T) {
+	for _, operation := range []string{"WorkerStart", "WorkerResult", "WorkerLateEvidence"} {
+		for _, tc := range []struct {
+			status int
+			code   string
+		}{{410, "workerCheckExpired"}, {409, "workerCheckExpired"}, {410, "gone"}, {503, "workerCheckExpired"}, {403, "workerCheckExpired"}} {
+			t.Run(operation+tc.code+http.StatusText(tc.status), func(t *testing.T) {
+				var calls atomic.Int32
+				c := &WorkerClient{fixture(t, func(w http.ResponseWriter, _ *http.Request) {
+					calls.Add(1)
+					w.WriteHeader(tc.status)
+					_ = json.NewEncoder(w).Encode(api.Problem{Code: tc.code})
+				}, nil)}
+				_, err := workerProtocolCall(t.Context(), c, workerProtocolRequest(operation))
+				want := tc.status == 410 && tc.code == "workerCheckExpired" && operation != "WorkerLateEvidence"
+				var problem *Error
+				if errors.Is(err, ErrWorkerCheckExpired) != want || !errors.As(err, &problem) || calls.Load() != 1 {
+					t.Fatal(err, calls.Load())
+				}
+			})
+		}
+	}
+	for _, kind := range []string{"recovery", "notification"} {
+		c := &WorkerClient{fixture(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusGone)
+			_ = json.NewEncoder(w).Encode(api.Problem{Code: "workerCheckExpired"})
+		}, nil)}
+		input := workerProtocolRequest("WorkerResult").(api.Outcome)
+		input.Kind, input.Status = kind, "unknown"
+		if _, err := c.Result(t.Context(), input); err == nil || errors.Is(err, ErrWorkerCheckExpired) {
+			t.Fatal("action classified as expired check", err)
+		}
 	}
 }
 

@@ -188,6 +188,7 @@ func (c *PulseConfig) Copy() *PulseConfig {
 
 // InterventionConfig consolidates intervention configuration
 type InterventionConfig struct {
+	MaxAttempts int
 	Target      manifest.InterventionTarget
 	Action      string
 	MaxFailures int
@@ -199,6 +200,7 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 	}
 	cpy := &InterventionConfig{
 		Action:      strings.Clone(c.Action),
+		MaxAttempts: c.MaxAttempts,
 		MaxFailures: c.MaxFailures,
 	}
 
@@ -216,6 +218,7 @@ type CodeConfig struct {
 }
 
 type ColorCodeConfig struct {
+	Trigger     string
 	Config      manifest.CodeNotification
 	Notify      string
 	MaxFailures int
@@ -230,6 +233,7 @@ func (c *ColorCodeConfig) Copy() *ColorCodeConfig {
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
 		Notify:      strings.Clone(c.Notify),
+		Trigger:     strings.Clone(c.Trigger),
 	}
 	if c.Config != nil {
 		cpy.Config = c.Config.Copy()

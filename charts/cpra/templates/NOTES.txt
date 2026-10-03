@@ -1,8 +1,13 @@
 CPRa has {{ ternary "zero owners (maintenance)" "one owner" .Values.maintenance }}. Single-node Raft provides restart recovery, not HA.
 {{ if .Values.api.enabled -}}
 The API requires the token in existing Secret {{ .Values.auth.existingSecret }}. Its value is never printed here.
-Use a versioned immutable token Secret; rotate by changing its name and performing an intentional upgrade.
+Use versioned immutable token Secrets. Stop the owner in maintenance, commit token rotation through cpractl local auth, then deploy the new Secret reference and resume one owner. Replacing a Secret alone does not rotate committed access. See the container and Helm operations guide.
 For local access: kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "cpra.fullname" . }} 8060:{{ .Values.service.port }}
+{{ if .Values.management.enabled -}}
+Management uses HTTPS. Trust the configured CA and use https://127.0.0.1:8060 for local access.
+The certificate must cover 127.0.0.1 and {{ include "cpra.fullname" . }}.{{ .Release.Namespace }}.svc. Probes and helm test verify that identity.
+Policy and encryption sources bootstrap or unlock committed state; replacing their Secret references does not rotate committed principals or undo external actions. Keep original wrapping keys available for retained data and backups.
+{{ end -}}
 {{ else -}}
 The API is disabled. No API Service, credentials, probes or Helm test Job are installed.
 {{ end -}}

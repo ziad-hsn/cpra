@@ -39,7 +39,7 @@ func TestUnknownDriverReadableNotWritable(t *testing.T) {
 	}
 }
 func TestEveryBuiltInDriverRoundTrips(t *testing.T) {
-	types := map[string][]string{"check": {"http", "tcp", "icmp", "dns", "udp", "grpc", "docker", "redis", "postgres", "mysql", "mongo", "rabbitmq", "kafka", "tls"}, "recovery": {"docker", "kubernetes", "webhook", "systemd", "aws"}, "notification": {"log", "pagerduty", "slack", "discord", "email", "webhook", "telegram", "teams", "mattermost", "pushover", "twilio", "datadog", "victorops", "opsgenie"}}
+	types := map[string][]string{"check": {"http", "tcp", "icmp", "dns", "udp", "grpc", "docker", "redis", "postgres", "mysql", "mongo", "rabbitmq", "kafka", "tls"}, "recovery": {"docker", "kubernetes", "webhook", "systemd", "aws", "a2a"}, "notification": {"log", "pagerduty", "slack", "discord", "email", "webhook", "telegram", "teams", "mattermost", "pushover", "twilio", "datadog", "victorops", "opsgenie", "a2a"}}
 	count := 0
 	for category, names := range types {
 		for _, name := range names {
@@ -81,7 +81,7 @@ func TestEveryBuiltInDriverRoundTrips(t *testing.T) {
 			count++
 		}
 	}
-	if count != 33 {
+	if count != 35 {
 		t.Fatal(count)
 	}
 }
@@ -126,6 +126,26 @@ func TestMutableSpecPreservesZeroAndEmpty(t *testing.T) {
 			if decoded.Metadata.Labels != nil || decoded.Spec.Check.Retries != nil || decoded.Spec.Check.Groups != nil || decoded.Spec.Enabled != nil {
 				t.Fatal("omitted value materialized", string(raw))
 			}
+		}
+	}
+}
+
+func TestRecoveryNotificationPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		color, trigger string
+		recovery, want bool
+	}{
+		{"red", "state_change", false, true}, {"red", "recovery_failed", true, true}, {"red", "recovery_exhausted", true, true},
+		{"red", "recovery_failed", false, false}, {"yellow", "recovery_failed", true, false}, {"red", "unknown", true, false}, {"red", "", true, false},
+	} {
+		spec := MonitorSpec{Check: CheckSpec{Interval: "60s", Timeout: "5s", Driver: DriverConfig{Type: "tcp", Config: json.RawMessage(`{"host":"test.example","port":443}`)}}, Notifications: Pointer(map[string]AlertRule{tc.color: {Trigger: Pointer(AlertRuleTrigger(tc.trigger)), Driver: &DriverConfig{Type: "log", Config: json.RawMessage(`{}`)}}})}
+		if tc.recovery {
+			spec.Recovery = &RecoverySpec{Driver: DriverConfig{Type: "docker", Config: json.RawMessage(`{"container":"test"}`)}}
+		}
+		raw, _ := json.Marshal(spec)
+		err := ValidateResource(Resource{APIVersion: APIVersion, Kind: "Monitor", Metadata: Metadata{ID: "test"}, Spec: raw})
+		if (err == nil) != tc.want {
+			t.Fatalf("%s/%s recovery=%v: %v", tc.color, tc.trigger, tc.recovery, err)
 		}
 	}
 }

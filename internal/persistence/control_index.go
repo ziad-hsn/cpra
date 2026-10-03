@@ -57,7 +57,7 @@ func (f *machine) indexMonitor(m Monitor) {
 		f.incidents.ReplaceOrInsert(r)
 		f.incidentsByMonitor.ReplaceOrInsert(r)
 	}
-	if m.IncidentID != "" || !m.SnoozedUntil.IsZero() || m.ControlRevision != identity("control/"+m.ID+"/"+m.CatalogUID) {
+	if m.IncidentID != "" || !m.SnoozedUntil.IsZero() || m.ControlRevision != identity("control/"+m.ID+"/"+m.CatalogUID) || f.hasWorkerCheckState(m) {
 		f.controls.ReplaceOrInsert(changeOf(m))
 	}
 }
@@ -89,13 +89,14 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 		f.image.Monitors[id] = m
 		f.indexMonitor(m)
 	}
-	return ctx.Err()
+	return f.indexExtensionMonitors(ctx)
 }
 
 // installMonitor runs only in Apply. Trees contain immutable scalar projections;
 // readers never walk mutable action maps or scan the fleet for an incident page.
 func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
-	f.image.Version = max(f.image.Version, policyMinimumFormat(m.Policy))
+	f.image.Version = joinStorageFormat(f.image.Version, policyMinimumFormat(m.Policy))
+	f.image.Version = joinStorageFormat(f.image.Version, recoveryNotificationPolicyFormat(m.Policy))
 	preserveOwnerObservation(previous, &m)
 	if f.incidents == nil {
 		f.rebuildControlIndexes()
@@ -151,15 +152,20 @@ func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
 		f.controls.Delete(ControlChange{MonitorID: m.ID})
 		f.indexMonitor(m)
 		if previous.ID != "" {
-			if f.controlChanges == nil {
-				f.controlChanges = make([]ControlChange, controlChangeCapacity)
-			}
-			f.controlSequence++
-			f.controlChanges[(f.controlSequence-1)%controlChangeCapacity] = changeOf(m)
+			f.publishControlChange(m)
 		}
 	}
 	return events
 }
+
+func (f *machine) publishControlChange(m Monitor) {
+	if f.controlChanges == nil {
+		f.controlChanges = make([]ControlChange, controlChangeCapacity)
+	}
+	f.controlSequence++
+	f.controlChanges[(f.controlSequence-1)%controlChangeCapacity] = changeOf(m)
+}
+
 func (s *Store) controlReadReady() error {
 	if err := s.ControllerHealth(); err != nil {
 		return errors.Join(errors.New("durable controls unavailable"), err)
@@ -214,20 +220,23 @@ type IncidentView struct {
 }
 
 func (s *Store) IncidentSnapshot() (IncidentView, error) {
-	if err := s.controlReadReady(); err != nil {
+	return s.IncidentSnapshotContext(context.Background())
+}
+
+func (s *Store) IncidentSnapshotContext(ctx context.Context) (IncidentView, error) {
+	unlock, err := s.lockControllerState(ctx, true)
+	if err != nil {
 		return IncidentView{}, err
 	}
-	s.fsm.mu.Lock()
-	defer s.fsm.mu.Unlock()
+	defer unlock()
 	f := s.fsm
-	if f.err != nil {
-		return IncidentView{}, f.err
-	}
-	if f.bootstrapPending() {
-		return IncidentView{}, ErrBootstrapPending
-	}
 	if f.incidents == nil {
-		f.rebuildControlIndexes()
+		if err := f.rebuildControlIndexesContext(ctx); err != nil {
+			return IncidentView{}, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return IncidentView{}, err
 	}
 	return IncidentView{tree: f.incidents.Clone(), byMonitor: f.incidentsByMonitor.Clone(), Index: f.image.Index}, nil
 }
@@ -263,15 +272,19 @@ func (v IncidentView) Page(after string, limit int) ([]IncidentRecord, string, e
 	return records, next, nil
 }
 func (s *Store) Incident(id string) (IncidentRecord, bool, error) {
-	if err := s.controlReadReady(); err != nil {
-		return IncidentRecord{}, false, err
-	}
+	return s.IncidentContext(context.Background(), id)
+}
+
+func (s *Store) IncidentContext(ctx context.Context, id string) (IncidentRecord, bool, error) {
 	// Snapshot cloning is O(1); no iteration or monitor/action copy is necessary.
-	v, err := s.IncidentSnapshot()
+	v, err := s.IncidentSnapshotContext(ctx)
 	if err != nil {
 		return IncidentRecord{}, false, err
 	}
 	r, ok := v.Get(id)
+	if err := ctx.Err(); err != nil {
+		return IncidentRecord{}, false, err
+	}
 	return r, ok, nil
 }
 func (s *Store) ControlSnapshot() (ControlView, error) {

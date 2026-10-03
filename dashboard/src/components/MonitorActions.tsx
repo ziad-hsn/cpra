@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { loadAction, loadActions } from '../api/actions';
@@ -8,6 +8,7 @@ import { mutationReceipt } from '../api/resources';
 import { useManagementMutation } from '../hooks/mutations';
 import { MutationReceipt, OperationLink } from './OperationReceipt';
 import { formatDateTime } from '../lib/format';
+import { Dialog } from './Dialog';
 
 export function MonitorActions({ monitorID }: { monitorID: string }) {
   const session = useDashboardSession();
@@ -52,6 +53,11 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
       await queries.invalidateQueries({ queryKey: ['durable-state', monitorID] });
     } catch { /* Preserve the reviewed observation. Never rebase or retry a write. */ }
   };
+  const feedback = <>
+    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The action changed since this review was opened. Close this draft and inspect its latest observation before reviewing again.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the original operation before taking another action.' : ''}</p>}
+    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted review" />}
+    {mutation.response && <MutationReceipt response={mutation.response} />}
+  </>;
   return <section className="card" aria-label="Action outcomes">
     <h2 className="card-title">Action outcomes</h2>
     <p>Provider observations and operator reviews are recorded separately. Reviewing an action never repeats it.</p>
@@ -64,6 +70,8 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
         <strong>{action.kind === 'intervention' ? 'Recovery' : action.kind === 'code' ? 'Notification' : action.kind || 'Action'}</strong> · <span className="mono">{action.id}</span>
         <p>Provider outcome: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
         {action.updatedAt && <p className="muted">Last recorded change: {formatDateTime(action.updatedAt)}</p>}
+        {action.recoveryFailure && <p style={{ overflowWrap: 'anywhere' }}>Triggered by confirmed {action.recoveryFailure.driver} recovery failure: attempt {action.recoveryFailure.attempt} of {action.recoveryFailure.maxAttempts}, action {action.recoveryFailure.actionID}, at {formatDateTime(action.recoveryFailure.failedAt)}.</p>}
+        {action.agentReceipt && <p style={{ overflowWrap: 'anywhere' }}>Agent {action.agentReceipt.taskID ? `task ${action.agentReceipt.taskID}: ${action.agentReceipt.state}` : `message ${action.agentReceipt.messageID}: accepted`}. Receipt {action.agentReceipt.sequence}, observed {formatDateTime(action.agentReceipt.observedAt)}. Monitor checks establish service health.</p>}
         {action.lateEvidence && <p>Later provider evidence: {action.lateEvidence.outcome}, recorded {formatDateTime(action.lateEvidence.recordedAt)}.</p>}
         {action.conflictingEvidence && <p role="alert">Conflicting provider evidence: {action.conflictingEvidence.outcome}, recorded {formatDateTime(action.conflictingEvidence.recordedAt)}. The investigation hold remains.</p>}
         {action.state === 'unknown' && action.executorFenced !== true && <p>The original executor has not been proven stopped. A conclusive review cannot release the hold.</p>}
@@ -83,16 +91,13 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
       </div>
       {(cursor || page.data.nextCursor) && <p className="muted">This paginated view stays fixed while you browse. Refresh actions to start from current observations.</p>}
     </>}
-    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The action changed since this review was opened. Close this draft and inspect its latest observation before reviewing again.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the original operation before taking another action.' : ''}</p>}
-    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted review" />}
-    {mutation.response && <MutationReceipt response={mutation.response} />}
-    {draft && <ReviewDialog key={`${draft.id}/${draft.reviewRevision}`} action={draft} pending={mutation.pending} unconfirmed={mutation.error?.reason === 'unconfirmed'} onCancel={() => setDraft(undefined)} onSubmit={submit} />}
+    {!draft && feedback}
+    {draft && <ReviewDialog key={`${draft.id}/${draft.reviewRevision}`} action={draft} pending={mutation.pending} unconfirmed={mutation.error?.reason === 'unconfirmed'} onCancel={() => setDraft(undefined)} onSubmit={submit}>{feedback}</ReviewDialog>}
   </section>;
 }
 
-function ReviewDialog({ action, pending, unconfirmed, onCancel, onSubmit }: { action: Action; pending: boolean; unconfirmed: boolean; onCancel: () => void; onSubmit: (input: { resolution: ActionReview['resolution']; reason: string; note: string; evidenceRefs: string[] }) => Promise<void> }) {
+function ReviewDialog({ action, pending, unconfirmed, children, onCancel, onSubmit }: { action: Action; pending: boolean; unconfirmed: boolean; children: ReactNode; onCancel: () => void; onSubmit: (input: { resolution: ActionReview['resolution']; reason: string; note: string; evidenceRefs: string[] }) => Promise<void> }) {
   const heading = useId();
-  const root = useRef<HTMLDivElement>(null);
   const [resolution, setResolution] = useState<ActionReview['resolution']>('inconclusive');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -101,19 +106,7 @@ function ReviewDialog({ action, pending, unconfirmed, onCancel, onSubmit }: { ac
   const bytes = (text: string) => new TextEncoder().encode(text).byteLength;
   const canConclude = (value: string) => action.executorFenced === true && !action.conflictingEvidence && (!action.lateEvidence || action.lateEvidence.outcome === value);
   const valid = !!reason.trim() && [reason, note].every(text => bytes(text) <= 4096 && !/[\0\r]/.test(text)) && refs.length <= 8 && new Set(refs).size === refs.length && refs.every(ref => bytes(ref) <= 2048 && !/\p{Cc}/u.test(ref)) && (resolution === 'inconclusive' || canConclude(resolution));
-  useEffect(() => {
-    const previous = document.activeElement;
-    root.current?.querySelector<HTMLElement>('select')?.focus();
-    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
-  }, []);
-  return <div ref={root} className="management-modal" role="dialog" aria-modal="true" aria-labelledby={heading} onKeyDown={event => {
-    if (event.key === 'Escape' && !pending) onCancel();
-    if (event.key !== 'Tab') return;
-    const controls = root.current?.querySelectorAll<HTMLElement>('select:not(:disabled),textarea:not(:disabled),button:not(:disabled)');
-    if (!controls?.length) { event.preventDefault(); return; }
-    if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus(); }
-    else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus(); }
-  }}><form className="card" onSubmit={event => { event.preventDefault(); if (valid && !pending && !unconfirmed) void onSubmit({ resolution, reason, note, evidenceRefs: refs }); }}>
+  return <Dialog labelledBy={heading} pending={pending} onCancel={onCancel}><form className="card" onSubmit={event => { event.preventDefault(); if (valid && !pending && !unconfirmed) void onSubmit({ resolution, reason, note, evidenceRefs: refs }); }}>
     <h2 id={heading}>Review unknown action</h2>
     <p>Action <span className="mono">{action.id}</span> belongs to monitor incarnation <span className="mono">{action.incarnationUID}</span>. Your review is an audited assertion; it does not replace provider evidence or replay the action.</p>
     <label className="management-field">Conclusion<select className="input" value={resolution} disabled={pending} onChange={event => setResolution(event.target.value as ActionReview['resolution'])}>
@@ -128,6 +121,7 @@ function ReviewDialog({ action, pending, unconfirmed, onCancel, onSubmit }: { ac
     <label className="management-field">Note (optional)<textarea className="input" maxLength={4096} disabled={pending} value={note} onChange={event => setNote(event.target.value)} /></label>
     <label className="management-field">Evidence references (optional)<textarea className="input" disabled={pending} value={evidence} maxLength={16392} onChange={event => setEvidence(event.target.value)} /><span className="muted">One reference per line, at most 8. CPRa records this text without opening links. Keep credentials out of notes and references.</span></label>
     {!valid && reason.trim() && <p role="alert">Each reason and note must fit within 4,096 UTF-8 bytes; each evidence reference within 2,048 bytes, with at most 8 references. A conclusive review also requires a stopped or fenced executor.</p>}
+    {children}
     <div className="row" style={{ gap: 8 }}><button type="button" className="btn" disabled={pending} onClick={onCancel}>Cancel</button><button type="submit" className="btn" disabled={!valid || pending || unconfirmed}>{pending ? 'Submitting…' : 'Record review'}</button></div>
-  </form></div>;
+  </form></Dialog>;
 }

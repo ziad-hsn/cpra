@@ -13,6 +13,7 @@ import (
 
 func catalogContextReads(s *Store, key CatalogKey, cursor CatalogCursor) []controllerContextRead {
 	return []controllerContextRead{
+		{"get", func(ctx context.Context) error { _, _, err := s.CatalogGetContext(ctx, key); return err }},
 		{"snapshot", func(ctx context.Context) error { _, err := s.CatalogSnapshotContext(ctx); return err }},
 		{"changes", func(ctx context.Context) error { _, err := s.CatalogChangesSinceContext(ctx, cursor, 10); return err }},
 		{"dependents", func(ctx context.Context) error { _, _, err := s.CatalogDependentsContext(ctx, key, 100); return err }},

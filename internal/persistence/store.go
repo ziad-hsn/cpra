@@ -47,6 +47,7 @@ type reply struct {
 var ErrCommitUnconfirmed = errors.New("durable commit outcome unknown")
 
 type Store struct {
+	storeExtensions
 	administrative  bool
 	opening         bool
 	restoreMarker   *RestoreMarker
@@ -373,7 +374,7 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 		if err := validateCommand(c); err != nil {
 			return nil, err
 		}
-		version = max(version, commandWriteFormat(c))
+		version = joinStorageFormat(version, commandWriteFormat(c))
 		encoded, err := json.Marshal(c)
 		if err != nil {
 			return nil, err
@@ -478,7 +479,7 @@ func (s *Store) run() {
 		timer.Stop()
 		version := FormatVersion
 		for _, req := range requests {
-			version = max(version, req.version)
+			version = joinStorageFormat(version, req.version)
 		}
 		data := make([]byte, 0, bytes)
 		data = append(data, commandPrefix(version)...)
@@ -558,10 +559,30 @@ func (s *Store) SLO() *slo.Recorder { return s.recorder }
 
 func (s *Store) History() *HistoryStore { return s.fsm.history }
 func (s *Store) Status() Status {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	s.fsm.mu.RLock()
-	defer s.fsm.mu.RUnlock()
+	status, _ := s.StatusContext(context.Background())
+	return status
+}
+
+// StatusContext observes diagnostics without changing storage health. Waiting
+// for Store/FSM locks follows ctx; an interrupted read never poisons the store.
+func (s *Store) StatusContext(ctx context.Context) (Status, error) {
+	if ctx == nil {
+		return Status{}, context.Canceled
+	}
+	unlock, err := s.lockStateContext(ctx, false)
+	if err != nil {
+		return Status{}, err
+	}
+	defer unlock()
+	if err := ctx.Err(); err != nil {
+		return Status{}, err
+	}
+	return s.statusLocked(), nil
+}
+
+// statusLocked observes diagnostic readiness with Store.mu and FSM.mu held.
+// Administrative inspection remains available without runtime admission.
+func (s *Store) statusLocked() Status {
 	status := Status{Mode: s.config.Storage.Mode, NodeID: s.nodeID, SingleNode: true, Ready: s.err == nil && s.fsm.err == nil, CommittedIndex: s.fsm.image.Index, CommitLatencyMS: float64(s.lastCommit) / float64(time.Millisecond), SnapshotDurationMS: float64(s.lastSnapshot) / float64(time.Millisecond)}
 	select {
 	case <-s.stop:
@@ -614,6 +635,9 @@ func (s *Store) maintain() {
 		case <-s.stop:
 			return
 		case <-collectionTicker.C:
+			if err := s.maintainExtensions(time.Now().UTC()); err != nil {
+				s.MarkUnavailable(err)
+			}
 			if err := s.maintainCollections(time.Now().UTC()); err != nil {
 				s.mu.Lock()
 				s.err = err
@@ -719,5 +743,22 @@ func (s *Store) MarkUnavailable(err error) {
 	s.mu.Unlock()
 }
 func (s *Store) SLOView(at time.Time) slo.View {
-	return s.recorder.View(at, s.config.SLO.Window, uint64(s.config.SLO.MinimumSamples))
+	view, _ := s.SLOViewContext(context.Background(), at)
+	return view
+}
+
+// SLOViewContext is a diagnostic read, including while admission is unavailable.
+// It reports cancellation instead of publishing an incomplete aggregate.
+func (s *Store) SLOViewContext(ctx context.Context, at time.Time) (slo.View, error) {
+	view, err := s.recorder.ViewContext(ctx, at, s.config.SLO.Window, uint64(s.config.SLO.MinimumSamples))
+	if err != nil {
+		return slo.View{}, err
+	}
+	if err := s.extendSLOView(ctx, &view); err != nil {
+		return slo.View{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return slo.View{}, err
+	}
+	return view, nil
 }

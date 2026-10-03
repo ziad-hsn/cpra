@@ -25,7 +25,7 @@ func TestDispatchFinalizesEachReservedInvocationWithoutChangingProviderFacts(t *
 			called, finished := 0, 0
 			d := NewDispatch(&projectionFixture{called: &called, panics: mode == "provider panic"}, ecs.Entity{}, "intervention", "", 1, 0)
 			var finishAt time.Time
-			d.Authorize = func(context.Context) (func() error, error) {
+			d.Authorize = func(context.Context) (ActionExecution, error) {
 				finish := func() error {
 					finished++
 					finishAt = time.Now()
@@ -38,9 +38,9 @@ func TestDispatchFinalizesEachReservedInvocationWithoutChangingProviderFacts(t *
 					return nil
 				}
 				if mode == "rejected start" {
-					return finish, errors.New("start unconfirmed")
+					return ActionExecution{Finish: finish}, errors.New("start unconfirmed")
 				}
-				return finish, nil
+				return ActionExecution{Finish: finish}, nil
 			}
 			r := d.Execute()
 			if finished != 1 {
@@ -71,14 +71,14 @@ func TestDispatchCopiesKeepInvocationCompletionHandlesIndependent(t *testing.T) 
 	d := NewDispatch(&concurrentDispatchFixture{}, ecs.Entity{}, "code", "red", 1, 0)
 	var assigned atomic.Int64
 	var finished sync.Map
-	d.Authorize = func(context.Context) (func() error, error) {
+	d.Authorize = func(context.Context) (ActionExecution, error) {
 		id := assigned.Add(1)
-		return func() error {
+		return ActionExecution{Finish: func() error {
 			if _, duplicate := finished.LoadOrStore(id, true); duplicate {
 				return errors.New("completion handle reused")
 			}
 			return nil
-		}, nil
+		}}, nil
 	}
 	var group sync.WaitGroup
 	for range 32 {
@@ -108,8 +108,8 @@ func TestDispatchPreservesProviderOutcomeWhenCompletionLosesLeadership(t *testin
 			called, finalized := 0, 0
 			dispatch := NewDispatch(&projectionFixture{called: &called, err: providerErr}, ecs.Entity{}, "intervention", "", 1, 0)
 			markerErr := errors.Join(errors.New("completion unconfirmed"), raft.ErrLeadershipLost)
-			dispatch.Authorize = func(context.Context) (func() error, error) {
-				return func() error { finalized++; return markerErr }, nil
+			dispatch.Authorize = func(context.Context) (ActionExecution, error) {
+				return ActionExecution{Finish: func() error { finalized++; return markerErr }}, nil
 			}
 			result := dispatch.Execute()
 			if result.Err != providerErr || result.FinalizationErr != markerErr || called != 1 || finalized != 1 {

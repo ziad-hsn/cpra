@@ -5,12 +5,14 @@ import { DashboardSession } from '../src/api/session';
 import { SessionBoundary } from '../src/auth/SessionBoundary';
 import { MonitorActions } from '../src/components/MonitorActions';
 import { operationContracts } from '../src/api/generated';
+import { agentReceiptView, recoveryFailureView } from '../src/api/actions';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function actions(options: { reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
+async function actions(options: { agent?: boolean; reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
   const action: Record<string, unknown> = { id: 'execution-1', monitorID: 'checkout', incarnationUID: 'original-monitor-uid', state: 'unknown', kind: 'intervention', reviewRevision: 'observed-1', held: true, executorFenced: !options.unfenced,
     ...(options.reviewedConflict ? { review: { revision: 'review-old', resolution: 'rejected', actor: 'alice', reviewedAt: '2026-09-14T00:00:00Z', reason: 'Provider records checked', note: '<script>not executable</script>', evidenceRefs: ['javascript:alert(1)'], conflict: true } } : {}) };
+  if (options.agent) action.agentReceipt = { sequence: '1', taskID: 'agent-task', state: 'TASK_STATE_WORKING', observedAt: '2026-09-30T00:00:00Z', providerOutput: 'private-agent-output', url: 'https://private-agent.test' };
   const writes: { method: string; path: string; match: string | null; body: Record<string, unknown> }[] = [];
   const permissions = Object.keys(operationContracts).filter(name => !options.reader || name.startsWith('Get') || name.startsWith('List'));
   const reply = (body: unknown, status = 200, headers: HeadersInit = {}) => new Response(JSON.stringify(body), { status, headers });
@@ -161,4 +163,29 @@ it('discards a review draft on sign-out', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.body.textContent).not.toContain('Private draft in this tab');
   expect(writes).toHaveLength(0);
+});
+
+
+it('shows committed agent correlation while retaining the unknown action hold', async () => {
+  await actions({ reader: true, agent: true, unfenced: true });
+  expect(await screen.findByText(/Agent task agent-task: TASK_STATE_WORKING/)).toBeInTheDocument();
+  expect(screen.queryByText('private-agent-output')).not.toBeInTheDocument();
+  expect(screen.queryByText('https://private-agent.test')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Review action/ })).not.toBeInTheDocument();
+});
+
+it('keeps large agent receipt sequences lossless and drops all content beyond correlation', () => {
+  const receipt = { sequence: '9223372036854775825', observedAt: '2026-09-30T00:00:00Z', taskID: 'task', state: 'TASK_STATE_FUTURE' };
+  expect(agentReceiptView({ ...receipt, token: 'private', text: 'private', artifacts: [{ url: 'https://private.test' }] })).toEqual(receipt);
+  for (const bad of [{ ...receipt, sequence: 1 }, { ...receipt, taskID: 'x'.repeat(257) }, { ...receipt, state: 'bad\nstate' }, { ...receipt, messageID: 'ambiguous' }, { ...receipt, observedAt: 'invalid' }]) {
+    expect(() => agentReceiptView(bad)).toThrow();
+  }
+});
+
+it('retains only confirmed original recovery context and rejects impossible escalation observations', () => {
+  const failure = { actionID: 'original-restart', driver: 'docker', attempt: 2, maxAttempts: 2, trigger: 'recovery_exhausted', outcome: 'failure', failedAt: '2026-09-30T00:00:00Z' };
+  expect(recoveryFailureView({ ...failure, token: 'private', diagnostic: 'private', target: 'https://private.test' })).toEqual(failure);
+  for (const patch of [{ outcome: 'unknown' }, { attempt: 1 }, { attempt: 2147483648 }, { maxAttempts: 0 }, { actionID: '' }, { failedAt: 'invalid' }]) {
+    expect(() => recoveryFailureView({ ...failure, ...patch })).toThrow();
+  }
 });

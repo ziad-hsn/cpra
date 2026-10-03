@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,7 +39,7 @@ type mainManagementFixture struct {
 	client   *http.Client
 }
 
-func newMainManagementFixture(t *testing.T) mainManagementFixture {
+func newMainManagementFixture(t *testing.T) *mainManagementFixture {
 	t.Helper()
 	if runtime.GOOS != "linux" {
 		t.Skip("real startup filesystem fixture qualified on Linux; native platform key/service gates remain separate")
@@ -86,25 +88,12 @@ func newMainManagementFixture(t *testing.T) mainManagementFixture {
 		t.Fatal(err)
 	}
 	settings.Management = runtimeconfig.Management{Enabled: true, PolicyFile: policyPath, TLS: &runtimeconfig.ManagementTLS{CertFile: certPath, KeyFile: keyPath}, Encryption: &runtimeconfig.ManagementEncryption{Local: &runtimeconfig.ManagementLocalKeys{ActiveKeyFile: key.Path}}}
-	options := runOptions{runtimeFile: filepath.Join(private, "runtime.yaml"), manifest: filepath.Join(private, "monitors.yaml"), web: true, webAddr: availableLocalAddress(t), allowEmpty: true, shutdownTimeout: 5 * time.Second}
+	options := runOptions{runtimeFile: filepath.Join(private, "runtime.yaml"), manifest: filepath.Join(private, "monitors.yaml"), web: true, webAddr: "127.0.0.1:0", allowEmpty: true, shutdownTimeout: 5 * time.Second}
 	if err := os.WriteFile(options.manifest, []byte("monitors: []\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	writeMainRuntime(t, options.runtimeFile, settings)
-	return mainManagementFixture{settings: settings, options: options, client: client}
-}
-
-func availableLocalAddress(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	address := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return address
+	return &mainManagementFixture{settings: settings, options: options, client: client}
 }
 
 func writeMainRuntime(t *testing.T, path string, settings runtimeconfig.Config) {
@@ -118,11 +107,15 @@ func writeMainRuntime(t *testing.T, path string, settings runtimeconfig.Config) 
 	}
 }
 
-func startMainManagement(t *testing.T, fixture mainManagementFixture) (*cpra.Client, func()) {
+func startMainManagement(t *testing.T, fixture *mainManagementFixture) (*cpra.Client, func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ready, done := make(chan struct{}), make(chan error, 1)
-	go func() { done <- runCPRa(ctx, fixture.options, func() { close(ready) }) }()
+	options := fixture.options
+	options.webAddr = "127.0.0.1:0"
+	var address string
+	options.webStarted = func(bound string) { address = bound }
+	go func() { done <- runCPRa(ctx, options, func() { close(ready) }) }()
 	select {
 	case <-ready:
 	case err := <-done:
@@ -154,6 +147,11 @@ func startMainManagement(t *testing.T, fixture mainManagementFixture) (*cpra.Cli
 		}
 	}
 	t.Cleanup(stop)
+	host, port, err := net.SplitHostPort(address)
+	if err != nil || host != "127.0.0.1" || port == "" || port == "0" {
+		t.Fatal("application did not report its bound loopback address", address, err)
+	}
+	fixture.options.webAddr = address
 	client, err := cpra.New(cpra.Config{BaseURL: "https://" + fixture.options.webAddr, AuthToken: startupOperatorToken, HTTPClient: fixture.client})
 	if err != nil {
 		stop()
@@ -182,6 +180,43 @@ func waitMainOperation(t *testing.T, client *cpra.Client, id string) {
 			t.Fatal("normal owner did not apply mutation", result.Data.State)
 		case <-time.After(25 * time.Millisecond):
 		}
+	}
+}
+
+func TestMainManagementFixtureOwnsListener(t *testing.T) {
+	fixture := newMainManagementFixture(t)
+	occupied, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = occupied.Close() })
+	fixture.options.webAddr = occupied.Addr().String()
+
+	for _, phase := range []string{"initial", "restart"} {
+		previous := fixture.options.webAddr
+		client, stop := startMainManagement(t, fixture)
+		address := fixture.options.webAddr
+		if address == previous {
+			t.Fatal(phase, "reused an occupied listener address")
+		}
+		if _, err := client.Access(t.Context()); err != nil {
+			t.Fatal(phase, "reported listener did not serve authenticated TLS", err)
+		}
+		duplicate, err := net.Listen("tcp", address)
+		if duplicate != nil {
+			_ = duplicate.Close()
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) {
+			t.Fatal(phase, "application did not retain its listener", err)
+		}
+		stop()
+		released, err := net.Listen("tcp", address)
+		if err != nil {
+			t.Fatal(phase, "shutdown did not release its listener", err)
+		}
+		// Retain the previous port while the next owner starts. Restart must
+		// use the new application's actual bind rather than this old address.
+		t.Cleanup(func() { _ = released.Close() })
 	}
 }
 
@@ -226,7 +261,6 @@ func TestMainManagedTLSWritesRecoverAuthoritativeCatalog(t *testing.T) {
 	}
 	// Restart has no original source file and no permission to reinterpret it.
 	fixture.options.allowEmpty = false
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	got, err := restarted.Monitors.Get(context.Background(), "managed-disabled")
 	if err != nil || got.Data.Metadata.UID != created.Data.Metadata.UID || got.Data.Metadata.Name == nil || *got.Data.Metadata.Name != "Edited in dashboard" || got.Data.Spec.Enabled == nil || *got.Data.Spec.Enabled {

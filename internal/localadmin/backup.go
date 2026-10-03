@@ -28,11 +28,14 @@ type BackupFile struct {
 }
 
 type BackupManifest struct {
-	Version       int       `json:"version"`
-	StorageFormat int       `json:"storage_format"`
-	NodeID        string    `json:"node_id"`
-	Created       time.Time `json:"created"`
-	Artifact      string    `json:"artifact"`
+	Version       int `json:"version"`
+	StorageFormat int `json:"storage_format"`
+	// StorageFormat identifies the base container; StateFormat identifies the
+	// committed application state after snapshot and log validation.
+	StateFormat int       `json:"state_format,omitempty"`
+	NodeID      string    `json:"node_id"`
+	Created     time.Time `json:"created"`
+	Artifact    string    `json:"artifact"`
 	// ConfigurationDigest identifies matching configuration without copying
 	// provider credentials into the backup manifest.
 	ConfigurationDigest string               `json:"configuration_sha256,omitempty"`
@@ -77,7 +80,7 @@ func backupWithKey(source, destination, config string, key []byte) error {
 	if err != nil {
 		return err
 	}
-	m := BackupManifest{Version: 2, StorageFormat: persistence.FormatVersion, NodeID: lock.NodeID, Created: time.Now().UTC(), Artifact: version.Info(), Files: files}
+	m := BackupManifest{Version: 2, StorageFormat: persistence.FormatVersion, StateFormat: lock.StateFormat, NodeID: lock.NodeID, Created: time.Now().UTC(), Artifact: version.Info(), Files: files}
 	if config != "" {
 		f, err := hashFile(config)
 		if err != nil {
@@ -130,6 +133,9 @@ func Restore(backup, destination, authenticationKeyFile string) error {
 	defer lock.Close()
 	if lock.NodeID != m.NodeID {
 		return fmt.Errorf("backup node identity does not match inventory")
+	}
+	if m.StateFormat != 0 && lock.StateFormat != m.StateFormat {
+		return fmt.Errorf("backup state format does not match committed state")
 	}
 	stage, err := stageDirectory(destination)
 	if err != nil {

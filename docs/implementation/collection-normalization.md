@@ -64,13 +64,13 @@ original profile identity.
 
 ## Executed checks
 
-The [private evidence manifest](../../bin/verification/collection-normalization-2026-09-24/result.json)
-records commands, logs and the [selected source snapshot](../../bin/verification/collection-normalization-2026-09-24/source-manifest.json).
+The [private evidence manifest](../review/local-evidence.md#record-84c62f895d631ff4129002d1)
+records commands, logs and the [selected source snapshot](../review/local-evidence.md#record-b63fcd00fdd90cc7f5f1b269).
 This is a format-14 normalization checkpoint, not qualification of the whole
 working tree or the complete dashboard goal. Commands recovered from an agent's
 execution record are identified separately from freshly recorded invocations.
 The separate
-[normalizer record](../../bin/verification/file-normalization-2026-09-24/result.json)
+[normalizer record](../review/local-evidence.md#record-440ec767f6a478490338476f)
 contains the six-way SDK matrix and compiled fixed-vector qualification.
 
 - Go 1.27 default/tagged SDK tests and races; Go 1.25 default/tagged SDK tests.
@@ -106,7 +106,7 @@ vet log is recorded with the executing agent's confirmed exit status rather
 than treated as proof by itself.
 
 The encrypted temporary-spool primitive has its own
-[independent race record](../../bin/verification/collection-reselection-spool-2026-09-24/independent-race.json)
+[independent race record](../review/local-evidence.md#record-2399f594fa1949335f657fce)
 and minimum-Go log. Those isolated checks do not establish a connected
 reselection workflow. The separately recorded
 [source/proof components](collection-reselection-proof.md) have their own

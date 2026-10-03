@@ -1,10 +1,51 @@
 import subprocess
+from pathlib import Path
+import tempfile
 import unittest
 
-from verify_worker_exclusion import builtin_tags, json_stream, require_symbol_absent
+from verify_worker_exclusion import (MODULE, SDK_MODULE, builtin_tags, json_stream,
+                                    require_symbol_absent, require_symbols_absent, selected_source_files)
 
 
 class WorkerExclusionOracleTests(unittest.TestCase):
+    def test_downloaded_sdk_sources_use_the_repository_source_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            for module, base, relative, expected in (
+                (MODULE, root, "internal/httpauth", "internal/httpauth/auth.go"),
+                (SDK_MODULE, Path(directory) / "module-cache/sdk@v0.1.0", "api", "sdk/go/api/auth.go"),
+                (SDK_MODULE, root / "sdk/go", ".", "sdk/go/auth.go"),
+            ):
+                package_dir = base / relative
+                package_dir.mkdir(parents=True, exist_ok=True)
+                source = package_dir / "auth.go"
+                source.write_text("package fixture\n")
+                package = {"Module": {"Path": module, "Dir": str(base)},
+                           "ImportPath": module + ("/" + relative if relative != "." else ""),
+                           "Dir": str(package_dir), "GoFiles": ["auth.go"]}
+                self.assertEqual(selected_source_files(package, root), {expected: source})
+
+    def test_source_mapping_rejects_foreign_packages_aliases_and_unframed_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "fixture.go"
+            source.write_text("package fixture\n")
+            package = {"Module": {"Path": MODULE, "Dir": str(root)},
+                       "ImportPath": MODULE, "Dir": str(root), "GoFiles": [source.name]}
+            cases = [dict(package, ImportPath=MODULE + "/other"),
+                     dict(package, GoFiles=["../fixture.go"]),
+                     dict(package, GoFiles=["fixture.go", "fixture.go"]),
+                     dict(package, Module={"Path": "example.com/foreign", "Dir": str(root)}),
+                     dict(package, Module={"Path": MODULE, "Dir": str(root / "other")})]
+            for bad in cases:
+                with self.subTest(package=bad), self.assertRaises((ValueError, OSError)):
+                    selected_source_files(bad, root)
+            link = root / "linked.go"
+            link.symlink_to(source)
+            with self.assertRaises(ValueError):
+                selected_source_files(dict(package, GoFiles=[link.name]), root)
+
     def test_builtin_tag_recipe_is_explicit_and_excludes_extension(self):
         self.assertEqual(builtin_tags("ALL_DRIVER_TAGS = redis systemd\n"), "redis systemd")
         for bad in ("", "ALL_DRIVER_TAGS = redis externaljobs", "ALL_DRIVER_TAGS = $(TAGS)",
@@ -22,6 +63,14 @@ class WorkerExclusionOracleTests(unittest.TestCase):
             ("CanonicalJobTypeReferences", "fixture.go:3:18: undefined: excluded.CanonicalJobTypeReferences\n"),
             ("LookupJobTypeVersion", "fixture.go:3:25: (*excluded.Store).LookupJobTypeVersion undefined "
              "(type *persistence.Store has no field or method LookupJobTypeVersion)\n"),
+            ("LookupBootstrapJobTypeVersion", "fixture.go:3:25: (*excluded.Store).LookupBootstrapJobTypeVersion undefined "
+             "(type *persistence.Store has no field or method LookupBootstrapJobTypeVersion)\n"),
+            ("ExternalJobsEnabled", "fixture.go:3:35: excluded.CatalogOptions{}.ExternalJobsEnabled undefined "
+             "(type management.CatalogOptions has no field or method ExternalJobsEnabled)\n"),
+            ("Workers", "fixture.go:3:28: (*excluded.Client).Workers undefined "
+             "(type *cpra.Client has no field or method Workers)\n"),
+            ("IterateWorkers", "fixture.go:3:28: (*excluded.Client).IterateWorkers undefined "
+             "(type *cpra.Client has no field or method IterateWorkers)\n"),
             ("JobTypeReferences", "fixture.go:3:35: excluded.CatalogRecord{}.JobTypeReferences undefined "
              "(type persistence.CatalogRecord has no field or method JobTypeReferences)\n"),
         ):
@@ -40,6 +89,14 @@ class WorkerExclusionOracleTests(unittest.TestCase):
             with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                 require_symbol_absent(subprocess.CompletedProcess([], 1, "", diagnostic), symbol)
         for diagnostic in (
+            "(*excluded.Client).WorkersExtra undefined (type *cpra.Client has no field or method WorkersExtra)",
+            "(*excluded.Client).Workers undefined (type *cpra.Client has no field or method WorkersExtra)",
+            "(*excluded.Client).Workers undefined (type *cpra.Store has no field or method Workers)",
+            "(*excluded.OtherClient).Workers undefined (type *cpra.OtherClient has no field or method Workers)",
+        ):
+            with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
+                require_symbol_absent(subprocess.CompletedProcess([], 1, "", diagnostic), "Workers")
+        for diagnostic in (
             "excluded.CatalogRecord{}.JobTypeReferencesExtra undefined "
             "(type persistence.CatalogRecord has no field or method JobTypeReferencesExtra)",
             "excluded.CatalogRecord{}.JobTypeReferences undefined "
@@ -49,12 +106,37 @@ class WorkerExclusionOracleTests(unittest.TestCase):
         ):
             with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                 require_symbol_absent(subprocess.CompletedProcess([], 1, "", diagnostic), "JobTypeReferences")
+        for diagnostic in (
+            "excluded.CatalogOptions{}.ExternalJobsEnabledExtra undefined "
+            "(type management.CatalogOptions has no field or method ExternalJobsEnabledExtra)",
+            "excluded.CatalogOptions{}.ExternalJobsEnabled undefined "
+            "(type management.CatalogRecord has no field or method ExternalJobsEnabled)",
+            "excluded.CatalogRecord{}.ExternalJobsEnabled undefined "
+            "(type management.CatalogOptions has no field or method ExternalJobsEnabled)",
+        ):
+            with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
+                require_symbol_absent(subprocess.CompletedProcess([], 1, "", diagnostic), "ExternalJobsEnabled")
 
     def test_multiple_go_list_documents_are_not_silently_ignored(self):
         self.assertEqual(list(json_stream(' {"ImportPath":"a"}\n{"ImportPath":"b"} ')),
                          [{"ImportPath": "a"}, {"ImportPath": "b"}])
         with self.assertRaises(ValueError):
             list(json_stream('{"ImportPath":"a"}\ninvalid'))
+
+    def test_grouped_compilation_requires_every_symbol(self):
+        output = ("fixture.go:3:16: undefined: excluded.WorkerAuthority\n"
+                  "fixture.go:4:16: undefined: excluded.WorkerOffer\n")
+        failed = subprocess.CompletedProcess([], 1, "", output)
+        require_symbols_absent(failed, ("WorkerAuthority", "WorkerOffer"))
+        # Another missing API cannot conceal one that leaked into this build.
+        with self.assertRaises(RuntimeError):
+            require_symbols_absent(failed, ("WorkerAuthority", "Store"))
+        with self.assertRaises(RuntimeError):
+            require_symbols_absent(subprocess.CompletedProcess([], 0, "", output),
+                                   ("WorkerAuthority", "WorkerOffer"))
+        for names in ((), ("WorkerAuthority", "WorkerAuthority")):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                require_symbols_absent(failed, names)
 
 
 if __name__ == "__main__":

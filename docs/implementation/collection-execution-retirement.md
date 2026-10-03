@@ -156,7 +156,7 @@ namespaces and the header have been removed.
 
 The format-12 checkpoint evidence records exact commands, retained failures, corrected
 reruns and source hashes in
-[`bin/verification/collection-execution-retirement-2026-09-23/result.json`](../../bin/verification/collection-execution-retirement-2026-09-23/result.json).
+[`bin/verification/collection-execution-retirement-2026-09-23/result.json`](../review/local-evidence.md#record-33cde82144d1dd6e07294614).
 It covers paired transactions, quota refunds, stale retries, frozen readers,
 failed native writes, partial-prefix recovery, corruption, committed history
 expiry, process termination, retained reads and historical format compatibility.
@@ -167,7 +167,7 @@ detection or Go 1.25.
 The current format-13 qualification adds partial-source snapshots, strict prefix
 commitments, actual header deletion, retained listing and forced termination at
 the validation, plan, input and header boundaries. The
-[source-retirement record](../../bin/verification/collection-source-retirement-2026-09-24/result.json)
+[source-retirement record](../review/local-evidence.md#record-e166fe715432c4e1f8c7f609)
 records the separate current checks and source hashes. Warm verification uses
 the bounded certificate described above. Cold audits retain full verification;
 their maximum-size latency has not been benchmarked by these regressions.

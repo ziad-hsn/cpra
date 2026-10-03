@@ -5,6 +5,7 @@ import { DashboardSession, ManagementError, type APIResponse } from '../src/api/
 import { operationApplied, operationMessage, operationPollInterval, operationView, type OperationObservation } from '../src/api/operations';
 import { mutationReceipt } from '../src/api/resources';
 import type { Operation } from '../src/api/generated';
+import { collectionIdentityFormat } from '../src/api/collectionInventory';
 import { SessionBoundary } from '../src/auth/SessionBoundary';
 import OperationDetail from '../src/pages/OperationDetail';
 import { fixture, resource } from './managementFixture';
@@ -98,6 +99,31 @@ it.each([
 it('automatically polls only interpreted reserved and committed receipt states', () => {
   for (const state of ['reserved', 'committed']) expect(operationPollInterval(wrapped({ ...reservedReceipt('one-operation'), state }))).toBe(5000);
   for (const state of ['completed', 'failed', 'partial', 'unrecognized']) expect(operationPollInterval(wrapped({ ...reservedReceipt('one-operation'), state }))).toBe(false);
+});
+
+it('keeps reading a terminal operation while its execution results are pending', async () => {
+  vi.useFakeTimers();
+  const pending: Operation = { id: 'original-operation', state: 'partial', contentDigest: 'a'.repeat(64),
+    identityFormat: collectionIdentityFormat, itemCount: 1, executionResult: { state: 'pending' } };
+  const state = await operationFixture({ initial: pending });
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+  expect(state.reads()).toHaveLength(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(state.reads()).toHaveLength(2);
+  state.change({ ...pending, executionResult: { state: 'expired' } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(state.reads()).toHaveLength(3);
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(state.reads()).toHaveLength(3);
+  expect(state.reads().every(([url, init]) => new URL(String(url)).pathname === '/api/v2/operations/original-operation' && (!init?.method || init.method === 'GET'))).toBe(true);
+});
+
+it('honors result retry delays without following expired or unrecognized operations', () => {
+  const pending = { ...reservedReceipt('one-operation'), state: 'partial', executionResult: { state: 'pending' } };
+  expect(operationPollInterval(wrapped(pending, 15_000))).toBe(15_000);
+  for (const state of ['expired', 'unrecognized', 'validated', 'rejected']) expect(operationPollInterval(wrapped({ ...pending, state }))).toBe(false);
+  for (const state of ['expired', 'ready', 'future']) expect(operationPollInterval(wrapped({ ...pending, executionResult: { state } }))).toBe(false);
+  expect(operationPollInterval(wrapped(pending), new ManagementError('forbidden', 'Forbidden'))).toBe(false);
 });
 
 it('keeps the exact sequenced handle across committed progress and expiry without repeating work', async () => {

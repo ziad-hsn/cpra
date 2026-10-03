@@ -25,7 +25,7 @@ func (m *managementHTTP) handleCollectionCancellation(w http.ResponseWriter, r *
 		writeManagementError(w, managementFailure(400, "invalidQuery", "Cancellation accepts only its original operation path."))
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeManagementError(w, mutationUnavailable())
 		return
 	}

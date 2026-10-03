@@ -21,7 +21,8 @@ def encoded(value):
 def build_environment():
     # Deliberate allowlist: ambient Go tool options, credentials, NODE_OPTIONS,
     # preloads and frontend environment values are not build inputs.
-    environment = {key: os.environ[key] for key in ("PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "SystemRoot", "TEMP", "TMP", "TMPDIR") if key in os.environ}
+    environment = {key: os.environ[key] for key in ("PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "SystemRoot", "TEMP", "TMP", "TMPDIR",
+                   "GOCACHE", "GOMODCACHE", "GOPATH") if key in os.environ}
     recipe = json.loads((ROOT / "scripts/release/recipe.json").read_text())
     environment.update(recipe["environment"])
     environment.update(GOOS="js", GOARCH="wasm", GOWASM="", GOMAXPROCS="2", TZ="UTC")

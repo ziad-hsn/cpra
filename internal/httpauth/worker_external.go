@@ -61,10 +61,15 @@ func (a *Authorizer) AuthorizeWorker(r *http.Request, operationID string, source
 	if err := r.Context().Err(); err != nil {
 		return empty, err
 	}
-	a.mu.RLock()
+	if err := a.readLock(r.Context()); err != nil {
+		return empty, err
+	}
 	verifier, at, err := workerRequest(a.current, r, operationID, a.now())
 	a.mu.RUnlock()
 	if err != nil {
+		return empty, err
+	}
+	if err := r.Context().Err(); err != nil {
 		return empty, err
 	}
 	// No policy lock is held while waiting for the committed state reader.

@@ -168,9 +168,9 @@ func TestCollectionCandidateEncodingValidationParityAndSourceIssue(t *testing.T)
 	}
 }
 
-func TestCollectionCandidateEncodingPolicyTwoRejectsOldAttempt(t *testing.T) {
+func TestCollectionCandidateEncodingRejectsOldPolicy(t *testing.T) {
 	base, contract, kinds, caps, models := profileInputs(t)
-	if collectionValidationPolicyVersion != 2 || base.ValidationPolicyVersion != 2 {
+	if collectionValidationPolicyVersion < 2 || base.ValidationPolicyVersion != collectionValidationPolicyVersion {
 		t.Fatal("headroom policy was not versioned")
 	}
 	base.ValidationPolicyVersion = 1

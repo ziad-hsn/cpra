@@ -137,7 +137,7 @@ func TestCollectionExecutionRetirementRejectsForeignFormatAndLiveWork(t *testing
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == CollectionExecutionRetirementFormatVersion || version == CollectionExecutionSourceRetirementFormatVersion || version == CollectionReselectionFormatVersion || externalStorageFormat(version)) {
+		if (err == nil) != (version == CollectionExecutionRetirementFormatVersion || version == CollectionExecutionSourceRetirementFormatVersion || version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || externalStorageFormat(version)) {
 			t.Fatal("retirement envelope format", version, err)
 		}
 	}

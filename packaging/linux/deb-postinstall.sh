@@ -29,6 +29,12 @@ if [ "$cpra_uid" -eq 0 ] || [ "$cpra_group_gid" -eq 0 ] || [ "$cpra_gid" -ne "$c
 fi
 install -d -m 0700 -o cpra -g cpra /var/lib/cpra
 install -d -m 0750 -o root -g cpra /etc/cpra
+for cpra_config in /etc/cpra/auth.token /etc/cpra/runtime.yaml /etc/cpra/monitors.yaml /etc/cpra/install.json; do
+    if [ -L "$cpra_config" ] || { [ -e "$cpra_config" ] && [ ! -f "$cpra_config" ]; }; then
+        echo "CPRa configuration must be a regular file" >&2
+        exit 1
+    fi
+done
 # Config conffiles are owned by the package manager; never rewrite their content.
 if [ ! -e /etc/cpra/auth.token ]; then
     umask 077
@@ -37,10 +43,16 @@ if [ ! -e /etc/cpra/auth.token ]; then
     chown root:cpra /etc/cpra/auth.token
     chmod 0640 /etc/cpra/auth.token
 fi
+for cpra_config in /etc/cpra/auth.token /etc/cpra/runtime.yaml /etc/cpra/monitors.yaml; do
+    if [ -f "$cpra_config" ]; then
+        chown root:cpra "$cpra_config"
+        chmod 0640 "$cpra_config"
+    fi
+done
 printf '%s\n' '{"schema_version":1,"kind":"package"}' > /etc/cpra/install.json
 chmod 0640 /etc/cpra/install.json
 chown root:cpra /etc/cpra/install.json
-if command -v systemctl >/dev/null 2>&1; then systemctl daemon-reload || :; fi
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
 
 if [ -f /run/cpra-package/restart ]; then
     systemctl start cpra.service

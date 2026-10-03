@@ -152,9 +152,16 @@ export function operationMessage(operation: OperationObservation): string {
   return 'This server reports an operation state the dashboard cannot interpret. Application has not been confirmed.';
 }
 
+// Finishing activation can precede publication of the accepted resources' results.
+// Continue observing that original operation without reopening its mutation flow.
+export function operationResultsPending(operation: Pick<Operation, 'state' | 'executionResult'>): boolean {
+  return operation.executionResult?.state === 'pending' &&
+    ['applying', 'committed', 'completed', 'partial', 'failed', 'interrupted', 'invalidated', 'canceled', 'cancelled'].includes(operation.state);
+}
+
 export function operationPollInterval(response?: APIResponse<OperationObservation>, error?: unknown): number | false {
   if (error instanceof ManagementError && ([401, 403, 404, 410].includes(error.status ?? 0) || ['invalid', 'too-large', 'forbidden', 'session-changed'].includes(error.reason))) return false;
-  if (!error && response && !['committed', 'reserved', 'pending', 'validating', 'applying'].includes(response.data.state)) return false;
+  if (!error && response && !['committed', 'reserved', 'pending', 'validating', 'applying'].includes(response.data.state) && !operationResultsPending(response.data)) return false;
   const retry = error instanceof ManagementError ? error.response?.retryAfterMs ?? 0 : 0;
   return Math.min(2_147_483_647, Math.max(5000, Number.isFinite(retry) ? retry : 2_147_483_647,
     response?.retryAfterMs ?? 0, (response?.data.retryAfterSeconds ?? 0) * 1000));

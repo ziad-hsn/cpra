@@ -9,6 +9,11 @@ cpra_scope: docs
 Edit documentation in **`docs/` on `main`**. The `gh-pages` branch holds the exact
 copy in `_sources/docs/`, the MkDocs configuration and templates, and the generated
 website. The application and documentation branches use separate Git worktrees.
+`scripts/docs/navigation.json` on main owns the page navigation; synchronization
+updates that section of the site configuration while preserving its other settings.
+It also copies `docs/source-version.json`, updates the associated version fields,
+and applies `scripts/docs/announcement.html.j2` to the announcement block. Other
+template blocks, theme settings and redirects remain owned by gh-pages.
 
 ## Choose the source scope
 
@@ -20,7 +25,7 @@ scope in page notices, examples, source links and search descriptions.
 
 Record source changes in `docs/source-version.json`. Uncommitted candidates need
 a content inventory as well as a parent commit. A docs-only commit does not
-change the runtime revision. Update the matching fields in
+change the runtime revision. Synchronization updates the matching fields in
 `_sources/source-version.json` and `extra` in `_sources/mkdocs.yml`; keep
 `documentation_commit` separate from `source_commit`.
 
@@ -29,6 +34,7 @@ change the runtime revision. Update the matching fields in
 Use separate checkouts such as `/work/cpra-main` and `/work/cpra-pages`. From main:
 
 ```sh
+python3 scripts/docs/references.py
 python3 scripts/docs/check.py
 python3 scripts/docs/sync.py --site /work/cpra-pages
 python3 scripts/docs/sync.py --site /work/cpra-pages --check
@@ -44,8 +50,10 @@ python _sources/rebuild.py
 python _sources/verify_site.py .
 ```
 
-Navigation, redirects, theme configuration and build validation live under
-`_sources/` on gh-pages. The strict build checks links and anchors, titles,
+Add each new Markdown page to `scripts/docs/navigation.json`. The source check
+requires every page exactly once, and rejects duplicates, missing pages and
+paths outside the docs. Redirects, theme configuration and build validation live
+under `_sources/` on gh-pages. The strict build checks links and anchors, titles,
 descriptions, one primary heading per page, project-prefixed URLs and search.
 It replaces only paths in `_sources/generated-files.txt`. Commit canonical
 Markdown on main and synchronized sources plus generated output on gh-pages.
@@ -54,6 +62,29 @@ Do not hand-edit generated HTML or the search index.
 `python _sources/rebuild.py --output /path/to/new-artifact` builds a separate
 artifact without replacing the tracked site; the output path must be absent.
 `python -m mkdocs serve -f _sources/mkdocs.yml` provides a local preview.
+
+## Implementation references and private records
+
+Run `scripts/docs/references.py` after editing repository files referenced by
+implementation records. It copies selected UTF-8 source files byte for byte into
+`review/source/` with `.txt` suffixes, rewrites repository links to those downloads,
+and records their hashes in `review/reference-data.json`. The
+[source index](review/implementation-sources.md) explains their scope. These
+selected files are not a complete or reviewed source release.
+
+Links to ignored `bin/verification/` artifacts lead to the
+[private-record index](review/local-evidence.md). That index records each path,
+availability at preparation, and a file hash when available. It never copies the
+artifact contents and never verifies a result. Missing records remain explicit.
+`--check` verifies the prepared index without requiring private artifacts on CI;
+it does not reinterpret their recorded availability as current evidence.
+
+`make docs-references` refreshes these references. `make docs-check` verifies
+their freshness and navigation as well as the source contracts. Preparation
+rejects symlinks, paths outside the repository, credential files, binary inputs
+and oversized downloads before rewriting documents. Code fences are preserved.
+The [MkDocs file-layout rules](https://www.mkdocs.org/user-guide/writing-your-docs/#file-layout)
+explain why download assets belong inside the documentation directory.
 
 ## Theme and artwork
 

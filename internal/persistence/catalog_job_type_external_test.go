@@ -207,7 +207,8 @@ func TestCatalogJobTypeCanonicalShapeAndFormats(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == CatalogJobTypeFormatVersion || version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion) {
+		want := version >= 18 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion
+		if (err == nil) != want {
 			t.Fatal("format gate", version, err)
 		}
 	}
@@ -304,6 +305,49 @@ func TestCatalogJobTypeBootstrapAndLookupCancellation(t *testing.T) {
 	s.fsm.mu.Unlock()
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal("lookup ignored cancellation", err)
+	}
+}
+
+func TestCatalogJobTypeBootstrapLookupKeepsAdmissionClosed(t *testing.T) {
+	s := openCatalogMemory(t)
+	job := commitJobType(t, s, jobTypeFixture(t, s, "bootstrap-contract"))
+	r := catalogJobTypeRecord(t, s, "bootstrap-monitor", job.Current)
+	digest, err := BootstrapDigest("", r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := BootstrapManifest{StageID: "owned-stage", InventoryDigest: strings.Repeat("a", 64), CatalogDigest: digest, Count: 1}
+	command := BootstrapCommand{Action: "begin", StageID: manifest.StageID, Manifest: &manifest}
+	results := submit(t, s, Command{Kind: "bootstrap", At: r.UpdatedAt, Bootstrap: &command})
+	if len(results) != 1 || results[0].Err != nil {
+		t.Fatal(results)
+	}
+	if _, _, err := s.LookupJobTypeVersion(t.Context(), job.Current.Record.Key.ID, "v1"); !errors.Is(err, ErrBootstrapPending) {
+		t.Fatal("ordinary contract lookup opened during seeding", err)
+	}
+	if _, _, err := s.LookupBootstrapJobTypeVersion(t.Context(), "other-stage", job.Current.Record.Key.ID, "v1"); !errors.Is(err, ErrBootstrapConflict) {
+		t.Fatal("foreign stage borrowed contract authority", err)
+	}
+	selected, ok, err := s.LookupBootstrapJobTypeVersion(t.Context(), manifest.StageID, job.Current.Record.Key.ID, "v1")
+	if err != nil || !ok || !reflect.DeepEqual(selected.Version, job.Current) {
+		t.Fatal("original stage lost immutable contract", err)
+	}
+	selected.Version.Record.Payload.Ciphertext[0] ^= 1
+	retained, _, err := s.LookupBootstrapJobTypeVersion(t.Context(), manifest.StageID, job.Current.Record.Key.ID, "v1")
+	if err != nil || !reflect.DeepEqual(retained.Version, job.Current) {
+		t.Fatal("bootstrap lookup aliases committed state", err)
+	}
+	if _, err := s.CatalogSnapshotContext(t.Context()); !errors.Is(err, ErrBootstrapPending) {
+		t.Fatal("contract lookup made partial catalog visible", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, _, err := s.LookupBootstrapJobTypeVersion(ctx, manifest.StageID, job.Current.Record.Key.ID, "v1"); !errors.Is(err, context.Canceled) {
+		t.Fatal("canceled bootstrap lookup continued", err)
+	}
+	s.MarkUnavailable(errors.New("private-storage-error-canary"))
+	if _, _, err := s.LookupBootstrapJobTypeVersion(t.Context(), manifest.StageID, job.Current.Record.Key.ID, "v1"); err == nil || strings.Contains(err.Error(), "canary") {
+		t.Fatal("failed storage admitted lookup or leaked diagnostic", err)
 	}
 }
 

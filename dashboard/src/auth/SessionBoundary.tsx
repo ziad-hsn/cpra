@@ -68,7 +68,7 @@ export function SessionBoundary({ children, session = dashboardSession }: { chil
 
   return <SessionContext.Provider value={session}>
     <IdentityQueries key={state.epoch} session={session}>
-      <div className="row" aria-label="Dashboard access" style={{ padding: '8px 16px', justifyContent: 'space-between', background: 'var(--surface-2)' }}>
+      <div className="row" role="group" aria-label="Dashboard access" style={{ padding: '8px 16px', justifyContent: 'space-between', background: 'var(--surface-2)' }}>
         {state.phase === 'legacy' ? <span>Read-only server. Management is not available on this server version.</span>
           : <><span>{state.access?.principalId} · {state.access?.role === 'operator' ? 'Operator' : 'Read-only access'}</span><button className="btn ghost" onClick={session.signOut}>Sign out</button></>}
       </div>

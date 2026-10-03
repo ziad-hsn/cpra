@@ -32,6 +32,9 @@
       "Action": {
         "additionalProperties": false,
         "properties": {
+          "agentReceipt": {
+            "$ref": "#/components/schemas/AgentReceipt"
+          },
           "conflictingEvidence": {
             "$ref": "#/components/schemas/ActionEvidence"
           },
@@ -97,6 +100,9 @@
             "type": "string",
             "x-go-name": "ReceiptID",
             "x-go-type-skip-optional-pointer": true
+          },
+          "recoveryFailure": {
+            "$ref": "#/components/schemas/RecoveryFailure"
           },
           "review": {
             "$ref": "#/components/schemas/ActionReview"
@@ -228,6 +234,46 @@
         ],
         "type": "object"
       },
+      "AgentReceipt": {
+        "additionalProperties": false,
+        "description": "Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.",
+        "properties": {
+          "contextID": {
+            "maxLength": 256,
+            "type": "string",
+            "x-go-name": "ContextID"
+          },
+          "messageID": {
+            "maxLength": 256,
+            "type": "string",
+            "x-go-name": "MessageID"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sequence": {
+            "description": "Decimal uint64 receipt sequence. String encoding preserves ordering identities for JavaScript clients.",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "type": "string"
+          },
+          "state": {
+            "description": "A2A task state at this receipt; omitted for message acceptance. Future states remain observational.",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "taskID": {
+            "maxLength": 256,
+            "type": "string",
+            "x-go-name": "TaskID"
+          }
+        },
+        "required": [
+          "sequence",
+          "observedAt"
+        ],
+        "type": "object"
+      },
       "AlertRule": {
         "additionalProperties": false,
         "properties": {
@@ -258,6 +304,15 @@
             },
             "type": "array",
             "uniqueItems": true
+          },
+          "trigger": {
+            "description": "Omission or state_change uses health transitions. Red rules may select recovery_failed after a confirmed failed intervention or recovery_exhausted after the configured attempt limit. Requires recovery. Unknown outcomes never trigger escalation; an endpoint with queued, started or unknown delivery retains its original action.",
+            "enum": [
+              "state_change",
+              "recovery_failed",
+              "recovery_exhausted"
+            ],
+            "type": "string"
           }
         },
         "type": "object"
@@ -524,6 +579,46 @@
           "interval",
           "timeout"
         ],
+        "type": "object"
+      },
+      "CodeNotificationA2A": {
+        "additionalProperties": false,
+        "properties": {
+          "allowInsecureHttp": {
+            "description": "Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false.",
+            "type": "boolean",
+            "x-go-name": "AllowInsecureHTTP"
+          },
+          "requestTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Deadline for one HTTP request; defaults to 10s, at most 5m.",
+            "x-go-name": "RequestTimeout"
+          },
+          "tenant": {
+            "description": "Optional A2A tenant. Must not contain control characters.",
+            "maxLength": 256,
+            "type": "string",
+            "x-go-name": "Tenant"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Overall delivery deadline including the acceptance receipt commit; defaults to 60s, range 1s to 5m. Notifications do not poll remote tasks.",
+            "x-go-name": "Timeout"
+          },
+          "token": {
+            "description": "Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.",
+            "maxLength": 8192,
+            "type": "string",
+            "x-go-name": "Token"
+          },
+          "url": {
+            "description": "Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.",
+            "maxLength": 4096,
+            "type": "string",
+            "x-go-name": "URL"
+          }
+        },
+        "required": [],
         "type": "object"
       },
       "CodeNotificationDatadog": {
@@ -1179,6 +1274,9 @@
             "type": "string",
             "x-go-type-skip-optional-pointer": true
           },
+          "agentReceipt": {
+            "$ref": "#/components/schemas/AgentReceipt"
+          },
           "color": {
             "description": "Original notification Code, when applicable.",
             "type": "string",
@@ -1236,6 +1334,9 @@
           "reason": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "recoveryFailure": {
+            "$ref": "#/components/schemas/RecoveryFailure"
           },
           "time": {
             "format": "date-time",
@@ -1724,6 +1825,51 @@
         "required": [
           "items"
         ],
+        "type": "object"
+      },
+      "InterventionTargetA2A": {
+        "additionalProperties": false,
+        "properties": {
+          "allowInsecureHttp": {
+            "description": "Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false.",
+            "type": "boolean",
+            "x-go-name": "AllowInsecureHTTP"
+          },
+          "pollInterval": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Task observation interval, 1s to 30s and no greater than taskTimeout. Defaults to the smaller of 5s and taskTimeout.",
+            "x-go-name": "PollInterval"
+          },
+          "requestTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Deadline for one HTTP request; defaults to 10s, at most 5m.",
+            "x-go-name": "RequestTimeout"
+          },
+          "taskTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Overall intervention deadline including task polling and receipt commits; defaults to 60s, range 1s to 5m. Expiry holds an unknown outcome without resending or canceling the task.",
+            "x-go-name": "TaskTimeout"
+          },
+          "tenant": {
+            "description": "Optional A2A tenant. Must not contain control characters.",
+            "maxLength": 256,
+            "type": "string",
+            "x-go-name": "Tenant"
+          },
+          "token": {
+            "description": "Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.",
+            "maxLength": 8192,
+            "type": "string",
+            "x-go-name": "Token"
+          },
+          "url": {
+            "description": "Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.",
+            "maxLength": 4096,
+            "type": "string",
+            "x-go-name": "URL"
+          }
+        },
+        "required": [],
         "type": "object"
       },
       "InterventionTargetAWS": {
@@ -3392,6 +3538,60 @@
         },
         "required": [
           "endpointRefs"
+        ],
+        "type": "object"
+      },
+      "RecoveryFailure": {
+        "additionalProperties": false,
+        "description": "Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.",
+        "properties": {
+          "actionID": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+            "x-go-name": "ActionID"
+          },
+          "attempt": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "driver": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "failedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "maxAttempts": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "failure"
+            ],
+            "type": "string"
+          },
+          "trigger": {
+            "enum": [
+              "recovery_failed",
+              "recovery_exhausted"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionID",
+          "driver",
+          "attempt",
+          "maxAttempts",
+          "trigger",
+          "outcome",
+          "failedAt"
         ],
         "type": "object"
       },

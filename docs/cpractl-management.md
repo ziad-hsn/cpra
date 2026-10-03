@@ -55,6 +55,23 @@ enabled. A reader identity can observe the resources the server permits. Writes
 require a named operator identity; notification Recipients are contacts, not
 login accounts.
 
+## Local encryption setup
+
+Local wrapping keys are administered on the CPRa host, independently of API
+credentials and the server's write-only Credential resources:
+
+```sh
+cpractl local encryption init --key-file /absolute/config/keys/wrapping.key --data-dir /absolute/state
+cpractl local encryption inspect --key-file /absolute/config/keys/wrapping.key --data-dir /absolute/state
+```
+
+The commands require explicit absolute paths, use no API connection, and print
+only a non-secret `key_id` in JSON. Initialization never overwrites an existing
+key. Inspection validates its file permissions and identity without changing
+configuration or opening Raft. See [native key setup](native-installation.md#initialize-a-local-encryption-key)
+for service reader permissions, interrupted initialization, and retaining keys
+needed by old records and backups.
+
 ## Create contacts, destinations, and a monitor
 
 The [example files](https://github.com/ziad-hsn/cpra/tree/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/cpractl) contain one resource per file. Apply the

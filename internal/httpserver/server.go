@@ -14,6 +14,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -34,6 +35,7 @@ var assetsFS embed.FS
 
 // Server exposes CPRa observations and explicitly configured durable management.
 type Server struct {
+	serverExtensions
 	mutationMu       sync.Mutex
 	mutationStopped  bool
 	activeMutations  int
@@ -70,7 +72,7 @@ func New(cfg ServerConfig, holder *fleetview.Holder, metrics *controller.Metrics
 		cfg.ReadTimeout = 10 * time.Second
 	}
 	if cfg.WriteTimeout <= 0 {
-		cfg.WriteTimeout = 30 * time.Second
+		cfg.WriteTimeout = cfg.defaultWriteTimeout()
 	}
 	// Pre-load the SPA index.html so we can serve it directly for the root and
 	// SPA fallback routes without triggering net/http's index-canonical redirect.
@@ -180,8 +182,16 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	controller.SystemLogger.Info("Web server listening at %s://%s (API: /api/v1, metrics: /metrics)", scheme, s.cfg.Addr)
+	controller.SystemLogger.Info("Web server listening at %s://%s (API: /api/v1, metrics: /metrics)", scheme, s.srv.Addr)
 	return nil
+}
+
+// Address returns the bound address after Start succeeds.
+func (s *Server) Address() string {
+	if s.srv == nil {
+		return ""
+	}
+	return s.srv.Addr
 }
 
 // Stop gracefully shuts down the server, draining in-flight requests and
@@ -192,11 +202,16 @@ func (s *Server) Stop() {
 	_ = s.StopContext(ctx)
 }
 
-// StopContext bounds HTTP draining. On timeout active connections are closed;
-// callers must still finish process shutdown and must not report readiness.
+// StopContext bounds HTTP draining and joins accepted completion callbacks. On
+// timeout connections close, but the caller must retain storage and encryption
+// ownership until a later successful join or process exit.
 func (s *Server) StopContext(ctx context.Context) error {
+	if ctx == nil {
+		return context.Canceled
+	}
+	admissionErr := s.StopAdmission(ctx)
 	if s.srv == nil {
-		return nil
+		return errors.Join(admissionErr, s.stopExtensions(ctx))
 	}
 	s.stopHistorySampler()
 	err := s.srv.Shutdown(ctx)
@@ -205,7 +220,10 @@ func (s *Server) StopContext(ctx context.Context) error {
 		controller.SystemLogger.Warn("Web server shutdown: %v", err)
 	}
 	s.wg.Wait()
-	controller.SystemLogger.Info("Web server stopped")
+	err = errors.Join(admissionErr, err, s.stopExtensions(ctx))
+	if err == nil {
+		controller.SystemLogger.Info("Web server stopped")
+	}
 	return err
 }
 
@@ -328,6 +346,11 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		return configured && subtle.ConstantTimeCompare(expected[:], digest[:]) == 1
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && (strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/metrics") {
+			ctx, cancel := context.WithTimeout(r.Context(), s.observationTimeout())
+			defer cancel()
+			r = r.WithContext(ctx)
+		}
 		if s.anonymousLoopbackConfigured() && !strings.HasPrefix(r.URL.Path, "/api/v2/") {
 			host, _, err := net.SplitHostPort(r.RemoteAddr)
 			if err == nil && net.ParseIP(host).IsLoopback() {
@@ -450,8 +473,8 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
-	ready, projectionFresh, _, _ := s.observationReadiness(time.Now().UTC())
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	ready, projectionFresh, _, _ := s.observationReadiness(r.Context(), time.Now().UTC())
 	status, code := "ready", http.StatusOK
 	if !ready {
 		status, code = "not ready", http.StatusServiceUnavailable
@@ -764,7 +787,11 @@ func (s *Server) registerMetrics(mux *http.ServeMux) {
 	mux.HandleFunc("/metrics", s.handleMetrics)
 }
 
-func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if err := r.Context().Err(); err != nil {
+		writeErr(w, http.StatusServiceUnavailable, "metrics unavailable")
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	var b metricWriter
 
@@ -818,7 +845,10 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	s.writeSystemMetrics(&b)
-	s.writeSLOMetrics(&b, time.Now().UTC())
+	if err := s.writeSLOMetrics(r.Context(), &b, time.Now().UTC()); err != nil {
+		writeErr(w, http.StatusServiceUnavailable, "metrics unavailable")
+		return
+	}
 
 	_, _ = w.Write([]byte(b.String()))
 }

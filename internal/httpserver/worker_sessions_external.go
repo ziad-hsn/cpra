@@ -21,22 +21,33 @@ const maxConcurrentWorkerPolls = 32
 
 type workerSessionStore interface {
 	httpauth.WorkerPolicyReader
+	WaitWorkerPoll(context.Context, persistence.WorkerAuthority, persistence.WorkerPollRequest) error
 	CommitWorkerPoll(context.Context, persistence.WorkerAuthority, persistence.WorkerPollRequest) (persistence.WorkerPollResponse, error)
 	CommitWorkerStart(context.Context, persistence.WorkerAuthority, persistence.WorkerStartRequest) (persistence.WorkerStartResponse, error)
+	CommitWorkerHeartbeat(context.Context, persistence.WorkerAuthority, persistence.WorkerHeartbeatRequest) (persistence.WorkerHeartbeatResponse, error)
 }
 
-// workerSessionHTTP adapts committed worker protocol operations. Production route
-// registration remains closed until result handling and dispatch are qualified.
+// workerSessionHTTP adapts committed worker protocol operations. New work and
+// completion use separate admission barriers so shutdown can retain outcomes.
 type workerSessionHTTP struct {
-	auth     *httpauth.Authorizer
-	store    workerSessionStore
-	ready    func(context.Context) error
-	admit    func(context.Context, func() error) error
-	mu       sync.Mutex
-	polls    map[string]struct{}
-	catalog  *management.Catalog
-	starts   map[string]int
-	starting int
+	auth             *httpauth.Authorizer
+	store            workerSessionStore
+	ready            func(context.Context) error
+	admit            func(context.Context, func() error) error
+	completionReady  func(context.Context) error
+	complete         func(context.Context, func() error) error
+	admissionContext context.Context
+	stopAdmission    context.CancelFunc
+	completions      workerCompletionDrain
+	mu               sync.Mutex
+	polls            map[string]struct{}
+	catalog          *management.Catalog
+	starts           map[string]int
+	starting         int
+	results          map[string]int
+	resulting        int
+	heartbeats       workerIngressLimit
+	evidenceRequests workerIngressLimit
 }
 
 func (h *workerSessionHTTP) reserve(uid string) bool {
@@ -60,7 +71,13 @@ func (h *workerSessionHTTP) release(uid string) {
 
 func (h *workerSessionHTTP) poll(w http.ResponseWriter, r *http.Request) {
 	managementHeaders(w)
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	parent, stop := context.WithCancel(r.Context())
+	defer stop()
+	if h.admissionContext != nil {
+		cancelOnStop := context.AfterFunc(h.admissionContext, stop)
+		defer cancelOnStop()
+	}
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 	r = r.WithContext(ctx)
 	authority, err := h.auth.AuthorizeWorker(r, "WorkerPoll", h.store)
@@ -121,6 +138,23 @@ func (h *workerSessionHTTP) poll(w http.ResponseWriter, r *http.Request) {
 		ServerID: request.ServerID, WorkerID: request.WorkerID, ClientSessionID: request.ClientSessionID,
 		SessionID: request.SessionID, PollSequence: uint64(request.PollSequence), Capabilities: capabilities,
 		Capacity: int(request.Capacity), Limit: int(request.Limit), WaitSeconds: int(request.WaitSeconds),
+	}
+	// Body reads have their own short deadline. A valid long poll gets its
+	// requested wait plus bounded commit/response time, still under the caller's
+	// deadline. Keep the global/per-worker reservation, but hold no mutation
+	// admission gate while waiting for work.
+	cancel()
+	ctx, pollCancel := context.WithTimeout(parent, time.Duration(request.WaitSeconds+5)*time.Second)
+	defer pollCancel()
+	if command.WaitSeconds > 0 {
+		if err := h.store.WaitWorkerPoll(ctx, authority, command); err != nil {
+			writeWorkerSessionError(w, err)
+			return
+		}
+	}
+	if err := h.ready(ctx); err != nil {
+		writeWorkerSessionError(w, err)
+		return
 	}
 	var response persistence.WorkerPollResponse
 	err = h.admit(ctx, func() error {

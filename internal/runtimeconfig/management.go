@@ -45,7 +45,8 @@ type ManagementProxy struct {
 	PublicOrigin string `yaml:"public_origin" json:"-"`
 }
 
-// ManagementEncryption describes exactly one approved wrapping source. Empty
+// ManagementEncryption describes the wrapping source accepted under storage or
+// management. Supplying both locations is an error. Empty
 // Backend selects local. Omitting this entire section is permitted only in
 // explicit memory mode, where startup may generate a nonpersistent ephemeral key.
 // A validated remote descriptor does not instantiate or certify that backend.
@@ -214,6 +215,14 @@ func (c Management) EffectiveEncryptionBackend(storageMode string) string {
 // symlinks and backend capabilities require separate startup verification.
 func (c Management) Validate(storage Storage) error {
 	invalid := func(field, detail string) error { return managementConfigError("management."+field, 0, detail) }
+	if storage.Encryption != nil {
+		if c.Encryption != nil {
+			return managementConfigError("storage.encryption", 0, "configure one wrapping source; management.encryption is also supplied")
+		}
+		if err := storage.Encryption.validate(storage, "storage"); err != nil {
+			return err
+		}
+	}
 	if !c.Enabled {
 		if c.PolicyFile != "" || c.PolicyReaderGroupID != nil || c.PolicyReaderSID != "" || c.TLS != nil || c.TrustedProxy != nil || c.Encryption != nil {
 			return invalid("enabled", "must be true when management settings are supplied")
@@ -248,6 +257,9 @@ func (c Management) Validate(storage Storage) error {
 	} else if !managementHTTPSOrigin(c.TrustedProxy.PublicOrigin) {
 		return invalid("trusted_proxy.public_origin", "requires one HTTPS origin without credentials, path, query or fragment")
 	}
+	if c.Encryption == nil {
+		c.Encryption = storage.Encryption
+	}
 	if err := c.Encryption.Validate(storage); err != nil {
 		return err
 	}
@@ -261,13 +273,17 @@ func (c Management) Validate(storage Storage) error {
 // backend. A nil descriptor is accepted only in explicit memory mode. The caller
 // must supply the resolved storage boundary before any source is loaded.
 func (c *ManagementEncryption) Validate(storage Storage) error {
-	invalid := func(field, detail string) error { return managementConfigError("management."+field, 0, detail) }
+	return c.validate(storage, "management")
+}
+
+func (c *ManagementEncryption) validate(storage Storage, section string) error {
+	invalid := func(field, detail string) error { return managementConfigError(section+"."+field, 0, detail) }
 	if storage.Mode != "raft" && storage.Mode != "memory" {
 		return invalid("encryption", "requires an explicit supported storage mode")
 	}
 	if c == nil {
 		if storage.Mode != "memory" {
-			return invalid("encryption.local.active_key_file", "initialize encryption explicitly with cpractl encryption init, or configure an approved wrapping backend before enabling durable management")
+			return invalid("encryption.local.active_key_file", "initialize encryption explicitly with cpractl local encryption init, or configure an approved wrapping backend before enabling durable management")
 		}
 	} else {
 		encryption := c
@@ -289,7 +305,7 @@ func (c *ManagementEncryption) Validate(storage Storage) error {
 			if !managementPath(encryption.Local.ActiveKeyFile) {
 				return invalid("encryption.local.active_key_file", "requires an absolute initialized key file path")
 			}
-			if err := validateSourceFiles(encryption.Local.PreviousKeyFiles, MaxPreviousManagementKeys, "management.encryption.local.previous_key_files", encryption.Local.ActiveKeyFile); err != nil {
+			if err := validateSourceFiles(encryption.Local.PreviousKeyFiles, MaxPreviousManagementKeys, section+".encryption.local.previous_key_files", encryption.Local.ActiveKeyFile); err != nil {
 				return err
 			}
 		case "openbao-transit", "vault-transit":
@@ -332,10 +348,10 @@ func (c *ManagementEncryption) Validate(storage Storage) error {
 			if source.Profile != "" && !managementText(source.Profile, 128) {
 				return invalid("encryption.aws_kms.profile", "requires a bounded profile name")
 			}
-			if err := validateSourceFiles(source.SharedConfigFiles, MaxManagementSourceFiles, "management.encryption.aws_kms.shared_config_files", ""); err != nil {
+			if err := validateSourceFiles(source.SharedConfigFiles, MaxManagementSourceFiles, section+".encryption.aws_kms.shared_config_files", ""); err != nil {
 				return err
 			}
-			if err := validateSourceFiles(source.SharedCredentialsFiles, MaxManagementSourceFiles, "management.encryption.aws_kms.shared_credentials_files", ""); err != nil {
+			if err := validateSourceFiles(source.SharedCredentialsFiles, MaxManagementSourceFiles, section+".encryption.aws_kms.shared_credentials_files", ""); err != nil {
 				return err
 			}
 		default:
@@ -343,7 +359,7 @@ func (c *ManagementEncryption) Validate(storage Storage) error {
 		}
 	}
 	if storage.Directory != "" {
-		return (Management{Enabled: true, Encryption: c}).ValidateDataDirectory(storage.Directory)
+		return (Management{Enabled: true, Encryption: c}).validateDataDirectory(storage.Directory, section)
 	}
 	return nil
 }
@@ -352,12 +368,16 @@ func (c *ManagementEncryption) Validate(storage Storage) error {
 // path overrides are resolved. File loading must additionally reject symlinks or
 // otherwise prove resolved key/bootstrap files lie outside the real data tree.
 func (c Management) ValidateDataDirectory(directory string) error {
+	return c.validateDataDirectory(directory, "management")
+}
+
+func (c Management) validateDataDirectory(directory, section string) error {
 	if !c.Enabled || directory == "" {
 		return nil
 	}
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
-		return managementConfigError("management", 0, "cannot resolve data-directory boundary")
+		return managementConfigError(section, 0, "cannot resolve data-directory boundary")
 	}
 	paths := []string{c.PolicyFile}
 	if c.TLS != nil {
@@ -382,7 +402,7 @@ func (c Management) ValidateDataDirectory(directory string) error {
 		}
 		rel, err := filepath.Rel(absolute, filepath.Clean(source))
 		if err == nil && (rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
-			return managementConfigError("management", 0, "policy, keys and bootstrap source files must remain outside the data directory")
+			return managementConfigError(section, 0, "policy, keys and bootstrap source files must remain outside the data directory")
 		}
 	}
 	return nil

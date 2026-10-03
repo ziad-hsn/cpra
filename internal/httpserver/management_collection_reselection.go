@@ -49,7 +49,7 @@ func (m *managementHTTP) handleCollectionReselection(w http.ResponseWriter, r *h
 		writeManagementError(w, mediaErr)
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeManagementError(w, mutationUnavailable())
 		return
 	}

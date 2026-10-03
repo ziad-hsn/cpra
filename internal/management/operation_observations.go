@@ -16,21 +16,28 @@ type OperationView struct {
 }
 
 func (c *Catalog) OperationSnapshot(at time.Time, maxBytes int64) (OperationView, error) {
-	if !c.Ready() {
-		return OperationView{}, ErrUnavailable
+	return c.OperationSnapshotContext(context.Background(), at, maxBytes)
+}
+
+func (c *Catalog) OperationSnapshotContext(ctx context.Context, at time.Time, maxBytes int64) (OperationView, error) {
+	if err := c.readyContext(ctx); err != nil {
+		return OperationView{}, err
 	}
-	view, err := c.store.OperationSnapshot(at, maxBytes)
+	view, err := c.store.OperationSnapshotContext(ctx, at, maxBytes)
 	return OperationView{view: view, catalog: c}, err
 }
 
 func (v OperationView) EstimatedBytes() int64 { return v.view.EstimatedBytes() }
 
 func (v OperationView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Operation, string, error) {
+	if ctx == nil {
+		return nil, "", ErrValidation
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	if v.catalog == nil || !v.catalog.Ready() {
-		return nil, "", ErrUnavailable
+	if err := v.catalog.readyContext(ctx); err != nil {
+		return nil, "", err
 	}
 	if monitorID != "" && !validID(monitorID) {
 		return nil, "", ErrValidation

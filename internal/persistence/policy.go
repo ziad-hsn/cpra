@@ -20,6 +20,7 @@ type MaintenanceWindow struct {
 func (p Policy) Clone() Policy {
 	p.policyExtensions = clonePolicyExtensions(p)
 	p.Endpoints = maps.Clone(p.Endpoints)
+	p.NotificationTriggers = maps.Clone(p.NotificationTriggers)
 	p.Maintenance = slices.Clone(p.Maintenance)
 	return p
 }
@@ -27,6 +28,9 @@ func (p Policy) Clone() Policy {
 // Validate accepts absent optional fields in older records. Zero recovery
 // attempts means the existing single-attempt behavior, not unlimited attempts.
 func (p Policy) Validate() error {
+	if err := validateRecoveryNotificationPolicy(p); err != nil {
+		return err
+	}
 	if err := validatePolicyExtensions(p); err != nil {
 		return err
 	}

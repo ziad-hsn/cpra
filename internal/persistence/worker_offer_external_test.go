@@ -18,6 +18,15 @@ import (
 
 func workerOfferFixture(t *testing.T, category string) (*Store, WorkerAuthority, WorkerPollRequest, WorkerExecutionIntent, WorkerPrincipal) {
 	t.Helper()
+	s, a, request, in, p := workerPollFixture(t, category)
+	if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
+		t.Fatal(err)
+	}
+	return s, a, request, in, p
+}
+
+func workerPollFixture(t *testing.T, category string) (*Store, WorkerAuthority, WorkerPollRequest, WorkerExecutionIntent, WorkerPrincipal) {
+	t.Helper()
 	s := openCatalogMemory(t)
 	in, job := workerExecutionFixture(t, s, category)
 	s.administrative = true
@@ -34,9 +43,6 @@ func workerOfferFixture(t *testing.T, category string) (*Store, WorkerAuthority,
 	}
 	server, err := s.WorkerProtocolIdentity(t.Context())
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)
 	}
 	request := WorkerPollRequest{ServerID: server.ServerID, WorkerID: p.ID, ClientSessionID: uuid.NewString(), PollSequence: 1, Capacity: 10, Limit: 10, Capabilities: []WorkerSessionCapability{{JobTypeID: job.Current.Record.Key.ID, Version: job.Current.Version, Category: category}}}
@@ -318,12 +324,12 @@ func TestWorkerOfferFormatsSnapshotsAndCancelledRequests(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerOfferFormatVersion) {
+		if (err == nil) != (version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion) {
 			t.Fatal("start format", version, err)
 		}
 	}
 	snap := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(snap, []byte(workerOfferSnapshotMagic)) {
+	if !bytes.HasPrefix(snap, []byte(workerQueueSnapshotMagic)) {
 		t.Fatal("snapshot frame")
 	}
 	restored, ledger, err := decodeSnapshot(bytes.NewReader(snap), "")

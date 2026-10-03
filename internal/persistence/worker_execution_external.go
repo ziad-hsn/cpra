@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
@@ -33,6 +35,7 @@ var (
 // only a sealed, validated assignment; no provider secrets or executable object
 // may be supplied in identity fields. Admission does not grant invocation.
 type WorkerExecutionIntent struct {
+	Schedule        *WorkerScheduleTicket `json:"schedule,omitempty"`
 	ID              string                `json:"id"`
 	Revision        string                `json:"revision"`
 	MonitorID       string                `json:"monitor_id"`
@@ -53,6 +56,10 @@ type WorkerExecutionIntent struct {
 }
 
 func (i WorkerExecutionIntent) Clone() WorkerExecutionIntent {
+	if i.Schedule != nil {
+		copy := *i.Schedule
+		i.Schedule = &copy
+	}
 	i.Guard = i.Guard.Clone()
 	i.Payload = i.Payload.Clone()
 	return i
@@ -65,6 +72,9 @@ func (i WorkerExecutionIntent) Binding(storeID string) secureconfig.Binding {
 func (i WorkerExecutionIntent) Validate() error { return i.validate() }
 
 func (i WorkerExecutionIntent) validate() error {
+	if i.Schedule != nil && (i.Category != "check" || !i.Schedule.valid(i.Scheduled)) {
+		return ErrWorkerExecutionInvalid
+	}
 	for _, id := range []string{i.ID, i.Revision, i.MonitorID, i.MonitorUID, i.MonitorRevision, i.ControlRevision, i.SourceUID, i.SourceRevision} {
 		if !catalogIdentifier(id, 256) {
 			return ErrWorkerExecutionInvalid
@@ -81,7 +91,7 @@ func (i WorkerExecutionIntent) validate() error {
 		return ErrWorkerExecutionInvalid
 	}
 	if i.Category == "notification" {
-		if i.Source.Kind != "NotificationEndpoint" {
+		if i.Source.Kind != "NotificationEndpoint" && (i.Source != (CatalogKey{Kind: "Monitor", ID: i.MonitorID}) || i.SourceUID != i.MonitorUID) {
 			return ErrWorkerExecutionInvalid
 		}
 	} else if i.Source != (CatalogKey{Kind: "Monitor", ID: i.MonitorID}) || i.SourceUID != i.MonitorUID {
@@ -95,20 +105,61 @@ func (i WorkerExecutionIntent) validate() error {
 	return ErrWorkerExecutionInvalid
 }
 
+func (i WorkerExecutionIntent) minimumFormat() int {
+	if i.Schedule != nil {
+		return WorkerScheduleFormatVersion
+	}
+	if i.Category == "notification" && i.Source.Kind == "Monitor" {
+		return WorkerNotificationFormatVersion
+	}
+	return WorkerExecutionFormatVersion
+}
+
 type WorkerExecutionRecord struct {
-	Intent         WorkerExecutionIntent     `json:"intent"`
-	OwnerEpoch     string                    `json:"owner_epoch"`
-	CreatedAt      time.Time                 `json:"created_at"`
-	CommittedIndex uint64                    `json:"committed_index"`
-	Digest         string                    `json:"digest"`
-	Lifecycle      *WorkerExecutionLifecycle `json:"lifecycle,omitempty"`
+	RetiredOffers  []WorkerExecutionLifecycle `json:"retired_offers,omitempty"`
+	ResultTarget   time.Duration              `json:"result_target,omitempty"`
+	SLOEpoch       uint64                     `json:"slo_epoch,omitempty"`
+	Observation    *WorkerResultObservation   `json:"observation,omitempty"`
+	Intent         WorkerExecutionIntent      `json:"intent"`
+	OwnerEpoch     string                     `json:"owner_epoch"`
+	CreatedAt      time.Time                  `json:"created_at"`
+	CommittedIndex uint64                     `json:"committed_index"`
+	Digest         string                     `json:"digest"`
+	Lifecycle      *WorkerExecutionLifecycle  `json:"lifecycle,omitempty"`
+	Result         *WorkerResultRecord        `json:"result,omitempty"`
+	Evidence       []WorkerEvidenceRecord     `json:"evidence,omitempty"`
+	Finalization   *WorkerFinalization        `json:"finalization,omitempty"`
 }
 
 func (r WorkerExecutionRecord) Clone() WorkerExecutionRecord {
+	r.RetiredOffers = slices.Clone(r.RetiredOffers)
+	if r.Observation != nil {
+		copy := *r.Observation
+		r.Observation = &copy
+	}
+	if r.Finalization != nil {
+		value := *r.Finalization
+		r.Finalization = &value
+	}
 	r.Intent = r.Intent.Clone()
 	if r.Lifecycle != nil {
 		value := *r.Lifecycle
+		if value.Heartbeat != nil {
+			heartbeat := *value.Heartbeat
+			value.Heartbeat = &heartbeat
+		}
 		r.Lifecycle = &value
+	}
+	if r.Result != nil {
+		value := r.Result.Clone()
+		r.Result = &value
+	}
+	if r.Evidence != nil {
+		values := make([]WorkerEvidenceRecord, len(r.Evidence))
+		for n, value := range r.Evidence {
+			values[n] = value.Clone()
+		}
+		r.Evidence = values
 	}
 	return r
 }
@@ -116,12 +167,22 @@ func (r WorkerExecutionRecord) Clone() WorkerExecutionRecord {
 // WorkerExecutionCommand is stamped by CommitWorkerExecution before admission.
 // Apply generates neither time nor identity and performs no external I/O.
 type WorkerExecutionCommand struct {
-	Intent     WorkerExecutionIntent `json:"intent"`
-	OwnerEpoch string                `json:"owner_epoch"`
+	CheckReserved     bool                  `json:"check_reserved,omitempty"`
+	SchedulingVersion int                   `json:"scheduling_version,omitempty"`
+	ResultTarget      time.Duration         `json:"result_target,omitempty"`
+	Intent            WorkerExecutionIntent `json:"intent"`
+	OwnerEpoch        string                `json:"owner_epoch"`
 }
 
 func (c WorkerExecutionCommand) validate(at time.Time) error {
-	if c.Intent.validate() != nil || !catalogIdentifier(c.OwnerEpoch, 256) || at.IsZero() || at.Year() < 1 || at.Year() > 9998 {
+	if c.Intent.Schedule != nil && (c.Intent.Schedule.OwnerEpoch != c.OwnerEpoch || c.ResultTarget <= 0) {
+		return ErrWorkerExecutionInvalid
+	}
+	_, _, numbered := parseWorkerCheckID(c.Intent.ID)
+	if c.CheckReserved && (!numbered || c.Intent.Category != "check" || c.SchedulingVersion != 1) || !c.CheckReserved && strings.HasPrefix(c.Intent.ID, "wc.") {
+		return ErrWorkerExecutionInvalid
+	}
+	if c.SchedulingVersion < 0 || c.SchedulingVersion > 1 || c.ResultTarget < 0 || c.ResultTarget > 0 && c.Intent.Category != "check" || c.Intent.validate() != nil || !catalogIdentifier(c.OwnerEpoch, 256) || at.IsZero() || at.Year() < 1 || at.Year() > 9998 {
 		return ErrWorkerExecutionInvalid
 	}
 	return nil
@@ -158,6 +219,13 @@ func workerExecutionDigest(i WorkerExecutionIntent) string {
 		Scheduled: i.Scheduled, Deadline: i.Deadline, Payload: i.Payload,
 	}
 	raw, _ := json.Marshal(projection)
+	if i.Schedule != nil {
+		value, _ := json.Marshal(struct {
+			Intent   workerExecutionIntentDigestV1 `json:"intent"`
+			Schedule workerScheduleTicketDigestV2  `json:"schedule"`
+		}{projection, i.Schedule.digestProjection()})
+		return identity("cpra/worker/execution-intent/v2\x00" + string(value))
+	}
 	return identity("cpra/worker/execution-intent/v1\x00" + string(raw))
 }
 
@@ -174,7 +242,11 @@ func (s *Store) CommitWorkerExecution(ctx context.Context, intent WorkerExecutio
 	if err := s.controllerHealthContext(ctx); err != nil {
 		return WorkerExecutionRecord{}, err
 	}
-	command := WorkerExecutionCommand{Intent: intent.Clone(), OwnerEpoch: s.executorSession}
+	command := WorkerExecutionCommand{SchedulingVersion: 1, Intent: intent.Clone(), OwnerEpoch: s.executorSession}
+	_, _, command.CheckReserved = parseWorkerCheckID(intent.ID)
+	if intent.Category == "check" {
+		command.ResultTarget = s.config.SLO.ResultTarget
+	}
 	results, err := s.Submit(ctx, []Command{{Kind: "worker_execution", At: time.Now().UTC(), commandExtensions: commandExtensions{WorkerExecution: &command}}})
 	if err != nil {
 		return WorkerExecutionRecord{}, errors.Join(ErrCommitUnconfirmed, err)

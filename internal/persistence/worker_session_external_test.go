@@ -212,10 +212,10 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	}
 	c := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: r, ProposedSessionID: uuid.NewString()}
 	command := Command{Kind: "worker_poll", At: time.Now().UTC(), commandExtensions: commandExtensions{WorkerSession: &c}}
-	for version := 1; version <= WorkerSessionFormatVersion+1; version++ {
+	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion) {
+		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion) {
 			t.Fatal("format gate", version, err)
 		}
 	}
@@ -229,7 +229,7 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != WorkerOfferFormatVersion {
+	if s.fsm.image.Version != WorkerQueueFormatVersion {
 		t.Fatal("format not advanced")
 	}
 	clone := cloneImageExtensions(s.fsm.image)

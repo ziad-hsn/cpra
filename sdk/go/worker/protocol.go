@@ -99,7 +99,7 @@ func validateStart(reply *api.StartResponse, request api.StartRequest, workerUID
 			return ErrIdentity
 		}
 	case api.StartDispositionUnknown:
-		if !validID(reply.GrantID) || !validDeadline(reply.Deadline) || (reply.ReceiptID != "" && !validID(reply.ReceiptID)) {
+		if !validID(reply.GrantID) || !validDeadline(reply.Deadline) || reply.ReceiptID != "" {
 			return ErrIdentity
 		}
 	case api.StartDispositionPending, api.StartDispositionRejected:

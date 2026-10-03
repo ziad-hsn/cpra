@@ -15,7 +15,7 @@ import (
 
 func testKeyFileOptions(t *testing.T) KeyFileOptions {
 	t.Helper()
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		t.Skip("native ACL verifier is not yet implemented on this OS")
 	}
 	base := keyFileTestDirectory(t)

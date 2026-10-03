@@ -28,7 +28,13 @@ type HistoryView struct {
 }
 
 func (h *HistoryStore) Snapshot() (HistoryView, error) {
-	h.mu.RLock()
+	return h.SnapshotContext(context.Background())
+}
+
+func (h *HistoryStore) SnapshotContext(ctx context.Context) (HistoryView, error) {
+	if err := collectionReadLock(ctx, &h.mu); err != nil {
+		return HistoryView{}, err
+	}
 	defer h.mu.RUnlock()
 	if h.err != nil || h.closed {
 		return HistoryView{}, ErrHistoryUnavailable
@@ -61,8 +67,17 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 		return nil, "", err
 	}
 	h := v.store
-	h.mu.RLock()
+	if err := collectionReadLock(ctx, &h.mu); err != nil {
+		return nil, "", err
+	}
 	defer h.mu.RUnlock()
+	return v.pageLocked(ctx, monitorID, after, limit)
+}
+
+// pageLocked shares the bounded scan with the v1 cursor without nesting locks.
+// The caller holds the history read lock for this entire page.
+func (v HistoryView) pageLocked(ctx context.Context, monitorID, after string, limit int) ([]Event, string, error) {
+	h := v.store
 	if h.err != nil || h.closed {
 		return nil, "", ErrHistoryUnavailable
 	}
@@ -161,6 +176,9 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 		}
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
 	if len(items) > limit {
 		items = items[:limit]
 		return items, items[len(items)-1].ID, nil

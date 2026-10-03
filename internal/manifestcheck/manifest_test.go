@@ -22,7 +22,7 @@ func TestManifestValidationDoesNotContactTarget(t *testing.T) {
 	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Manifest(context.Background(), path, false); err != nil {
+	if err := Manifest(context.Background(), path, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if calls.Load() != 0 {
@@ -41,7 +41,7 @@ func TestDuplicateIdentityAcrossParserBatches(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := Manifest(ctx, path, false); err == nil || !strings.Contains(err.Error(), "duplicate effective monitor id") {
+	if err := Manifest(ctx, path, false, false); err == nil || !strings.Contains(err.Error(), "duplicate effective monitor id") {
 		t.Fatalf("duplicate result: %v", err)
 	}
 }
@@ -51,10 +51,43 @@ func TestEmptyManifestRequiresOptIn(t *testing.T) {
 	if err := os.WriteFile(path, []byte("monitors: []\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Manifest(context.Background(), path, false); err == nil {
+	if err := Manifest(context.Background(), path, false, false); err == nil {
 		t.Fatal("empty accepted")
 	}
-	if err := Manifest(context.Background(), path, true); err != nil {
+	if err := Manifest(context.Background(), path, true, false); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestA2AFileRequiresEncryptionWithoutProviderRequests(t *testing.T) {
+	for _, role := range []string{"intervention", "inline-notification", "group-notification"} {
+		t.Run(role, func(t *testing.T) {
+			var calls atomic.Int32
+			target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls.Add(1) }))
+			defer target.Close()
+			connection := fmt.Sprintf("{url: %q, allow_insecure_http: true}", target.URL)
+			input := "monitors:\n  - name: agent\n    pulse_check: {type: http, interval: 1m, timeout: 1s, config: {url: " + target.URL + "}}\n"
+			switch role {
+			case "intervention":
+				input += "    intervention: {action: a2a, target: " + connection + "}\n"
+			case "inline-notification":
+				input += "    codes: {red: {notify: a2a, config: " + connection + "}}\n"
+			case "group-notification":
+				input += "    codes: {red: {notify_group: agents}}\nendpoints: {agent: {type: a2a, config: " + connection + "}}\nnotification_groups: {agents: [agent]}\n"
+			}
+			path := filepath.Join(t.TempDir(), "monitors.yaml")
+			if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := Manifest(t.Context(), path, false, false); err == nil || !strings.Contains(err.Error(), "storage.encryption") {
+				t.Fatal("missing key selection accepted", err)
+			}
+			if err := Manifest(t.Context(), path, false, true); err != nil {
+				t.Fatal("explicit key selection rejected", err)
+			}
+			if calls.Load() != 0 {
+				t.Fatal("preflight contacted a provider")
+			}
+		})
 	}
 }

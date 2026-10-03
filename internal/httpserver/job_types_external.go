@@ -63,7 +63,7 @@ func (m *managementHTTP) handleJobType(w http.ResponseWriter, r *http.Request, o
 		writeManagementJSON(w, http.StatusOK, resource)
 		return
 	}
-	if !m.ready() {
+	if !m.ready(r.Context()) {
 		writeJobTypeError(w, mutationUnavailable())
 		return
 	}

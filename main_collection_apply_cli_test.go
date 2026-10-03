@@ -88,7 +88,6 @@ func TestMainManagementCollectionApplyCLI(t *testing.T) {
 		t.Fatal("native continuation changed the original retained result")
 	}
 	stop()
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	cli.origin = "https://" + fixture.options.webAddr
 	after := decodeMainCLI[api.Operation](t, cli.success(t, nil, "wait", "operation/"+admission.ID, "--timeout=12s", "-o", "json").stdout)

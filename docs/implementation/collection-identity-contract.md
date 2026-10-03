@@ -1,7 +1,7 @@
 # Collection identity and preflight
 
 This document records the bounded cryptographic protocol implemented under
-[`sdk/go/collection/commitment`](../../sdk/go/collection/commitment/README.md).
+[`sdk/go/collection/commitment`](../review/source/sdk/go/collection/commitment/README.md.txt).
 It supports the collection work in the
 [management API plan](api-management-plan.md). The private working branch now
 connects keyed SDK freezing to `POST /api/v2/collections/preflight`. The normal
@@ -23,7 +23,7 @@ must not reconstruct that span by re-encoding a map or a typed resource. This
 avoids assumptions about JSON key order, Unicode escaping, or numeric spellings
 being identical across languages.
 
-The [package framing specification](../../sdk/go/collection/commitment/README.md)
+The [package framing specification](../review/source/sdk/go/collection/commitment/README.md.txt)
 defines domain separation, eight-byte length prefixes, unsigned big-endian
 coordinates, source boundaries, and ordered inventory construction. The package
 accepts only bounded `Kind/ID` identities and canonical ordered source tokens such

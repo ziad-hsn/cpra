@@ -25,8 +25,10 @@ owner-loop integration remain open; draft SDK HTTP fixtures alone do not
 establish management behavior.
 
 Preserve Go 1.25, Ark ownership, existing manifests and reads, optional driver
-builds, and single-node Raft. Provider-account and million-monitor endurance
-evidence remain separate release gates. Custom-job configuration and worker
+builds, and single-node Raft. Provider-account and comparative performance
+evidence remain separate release gates. The 24-hour endurance run is outside
+this task and is not a mandatory completion check, following the user's
+1 October 2026 scope correction. Custom-job configuration and worker
 management remain outside the dashboard; their optional SDK/server paths require
 the existing build, runtime, and authorization boundaries.
 

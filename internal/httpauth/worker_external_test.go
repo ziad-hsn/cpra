@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,6 +21,56 @@ import (
 )
 
 const workerToken = "worker-fixture-012345678901234567890123456789"
+
+func TestWorkerAuthenticationHonorsPolicyLockDeadline(t *testing.T) {
+	a := newFixture(t, configFixture(t))
+	a.mu.Lock()
+	var once sync.Once
+	unblock := func() { once.Do(a.mu.Unlock) }
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	finished, result := make(chan struct{}), make(chan error, 1)
+	var calls atomic.Int32
+	t.Cleanup(func() { cancel(); unblock(); <-finished })
+	reader := workerReaderFunc(func(context.Context, string, time.Time) (persistence.WorkerAuthority, error) {
+		calls.Add(1)
+		return persistence.WorkerAuthority{WorkerID: "worker-a"}, nil
+	})
+	go func() {
+		defer close(finished)
+		r := requestFixture(http.MethodPost, "/api/v2/external-workers/start", workerToken).WithContext(ctx)
+		_, err := a.AuthorizeWorker(r, "WorkerStart", reader)
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.DeadlineExceeded) || calls.Load() != 0 {
+			t.Fatal("expired worker authentication reached credential reader", err, calls.Load())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("worker authentication waited past its deadline")
+	}
+	unblock()
+	if _, err := a.AuthorizeWorker(requestFixture(http.MethodPost, "/api/v2/external-workers/start", workerToken), "WorkerStart", reader); err != nil || calls.Load() != 1 {
+		t.Fatal("deadline prevented a later credential read", err, calls.Load())
+	}
+}
+
+func TestWorkerAuthenticationCanceledPolicyReadSkipsCredentialReader(t *testing.T) {
+	a := newFixture(t, configFixture(t))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	a.now = func() time.Time { cancel(); return time.Now() }
+	called := false
+	reader := workerReaderFunc(func(context.Context, string, time.Time) (persistence.WorkerAuthority, error) {
+		called = true
+		return persistence.WorkerAuthority{WorkerID: "worker-a"}, nil
+	})
+	r := requestFixture(http.MethodPost, "/api/v2/external-workers/start", workerToken).WithContext(ctx)
+	got, err := a.AuthorizeWorker(r, "WorkerStart", reader)
+	if !errors.Is(err, context.Canceled) || called || got != (persistence.WorkerAuthority{}) {
+		t.Fatal("canceled policy read returned authority or invoked credential reader", err, called)
+	}
+}
 
 type workerReaderFunc func(context.Context, string, time.Time) (persistence.WorkerAuthority, error)
 

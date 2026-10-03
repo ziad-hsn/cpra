@@ -27,10 +27,10 @@ func validateCollectionHeaders(i image) error {
 		if state.NormalizationProfile != "" && i.Version < CollectionReselectionFormatVersion {
 			return ErrCollectionInvalid
 		}
-		if state.ExecutionRetirement != nil && i.Version != CollectionExecutionRetirementFormatVersion && i.Version != CollectionExecutionSourceRetirementFormatVersion && i.Version != CollectionReselectionFormatVersion && !externalStorageFormat(i.Version) {
+		if state.ExecutionRetirement != nil && i.Version != CollectionExecutionRetirementFormatVersion && i.Version != CollectionExecutionSourceRetirementFormatVersion && i.Version != CollectionReselectionFormatVersion && !agentActionStorageFormat(i.Version) && !externalStorageFormat(i.Version) {
 			return ErrCollectionInvalid
 		}
-		if state.ExecutionRetirement != nil && state.ExecutionRetirement.Sources != nil && i.Version != CollectionExecutionSourceRetirementFormatVersion && i.Version != CollectionReselectionFormatVersion && !externalStorageFormat(i.Version) {
+		if state.ExecutionRetirement != nil && state.ExecutionRetirement.Sources != nil && i.Version != CollectionExecutionSourceRetirementFormatVersion && i.Version != CollectionReselectionFormatVersion && !agentActionStorageFormat(i.Version) && !externalStorageFormat(i.Version) {
 			return ErrCollectionInvalid
 		}
 		if state.Execution != nil && !collectionExecutionStorageFormat(i.Version) {
@@ -183,6 +183,14 @@ func (s *frozenSnapshot) persistCollections(sink raft.SnapshotSink) error {
 	magic := collectionSnapshotMagic
 	if external := externalSnapshotMagic(s.image.Version); external != "" {
 		magic = external
+	} else if s.image.Version == NotificationFormatVersion {
+		magic = notificationSnapshotMagic
+	} else if s.image.Version == AgentObservationFormatVersion {
+		magic = agentObservationSnapshotMagic
+	} else if s.image.Version == RecoveryNotificationFormatVersion {
+		magic = recoveryNotificationSnapshotMagic
+	} else if s.image.Version == AgentActionFormatVersion {
+		magic = agentActionSnapshotMagic
 	} else if s.image.Version == CollectionReselectionFormatVersion {
 		magic = collectionReselectionSnapshotMagic
 	} else if s.image.Version == CollectionExecutionSourceRetirementFormatVersion {
@@ -254,6 +262,18 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	switch {
 	case version != 0:
 		magicLength = externalLength
+	case bytes.HasPrefix(prefix, []byte(notificationSnapshotMagic)):
+		version = NotificationFormatVersion
+		magicLength = len(notificationSnapshotMagic)
+	case bytes.HasPrefix(prefix, []byte(agentObservationSnapshotMagic)):
+		version = AgentObservationFormatVersion
+		magicLength = len(agentObservationSnapshotMagic)
+	case bytes.HasPrefix(prefix, []byte(recoveryNotificationSnapshotMagic)):
+		version = RecoveryNotificationFormatVersion
+		magicLength = len(recoveryNotificationSnapshotMagic)
+	case bytes.HasPrefix(prefix, []byte(agentActionSnapshotMagic)):
+		version = AgentActionFormatVersion
+		magicLength = len(agentActionSnapshotMagic)
 	case bytes.HasPrefix(prefix, []byte(collectionReselectionSnapshotMagic)):
 		version = CollectionReselectionFormatVersion
 		magicLength = len(collectionReselectionSnapshotMagic)
@@ -330,7 +350,7 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	}
 	if collectionExecutionStorageFormat(i.Version) {
 		offsets := map[string]uint64{}
-		if i.Version == CollectionExecutionRetirementFormatVersion || i.Version == CollectionExecutionSourceRetirementFormatVersion || i.Version == CollectionReselectionFormatVersion || externalStorageFormat(i.Version) {
+		if i.Version == CollectionExecutionRetirementFormatVersion || i.Version == CollectionExecutionSourceRetirementFormatVersion || i.Version == CollectionReselectionFormatVersion || agentActionStorageFormat(i.Version) || externalStorageFormat(i.Version) {
 			for id, state := range i.Collections {
 				if r := state.ExecutionRetirement; r != nil && r.Checkpoint != nil {
 					offsets[id] = r.Checkpoint.Progress.Processed

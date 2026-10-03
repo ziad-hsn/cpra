@@ -59,6 +59,10 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.management.enabled }}
+      initContainers:
+        {{- include "cpra.managementInit" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cpra
           image: {{ include "cpra.image" . | quote }}
@@ -71,7 +75,7 @@ spec:
             - /etc/cpra/runtime/runtime.yaml
             {{- if .Values.api.enabled }}
             - -web.addr=0.0.0.0:8060
-            - -web.auth-file=/run/secrets/cpra/token
+            - {{ printf "-web.auth-file=%s" (include "cpra.readTokenPath" .) | quote }}
             {{- else }}
             - -web=false
             {{- end }}
@@ -95,7 +99,7 @@ spec:
               drop: [ALL]
           {{- if .Values.api.enabled }}
           ports:
-            - name: http
+            - name: {{ include "cpra.apiScheme" . }}
               containerPort: 8060
           {{- end }}
           resources:
@@ -108,16 +112,27 @@ spec:
                 - /usr/local/bin/cpractl
                 - {{ ternary "ready" "health" (eq $name "readiness") }}
                 - --server
-                - http://127.0.0.1:8060
+                - {{ printf "%s://127.0.0.1:8060" (include "cpra.apiScheme" $) }}
+                {{- if $.Values.management.enabled }}
+                - --ca-file
+                - /etc/cpra/management/ca.crt
+                {{- else }}
                 - --allow-insecure-http
+                {{- end }}
                 - --token-file
-                - /run/secrets/cpra/token
+                - {{ include "cpra.readTokenPath" $ }}
                 - --request-timeout
                 - 2s
             {{- toYaml (index $.Values.probes $name) | nindent 12 }}
           {{- end }}
           {{- end }}
           volumeMounts:
+            {{- if .Values.management.enabled }}
+            - name: management-bootstrap
+              mountPath: /etc/cpra/management
+              subPath: protected
+              readOnly: true
+            {{- end }}
             {{- if .Values.providerFiles.existingSecret }}
             - name: provider
               mountPath: /etc/cpra/provider
@@ -131,7 +146,7 @@ spec:
             - name: monitors
               mountPath: /etc/cpra/monitors
               readOnly: true
-            {{- if .Values.api.enabled }}
+            {{- if and .Values.api.enabled (not .Values.management.enabled) }}
             - name: auth
               mountPath: /run/secrets/cpra
               readOnly: true
@@ -139,6 +154,9 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- if .Values.management.enabled }}
+        {{- include "cpra.managementVolumes" . | nindent 8 }}
+        {{- end }}
         {{- if .Values.providerFiles.existingSecret }}
         - name: provider
           secret:
@@ -148,7 +166,7 @@ spec:
         - name: runtime
           configMap:
             name: {{ include "cpra.fullname" . }}-runtime
-        {{- if .Values.api.enabled }}
+        {{- if and .Values.api.enabled (not .Values.management.enabled) }}
         - name: auth
           secret:
             secretName: {{ .Values.auth.existingSecret }}

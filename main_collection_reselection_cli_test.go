@@ -40,7 +40,7 @@ type collectionRecoveryCLIReport struct {
 
 // The proxy forwards to the normal application's real TLS endpoint. It can
 // discard or delay a response only after that endpoint has returned it.
-func collectionCLIRecoveryProxy(t *testing.T, f mainManagementFixture, observe func(*http.Request), response func(*http.Response) error) *httptest.Server {
+func collectionCLIRecoveryProxy(t *testing.T, f *mainManagementFixture, observe func(*http.Request), response func(*http.Response) error) *httptest.Server {
 	t.Helper()
 	target, err := url.Parse("https://" + f.options.webAddr)
 	if err != nil {
@@ -79,7 +79,7 @@ func collectionCLIRecoveryProxy(t *testing.T, f mainManagementFixture, observe f
 	return server
 }
 
-func newCollectionRecoveryCLI(t *testing.T, f mainManagementFixture, binary string) *mainCLIRunner {
+func newCollectionRecoveryCLI(t *testing.T, f *mainManagementFixture, binary string) *mainCLIRunner {
 	t.Helper()
 	token := filepath.Join(filepath.Dir(f.options.runtimeFile), "recovery-operator.token")
 	if err := os.WriteFile(token, []byte(startupOperatorToken), 0600); err != nil {
@@ -235,7 +235,6 @@ func TestMainManagementCollectionReselectionCLI(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	f.options.webAddr = availableLocalAddress(t)
 	client, stop = startMainManagement(t, f)
 	cli.origin = "https://" + f.options.webAddr
 	if restored := requireInactiveCLIUpload(t, client, id, 256, 300); restored.ContentDigest != before.ContentDigest {
@@ -253,7 +252,6 @@ func TestMainManagementCollectionReselectionCLI(t *testing.T) {
 	stop()
 	// Restart deliberately discards the failed disposable attempt; it does not
 	// cancel/recreate the committed original collection.
-	f.options.webAddr = availableLocalAddress(t)
 	client, stop = startMainManagement(t, f)
 	cli.origin = "https://" + f.options.webAddr
 	if err := os.WriteFile(last, nil, 0600); err != nil {

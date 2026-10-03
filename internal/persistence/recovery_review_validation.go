@@ -23,6 +23,12 @@ func validateRecoveryReviewImage(i image) error {
 			}
 		}
 		for id, a := range m.Actions {
+			if err := validateRecoveryNotificationAction(i.Version, a); err != nil {
+				return err
+			}
+			if err := validateAgentAction(i.Version, a); err != nil {
+				return err
+			}
 			if id != a.ID || seen[id] {
 				return errors.New("invalid or duplicate durable action identity")
 			}
@@ -38,7 +44,7 @@ func validateRecoveryReviewImage(i image) error {
 				if !validExternalActionExecutor(i, a) {
 					return ErrExecutorUnfenced
 				}
-			} else if a.ExecutorKind != "local" || !catalogIdentifier(a.ExecutorSession, 256) || i.LocalExecutorSession == "" || a.StartedAt.IsZero() || a.State == Queued || (!a.ExecutorFinishedAt.IsZero() && a.ExecutorFinishedAt.Before(a.StartedAt)) {
+			} else if (a.ExecutorKind != "local" && a.ExecutorKind != "agent") || !catalogIdentifier(a.ExecutorSession, 256) || i.LocalExecutorSession == "" || a.StartedAt.IsZero() || a.State == Queued || (!a.ExecutorFinishedAt.IsZero() && a.ExecutorFinishedAt.Before(a.StartedAt)) {
 				return ErrExecutorUnfenced
 			}
 			if a.ConflictingEvidence != nil {

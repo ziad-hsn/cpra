@@ -7,7 +7,7 @@ import (
 
 func TestCompiledCapabilityInventory(t *testing.T) {
 	list := Capabilities()
-	if len(list) != 33 {
+	if len(list) != 35 {
 		t.Fatalf("inventory=%d", len(list))
 	}
 	seen := map[string]bool{}

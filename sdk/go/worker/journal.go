@@ -66,7 +66,26 @@ type journal struct {
 	epoch       string
 	encryptions uint64
 	limits      Limits
+	accounting  journalAccounting
 	closed      bool
+}
+
+// journalAccounting is derived from authenticated records when the journal opens and
+// changes only after a successful write transaction. It is never persisted as
+// another source of truth or recomputed by status polling.
+type journalAccounting struct {
+	records, pendingOutcomes, unknownActions int
+	liveBytes, reservedBytes                 int64
+}
+
+func (a journalAccounting) replace(previous, next journalAccounting) journalAccounting {
+	return journalAccounting{
+		records:         a.records - previous.records + next.records,
+		pendingOutcomes: a.pendingOutcomes - previous.pendingOutcomes + next.pendingOutcomes,
+		unknownActions:  a.unknownActions - previous.unknownActions + next.unknownActions,
+		liveBytes:       a.liveBytes - previous.liveBytes + next.liveBytes,
+		reservedBytes:   a.reservedBytes - previous.reservedBytes + next.reservedBytes,
+	}
 }
 
 func openJournal(c Config) (*journal, error) {
@@ -227,7 +246,16 @@ func openJournal(c Config) (*journal, error) {
 		})
 	})
 	if err == nil {
-		_, err = j.records()
+		err = db.View(func(tx *bolt.Tx) error {
+			return tx.Bucket(recordsBucket).ForEach(func(k, v []byte) error {
+				r, err := j.decode(string(k), v)
+				if err != nil {
+					return err
+				}
+				j.accounting = j.accounting.replace(journalAccounting{}, recordAccounting(r, j.limits))
+				return nil
+			})
+		})
 	}
 	if err == nil {
 		err = j.rotateEpoch()
@@ -433,30 +461,31 @@ func recordBytes(r journalRecord, limits Limits) (live, reserved int64) {
 	return int64(len(b)), 0
 }
 
-func (j *journal) statsLocked(tx *bolt.Tx) (Status, error) {
-	s := Status{}
+func recordAccounting(r journalRecord, limits Limits) journalAccounting {
+	live, reserved := recordBytes(r, limits)
+	a := journalAccounting{records: 1, liveBytes: live, reservedBytes: reserved}
+	if r.State == "outcome" || r.Evidence != nil {
+		a.pendingOutcomes = 1
+	}
+	if r.State == "unknown" {
+		a.unknownActions = 1
+	}
+	return a
+}
+
+func (j *journal) statsLocked() (Status, error) {
+	s := Status{
+		Records:         j.accounting.records,
+		PendingOutcomes: j.accounting.pendingOutcomes,
+		UnknownActions:  j.accounting.unknownActions,
+		LiveBytes:       j.accounting.liveBytes,
+		ReservedBytes:   j.accounting.reservedBytes,
+	}
 	info, err := os.Stat(j.path)
 	if err != nil {
 		return s, err
 	}
 	s.AllocatedBytes = info.Size()
-	err = tx.Bucket(recordsBucket).ForEach(func(k, v []byte) error {
-		r, e := j.decode(string(k), v)
-		if e != nil {
-			return e
-		}
-		s.Records++
-		live, reserved := recordBytes(r, j.limits)
-		s.LiveBytes += live
-		s.ReservedBytes += reserved
-		if r.State == "outcome" || r.Evidence != nil {
-			s.PendingOutcomes++
-		}
-		if r.State == "unknown" {
-			s.UnknownActions++
-		}
-		return nil
-	})
 	s.AdmissionCapacity = j.limits.Records - s.Records
 	byteCapacity := (j.limits.LiveBytes - s.LiveBytes - s.ReservedBytes) / int64(j.limits.OutcomeBytes+journalMetadataReserve)
 	if byteCapacity < int64(s.AdmissionCapacity) {
@@ -466,7 +495,7 @@ func (j *journal) statsLocked(tx *bolt.Tx) (Status, error) {
 		s.AdmissionCapacity = 0
 	}
 	s.AdmissionAvailable = s.AdmissionCapacity > 0
-	return s, err
+	return s, nil
 }
 
 func (j *journal) stats() (Status, error) {
@@ -475,9 +504,7 @@ func (j *journal) stats() (Status, error) {
 	if j.closed {
 		return Status{}, ErrClosed
 	}
-	var s Status
-	err := j.db.View(func(tx *bolt.Tx) error { var e error; s, e = j.statsLocked(tx); return e })
-	return s, err
+	return j.statsLocked()
 }
 
 func (j *journal) reserve(a api.Assignment) error {
@@ -503,12 +530,13 @@ func (j *journal) reserve(a api.Assignment) error {
 			return err
 		}
 	}
-	return j.db.Update(func(tx *bolt.Tx) error {
+	var committed journalAccounting
+	err = j.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(recordsBucket)
 		if b.Get([]byte(a.ExecutionID)) != nil {
 			return ErrDuplicate
 		}
-		s, err := j.statsLocked(tx)
+		s, err := j.statsLocked()
 		if err != nil {
 			return err
 		}
@@ -520,8 +548,13 @@ func (j *journal) reserve(a api.Assignment) error {
 		if err != nil {
 			return err
 		}
+		committed = recordAccounting(r, j.limits)
 		return b.Put([]byte(r.ExecutionID), encoded)
 	})
+	if err == nil {
+		j.accounting = j.accounting.replace(journalAccounting{}, committed)
+	}
+	return err
 }
 
 func (j *journal) update(id string, fn func(*journalRecord) error) error {
@@ -536,6 +569,7 @@ func (j *journal) update(id string, fn func(*journalRecord) error) error {
 		}
 	}
 	var callbackErr error
+	var previous, committed journalAccounting
 	err := j.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(recordsBucket)
 		raw := b.Get([]byte(id))
@@ -546,20 +580,20 @@ func (j *journal) update(id string, fn func(*journalRecord) error) error {
 		if err != nil {
 			return err
 		}
-		beforeLive, beforeReserved := recordBytes(r, j.limits)
+		previous = recordAccounting(r, j.limits)
 		if err = fn(&r); err != nil {
 			callbackErr = err
 			return err
 		}
-		afterLive, afterReserved := recordBytes(r, j.limits)
+		committed = recordAccounting(r, j.limits)
 		// Completion consumes capacity already reserved before permission to start.
 		// Evidence requires extra capacity and cannot displace pending outcomes.
-		if afterLive+afterReserved > beforeLive+beforeReserved {
-			s, e := j.statsLocked(tx)
+		if committed.liveBytes+committed.reservedBytes > previous.liveBytes+previous.reservedBytes {
+			s, e := j.statsLocked()
 			if e != nil {
 				return e
 			}
-			if s.LiveBytes+s.ReservedBytes-beforeLive-beforeReserved+afterLive+afterReserved > j.limits.LiveBytes {
+			if s.LiveBytes+s.ReservedBytes-previous.liveBytes-previous.reservedBytes+committed.liveBytes+committed.reservedBytes > j.limits.LiveBytes {
 				return ErrCapacity
 			}
 		}
@@ -569,6 +603,9 @@ func (j *journal) update(id string, fn func(*journalRecord) error) error {
 		}
 		return b.Put([]byte(id), encoded)
 	})
+	if err == nil {
+		j.accounting = j.accounting.replace(previous, committed)
+	}
 	if err != nil && callbackErr == nil && !errors.Is(err, ErrCapacity) && !errors.Is(err, ErrCorrupt) {
 		return fmt.Errorf("%w: %w", ErrStorage, err)
 	}
@@ -581,6 +618,7 @@ func (j *journal) remove(id string) error {
 	if j.closed {
 		return ErrClosed
 	}
+	var removed journalAccounting
 	err := j.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(recordsBucket)
 		raw := bucket.Get([]byte(id))
@@ -596,8 +634,12 @@ func (j *journal) remove(id string) error {
 		if record.Evidence != nil {
 			return nil
 		}
+		removed = recordAccounting(record, j.limits)
 		return bucket.Delete([]byte(id))
 	})
+	if err == nil {
+		j.accounting = j.accounting.replace(removed, journalAccounting{})
+	}
 	if err != nil && !errors.Is(err, ErrCorrupt) {
 		return fmt.Errorf("%w: %w", ErrStorage, err)
 	}

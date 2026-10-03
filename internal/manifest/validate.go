@@ -1,6 +1,9 @@
 package manifest
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Validate checks a manifest for semantic errors: required fields on each
 // monitor and dangling notification-group references. It is the single
@@ -34,6 +37,38 @@ func ValidateMonitor(m *Monitor) error {
 	}
 	if m.Pulse.Config == nil {
 		return fmt.Errorf("monitor %q: pulse_check.config is required", m.Name)
+	}
+	if m.Intervention.Action == "a2a" {
+		cfg, ok := m.Intervention.Target.(*InterventionTargetA2A)
+		if !ok {
+			return fmt.Errorf("A2A intervention target is required")
+		}
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
+	}
+	if m.Intervention.MaxAttempts < 0 || m.Intervention.MaxAttempts > math.MaxInt32 {
+		return fmt.Errorf("intervention max_attempts is outside the supported range")
+	}
+	for color, notification := range m.Codes {
+		switch notification.Trigger {
+		case "", "state_change":
+		case "recovery_failed", "recovery_exhausted":
+			if color != "red" || m.Intervention.Action == "" {
+				return fmt.Errorf("recovery notification triggers require Code red and an intervention")
+			}
+		default:
+			return fmt.Errorf("unsupported notification trigger")
+		}
+		if notification.Notify == "a2a" {
+			cfg, ok := notification.Config.(*CodeNotificationA2A)
+			if !ok {
+				return fmt.Errorf("A2A notification configuration is required")
+			}
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+		}
 	}
 
 	switch cfg := m.Pulse.Config.(type) {
@@ -75,6 +110,17 @@ func ValidateMonitor(m *Monitor) error {
 // validateGroups checks that every notify_group reference resolves to a
 // defined group whose endpoints all exist.
 func validateGroups(m *Manifest) error {
+	for _, endpoint := range m.Endpoints {
+		if endpoint.Type == "a2a" {
+			cfg, ok := endpoint.Config.(*CodeNotificationA2A)
+			if !ok {
+				return fmt.Errorf("A2A endpoint configuration is required")
+			}
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+		}
+	}
 	for i := range m.Monitors {
 		mon := &m.Monitors[i]
 		for color, cfg := range mon.Codes {

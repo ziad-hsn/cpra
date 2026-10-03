@@ -24,6 +24,10 @@ func workerExecutionFixture(t *testing.T, s *Store, category string) (WorkerExec
 	return workerExecutionFixtureType(t, s, job), job
 }
 func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState) WorkerExecutionIntent {
+	return workerExecutionSourceFixture(t, s, job, false)
+}
+
+func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inline bool) WorkerExecutionIntent {
 	t.Helper()
 	category := job.Current.Category
 	monitor := testMonitor()
@@ -33,7 +37,7 @@ func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState) Worker
 	monitor.Policy.Endpoints = nil
 	source := catalogJobTypeRecord(t, s, monitor.ID, job.Current)
 	keys := []CatalogKey{source.Key}
-	if category == "notification" {
+	if category == "notification" && !inline {
 		source.Key = CatalogKey{Kind: "NotificationEndpoint", ID: uuid.NewString()}
 		source = createCatalog(t, s, source)
 		root := catalogRecord(t, s, "Monitor", monitor.ID, uuid.NewString(), uuid.NewString(), "private-monitor", source.Key)
@@ -43,6 +47,10 @@ func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState) Worker
 		monitor.Policy.WorkerNotificationSources = map[string][]WorkerNotificationSource{"red": {{}, {ID: source.Key.ID, UID: source.UID, Revision: source.Revision}}}
 	} else {
 		source = createCatalog(t, s, source)
+		if category == "notification" {
+			monitor.Policy.Endpoints = map[string]int{"red": 1}
+			monitor.Policy.WorkerNotificationSources = map[string][]WorkerNotificationSource{"red": {{Kind: "Monitor", ID: source.Key.ID, UID: source.UID, Revision: source.Revision}}}
+		}
 	}
 	guard := CatalogGuard{Conditions: catalogConditions(t, s, keys)}
 	now := time.Now().UTC()
@@ -62,7 +70,7 @@ func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState) Worker
 		in.Generation = monitor.Generation + 1
 	} else {
 		for _, a := range monitor.Actions {
-			if category == "recovery" && a.Kind == "intervention" || category == "notification" && a.Kind == "code" && a.Endpoint == 1 {
+			if category == "recovery" && a.Kind == "intervention" || category == "notification" && a.Kind == "code" && (inline && a.Endpoint == 0 || !inline && a.Endpoint == 1) {
 				in.ActionID = a.ID
 				in.Scheduled = a.NotBefore
 				break
@@ -166,7 +174,7 @@ func TestWorkerExecutionNotificationOriginalMixedOrdinal(t *testing.T) {
 	if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != WorkerExecutionFormatVersion {
+	if s.fsm.image.Version != NotificationWorkerFormatVersion {
 		t.Fatal("notification policy failed to advance format")
 	}
 	p := m.Policy.Clone()

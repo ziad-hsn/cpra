@@ -11,7 +11,7 @@ import (
 
 func newLocalCommand() *cobra.Command {
 	var scope string
-	root := &cobra.Command{Use: "local", Short: "Manage local configuration, installation, and stopped backups"}
+	root := &cobra.Command{Use: "local", Short: "Manage local installation, access, encryption, and stopped backups"}
 	root.PersistentFlags().StringVar(&scope, "scope", "user", "installation scope: user or system")
 	paths := &cobra.Command{Use: "paths", Args: cobra.NoArgs, Short: "Show native configuration and state paths", RunE: func(cmd *cobra.Command, _ []string) error {
 		l, err := installpath.Resolve(scope)
@@ -77,7 +77,7 @@ func newLocalCommand() *cobra.Command {
 	restore.Flags().StringVar(&restoreDir, "data-dir", "", "new destination state directory")
 	restore.Flags().StringVar(&backupDir, "backup", "", "complete backup directory")
 	restore.Flags().StringVar(&restoreKey, "backup-auth-key", "", "protected external key used to authenticate this backup")
-	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand())
+	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand(), newLocalEncryptionCommand())
 	registerLocalExtensions(root)
 	return root
 }

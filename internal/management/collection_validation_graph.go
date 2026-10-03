@@ -18,7 +18,7 @@ func (v *collectionValidator) validateSet(ctx context.Context, resources map[per
 			return key, err
 		}
 		r := resources[key]
-		if validateMetadata(r.Metadata) != nil || validateDesired(&r) != nil {
+		if validateMetadata(r.Metadata) != nil || v.catalog.options.validateDesired(&r) != nil {
 			return key, ErrValidation
 		}
 		refs, err := directReferences(r)
@@ -60,9 +60,9 @@ func (v *collectionValidator) validateSet(ctx context.Context, resources map[per
 			if err := resolveDriver(driver, category, resources); err != nil {
 				return err
 			}
-			return ValidateResolvedDriver(category, *driver)
+			return v.catalog.validateResolvedDriver(ctx, category, *driver)
 		}); err != nil {
-			return key, ErrValidation
+			return key, stagedValidationError(err)
 		}
 	}
 	// Validate shared definitions once, then each monitor exactly once. The

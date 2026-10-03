@@ -26,8 +26,9 @@ var (
 // for that group only. On Windows, protected DACLs permit the owner (user mode),
 // SYSTEM and Administrators; an explicit ReaderSID selects system mode and grants
 // that service SID read access only. Options for the other OS are rejected.
-// Linux extended access ACLs are rejected. Other Unix systems currently fail
-// closed until their native ACL verifier is implemented and qualified.
+// Linux extended access ACLs are rejected. macOS permits deny-only ACLs on
+// filesystems that report extended security; grants or unknown metadata fail.
+// Other Unix systems reject key access until a native ACL verifier is available.
 type KeyFileOptions struct {
 	Path          string
 	DataDirectory string

@@ -129,6 +129,17 @@ func ValidateResource(r Resource) error {
 		}
 		if spec.Notifications != nil {
 			for color, rule := range *spec.Notifications {
+				if rule.Trigger != nil {
+					switch string(*rule.Trigger) {
+					case "state_change":
+					case "recovery_failed", "recovery_exhausted":
+						if color != "red" || spec.Recovery == nil {
+							return errors.New("recovery notification triggers require Code red and recovery")
+						}
+					default:
+						return errors.New("unsupported notification trigger")
+					}
+				}
 				if err := validateAlertRule(rule); err != nil {
 					return fmt.Errorf("notifications.%s: %w", color, err)
 				}
@@ -268,7 +279,7 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 		if _, exists := result[n]; exists {
 			return nil, errors.New("duplicate normalized driver field")
 		}
-		if n == "timeout" && len(v) > 0 && v[0] != '"' {
+		if (n == "timeout" || n == "requestTimeout" || n == "taskTimeout" || n == "pollInterval") && len(v) > 0 && v[0] != '"' && string(v) != "null" {
 			var nanos int64
 			if err := json.Unmarshal(v, &nanos); err != nil {
 				return nil, err

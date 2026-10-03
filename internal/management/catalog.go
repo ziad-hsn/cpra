@@ -12,7 +12,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
@@ -35,6 +34,7 @@ type Catalog struct {
 	store    *persistence.Store
 	sealer   *secureconfig.Sealer
 	storeID  string
+	options  CatalogOptions
 	failed   atomic.Bool
 	verified atomic.Bool
 	// Only inactive cancellation is serialized here, before policy admission.
@@ -46,11 +46,19 @@ type Catalog struct {
 	validationStopping atomic.Bool
 }
 
-func NewCatalog(store *persistence.Store, sealer *secureconfig.Sealer) (*Catalog, error) {
-	if store == nil || sealer == nil || store.Status().NodeID == "" {
+// CatalogOptions is captured at construction and cannot change during admission.
+// Optional execution settings are present only in their tagged builds.
+type CatalogOptions struct{ catalogOptionsExtensions }
+
+func NewCatalog(store *persistence.Store, sealer *secureconfig.Sealer, options ...CatalogOptions) (*Catalog, error) {
+	if store == nil || sealer == nil || store.Status().NodeID == "" || len(options) > 1 {
 		return nil, errors.New("catalog requires an initialized store and encryption keyring")
 	}
-	return &Catalog{store: store, sealer: sealer, storeID: store.Status().NodeID, collectionCancel: make(chan struct{}, 1), validationWake: make(chan struct{}, 1)}, nil
+	var selected CatalogOptions
+	if len(options) == 1 {
+		selected = options[0]
+	}
+	return &Catalog{store: store, sealer: sealer, storeID: store.Status().NodeID, options: selected, collectionCancel: make(chan struct{}, 1), validationWake: make(chan struct{}, 1)}, nil
 }
 
 // Verify authenticates retained configuration and execution payloads before
@@ -102,6 +110,9 @@ func (c *Catalog) Verify(ctx context.Context) error {
 	if err := c.verifyWorkerExecutions(ctx); err != nil {
 		return err
 	}
+	if err := c.verifyAgentConnections(ctx); err != nil {
+		return err
+	}
 	c.verified.Store(true)
 	return nil
 }
@@ -111,7 +122,16 @@ func ResourceKinds() []string {
 }
 
 func (c *Catalog) Ready() bool {
-	return c.verified.Load() && !c.failed.Load() && c.store.Status().Ready
+	return c.ReadyContext(context.Background())
+}
+
+// ReadyContext bounds diagnostic lock waits without changing catalog validity.
+func (c *Catalog) ReadyContext(ctx context.Context) bool {
+	if ctx == nil || ctx.Err() != nil || !c.verified.Load() || c.failed.Load() {
+		return false
+	}
+	status, err := c.store.StatusContext(ctx)
+	return err == nil && status.Ready && ctx.Err() == nil && c.verified.Load() && !c.failed.Load()
 }
 
 // readyContext avoids the uncancellable diagnostic Status path for owner work.
@@ -196,12 +216,12 @@ func (c *Catalog) Get(ctx context.Context, kind, id string) (api.Resource, error
 	if !supportedKind(kind) || !validID(id) {
 		return api.Resource{}, ErrValidation
 	}
-	if !c.Ready() {
-		return api.Resource{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return api.Resource{}, err
 	}
-	record, ok, err := c.store.CatalogGet(persistence.CatalogKey{Kind: kind, ID: id})
+	record, ok, err := c.store.CatalogGetContext(ctx, persistence.CatalogKey{Kind: kind, ID: id})
 	if err != nil {
-		return api.Resource{}, ErrUnavailable
+		return api.Resource{}, errors.Join(ErrUnavailable, err)
 	}
 	if !ok {
 		return api.Resource{}, persistence.ErrCatalogNotFound
@@ -310,8 +330,8 @@ func (p *PreparedChange) OperationID() string {
 // Prepare prepares create/replace without provider execution or durable writes.
 // expectedVersion is empty only for create-if-absent.
 func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersion string, create bool) (*PreparedChange, error) {
-	if !c.Ready() {
-		return nil, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return nil, err
 	}
 	raw, err := json.Marshal(input)
 	if err != nil || len(raw) > api.MaxResourceBytes {
@@ -330,9 +350,9 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 		}
 	}
 	key := persistence.CatalogKey{Kind: resource.Kind, ID: resource.Metadata.ID}
-	view, err := c.store.CatalogSnapshot()
+	view, err := c.store.CatalogSnapshotContext(ctx)
 	if err != nil {
-		return nil, ErrUnavailable
+		return nil, errors.Join(ErrUnavailable, err)
 	}
 	old, exists := view.Get(key)
 	if create {
@@ -375,7 +395,7 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 	}
 	resource.Metadata.UID, resource.Metadata.ResourceVersion = record.UID, record.Revision
 	resource.Metadata.Generation = int64(record.Generation)
-	if err := validateDesired(&resource); err != nil {
+	if err := c.options.validateDesired(&resource); err != nil {
 		return nil, err
 	}
 	refs, conditions, err := c.validateGraph(ctx, view, resource, old, create)
@@ -395,6 +415,9 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	mutation := persistence.CatalogMutation{Record: record, Create: create, Conditions: conditions, OperationID: record.Revision, Actor: "local"}
 	if !create {
 		mutation.ExpectedUID, mutation.ExpectedRevision = old.UID, old.Revision
@@ -404,15 +427,18 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 }
 
 func (c *Catalog) PrepareDelete(ctx context.Context, kind, id, expectedVersion string) (*PreparedChange, error) {
+	if ctx == nil {
+		return nil, ErrValidation
+	}
 	if !supportedKind(kind) || !validID(id) || expectedVersion == "" {
 		return nil, ErrValidation
 	}
-	if !c.Ready() {
-		return nil, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return nil, err
 	}
-	old, ok, err := c.store.CatalogGet(persistence.CatalogKey{Kind: kind, ID: id})
+	old, ok, err := c.store.CatalogGetContext(ctx, persistence.CatalogKey{Kind: kind, ID: id})
 	if err != nil {
-		return nil, ErrUnavailable
+		return nil, errors.Join(ErrUnavailable, err)
 	}
 	if !ok {
 		return nil, persistence.ErrCatalogNotFound
@@ -442,14 +468,14 @@ func (c *Catalog) Commit(ctx context.Context, prepared *PreparedChange) (Mutatio
 // CommitAs receives the authenticated actor from the admission boundary. HTTP
 // handlers must never take this identity from submitted resource data.
 func (c *Catalog) CommitAs(ctx context.Context, prepared *PreparedChange, actor string) (MutationResult, error) {
-	if prepared == nil || prepared.catalog != c || !prepared.used.CompareAndSwap(false, true) {
+	if ctx == nil || prepared == nil || prepared.catalog != c || !prepared.used.CompareAndSwap(false, true) {
 		return MutationResult{}, ErrValidation
 	}
 	if err := ctx.Err(); err != nil {
 		return MutationResult{}, err
 	}
-	if !c.Ready() {
-		return MutationResult{}, ErrUnavailable
+	if err := c.readyContext(ctx); err != nil {
+		return MutationResult{}, err
 	}
 	if actor == "" || len(actor) > 128 || !utf8.ValidString(actor) || strings.ContainsAny(actor, "\x00\r\n") {
 		return MutationResult{}, ErrValidation
@@ -463,16 +489,7 @@ func (c *Catalog) CommitAs(ctx context.Context, prepared *PreparedChange, actor 
 	prepared.operationID.Store(&id)
 	results, err := c.store.Submit(ctx, []persistence.Command{command})
 	if err != nil {
-		if errors.Is(err, persistence.ErrCommitUnconfirmed) {
-			return MutationResult{}, fmt.Errorf("%w: %w", ErrOutcomeUnconfirmed, err)
-		}
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return MutationResult{}, err
-		}
-		if !c.store.Status().Ready {
-			return MutationResult{}, ErrUnavailable
-		}
-		return MutationResult{}, err
+		return MutationResult{}, c.submissionError(ctx, err)
 	}
 	if len(results) != 1 {
 		return MutationResult{}, ErrOutcomeUnconfirmed
@@ -484,6 +501,25 @@ func (c *Catalog) CommitAs(ctx context.Context, prepared *PreparedChange, actor 
 		return MutationResult{}, ErrOutcomeUnconfirmed
 	}
 	return MutationResult{Resource: prepared.resource, CommittedIndex: results[0].Catalog.CommittedIndex, Operation: operationView(*results[0].Operation)}, nil
+}
+
+// submissionError preserves an uncertain durable write before inspecting
+// current health. Diagnostic lock waits use the original admission context.
+func (c *Catalog) submissionError(ctx context.Context, err error) error {
+	if errors.Is(err, persistence.ErrCommitUnconfirmed) {
+		return fmt.Errorf("%w: %w", ErrOutcomeUnconfirmed, err)
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	status, statusErr := c.store.StatusContext(ctx)
+	if statusErr != nil {
+		return errors.Join(err, statusErr)
+	}
+	if !status.Ready {
+		return errors.Join(ErrUnavailable, err)
+	}
+	return err
 }
 
 func validateMetadata(m api.Metadata) error {
@@ -504,6 +540,10 @@ func validateMetadata(m api.Metadata) error {
 }
 
 func validateDesired(resource *api.Resource) error {
+	return (CatalogOptions{}).validateDesired(resource)
+}
+
+func (o CatalogOptions) validateDesired(resource *api.Resource) error {
 	if resource.Kind == "Credential" {
 		var spec api.CredentialSpec
 		if api.StrictDecode(resource.Spec, &spec) != nil || spec.Value == nil ||
@@ -512,13 +552,7 @@ func validateDesired(resource *api.Resource) error {
 		}
 	}
 	return visitDrivers(resource, func(category string, driver *api.DriverConfig) error {
-		if err := jobs.ValidateDriver(category, driver.Type); err != nil {
-			return fmt.Errorf("%w: selected driver is not compiled into this server", ErrValidation)
-		}
-		if err := validateProtectedDriver(category, *driver); err != nil {
-			return fmt.Errorf("%w: %w", ErrValidation, err)
-		}
-		return nil
+		return o.validateDriver(category, *driver)
 	})
 }
 

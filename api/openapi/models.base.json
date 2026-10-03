@@ -1470,6 +1470,12 @@
           },
           "conflictingEvidence": {
             "$ref": "#/components/schemas/ActionEvidence"
+          },
+          "agentReceipt": {
+            "$ref": "#/components/schemas/AgentReceipt"
+          },
+          "recoveryFailure": {
+            "$ref": "#/components/schemas/RecoveryFailure"
           }
         },
         "required": [
@@ -1607,6 +1613,12 @@
             "maxItems": 8,
             "description": "Opaque operator-supplied evidence references. CPRa does not fetch these references.",
             "x-go-type-skip-optional-pointer": true
+          },
+          "agentReceipt": {
+            "$ref": "#/components/schemas/AgentReceipt"
+          },
+          "recoveryFailure": {
+            "$ref": "#/components/schemas/RecoveryFailure"
           }
         },
         "required": [
@@ -3200,6 +3212,15 @@
               "minLength": 1
             },
             "uniqueItems": true
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "state_change",
+              "recovery_failed",
+              "recovery_exhausted"
+            ],
+            "description": "Omission or state_change uses health transitions. Red rules may select recovery_failed after a confirmed failed intervention or recovery_exhausted after the configured attempt limit. Requires recovery. Unknown outcomes never trigger escalation; an endpoint with queued, started or unknown delivery retains its original action."
           }
         },
         "additionalProperties": false
@@ -4130,6 +4151,185 @@
           }
         },
         "description": "Bounded observation of an owned, disposable source-reselection attempt. Source bytes include comments and unused text. This response contains no file names, source paths, item digests, source fingerprints, inventory keys or resource plaintext. Verification and remainder upload do not activate configuration."
+      },
+      "InterventionTargetA2A": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL",
+            "description": "Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.",
+            "maxLength": 4096
+          },
+          "token": {
+            "type": "string",
+            "x-go-name": "Token",
+            "description": "Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.",
+            "maxLength": 8192
+          },
+          "tenant": {
+            "type": "string",
+            "x-go-name": "Tenant",
+            "description": "Optional A2A tenant. Must not contain control characters.",
+            "maxLength": 256
+          },
+          "requestTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "RequestTimeout",
+            "description": "Deadline for one HTTP request; defaults to 10s, at most 5m."
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "x-go-name": "AllowInsecureHTTP",
+            "description": "Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false."
+          },
+          "taskTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "TaskTimeout",
+            "description": "Overall intervention deadline including task polling and receipt commits; defaults to 60s, range 1s to 5m. Expiry holds an unknown outcome without resending or canceling the task."
+          },
+          "pollInterval": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "PollInterval",
+            "description": "Task observation interval, 1s to 30s and no greater than taskTimeout. Defaults to the smaller of 5s and taskTimeout."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "CodeNotificationA2A": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "x-go-name": "URL",
+            "description": "Explicit A2A HTTP+JSON base URL. Management resources require credentialRefs.url; HTTPS is required by default.",
+            "maxLength": 4096
+          },
+          "token": {
+            "type": "string",
+            "x-go-name": "Token",
+            "description": "Agent bearer token. Management resources require credentialRefs.token. Use separate authority for recovery and notification.",
+            "maxLength": 8192
+          },
+          "tenant": {
+            "type": "string",
+            "x-go-name": "Tenant",
+            "description": "Optional A2A tenant. Must not contain control characters.",
+            "maxLength": 256
+          },
+          "requestTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "RequestTimeout",
+            "description": "Deadline for one HTTP request; defaults to 10s, at most 5m."
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "x-go-name": "AllowInsecureHTTP",
+            "description": "Explicitly permit plaintext HTTP to this trusted endpoint; defaults to false."
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/Duration",
+            "x-go-name": "Timeout",
+            "description": "Overall delivery deadline including the acceptance receipt commit; defaults to 60s, range 1s to 5m. Notifications do not poll remote tasks."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "AgentReceipt": {
+        "type": "object",
+        "description": "Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,19}$",
+            "description": "Decimal uint64 receipt sequence. String encoding preserves ordering identities for JavaScript clients."
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "taskID": {
+            "type": "string",
+            "maxLength": 256,
+            "x-go-name": "TaskID"
+          },
+          "contextID": {
+            "type": "string",
+            "maxLength": 256,
+            "x-go-name": "ContextID"
+          },
+          "messageID": {
+            "type": "string",
+            "maxLength": 256,
+            "x-go-name": "MessageID"
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "A2A task state at this receipt; omitted for message acceptance. Future states remain observational."
+          }
+        },
+        "required": [
+          "sequence",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RecoveryFailure": {
+        "type": "object",
+        "description": "Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.",
+        "properties": {
+          "actionID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "x-go-name": "ActionID"
+          },
+          "driver": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "recovery_failed",
+              "recovery_exhausted"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "failure"
+            ]
+          },
+          "failedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "actionID",
+          "driver",
+          "attempt",
+          "maxAttempts",
+          "trigger",
+          "outcome",
+          "failedAt"
+        ],
+        "additionalProperties": false
       }
     }
   }

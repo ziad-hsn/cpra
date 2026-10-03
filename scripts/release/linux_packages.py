@@ -43,7 +43,10 @@ def config(manifest, out, target, format):
           'rpm':{'buildhost':'reproducible.cpra'},
           'depends':['ca-certificates']}
     if format=='deb':
-        data['depends']+=['passwd', 'coreutils', 'libc-bin', 'grep']
+        # Account creation happens before unpacking; Depends alone cannot
+        # guarantee that these non-Essential tools are available to preinst.
+        data['deb']={'predepends':['passwd']}
+        data['depends']+=['coreutils', 'libc-bin', 'grep']
     else:
         data['depends']+=['shadow-utils', 'coreutils', 'glibc-common', 'grep']
         data['rpm']['scripts']={'posttrans':str(ROOT/'packaging/linux/rpm-posttrans.sh')}

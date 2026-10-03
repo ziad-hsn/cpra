@@ -41,9 +41,9 @@ Independent rows can continue after an unrelated conflict; a global catalog
 generation fence is not the per-item execution contract.
 
 This follows the existing separation between desired catalog state and observed
-application: the [compiler](../../internal/management/collection_plan.go) records
+application: the [compiler](../review/source/internal/management/collection_plan.go.txt) records
 `Requires` and `Touches` from catalog observations, while the
-[owner](../../internal/controller/systems/catalog_runtime.go) reconciles committed
+[owner](../review/source/internal/controller/systems/catalog_runtime.go.txt) reconciles committed
 resources and reports their exact-version application separately. Controller
 pending, applied, failed, or superseded outcomes remain separately visible. None
 authorizes refreshing a CAS guard, repeating an accepted mutation, rolling it

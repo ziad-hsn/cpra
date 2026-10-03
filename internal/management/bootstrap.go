@@ -56,6 +56,9 @@ func applyBootstrap(ctx context.Context, store bootstrapStore, stage *Stage) (Bo
 	if info.Phase != "frozen" {
 		return BootstrapProgress{}, ErrStageNotFrozen
 	}
+	if stage.options.requiresCatalogValidation() && !info.CatalogValidation {
+		return BootstrapProgress{}, ErrValidation
+	}
 	if info.StoreID != store.Status().NodeID {
 		return BootstrapProgress{}, persistence.ErrBootstrapConflict
 	}

@@ -12,7 +12,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
-from release import sha
+from release import evidence_identity, sha
 
 
 def request(url,token):
@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args();args.stage=args.stage.resolve()
     manifest=json.loads((args.stage/'RELEASE.json').read_text())
+    identity_record=evidence_identity(manifest)
     extension='.exe' if os.name=='nt' else ''
     binary=args.stage/('cpra'+extension);cli=args.stage/('cpractl'+extension)
     for program,flag in ((binary,'-version'),(cli,'--version')):
@@ -73,6 +74,7 @@ def main():
         if node_ids[0]!=node_ids[1]:raise RuntimeError('Restart changed durable node identity')
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text(json.dumps({'status':'pass','version':manifest['version'],'commit':manifest['commit'],
+        'release_identity':identity_record,
         'binary_sha256':sha(binary),'cli_sha256':sha(cli),
         'os':platform.system(),'architecture':platform.machine(),'os_version':platform.platform(),
         'source_candidate':manifest['candidate'],'source_dirty':manifest['dirty'],'capabilities':capabilities,'restart_states':states,

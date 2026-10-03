@@ -88,7 +88,7 @@ owned buffers is not a guarantee that the Go runtime erased all copies.
 
 ## Verification boundaries
 
-The [proof checkpoint record](../../bin/verification/collection-reselection-proof-2026-09-24/result.json)
+The [proof checkpoint record](../review/local-evidence.md#record-a75254847e9a6c7b37e6bc73)
 records source hashes and the final scoped runs: Go 1.27 independent combined
 race tests (11.488 s), Go 1.25 combined tests (11.776 s), and the applicable
 built-in-driver proof tests (9.421 s). Native Raft tests use actual log and

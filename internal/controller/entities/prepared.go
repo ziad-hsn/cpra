@@ -157,6 +157,7 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		b.intervention = &components.InterventionConfig{
 			Action: m.Intervention.Action, Target: m.Intervention.Target,
 			MaxFailures: max(1, m.Intervention.MaxFailures),
+			MaxAttempts: m.Intervention.MaxAttempts,
 		}
 		b.jobs.InterventionJob, err = preparer.intervention(m.Intervention)
 		if err != nil {
@@ -175,7 +176,7 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 	slices.Sort(colors)
 	for _, color := range colors {
 		code := codes[color]
-		b.codes.Configs[color] = &components.ColorCodeConfig{Dispatch: code.Dispatch, Notify: code.Notify, Config: code.Config}
+		b.codes.Configs[color] = &components.ColorCodeConfig{Dispatch: code.Dispatch, Notify: code.Notify, Config: code.Config, Trigger: code.Trigger}
 		if !code.Dispatch && code.Notify == "" && code.NotifyGroup == "" && code.Config == nil {
 			continue // An explicitly inert rule has no job to construct.
 		}
@@ -240,6 +241,9 @@ func (j *entityJob) SetContext(ctx context.Context) {
 		job.SetContext(ctx)
 	}
 }
+
+// Unwrap preserves the execution contract of a job with entity-bound results.
+func (j *entityJob) Unwrap() jobs.Job { return j.Job }
 func (j *entityJob) TracksEnqueueTime() bool {
 	if job, ok := j.Job.(jobs.EnqueueTimeTracker); ok {
 		return job.TracksEnqueueTime()

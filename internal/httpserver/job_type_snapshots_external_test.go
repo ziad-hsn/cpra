@@ -127,7 +127,7 @@ func TestJobTypeSnapshotActiveReaderRetainsPrunedCharge(t *testing.T) {
 			} else {
 				// System has no observations without configured systems; this still
 				// exercises the production observation cursor's shared prune path.
-				_, err = (&Server{}).observationPage(m, url.Values{}, "System", "other", 1)
+				_, err = (&Server{}).observationPage(t.Context(), m, url.Values{}, "System", "other", 1)
 				if err != nil {
 					t.Fatal(err)
 				}

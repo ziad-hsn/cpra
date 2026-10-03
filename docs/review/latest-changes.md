@@ -1,15 +1,19 @@
 ---
-title: Latest-change documentation review
-description: Source coverage, corrected documentation claims and verification boundaries for the complete main and gh-pages refresh.
+title: Historical documentation review
+description: Source coverage and verification boundaries recorded on 13 September 2026; current development status is described separately.
 cpra_scope: docs
 ---
 
-# Latest-change documentation review
+# Historical documentation review
 
-Reviewed on **13 September 2026**. This is a documentation and source-contract
-review. The [availability matrix](../versions.md) identifies main `51a835a`,
+Reviewed on **13 September 2026**. This record preserves that documentation and
+source-contract review. The [versions page](../versions.md) distinguishes its
+historical main `51a835a`,
 release candidate `410fbfb`, and the content-identified unpublished SDK snapshot.
 It is not an independent release certification or a completed provider campaign.
+Later management, worker, A2A and private release work is recorded in
+[current implementation status](../implementation/STATUS.md); the paragraphs
+below are dated findings, not a current availability verdict.
 
 ## Coverage and corrections
 
@@ -60,11 +64,14 @@ Historical SDK reports describe their original executed runs. This refresh
 rechecks the documentation generators and selected runtime contracts; it does
 not convert historical reports into a new full SDK or release qualification.
 
-## Remaining application work
+## Application work remaining at that review
 
-The newer durability/release code has not been merged into main. Its dashboard
+At the 13 September review, the newer durability/release code had not been merged
+into main. Its dashboard
 also needs the approved palette changes reconciled with its durable views when
-that code is integrated. SDK modules have not been committed to a public branch
+that code was integrated. SDK modules had not been committed to a public branch
 or published as versions. V2 server writes, encrypted configuration and the
-external-worker dispatcher remain planned. Provider, platform, performance and
-endurance release gates are documented in their respective candidate guides.
+external-worker dispatcher were planned. These findings have since changed; use
+the [current version notice](../versions.md#current-development-source) and
+[shipping plan](../implementation/dashboard-shipping-plan.md) for outstanding
+work. The 24-hour endurance test is outside the current requested scope.

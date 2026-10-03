@@ -75,7 +75,7 @@ func (c *Catalog) ActivateCollection(ctx context.Context, id, actor string, now 
 	if receipt.Phase != "validated" || receipt.Validation == nil || !receipt.Validation.Header.Valid || receipt.Validation.Header.SummaryOnly {
 		return api.Operation{ID: id}, persistence.ErrCollectionConflict
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := c.collectionValidationProfile()
 	if err != nil {
 		return api.Operation{ID: id}, err
 	}

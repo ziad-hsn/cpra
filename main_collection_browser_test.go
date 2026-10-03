@@ -110,7 +110,6 @@ func TestMainManagementCollectionBrowser(t *testing.T) {
 		t.Fatal("SDK result identity differs from the original browser result")
 	}
 	stop()
-	fixture.options.webAddr = availableLocalAddress(t)
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	recovered := assertMainCollectionBrowserState(t, restarted, browserReport.OperationID)
 	if recovered != original {

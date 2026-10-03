@@ -106,7 +106,7 @@ func TestWriteNewProtectedFileConcurrentIssuersDoNotOverwrite(t *testing.T) {
 }
 
 func TestWriteNewProtectedFileRejectsUnsafeDirectoryAndAlias(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("Unix mode and symbolic-link scenario; Windows uses native DACL tests")
 	}
 	key := testKeyFileOptions(t)

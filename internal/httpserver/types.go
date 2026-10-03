@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/controller"
@@ -15,20 +16,21 @@ import (
 type ServerConfig struct {
 	serverConfigExtensions
 	// Management and ManagementAuth must both be configured to expose v2 writes.
-	Management       *management.Catalog                      `json:"-"`
-	ManagementAuth   *httpauth.Authorizer                     `json:"-"`
-	Reselection      *management.CollectionReselectionManager `json:"-"`
-	TLSCertFile      string                                   `json:"-"`
-	TLSKeyFile       string                                   `json:"-"`
-	Ready            func() bool                              `json:"-"`
-	AllowEmpty       bool                                     `json:"-"`
-	Store            *persistence.Store                       `json:"-"`
-	Addr             string                                   `json:"addr"`
-	ReadTimeout      time.Duration                            `json:"read_timeout"`
-	WriteTimeout     time.Duration                            `json:"write_timeout"`
-	CORSAllowOrigins []string                                 `json:"cors_allow_origins"`
-	HistoryInterval  time.Duration                            `json:"history_interval"`
-	HistoryCapacity  int                                      `json:"history_capacity"`
+	Management     *management.Catalog                      `json:"-"`
+	ManagementAuth *httpauth.Authorizer                     `json:"-"`
+	Reselection    *management.CollectionReselectionManager `json:"-"`
+	TLSCertFile    string                                   `json:"-"`
+	TLSKeyFile     string                                   `json:"-"`
+	Ready          func(context.Context) bool               `json:"-"`
+	AllowEmpty     bool                                     `json:"-"`
+	Store          *persistence.Store                       `json:"-"`
+	Addr           string                                   `json:"addr"`
+	// ReadTimeout also sets the API observation and readiness request deadline.
+	ReadTimeout      time.Duration `json:"read_timeout"`
+	WriteTimeout     time.Duration `json:"write_timeout"`
+	CORSAllowOrigins []string      `json:"cors_allow_origins"`
+	HistoryInterval  time.Duration `json:"history_interval"`
+	HistoryCapacity  int           `json:"history_capacity"`
 	// AuthToken supports direct legacy-only server construction. Normal startup
 	// supplies committed authority instead. ManagementAuth is authoritative for
 	// every protected management/v1 route; this plaintext value cannot bypass it.

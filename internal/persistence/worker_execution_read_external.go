@@ -50,6 +50,26 @@ func (s *Store) WorkerExecutions(ctx context.Context, afterID string, limit int)
 		if err != nil {
 			return WorkerExecutionPage{}, err
 		}
+		outcomeCost, err := workerResultRecordCost(record.Result)
+		if err != nil {
+			return WorkerExecutionPage{}, err
+		}
+		cost += outcomeCost
+		if record.Observation != nil {
+			cost += maxWorkerObservationBytes
+		}
+		finalizationCost, err := workerFinalizationCost(record.Finalization)
+		if err != nil {
+			return WorkerExecutionPage{}, err
+		}
+		cost += finalizationCost
+		for _, evidence := range record.Evidence {
+			evidenceCost, err := workerEvidenceRecordCost(evidence)
+			if err != nil {
+				return WorkerExecutionPage{}, err
+			}
+			cost += evidenceCost
+		}
 		if len(page.Items) == limit || cost > MaxWorkerExecutionPageBytes-used {
 			page.More = true
 			break

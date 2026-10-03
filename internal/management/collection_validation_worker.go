@@ -36,10 +36,13 @@ func (c *Catalog) StartCollectionValidationCoordinator(ctx context.Context, now 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !c.Ready() || c.validationStopping.Load() {
+	if err := c.readyContext(ctx); err != nil {
+		return nil, err
+	}
+	if c.validationStopping.Load() {
 		return nil, ErrUnavailable
 	}
-	_, profile, err := collectionValidationProfile()
+	_, profile, err := c.collectionValidationProfile()
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,16 @@ func (c *Catalog) StartCollectionValidationCoordinator(ctx context.Context, now 
 }
 
 func (w *CollectionValidationCoordinator) Ready() bool {
-	return w != nil && w.ready.Load() && w.ctx.Err() == nil && w.catalog.store.Status().Ready
+	return w.ReadyContext(context.Background())
+}
+
+// ReadyContext keeps request cancellation separate from coordinator failure.
+func (w *CollectionValidationCoordinator) ReadyContext(ctx context.Context) bool {
+	if w == nil || ctx == nil || ctx.Err() != nil || !w.ready.Load() || w.ctx.Err() != nil {
+		return false
+	}
+	status, err := w.catalog.store.StatusContext(ctx)
+	return err == nil && status.Ready && ctx.Err() == nil && w.ready.Load() && w.ctx.Err() == nil
 }
 
 // BeginStop closes new validation admission and requests cooperative cancellation.

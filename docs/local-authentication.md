@@ -126,6 +126,22 @@ cpractl local auth revoke legacy-read \
 This reserved compatibility identity cannot be issued or rotated into a named
 principal. Use an explicitly named `reader` to migrate its consumers.
 
+For an existing file-configured read-only installation, rotate the shared API
+token directly after stopping its owner:
+
+```bash
+cpractl local auth rotate-read-token \
+  --data-dir /home/you/.local/state/cpra \
+  --token-output /home/you/.config/cpra-access/read-next.token
+```
+
+This creates a fresh protected token file and commits its verifier, preserving
+the authentication epoch and every named grant. It accepts no principal, role or
+expiry and cannot restore revoked, anonymous or post-restore access. It follows
+the same one-attempt and uncertain-commit rules below. Move the new token through
+your secure deployment process before restarting CPRa and its probes. Replacing
+a startup token file alone does not change committed authentication.
+
 ## Uncertain commits and output files
 
 The private output is fully written and flushed before its verifier is submitted.

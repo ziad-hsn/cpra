@@ -26,7 +26,9 @@ type mainCollectionObserver struct {
 
 func (o mainCollectionObserver) Done() <-chan struct{} { return o.done }
 func (o mainCollectionObserver) Err() error            { return o.err }
-func (o mainCollectionObserver) Ready() bool           { return o.ready }
+func (o mainCollectionObserver) ReadyContext(ctx context.Context) bool {
+	return o.ready && ctx.Err() == nil
+}
 
 type mainCollectionJoiner struct {
 	done chan struct{}
@@ -115,7 +117,7 @@ func TestMainCollectionInitializationNeverReadiesStoppedCoordinator(t *testing.T
 
 // The stopped fixture uses the same authenticated catalog admission as the
 // application. No public Validate route or controller/provider is started here.
-func seedMainCollectionValidation(t *testing.T, f mainManagementFixture, claimed bool) persistence.CollectionState {
+func seedMainCollectionValidation(t *testing.T, f *mainManagementFixture, claimed bool) persistence.CollectionState {
 	t.Helper()
 	ctx := t.Context()
 	encryption, err := encryptionsetup.Open(ctx, encryptionsetup.Options{StorageMode: f.settings.Storage.Mode,
@@ -266,6 +268,7 @@ func TestMainCollectionLifecycleJoinsOnListenerFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
+	fixture.options.webAddr = listener.Addr().String()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	err = runCPRa(ctx, fixture.options, func() { t.Error("failed listener announced readiness") })

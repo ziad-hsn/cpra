@@ -23,6 +23,10 @@ def fixture_report(directory, name, passes, category='local_integration', bounda
                         'observation_boundary': boundary, 'accepted': True, 'observed': boundary == 'effect'}
             if boundary == 'effect':
                 evidence.update(before={'count': 0}, after={'count': 1, 'observed': True})
+            if driver == 'a2a':
+                identity = dict(monitor_id='agent-monitor', action_id='a' * 64, action_state='succeeded')
+                evidence.update(identity)
+                row.update(identity)
             raw = json.dumps(evidence).encode()
             (evidence_dir / reference).write_bytes(raw)
             row.update(status='pass', configured=True, operation_invoked=True, accepted=True,
@@ -41,6 +45,49 @@ def change_record(path, change):
 
 
 class EvidenceSummaryTests(unittest.TestCase):
+    def test_local_fixture_environment_is_retained_and_bound_to_the_recorder(self):
+        path = self.report()
+        environment = pathlib.Path(str(path) + '.environment.json')
+        environment.write_text(json.dumps({'preflight': {'ready': True}, 'cleanup_confirmed': True}))
+        fixture = pathlib.Path(str(path) + '.fixture.json')
+        fixture.write_text(json.dumps({'status': 'pass', 'cleanup_failures': [],
+                                       'environment_sha256': summarize.digest(environment)}))
+        source = summarize.summarize([path])['sources'][0]
+        self.assertEqual(source['fixture_environment'], str(environment))
+        self.assertEqual(source['fixture_environment_sha256'], summarize.digest(environment))
+        environment.write_text(json.dumps({'preflight': {'ready': True}, 'cleanup_confirmed': True, 'changed': 1}))
+        with self.assertRaisesRegex(ValueError, 'different environment'):
+            summarize.summarize([path])
+        environment.unlink()
+        with self.assertRaisesRegex(ValueError, 'different environment'):
+            summarize.summarize([path])
+
+    def test_failed_local_admission_or_cleanup_cannot_be_hidden_by_a_passing_driver(self):
+        for index, details in enumerate(({'preflight': {'ready': False}, 'cleanup_confirmed': True},
+                                         {'preflight': {'ready': True}, 'cleanup_confirmed': False})):
+            path = self.report(name='environment-'+str(index))
+            pathlib.Path(str(path) + '.environment.json').write_text(json.dumps(details))
+            with self.subTest(details=details), self.assertRaisesRegex(ValueError, 'admission and cleanup'):
+                summarize.summarize([path])
+
+    def test_report_binary_identity_is_retained_and_must_match_adjacent_evidence(self):
+        path = self.report()
+        report = json.loads(path.read_text())
+        report['binary_sha256'] = 'a' * 64
+        path.write_text(json.dumps(report))
+        self.assertEqual(summarize.summarize([path])['binary_sha256'], 'a' * 64)
+        path.with_suffix('.suite.json').write_text(json.dumps({'passed': True, 'binary_sha256': 'b' * 64}))
+        with self.assertRaisesRegex(ValueError, 'conflicting binaries'):
+            summarize.summarize([path])
+
+    def test_report_binary_identity_cannot_be_malformed(self):
+        path = self.report()
+        report = json.loads(path.read_text())
+        report['binary_sha256'] = 'invalid'
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(ValueError, 'invalid binary hash'):
+            summarize.summarize([path])
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -54,17 +101,25 @@ class EvidenceSummaryTests(unittest.TestCase):
         rows = re.findall(r'\{"(pulse|intervention|code)", "([^"]+)"\}', inventory)
         expected = [(kind, driver) for kind, names in rows for driver in names.split()]
         self.assertEqual(tuple(expected), summarize.INVENTORY)
-        self.assertEqual(len(expected), 33)
-        self.assertEqual([sum(kind == group for kind, _ in expected) for group in ('pulse', 'intervention', 'code')], [14, 5, 14])
+        self.assertEqual(len(expected), 35)
+        self.assertEqual([sum(kind == group for kind, _ in expected) for group in ('pulse', 'intervention', 'code')], [14, 6, 15])
 
     def test_partial_coverage_retains_all_unknown_drivers(self):
         path = self.report()
         summary = summarize.summarize([path])
         self.assertEqual(summary['covered_driver_count'], 1)
-        self.assertEqual(len(summary['records']), 33)
+        self.assertEqual(len(summary['records']), 35)
         self.assertFalse(summary['all_drivers_covered'])
         self.assertFalse(summary['all_providers_verified'])
         self.assertEqual(summary['reports_without_binary_fingerprint'], [str(path)])
+
+    def test_agent_evidence_must_match_committed_action(self):
+        for index, mutation in enumerate(({'action_id': ''}, {'action_state': 'unknown'},
+                                          {'monitor_id': 'other'}, {'action_id': 'b' * 64})):
+            path = self.report(name='agent-' + str(index), passes=(('intervention', 'a2a'),))
+            change_record(path, lambda row: row.update(mutation))
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                summarize.summarize([path])
 
     def test_full_mock_coverage_does_not_establish_live_verification(self):
         path = self.report(passes=summarize.INVENTORY, category='mock_contract')
@@ -72,7 +127,7 @@ class EvidenceSummaryTests(unittest.TestCase):
         self.assertTrue(summary['all_drivers_covered'])
         self.assertFalse(summary['all_providers_verified'])
         self.assertFalse(summary['formal_vendor_certification'])
-        self.assertEqual(summary['strongest_evidence_counts']['mock_contract'], 33)
+        self.assertEqual(summary['strongest_evidence_counts']['mock_contract'], 35)
 
     def test_only_full_live_effect_coverage_satisfies_live_account_gate(self):
         path = self.report(passes=summarize.INVENTORY, category='live_account')

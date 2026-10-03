@@ -62,7 +62,7 @@ func validateWorkerPolicyImage(i image) error {
 	if s == nil {
 		return nil
 	}
-	if (i.Version != WorkerPolicyFormatVersion && i.Version != CatalogJobTypeFormatVersion && i.Version != WorkerSessionFormatVersion && i.Version != WorkerExecutionFormatVersion && i.Version != WorkerOfferFormatVersion) || s.Version != WorkerPolicyVersion || !validAuthenticationID(s.Epoch) || !validAuthenticationID(s.Revision) || !bootstrapHash(s.CommandDigest) || s.UpdatedAt.IsZero() || s.UpdatedAt.Year() < 1 || s.UpdatedAt.Year() > 9999 || s.Workers == nil || len(s.Workers) > MaxWorkers || i.Authentication == nil || i.Authentication.AnonymousLoopback {
+	if (i.Version < WorkerPolicyFormatVersion || !externalStorageFormat(i.Version)) || s.Version != WorkerPolicyVersion || !validAuthenticationID(s.Epoch) || !validAuthenticationID(s.Revision) || !bootstrapHash(s.CommandDigest) || s.UpdatedAt.IsZero() || s.UpdatedAt.Year() < 1 || s.UpdatedAt.Year() > 9999 || s.Workers == nil || len(s.Workers) > MaxWorkers || i.Authentication == nil || i.Authentication.AnonymousLoopback {
 		return ErrWorkerPolicyInvalid
 	}
 	if s.RestoreID != "" && (i.Restore == nil || s.RestoreID != i.Restore.Marker.ID) || s.ResetRequired && s.RestoreID == "" {
@@ -78,6 +78,9 @@ func validateWorkerPolicyImage(i image) error {
 		}
 		uids[p.UID] = true
 		for _, g := range p.Grants {
+			if i.Version < g.minimumFormat() {
+				return ErrWorkerPolicyInvalid
+			}
 			if err := validateWorkerGrantReference(i, p, g); err != nil {
 				return err
 			}
@@ -178,6 +181,9 @@ func (f *machine) applyWorkerPolicy(c WorkerPolicyCommand) Result {
 	next.EncodedBytes = cost
 	f.image.WorkerPolicy = &next
 	f.image.Version = max(f.image.Version, WorkerPolicyFormatVersion)
+	for _, grant := range candidate.Grants {
+		f.image.Version = max(f.image.Version, grant.minimumFormat())
+	}
 	copy := next.Clone()
 	return Result{Allowed: true, resultExtensions: resultExtensions{WorkerPolicy: &copy}, Events: []Event{workerPolicyEvent(c, previous, exists)}}
 }

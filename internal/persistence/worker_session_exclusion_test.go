@@ -11,7 +11,7 @@ import (
 
 func TestWorkerSessionDefaultExclusion(t *testing.T) {
 	for _, value := range []string{"null", "{}"} {
-		for _, version := range []int{1, 14, 18, 19} {
+		for _, version := range []int{1, 14, 18, 19, 37} {
 			raw := []byte(fmt.Sprintf(`{"version":%d,"commands":[{"kind":"worker_poll","worker_session":%s}]}`, version, value))
 			if _, err := decodeEnvelope(raw); err == nil {
 				t.Fatal("default decoded worker session command")
@@ -27,7 +27,10 @@ func TestWorkerSessionDefaultExclusion(t *testing.T) {
 			t.Fatal("default exposed session API", name)
 		}
 	}
-	if supportedFormat(19) {
+	if supportedFormat(19) || supportedFormat(37) {
 		t.Fatal("default enabled worker session storage")
+	}
+	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-37\n{}"), ""); err == nil {
+		t.Fatal("default accepted worker queue snapshot")
 	}
 }

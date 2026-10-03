@@ -53,11 +53,13 @@ func (h *workerSessionHTTP) start(w http.ResponseWriter, r *http.Request) {
 		writeWorkerStartError(w, err)
 		return
 	}
-	if h.ready == nil || h.admit == nil {
+	// Both begin and reconcile need usable storage. Check that boundary before
+	// reading the body; only begin additionally requires new-work readiness.
+	if h.completionReady == nil || h.complete == nil {
 		writeWorkerStartError(w, persistence.ErrWorkerSessionUnavailable)
 		return
 	}
-	if err := h.ready(ctx); err != nil {
+	if err := h.completionReady(ctx); err != nil {
 		writeWorkerStartError(w, err)
 		return
 	}
@@ -87,10 +89,22 @@ func (h *workerSessionHTTP) start(w http.ResponseWriter, r *http.Request) {
 		writeWorkerStartError(w, persistence.ErrWorkerExecutionInvalid)
 		return
 	}
+	admit := h.complete
+	if request.Mode == api.StartModeBegin {
+		if h.ready == nil || h.admit == nil {
+			writeWorkerStartError(w, persistence.ErrWorkerSessionUnavailable)
+			return
+		}
+		if err := h.ready(ctx); err != nil {
+			writeWorkerStartError(w, err)
+			return
+		}
+		admit = h.admit
+	}
 	command := persistence.WorkerStartRequest{ServerID: request.ServerID, SessionID: request.SessionID,
 		ExecutionID: request.ExecutionID, ExecutionRevision: request.ExecutionRevision, LeaseID: request.LeaseID, Mode: string(request.Mode)}
 	var response persistence.WorkerStartResponse
-	err = h.admit(ctx, func() error {
+	err = admit(ctx, func() error {
 		var err error
 		response, err = h.store.CommitWorkerStart(ctx, authority, command)
 		return err
@@ -110,6 +124,8 @@ func writeWorkerStartError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, persistence.ErrCommitUnconfirmed):
 		code, detail = "workerStartUnconfirmed", "Start admission is unconfirmed. Reconcile the original execution; do not repeat begin."
+	case errors.Is(err, persistence.ErrWorkerCheckExpired):
+		status, code, detail = 410, "workerCheckExpired", "This check record has expired. Its execution cannot be resumed."
 	case errors.Is(err, httpauth.ErrWorkerAuthentication), errors.Is(err, persistence.ErrWorkerUnauthorized):
 		status, code, detail = 401, "unauthorized", "Supply a current worker bearer token."
 		w.Header().Set("WWW-Authenticate", "Bearer")

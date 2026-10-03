@@ -31,6 +31,9 @@ func validateLateResult(c Command) error {
 }
 
 func (e LateActionEvidence) validate(a Action) error {
+	if a.ExecutorKind == "agent" && (e.Outcome != "accepted" || !agentSuccess(a)) {
+		return ErrAgentReceiptConflict
+	}
 	if a.State != Unknown || (a.Kind != "intervention" && a.Kind != "code") || a.StartedAt.IsZero() || e.ExecutionStart.IsZero() ||
 		e.ExecutionStart.Before(a.StartedAt) || e.ExecutionEnd.Before(e.ExecutionStart) || e.RecordedAt.Before(e.ExecutionEnd) ||
 		(e.Outcome != "accepted" && e.Outcome != "rejected") {

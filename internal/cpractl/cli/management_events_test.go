@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -87,5 +88,41 @@ func TestManagementActionDescribeQuotesUnknownReviewControls(t *testing.T) {
 	stdout, _, err := fixture.run(t, nil, "describe", "action/action-1")
 	if err != nil || strings.Contains(stdout, "\x1b") || !strings.Contains(stdout, `\x1b[31m\nassertion`) {
 		t.Fatal("unknown enum controls reached terminal output unquoted", err)
+	}
+}
+
+func TestA2AActionDescriptionKeepsReceiptSeparateFromOutcome(t *testing.T) {
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Error("description attempted a mutation")
+		}
+		_ = json.NewEncoder(w).Encode(api.Action{ID: "action-1", State: "unknown", Held: true, AgentReceipt: &api.AgentReceipt{Sequence: "9223372036854775825", TaskID: api.Pointer("agent-task"), State: api.Pointer("TASK_STATE_WORKING"), ObservedAt: time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)}})
+	})
+	stdout, _, err := fixture.run(t, nil, "describe", "action/action-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"unknown", "Agent task", "agent-task", "TASK_STATE_WORKING", "9223372036854775825"} {
+		if !strings.Contains(stdout, expected) {
+			t.Fatal("missing agent observation", expected)
+		}
+	}
+}
+
+func TestRecoveryNotificationActionDescription(t *testing.T) {
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Error("description attempted a mutation")
+		}
+		_ = json.NewEncoder(w).Encode(api.Action{ID: "notification", State: "unknown", Held: true, RecoveryFailure: &api.RecoveryFailure{ActionID: "original-restart", Driver: "docker", Attempt: 2, MaxAttempts: 2, Trigger: "recovery_exhausted", Outcome: "failure", FailedAt: time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)}})
+	})
+	stdout, _, err := fixture.run(t, nil, "describe", "action/notification")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"unknown", "Failed recovery action", "original-restart", "docker", "2 of 2", "recovery_exhausted"} {
+		if !strings.Contains(stdout, expected) {
+			t.Fatal("missing original recovery context", expected)
+		}
 	}
 }

@@ -621,6 +621,9 @@ func (r *Runner) deliver(ctx context.Context, rec journalRecord) error {
 		// Persisted requests are always read-only reconciliations. Never repeat begin.
 		start, err := r.config.Client.Start(ctx, rec.Start)
 		if err != nil {
+			if rec.Kind == "check" && errors.Is(err, cpra.ErrWorkerCheckExpired) {
+				return r.journal.remove(rec.ExecutionID)
+			}
 			return err
 		}
 		if err = validateStart(start, rec.Start, rec.WorkerUID); err != nil {
@@ -628,6 +631,14 @@ func (r *Runner) deliver(ctx context.Context, rec journalRecord) error {
 		}
 		switch start.Disposition {
 		case api.StartDispositionTerminal:
+			if rec.State == "unknown" {
+				if rec.ReceiptID != start.ReceiptID {
+					return ErrIdentity
+				}
+				// A terminal execution receipt does not resolve an uncertain action.
+				// Preserve its outcome and late-evidence identity without invoking it.
+				return nil
+			}
 			return r.journal.remove(rec.ExecutionID)
 		case api.StartDispositionRejected:
 			if rec.State == "reserved" {
@@ -664,6 +675,9 @@ func (r *Runner) deliver(ctx context.Context, rec journalRecord) error {
 		}
 		receipt, err := r.config.Client.Result(ctx, *rec.Outcome)
 		if err != nil {
+			if rec.Kind == "check" && errors.Is(err, cpra.ErrWorkerCheckExpired) {
+				return r.journal.remove(rec.ExecutionID)
+			}
 			return err
 		}
 		if err = r.checkReceipt(rec.ExecutionID, receipt); err != nil {

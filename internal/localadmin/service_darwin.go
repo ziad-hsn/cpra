@@ -96,11 +96,6 @@ func nativeSecure(l installpath.Layout, account string) error {
 		dirMode, fileMode fs.FileMode
 	}
 	rules := []rule{{l.StateDir, uid, gid, 0700, 0600}, {l.LogDir, uid, gid, 0700, 0600}}
-	if l.Scope == "system" {
-		rules = append(rules, rule{l.ConfigDir, 0, gid, 0750, 0640}, rule{l.BinDir, 0, 0, 0755, 0755}, rule{l.ServiceFile, 0, 0, 0755, 0644})
-	} else {
-		rules = append(rules, rule{l.ConfigDir, uid, gid, 0700, 0600}, rule{l.BinDir, uid, gid, 0700, 0700}, rule{l.ServiceFile, uid, gid, 0700, 0600})
-	}
 	for _, rule := range rules {
 		if rule.path == "" {
 			continue
@@ -117,6 +112,9 @@ func nativeSecure(l installpath.Layout, account string) error {
 			if entry.Type()&os.ModeSymlink != 0 {
 				return fmt.Errorf("refusing ownership update through link %s", path)
 			}
+			if !entry.IsDir() && !entry.Type().IsRegular() {
+				return fmt.Errorf("non-regular state file: %s", path)
+			}
 			mode := rule.fileMode
 			if entry.IsDir() {
 				mode = rule.dirMode
@@ -127,6 +125,53 @@ func nativeSecure(l installpath.Layout, account string) error {
 			return os.Chmod(path, mode)
 		})
 		if err != nil {
+			return err
+		}
+	}
+	// Configuration can contain executable credential helpers owned by the
+	// operator. Repair only the managed directory and starter files; state and
+	// logs above remain private throughout their trees.
+	configUID, executableUID, executableGID := uid, uid, gid
+	configDirMode, configFileMode := fs.FileMode(0700), fs.FileMode(0600)
+	executableDirMode, executableFileMode, serviceFileMode := fs.FileMode(0700), fs.FileMode(0700), fs.FileMode(0600)
+	if l.Scope == "system" {
+		configUID, executableUID, executableGID = 0, 0, 0
+		configDirMode, configFileMode = 0750, 0640
+		executableDirMode, executableFileMode, serviceFileMode = 0755, 0755, 0644
+	}
+	for _, entry := range []struct {
+		path      string
+		uid, gid  int
+		mode      fs.FileMode
+		directory bool
+	}{
+		{l.ConfigDir, configUID, gid, configDirMode, true},
+		{filepath.Join(l.ConfigDir, "monitors.yaml"), configUID, gid, configFileMode, false},
+		{filepath.Join(l.ConfigDir, "runtime.yaml"), configUID, gid, configFileMode, false},
+		{filepath.Join(l.ConfigDir, "auth.token"), configUID, gid, configFileMode, false},
+		{l.BinDir, executableUID, executableGID, executableDirMode, true},
+		{binaryPath(l), executableUID, executableGID, executableFileMode, false},
+		{l.ServiceFile, executableUID, executableGID, serviceFileMode, false},
+	} {
+		if entry.path == "" {
+			continue
+		}
+		if err := rejectSymlinkAncestors(entry.path); err != nil {
+			return err
+		}
+		info, err := os.Lstat(entry.path)
+		if os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		if entry.directory && !info.IsDir() || !entry.directory && !info.Mode().IsRegular() {
+			return fmt.Errorf("managed path has an unexpected file type: %s", entry.path)
+		}
+		if err = os.Chown(entry.path, entry.uid, entry.gid); err != nil {
+			return err
+		}
+		if err = os.Chmod(entry.path, entry.mode); err != nil {
 			return err
 		}
 	}

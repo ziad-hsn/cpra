@@ -4,7 +4,7 @@
   "files": {
     "DEPENDENCIES.json": {
       "bytes": 1710,
-      "sha256": "a1057a076092027a68fb0ccf2ff4d50309cd8cc122141bec0a4fc7f80184a13c"
+      "sha256": "dcf8aeb777f19c516e7c2ff32d1ea02e4c07a4357b121b407d5a55368eda152b"
     },
     "GO-LICENSE.txt": {
       "bytes": 1453,
@@ -59,6 +59,6 @@
     "-tags=",
     "-ldflags="
   ],
-  "sdk_source_sha256": "e6acc9f8531b8d043b0359e173733e8b11148beb40ac4880322281ce066de88b",
+  "sdk_source_sha256": "e8a6e2738b9a93c7f39dc7c4bcc1390db04d82e933182182ed577988b0fa7ccb",
   "target": "js/wasm"
 }

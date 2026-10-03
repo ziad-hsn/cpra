@@ -6,6 +6,23 @@ cpra_scope: plan
 
 **Scope correction, 1 October 2026:** The user removed the 24-hour endurance run from the task and mandatory completion checks. No such run has been started or completed. Historical entries below record earlier requirements; they do not reinstate this test. Comparative performance remains separate from endurance, and documentation must not claim an unperformed endurance result.
 
+## Dashboard dependency and provenance correction, 4 October 2026
+
+A fresh audit found three `brace-expansion` denial-of-service advisories in two
+development dependency versions. The targeted lockfile update selects `1.1.21`
+and `5.0.12`; the repeated audit reports no findings. Direct dependencies and the
+SDK/worker sources are unchanged. The pinned dashboard build and checked rebuild
+both pass TypeScript, lint and all 513 tests. Regeneration also refreshes browser
+parser provenance for the committed SDK checksum graph. The parser executable,
+matching Go runtime and linked dependency versions remain unchanged.
+
+The complete Go matrix for source `42d7e88` was interrupted after the audit found
+the required correction. Its retained partial results are not a passing matrix.
+The corrected candidate still requires the complete compiler/tag matrix, browser,
+security, packaged/native, configured-provider/agent, comparative-performance and
+independent-review gates. Candidates remain private at `v0.1.0-rc.1` (chart
+`0.1.0-rc.1`); publication and final documentation alignment remain pending.
+
 ## First candidate version selected, 3 October 2026
 
 The user approved `v0.1.0-rc.1` for the application, SDK and worker, with

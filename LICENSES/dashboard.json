@@ -60,7 +60,7 @@
     "version": "source",
     "sha256": "8bf07ceb8893c0661d437ecf129c3e2e5a192d6d07e08e033e6cb5a4aabc19f2",
     "source_file": "dashboard/src/import/generated/collection-parser.wasm",
-    "source_identity": "e6acc9f8531b8d043b0359e173733e8b11148beb40ac4880322281ce066de88b",
+    "source_identity": "e8a6e2738b9a93c7f39dc7c4bcc1390db04d82e933182182ed577988b0fa7ccb",
     "declared_license": "MIT",
     "license_files": [
       "sdk/go/LICENSE"
@@ -140,7 +140,7 @@
     ],
     "name": "github.com/ziad-hsn/cpra/sdk/go",
     "scope": "dashboard-wasm",
-    "source_sha256": "e6acc9f8531b8d043b0359e173733e8b11148beb40ac4880322281ce066de88b",
+    "source_sha256": "e8a6e2738b9a93c7f39dc7c4bcc1390db04d82e933182182ed577988b0fa7ccb",
     "version": "source"
   },
   {

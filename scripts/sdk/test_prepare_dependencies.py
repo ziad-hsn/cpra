@@ -1,5 +1,7 @@
 """Preparation boundaries using real Git selection and filesystem changes."""
 import json
+import base64
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -166,6 +168,82 @@ class PreparationTests(unittest.TestCase):
                 prepare.prepare(sys.executable, root / 'output', 'v0.1.0-rc.1', root)
             with self.assertRaisesRegex(ValueError, 'canonical'):
                 prepare.prepare(sys.executable, Path(directory) / 'output', 'latest', root)
+
+    def test_archives_cover_final_graph_and_checksum_refresh_is_explicit(self):
+        for refresh in (False, True):
+            with self.subTest(refresh=refresh), tempfile.TemporaryDirectory() as directory:
+                root = self.repository(directory)
+                version = 'v0.1.0-rc.1'
+                stale = prepare.CORE + ' ' + version + ' h1:old-fixture-content\n'
+                definition = prepare.CORE + ' ' + version + '/go.mod h1:fixture-definition\n'
+                for module, relative in prepare.MODULES.items():
+                    path = root / relative
+                    path.mkdir(parents=True, exist_ok=True)
+                    (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.25.0\n')
+                    (path / 'go.sum').write_text('leaf fixture\n' if module == prepare.CORE else stale + definition)
+                subprocess.run(['git', 'add', '.'], cwd=root, check=True)
+                subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                                '-c', 'commit.gpgSign=false', 'commit', '-qm', 'Fixture'], cwd=root, check=True)
+                original = prepare.source_inventory(root)
+                out = Path(directory) / 'prepared'
+                archives = {}
+
+                def stage(archiver, proxy, module, selected_version, path, source_time):
+                    content = (path / 'go.sum').read_bytes()
+                    digest = 'h1:' + base64.b64encode(hashlib.sha256(content).digest()).decode()
+                    archive = out / 'module-cache' / ('sdk.fixture' if module == prepare.CORE else 'worker.fixture')
+                    archive.parent.mkdir(exist_ok=True)
+                    archive.write_bytes(content)
+                    record = {'Path': module, 'Version': selected_version, 'Sum': digest,
+                              'GoModSum': 'h1:fixture-definition', 'ArchiveSHA256': prepare.sha256(archive),
+                              'Requires': {} if module == prepare.CORE else {prepare.CORE: version},
+                              'Zip': str(archive)}
+                    archives[module] = record
+                    return record
+
+                def go_output(go, path, args, env, destination, name, commands):
+                    if args == ['version']:
+                        return 'go version go1.27.1 linux/amd64\n'
+                    if args[:2] == ['mod', 'edit']:
+                        module = next(module for module, relative in prepare.MODULES.items()
+                                      if path == out / 'source' / relative)
+                        value = {'Module': {'Path': module}, 'Go': '1.25.0',
+                                 'Require': [] if module == prepare.CORE else [{'Path': prepare.CORE, 'Version': version}]}
+                        result = json.dumps(value)
+                        (destination / (name + '.stdout')).write_text(result)
+                        return result
+                    if name == 'sdk-tidy':
+                        (path / 'go.sum').write_text('leaf fixture\n')
+                    elif name in ('application-tidy', 'worker-tidy'):
+                        contents = (path / 'go.sum').read_text()
+                        if stale in contents:
+                            raise ValueError('checksum mismatch in copied dependent module')
+                        (path / 'go.sum').write_text(contents + prepare.CORE + ' ' + version + ' ' + archives[prepare.CORE]['Sum'] + '\n')
+                    elif args == ['mod', 'download', '-json', 'all']:
+                        with (path / 'go.sum').open('a') as stream:
+                            stream.write('complete graph fixture\n')
+                    elif name == 'private-module-download':
+                        return '\n'.join(json.dumps(record) for record in archives.values())
+                    return ''
+
+                with patch.object(prepare, 'run_go', side_effect=go_output), \
+                        patch.object(prepare, 'build_archiver', return_value=Path(sys.executable)), \
+                        patch.object(prepare, 'stage_module', side_effect=stage):
+                    if not refresh:
+                        with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+                            prepare.prepare(sys.executable, out, version, root)
+                    else:
+                        report = prepare.prepare(sys.executable, out, version, root, refresh_sdk_checksum=True)
+                        self.assertEqual(report['status'], 'prepared')
+                        self.assertEqual(len(report['sdk_checksum_refresh']), 2)
+                        for module, relative in prepare.MODULES.items():
+                            self.assertIn('complete graph fixture\n', (out / 'source' / relative / 'go.sum').read_text())
+                        sdk = out / 'source/sdk/go/go.sum'
+                        self.assertEqual(Path(archives[prepare.CORE]['Zip']).read_bytes(), sdk.read_bytes())
+                        worker = out / 'source/sdk/go/worker/go.sum'
+                        self.assertEqual(Path(archives[prepare.WORKER]['Zip']).read_bytes(), worker.read_bytes())
+                        self.assertIn(definition, worker.read_text())
+                self.assertEqual(prepare.source_inventory(root), original)
 
     @unittest.skipIf(os.name == 'nt', 'process group boundary uses the WSL release host')
     def test_timed_out_command_is_terminal_and_retains_failed_logs(self):

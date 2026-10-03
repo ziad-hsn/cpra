@@ -907,6 +907,14 @@ excluded, and the freshness gate still requires the current recorded inputs.
 
 ## Prepare private dependencies
 
+First use the [module preparation procedure](sdk/publishing.md#prepare-dependency-changes-before-freezing-source)
+to review Go-generated module files, including checksums for the full dependency
+graph. If an unpublished SDK candidate changes, its README and checksum files
+also change its module content identity. Refresh dependent checksums through the
+explicit preparation option, review the proposed files and commit them before
+creating the frozen source archive. Frozen cache preparation never repairs a
+checksum mismatch or changes the source archive.
+
 Before the SDK tags exist, prepare dependencies in a new directory outside the
 checkout. Select the worker version explicitly; the application and worker must
 already require the same reviewed SDK version. Source archive creation is

@@ -271,7 +271,7 @@ def copy_prepared_source(directory, destination):
     return report
 
 
-def prepare(go, out, worker_version, root=ROOT):
+def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
     root, out, go = Path(root).resolve(), Path(out).resolve(), Path(go).resolve(strict=True)
     if out.is_relative_to(root) or root.is_relative_to(out):
         raise ValueError('Select a new private output directory outside the checkout')
@@ -310,6 +310,7 @@ def prepare(go, out, worker_version, root=ROOT):
         report['versions'] = {CORE: sdk_version, WORKER: worker_version}
         # Normalize the leaf first: its final bytes determine dependent sums.
         run(source / 'sdk/go', ['mod', 'tidy', '-compat=1.25'], 'sdk-tidy')
+        run(source / 'sdk/go', ['mod', 'download', '-json', 'all'], 'sdk-download')
         archiver = build_archiver(go, out / 'archiver', source)
         report['archiver_sha256'] = sha256(archiver)
         epoch = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', report['base_commit']], cwd=root, text=True))
@@ -321,7 +322,25 @@ def prepare(go, out, worker_version, root=ROOT):
         report['module_archives'][CORE] = sdk
         env.update(GOPROXY=proxy.as_uri() + ',https://proxy.golang.org', GONOSUMDB=CORE + ',' + WORKER)
         for name, relative in [('application', '.'), ('worker', 'sdk/go/worker')]:
+            if refresh_sdk_checksum:
+                # This is a proposal in the disposable source copy. Keep the
+                # module-definition checksum and every unrelated checksum.
+                # Go calculates the new content checksum from the staged SDK.
+                path = source / relative / 'go.sum'
+                if path.exists():
+                    original_rows = path.read_bytes().splitlines(keepends=True)
+                    selected = (CORE + ' ' + sdk_version + ' ').encode()
+                    stale = [row for row in original_rows if row.startswith(selected)
+                             and row.strip().split()[-1].decode() != sdk['Sum']]
+                    if stale:
+                        report.setdefault('sdk_checksum_refresh', []).append({
+                            'path': path.relative_to(source).as_posix(),
+                            'version': sdk_version, 'source_archive_sum': sdk['Sum'],
+                            'previous_rows': [row.decode().strip() for row in stale],
+                        })
+                        path.write_bytes(b''.join(row for row in original_rows if row not in stale))
             run(source / relative, ['mod', 'tidy', '-compat=1.25'], name + '-tidy')
+            run(source / relative, ['mod', 'download', '-json', 'all'], name + '-download')
         for index, (module, relative) in enumerate(MODULES.items()):
             metadata = json.loads(run(source / relative, ['mod', 'edit', '-json'], 'module-after-' + str(index)))
             module_contract(metadata, module, sdk_version)
@@ -379,9 +398,12 @@ def main():
     parser.add_argument('--go', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--worker-version', required=True)
+    parser.add_argument('--refresh-sdk-checksum', action='store_true',
+                        help='propose refreshed SDK content checksums for an unpublished private candidate; only copied files change')
     args = parser.parse_args()
     try:
-        report = prepare(args.go, args.out, args.worker_version)
+        report = prepare(args.go, args.out, args.worker_version,
+                         refresh_sdk_checksum=args.refresh_sdk_checksum)
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         parser.exit(1, str(error) + '\n')
     print(json.dumps({'status': report['status'], 'proposals': report['proposals'],

@@ -151,6 +151,22 @@ Go resolves dependencies and generates the proposed `go.mod` and `go.sum` edits;
 `module-files.diff`, command logs, original input hashes and canonical module
 payloads remain available for review. The checkout is not changed by this command.
 
+Preparation runs `go mod tidy` followed by the complete dependency-graph download
+before archiving each module. The SDK is prepared first because its final files,
+including `go.sum` and README content, determine the checksums used by the
+application and worker. Frozen dependency preparation must then leave all three
+modules unchanged.
+
+If an **unpublished private candidate** has changed SDK files while its dependent
+checksum still identifies earlier contents, rerun the preparer with
+`--refresh-sdk-checksum`. This explicitly removes only the stale SDK content row
+from the copied application and worker checksum files. Go generates its
+replacement from the source-derived archive. The previous rows, archive identity
+and resulting diff remain in the preparation report; the SDK's module-definition
+checksum and unrelated entries retain normal verification. Without this option,
+a checksum mismatch remains an error. Never use this procedure to change the
+contents of a published module version; select a new version instead.
+
 Apply reviewed proposals only while their original file hashes still match.
 Any subsequent SDK source change requires new dependency preparation because
 module checksums cover its complete selected payload. The preparation report is

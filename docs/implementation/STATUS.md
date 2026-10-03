@@ -2348,3 +2348,33 @@ scenarios, final-commit documentation and publication remain open. Candidate
 versions stay `v0.1.0-rc.1`, with chart `0.1.0-rc.1`; the 24-hour test remains
 outside the task. The private CI location has been requested while local work
 continues; no new repository or public object was created.
+
+## Module input preparation review, 4 October 2026
+
+Committed-source qualification caught two preparation defects. The SDK archive
+from `c72a499` differed from the recorded dependent checksum because its README
+had gained ambiguity guidance. A Go-generated checksum correction was saved in
+local commit `62e1560`. The next frozen check then reported additions to all
+three `go.sum` files when downloading the full dependency graph; its source
+archive was left unchanged and the failure was retained.
+
+Working-tree preparation now completes `tidy` and the full graph download before
+archiving each module, starting with the SDK. Refreshing a changed unpublished
+SDK checksum requires the explicit `--refresh-sdk-checksum` option. It removes
+only the stale content row from copied dependent files; Go regenerates that row,
+and the original entries and proposals remain available for review. Frozen
+preparation retains its ordinary checksum and source-immutability checks.
+
+All 48 SDK-tool contract tests pass. The new controlled-graph regression checks
+final archive contents, explicit refresh and preservation of the original
+checkout. Actual Go 1.27.1 preparation also completed twenty commands covering
+all three module graphs, cache verification and source-derived SDK/worker
+downloads. It proposed changes only to the three checksum files, with no module
+declaration or version change. The proposals identify SDK content as
+`h1:dloPu/idkVjrLQa2Ocp9oJX8ctJFMwFO2mQOYUzahk8=`.
+
+These results qualify preparation behavior. Committed-source cache and both
+compiler consumer checks must run again after the reviewed proposals are saved;
+complete candidate, independent review, platform/provider, performance and
+publication gates remain open. No public object was created and no 24-hour run
+was performed.

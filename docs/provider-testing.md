@@ -6,6 +6,9 @@ mock endpoints, provider sandboxes and real accounts establish different evidenc
 
 ## Reporting
 
+Verification configuration accepts one YAML document up to 4 MiB. Oversized
+files and additional documents are rejected before observers or providers run.
+
 Each case accepts `evidence_type`: `local_integration`, `mock_contract`,
 `provider_sandbox`, or `live_account`. Omission preserves the original
 `live_account` behavior. New local fixtures explicitly declare their boundary.

@@ -16,6 +16,41 @@ import (
 	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
+func TestLoadConfigurationBoundaries(t *testing.T) {
+	prefix := "manifest: {}\ncases: []\n"
+	padding := strings.Repeat(" ", (4<<20)-len(prefix))
+	for _, tc := range []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		{"at size limit", prefix + padding, true},
+		{"oversized valid input", prefix + padding + "\n", false},
+		{"trailing document", prefix + "---\nstate_directory: PRIVATE_CONFIG_VALUE\n", false},
+		{"trailing document past size limit", prefix + padding + "\n---\nstate_directory: PRIVATE_CONFIG_VALUE\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "verification.yaml")
+			if err := os.WriteFile(path, []byte(tc.input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load(path)
+			if tc.valid {
+				if err != nil || len(cfg.Cases) != 0 || len(cfg.Manifest.Monitors) != 0 {
+					t.Fatalf("valid configuration rejected: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("accepted oversized or multiple-document configuration")
+			}
+			if strings.Contains(err.Error(), "PRIVATE_CONFIG_VALUE") {
+				t.Fatal("configuration error disclosed an input value")
+			}
+		})
+	}
+}
+
 func TestUnconfiguredInventoryNeverPasses(t *testing.T) {
 	r, err := Run(context.Background(), Config{}, false)
 	if err != nil {

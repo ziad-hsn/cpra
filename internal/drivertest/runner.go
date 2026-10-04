@@ -63,6 +63,8 @@ const (
 	BoundaryAPIAcceptance    = "api_acceptance"
 )
 
+const maxConfigurationBytes = 4 << 20
+
 type Config struct {
 	StateDirectory string            `yaml:"state_directory"`
 	Manifest       manifest.Manifest `yaml:"manifest"`
@@ -114,7 +116,14 @@ func Load(path string) (Config, error) {
 		return cfg, err
 	}
 	defer f.Close()
-	d := yaml.NewDecoder(io.LimitReader(f, 4<<20))
+	data, err := io.ReadAll(io.LimitReader(f, maxConfigurationBytes+1))
+	if err != nil {
+		return cfg, err
+	}
+	if len(data) > maxConfigurationBytes {
+		return cfg, errors.New("live verification configuration exceeds 4 MiB")
+	}
+	d := yaml.NewDecoder(bytes.NewReader(data))
 	d.KnownFields(true)
 	if err = d.Decode(&cfg); err != nil {
 		return cfg, fmt.Errorf("invalid live verification configuration (check field names and value types)")

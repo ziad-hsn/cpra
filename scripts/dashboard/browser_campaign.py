@@ -84,7 +84,9 @@ def source_inventory(root, source_files=None):
     selected = set(name for name in names if name and (
         name.startswith(prefixes) or ("/" not in name and name.endswith(".go"))
         or name in ("go.mod", "go.sum", ".github/workflows/ci.yml")))
-    selected.update(asset_manifest.snapshot(root)["inputs"])
+    dashboard = asset_manifest.snapshot(root)
+    selected.update(dashboard["inputs"])
+    selected.update(dashboard["outputs"])
     selected.add(asset_manifest.MANIFEST)
     return {name: sha(root / name) for name in sorted(selected) if (root / name).is_file()}
 

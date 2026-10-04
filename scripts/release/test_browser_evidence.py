@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import browser_evidence
+import browser_record
 import release
 from test_evidence import manifest_fixture
 
@@ -125,6 +126,24 @@ class BrowserEvidenceTests(unittest.TestCase):
         self.assertEqual(report['release_identity'], release.evidence_identity(self.manifest))
         self.assertEqual(len(report['reports']), 4)
         self.assertEqual(len(report['input_sha256']), 44)
+
+    def test_archive_producer_inventory_matches_reader_and_tracks_dashboard_notices(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = copy.deepcopy(self.manifest)
+            for name, record in manifest['source_files'].items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                data = name.encode()
+                path.write_bytes(data)
+                record['sha256'] = sha(data)
+            with patch.object(browser_record.browser_campaign.subprocess, 'check_output',
+                              side_effect=AssertionError('source archive invoked Git')):
+                observed = browser_record.browser_campaign.source_inventory(root, manifest['source_files'])
+                self.assertEqual(observed, browser_evidence.source_inputs(manifest))
+                (root / 'LICENSES/dashboard.txt').write_bytes(b'updated dashboard notices')
+                changed = browser_record.browser_campaign.source_inventory(root, manifest['source_files'])
+            self.assertNotEqual(observed['LICENSES/dashboard.txt'], changed['LICENSES/dashboard.txt'])
 
     def test_each_matrix_identity_must_be_distinct_and_supported(self):
         for paths in (self.paths[:3], self.paths + [self.paths[0]], [self.paths[0]] * 4):

@@ -84,7 +84,7 @@ class BrowserCampaignTests(unittest.TestCase):
             root = Path(temp)
             (root / 'main.go').write_bytes(b'package main')
             (root / 'go.mod').write_bytes(b'module fixture')
-            with patch.object(browser_campaign.asset_manifest, 'snapshot', return_value={'inputs': {}}), \
+            with patch.object(browser_campaign.asset_manifest, 'snapshot', return_value={'inputs': {}, 'outputs': {}}), \
                     patch.object(browser_campaign.subprocess, 'check_output', side_effect=AssertionError('Git invoked')):
                 values = browser_campaign.source_inventory(root, {'main.go': {}, 'go.mod': {}})
         self.assertEqual(values['main.go'], hashlib.sha256(b'package main').hexdigest())

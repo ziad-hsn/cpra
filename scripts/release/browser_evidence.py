@@ -142,8 +142,8 @@ def terminal_results(path, dashboard_sha256=None, compiler=None):
             if (event['Action'] == 'output'
                     and event.get('Package') == 'github.com/ziad-hsn/cpra/internal/httpserver'
                     and event.get('Test') == 'TestManagementBrowser'
-                    and 'private dist index sha256=' in event.get('Output', '')):
-                match = re.search(r'private dist index sha256=([a-f0-9]{64}); compiler=(go[0-9.]+); '
+                    and 'dashboard assets index sha256=' in event.get('Output', '')):
+                match = re.search(r'dashboard assets index sha256=([a-f0-9]{64}); compiler=(go[0-9.]+); '
                                   r'platform=([a-z0-9]+/[a-z0-9]+)', event['Output'])
                 require(match is not None, 'served dashboard/compiler observation is malformed')
                 served.append(match.groups())

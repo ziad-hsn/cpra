@@ -53,7 +53,7 @@ class BrowserEvidenceTests(unittest.TestCase):
                 log = directory / 'go.jsonl'
                 served = {'Action': 'output', 'Package': 'github.com/ziad-hsn/cpra/internal/httpserver',
                           'Test': 'TestManagementBrowser',
-                          'Output': 'private dist index sha256=' +
+                          'Output': 'dashboard assets index sha256=' +
                                     self.manifest['source_files']['internal/httpserver/assets/index.html']['sha256'] +
                                     '; compiler=' + compiler + '; platform=linux/amd64\n'}
                 log.write_bytes(event_lines([served] + self.events))
@@ -100,7 +100,7 @@ class BrowserEvidenceTests(unittest.TestCase):
         path = self.root / next(name for name in self.reports[0]['logs'] if name.endswith('go.jsonl'))
         output = {'Action': 'output', 'Package': 'github.com/ziad-hsn/cpra/internal/httpserver',
                   'Test': 'TestManagementBrowser',
-                  'Output': 'private dist index sha256=' +
+                  'Output': 'dashboard assets index sha256=' +
                             self.manifest['source_files']['internal/httpserver/assets/index.html']['sha256'] +
                             '; compiler=' + self.reports[0]['go'] + '; platform=linux/amd64\n'}
         path.write_bytes((event_lines([output]) if served else b'') + data)
@@ -242,9 +242,9 @@ class BrowserEvidenceTests(unittest.TestCase):
         self.rewrite_log(event_lines(self.events), served=False)
         with self.assertRaisesRegex(ValueError, 'served dashboard'):
             self.verify()
-        for output in ('private dist index sha256=' + 'a' * 64 + '; compiler=go1.25.0; platform=linux/amd64',
-                       'private dist index sha256=invalid; compiler=go1.25.0; platform=linux/amd64',
-                       'private dist index sha256=' +
+        for output in ('dashboard assets index sha256=' + 'a' * 64 + '; compiler=go1.25.0; platform=linux/amd64',
+                       'dashboard assets index sha256=invalid; compiler=go1.25.0; platform=linux/amd64',
+                       'dashboard assets index sha256=' +
                        self.manifest['source_files']['internal/httpserver/assets/index.html']['sha256'] +
                        '; compiler=go9.0.0; platform=linux/amd64'):
             with self.subTest(output=output):

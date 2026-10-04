@@ -28,7 +28,7 @@ import (
 // TestManagementBrowser is deliberately opt-in and never downloads a browser.
 // It exercises real HTTP admission, authentication and encrypted Raft storage.
 // No controller runs: every mutation must remain committed, never "applied".
-// Serving private dist assets here avoids replacing the release's embedded assets.
+// Serve committed dashboard assets so the fixture also runs from a source archive.
 func TestManagementBrowser(t *testing.T) {
 	module := os.Getenv("CPRA_BROWSER_MODULE")
 	if module == "" {
@@ -50,13 +50,13 @@ func TestManagementBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dist := filepath.Join(root, "dashboard", "dist")
-	index, err := os.ReadFile(filepath.Join(dist, "index.html"))
+	assetsDir := filepath.Join(root, "internal", "httpserver", "assets")
+	index, err := os.ReadFile(filepath.Join(assetsDir, "index.html"))
 	if err != nil {
-		t.Fatal("build dashboard/dist before running this fixture")
+		t.Fatal("committed dashboard assets are unavailable", err)
 	}
 	indexDigest := sha256.Sum256(index)
-	t.Logf("private dist index sha256=%x; compiler=%s; platform=%s/%s", indexDigest, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	t.Logf("dashboard assets index sha256=%x; compiler=%s; platform=%s/%s", indexDigest, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	cfg := runtimeconfig.Default()
 	cfg.Storage.Directory = filepath.Join(t.TempDir(), "state")
 	store, err := persistence.Open(t.Context(), cfg)
@@ -96,8 +96,8 @@ func TestManagementBrowser(t *testing.T) {
 	mux := http.NewServeMux()
 	s.registerAPI(mux)
 	s.registerMetrics(mux)
-	files := http.FileServer(http.Dir(dist))
-	assets := os.DirFS(dist)
+	files := http.FileServer(http.Dir(assetsDir))
+	assets := os.DirFS(assetsDir)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			http.NotFound(w, r)

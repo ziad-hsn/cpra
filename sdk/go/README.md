@@ -4,7 +4,7 @@ This independently versioned module contains the typed Go client for CPRa.
 It supports Go 1.25 and does not depend on the CPRa application module, controller,
 Ark, Raft, provider SDKs, or worker execution library.
 
-**Private integration status (2026-09-24):** this SDK and the current CPRa working
+**Private integration status:** this SDK and the current CPRa working
 branch implement v2 resource management, incident/monitor controls, audited action
 review, operation reads and observations. Tests exercise these routes through the
 public SDK and real local TLS/Raft servers; selected dashboard flows also run
@@ -15,8 +15,12 @@ connected SDK/server path and a guided browser flow for the versioned file profi
 The shared `collection.Reselect` helper and native `cpractl resume-upload`
 support restarted clients for that profile. Additional source profiles remain
 separate work.
-External-worker server integration remains unfinished; SDK transport fixtures
-for that protocol do not establish server support.
+External-worker server routes and controller dispatch are connected when the
+server is built with `externaljobs` and explicitly enabled. The
+[separate-process tests](../../docs/implementation/worker-dispatch.md#separate-process-verification)
+exercise the real SDK worker runner and CPRa server, including crash recovery
+and result delivery. Final candidate qualification and independent review remain
+pending; local process evidence does not establish provider-account verification.
 
 Discover the connected server's capabilities
 before selecting v2 operations; this working-branch evidence does not establish

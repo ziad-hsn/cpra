@@ -400,9 +400,42 @@ func TestManagementPageByteLimit(t *testing.T) {
 		t.Fatal("response byte bound exceeded", len(raw))
 	}
 	var page managementList
-	_ = json.Unmarshal(raw, &page)
+	if err := json.Unmarshal(raw, &page); err != nil {
+		t.Fatal(err)
+	}
 	if len(page.Items) == 0 || len(page.Items) >= 12 || page.NextCursor == "" {
 		t.Fatal("byte bound did not produce continuation")
+	}
+	seen := make(map[string]bool)
+	for pages := 0; ; pages++ {
+		if pages >= 12 {
+			t.Fatal("pagination did not terminate")
+		}
+		for _, item := range page.Items {
+			if seen[item.Metadata.ID] {
+				t.Fatal("monitor repeated across pages", item.Metadata.ID)
+			}
+			seen[item.Metadata.ID] = true
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		response, raw = f.request(t, "GET", "/api/v2/monitors?cursor="+url.QueryEscape(page.NextCursor), managementOperatorToken, nil, nil)
+		if response.StatusCode != http.StatusOK || len(raw) > managementMaxPageBytes {
+			t.Fatalf("continuation failed: status=%d bytes=%d", response.StatusCode, len(raw))
+		}
+		page = managementList{}
+		if err := json.Unmarshal(raw, &page); err != nil || len(page.Items) == 0 {
+			t.Fatal("invalid continuation", err)
+		}
+	}
+	if len(seen) != 12 {
+		t.Fatal("pagination lost monitors", seen)
+	}
+	for i := 0; i < 12; i++ {
+		if !seen[fmt.Sprintf("m%02d", i)] {
+			t.Fatal("pagination omitted a configured monitor", i)
+		}
 	}
 }
 

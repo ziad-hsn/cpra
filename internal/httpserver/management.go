@@ -546,8 +546,31 @@ func managementPage(ctx context.Context, view snapshotPageView[api.Resource], ki
 	items := make([]api.Resource, 0, min(limit, 16))
 	size := 1024
 	boundary := after
+	var largestResource int
+	var readCost time.Duration
 	for len(items) < limit {
-		batch, next, err := view.Page(ctx, kind, boundary, min(16, limit-len(items)))
+		// Measure one resource before selecting a batch. Catalog reads decrypt and
+		// validate each record, so an oversized batch spends work on rows that
+		// cannot fit in this response. A limit is a maximum, not a page-size promise.
+		batchLimit := 1
+		if len(items) > 0 {
+			batchLimit = min(16, limit-len(items), (managementMaxPageBytes-size)/largestResource)
+			if deadline, ok := ctx.Deadline(); ok && readCost > 0 {
+				// Leave time for the authorization recheck and response encoding.
+				remaining := time.Until(deadline) - 2*time.Second
+				if remaining <= 0 {
+					return items, boundary, nil
+				}
+				if remaining/readCost < time.Duration(batchLimit) {
+					batchLimit = int(remaining / readCost)
+				}
+			}
+			if batchLimit == 0 {
+				return items, boundary, nil
+			}
+		}
+		started := time.Now()
+		batch, next, err := view.Page(ctx, kind, boundary, batchLimit)
 		if err != nil {
 			return nil, "", err
 		}
@@ -560,12 +583,17 @@ func managementPage(ctx context.Context, view snapshotPageView[api.Resource], ki
 				return items, boundary, nil
 			}
 			size += len(raw) + 1
+			largestResource = max(largestResource, len(raw)+1)
 			items = append(items, resource)
 			boundary = resource.Metadata.ID
 		}
 		if next == "" {
 			return items, "", nil
 		}
+		if len(batch) == 0 {
+			return nil, "", management.ErrUnavailable
+		}
+		readCost = max(readCost, time.Since(started)/time.Duration(len(batch)))
 	}
 	return items, boundary, nil
 }

@@ -26,6 +26,20 @@ with chart version `0.1.0-rc.1`. Its application and image tag retain the leadin
 `sdk/go/worker/v0.1.0-rc.1`. These are selected versions, not available downloads.
 Source review, candidate freeze and qualification must finish before publication.
 
+Qualification runners need a stable wall clock as well as an elapsed-time clock.
+Collection ownership, retention and cursor publication compare the observation
+time with committed timestamps. A backward wall-clock step can therefore make an
+already committed result temporarily unavailable. CPRa does not rewrite the
+result timestamp or publish it with an observation that precedes completion.
+The validation reader retries a stale observation once; if the clock still
+precedes the committed result, it returns `503 unavailable`.
+
+Before repeating a clock-sensitive campaign, compare wall-clock changes with
+monotonic elapsed time and inspect the runner's synchronization status. Preserve
+the failed execution and clock measurements. Stabilize the runner's time
+synchronization before claiming the complete campaign passed; removing the
+clock checks or changing test assertions is not qualification.
+
 ## Private evidence assessment
 
 `scripts/release/qualification.py` collects the packaging, SDK consumer, external

@@ -4,6 +4,7 @@ package management
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 
@@ -35,7 +36,8 @@ func (c *Catalog) prepareJobTypeReferences(ctx context.Context, resource api.Res
 }
 
 func (c *Catalog) authenticateJobTypeReferences(ctx context.Context, resource api.Resource, record persistence.CatalogRecord) error {
-	refs, err := c.resourceJobTypeReferences(ctx, resource, false)
+	// Catalog.open has already strictly validated the authenticated resource.
+	refs, err := c.collectJobTypeReferences(ctx, resource, false, c.store.LookupJobTypeVersion, json.Unmarshal)
 	if err != nil {
 		if ctx != nil && ctx.Err() != nil {
 			return ctx.Err()
@@ -61,6 +63,10 @@ func (c *Catalog) resourceJobTypeReferences(ctx context.Context, resource api.Re
 type jobTypeVersionLookup func(context.Context, string, string) (persistence.JobTypeVersionView, bool, error)
 
 func (c *Catalog) lookupJobTypeReferences(ctx context.Context, resource api.Resource, preparing bool, lookup jobTypeVersionLookup) ([]persistence.JobTypeReference, error) {
+	return c.collectJobTypeReferences(ctx, resource, preparing, lookup, api.StrictDecode)
+}
+
+func (c *Catalog) collectJobTypeReferences(ctx context.Context, resource api.Resource, preparing bool, lookup jobTypeVersionLookup, decode func([]byte, any) error) ([]persistence.JobTypeReference, error) {
 	if ctx == nil {
 		return nil, ErrValidation
 	}
@@ -68,19 +74,50 @@ func (c *Catalog) lookupJobTypeReferences(ctx context.Context, resource api.Reso
 		return nil, err
 	}
 	var refs []persistence.JobTypeReference
-	err := visitDrivers(&resource, func(category string, driver *api.DriverConfig) error {
+	visit := func(category string, driver api.DriverConfig) error {
 		if driver.Type != "external" {
 			return nil
 		}
-		ref, err := c.externalJobTypeReference(ctx, category, *driver, preparing, lookup)
+		ref, err := c.externalJobTypeReference(ctx, category, driver, preparing, lookup)
 		if err != nil {
 			return err
 		}
 		refs = append(refs, ref)
 		return nil
-	})
-	if err != nil {
-		return nil, err
+	}
+	// This path inspects a catalog resource and never changes a driver.
+	// Decode its envelope without rewriting large configuration payloads.
+	switch resource.Kind {
+	case "NotificationEndpoint":
+		var driver api.DriverConfig
+		if decode(resource.Spec, &driver) != nil {
+			return nil, ErrValidation
+		}
+		if err := visit("notification", driver); err != nil {
+			return nil, err
+		}
+	case "Monitor":
+		var spec api.MonitorSpec
+		if decode(resource.Spec, &spec) != nil {
+			return nil, ErrValidation
+		}
+		if err := visit("check", spec.Check.Driver); err != nil {
+			return nil, err
+		}
+		if spec.Recovery != nil {
+			if err := visit("recovery", spec.Recovery.Driver); err != nil {
+				return nil, err
+			}
+		}
+		if spec.Notifications != nil {
+			for _, rule := range *spec.Notifications {
+				if rule.Driver != nil {
+					if err := visit("notification", *rule.Driver); err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
 	}
 	return persistence.CanonicalJobTypeReferences(refs)
 }

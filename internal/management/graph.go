@@ -181,6 +181,10 @@ func (c *Catalog) validateGraph(ctx context.Context, view persistence.CatalogVie
 }
 
 func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
+	return resourceReferences(resource, api.StrictDecode)
+}
+
+func resourceReferences(resource api.Resource, decode func([]byte, any) error) ([]persistence.CatalogKey, error) {
 	refs := make(map[persistence.CatalogKey]bool)
 	add := func(kind string, ids ...string) error {
 		for _, id := range ids {
@@ -191,10 +195,28 @@ func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
 		}
 		return nil
 	}
+	addDriver := func(driver api.DriverConfig) error {
+		if driver.CredentialRefs != nil {
+			for _, id := range *driver.CredentialRefs {
+				if err := add("Credential", id); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
 	switch resource.Kind {
+	case "NotificationEndpoint":
+		var driver api.DriverConfig
+		if decode(resource.Spec, &driver) != nil {
+			return nil, ErrValidation
+		}
+		if err := addDriver(driver); err != nil {
+			return nil, err
+		}
 	case "NotificationGroup":
 		var spec api.NotificationGroupSpec
-		if api.StrictDecode(resource.Spec, &spec) != nil {
+		if decode(resource.Spec, &spec) != nil {
 			return nil, ErrValidation
 		}
 		if err := add("NotificationEndpoint", spec.EndpointRefs...); err != nil {
@@ -205,7 +227,7 @@ func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
 		}
 	case "Recipient":
 		var spec api.RecipientSpec
-		if api.StrictDecode(resource.Spec, &spec) != nil {
+		if decode(resource.Spec, &spec) != nil {
 			return nil, ErrValidation
 		}
 		if err := add("NotificationEndpoint", spec.EndpointRefs...); err != nil {
@@ -213,8 +235,16 @@ func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
 		}
 	case "Monitor":
 		var spec api.MonitorSpec
-		if api.StrictDecode(resource.Spec, &spec) != nil {
+		if decode(resource.Spec, &spec) != nil {
 			return nil, ErrValidation
+		}
+		if err := addDriver(spec.Check.Driver); err != nil {
+			return nil, err
+		}
+		if spec.Recovery != nil {
+			if err := addDriver(spec.Recovery.Driver); err != nil {
+				return nil, err
+			}
 		}
 		if spec.NotificationGroupRefs != nil {
 			if err := add("NotificationGroup", (*spec.NotificationGroupRefs)...); err != nil {
@@ -223,6 +253,11 @@ func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
 		}
 		if spec.Notifications != nil {
 			for _, rule := range *spec.Notifications {
+				if rule.Driver != nil {
+					if err := addDriver(*rule.Driver); err != nil {
+						return nil, err
+					}
+				}
 				if rule.GroupRef != nil {
 					if err := add("NotificationGroup", *rule.GroupRef); err != nil {
 						return nil, err
@@ -240,18 +275,6 @@ func directReferences(resource api.Resource) ([]persistence.CatalogKey, error) {
 				}
 			}
 		}
-	}
-	if err := visitDrivers(&resource, func(_ string, driver *api.DriverConfig) error {
-		if driver.CredentialRefs != nil {
-			for _, id := range *driver.CredentialRefs {
-				if err := add("Credential", id); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}); err != nil {
-		return nil, err
 	}
 	out := make([]persistence.CatalogKey, 0, len(refs))
 	for ref := range refs {

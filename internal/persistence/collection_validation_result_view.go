@@ -8,6 +8,9 @@ import (
 	"github.com/hashicorp/raft"
 )
 
+// ErrCollectionObservationStale identifies a result finalized after the caller's observation.
+var ErrCollectionObservationStale = errors.New("collection observation predates validation result")
+
 // CollectionValidationResultStatus distinguishes absence and pending publication
 // from an original sealed verdict. Its collection commitment is the original
 // public inventory MAC, not the encrypted-input progress digest or source hash.
@@ -129,7 +132,7 @@ func (s *Store) CollectionValidationResultView(ctx context.Context, id, actor st
 	} else {
 		v.receipt = *receipt.Validation
 		if at.Before(v.receipt.FinalizedAt) {
-			return nil, empty, ErrCollectionInvalid
+			return nil, empty, errors.Join(ErrCollectionInvalid, ErrCollectionObservationStale)
 		}
 		if !at.Before(v.receipt.FinalizedAt.AddDate(0, 0, 30)) {
 			return nil, empty, ErrOperationExpired

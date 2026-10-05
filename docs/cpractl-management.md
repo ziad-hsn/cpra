@@ -188,6 +188,12 @@ CLI never follows all pages implicitly. Label selectors are sent to the server;
 an unsupported selector receives an error rather than client-side fleet
 filtering. Expired cursors require a fresh list.
 
+The requested limit is an upper bound. Resource pages can end earlier to stay
+within the 8 MiB response ceiling or the request's read budget. Cursor retries
+retain the original snapshot and starting position; the number of returned
+resources can vary with read cost. Follow `nextCursor` until it is empty to
+complete the ordered traversal.
+
 ```bash
 cpractl get recipients --limit 100 -o json
 cpractl get recipients --limit 100 --cursor RETURNED_CURSOR -o json

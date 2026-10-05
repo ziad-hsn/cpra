@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -277,6 +278,20 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 			limit = 100
 		}
 		view, status, err := m.catalog.CollectionValidationResultView(ctx, id, principal, read.observed)
+		if errors.Is(err, persistence.ErrCollectionObservationStale) {
+			// Validation may commit between recording the read time and capturing
+			// its state. Retry this read once with a fresh observation; a clock that
+			// still predates the stored result cannot publish a successful page.
+			now := m.now().UTC()
+			if now.Before(read.observed) {
+				return read, management.ErrUnavailable
+			}
+			read.observed = now
+			view, status, err = m.catalog.CollectionValidationResultView(ctx, id, principal, read.observed)
+			if errors.Is(err, persistence.ErrCollectionObservationStale) {
+				return read, management.ErrUnavailable
+			}
+		}
 		if err != nil {
 			return read, err
 		}

@@ -177,7 +177,8 @@ func (c *Catalog) open(ctx context.Context, record persistence.CatalogRecord) (a
 	}
 	// Reference edges are cleartext indexes. Authenticate their meaning against
 	// the encrypted resource before trusting them for shared-resource validation.
-	refs, err := directReferences(resource)
+	// ValidateResource already strictly decoded the complete specification above.
+	refs, err := resourceReferences(resource, json.Unmarshal)
 	if err != nil || len(refs) != len(record.References) {
 		c.fail()
 		return api.Resource{}, ErrUnavailable

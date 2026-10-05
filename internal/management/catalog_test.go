@@ -315,3 +315,47 @@ func TestCatalogDetectsUnauthenticatedReferenceIndexAndUnknownKinds(t *testing.T
 		}
 	})
 }
+
+func TestCatalogOpenRejectInvalidSpec(t *testing.T) {
+	for name, rewrite := range map[string]func([]byte) []byte{
+		"duplicate config key": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"url":`), []byte(`"url":"https://first.test","url":`), 1)
+		},
+		"unknown spec field": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"check":`), []byte(`"unexpected":true,"check":`), 1)
+		},
+		"unknown config field": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"url":`), []byte(`"unexpected":true,"url":`), 1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, store := testCatalog(t)
+			monitor := createResource(t, c, resource("Monitor", "service", api.MonitorSpec{
+				Check: api.CheckSpec{Interval: "60s", Timeout: "5s", Driver: api.DriverConfig{
+					Type: "http", Config: json.RawMessage(`{"url":"https://example.test"}`),
+				}},
+			}))
+			record, _, err := store.CatalogGet(persistence.CatalogKey{Kind: monitor.Kind, ID: monitor.Metadata.ID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			plain, err := c.sealer.Open(t.Context(), record.Binding(c.storeID), record.Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer clear(plain)
+			invalid := rewrite(plain)
+			defer clear(invalid)
+			if bytes.Equal(invalid, plain) || !json.Valid(invalid) {
+				t.Fatal("invalid fixture did not change the specification")
+			}
+			record.Payload, err = c.sealer.Seal(t.Context(), record.Binding(c.storeID), invalid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = c.open(t.Context(), record); !errors.Is(err, ErrUnavailable) || c.Ready() {
+				t.Fatal("invalid authenticated configuration reached reference extraction", err)
+			}
+		})
+	}
+}

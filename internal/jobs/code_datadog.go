@@ -64,7 +64,7 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	}
 	body, err := json.Marshal(map[string]interface{}{
 		"title":      "CPRA alert: " + c.Monitor,
-		"text":       c.Message,
+		"text":       c.notificationMessage(c.Message),
 		"alert_type": "error",
 		"tags":       c.Tags,
 	})

@@ -570,6 +570,7 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 			outcome = "timeout"
 		}
 		c := persistence.Command{Kind: "pulse", MonitorID: r.MonitorID, Revision: r.Revision, At: now, Generation: r.Generation, CheckControlRevision: r.CheckControlRevision, Outcome: outcome, Scheduled: r.Scheduled, ExecutionStart: r.ExecutionStart, ExecutionEnd: r.ExecutionEnd, Warning: r.Warning != "", Maintenance: manifest.InMaintenance(state.Maintenance, now), Driver: r.Driver}
+		c.Failure = persistence.NewFailureDiagnostic(jobs.FailureCode(r.Err))
 		if r.Type == "pulse" && managed {
 			guard := projection.guard.Clone()
 			c.Guard = &guard
@@ -966,6 +967,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d.IncidentID, d.CatalogUID, d.Attempt = a.IncidentID, a.CatalogUID, a.Attempt
 			d.DeliveryID, d.EndpointID = a.DeliveryID, a.EndpointID
 			d.NotificationCorrelation = a.NotificationCorrelation
+			d.FailureCode, d.FailureMessage = a.Cause.Code, a.Cause.Message
 			d.Scheduled = a.NotBefore
 			if a.Kind == "code" {
 				d.Deadline = a.Deadline
@@ -1084,6 +1086,9 @@ func (s *DurableSystem) project(ent ecs.Entity, m persistence.Monitor) {
 	state.LastError = nil
 	if m.LastOutcome != "" && m.LastOutcome != "success" {
 		state.LastError = fmt.Errorf("health check %s", m.LastOutcome)
+		if m.LastFailure.Code != "" {
+			state.LastError = fmt.Errorf("%s: %s", m.LastFailure.Code, m.LastFailure.Message)
+		}
 	}
 	state.PulseWarning = ""
 	if m.Warning {

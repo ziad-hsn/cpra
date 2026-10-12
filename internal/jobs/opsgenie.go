@@ -29,7 +29,7 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 	} else if c.Color == "yellow" {
 		priority = "P3"
 	}
-	data := map[string]string{"message": truncateNotification(c.Message, 130), "description": truncateNotification(c.Message, 15000), "alias": alias, "priority": priority}
+	data := map[string]string{"message": truncateNotification(c.notificationMessage(c.Message), 130), "description": truncateNotification(c.notificationMessage(c.Message), 15000), "alias": alias, "priority": priority}
 	target := base
 	if c.Color == "green" {
 		if c.CorrelationKey == "" {
@@ -44,7 +44,7 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 		query.Set("identifierType", "alias")
 		parsed.RawQuery = query.Encode()
 		target = parsed.String()
-		data = map[string]string{"source": "CPRa", "note": truncateNotification(c.Message, 15000)}
+		data = map[string]string{"source": "CPRa", "note": truncateNotification(c.notificationMessage(c.Message), 15000)}
 	}
 	status, raw, err := c.opsgenieRequest(ctx, http.MethodPost, target, data)
 	if err != nil {

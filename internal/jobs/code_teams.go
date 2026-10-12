@@ -45,7 +45,7 @@ func (c *CodeTeamsJob) Execute() (result Result) {
 	payload := map[string]interface{}{"type": "code", "driver": "teams", "color": c.Color}
 	data := map[string]interface{}{"type": "message", "attachments": []interface{}{map[string]interface{}{
 		"contentType": "application/vnd.microsoft.card.adaptive", "content": map[string]interface{}{
-			"type": "AdaptiveCard", "version": "1.2", "body": []interface{}{map[string]interface{}{"type": "TextBlock", "text": c.Message, "wrap": true}}}}}}
+			"type": "AdaptiveCard", "version": "1.2", "body": []interface{}{map[string]interface{}{"type": "TextBlock", "text": c.notificationMessage(c.Message), "wrap": true}}}}}}
 	if err := sendJSON(ctx, http.MethodPost, c.WebhookURL, nil, data); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

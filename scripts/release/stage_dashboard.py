@@ -22,6 +22,7 @@ text = 'Licenses for dependencies in the embedded dashboard.\n'
 for name, content in sorted(notices.items()):
     text += '\n' + '=' * 72 + '\n' + name + '\n' + '=' * 72 + '\n'
     text += content.decode('utf-8') + '\n'
+text = text.rstrip() + '\n'
 (license_dir / 'dashboard.txt').write_text(text)
 (target / 'notices.txt').write_text(text)
 

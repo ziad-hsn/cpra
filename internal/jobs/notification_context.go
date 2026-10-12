@@ -6,6 +6,23 @@ import (
 	"strings"
 )
 
+func bindFailureDiagnostic(job Job, dispatch *Dispatch) {
+	if dispatch.Kind != "code" || dispatch.FailureCode == "" {
+		return
+	}
+	for range 8 {
+		if target, ok := job.(interface{ SetFailureDiagnostic(string, string) }); ok {
+			target.SetFailureDiagnostic(dispatch.FailureCode, dispatch.FailureMessage)
+			return
+		}
+		wrapper, ok := job.(interface{ Unwrap() Job })
+		if !ok {
+			return
+		}
+		job = wrapper.Unwrap()
+	}
+}
+
 func bindNotificationContext(job Job, dispatch *Dispatch) {
 	if dispatch.Kind != "code" {
 		return

@@ -43,14 +43,14 @@ func writeManagementEvents(cmd *cobra.Command, o *options, data []byte) error {
 	}
 	headers := []string{"EVENT", "TIME", "KIND", "ACTION", "ACTOR", "OUTCOME", "REASON", "NOTE", "EVIDENCE REFERENCES"}
 	if o.output == formatWide {
-		headers = append(headers, "MONITOR", "INCIDENT", "EXECUTION REVISION", "CONTROL REVISION")
+		headers = append(headers, "MONITOR", "INCIDENT", "EXECUTION REVISION", "CONTROL REVISION", "FAILURE", "NOTIFICATION CAUSE")
 	}
 	rows := make([][]string, 0, len(page.Items))
 	for _, event := range page.Items {
 		refs, _ := json.Marshal(event.EvidenceRefs)
 		row := []string{managementDisplay(event.ID), managementObservedTime(event.Time), managementDisplay(event.Kind), managementDisplay(event.ActionID), managementDisplay(event.Actor), managementDisplay(event.Outcome), managementDisplay(event.Reason), managementDisplay(event.Note), string(refs)}
 		if o.output == formatWide {
-			row = append(row, managementDisplay(event.MonitorID), managementDisplay(event.IncidentID), managementDisplay(event.ExecutionRevision), managementDisplay(event.ControlRevision))
+			row = append(row, managementDisplay(event.MonitorID), managementDisplay(event.IncidentID), managementDisplay(event.ExecutionRevision), managementDisplay(event.ControlRevision), diagnosticText(event.Failure), diagnosticText(event.Cause))
 		}
 		rows = append(rows, row)
 	}

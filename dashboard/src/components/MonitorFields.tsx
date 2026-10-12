@@ -6,6 +6,7 @@ import { useDashboardSession } from '../auth/SessionBoundary';
 import { CODE_LABELS } from '../theme/tokens';
 import { formatDateTime } from '../lib/format';
 import { DriverFields, ReferencePicker } from './ResourceForms';
+import { FailureDetails } from './FailureDetails';
 
 const noop = () => undefined;
 const record = (value: unknown): Record<string, unknown> => object(value) ? value : {};
@@ -182,6 +183,7 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
     <p>Configured generation: {monitor.metadata.generation ?? 'Unavailable'} · Observed generation: {status?.observedGeneration ?? 'Unavailable'}</p>
     <p>{monitor.metadata.generation !== undefined && monitor.metadata.generation > 0 && status?.observedGeneration === monitor.metadata.generation ? 'The controller reports this configuration generation applied.' : 'Controller application of this saved configuration has not been confirmed.'}</p>
     <p>Observed health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
+    <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>
     <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown actions: {status?.unknownActions ?? 'Unavailable'}</p>

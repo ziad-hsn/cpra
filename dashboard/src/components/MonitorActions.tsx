@@ -1,3 +1,4 @@
+import { FailureDetails } from './FailureDetails';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardSession } from '../auth/SessionBoundary';
@@ -69,6 +70,8 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
       {page.data.items.length === 0 ? <p>No retained actions for this monitor.</p> : <ul className="stack-12">{page.data.items.map(action => <li key={action.id} style={{ overflowWrap: 'anywhere' }}>
         <strong>{action.kind === 'intervention' ? 'Recovery' : action.kind === 'code' ? 'Notification' : action.kind || 'Action'}</strong> · <span className="mono">{action.id}</span>
         <p>Provider outcome: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
+        <FailureDetails diagnostic={action.failure} />
+        <FailureDetails diagnostic={action.cause} label="Notification cause" />
         {action.updatedAt && <p className="muted">Last recorded change: {formatDateTime(action.updatedAt)}</p>}
         {action.recoveryFailure && <p style={{ overflowWrap: 'anywhere' }}>Triggered by confirmed {action.recoveryFailure.driver} recovery failure: attempt {action.recoveryFailure.attempt} of {action.recoveryFailure.maxAttempts}, action {action.recoveryFailure.actionID}, at {formatDateTime(action.recoveryFailure.failedAt)}.</p>}
         {action.agentReceipt && <p style={{ overflowWrap: 'anywhere' }}>Agent {action.agentReceipt.taskID ? `task ${action.agentReceipt.taskID}: ${action.agentReceipt.state}` : `message ${action.agentReceipt.messageID}: accepted`}. Receipt {action.agentReceipt.sequence}, observed {formatDateTime(action.agentReceipt.observedAt)}. Monitor checks establish service health.</p>}

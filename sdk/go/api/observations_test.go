@@ -6,6 +6,24 @@ import (
 	"testing"
 )
 
+func TestFailureDiagnosticObservationRoundTrips(t *testing.T) {
+	raw := []byte(`{"lastFailure":{"code":"dns_failed","message":"The target name could not be resolved."}}`)
+	var status MonitorStatus
+	if err := DecodeResponse(raw, &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.LastFailure == nil || status.LastFailure.Code != "dns_failed" {
+		t.Fatal("safe diagnostic not decoded")
+	}
+	encoded, err := json.Marshal(status)
+	if err != nil || !bytes.Contains(encoded, []byte(`"lastFailure"`)) {
+		t.Fatal("safe diagnostic not encoded", err)
+	}
+	if err := DecodeResponse([]byte(`{"lastFailure":{"code":"dns_failed"}}`), &status); err == nil {
+		t.Fatal("incomplete diagnostic accepted")
+	}
+}
+
 func TestObservationKnownZeroAndOlderOptionalFields(t *testing.T) {
 	for _, value := range []any{Measurement{Available: true}, Percentiles{Available: true}, Operation{ID: "op", State: "committed", Committed: Pointer(int64(0)), Applied: Pointer(int64(0))}} {
 		raw, err := json.Marshal(value)

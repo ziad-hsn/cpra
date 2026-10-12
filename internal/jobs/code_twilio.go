@@ -58,7 +58,7 @@ func (c *CodeTwilioJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "twilio", "color": c.Color}
-	form := url.Values{"To": {c.To}, "From": {c.From}, "Body": {c.Message}}
+	form := url.Values{"To": {c.To}, "From": {c.From}, "Body": {c.notificationMessage(c.Message)}}
 	target, err := notificationURL(c.URL, "https://api.twilio.com/2010-04-01/Accounts/"+url.PathEscape(c.AccountSID)+"/Messages.json")
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}

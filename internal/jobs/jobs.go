@@ -598,7 +598,7 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 		if statusOk {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
-		lastErr = fmt.Errorf("received unexpected status code: %d", resp.StatusCode)
+		lastErr = &HTTPStatusError{Status: resp.StatusCode}
 		if resp.StatusCode < 500 && resp.StatusCode != 429 {
 			break
 		}
@@ -1118,7 +1118,7 @@ func (c *CodeLogJob) Execute() (result Result) {
 		Action:    c.Action,
 		NextSteps: c.NextSteps,
 	}
-	message := buildCodeNotificationMessage(c.Monitor, tpl)
+	message := c.notificationMessage(buildCodeNotificationMessage(c.Monitor, tpl))
 
 	// Ensure the parent directory exists so a configured path whose
 	// directory is missing (e.g. /var/log/cpra) does not fail the write.
@@ -1216,7 +1216,7 @@ func (c *CodePagerDutyJob) Execute() (result Result) {
 		key = "cpra:" + c.ID.String()
 	}
 	data := map[string]interface{}{"routing_key": c.RoutingKey, "event_action": action, "dedup_key": key,
-		"payload": map[string]string{"summary": c.Message, "source": c.Monitor, "severity": codeAlertTemplateFor(c.Color).Severity}}
+		"payload": map[string]string{"summary": c.notificationMessage(c.Message), "source": c.Monitor, "severity": codeAlertTemplateFor(c.Color).Severity}}
 	result.Err = sendJSON(ctx, http.MethodPost, target, nil, data)
 	return
 }
@@ -1246,7 +1246,7 @@ func (c *CodeSlackJob) Execute() (result Result) {
 	ctx, cancel := operationContext(c.Context(), 10*time.Second)
 	defer cancel()
 	result = Result{ID: c.ID, Ent: c.Entity, Payload: map[string]interface{}{"type": "code", "driver": "slack", "color": c.Color}}
-	result.Err = sendJSON(ctx, http.MethodPost, c.WebhookURL, nil, map[string]string{"text": c.Message})
+	result.Err = sendJSON(ctx, http.MethodPost, c.WebhookURL, nil, map[string]string{"text": c.notificationMessage(c.Message)})
 	return
 }
 
@@ -1275,7 +1275,7 @@ func (c *CodeEmailJob) Execute() (result Result) {
 	ctx, cancel := operationContext(c.Context(), 10*time.Second)
 	defer cancel()
 	result = Result{ID: c.ID, Ent: c.Entity, Payload: map[string]interface{}{"type": "code", "driver": "email", "color": c.Color}}
-	result.Err = sendEmail(ctx, c.Config, c.Message)
+	result.Err = sendEmail(ctx, c.Config, c.notificationMessage(c.Message))
 	return
 }
 
@@ -1309,7 +1309,7 @@ func (c *CodeWebhookJob) Execute() (result Result) {
 	if method == "" {
 		method = http.MethodPost
 	}
-	result.Err = sendJSON(ctx, method, c.URL, c.Headers, map[string]string{"monitor": c.Monitor, "color": c.Color, "message": c.Message})
+	result.Err = sendJSON(ctx, method, c.URL, c.Headers, map[string]string{"monitor": c.Monitor, "color": c.Color, "message": c.notificationMessage(c.Message)})
 	return
 }
 
@@ -1346,7 +1346,7 @@ func (c *CodeTelegramJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	body, err := json.Marshal(map[string]string{"chat_id": c.ChatID, "text": c.Message})
+	body, err := json.Marshal(map[string]string{"chat_id": c.ChatID, "text": c.notificationMessage(c.Message)})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
@@ -1387,7 +1387,7 @@ func (c *CodeDiscordJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "discord", "color": c.Color}
-	body, err := json.Marshal(map[string]string{"content": c.Message})
+	body, err := json.Marshal(map[string]string{"content": c.notificationMessage(c.Message)})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

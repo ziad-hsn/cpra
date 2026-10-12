@@ -16,6 +16,7 @@ type ActionView struct {
 
 func actionView(a persistence.ActionRecord) api.Action {
 	out := api.Action{ID: a.ID, MonitorID: a.MonitorID, IncarnationUID: a.CatalogUID, IncidentID: a.IncidentID, ExecutionID: a.ID, ExecutionRevision: a.Revision, State: string(a.State), Kind: a.Kind, Outcome: a.Outcome, ReviewRevision: a.ReviewRevision, Held: a.Held, ExecutorFenced: a.ExecutorFenced, ReceiptID: a.OperationID}
+	out.Failure, out.Cause = failureView(a.Failure), failureView(a.Cause)
 	out.AgentReceipt = agentReceiptView(a.AgentReceipt)
 	out.RecoveryFailure = recoveryFailureView(a.RecoveryFailure)
 	// NotBefore is a scheduling bound, not an action creation timestamp.

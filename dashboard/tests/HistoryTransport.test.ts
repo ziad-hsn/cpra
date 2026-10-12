@@ -46,3 +46,18 @@ it('denies reads locally without the exact history permission', async () => {
   await expect(loadTimeline(session, 'service')).rejects.toMatchObject({ reason: 'forbidden' });
   expect(fetcher).toHaveBeenCalledTimes(count);
 });
+
+it('retains bounded safe failure and notification cause without extra fields', async () => {
+  const failure = { code: 'deadline_exceeded', message: 'The operation did not finish within its deadline.', providerBody: 'private-provider-response' };
+  const cause = { code: 'dns_failed', message: 'The target name could not be resolved.' };
+  const { session } = await timeline({ items: [{ id: 'event-1', monitorID: 'service', time: '2026-10-12T00:00:00Z', kind: 'action_unknown', failure, cause }] });
+  const page = await loadTimeline(session, 'service');
+  expect(page.events[0].failure).toEqual({ code: failure.code, message: failure.message });
+  expect(page.events[0].cause).toEqual(cause);
+  expect(JSON.stringify(page)).not.toContain('private-provider-response');
+});
+
+it.each([{ code: 'invalid\ncode', message: 'safe' }, { code: 'operation_failed', message: 'x'.repeat(257) }, { code: 'operation_failed', message: 'unsafe\u202e' }])('rejects malformed failure diagnostic %j', async failure => {
+  const { session } = await timeline({ items: [{ id: 'event-1', monitorID: 'service', time: '2026-10-12T00:00:00Z', kind: 'action_unknown', failure }] });
+  await expect(loadTimeline(session, 'service')).rejects.toMatchObject({ reason: 'invalid' });
+});

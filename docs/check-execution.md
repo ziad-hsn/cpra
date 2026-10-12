@@ -41,3 +41,29 @@ Missed and overdue scheduled obligations remain in the SLO denominator. Admissio
 retries preserve the original obligation rather than creating a new one, and
 capacity recovery does not erase previously missed cadence slots. Paused monitors
 remain covered by the separate intentional-pause measurements.
+
+## Safe failure diagnostics
+
+The latest failed check reports a `lastFailure` cause code and fixed description
+in the management API. A successful observation clears that current failure.
+Actions report their own `failure` separately from the original notification
+`cause`; incident and action events retain those safe descriptions for the
+existing history period. The SDK, CLI descriptions and dashboard expose the
+same fields. No raw successful-check history is added.
+
+Diagnostics classify typed deadline, cancellation, DNS, TLS, connection,
+permission, HTTP-status and explicit-rejection errors. Other failures receive an
+explicit generic description. Provider response bodies, target addresses,
+filesystem paths and arbitrary error strings are not diagnostic inputs. Messages
+are reviewed constants bounded to 256 bytes, rather than provider text with a
+best-effort redaction pattern.
+
+Notifications include the cause committed with their intent. Reusable job
+prototypes do not acquire a previous delivery's diagnostic. A2A notifications
+receive only the same code and description in their structured context.
+External-worker outcomes receive a generic safe cause or confirmed rejection;
+the worker's private diagnostic payload is not copied into public state.
+
+A failure explanation does not prove whether an external effect occurred. The
+recorded action outcome and investigation hold remain authoritative, including
+unknown outcomes after transport interruption or process restart.

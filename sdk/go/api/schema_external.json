@@ -60,6 +60,9 @@
           "agentReceipt": {
             "$ref": "#/components/schemas/AgentReceipt"
           },
+          "cause": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
+          },
           "conflictingEvidence": {
             "$ref": "#/components/schemas/ActionEvidence"
           },
@@ -80,6 +83,9 @@
             "description": "Whether the original executor is known finished or fenced for review.",
             "type": "boolean",
             "x-go-type-skip-optional-pointer": true
+          },
+          "failure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           },
           "held": {
             "description": "An unresolved action hold; independent of the recorded provider outcome.",
@@ -1497,6 +1503,9 @@
           "agentReceipt": {
             "$ref": "#/components/schemas/AgentReceipt"
           },
+          "cause": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
+          },
           "color": {
             "description": "Original notification Code, when applicable.",
             "type": "string",
@@ -1524,6 +1533,9 @@
             "description": "Original execution revision, never a configuration or control version.",
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "failure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           },
           "id": {
             "type": "string",
@@ -1951,6 +1963,25 @@
           "jobTypeID",
           "version",
           "parameters"
+        ],
+        "type": "object"
+      },
+      "FailureDiagnostic": {
+        "additionalProperties": false,
+        "description": "Bounded safe failure explanation. No provider response body, address, path or credential is included.",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 256,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ],
         "type": "object"
       },
@@ -2754,6 +2785,9 @@
             "format": "date-time",
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "lastFailure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           },
           "observedGeneration": {
             "format": "int64",

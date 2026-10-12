@@ -92,6 +92,9 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		}
 		slices.SortFunc(actions, func(a, b persistence.Action) int { return strings.Compare(a.ID, b.ID) })
 		response["monitor_id"], response["revision"], response["actions"] = id, m.Revision, actions
+		if m.LastFailure.Code != "" {
+			response["last_failure"] = m.LastFailure
+		}
 	}
 	writeJSON(w, 200, response)
 }

@@ -19,10 +19,16 @@ func deliveryStorageFormat(version int) bool {
 }
 
 func requiresDeliveryFormat(m Monitor) bool {
+	if m.LastFailure != (FailureDiagnostic{}) {
+		return true
+	}
 	if m.NotificationVersion != 0 || m.NotificationEpisode != "" || m.NotificationCorrelation != "" || m.NotificationMaintenance || len(m.Policy.NotificationEndpointIDs) != 0 {
 		return true
 	}
 	for _, a := range m.Actions {
+		if a.Failure != (FailureDiagnostic{}) || a.Cause != (FailureDiagnostic{}) {
+			return true
+		}
 		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.NotificationCorrelation != "" || a.EndpointID != "" || !a.QueuedAt.IsZero() || !a.Deadline.IsZero() {
 			return true
 		}
@@ -116,6 +122,9 @@ func (m Monitor) notificationEligible(a Action) bool {
 }
 
 func validateNotificationIdentity(m Monitor, version int) error {
+	if err := m.LastFailure.validate(version); err != nil {
+		return err
+	}
 	if m.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(m.NotificationCorrelation, 256)) {
 		return ErrNotificationIdentity
 	}
@@ -130,6 +139,12 @@ func validateNotificationIdentity(m Monitor, version int) error {
 		return ErrNotificationIdentity
 	}
 	for _, a := range m.Actions {
+		if err := a.Cause.validate(version); err != nil {
+			return err
+		}
+		if err := a.Failure.validate(version); err != nil {
+			return err
+		}
 		if a.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(a.NotificationCorrelation, 256)) {
 			return ErrNotificationIdentity
 		}

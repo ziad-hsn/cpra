@@ -1137,6 +1137,9 @@
             "type": "integer",
             "format": "int64",
             "x-go-type-skip-optional-pointer": true
+          },
+          "lastFailure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           }
         },
         "required": [],
@@ -1505,6 +1508,12 @@
           },
           "recoveryFailure": {
             "$ref": "#/components/schemas/RecoveryFailure"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           }
         },
         "required": [
@@ -1648,6 +1657,12 @@
           },
           "recoveryFailure": {
             "$ref": "#/components/schemas/RecoveryFailure"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
           }
         },
         "required": [
@@ -4443,6 +4458,25 @@
           "stepDurationMs"
         ],
         "additionalProperties": false
+      },
+      "FailureDiagnostic": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "Bounded safe failure explanation. No provider response body, address, path or credential is included.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
       }
     }
   }

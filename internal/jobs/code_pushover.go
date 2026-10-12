@@ -82,7 +82,7 @@ func (c *CodePushoverJob) Execute() (result Result) {
 	form := url.Values{}
 	form.Set("token", c.AppToken)
 	form.Set("user", c.UserKey)
-	form.Set("message", c.Message)
+	form.Set("message", c.notificationMessage(c.Message))
 	if c.Title != "" {
 		form.Set("title", c.Title)
 	}

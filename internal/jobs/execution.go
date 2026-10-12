@@ -19,7 +19,21 @@ type ActionExecution struct {
 // Execution carries the owner context into a private, dispatched job copy.
 // Direct Execute calls use a background parent; each transport still supplies
 // its own finite operation timeout.
-type Execution struct{ parent context.Context }
+type Execution struct {
+	parent                      context.Context
+	failureCode, failureMessage string
+}
+
+func (e *Execution) SetFailureDiagnostic(code, message string) {
+	e.failureCode, e.failureMessage = code, message
+}
+
+func (e *Execution) notificationMessage(message string) string {
+	if e.failureCode != "" && e.failureMessage != "" {
+		return message + "\nCause: " + e.failureCode + " — " + e.failureMessage
+	}
+	return message
+}
 
 func (e *Execution) SetContext(ctx context.Context) { e.parent = ctx }
 func (e *Execution) Context() context.Context {
@@ -39,6 +53,7 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
+	FailureCode, FailureMessage                     string
 	RecoveryFailure                                 *RecoveryFailure
 	ProjectionVersion                               string
 	CheckControlRevision                            string
@@ -84,7 +99,7 @@ func (d *Dispatch) Execute() (r Result) {
 	var finished func() error
 	defer func() {
 		if recover() != nil {
-			r.Err = fmt.Errorf("%s job panicked", d.Kind)
+			r.Err = ErrJobPanic
 		}
 		ended := time.Now()
 		if finished != nil {
@@ -139,6 +154,7 @@ func (d *Dispatch) Execute() (r Result) {
 		j.SetContext(ctx)
 	}
 	bindNotificationContext(d.Job, d)
+	bindFailureDiagnostic(d.Job, d)
 	return d.Job.Execute()
 }
 

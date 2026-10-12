@@ -354,6 +354,9 @@ type Action struct {
 	// AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
 	AgentReceipt *AgentReceipt `json:"agentReceipt,omitempty"`
 
+	// Cause Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	Cause *FailureDiagnostic `json:"cause,omitempty"`
+
 	// ConflictingEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
@@ -362,6 +365,9 @@ type Action struct {
 
 	// ExecutorFenced Whether the original executor is known finished or fenced for review.
 	ExecutorFenced bool `json:"executorFenced"`
+
+	// Failure Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	Failure *FailureDiagnostic `json:"failure,omitempty"`
 
 	// Held An unresolved action hold; independent of the recorded provider outcome.
 	Held           bool   `json:"held"`
@@ -847,6 +853,9 @@ type Event struct {
 	// AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
 	AgentReceipt *AgentReceipt `json:"agentReceipt,omitempty"`
 
+	// Cause Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	Cause *FailureDiagnostic `json:"cause,omitempty"`
+
 	// Color Original notification Code, when applicable.
 	Color string `json:"color,omitempty"`
 
@@ -861,10 +870,13 @@ type Event struct {
 
 	// ExecutionRevision Original execution revision, never a configuration or control version.
 	ExecutionRevision string `json:"executionRevision,omitempty"`
-	ID                string `json:"id"`
-	IncidentID        string `json:"incidentID,omitempty"`
-	Kind              string `json:"kind"`
-	MonitorID         string `json:"monitorID"`
+
+	// Failure Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	Failure    *FailureDiagnostic `json:"failure,omitempty"`
+	ID         string             `json:"id"`
+	IncidentID string             `json:"incidentID,omitempty"`
+	Kind       string             `json:"kind"`
+	MonitorID  string             `json:"monitorID"`
 
 	// Note Operator note recorded with the original audited event; never provider credentials.
 	Note string `json:"note,omitempty"`
@@ -1031,6 +1043,12 @@ type ExternalConfig struct {
 	JobTypeID         string          `json:"jobTypeID"`
 	Parameters        json.RawMessage `json:"parameters"`
 	Version           string          `json:"version"`
+}
+
+// FailureDiagnostic Bounded safe failure explanation. No provider response body, address, path or credential is included.
+type FailureDiagnostic struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // FieldError defines model for FieldError.
@@ -1290,10 +1308,13 @@ type MonitorStatus struct {
 	IncidentID         string      `json:"incidentID,omitempty"`
 	LastCheckLatencyMS Measurement `json:"lastCheckLatencyMs,omitempty"`
 	LastCheckedAt      time.Time   `json:"lastCheckedAt,omitempty"`
-	ObservedGeneration int64       `json:"observedGeneration,omitempty"`
-	SnoozedUntil       time.Time   `json:"snoozedUntil,omitempty"`
-	StatusRevision     string      `json:"statusRevision,omitempty"`
-	UnknownActions     int64       `json:"unknownActions,omitempty"`
+
+	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	LastFailure        *FailureDiagnostic `json:"lastFailure,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty"`
+	StatusRevision     string             `json:"statusRevision,omitempty"`
+	UnknownActions     int64              `json:"unknownActions,omitempty"`
 }
 
 // NotificationEndpoint defines model for NotificationEndpoint.

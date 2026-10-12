@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
 )
@@ -85,6 +87,7 @@ func A2AConnection(job Job) (A2AConfig, bool) {
 // agentAction is an allowlist of committed incident context, not a manifest or
 // an instruction assembled from provider error messages or agent output.
 type agentAction struct {
+	Failure         *agentFailure    `json:"failure,omitempty"`
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
 	SchemaVersion   string           `json:"schemaVersion"`
 	MonitorID       string           `json:"monitorId"`
@@ -97,13 +100,22 @@ type agentAction struct {
 	Attempt         int              `json:"attempt"`
 }
 
+type agentFailure struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 func (d *Dispatch) agentAction() agentAction {
 	role := "intervention"
 	if d.Kind == "code" {
 		role = "notification"
 	}
-	return agentAction{SchemaVersion: "1", MonitorID: d.MonitorID, MonitorUID: d.CatalogUID,
+	action := agentAction{SchemaVersion: "1", MonitorID: d.MonitorID, MonitorUID: d.CatalogUID,
 		Revision: d.Revision, IncidentID: d.IncidentID, ActionID: d.ActionID, Role: role, Color: d.Color, Attempt: d.Attempt, RecoveryFailure: d.RecoveryFailure}
+	if d.Kind == "code" && d.FailureCode != "" {
+		action.Failure = &agentFailure{Code: d.FailureCode, Message: d.FailureMessage}
+	}
+	return action
 }
 
 func (j *A2AJob) validAction(action agentAction) bool {
@@ -118,6 +130,11 @@ func (j *A2AJob) validAction(action agentAction) bool {
 	}
 	if action.Color != "" && action.Color != "red" && action.Color != "yellow" && action.Color != "green" && action.Color != "cyan" {
 		return false
+	}
+	if failure := action.Failure; failure != nil {
+		if action.Role != "notification" || !validA2AIdentity(failure.Code) || len(failure.Code) > 64 || failure.Message == "" || len(failure.Message) > 256 || strings.IndexFunc(failure.Message, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 {
+			return false
+		}
 	}
 	if f := action.RecoveryFailure; f != nil {
 		if action.Role != "notification" || action.Color != "red" || action.IncidentID == "" || !validA2AIdentity(f.ActionID) || f.ActionID == action.ActionID || !validA2AIdentity(f.Driver) || len(f.Driver) > 128 || f.Attempt < 1 || f.Attempt > math.MaxInt32 || f.MaxAttempts < 1 || f.MaxAttempts > math.MaxInt32 || f.FailedAt.IsZero() || f.Outcome != "failure" ||

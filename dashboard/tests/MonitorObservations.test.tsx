@@ -36,3 +36,11 @@ it('preserves measured zero latency without inventing unavailable measurements',
   rerender(<MonitorStatusDetails monitor={monitor({ lastCheckLatencyMs: { available: false, value: 0 } })} />);
   expect(screen.getByText('Last-check latency: Unavailable')).toBeVisible();
 });
+
+it('renders a safe failure and removes it after successful observation', () => {
+  const { rerender } = render(<MonitorStatusDetails monitor={monitor({ lastFailure: { code: 'dns_failed', message: 'The target name could not be resolved.' } })} />);
+  expect(screen.getByText('dns_failed')).toBeVisible();
+  expect(screen.getByText(/The target name could not be resolved/)).toBeVisible();
+  rerender(<MonitorStatusDetails monitor={monitor({ health: 'healthy' })} />);
+  expect(screen.queryByText('dns_failed')).toBeNull();
+});

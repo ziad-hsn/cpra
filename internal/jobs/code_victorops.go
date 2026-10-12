@@ -44,7 +44,7 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 	body, err := json.Marshal(map[string]string{
 		"message_type":  messageType,
 		"entity_id":     c.EntityID,
-		"state_message": c.Message,
+		"state_message": c.notificationMessage(c.Message),
 	})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}

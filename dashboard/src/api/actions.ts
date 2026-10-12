@@ -1,6 +1,7 @@
 import type { Action, ActionReview, AgentReceipt, RecoveryFailure } from './generated';
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
+import { failureView } from './failure';
 
 function invalid(): never { throw new ManagementError('invalid', 'The action response could not be safely identified.'); }
 
@@ -29,6 +30,8 @@ export function recoveryFailureView(value: unknown): RecoveryFailure {
 export function actionView(value: unknown, monitorID: string, expectedID?: string): Action {
   if (!object(value) || typeof value.id !== 'string' || !value.id || value.id.length > 256 || (expectedID && value.id !== expectedID) || value.monitorID !== monitorID || typeof value.state !== 'string' || typeof value.held !== 'boolean' || typeof value.executorFenced !== 'boolean') return invalid();
   const action: Action = { id: value.id, monitorID, state: value.state, held: value.held, executorFenced: value.executorFenced };
+  if (value.failure !== undefined) action.failure = failureView(value.failure);
+  if (value.cause !== undefined) action.cause = failureView(value.cause);
   if (value.agentReceipt !== undefined) action.agentReceipt = agentReceiptView(value.agentReceipt);
   if (value.recoveryFailure !== undefined) action.recoveryFailure = recoveryFailureView(value.recoveryFailure);
   for (const key of ['incarnationUID', 'incidentID', 'kind', 'executionID', 'executionRevision', 'createdAt', 'updatedAt', 'reason', 'receiptID', 'reviewRevision', 'outcome'] as const) {

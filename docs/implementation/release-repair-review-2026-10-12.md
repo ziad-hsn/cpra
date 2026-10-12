@@ -111,3 +111,18 @@ re-review of this final correction remains required.
 The pinned dashboard rebuild passed all 528 tests, type checking, lint and
 embedded-asset regeneration. This remains development evidence; the real-browser
 and final frozen-source qualification gates remain open.
+
+## Safe diagnostic checkpoint
+
+The final snooze correction at `23989e3` passed independent source re-review.
+The subsequent diagnostic implementation uses canonical cause codes/messages,
+format 40/41 gates, immutable queued notification causes, and separate action
+failure outcomes. Current observations, retained events, SDK types, CLI and
+browser views share that contract. Raw provider bodies and error text are not
+copied into these public records.
+
+Focused Go 1.25.0/1.27.1, default/externaljobs and race checks pass, including a
+real Raft snapshot/restart and an HTTP check followed by the production webhook.
+Complete controller, jobs, CLI and SDK API suites pass on Go 1.27.1. The pinned
+frontend rebuild passes 533 tests, types and lint. Independent source review of
+this new checkpoint remains required; these are not frozen release matrices.

@@ -31,7 +31,7 @@ func (c *CodeMattermostJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "mattermost", "color": c.Color}
-	fields := map[string]string{"text": c.Message}
+	fields := map[string]string{"text": c.notificationMessage(c.Message)}
 	if c.Channel != "" {
 		fields["channel"] = c.Channel
 	}

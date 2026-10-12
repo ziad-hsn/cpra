@@ -22,8 +22,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	}
 	r := Result{Monitor: &m}
 	emit := func(kind string, a *Action) {
-		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident()}
+		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident(), Failure: m.LastFailure}
 		if a != nil {
+			e.Failure, e.Cause = a.Failure, a.Cause
 			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
 			if a.RecoveryFailure != nil {
 				v := *a.RecoveryFailure
@@ -217,6 +218,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			m.suppressMaintenanceNotifications(c.At, emit)
 		}
 		a.State, a.Outcome, a.FinishedAt = Succeeded, "accepted", c.At
+		a.Failure = c.Failure
 		if c.Outcome != "success" {
 			a.State, a.Outcome = Failed, "rejected"
 			if c.Ambiguous {
@@ -252,6 +254,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				a.ID = identity(fmt.Sprintf("%s/retry/%d", a.ID, a.Attempt))
 			}
 			a.State, a.Outcome, a.NotBefore = Queued, "", c.At.Add(time.Second*time.Duration(1<<a.Attempt))
+			a.Failure = FailureDiagnostic{}
 			a.StartedAt, a.FinishedAt, a.ExecutorFinishedAt = time.Time{}, time.Time{}, time.Time{}
 			a.ExecutorKind, a.ExecutorSession = "", ""
 			m.Actions[a.ID] = a
@@ -275,7 +278,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.SuccessfulChecks++
 	}
 	m.Generation = c.Generation
-	m.LastCheck, m.LastOutcome = c.At, c.Outcome
+	m.LastCheck, m.LastOutcome, m.LastFailure = c.At, c.Outcome, c.Failure
 	if !c.ExecutionStart.IsZero() && !c.ExecutionEnd.Before(c.ExecutionStart) {
 		m.LastLatency, m.LatencyAvailable = c.ExecutionEnd.Sub(c.ExecutionStart), true
 	}
@@ -480,6 +483,12 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 	}
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
 	if kind == "code" && m.NotificationVersion == DeliveryFormatVersion {
+		if color == "yellow" || color == "red" {
+			a.Cause = m.LastFailure
+			if failure != nil {
+				a.Cause = m.Actions[failure.ActionID].Failure
+			}
+		}
 		a.QueuedAt = at
 		a.NotificationCorrelation = m.NotificationCorrelation
 		a.DeliveryID, a.NotificationEpisode = id, m.NotificationEpisode

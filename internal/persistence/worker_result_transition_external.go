@@ -26,6 +26,9 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		}
 		command := Command{Kind: "pulse", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
 			Generation: in.Generation, CheckControlRevision: in.ControlRevision, Outcome: input.Status, At: at}
+		if deliveryStorageFormat(version) && input.Status != "success" {
+			command.Failure = NewFailureDiagnostic("operation_failed")
+		}
 		// The protocol does not report trustworthy handler timing. Retain actual
 		// health without fabricating execution latency from network/result delay.
 		// A control change still suppresses lifecycle side effects in transition.
@@ -58,8 +61,16 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 	if input.Status == "rejected" || input.Status == "unknown" {
 		outcome = "failure"
 	}
-	result := transitionAtFormat(previous, Command{Kind: "result", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
-		ActionID: in.ActionID, At: at, Outcome: outcome, Retryable: input.Retryable, Ambiguous: input.Status == "unknown"}, version)
+	command := Command{Kind: "result", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
+		ActionID: in.ActionID, At: at, Outcome: outcome, Retryable: input.Retryable, Ambiguous: input.Status == "unknown"}
+	if deliveryStorageFormat(version) && outcome != "success" {
+		code := "operation_failed"
+		if input.Status == "rejected" {
+			code = "rejected"
+		}
+		command.Failure = NewFailureDiagnostic(code)
+	}
+	result := transitionAtFormat(previous, command, version)
 	if result.Monitor == nil || result.Err != nil {
 		return nil, nil, false, false, true
 	}

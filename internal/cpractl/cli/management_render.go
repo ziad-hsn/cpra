@@ -224,7 +224,7 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 		{"Check driver", spec.Check.Driver.Type}, {"Check interval", spec.Check.Interval}, {"Check timeout", spec.Check.Timeout},
 		{"Recovery driver", recovery}, {"Observed health", monitorHealth(resource.Status)}, {"Last checked", checked}, {"Latency ms", latency},
 		{"Snoozed until", snoozed}, {"Incident", strOrDash(status.IncidentID)}, {"Control version", strOrDash(status.ControlRevision)},
-		{"Unknown actions", unknownActions},
+		{"Unknown actions", unknownActions}, {"Last failure", diagnosticText(status.LastFailure)},
 	})
 }
 
@@ -233,4 +233,11 @@ func operationCount(value *int64) string {
 		return "unavailable"
 	}
 	return strconv.FormatInt(*value, 10)
+}
+
+func diagnosticText(d *api.FailureDiagnostic) string {
+	if d == nil || d.Code == "" {
+		return "unavailable"
+	}
+	return d.Code + ": " + d.Message
 }

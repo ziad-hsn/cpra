@@ -52,6 +52,8 @@ type Policy struct {
 }
 
 type Action struct {
+	Cause                   FailureDiagnostic   `json:"cause,omitzero"`
+	Failure                 FailureDiagnostic   `json:"failure,omitzero"`
 	NotificationCorrelation string              `json:"notification_correlation,omitempty"`
 	DeliveryID              string              `json:"delivery_id,omitempty"`
 	NotificationEpisode     string              `json:"notification_episode,omitempty"`
@@ -85,6 +87,7 @@ type Action struct {
 }
 
 type Monitor struct {
+	LastFailure             FailureDiagnostic    `json:"last_failure,omitzero"`
 	NotificationCorrelation string               `json:"notification_correlation,omitempty"`
 	NotificationVersion     int                  `json:"notification_version,omitempty"`
 	NotificationEpisode     string               `json:"notification_episode,omitempty"`
@@ -156,6 +159,7 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	Failure              FailureDiagnostic         `json:"failure,omitzero"`
 	ActionDeadline       time.Time                 `json:"action_deadline,omitzero"`
 	AgentConnection      *AgentConnection          `json:"agent_connection,omitempty"`
 	AgentObservation     *AgentObservationCommand  `json:"agent_observation,omitempty"`
@@ -195,6 +199,8 @@ type Command struct {
 }
 
 type Event struct {
+	Cause                      FailureDiagnostic            `json:"cause,omitzero"`
+	Failure                    FailureDiagnostic            `json:"failure,omitzero"`
 	DeliveryID                 string                       `json:"delivery_id,omitempty"`
 	NotificationEpisode        string                       `json:"notification_episode,omitempty"`
 	EndpointID                 string                       `json:"endpoint_id,omitempty"`
@@ -250,6 +256,14 @@ func identity(parts string) string {
 func validateCommand(c Command) error {
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if c.Failure != (FailureDiagnostic{}) {
+		if (c.Kind != "pulse" && c.Kind != "result") || c.Outcome == "success" {
+			return ErrFailureDiagnostic
+		}
+		if err := c.Failure.validate(commandMinimumFormat(c)); err != nil {
+			return err
+		}
 	}
 	if !c.ActionDeadline.IsZero() && (c.Kind != "start" || !c.ActionDeadline.After(c.At) || c.ActionDeadline.Sub(c.At) > 24*time.Hour) {
 		return ErrNotificationIdentity

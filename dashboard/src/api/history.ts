@@ -1,6 +1,7 @@
 import { api } from './client';
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
+import { failureView } from './failure';
 import { agentReceiptView, recoveryFailureView } from './actions';
 import type { HistoryResponse, MonitorEvent } from './types';
 
@@ -20,6 +21,8 @@ export async function loadTimeline(session: DashboardSession, monitorID: string,
       throw new ManagementError('invalid', 'An event could not be matched to this monitor.');
     }
     const event: MonitorEvent = { id: value.id, monitor_id: monitorID, at: value.time, type: value.kind, revision: typeof value.executionRevision === 'string' ? value.executionRevision : '' };
+    if (value.failure !== undefined) event.failure = failureView(value.failure);
+    if (value.cause !== undefined) event.cause = failureView(value.cause);
     if (value.agentReceipt !== undefined) event.agentReceipt = agentReceiptView(value.agentReceipt);
     if (value.recoveryFailure !== undefined) event.recoveryFailure = recoveryFailureView(value.recoveryFailure);
     for (const [source, target] of [['actor', 'actor'], ['reason', 'reason'], ['note', 'note'], ['actionID', 'action_id'], ['incidentID', 'incident_id'], ['controlRevision', 'control_revision'], ['actionKind', 'kind'], ['color', 'color'], ['outcome', 'outcome']] as const) {

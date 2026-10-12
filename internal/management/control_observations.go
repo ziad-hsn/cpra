@@ -126,6 +126,7 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		status.IncidentID = current.IncidentID
 		status.SnoozedUntil = current.SnoozedUntil
 		status.LastCheckedAt = current.LastCheck
+		status.LastFailure = failureView(current.LastFailure)
 		status.UnknownActions = int64(current.UnknownActions)
 		status.LastCheckLatencyMS = api.Measurement{Available: current.LatencyAvailable, Reason: "notObserved"}
 		if current.LatencyAvailable {
@@ -150,4 +151,11 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		return api.Resource{}, ctxErr
 	}
 	return resource, err
+}
+
+func failureView(d persistence.FailureDiagnostic) *api.FailureDiagnostic {
+	if d.Code == "" {
+		return nil
+	}
+	return &api.FailureDiagnostic{Code: d.Code, Message: d.Message}
 }

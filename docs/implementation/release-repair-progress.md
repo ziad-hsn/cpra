@@ -3,7 +3,7 @@
 Plan: [approved release repairs](release-repair-plan.md).
 Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
-Updated: 2026-10-12. The candidate is not frozen or publicly qualified.
+Updated: 2026-10-13. The candidate is not frozen or publicly qualified.
 
 All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
@@ -235,3 +235,24 @@ never reached the callback. Both now use valid static configurations; their
 intended cancellation, expiry and unknown-delivery checks pass three repeated
 runs. No production shutdown or routing guard was relaxed. The broader run
 remains failed evidence, not a passing final-source matrix.
+
+Source review closed both deployment-command corrections at `b431ec9`. It
+identified three verification follow-ups: notification status was being used
+as a health-check cause, body rejection codes could replace received HTTP
+status, and body-read errors discarded received headers. Response metadata
+now wraps the safe cause separately; it never grants retry permission. The
+report retains received status and logical rejection code independently.
+Real Telegram HTTP 200 rejection and delayed-body fixtures, tagged Teams
+throttling and committed webhook-unknown action checks pass. A first delayed
+receiver fixture left its request body unread and timed out during teardown;
+draining that body repairs the fixture, and the corrected check passes. Canonical
+persisted diagnostic messages and format versions are unchanged. Independent
+source re-review remains required.
+
+The broader default application run passed the root package and most leaf
+packages, but failed the three fixture/report checks above and timed out the
+persistence package at the locally supplied ten-minute limit. Its alarm fired
+during a fresh recovery case, not an established deadlock. The repository's
+existing suite budget is 45 minutes; a complete persistence rerun uses that
+budget. Neither the timed-out run nor mixed working-source inventories count
+as final-source qualification.

@@ -18,8 +18,12 @@ func (notificationReadFailure) Close() error             { return nil }
 func TestNotificationBodyFailurePreservesTimeoutWithoutResponseText(t *testing.T) {
 	err := notificationResponseError("telegram", &http.Response{StatusCode: 200, Header: make(http.Header), Body: notificationReadFailure{}})
 	var rejection *DeliveryError
+	var response *NotificationResponseError
 	if !errors.Is(err, context.DeadlineExceeded) || errors.As(err, &rejection) || FailureCode(err) != "deadline_exceeded" {
 		t.Fatal("body timeout lost cause or authorized repetition", err)
+	}
+	if !errors.As(err, &response) || response.Status != 200 {
+		t.Fatal("received headers were lost after body timeout", err)
 	}
 }
 
@@ -65,6 +69,10 @@ func TestNotificationProviderRejectionContract(t *testing.T) {
 			err := notificationResponseError(tc.provider, response)
 			if (err == nil) != tc.success {
 				t.Fatal("incorrect success disposition", err)
+			}
+			var received *NotificationResponseError
+			if err != nil && (!errors.As(err, &received) || received.Status != tc.status || FailureCode(err) == "unexpected_http_status") {
+				t.Fatal("received status confused with health failure or body outcome", err)
 			}
 			var rejection *DeliveryError
 			if errors.As(err, &rejection) != tc.rejected {

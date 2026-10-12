@@ -234,13 +234,61 @@ func TestReportRecordsProvenRejectionWithoutRetrying(t *testing.T) {
 	}
 	for _, row := range r.Records {
 		if row.Kind == "code" && row.Name == "slack" {
-			if row.Status != "fail" || row.HTTPStatus != http.StatusForbidden || row.Outcome != "rejected" || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
+				if row.Status != "fail" || row.HTTPStatus != http.StatusForbidden || row.RejectionCode != http.StatusForbidden || row.Outcome != "rejected" || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
 				t.Fatal("documented rejection was lost or repeated", row, invoked.Load())
 			}
 			return
 		}
 	}
 	t.Fatal("configured Slack case missing from the report")
+}
+
+func TestReportRetainsReceivedStatusForBodyRejectionAndReadFailure(t *testing.T) {
+	for _, mode := range []string{"body-rejection", "body-timeout"} {
+		t.Run(mode, func(t *testing.T) {
+			cfg, _ := localHTTPScenario(t)
+			var invoked atomic.Int64
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.Copy(io.Discard, r.Body)
+				invoked.Add(1)
+				w.WriteHeader(http.StatusOK)
+				if mode == "body-rejection" {
+					_, _ = io.WriteString(w, `{"ok":false,"error_code":400,"description":"PRIVATE_RESPONSE_TEXT"}`)
+					return
+				}
+				_, _ = io.WriteString(w, `{"private":"PRIVATE_RESPONSE_TEXT`)
+				w.(http.Flusher).Flush()
+				<-r.Context().Done()
+			}))
+			t.Cleanup(target.Close)
+			cfg.Manifest.Monitors[0].Codes = manifest.Codes{"red": {Notify: "telegram", Dispatch: true, Config: &manifest.CodeNotificationTelegram{URL: target.URL, BotToken: "fixture-token", ChatID: "fixture-chat"}}}
+			cfg.Cases[0].Kind, cfg.Cases[0].Driver, cfg.Cases[0].Color = "code", "telegram", "red"
+			cfg.Cases[0].Timeout = 2 * time.Second
+			r, err := Run(context.Background(), cfg, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "rejected"
+			code := 400
+			if mode == "body-timeout" {
+				want = "unknown"
+				code = 0
+			}
+			for _, row := range r.Records {
+				if row.Kind == "code" && row.Name == "telegram" {
+					if row.Status != "fail" || row.HTTPStatus != http.StatusOK || row.RejectionCode != code || row.Outcome != want || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
+						t.Fatal("received status or effect certainty was lost", row, invoked.Load())
+					}
+					data, _ := json.Marshal(row)
+					if strings.Contains(string(data), "PRIVATE_RESPONSE_TEXT") || strings.Contains(string(data), "fixture-token") {
+						t.Fatal("provider response or credential escaped into report")
+					}
+					return
+				}
+			}
+			t.Fatal("configured Telegram case missing from the report")
+		})
+	}
 }
 
 func TestReferencedEndpointPlaceholdersAreNotInvoked(t *testing.T) {

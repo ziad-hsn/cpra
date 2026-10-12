@@ -19,7 +19,9 @@ so that report always has `observed: false`.
 
 Reports retain `configured`, `operation_invoked`, `accepted`, `observed`, timing,
 classification and evidence hashes. `http_status` records a received HTTP status;
-network failures do not invent one. `outcome` reports accepted, rejected or
+network failures do not invent one. `rejection_code` records the provider's
+logical rejection separately, including one carried in an HTTP 200 body.
+Received headers remain available after a body-read failure. `outcome` reports accepted, rejected or
 unknown effect certainty (failed for a check). A generic webhook HTTP 500 or 429
 can retain its observed status while leaving the effect unknown. That status
 does not authorize replay or establish delivery.

@@ -6,8 +6,16 @@ Source review of `29273ac..52f4e9d` found two deployment-command defects:
 the inherited container snippets omitted required release/Compose inputs, and
 the fresh management start command rejected the initializer's empty manifest.
 The incomplete snippets are removed in favour of the complete container guide;
-the native start command now includes `-allow-empty`. Re-review of these two
-corrections remains required.
+the native start command now includes `-allow-empty`. Source re-review at
+`b431ec9` closed both corrections.
+
+The verification review at `6669e7b` confirmed conservative retry ownership,
+but found separate diagnostic and reporting defects: the unknown response
+wrapper selected a health-check message, logical body rejection replaced the
+received HTTP status, and body-read failure discarded received headers. The
+follow-up separates safe response metadata from rejection evidence and health
+cause selection. Real network/report regressions and a committed unknown-action
+regression pass; source re-review of that follow-up remains required.
 
 The reviewer reported no additional actionable contradiction in the bounded
 availability, dated archives, navigation exceptions or source-reference

@@ -15,14 +15,30 @@ import (
 
 const maxNotificationResponse = 64 << 10
 
+// NotificationResponseError retains received response metadata independently
+// of the provider's outcome evidence. Only its wrapped DeliveryError, if any,
+// can establish rejection; Status is never retry permission.
+type NotificationResponseError struct {
+	Status int
+	cause  error
+}
+
+func (e *NotificationResponseError) Error() string { return e.cause.Error() }
+func (e *NotificationResponseError) Unwrap() error { return e.cause }
+
 func unknownNotificationResponse(status int) error {
-	return fmt.Errorf("notification outcome unknown: %w", &HTTPStatusError{Status: status})
+	return fmt.Errorf("notification outcome unknown (HTTP %d)", status)
 }
 
 // notificationResponseError interprets only the selected provider's rejection
 // contract. It never replays a request or exposes a provider response body.
-func notificationResponseError(provider string, response *http.Response) error {
+func notificationResponseError(provider string, response *http.Response) (err error) {
 	status := response.StatusCode
+	defer func() {
+		if err != nil {
+			err = &NotificationResponseError{Status: status, cause: err}
+		}
+	}()
 	accepted := status >= 200 && status < 300
 	if status >= 500 || status == http.StatusRequestTimeout || status >= 300 && status < 400 {
 		return unknownNotificationResponse(status)

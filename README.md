@@ -215,6 +215,10 @@ Reports distinguish these results from real-account delivery and recovery.
 
 ## License
 
-CPRa is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
+CPRa code is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
 
-The CPRa name and mark are not covered by the MIT licence. Brand assets, shared light/dark theme colors, usage rules, and their (pending) licence live in [`brand/`](brand/BRANDING.md).
+CPRa-authored artwork by Ziad Hassan is licensed under [CC BY 4.0](brand/ATTRIBUTION.md), with a separate note about the name and endorsement. Third-party fonts retain their own licenses. Brand assets and usage guidance live in [`brand/`](brand/BRANDING.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification guidance,
+[SECURITY.md](SECURITY.md) for private vulnerability reporting, and the
+[code of conduct](CODE_OF_CONDUCT.md) for participation.

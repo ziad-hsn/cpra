@@ -18,7 +18,7 @@ independent review. Failed reproductions and intermediate failures are retained.
 | 5. Access | Go-based `local init --management`, exclusive protected files and localhost CA/leaf certificate; system token-output separation; mode-aware service arguments; minimum 32 printable token characters; explicit access discovery; ignored-bootstrap warning; loopback Host/origin guards; profiling cmdline removal; bounded failed-authentication throttling with 401/Retry-After; CSP/security headers. Local initialization, API/authentication and real application start/create/restart checks pass. Dashboard type checking, lint and tests pass across the full run and focused fixture repairs. | Embedded asset rebuild and required browser qualification; native system service and ACL tests; trusted-operator boundary documentation; independent security review. |
 | 6. Drivers/configuration | File parsers always reject unknown fields and duplicate JSON keys. Shared static driver settings validate required destinations, ranges, gRPC mode and Docker budgets in manifests, management and SDK preflight/new apply, while original-input normalization stays byte-compatible. gRPC health mode uses verified TLS by default, the configured service and SERVING-only success. Docker has separate stop grace and operation budgets. ICMP selects supported privilege mode or rejects the platform. PagerDuty/Opsgenie correlation, closure and severity fixtures pass. Complete jobs/manifest/loader/SDK API/collection suites and focused management checks pass. | Native service-identity ICMP checks; complete driver/provider and process campaign; independent review. |
 | 7. Interfaces/diagnostics | Version and canonical schema explanation routes implemented and authorized; SDK inventory and access discovery generated from canonical inputs; unavailable source time remains omitted. | Failure diagnostics; CLI/dashboard detail and display repairs; unified logging and caller/color handling; dead-path reachability audit; measured idle profile and any warranted loop repair. |
-| 8. Materials/qualification | README begins with protected management initialization. Private compiler/frontend tools installed from recorded checksums. | Remaining documentation, CC BY artwork attribution, contributor/security guidance, generated assets/notices, deployment/package changes, final source freeze and all release gates. |
+| 8. Materials/qualification | README begins with protected management initialization. Private compiler/frontend tools installed from recorded checksums. CC BY 4.0 artwork license, Ziad Hassan attribution and separate name-use note added, with archive/package/image/dashboard notice inputs. Security reporting, contribution and conduct guidance added. | Remaining documentation consolidation, generated assets/notices and packaging verification, final source freeze and all release gates. |
 
 ## Recorded local checks
 
@@ -60,8 +60,17 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
   status-read failures after acceptance remain unknown. The mock-contract
   receiver and its twelve request-oracle tests were updated and pass. These
   fixtures are not provider-account delivery evidence.
+- Artwork/release archive contracts, asset freshness contracts and frontend
+  type checking passed after the licensing changes. The 702-test release-script
+  run passed 700; its failures were an absent compiler on the check's PATH and
+  an old discovery operation count. Archive and native event-reader regressions
+  passed after correcting the environment/count. Documentation reference copies
+  are stale after the source repairs and must be regenerated before strict
+  documentation qualification.
 
-No independent reviewer has signed off this branch. No public branch, tag,
+An independent reviewer agent is inspecting checkpoint `b59d5b8` at the user's
+request. Its findings require repair before any sign-off; this is not a review
+of a final frozen release. No public branch, tag,
 release, module, image, chart or documentation promotion has been performed.
 
 ## External gates

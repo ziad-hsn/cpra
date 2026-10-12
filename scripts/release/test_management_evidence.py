@@ -110,7 +110,7 @@ class ManagementEvidenceTests(unittest.TestCase):
         self.assertEqual(result['unverified'], [])
         self.assertFalse(result['release_gate_passed'])
         for report in result['reports']:
-            self.assertEqual(report['operations'], {'base': 71, 'external_enabled': 82})
+            self.assertEqual(report['operations'], {'base': 72, 'external_enabled': 83})
             self.assertEqual(len(report['variants']), 6)
             for variant in report['variants'][:4]:
                 self.assertEqual(set(variant['native_cli_helpers']), set(management.CLI_TESTS))

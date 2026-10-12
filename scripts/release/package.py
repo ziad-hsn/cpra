@@ -13,6 +13,12 @@ import tarfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+ARTWORK_NOTICES = ('brand/LICENSE', 'brand/ATTRIBUTION.md')
+
+
+def artwork_notices():
+    """Keep the authored-artwork grant separate from third-party licenses."""
+    return {name: (ROOT / name).read_bytes() for name in ARTWORK_NOTICES}
 
 def command(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True)
@@ -73,6 +79,7 @@ def dependency_inventory(tags, binaries=None, go=None, env=None):
         frontend, frontend_notices = dashboard_inventory()
     inventory.extend(frontend)
     notices.update(frontend_notices)
+    notices.update(artwork_notices())
     goroot = Path(subprocess.check_output([go, 'env', 'GOROOT'], env=env, text=True).strip())
     notices['go-toolchain/LICENSE'] = (goroot / 'LICENSE').read_bytes()
     return sorted(inventory, key=lambda x: (x['ecosystem'], x['name'])), notices
@@ -178,6 +185,7 @@ def dashboard_inventory():
     notices.update(wasm_notices)
     inventory.append(bundled_font_inventory())
     notices['fonts/RobotoSlab/LICENSE.txt'] = (ROOT / 'brand/fonts/LICENSE.txt').read_bytes()
+    notices.update(artwork_notices())
     return sorted(inventory, key=lambda x: x['name']), notices
 
 def archive(path, entries, epoch):

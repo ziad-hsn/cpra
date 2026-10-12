@@ -4,6 +4,7 @@ import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { MetricsView } from '../components/MetricsView';
 import { formatDurationNs } from '../lib/format';
 import { useTheme, type ThemePreference } from '../theme/useTheme';
+import artworkAttribution from '../../../brand/ATTRIBUTION.md?raw';
 
 export default function Settings() {
   const { preference, setTheme } = useTheme();
@@ -79,6 +80,11 @@ export default function Settings() {
         <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           <strong>CPRa</strong> checks services, sends alerts, and runs configured recovery actions.
         </p>
+        <p>CPRa artwork by Ziad Hassan, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Application code is MIT; third-party licenses remain intact.</p>
+        <details>
+          <summary>Artwork attribution and name use</summary>
+          <pre className="pre">{artworkAttribution}</pre>
+        </details>
       </div>
     </div>
   );

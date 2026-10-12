@@ -10,6 +10,8 @@ ARG SOURCE_DATE_EPOCH
 COPY --from=runtime-base /etc/passwd /etc/group /payload/etc/
 COPY --from=release /linux_${TARGETARCH}/cpra /linux_${TARGETARCH}/cpractl /payload/usr/local/bin/
 COPY --from=release /linux_${TARGETARCH}/LICENSE /payload/usr/share/licenses/cpra/LICENSE
+COPY --from=release /linux_${TARGETARCH}/brand/LICENSE /payload/usr/share/licenses/cpra/brand/LICENSE
+COPY --from=release /linux_${TARGETARCH}/brand/ATTRIBUTION.md /payload/usr/share/licenses/cpra/brand/ATTRIBUTION.md
 COPY --from=release /linux_${TARGETARCH}/LICENSES/ /payload/usr/share/licenses/cpra/LICENSES/
 COPY --from=release /linux_${TARGETARCH}/THIRD_PARTY_NOTICES/ /payload/usr/share/licenses/cpra/THIRD_PARTY_NOTICES/
 COPY --from=release /linux_${TARGETARCH}/RELEASE.json /linux_${TARGETARCH}/DEPENDENCIES.json /payload/usr/share/cpra/
@@ -36,7 +38,7 @@ LABEL org.opencontainers.image.title="CPRa" \
       org.opencontainers.image.source="https://github.com/ziad-hsn/cpra" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="MIT AND CC-BY-4.0"
 # The pinned base supplies CA certificates. The final image contains only its
 # layers and the normalized payload; no packages are fetched while packaging.
 COPY --from=payload /payload/ /

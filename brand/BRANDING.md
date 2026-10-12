@@ -129,8 +129,13 @@ from 32 and 16 px renders of `cpra-mark-small.svg`.
 
 ## Licence and use of the name
 
-TODO: the artwork licence has not been decided. Until it is, the files in
-this directory are copyright Ziad Hassan, all rights reserved, and are not
-covered by the MIT licence that applies to the source code. You may use the
-unmodified mark to refer to or link to CPRa. The recommended default, once
-decided, is CC BY 4.0 for the artwork with a short trademark note.
+CPRa-authored artwork is copyright Ziad Hassan and licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). You may share and
+adapt it, including commercially, with credit and an indication of changes.
+The geometry and colour guidance above describes the project's own branding;
+it does not add restrictions to the artwork licence.
+
+See [ATTRIBUTION.md](ATTRIBUTION.md) for the covered files, attribution example,
+third-party exclusions and name/endorsement note, and [LICENSE](LICENSE) for the
+complete terms. Application code and theme sources remain MIT. The vendored
+Roboto Slab font retains its Apache-2.0 licence.

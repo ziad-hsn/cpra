@@ -316,7 +316,8 @@ def stage(go, manifest, out, target, dependency_paths=None):
             else: child.unlink()
     binaries=[destination/(name+('.exe' if target.startswith('windows_') else '')) for name in RECIPE['binaries']]
     inventory,notices=package.dependency_inventory(' '.join(RECIPE['build_tags']),binaries,go,environment(go,manifest,target,dependency_paths))
-    for name in ('LICENSE','README.md','go.mod','LICENSES/dashboard.txt','brand/BRANDING.md',
+    for name in ('LICENSE','README.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md',
+                 'go.mod','LICENSES/dashboard.txt','brand/BRANDING.md',*package.ARTWORK_NOTICES,
                  'brand/fonts/LICENSE.txt','brand/dist/svg/cpra-horizontal-dark.svg','brand/dist/svg/cpra-horizontal-color.svg'):
         path=destination/name
         path.parent.mkdir(parents=True,exist_ok=True)
@@ -365,7 +366,7 @@ def compose_bundle(manifest, out):
         if name == '.env.example':
             data = re.sub(rb'(?m)^CPRA_IMAGE=.*$', ('CPRA_IMAGE=ghcr.io/ziad-hsn/cpra:'+manifest['version']).encode(), data)
         entries[name] = (data, False)
-    for name in ('LICENSE',):
+    for name in ('LICENSE', 'SECURITY.md', *package.ARTWORK_NOTICES):
         entries[name] = ((ROOT/name).read_bytes(), False)
     entries['RELEASE.json'] = (encoded(manifest), False)
     guide = (ROOT/'docs/container-helm.md').read_text()

@@ -30,6 +30,9 @@ def config(manifest, out, target, format):
             if item.is_file():
                 contents.append({'src':str(item),'dst':'/usr/share/doc/cpra/'+str(item.relative_to(stage)),
                                  'file_info':{'mode':0o644}})
+    for name in ('brand/LICENSE', 'brand/ATTRIBUTION.md', 'SECURITY.md'):
+        contents.append({'src':str(stage/name),'dst':'/usr/share/doc/cpra/'+name,
+                         'file_info':{'mode':0o644}})
     contents += [{'dst':'/var/lib/cpra','type':'dir','file_info':{'mode':0o700,'owner':'cpra','group':'cpra'}},
                  {'dst':'/etc/cpra','type':'dir','file_info':{'mode':0o750,'owner':'root','group':'cpra'}}]
     scripts={key:str(ROOT/'packaging/linux'/f'{format}-{name}.sh') for key,name in
@@ -38,7 +41,7 @@ def config(manifest, out, target, format):
           'version':version_fields(manifest['version'],format),'version_schema':'none','release':manifest['package_revision'],
           'maintainer':'CPRa maintainers <ziad-hsn@users.noreply.github.com>',
           'description':'Durable single-node monitoring and incident automation.\nConfiguration and durable data are preserved during upgrades and removal.',
-          'homepage':'https://github.com/ziad-hsn/cpra','license':'MIT',
+          'homepage':'https://github.com/ziad-hsn/cpra','license':'MIT AND CC-BY-4.0',
           'mtime':manifest['source_date'],'contents':contents,'scripts':scripts,
           'rpm':{'buildhost':'reproducible.cpra'},
           'depends':['ca-certificates']}

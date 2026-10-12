@@ -39,7 +39,7 @@ class ReleaseTests(unittest.TestCase):
     def test_storage_recipe_matches_current_reader(self):
         self.assertEqual(release.storage_format(release.RECIPE['build_tags']), release.RECIPE['storage_format_version'])
         self.assertNotIn('externaljobs', release.RECIPE['build_tags'])
-        self.assertEqual(release.storage_format(['externaljobs']), 39)
+        self.assertEqual(release.storage_format(['externaljobs']), 41)
 
     def test_manifest_rejects_previous_storage_format_even_with_matching_recipe(self):
         manifest = manifest_fixture()
@@ -227,7 +227,9 @@ class ReleaseTests(unittest.TestCase):
             release.compose_bundle(manifest,root)
             self.assertEqual(path.read_bytes(),first)
             with tarfile.open(path) as archive:
-                self.assertEqual(set(archive.getnames()),{'docker-compose.yml','runtime.yaml','.env.example','LICENSE','RELEASE.json','README.md','OPERATIONS.md'})
+                self.assertEqual(set(archive.getnames()),{'docker-compose.yml','runtime.yaml','.env.example','LICENSE','SECURITY.md',*release.package.ARTWORK_NOTICES,'RELEASE.json','README.md','OPERATIONS.md'})
+                self.assertIn(b'Ziad Hassan', archive.extractfile('brand/ATTRIBUTION.md').read())
+                self.assertEqual(archive.extractfile('brand/LICENSE').read(), (release.ROOT/'brand/LICENSE').read_bytes())
                 self.assertIn(b'CPRA_IMAGE=ghcr.io/ziad-hsn/cpra:v1.2.3',archive.extractfile('.env.example').read())
                 self.assertIn(b'-f docker-compose.yml up -d',archive.extractfile('README.md').read())
 

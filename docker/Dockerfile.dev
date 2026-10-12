@@ -24,6 +24,7 @@ COPY --from=dashboard /src/dashboard/package.json ./dashboard/package.json
 COPY --from=dashboard /src/dashboard/node_modules/ ./dashboard/node_modules/
 COPY --from=dashboard /src/brand/fonts/LICENSE.txt ./brand/fonts/LICENSE.txt
 COPY --from=dashboard /src/brand/fonts/RobotoSlab-Bold.ttf ./brand/fonts/RobotoSlab-Bold.ttf
+COPY --from=dashboard /src/brand/LICENSE /src/brand/ATTRIBUTION.md ./brand/
 ARG TARGETOS
 ARG TARGETARCH
 ARG BUILD_TAGS="redis,postgres,mysql,mongo,rabbitmq,kafka,kubernetes,aws,systemd,teams,twilio"

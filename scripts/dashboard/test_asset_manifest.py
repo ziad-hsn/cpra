@@ -12,7 +12,8 @@ class AssetManifestTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         for name in ("dashboard/src/App.tsx", "dashboard/pnpm-lock.yaml", "internal/httpserver/assets/index.html",
-                     "sdk/go/collection/parse.go", "LICENSES/dashboard.txt", "brand/palette.json", "brand/dist/palette.css"):
+                     "sdk/go/collection/parse.go", "LICENSES/dashboard.txt", "brand/palette.json", "brand/dist/palette.css",
+                     "brand/LICENSE", "brand/ATTRIBUTION.md", "brand/dist/svg/cpra-mark-color.svg", "brand/fonts/LICENSE.txt"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("original")
@@ -37,7 +38,8 @@ class AssetManifestTests(unittest.TestCase):
                     path.write_bytes(old)
 
     def test_shared_palette_changes_require_dashboard_rebuild(self):
-        for name in ("brand/palette.json", "brand/dist/palette.css"):
+        for name in ("brand/palette.json", "brand/dist/palette.css", "brand/LICENSE", "brand/ATTRIBUTION.md",
+                     "brand/dist/svg/cpra-mark-color.svg", "brand/fonts/LICENSE.txt"):
             with self.subTest(name=name):
                 path = self.root / name
                 old = path.read_bytes()

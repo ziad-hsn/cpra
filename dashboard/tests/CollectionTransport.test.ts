@@ -29,9 +29,9 @@ it('binds operation progress to the original optional normalization profile', ()
 });
 async function fixture(handler: (url: string, init: RequestInit) => Promise<Response>, permissions = [...all], options: { maxResponseBytes?: number } = {}) {
   const sent = vi.fn(handler);
-  const fetcher = vi.fn<typeof fetch>(async (url, init = {}) => String(url).endsWith('/self') ? new Headers(init.headers).has('Authorization') ? response({ principalId: 'operator', role: 'operator', permissions }) : response({}, 401) : sent(String(url), init));
+  const fetcher = vi.fn<typeof fetch>(async (url, init = {}) => String(url).endsWith('/access') ? response({ mode: 'management', authenticationRequired: true }) : String(url).endsWith('/self') ? new Headers(init.headers).has('Authorization') ? response({ principalId: 'operator', role: 'operator', permissions }) : response({}, 401) : sent(String(url), init));
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher, ...options });
-  await session.discover(); await session.signIn('fixture-token'); return { session, sent };
+  await session.discover(); await session.signIn('fixture-token-01234567890123456789012345678901'); return { session, sent };
 }
 function body(text: string) { return new PrivateCollectionBody(encoder.encode(text).buffer); }
 
@@ -223,7 +223,7 @@ it('validation page GET uses same-origin auth, a4MiB response ceiling, and clear
   const { session, sent } = await fixture(async (url, init) => {
     expect(url).toBe('https://cpra.example/api/v2/operations/original-1/validation?limit=100');
     expect(init.method).toBe('GET'); expect(init.body).toBeUndefined(); expect(init.redirect).toBe('error');
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fixture-token');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fixture-token-01234567890123456789012345678901');
     return new Response('ignored', { headers: { 'Content-Length': String((4 << 20) + 1) } });
   });
   await expect(readCollectionValidation(session, identity, receipt.id)).rejects.toMatchObject({ reason: 'too-large' });

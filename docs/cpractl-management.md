@@ -503,3 +503,33 @@ The SDK's `collection.Reselect` supplies this upload-only workflow. Its separate
 continue through activation. Freezing identical files again does not recreate
 the original private identity. See the [upload recovery contract](implementation/collection-reselection-runtime.md)
 for server ownership, storage limits and qualification boundaries.
+
+## Continue the original collection through activation
+
+```sh
+cpractl resume operation/OPERATION_ID \
+  -f shared/contacts.yaml -f services/payments.yaml -f config/empty.yaml
+cpractl resume operation/OPERATION_ID --attempt ATTEMPT_ID --wait
+```
+
+`resume` is an explicit continuation of the original operation. It verifies the
+exact raw sources and ordered resource identities using the server-held encrypted
+original identity, fills missing uploads, reconciles the current phase, then
+requests whole-input validation and conditional activation. Complete uploads
+still require verification. Ordinary SDK file inputs retain their empty profile;
+they are not relabeled as `cpra.file.base.v1`. The same 1,000-source, 64 MiB raw
+input and 10,000-resource verification limits apply.
+
+Keep source order, boundaries and contents unchanged, including comments,
+whitespace and empty files. An explicit known attempt uses its already staged
+bytes as authoritative; newly selected files supply only missing source bytes.
+Attempts are disposable and disappear on server restart. The original operation
+handle and committed progress survive. A failed/lost response stops continuation
+and retains the original handle and any known attempt handle. No write is retried
+automatically, and no replacement operation is created.
+
+`--wait` observes the original execution after activation. Canceling the client
+wait never cancels that execution. `resume-upload` remains limited to missing
+uploads and never validates or activates. SDK callers use `collection.ResumeFiles`
+for file-based continuation, or retain the original open `Frozen` for
+`collection.Resume`.

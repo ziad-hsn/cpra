@@ -63,6 +63,14 @@ func nativePrepare(l installpath.Layout, account string) (string, error) {
 	return account, nil
 }
 
+func managementServiceReader(l installpath.Layout, account string) (*int, string, error) {
+	if l.Scope == "user" {
+		return nil, "", nil
+	}
+	_, group, err := darwinIdentity(account)
+	return &group, "", err
+}
+
 func nativeSecure(l installpath.Layout, account string) error {
 	uid, gid := os.Geteuid(), os.Getegid()
 	var err error

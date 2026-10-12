@@ -10,7 +10,7 @@ export function MonitorTimeline({ monitorID }: { monitorID: string }) {
   const [cursors, setCursors] = useState(['']);
   const cursor = cursors[cursors.length - 1];
   const history = useQuery({ queryKey: ['history', monitorID, cursor], queryFn: ({ signal }) => loadTimeline(session, monitorID, cursor, signal), refetchInterval: query => cursor || query.state.data?.next_cursor ? false : 10000 });
-  const legacy = session.getSnapshot().phase === 'legacy';
+  const legacy = session.getSnapshot().phase === 'observation';
   const state = useQuery({ queryKey: ['durable-state', monitorID], queryFn: () => api.getState(monitorID), enabled: legacy, refetchInterval: 5000 });
   const unknown = state.data?.actions.filter(a => a.state === 'unknown') ?? [];
   return <section className='card' aria-label='Monitor event timeline'>

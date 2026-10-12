@@ -65,8 +65,8 @@ func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
 			if err := json.Unmarshal(data, &manifest); err != nil {
 				t.Fatal(err)
 			}
-			if manifest.StateFormat != persistence.CollectionValidationFormatVersion {
-				t.Fatalf("backup does not identify committed state: state_format=%d, want %d (storage container format=%d)", manifest.StateFormat, persistence.CollectionValidationFormatVersion, manifest.StorageFormat)
+			if manifest.StateFormat != persistence.DeliveryFormatVersion {
+				t.Fatalf("backup does not identify committed state: state_format=%d, want %d (storage container format=%d)", manifest.StateFormat, persistence.DeliveryFormatVersion, manifest.StorageFormat)
 			}
 			original, err := readBackupManifest(filepath.Join(backup, "BACKUP.json"))
 			if err != nil {

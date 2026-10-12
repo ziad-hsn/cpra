@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -75,14 +76,14 @@ func proveCollectionReselection(ctx context.Context, catalog *Catalog, id, actor
 	if _, err := catalog.store.CollectionOperationAs(ctx, id, actor, now()); err != nil {
 		return nil, err
 	}
-	view, head, err := catalog.store.CollectionUploadView(ctx, id, now())
+	view, head, err := catalog.store.CollectionInputView(ctx, id, now())
 	if err != nil {
 		return nil, err
 	}
 	if head.Actor != actor || head.Owner == nil || head.Owner.Actor != actor || head.Owner.Epoch != authority.Epoch {
 		return nil, persistence.ErrOperationNotFound
 	}
-	if head.NormalizationProfile != collection.FileNormalizationProfile {
+	if head.NormalizationProfile != "" && head.NormalizationProfile != collection.FileNormalizationProfile {
 		return nil, collection.ErrUnsupportedNormalization
 	}
 	if head.ItemCount > 10_000 {
@@ -232,7 +233,7 @@ func (p *collectionReselectionProof) verifyInventory(ctx context.Context, source
 		}
 		defer r.Close()
 		var visitErr error
-		parseErr := collection.NormalizeFile(ctx, r, p.head.NormalizationProfile, collection.DecodeOptions{SourceName: token}, func(item collection.NormalizedItem) error {
+		parseErr := decodeReselectionSource(ctx, r, p.head.NormalizationProfile, token, func(item collection.NormalizedItem) error {
 			defer clear(item.JSON)
 			visitErr = func() error {
 				if err := p.check(ctx); err != nil {
@@ -296,6 +297,23 @@ func (p *collectionReselectionProof) verifyInventory(ctx context.Context, source
 		return errReselectionInput
 	}
 	return nil
+}
+
+// Unprofiled sources use the ordinary SDK parser. They are never relabeled as
+// a versioned file profile: both raw-source and exact ordered-resource HMACs
+// must match the encrypted original identity before any continuation proceeds.
+func decodeReselectionSource(ctx context.Context, r io.Reader, profile, token string, visit func(collection.NormalizedItem) error) error {
+	options := collection.DecodeOptions{SourceName: token, MaxBytes: 64 << 20, MaxResources: 10_000, MaxResourceBytes: 1 << 20}
+	if profile != "" {
+		return collection.NormalizeFile(ctx, r, profile, options, visit)
+	}
+	return collection.Decode(ctx, r, options, func(item collection.Item) error {
+		raw, err := json.Marshal(item.Resource)
+		if err != nil {
+			return errReselectionInput
+		}
+		return visit(collection.NormalizedItem{ID: item.ID, Location: item.Location, JSON: raw})
+	})
 }
 
 func (p *collectionReselectionProof) verifyPrefix(ctx context.Context, ref stagedItemRef, digest string, raw []byte) error {

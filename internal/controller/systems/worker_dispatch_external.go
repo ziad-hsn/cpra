@@ -117,6 +117,22 @@ func (d *workerDispatcher) prepare(request workerDispatchRequest) (persistence.W
 		return persistence.WorkerDispatchState{}, err
 	}
 	in.Deadline = in.Scheduled.Add(timeout)
+	if in.Category == "notification" {
+		monitor, found, err := d.store.GetContext(ctx, in.MonitorID)
+		if err != nil {
+			return persistence.WorkerDispatchState{}, err
+		}
+		if !found {
+			return persistence.WorkerDispatchState{}, persistence.ErrWorkerExecutionConflict
+		}
+		action, found := monitor.Actions[in.ActionID]
+		if !found || action.CatalogUID != in.MonitorUID || action.Revision != in.MonitorRevision {
+			return persistence.WorkerDispatchState{}, persistence.ErrWorkerExecutionConflict
+		}
+		if !action.Deadline.IsZero() && action.Deadline.Before(in.Deadline) {
+			in.Deadline = action.Deadline
+		}
+	}
 	if !time.Now().Before(in.Deadline) {
 		if in.Category != "check" {
 			if err := d.expireAction(ctx, in); err != nil {

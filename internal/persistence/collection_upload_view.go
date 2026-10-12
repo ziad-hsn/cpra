@@ -26,6 +26,18 @@ func (s *Store) CollectionUploadView(ctx context.Context, id string, at time.Tim
 	return &CollectionUploadView{view: view}, header, nil
 }
 
+// CollectionInputView verifies an original inactive input during upload or
+// validation. It neither claims validation work nor permits upload/activation.
+// Its captured prefix and complete inventory identity remain immutable across
+// validation progress. Mutation paths retain their own phase and authority guards.
+func (s *Store) CollectionInputView(ctx context.Context, id string, at time.Time) (*CollectionUploadView, CollectionState, error) {
+	view, header, err := s.initializeCollectionReadView(ctx, id, at, &CollectionValidationView{store: s, allowPartial: true, inputProof: true})
+	if err != nil {
+		return nil, CollectionState{}, err
+	}
+	return &CollectionUploadView{view: view}, header, nil
+}
+
 // Check rechecks prefix identity, current phase/expiry and storage availability.
 // Supply current observed time and check again after any preparation work; this
 // read is not a reservation against later upload or cancellation commands.

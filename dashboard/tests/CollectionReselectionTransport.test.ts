@@ -18,7 +18,7 @@ async function fixture(handler: (url: string, init: RequestInit) => Promise<Resp
   const sent = vi.fn(handler);
   const fetcher = vi.fn<typeof fetch>(async (url, init = {}) => String(url).endsWith('/self') ? response({ principalId: 'operator', role: 'operator', permissions }) : sent(String(url), init));
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher, ...options });
-  await session.signIn('tab-only-reselection-token');
+  await session.signIn('tab-only-reselection-token-01234567890123456789');
   return { session, sent };
 }
 
@@ -54,12 +54,12 @@ it('uses six fixed contracts with binary sources, an explicit empty end, no CAS 
   expect(requests[2].text).toBe('hello'); expect(requests[3].text).toBe('');
   for (const request of requests) {
     expect(request.init).toMatchObject({ redirect: 'error', cache: 'no-store', credentials: 'omit' });
-    expect(new Headers(request.init.headers).get('Authorization')).toBe('Bearer tab-only-reselection-token');
+    expect(new Headers(request.init.headers).get('Authorization')).toBe('Bearer tab-only-reselection-token-01234567890123456789');
     expect(new Headers(request.init.headers).has('If-Match')).toBe(false);
     expect(request.path).not.toContain('tab-only');
   }
   expect(input.every(byte => byte === 0)).toBe(true);
-  expect(JSON.stringify(session.getSnapshot())).not.toContain('tab-only-reselection-token');
+  expect(JSON.stringify(session.getSnapshot())).not.toContain('tab-only-reselection-token-01234567890123456789');
 });
 
 it('requires discovery and exact current permission, clearing source bytes even before dispatch', async () => {

@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -225,9 +226,12 @@ func TestIncompatibleSnapshotFailsExplicitly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var i image
-	if err = json.Unmarshal(data, &i); err != nil {
+	i, ledger, err := decodeSnapshot(bytes.NewReader(data), "")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if ledger != nil {
+		defer ledger.Close()
 	}
 	i.Version = 999
 	data, _ = json.Marshal(i)

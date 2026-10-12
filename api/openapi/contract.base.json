@@ -3397,6 +3397,35 @@
           }
         ]
       }
+    },
+    "/api/v2/access": {
+      "get": {
+        "operationId": "DiscoverAccess",
+        "summary": "Discover access mode without authenticating",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process access mode only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/AccessDiscovery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

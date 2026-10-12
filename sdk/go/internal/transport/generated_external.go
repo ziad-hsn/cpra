@@ -585,6 +585,11 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// DiscoverAccess Discover access mode without authenticating
+	//
+	// Corresponds with GET /api/v2/access (the `DiscoverAccess` operationId).
+	DiscoverAccess(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListActions ListActions
 	//
 	// Corresponds with GET /api/v2/actions (the `ListActions` operationId).
@@ -1340,6 +1345,21 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v2/version (the `GetVersion` operationId).
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// DiscoverAccess Discover access mode without authenticating
+//
+// Corresponds with GET /api/v2/access (the `DiscoverAccess` operationId).
+func (c *Client) DiscoverAccess(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDiscoverAccessRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListActions ListActions
@@ -3256,6 +3276,33 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewDiscoverAccessRequest constructs an http.Request for the DiscoverAccess method
+func NewDiscoverAccessRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/access")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewListActionsRequest constructs an http.Request for the ListActions method
@@ -7694,6 +7741,13 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// DiscoverAccessWithResponse Discover access mode without authenticating
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/access (the `DiscoverAccess` operationId).
+	DiscoverAccessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DiscoverAccessResponse, error)
+
 	// ListActionsWithResponse ListActions
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -8543,6 +8597,54 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v2/version (the `GetVersion` operationId).
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
+}
+
+type DiscoverAccessResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *externalRef0.AccessDiscovery
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *externalRef0.Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DiscoverAccessResponse) GetJSON200() *externalRef0.AccessDiscovery {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DiscoverAccessResponse) GetApplicationproblemJSONDefault() *externalRef0.Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DiscoverAccessResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DiscoverAccessResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DiscoverAccessResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DiscoverAccessResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListActionsResponse struct {
@@ -12488,6 +12590,19 @@ func (r GetVersionResponse) ContentType() string {
 	return ""
 }
 
+// DiscoverAccessWithResponse Discover access mode without authenticating
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/access (the `DiscoverAccess` operationId).
+func (c *ClientWithResponses) DiscoverAccessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DiscoverAccessResponse, error) {
+	rsp, err := c.DiscoverAccess(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDiscoverAccessResponse(rsp)
+}
+
 // ListActionsWithResponse ListActions
 //
 // Returns a wrapper object for the known response body format(s).
@@ -14032,6 +14147,39 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 		return nil, err
 	}
 	return ParseGetVersionResponse(rsp)
+}
+
+// ParseDiscoverAccessResponse parses an HTTP response from a DiscoverAccessWithResponse call
+func ParseDiscoverAccessResponse(rsp *http.Response) (*DiscoverAccessResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DiscoverAccessResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.AccessDiscovery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListActionsResponse parses an HTTP response from a ListActionsWithResponse call

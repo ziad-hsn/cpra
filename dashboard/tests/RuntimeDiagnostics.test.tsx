@@ -22,6 +22,7 @@ async function fixture(options: { permissions?: string[]; legacy?: boolean; read
     const path = new URL(String(input)).pathname;
     requests.push({ path, method: init?.method ?? 'GET', authorization: new Headers(init?.headers).get('Authorization') });
     if (path === '/api/v2/discovery') return options.legacy ? response({}, 404) : response({ apiVersions: ['cpra.io/v2'], resources: [], drivers: {}, patchTypes: [] });
+    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: options.legacy ? 'observation' : 'management', authenticationRequired: !options.legacy }));
     if (path === '/api/v2/self') return options.legacy ? response({}, 404) : response({ principalId: 'alice', role: 'reader', permissions: options.permissions ?? ['GetState', 'GetReady'] });
     if (path === '/api/v2/state') return response(wire.stateBody, wire.stateStatus);
     if (path === '/api/v2/readyz') return response(wire.readyBody, wire.readyStatus);
@@ -30,7 +31,7 @@ async function fixture(options: { permissions?: string[]; legacy?: boolean; read
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover();
-  if (!options.legacy) await session.signIn('test-token');
+  if (!options.legacy) await session.signIn('test-token-01234567890123456789012345678901');
   render(<SessionBoundary session={session}><RuntimeDiagnostics /></SessionBoundary>);
   return { wire, requests };
 }
@@ -80,7 +81,7 @@ it('shows ready controller and storage separately from stale dashboard projectio
   expect(screen.getByText(/intentionally empty configuration/)).toHaveTextContent('can be ready when the server permits it');
   expect(screen.getByText(/A stale projection/)).toHaveTextContent('does not prove a disk failure');
   expect(requests.every(request => request.method === 'GET')).toBe(true);
-  expect(requests.filter(request => !request.path.endsWith('/self') && !request.path.endsWith('/discovery')).map(request => request.path).sort()).toEqual(['/api/v2/readyz', '/api/v2/state']);
+  expect(requests.filter(request => !['/self', '/access', '/discovery'].some(suffix => request.path.endsWith(suffix))).map(request => request.path).sort()).toEqual(['/api/v2/readyz', '/api/v2/state']);
 });
 
 it('renders the explicit notReady response and draining reason while liveness remains available', async () => {
@@ -113,19 +114,19 @@ it('honors separate state/readiness permissions without trying a legacy route', 
   cleanup();
   const denied = await fixture({ permissions: [] });
   await screen.findByText('Your identity cannot read the readiness endpoint.');
-  expect(denied.requests.filter(request => !request.path.endsWith('/self') && !request.path.endsWith('/discovery'))).toHaveLength(0);
+  expect(denied.requests.filter(request => !['/self', '/access', '/discovery'].some(suffix => request.path.endsWith(suffix)))).toHaveLength(0);
 });
 
 it('uses the limited legacy storage view only for an explicitly discovered legacy server', async () => {
   const { requests } = await fixture({ legacy: true });
   await screen.findByText('Memory (not persistent)');
-  expect(screen.getByText(/Legacy observation mode/)).toBeInTheDocument();
+  expect(screen.getByText(/^Observation mode:/)).toBeInTheDocument();
   expect(valueFor('Admission readiness (state)')).toHaveTextContent(/^Unavailable$/);
   expect(valueFor('Controller initialization and progress')).toHaveTextContent(/^Unavailable$/);
   expect(valueFor('Dashboard projection')).toHaveTextContent(/^Unavailable$/);
   expect(valueFor('Last recorded commit latency')).toHaveTextContent(/^Unavailable$/);
   expect(valueFor('FSM-applied log position')).toHaveTextContent(/^0$/);
-  expect(requests.map(request => request.path)).toEqual(['/api/v2/self', '/api/v1/state']);
+  expect(requests.map(request => request.path)).toEqual(['/api/v2/access', '/api/v1/state']);
   expect(requests.every(request => request.authorization === null && request.method === 'GET')).toBe(true);
 });
 

@@ -21,6 +21,7 @@ async function controls(options: { reader?: boolean; conflict?: boolean; lost?: 
     const path = new URL(String(input)).pathname;
     const method = init?.method ?? 'GET';
     if (path === '/api/v2/discovery') return reply({ apiVersions: ['cpra.io/v2'], resources: [], patchTypes: ['application/merge-patch+json'], drivers: { check: ['tcp'], recovery: [], notification: [] } });
+    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (path === '/api/v2/self') return reply({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions });
     if (method === 'GET') {
       if (path === '/api/v2/monitors/checkout') return reply(monitor);
@@ -40,7 +41,7 @@ async function controls(options: { reader?: boolean; conflict?: boolean; lost?: 
     return reply(path.includes('/incidents/') ? incident : path.endsWith('/checkout') ? monitor : { id: 'control-operation', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true }, 200, { 'X-Operation-ID': 'control-operation' });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('test-token');
+  await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
   render(<MemoryRouter><SessionBoundary session={session}><MonitorControls monitorID="checkout" /></SessionBoundary></MemoryRouter>);
   await screen.findByText(options.disabled ? /^Disabled/ : /^Enabled/);
   return { session, monitor, incident, writes, fetcher };

@@ -114,7 +114,7 @@ func TestCatalogFormatWriterMaximumAndHistoricalDecoder(t *testing.T) {
 			t.Fatal("historical reader minimum was replaced by new writer policy", format, err)
 		}
 	}
-	if commandWriteFormat(commands[0]) != CatalogMutationFormatVersion || commandWriteFormat(commands[1]) != CollectionFormatVersion || commandWriteFormat(Command{Kind: "recover"}) != FormatVersion {
+	if commandWriteFormat(commands[0]) != CatalogMutationFormatVersion || commandWriteFormat(commands[1]) != CollectionFormatVersion || commandWriteFormat(Command{Kind: "recover"}) != DeliveryFormatVersion {
 		t.Fatal("writer policy changed unrelated legacy formats")
 	}
 	seed := Command{Kind: "bootstrap", Bootstrap: &BootstrapCommand{Action: "seed"}}

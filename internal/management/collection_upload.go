@@ -88,7 +88,7 @@ func (c *Catalog) uploadCollectionBatch(ctx context.Context, id, actor string, i
 	}
 	defer prepared.close()
 	maxCommands, maxBytes := c.store.CommandLimits()
-	maxCommands = min(maxCommands, 256, len(items))
+	maxCommands = min(maxCommands, persistence.MaxCollectionApplyItems, len(items))
 	// Historical ownerless operations cannot carry the committed authority
 	// required by UploadFence. Keep their original one-row admission path.
 	if prepared.authority == nil {
@@ -103,7 +103,14 @@ func (c *Catalog) uploadCollectionBatch(ctx context.Context, id, actor string, i
 	}
 	commands := make([]persistence.Command, 0, maxCommands)
 	encodedBytes := 64 // Store.CommandEncodedBound's versioned envelope allowance.
+	resourceBytes := 0
 	for _, item := range items[:maxCommands] {
+		if len(item.Resource) > persistence.MaxCollectionApplyBytes {
+			return 0, ErrValidation
+		}
+		if len(item.Resource) > persistence.MaxCollectionApplyBytes-resourceBytes {
+			break
+		}
 		row, retry, err := prepared.prepareNext(ctx, collectionUploadInput{Ref: stagedItemRef{Ordinal: item.Ordinal, Key: item.Key,
 			Source: item.Source, Document: item.SourceDocument, Item: item.SourceItem}, ContentDigest: item.ContentDigest, Resource: item.Resource}, fence.Uploaded+1)
 		if err != nil {
@@ -132,6 +139,7 @@ func (c *Catalog) uploadCollectionBatch(ctx context.Context, id, actor string, i
 			break
 		}
 		commands = append(commands, command)
+		resourceBytes += len(item.Resource)
 		encodedBytes += bound
 		fence = next
 	}

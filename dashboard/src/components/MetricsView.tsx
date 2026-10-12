@@ -10,7 +10,7 @@ export function MetricsView() {
   const access = useAccess();
   const [display, setDisplay] = useState<Display>({ phase: 'hidden' });
   const pending = useRef<AbortController | null>(null);
-  const permitted = access.phase === 'legacy' || session.can('GetMetrics');
+  const permitted = access.phase === 'observation' || session.can('GetMetrics');
 
   useEffect(() => {
     const unsubscribe = session.onReset(() => {

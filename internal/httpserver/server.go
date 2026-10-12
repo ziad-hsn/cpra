@@ -27,6 +27,7 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/httpauth"
 	"github.com/ziad-hsn/cpra/internal/queue"
 )
 
@@ -165,6 +166,8 @@ func (s *Server) Start() error {
 	var handler http.Handler = s.authMiddleware(mux)
 
 	handler = s.corsMiddleware(handler)
+	handler = failedAuthenticationLimit(handler)
+	handler = s.securityHeaders(handler)
 	s.srv = &http.Server{
 		Addr:         ln.Addr().String(),
 		Handler:      handler,
@@ -289,6 +292,10 @@ func (s *Server) recordHistory() {
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	allow := s.cfg.CORSAllowOrigins
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.anonymousLoopbackConfigured() && !loopbackRequest(r) {
+			http.Error(w, "loopback request required", http.StatusForbidden)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/v2/") {
 			// Management is same-origin and performs its own authentication,
 			// origin and content-type checks. Legacy wildcard CORS grants none.
@@ -342,18 +349,28 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		expected, configured = sha256.Sum256([]byte(s.cfg.AuthToken)), true
 	}
 	matches := func(token string) bool {
+		if _, err := httpauth.HashToken(token); err != nil {
+			return false
+		}
 		digest := sha256.Sum256([]byte(token))
 		return configured && subtle.ConstantTimeCompare(expected[:], digest[:]) == 1
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/v2/access" {
+			if s.anonymousLoopbackConfigured() && !loopbackRequest(r) {
+				http.Error(w, "loopback request required", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.Method == http.MethodGet && (strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/metrics") {
 			ctx, cancel := context.WithTimeout(r.Context(), s.observationTimeout())
 			defer cancel()
 			r = r.WithContext(ctx)
 		}
 		if s.anonymousLoopbackConfigured() && !strings.HasPrefix(r.URL.Path, "/api/v2/") {
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err == nil && net.ParseIP(host).IsLoopback() {
+			if loopbackRequest(r) {
 				w.Header().Set("Cache-Control", "no-store")
 				next.ServeHTTP(w, r)
 				return
@@ -416,6 +433,7 @@ func subtleTimeCompare(a, b string) bool {
 // ---------- routing ----------
 
 func (s *Server) registerAPI(mux *http.ServeMux) {
+	s.registerAccessDiscovery(mux)
 	s.registerManagement(mux)
 	s.registerProbes(mux)
 	mux.HandleFunc("GET /api/v1/history", s.handleHistory)

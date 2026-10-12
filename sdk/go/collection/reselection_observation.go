@@ -47,12 +47,12 @@ func reselectionDigest(s string) bool {
 }
 
 // Metadata is allowlisted and pointers detached; item/provider messages are omitted.
-func reselectionOperation(r *cpra.Response[api.Operation], id string) (api.Operation, error) {
+func reselectionOperation(r *cpra.Response[api.Operation], id string, allowUnprofiled bool) (api.Operation, error) {
 	if r == nil || r.Data.ID != id || r.OperationID != "" && r.OperationID != id {
 		return api.Operation{}, ErrReselectionObservation
 	}
 	o := r.Data
-	if o.IdentityFormat != commitment.Format || o.NormalizationProfile != FileNormalizationProfile {
+	if o.IdentityFormat != commitment.Format || o.NormalizationProfile != FileNormalizationProfile && !(allowUnprofiled && o.NormalizationProfile == "") {
 		return api.Operation{}, ErrUnsupportedNormalization
 	}
 	if !reselectionDigest(o.ContentDigest) || o.ItemCount == nil || *o.ItemCount < 1 || *o.ItemCount > 10_000 || o.Uploaded == nil || *o.Uploaded < 0 || *o.Uploaded > *o.ItemCount || o.RetryAfterSeconds < 0 || o.RetryAfterSeconds > 86400 {
@@ -103,7 +103,7 @@ func reselectionObserve(result *ReselectionResult, r *cpra.Response[api.Collecti
 		return ErrReselectionObservation
 	}
 	a := r.Data
-	if a.OperationID != result.OperationID || !reselectionUUID(a.ID) || attempt != "" && a.ID != attempt || a.NormalizationProfile != FileNormalizationProfile || a.SourceCount < 1 || a.SourceCount > 1000 || a.SourcesCompleted < 0 || a.SourcesCompleted > a.SourceCount || a.RawBytes < 0 || a.RawBytes > reselectionRawBytes || a.NextOffset < 0 || a.NextOffset > a.RawBytes || a.OperationUploaded < *result.Operation.Uploaded || a.OperationUploaded > *result.Operation.ItemCount || a.ExpiresAt.IsZero() || reselectionPhase(a.Phase) < 0 || r.RetryAfter < 0 {
+	if a.OperationID != result.OperationID || !reselectionUUID(a.ID) || attempt != "" && a.ID != attempt || a.NormalizationProfile != result.Operation.NormalizationProfile || a.SourceCount < 1 || a.SourceCount > 1000 || a.SourcesCompleted < 0 || a.SourcesCompleted > a.SourceCount || a.RawBytes < 0 || a.RawBytes > reselectionRawBytes || a.NextOffset < 0 || a.NextOffset > a.RawBytes || a.OperationUploaded < *result.Operation.Uploaded || a.OperationUploaded > *result.Operation.ItemCount || a.ExpiresAt.IsZero() || reselectionPhase(a.Phase) < 0 || r.RetryAfter < 0 {
 		return ErrReselectionObservation
 	}
 	if !time.Now().Before(a.ExpiresAt) {

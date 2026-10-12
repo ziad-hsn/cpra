@@ -29,6 +29,7 @@ async function fixture(options: { state?: string; count?: number; uploaded?: num
   const requests: Request[] = [];
   const fetcher = vi.fn<typeof fetch>(async (input, init = {}) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname.endsWith('/self')) return new Headers(init.headers).has('Authorization')
       ? json({ principalId: 'operator', role: options.reader ? 'reader' : 'operator', permissions: options.permissions ?? Object.keys(operationContracts) }) : json({}, 401);
     if (url.pathname.endsWith('/discovery')) return json({ resourceOperations: { Collection: options.supported ?? steps, Operation: options.supported ?? steps } });
@@ -57,7 +58,7 @@ async function fixture(options: { state?: string; count?: number; uploaded?: num
     return json({}, 404);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('PRIVATE-CONTROL-TOKEN');
+  await session.discover(); await session.signIn('PRIVATE-CONTROL-TOKEN-01234567890123456789012345678901');
   const onProgress = vi.fn();
   const rendered = render(<SessionBoundary session={session}><CollectionOperationControls id={id} identity={expected} operation={{ ...operation }} onProgress={onProgress} /></SessionBoundary>);
   await waitFor(() => expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/discovery'))).toBe(true));

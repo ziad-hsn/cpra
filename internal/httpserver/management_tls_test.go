@@ -34,7 +34,7 @@ func TestManagementServerTLSListenerAndConfiguration(t *testing.T) {
 	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}), 0600); err != nil {
 		t.Fatal(err)
 	}
-	s := New(ServerConfig{Addr: "127.0.0.1:0", TLSCertFile: certFile, TLSKeyFile: keyFile, AuthToken: "tls-listener-fixture"}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	s := New(ServerConfig{Addr: "127.0.0.1:0", TLSCertFile: certFile, TLSKeyFile: keyFile, AuthToken: "tls-listener-fixture-01234567890123456789012345678901"}, fleetview.NewHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	if err := s.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestManagementServerTLSListenerAndConfiguration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, "GET", "https://"+s.srv.Addr+"/api/v1/healthz", nil)
-	req.Header.Set("Authorization", "Bearer tls-listener-fixture")
+	req.Header.Set("Authorization", "Bearer tls-listener-fixture-01234567890123456789012345678901")
 	response, err := fixture.Client().Do(req)
 	if err != nil {
 		t.Fatal("native listener failed TLS handshake", err)

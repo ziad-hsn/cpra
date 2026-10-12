@@ -20,13 +20,14 @@ async function operationFixture(options: { loggedOut?: boolean; permission?: boo
   let current = options.initial ?? receipt();
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return new Headers(init?.headers).has('Authorization') ? json({ principalId: 'reader', role: 'reader', permissions: options.permission === false ? [] : ['GetOperation'] }) : json({}, 401);
     if (url.pathname === `/api/v2/operations/${id}`) return json(current, options.status ?? 200, options.retryAfter ? { 'Retry-After': options.retryAfter } : {});
     return json({}, 404);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover();
-  if (!options.loggedOut) await session.signIn('reader-token');
+  if (!options.loggedOut) await session.signIn('reader-token-01234567890123456789012345678901');
   const router = createMemoryRouter([{ path: '/operations/:id?', element: <SessionBoundary session={session}><OperationDetail /></SessionBoundary> }], { initialEntries: [`/operations/${id}`] });
   render(<RouterProvider router={router} />);
   return { session, router, fetcher, change: (value: Operation) => { current = value; }, reads: () => fetcher.mock.calls.filter(([url]) => String(url).includes('/api/v2/operations/')) };
@@ -192,7 +193,7 @@ it('preserves an operation address through sign-in after a refresh and clears th
   const state = await operationFixture({ loggedOut: true });
   expect(screen.getByRole('heading', { name: 'Sign in to CPRa' })).toBeInTheDocument();
   expect(state.reads()).toHaveLength(0);
-  fireEvent.change(screen.getByLabelText('Bearer token'), { target: { value: 'reader-token' } });
+  fireEvent.change(screen.getByLabelText('Bearer token'), { target: { value: 'reader-token-01234567890123456789012345678901' } });
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   expect(await screen.findByRole('region', { name: 'Operation receipt' })).toBeInTheDocument();
   expect(state.router.state.location.pathname).toBe('/operations/original-operation');

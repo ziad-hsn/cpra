@@ -10,6 +10,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/btree"
@@ -42,7 +43,7 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
-		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
 			return batch, errors.New("optional commands require their own storage format")
 		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
@@ -79,6 +80,8 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
+	collectionUpload *collectionUploadTransaction // Apply-owned; never snapshot authority.
+	health           atomic.Pointer[controllerHealthState]
 	// Apply owns this across its outside-mu verification and mutation phases.
 	// Restore takes the same gate before replacing the authoritative generation.
 	transition                    sync.Mutex
@@ -117,6 +120,7 @@ func (f *machine) Apply(log *raft.Log) any {
 	defer f.transition.Unlock()
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	defer f.publishControllerHealth()
 	if f.err != nil {
 		return f.err
 	}
@@ -147,11 +151,12 @@ func (f *machine) Apply(log *raft.Log) any {
 	results := make([]Result, 0, len(batch.Commands))
 	var events []Event
 	var at time.Time
-	for _, c := range batch.Commands {
+	for commandIndex := 0; commandIndex < len(batch.Commands); commandIndex++ {
+		c := batch.Commands[commandIndex]
 		if c.At.After(at) {
 			at = c.At
 		}
-		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion {
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion {
 			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
 		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
@@ -227,6 +232,20 @@ func (f *machine) Apply(log *raft.Log) any {
 			continue
 		}
 		if c.Kind == "collection" {
+			if c.Collection.Action == "upload" {
+				count := collectionUploadGroup(batch.Commands[commandIndex:])
+				group, groupEvents, latest := f.applyCollectionUploadGroup(batch.Commands[commandIndex:commandIndex+count], batch.Version)
+				if f.err != nil {
+					return f.err
+				}
+				results = append(results, group...)
+				events = append(events, groupEvents...)
+				if latest.After(at) {
+					at = latest
+				}
+				commandIndex += count - 1
+				continue
+			}
 			r := f.applyCollection(*c.Collection, c.At, batch.Version)
 			if f.err != nil {
 				return f.err
@@ -328,7 +347,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			}
 		}
 		r := transitionAtFormat(f.image.Monitors[c.MonitorID], c, batch.Version)
-		if c.Kind == "pulse" && r.Monitor != nil && notificationStorageFormat(batch.Version) {
+		if r.Monitor != nil && (deliveryStorageFormat(batch.Version) || c.Kind == "pulse" && notificationStorageFormat(batch.Version)) {
 			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 		}
 		if c.Kind == "start" && c.Driver == "a2a" && r.Allowed {
@@ -497,6 +516,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 		if err := validateMonitorControls(m); err != nil {
 			return i, err
 		}
+		if err := validateNotificationIdentity(m, i.Version); err != nil {
+			return i, err
+		}
 		if err := m.Policy.Validate(); err != nil {
 			return i, err
 		}
@@ -586,6 +608,7 @@ func (f *machine) Restore(reader io.ReadCloser) error {
 	// hints; authoritative resources come from the restored snapshot and replay.
 	f.catalogChanges, f.catalogSequence = nil, 0
 	f.catalogEpoch++
+	f.publishControllerHealth()
 	return nil
 }
 

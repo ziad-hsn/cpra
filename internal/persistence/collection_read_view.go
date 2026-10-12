@@ -20,6 +20,7 @@ type CollectionValidationView struct {
 	store        *Store
 	header       CollectionState
 	allowPartial bool // Set only by the protected upload-view constructor.
+	inputProof   bool // Reads an immutable input while validation advances.
 	attempt      *CollectionValidationRequestFence
 }
 
@@ -48,6 +49,10 @@ func (s *Store) CollectionValidationAttemptView(ctx context.Context, id string, 
 
 func (s *Store) collectionReadViewForAttempt(ctx context.Context, id string, at time.Time, allowPartial bool, attempt *CollectionValidationRequestFence) (*CollectionValidationView, CollectionState, error) {
 	v := &CollectionValidationView{store: s, allowPartial: allowPartial, attempt: attempt}
+	return s.initializeCollectionReadView(ctx, id, at, v)
+}
+
+func (s *Store) initializeCollectionReadView(ctx context.Context, id string, at time.Time, v *CollectionValidationView) (*CollectionValidationView, CollectionState, error) {
 	if _, _, err := ParseOperationHandle(id); err != nil {
 		return nil, CollectionState{}, err
 	}
@@ -234,7 +239,14 @@ func (v *CollectionValidationView) current(id string, at time.Time) (CollectionS
 	if !at.Before(header.ExpiresAt) {
 		return CollectionState{}, ErrOperationExpired
 	}
-	if v.attempt == nil {
+	if v.inputProof {
+		// This capability verifies original bytes only. It cannot compile a
+		// validation artifact or authorize activation. Any active/terminal phase
+		// ends access; upload identity and captured prefix remain fenced below.
+		if header.Phase != "uploading" && header.Phase != "validating" && header.Phase != "validated" {
+			return CollectionState{}, ErrOperationExpired
+		}
+	} else if v.attempt == nil {
 		if header.Phase != "uploading" || header.ValidationRequest != nil {
 			return CollectionState{}, ErrOperationExpired
 		}

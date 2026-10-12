@@ -27,13 +27,14 @@ async function setup(options: { observation?: ExecutionResultAvailability; permi
   const reads: { url: URL; signal?: AbortSignal | null }[] = [];
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return new Headers(init?.headers).has('Authorization')
       ? json({ principalId: 'operator', role: 'operator', permissions: options.permissions ?? ['GetOperation'] }) : json({}, 401);
     reads.push({ url, signal: init?.signal });
     return options.reply?.(url, init) ?? json(result(url.searchParams.has('cursor')));
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('private-test-token');
+  await session.discover(); await session.signIn('private-test-token-01234567890123456789012345678901');
   const content = options.detail ? <OperationDetail /> : <CollectionExecution id={id} identity={identity} observation={options.observation ?? ready} />;
   const router = createMemoryRouter([{ path: '/operations/:id', element: <SessionBoundary session={session}>{content}</SessionBoundary> }, { path: '/away', element: <p>Away</p> }], { initialEntries: [`/operations/${id}`] });
   render(<RouterProvider router={router} />);

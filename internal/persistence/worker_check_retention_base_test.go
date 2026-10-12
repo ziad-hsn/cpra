@@ -19,7 +19,7 @@ func TestWorkerCheckRetentionDefaultExclusion(t *testing.T) {
 			}
 		}
 	}
-	if supportedFormat(27) || LatestFormatVersion != NotificationFormatVersion {
+	if supportedFormat(27) || LatestFormatVersion != DeliveryFormatVersion {
 		t.Fatal("default storage format changed")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-27\n{}"), ""); err == nil {

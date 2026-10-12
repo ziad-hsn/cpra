@@ -85,6 +85,7 @@ func NewRootCommand() *cobra.Command {
 		newDiffCommand(o),
 		newApplyCommand(o),
 		newResumeUploadCommand(o),
+		newResumeCommand(o),
 		newWaitCommand(o),
 	)
 	addManagementCommands(root, o)

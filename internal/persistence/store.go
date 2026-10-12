@@ -140,6 +140,7 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 		return nil, err
 	}
 	s.fsm = &machine{image: image{Version: FormatVersion, Monitors: make(map[string]Monitor)}, history: h}
+	s.fsm.publishControllerHealth()
 	if config.Storage.Mode == "raft" {
 		s.fsm.collectionDirectory = filepath.Join(config.Storage.Directory, "collections")
 		if err = s.openRaft(ctx); err != nil {
@@ -563,13 +564,13 @@ func (s *Store) Status() Status {
 	return status
 }
 
-// StatusContext observes diagnostics without changing storage health. Waiting
-// for Store/FSM locks follows ctx; an interrupted read never poisons the store.
+// StatusContext observes the published committed health without waiting for the
+// FSM writer or changing storage health. Store lock acquisition follows ctx.
 func (s *Store) StatusContext(ctx context.Context) (Status, error) {
 	if ctx == nil {
 		return Status{}, context.Canceled
 	}
-	unlock, err := s.lockStateContext(ctx, false)
+	unlock, state, err := s.lockHealthObservation(ctx)
 	if err != nil {
 		return Status{}, err
 	}
@@ -577,13 +578,13 @@ func (s *Store) StatusContext(ctx context.Context) (Status, error) {
 	if err := ctx.Err(); err != nil {
 		return Status{}, err
 	}
-	return s.statusLocked(), nil
+	return s.statusObserved(state), nil
 }
 
-// statusLocked observes diagnostic readiness with Store.mu and FSM.mu held.
+// statusObserved observes diagnostic readiness with Store.mu held.
 // Administrative inspection remains available without runtime admission.
-func (s *Store) statusLocked() Status {
-	status := Status{Mode: s.config.Storage.Mode, NodeID: s.nodeID, SingleNode: true, Ready: s.err == nil && s.fsm.err == nil, CommittedIndex: s.fsm.image.Index, CommitLatencyMS: float64(s.lastCommit) / float64(time.Millisecond), SnapshotDurationMS: float64(s.lastSnapshot) / float64(time.Millisecond)}
+func (s *Store) statusObserved(state controllerHealthState) Status {
+	status := Status{Mode: s.config.Storage.Mode, NodeID: s.nodeID, SingleNode: true, Ready: s.err == nil && !state.failed, CommittedIndex: state.index, CommitLatencyMS: float64(s.lastCommit) / float64(time.Millisecond), SnapshotDurationMS: float64(s.lastSnapshot) / float64(time.Millisecond)}
 	select {
 	case <-s.stop:
 		status.Ready = false
@@ -592,18 +593,24 @@ func (s *Store) statusLocked() Status {
 	if s.raft != nil && s.raft.State() != raft.Leader {
 		status.Ready = false
 	}
-	if s.err != nil || s.fsm.err != nil {
+	if s.err != nil || state.failed {
 		status.Error = "durable storage unavailable; inspect local diagnostics"
 	}
-	if s.fsm.bootstrapPending() {
+	if state.bootstrap {
 		status.Ready = false
 		status.Error = "configuration migration is incomplete"
 	}
-	if s.fsm.restorePending() || s.fsm.image.Authentication != nil && s.fsm.image.Authentication.ResetRequired {
+	if state.restore {
 		status.Ready = false
 		status.Error = "explicit restore requires stopped authentication provisioning"
 	}
 	return status
+}
+
+// statusLocked is for authoritative operation reads already holding both
+// Store.mu and FSM.mu. Routine readiness uses statusObserved instead.
+func (s *Store) statusLocked() Status {
+	return s.statusObserved(s.fsm.controllerHealthState())
 }
 
 func (s *Store) Snapshot() error {

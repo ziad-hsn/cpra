@@ -7,7 +7,7 @@ import { api } from '../src/api/client';
 import { dashboardSession } from '../src/api/session';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-beforeEach(() => { vi.spyOn(dashboardSession, 'getSnapshot').mockReturnValue({ phase: 'legacy', epoch: 1 }); });
+beforeEach(() => { vi.spyOn(dashboardSession, 'getSnapshot').mockReturnValue({ phase: 'observation', epoch: 1 }); });
 const wrap = (child: React.ReactNode) => <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{child}</QueryClientProvider>;
 
 it('shows unknown action outcomes without a replay control', async () => {

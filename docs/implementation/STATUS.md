@@ -16,6 +16,12 @@ operator diagnostics and release-material updates. The
 [finding inventory](release-review-findings.md) distinguishes confirmed defects,
 corrected review claims, intentional behavior and pending reproduction.
 
+The [repair progress record](release-repair-progress.md) separates locally checked
+working changes from outstanding implementation, independent review and final
+qualification. The user confirmed that native runner infrastructure, private
+Kubernetes and external provider/agent accounts are not configured. Candidates
+remain private while those and the comparative-performance gates are open.
+
 The baseline candidate, other reviewers' worktrees, original failing
 reproductions, retained evidence and separate documentation checkout are
 preserved. Saving this plan and creating the branch establish no new passing

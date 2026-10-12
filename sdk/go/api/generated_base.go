@@ -9,6 +9,24 @@ import (
 	"time"
 )
 
+// Defines values for AccessDiscoveryMode.
+const (
+	AccessDiscoveryModeManagement  AccessDiscoveryMode = "management"
+	AccessDiscoveryModeObservation AccessDiscoveryMode = "observation"
+)
+
+// Valid indicates whether the value is a known member of the AccessDiscoveryMode enum.
+func (e AccessDiscoveryMode) Valid() bool {
+	switch e {
+	case AccessDiscoveryModeManagement:
+		return true
+	case AccessDiscoveryModeObservation:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ActionReviewResolution.
 const (
 	Accepted     ActionReviewResolution = "accepted"
@@ -224,6 +242,15 @@ func (e RecoveryFailureTrigger) Valid() bool {
 		return false
 	}
 }
+
+// AccessDiscovery Non-sensitive process access mode. Discovery grants no permissions and never converts an authentication failure into observation access.
+type AccessDiscovery struct {
+	AuthenticationRequired bool                `json:"authenticationRequired"`
+	Mode                   AccessDiscoveryMode `json:"mode"`
+}
+
+// AccessDiscoveryMode defines model for AccessDiscovery.Mode.
+type AccessDiscoveryMode string
 
 // AccessInfo The authenticated principal and effective permissions for this request. Notification contacts are separate resources. Missing permissions never grant access.
 type AccessInfo struct {
@@ -628,7 +655,7 @@ type CollectionReselectionAttemptErrorCode string
 // CollectionReselectionAttemptPhase defines model for CollectionReselectionAttempt.Phase.
 type CollectionReselectionAttemptPhase string
 
-// CollectionReselectionCreateRequest Create a disposable attempt owned by the authenticated original operation owner. The explicit base file normalization profile must match the original operation. This request neither extends the original operation expiry nor creates a replacement operation. Attempts are process-local and unavailable after restart.
+// CollectionReselectionCreateRequest Create a disposable original-input verification attempt owned by the authenticated operation owner. The normalization profile must exactly match the original operation, including empty for ordinary SDK file inputs. Exact raw-source and ordered-resource identities are verified before continuation. Complete inactive uploads may be verified during validation; active and terminal operations cannot be changed by this attempt. This request neither extends the original operation expiry nor creates a replacement. Attempts are process-local and unavailable after restart.
 type CollectionReselectionCreateRequest struct {
 	NormalizationProfile string `json:"normalizationProfile"`
 	SourceCount          int64  `json:"sourceCount"`
@@ -1669,9 +1696,9 @@ type ValidationResultSummary struct {
 
 // Version defines model for Version.
 type Version struct {
-	Commit        string    `json:"commit,omitempty"`
-	GoVersion     string    `json:"goVersion,omitempty"`
-	SourceTime    time.Time `json:"sourceTime,omitempty"`
-	StorageFormat int64     `json:"storageFormat,omitempty"`
-	Version       string    `json:"version"`
+	Commit        string     `json:"commit,omitempty"`
+	GoVersion     string     `json:"goVersion,omitempty"`
+	SourceTime    *time.Time `json:"sourceTime,omitempty"`
+	StorageFormat int64      `json:"storageFormat,omitempty"`
+	Version       string     `json:"version"`
 }

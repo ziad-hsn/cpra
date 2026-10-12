@@ -8,12 +8,13 @@ afterEach(() => vi.restoreAllMocks());
 async function timeline(body: unknown, options: { permitted?: boolean; status?: number } = {}) {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async input => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return new Response(JSON.stringify({ principalId: 'alice', role: 'reader', permissions: options.permitted === false ? [] : ['GetHistory'] }));
     if (url.pathname === '/api/v2/discovery') return new Response(JSON.stringify({ apiVersions: ['cpra.io/v2'], resources: [], drivers: {}, patchTypes: [] }));
     return new Response(JSON.stringify(body), { status: options.status ?? 200 });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('test-token');
+  await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
   return { session, fetcher };
 }
 

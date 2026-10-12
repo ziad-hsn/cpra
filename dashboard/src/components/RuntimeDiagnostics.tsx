@@ -9,7 +9,7 @@ const status = (value: boolean | undefined, yes: string, no: string) => value ==
 export function RuntimeDiagnostics() {
   const session = useDashboardSession();
   const access = useAccess();
-  const legacy = access.phase === 'legacy';
+  const legacy = access.phase === 'observation';
   const canReadState = legacy || session.can('GetState');
   const canReadReady = !legacy && session.can('GetReady');
   const state = useQuery({ queryKey: ['runtime-observations', legacy ? 'legacy' : 'v2'], queryFn: ({ signal }) => loadRuntime(session, signal), enabled: canReadState, refetchInterval: 5000, retry: false, gcTime: 0 });
@@ -20,7 +20,7 @@ export function RuntimeDiagnostics() {
     <div className="card-head"><h2 className="card-title">Runtime readiness and progress</h2>
       {(canReadState || canReadReady) && <button className="btn" disabled={state.isFetching || ready.isFetching} onClick={() => { if (canReadState) void state.refetch(); if (canReadReady) void ready.refetch(); }}>Refresh runtime observations</button>}
     </div>
-    {legacy && <p role="status">Legacy observation mode: storage observations are available when reported. Admission readiness, controller progress and projection freshness require the management API.</p>}
+    {legacy && <p role="status">Observation mode: storage observations are available when reported. Admission readiness, controller progress and projection freshness require the management API.</p>}
     {!canReadState ? <p role="status">Your identity cannot read runtime state.</p> : state.isError ? <p role="alert">Runtime state is unavailable. No previous successful observation is shown as current.</p> : state.isPending ? <p role="status">Loading runtime state…</p> : null}
     {!legacy && (!canReadReady ? <p role="status">Your identity cannot read the readiness endpoint.</p> : ready.isError ? <p role="alert">Readiness endpoint is unavailable; readiness could not be determined.</p> : !ready.data ? <p role="status">Loading readiness observation…</p> : <p>Readiness endpoint: <strong>{ready.data.ready ? 'Ready' : 'Not ready'}</strong>{ready.data.generatedAt ? ` · Observed ${formatDateTime(ready.data.generatedAt)}` : ''}.</p>)}
     {current && <>

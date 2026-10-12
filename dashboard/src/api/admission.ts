@@ -103,9 +103,22 @@ function problemMediaType(header: string | null): boolean {
 }
 
 /** Only this validated contract proves that target admission did not occur. */
-export function allocationNotSubmitted(response: Response, value: unknown): boolean {
-  if (response.status !== 503 || response.headers.has('X-Operation-ID') || response.headers.get('X-CPRa-Admission') !== 'not-submitted' || !problemMediaType(response.headers.get('Content-Type')) || !object(value)) return false;
-  if (value.type !== 'about:blank' || value.status !== 503 || value.code !== 'operationAllocationUnconfirmed' || typeof value.title !== 'string' || !value.title.trim()) return false;
+export function admissionNotSubmitted(response: Response, value: unknown, requestPath?: string): boolean {
+  if (response.status !== 503 || response.headers.get('X-CPRa-Admission') !== 'not-submitted' || !problemMediaType(response.headers.get('Content-Type')) || !object(value)) return false;
+  if (value.type !== 'about:blank' || value.status !== 503 || typeof value.title !== 'string' || !value.title.trim()) return false;
+  if (value.code === 'operationAllocationUnconfirmed') {
+    if (response.headers.has('X-Operation-ID')) return false;
+  } else if (value.code === 'admissionUnavailable') {
+    const delay = response.headers.get('Retry-After');
+    if (delay === null || !/^[1-9][0-9]?$/.test(delay) || Number(delay) > 60) return false;
+    const handle = response.headers.get('X-Operation-ID');
+    if (handle !== null) {
+      const parsed = /^op\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9]{20})$/.exec(handle);
+      if (!parsed || BigInt(parsed[2]) === 0n || BigInt(parsed[2]) > 18446744073709551615n) return false;
+      const requested = requestPath?.match(/^\/api\/v2\/operations\/([^/]+)(?:\/|$)/)?.[1];
+      if (requested !== undefined && requested !== handle) return false;
+    }
+  } else return false;
   for (const [name, field] of Object.entries(value)) {
     if (name === 'status') continue;
     if (['type', 'title', 'detail', 'instance', 'code', 'requestID'].includes(name)) {

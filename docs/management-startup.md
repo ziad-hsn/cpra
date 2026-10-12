@@ -1,5 +1,45 @@
 # Starting the management dashboard
 
+For a fresh local installation, run:
+
+```sh
+cpractl local init --management
+```
+
+Use the exact server and CLI commands printed by initialization. The initializer
+creates a named operator verifier, protected bearer file, wrapping key outside
+state, an empty starter manifest and localhost TLS files. It never prints the
+bearer, replaces files, converts an existing store, starts a service or installs
+browser trust. Trust `localhost-ca.pem` explicitly in your browser before opening
+the printed HTTPS address. The local CA signing key is discarded after signing
+the localhost certificate; the leaf certificate is valid for one year. Certificate
+renewal/replacement is a stopped operator procedure, not an implicit init rerun.
+
+System initialization requires `--scope system` and a protected `--token-output`
+outside service configuration and state. That operator bearer is not passed to
+the service. Mode-aware service rendering omits read-only bootstrap-token
+arguments for management configuration.
+
+API tokens need at least 32 printable, non-whitespace characters. Generated tokens
+use 32 random bytes encoded as hexadecimal. Length validation does not establish
+entropy. Existing short tokens require stopped local rotation. Committed
+authority wins on restart, and supplied bootstrap sources that are ignored cause
+a non-sensitive warning; obsolete bootstrap files are not needed for restart.
+
+`GET /api/v2/access` reports only management/observation mode and whether
+authentication is required. It grants no access. Authentication failure remains
+401, including a bounded authentication hold with `Retry-After`; it never
+changes a write into an observation request. Local anonymous observations and
+profiling require approved loopback Host/origin identities. Profiling does not
+serve process command-line arguments.
+
+An operator with credential-use and configuration privileges is trusted to
+select destinations. CPRa does not isolate destinations per credential or claim
+multi-tenant security. Deployment permissions still determine access to local
+sockets, executables and provider accounts.
+
+The remaining manual configuration sections also cover existing installations.
+
 Optional external-job configuration requires a server and consumer built with
 `externaljobs`, explicit runtime enablement, retained JobTypes and separately
 provisioned worker grants. The [configuration procedure](implementation/external-configuration.md)

@@ -60,6 +60,16 @@ type Dispatch struct {
 	ID          uuid.UUID
 }
 
+// NotificationBudget is the overall controller-owned delivery budget. Each
+// built-in HTTP call still has its shorter transport timeout. Agent jobs retain
+// the operator's task budget instead of inheriting the ordinary HTTP limit.
+func NotificationBudget(job Job) time.Duration {
+	if agent := agentJob(job); agent != nil {
+		return agent.taskTimeout
+	}
+	return 45 * time.Second
+}
+
 func NewDispatch(job Job, ent ecs.Entity, kind, color string, generation uint64, endpoint int) *Dispatch {
 	d := &Dispatch{Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
 	if agentJob(d.Job) != nil {

@@ -133,10 +133,13 @@ func TestPolicyDoesNotRetryUnknownOrSuccessfulRecovery(t *testing.T) {
 func TestPolicyLegacyRecoveryBudgetAndFailureEvidence(t *testing.T) {
 	p := testMonitor().Policy
 	p.Intervention = true
-	m := policyPulse(t, configuredPolicyMonitor(t, p), policyTime().Add(time.Second), "failure")
+	config := testMonitor()
+	config.Policy = p
+	m := *transitionAtFormat(Monitor{}, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: policyTime()}, FormatVersion).Monitor
+	m = *transitionAtFormat(m, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, At: policyTime().Add(time.Second), Generation: 1, Outcome: "failure"}, FormatVersion).Monitor
 	a := interventionAction(t, m)
-	m = policyStart(t, m, a, a.NotBefore)
-	m = policyOutcome(t, m, a, a.NotBefore.Add(time.Second), "failure", false)
+	m = *transitionAtFormat(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore}, FormatVersion).Monitor
+	m = *transitionAtFormat(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore.Add(time.Second), Outcome: "failure"}, FormatVersion).Monitor
 	// Reproduce an old serialized record with only InterventionAttempted and
 	// the retained failed action, without either new optional state field.
 	m.InterventionAttempts, m.LastInterventionFailure = 0, time.Time{}

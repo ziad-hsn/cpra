@@ -15,7 +15,7 @@ it('keeps the data view unmounted before sign-in and clears the token input imme
   render(<SessionBoundary session={session}><p>Protected observations</p></SessionBoundary>);
   expect(await screen.findByRole('heading', { name: 'Sign in to CPRa' })).toBeInTheDocument();
   expect(screen.queryByText('Protected observations')).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Bearer token'), { target: { value: 'opaque-token' } });
+  fireEvent.change(screen.getByLabelText('Bearer token'), { target: { value: 'opaque-token-01234567890123456789012345678901' } });
   fireEvent.submit(screen.getByRole('form', { name: 'Dashboard sign-in' }));
   await waitFor(() => expect(screen.getByText('Protected observations')).toBeInTheDocument());
   expect(screen.getByText('alice · Read-only access')).toBeInTheDocument();
@@ -43,9 +43,9 @@ it('uses an empty query cache for a replacement identity and drops late old data
   }
   render(<SessionBoundary session={session}><Observations /></SessionBoundary>);
   await screen.findByRole('heading', { name: 'Sign in to CPRa' });
-  await act(async () => { await session.signIn('alice-token'); });
+  await act(async () => { await session.signIn('alice-token-01234567890123456789012345678901'); });
   await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
-  await act(async () => { session.signOut(); await session.signIn('bob-token'); });
+  await act(async () => { session.signOut(); await session.signIn('bob-token-01234567890123456789012345678901'); });
   expect(await screen.findByText('bob')).toBeInTheDocument();
   await act(async () => { resolveOld(json({ owner: 'alice-private-data' })); });
   expect(screen.queryByText('alice-private-data')).not.toBeInTheDocument();
@@ -56,10 +56,10 @@ it('uses an empty query cache for a replacement identity and drops late old data
 });
 
 it('preserves the observation view when the server has only v1', async () => {
-  const session = new DashboardSession({ origin: 'https://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(json({}, 404)) });
-  render(<SessionBoundary session={session}><p>Legacy observations</p></SessionBoundary>);
-  expect(await screen.findByText('Legacy observations')).toBeInTheDocument();
-  expect(screen.getByText(/Read-only server/)).toBeInTheDocument();
+  const session = new DashboardSession({ origin: 'https://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })) });
+  render(<SessionBoundary session={session}><p>Monitor observations</p></SessionBoundary>);
+  expect(await screen.findByText('Monitor observations')).toBeInTheDocument();
+  expect(screen.getByText(/Observation mode/)).toBeInTheDocument();
   expect(screen.queryByLabelText('Bearer token')).not.toBeInTheDocument();
 });
 
@@ -78,7 +78,7 @@ it('does not queue an offline mutation or retain its secret variables in the que
   }
   render(<SessionBoundary session={session}><Editor /></SessionBoundary>);
   await screen.findByRole('heading', { name: 'Sign in to CPRa' });
-  await act(async () => { await session.signIn('alice-token'); });
+  await act(async () => { await session.signIn('alice-token-01234567890123456789012345678901'); });
   onlineManager.setOnline(false);
   fireEvent.click(screen.getByRole('button', { name: 'Save credential' }));
   expect(await screen.findByText('unconfirmed')).toBeInTheDocument();

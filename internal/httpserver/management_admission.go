@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"net/http"
 )
 
 // StopAdmission first rejects new management commits and marks API readiness
@@ -41,9 +40,13 @@ func (s *Server) admissionStopped() bool {
 	return s.mutationStopped
 }
 
-func mutationUnavailable() error {
-	return managementFailure(http.StatusServiceUnavailable, "admissionUnavailable", "Management is not accepting writes. This request was not admitted.")
-}
+// managementAdmissionError is issued only before the commit callback is invoked.
+// It proves non-submission of this request, not absence of earlier operations.
+type managementAdmissionError struct{}
+
+func (*managementAdmissionError) Error() string { return "admissionUnavailable" }
+
+func mutationUnavailable() error { return &managementAdmissionError{} }
 
 func (s *Server) mutationReady(ctx context.Context) bool {
 	if ctx == nil || ctx.Err() != nil {

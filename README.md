@@ -63,10 +63,26 @@ The integrations example module remains opt-in. An explicit `GOWORK` path or
 
 ```sh
 make
-cp examples/monitors.yaml monitors.yaml
-# Set the service address in monitors.yaml.
-./bin/cpra -yaml monitors.yaml
+export PATH="$PWD/bin:$PATH"
+cpractl local init --management
+# Use the exact start and client commands printed by initialization.
 ```
+
+Initialization creates an intentionally empty manifest, a named operator token,
+its hash policy, a wrapping key, and localhost TLS material in the platform's
+configuration directory. It prints paths and commands, never the bearer value.
+It refuses existing configuration or state and starts no service. System scope
+requires an explicit protected `--token-output` outside service configuration and
+state. [Management startup](docs/management-startup.md) explains the files and
+stopped rotation.
+
+Start CPRa using the printed command, then manually trust the generated local CA
+in your browser and open `https://localhost:8060`. Read the protected operator
+token file locally for browser sign-in. The initializer does not install trust
+roots. The CLI uses `--ca-file` and `--token-file`; credentials belong in neither
+URLs nor command arguments. Add monitors through the dashboard or explicit
+`cpractl apply -f FILE` after startup. Management imports bootstrap manifests once;
+subsequent file edits need an explicit apply.
 
 For direct Go commands, select the workspace explicitly after `make dev-workspace`:
 
@@ -80,9 +96,10 @@ availability or release readiness.
 
 State is durable by default in the platform's user state directory (`cpractl local paths`); Linux system services explicitly use `/var/lib/cpra`. Keep that directory across restarts. An explicit `-data-dir` overrides runtime configuration and the platform default. A legacy `./cpra-data` requires an explicit path or a stopped migration. Use `-runtime-config examples/runtime-memory.yaml` for a disposable run. [Persistence and recovery](docs/durability.md) describes identities, unknown outcomes and complete backups.
 
-Open `http://localhost:8060` using the configured API credentials. The
-[management setup](docs/management-startup.md) enables current SDK commands such
-as `./bin/cpractl get monitors`; those commands use stable resource IDs. Missing or malformed configuration stops startup. Empty configurations require `-allow-empty`.
+The [management setup](docs/management-startup.md) enables current SDK commands
+such as `cpractl get monitors`; those commands use stable resource IDs. Missing
+or malformed configuration stops startup. Empty configurations require
+`-allow-empty`, included in the initialized start command.
 
 The example checks an HTTP endpoint and writes incident transitions to `alerts.jsonl`. Each monitor can specify a check interval, timeout, failure threshold, recovery threshold, notification destinations, and a recovery action. Maintenance windows suppress alerts and recovery while checks continue; they use five-field cron expressions, a duration, and an IANA timezone.
 
@@ -140,7 +157,7 @@ Rebuilding the dashboard requires Node.js 24.21.0, pnpm 11.22.0, and Python 3:
 
 ```sh
 make dashboard-build dashboard-check
-make release VERSION=v0.1.0
+make release VERSION=v0.1.0-rc.1
 ```
 
 The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned
@@ -155,7 +172,7 @@ Versioned installation needs only Go and the committed embedded assets:
 ```sh
 go install github.com/ziad-hsn/cpra@VERSION
 go install github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
-cpractl local init
+cpractl local init --management
 cpra -capabilities
 ```
 

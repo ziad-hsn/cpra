@@ -47,10 +47,13 @@ type Operations interface {
 // never treats a stopped client as a request to undo or cancel server commits.
 type Result struct {
 	OperationID string
-	Operation   api.Operation
-	Preflight   *api.Preflight
-	Validation  *api.ValidationResultSummary
-	Noop        bool
+	// VerificationAttemptID identifies disposable original-file verification.
+	// It remains available on failure for explicit continuation, never a new apply.
+	VerificationAttemptID string
+	Operation             api.Operation
+	Preflight             *api.Preflight
+	Validation            *api.ValidationResultSummary
+	Noop                  bool
 }
 
 // Preflight performs ephemeral, bounded server validation/diff. It does not

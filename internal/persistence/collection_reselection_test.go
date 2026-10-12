@@ -102,7 +102,7 @@ func TestCollectionReselectionHistoricalFormatAndStrictFenceFields(t *testing.T)
 		for version := 1; version <= LatestFormatVersion+1; version++ {
 			raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 			_, err := decodeEnvelope(raw)
-			if (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || externalStorageFormat(version)) {
+			if (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || externalStorageFormat(version)) {
 				t.Fatal("new fields interpreted under historical/future format", version, err)
 			}
 		}
@@ -257,7 +257,7 @@ func TestCollectionReselectionProfileSnapshotAndRetainedReceipt(t *testing.T) {
 	for version := CollectionFormatVersion; version <= LatestFormatVersion; version++ {
 		image := s.fsm.image
 		image.Version = version
-		if err := validateCollectionHeaders(image); (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || externalStorageFormat(version)) {
+		if err := validateCollectionHeaders(image); (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || externalStorageFormat(version)) {
 			t.Fatal("profile snapshot version gate", version, err)
 		}
 	}

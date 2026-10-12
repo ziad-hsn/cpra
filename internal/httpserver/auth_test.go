@@ -15,14 +15,14 @@ func TestCommittedLegacyAuthorityNeverFallsBackToPlaintext(t *testing.T) {
 	s := newTestServer(t)
 	s.cfg.AuthToken = "old-file-token"
 	s.cfg.AuthenticationRequired = true
-	digest := sha256.Sum256([]byte("committed-token"))
+	digest := sha256.Sum256([]byte("committed-token-01234567890123456789012345678901"))
 	s.cfg.LegacyTokenSHA256 = hex.EncodeToString(digest[:])
 	for _, empty := range []bool{false, true} {
 		if empty {
 			s.cfg.LegacyTokenSHA256 = ""
 		}
 		handler := s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) }))
-		for _, token := range []string{"committed-token", "old-file-token", ""} {
+		for _, token := range []string{"committed-token-01234567890123456789012345678901", "old-file-token", ""} {
 			for _, basic := range []bool{false, true} {
 				r := httptest.NewRequest("GET", "/api/v1/state", nil)
 				if basic {
@@ -33,7 +33,7 @@ func TestCommittedLegacyAuthorityNeverFallsBackToPlaintext(t *testing.T) {
 				w := httptest.NewRecorder()
 				handler.ServeHTTP(w, r)
 				want := 401
-				if token == "committed-token" && !empty {
+				if token == "committed-token-01234567890123456789012345678901" && !empty {
 					want = 200
 				}
 				if w.Code != want {
@@ -46,7 +46,7 @@ func TestCommittedLegacyAuthorityNeverFallsBackToPlaintext(t *testing.T) {
 
 func TestAuthenticatedBrowserAndBearerAPI(t *testing.T) {
 	s := newTestServer(t)
-	s.cfg.AuthToken = "local-fixture-token"
+	s.cfg.AuthToken = "local-fixture-token-01234567890123456789012345678901"
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
 	handler := s.corsMiddleware(s.authMiddleware(next))
 	for _, tc := range []struct {

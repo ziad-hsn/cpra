@@ -64,7 +64,7 @@ func (f *reselectionFixture) reply(method string) (*cpra.Response[api.Collection
 }
 func (f *reselectionFixture) CreateReselection(_ context.Context, _ string, r api.CollectionReselectionCreateRequest) (*cpra.Response[api.CollectionReselectionAttempt], error) {
 	f.calls = append(f.calls, "create")
-	if r.SourceCount != int64(len(f.raw)) || r.NormalizationProfile != FileNormalizationProfile {
+	if r.SourceCount != int64(len(f.raw)) || r.NormalizationProfile != f.operation.NormalizationProfile {
 		panic("unexpected source creation identity")
 	}
 	f.received = make([][]byte, len(f.raw))

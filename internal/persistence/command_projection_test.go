@@ -12,11 +12,19 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 	var command Command
 	c := reflect.ValueOf(&command).Elem()
 	frozen := reflect.TypeFor[operationCommandDigestV1]()
-	if c.NumField() != frozen.NumField()+4 {
+	if c.NumField() != frozen.NumField()+5 {
 		t.Fatal("Command gained a field without a reviewed legacy projection")
 	}
 	for n := 0; n < c.NumField(); n++ {
 		field := c.Type().Field(n)
+		if field.Name == "ActionDeadline" {
+			if field.Type != reflect.TypeFor[time.Time]() || field.Tag.Get("json") != "action_deadline,omitzero" {
+				t.Fatal("unreviewed notification deadline shape")
+			}
+			// Deadlines are allowed only for execution starts, never operations
+			// using the frozen resource-management digest v1 projection.
+			continue
+		}
 		if field.Name == "AgentConnection" || field.Name == "AgentObservation" {
 			want, tag := reflect.TypeFor[*AgentConnection](), "agent_connection,omitempty"
 			if field.Name == "AgentObservation" {

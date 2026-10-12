@@ -305,7 +305,12 @@ All listed notifications are included by default except `teams` and `twilio`, wh
 - Email uses an SMTP relay with STARTTLS. Username/password SMTP authentication is not implemented.
 - Teams uses a Workflow incoming webhook.
 - Pushover emergency priority needs `retry` and `expire` in seconds, defaulting to 60 and 1800.
-- HTTP notification retries classify 429 and server errors as retryable. Acceptance does not confirm a human received the alert.
+- HTTP notification server/gateway errors and timeouts leave the external outcome
+  unknown and held; they are not automatically replayed. Only confirmed retryable
+  rejection permits another controller-owned attempt, up to three attempts.
+  Acceptance does not confirm a human received the alert.
+- Intervention completion reports “health verification pending.” A recovered
+  health notification requires the configured successful-check threshold.
 
 ### log
 

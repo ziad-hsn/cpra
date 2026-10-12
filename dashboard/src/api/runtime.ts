@@ -64,7 +64,7 @@ export function runtimeView(value: unknown, legacy = false): RuntimeObservation 
 }
 
 export async function loadRuntime(session: DashboardSession, signal?: AbortSignal): Promise<RuntimeObservation> {
-  if (session.getSnapshot().phase === 'legacy') return runtimeView(await session.legacy<unknown>('/api/v1/state', { signal }), true);
+  if (session.getSnapshot().phase === 'observation') return runtimeView(await session.legacy<unknown>('/api/v1/state', { signal }), true);
   if (!session.can('GetState')) throw new ManagementError('forbidden', 'This identity cannot read runtime state.');
   return runtimeView((await session.get<unknown>('/api/v2/state', { signal })).data);
 }

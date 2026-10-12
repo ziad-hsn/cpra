@@ -26,6 +26,7 @@ async function fixture(options: { reader?: boolean; permissions?: string[]; unsu
     const method = init?.method ?? 'GET';
     requests.push({ path, method, search: url.searchParams });
     if (path === '/api/v2/discovery') return reply({ apiVersions: ['cpra.io/v2'], resources: [], patchTypes: ['application/merge-patch+json'], drivers: { check: ['tcp'], recovery: [], notification: [] } });
+    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (path === '/api/v2/self') return reply({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions });
     if (method !== 'GET') {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -43,7 +44,7 @@ async function fixture(options: { reader?: boolean; permissions?: string[]; unsu
     return reply({}, 404);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('test-token');
+  await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
   const router = createMemoryRouter([{ path: '*', element: <SessionBoundary session={session}><AppRoutes /></SessionBoundary> }], {
     initialEntries: [options.configuration ? `/monitor-configurations/${encodeURIComponent(id)}` : `/monitors/by-id/${encodeURIComponent(options.routeID ?? id)}`],
   });

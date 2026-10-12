@@ -144,7 +144,7 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 		return Result{Err: ErrCollectionConflict}
 	}
 	if item.Ordinal <= s.Uploaded {
-		previous, exists, err := f.collections.Item(s.ID, item.Ordinal)
+		previous, exists, err := f.collectionUploadItem(s.ID, item.Ordinal)
 		if err != nil || !exists {
 			return f.collectionStorageFailure(errors.Join(err, ErrCollectionUnavailable))
 		}
@@ -159,7 +159,7 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 		f.image.Collections[s.ID] = s
 		return collectionResult(s)
 	}
-	if _, exists, err := f.collections.Find(s.ID, item.Key); err != nil {
+	if _, exists, err := f.collectionUploadFind(s.ID, item.Key); err != nil {
 		return f.collectionStorageFailure(err)
 	} else if exists {
 		return Result{Err: ErrCollectionConflict}
@@ -172,7 +172,7 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 	if err != nil {
 		return Result{Err: err}
 	}
-	if err := f.collections.Append(s.ID, *item); err != nil {
+	if err := f.appendCollectionUpload(s.ID, *item); err != nil {
 		if errors.Is(err, errCollectionLedgerQuota) {
 			return Result{Err: ErrCollectionQuota}
 		}

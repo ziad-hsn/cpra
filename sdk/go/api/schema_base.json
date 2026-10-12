@@ -1,6 +1,31 @@
 {
   "components": {
     "schemas": {
+      "AccessDiscovery": {
+        "additionalProperties": false,
+        "description": "Non-sensitive process access mode. Discovery grants no permissions and never converts an authentication failure into observation access.",
+        "properties": {
+          "authenticationRequired": {
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "management",
+              "observation"
+            ],
+            "type": "string",
+            "x-enum-varnames": [
+              "AccessDiscoveryModeManagement",
+              "AccessDiscoveryModeObservation"
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "authenticationRequired"
+        ],
+        "type": "object"
+      },
       "AccessInfo": {
         "additionalProperties": false,
         "description": "The authenticated principal and effective permissions for this request. Notification contacts are separate resources. Missing permissions never grant access.",
@@ -1099,11 +1124,11 @@
       },
       "CollectionReselectionCreateRequest": {
         "additionalProperties": false,
-        "description": "Create a disposable attempt owned by the authenticated original operation owner. The explicit base file normalization profile must match the original operation. This request neither extends the original operation expiry nor creates a replacement operation. Attempts are process-local and unavailable after restart.",
+        "description": "Create a disposable original-input verification attempt owned by the authenticated operation owner. The normalization profile must exactly match the original operation, including empty for ordinary SDK file inputs. Exact raw-source and ordered-resource identities are verified before continuation. Complete inactive uploads may be verified during validation; active and terminal operations cannot be changed by this attempt. This request neither extends the original operation expiry nor creates a replacement. Attempts are process-local and unavailable after restart.",
         "properties": {
           "normalizationProfile": {
             "maxLength": 96,
-            "pattern": "^cpra\\.file\\.base\\.v1$",
+            "pattern": "^(cpra\\.file\\.base\\.v1)?$",
             "type": "string"
           },
           "sourceCount": {
@@ -4307,8 +4332,7 @@
           },
           "sourceTime": {
             "format": "date-time",
-            "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "type": "string"
           },
           "storageFormat": {
             "format": "int64",
@@ -4333,6 +4357,35 @@
   },
   "openapi": "3.1.2",
   "paths": {
+    "/api/v2/access": {
+      "get": {
+        "operationId": "DiscoverAccess",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessDiscovery"
+                }
+              }
+            },
+            "description": "Process access mode only"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details"
+          }
+        },
+        "security": [],
+        "summary": "Discover access mode without authenticating"
+      }
+    },
     "/api/v2/actions": {
       "get": {
         "operationId": "ListActions",

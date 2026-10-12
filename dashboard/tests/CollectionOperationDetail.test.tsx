@@ -22,13 +22,14 @@ async function setup(options: { receipt?: Record<string, unknown>; permissions?:
   let current = options.receipt ?? operation();
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return new Headers(init?.headers).has('Authorization')
       ? json({ principalId: 'reader', role: 'reader', permissions: options.permissions ?? ['GetOperation', 'GetOperationValidation'] }) : json({}, 401);
     if (url.pathname.endsWith('/validation')) { reads.push({ url, signal: init?.signal }); return options.reply?.(url, init) ?? json(result(url.searchParams.has('cursor'))); }
     return json(current);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('private-reader-token');
+  await session.discover(); await session.signIn('private-reader-token-01234567890123456789012345678901');
   const router = createMemoryRouter([{ path: '/operations/:id?', element: <SessionBoundary session={session}><OperationDetail /></SessionBoundary> }], { initialEntries: [`/operations/${id}`] });
   render(<RouterProvider router={router} />);
   return { session, reads, router, fetcher, change: (value: Record<string, unknown>) => { current = value; } };
@@ -77,7 +78,7 @@ it('reads results explicitly, replaces one page, and refreshes the original summ
   await waitFor(() => expect(screen.getByRole('region', { name: 'Original validation resource results' })).toHaveTextContent('monitor-1'));
   expect(state.reads[2].url.search).toBe('?limit=100');
   expect(document.body.textContent).not.toMatch(/private-provider-value|private\/source|private-reader-token/);
-  expect(state.reads.every(({ url }) => url.pathname === `/api/v2/operations/${id}/validation` && !url.href.includes('private-reader-token'))).toBe(true);
+  expect(state.reads.every(({ url }) => url.pathname === `/api/v2/operations/${id}/validation` && !url.href.includes('private-reader-token-01234567890123456789012345678901'))).toBe(true);
   expect(state.fetcher.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(true);
 });
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/installpath"
 	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"gopkg.in/yaml.v3"
 )
 
@@ -112,8 +113,23 @@ func binaryPath(l installpath.Layout) string {
 	return filepath.Join(l.BinDir, name)
 }
 
-func serviceArgs(l installpath.Layout) []string {
-	return []string{"-yaml", filepath.Join(l.ConfigDir, "monitors.yaml"), "-runtime-config", filepath.Join(l.ConfigDir, "runtime.yaml"), "-data-dir", l.StateDir, "-web.addr", "127.0.0.1:8060", "-web.auth-file", filepath.Join(l.ConfigDir, "auth.token"), "-allow-empty", "-shutdown-timeout", "45s"}
+func serviceArgs(l installpath.Layout) ([]string, error) {
+	runtimePath := filepath.Join(l.ConfigDir, "runtime.yaml")
+	managed := false
+	if _, err := os.Lstat(runtimePath); err == nil {
+		config, err := runtimeconfig.Load(runtimePath)
+		if err != nil {
+			return nil, err
+		}
+		managed = config.Management.Enabled
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+	args := []string{"-yaml", filepath.Join(l.ConfigDir, "monitors.yaml"), "-runtime-config", runtimePath, "-data-dir", l.StateDir, "-web.addr", "127.0.0.1:8060", "-allow-empty", "-shutdown-timeout", "45s"}
+	if !managed {
+		args = append(args, "-web.auth-file", filepath.Join(l.ConfigDir, "auth.token"))
+	}
+	return args, nil
 }
 
 // Render returns the service definition without creating files or accounts.
@@ -127,7 +143,11 @@ func Render(l installpath.Layout, account string) (string, error) {
 	if strings.ContainsAny(account, "\r\n\x00\t ") {
 		return "", fmt.Errorf("invalid service account")
 	}
-	args := append([]string{binaryPath(l)}, serviceArgs(l)...)
+	service, err := serviceArgs(l)
+	if err != nil {
+		return "", err
+	}
+	args := append([]string{binaryPath(l)}, service...)
 	if runtime.GOOS == "windows" {
 		return strings.Join(args, "\n") + "\n", nil
 	}

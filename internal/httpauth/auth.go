@@ -467,7 +467,7 @@ func decodeVerifier(value string) ([32]byte, bool) {
 	return digest, n == 32 && err == nil
 }
 func validToken(value string) bool {
-	if len(value) == 0 || len(value) > MaxTokenBytes {
+	if len(value) < 32 || len(value) > MaxTokenBytes {
 		return false
 	}
 	for _, c := range []byte(value) {

@@ -7,7 +7,7 @@ import type { HistoryResponse, MonitorEvent } from './types';
 /** Keep v1 only for an explicitly discovered legacy server. Named v2 access
  * never falls back to a less restrictive read after denial or unavailable data. */
 export async function loadTimeline(session: DashboardSession, monitorID: string, cursor = '', signal?: AbortSignal): Promise<HistoryResponse> {
-  if (session.getSnapshot().phase === 'legacy') return api.getHistory(monitorID, cursor);
+  if (session.getSnapshot().phase === 'observation') return api.getHistory(monitorID, cursor);
   if (!session.can('GetHistory')) throw new ManagementError('forbidden', 'This identity cannot read monitor history.');
   const params = new URLSearchParams({ monitorID, limit: '100' });
   if (cursor) params.set('cursor', cursor);

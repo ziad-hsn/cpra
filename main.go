@@ -363,7 +363,6 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if o.pprof {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
@@ -371,7 +370,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		if e != nil {
 			return e
 		}
-		profiling = &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		profiling = &http.Server{Handler: httpserver.LoopbackHandler(mux), ReadHeaderTimeout: 5 * time.Second}
 		profileDone = make(chan struct{})
 		go func() { defer close(profileDone); _ = profiling.Serve(listener) }()
 	}

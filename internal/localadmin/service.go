@@ -140,7 +140,11 @@ func Install(ctx context.Context, l installpath.Layout, source, account string, 
 	}
 	// Validation uses the candidate's compiled capabilities and creates no
 	// storage or provider clients. Never print its configuration or token.
-	args := append(serviceArgs(l), "-validate")
+	args, err := serviceArgs(l)
+	if err != nil {
+		return err
+	}
+	args = append(args, "-validate")
 	if err = runCommand(ctx, candidate, args...); err != nil {
 		return fmt.Errorf("candidate configuration validation: %w", err)
 	}

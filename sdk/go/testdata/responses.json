@@ -251,5 +251,9 @@
         "change": "create"
       }
     ]
+  },
+  "AccessDiscovery": {
+    "mode": "management",
+    "authenticationRequired": true
   }
 }

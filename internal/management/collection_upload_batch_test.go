@@ -117,9 +117,9 @@ func TestCollectionUploadBatchBounds(t *testing.T) {
 		sizes          []int
 		limit, batches int
 	}{
-		{"max-chunk", make([]int, 256), 0, 1},
+		{"max-chunk", make([]int, 256), 0, 4},
 		{"configured-count", []int{10, 10, 10, 10, 10}, 2, 3},
-		{"encoded-bytes", []int{900000, 900000, 900000, 900000}, 0, 2},
+		{"resource-bytes", []int{900000, 900000, 900000, 900000}, 0, 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := batchUploadFixture(t, tc.sizes, tc.limit, 0)

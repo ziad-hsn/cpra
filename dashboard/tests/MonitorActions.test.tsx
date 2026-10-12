@@ -21,6 +21,7 @@ async function actions(options: { agent?: boolean; reader?: boolean; unfenced?: 
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
     if (url.pathname === '/api/v2/discovery') return reply({ apiVersions: ['cpra.io/v2'], resources: [], patchTypes: ['application/merge-patch+json'], drivers: { check: ['tcp'], recovery: ['docker'], notification: [] } });
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return reply({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions });
     if (method === 'GET') {
       reads.push(url.pathname + url.search);
@@ -38,7 +39,7 @@ async function actions(options: { agent?: boolean; reader?: boolean; unfenced?: 
     return reply(action, 200, { 'X-Operation-ID': 'review-operation' });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('test-token');
+  await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
   render(<MemoryRouter><SessionBoundary session={session}><MonitorActions monitorID="checkout" /></SessionBoundary></MemoryRouter>);
   await screen.findByRole('heading', { name: 'Action outcomes' });
   await waitFor(() => expect(reads.some(path => path.startsWith('/api/v2/actions?'))).toBe(true));

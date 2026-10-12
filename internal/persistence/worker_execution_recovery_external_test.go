@@ -114,7 +114,7 @@ func TestWorkerExecutionSnapshotIsolationCorruptionAndFormat(t *testing.T) {
 	if err = snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(workerSchedulingSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(deliveryWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
 		t.Fatal("format/secrecy")
 	}
 	saved, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -176,7 +176,7 @@ func TestWorkerExecutionSnapshotIsolationCorruptionAndFormat(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
 			t.Fatal("command format", version, err)
 		}
 	}
@@ -220,7 +220,7 @@ func TestWorkerExecutionPolicyStrictFormatAndBounds(t *testing.T) {
 	}
 	s := openCatalogMemory(t)
 	_, _ = workerExecutionFixture(t, s, "notification")
-	if s.fsm.image.Version != NotificationWorkerFormatVersion || s.fsm.image.WorkerExecutions != nil {
+	if s.fsm.image.Version != DeliveryWorkerFormatVersion || s.fsm.image.WorkerExecutions != nil {
 		t.Fatal("policy-only format advancement missing")
 	}
 	data := captureSnapshotBytes(t, s.fsm)
@@ -229,7 +229,7 @@ func TestWorkerExecutionPolicyStrictFormatAndBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != NotificationWorkerFormatVersion {
+	if i.Version != DeliveryWorkerFormatVersion {
 		t.Fatal("policy snapshot downgraded")
 	}
 }

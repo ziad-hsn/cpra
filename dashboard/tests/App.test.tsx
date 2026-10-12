@@ -87,7 +87,7 @@ const emptyPool = {
 };
 
 const server = setupServer(
-  http.get('/api/v2/self', () => HttpResponse.json({ error: 'not found' }, { status: 404 })),
+  http.get('/api/v2/access', () => HttpResponse.json({ mode: 'observation', authenticationRequired: false })),
   http.get('/api/v1/overview', () => HttpResponse.json(overviewResponse)),
   http.get('/api/v1/monitors', () => HttpResponse.json(monitorsResponse)),
   http.get('/api/v1/monitors/:id', () => HttpResponse.json(monitorsResponse.monitors[0])),

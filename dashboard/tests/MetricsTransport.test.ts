@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardSession, PROMETHEUS_MAX_BYTES } from '../src/api/session';
 
-const token = 'tab-only-metrics-token';
+const token = 'tab-only-metrics-token-01234567890123456789012345678901';
 const plain = (body: BodyInit | null = 'cpra_checks_total 42\n', headers: HeadersInit = {}) => new Response(body, { headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8', ...headers } });
 async function authenticated(permissions = ['GetMetrics'], timeoutMs?: number) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ principalId: 'reader', role: 'reader', permissions })));
@@ -37,7 +37,7 @@ describe('authenticated metrics transport', () => {
   });
 
   it('allows browser Basic/read credentials only in discovered legacy phase', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('{}', { status: 404 })).mockResolvedValueOnce(plain());
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ mode: 'observation', authenticationRequired: false }))).mockResolvedValueOnce(plain());
     const session = new DashboardSession({ origin: 'http://cpra.example', fetch: fetcher });
     await expect(session.prometheus()).rejects.toMatchObject({ reason: 'forbidden' });
     await session.discover();
@@ -140,7 +140,7 @@ describe('authenticated metrics transport', () => {
     const old = session.prometheus().catch(error => error);
     await entered;
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ principalId: 'new-reader', role: 'reader', permissions: ['GetMetrics'] })));
-    await session.signIn('new-tab-token');
+    await session.signIn('new-tab-token-01234567890123456789012345678901');
     expect(session.getSnapshot()).toMatchObject({ phase: 'authenticated', access: { principalId: 'new-reader' } });
     finishCancel();
     expect(await old).toMatchObject({ reason: 'session-changed' });

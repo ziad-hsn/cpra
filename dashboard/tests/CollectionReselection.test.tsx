@@ -28,6 +28,7 @@ async function fixture(handler: (url: URL, init: RequestInit) => Promise<Respons
   const onProgress = vi.fn();
   const fetcher = vi.fn<typeof fetch>(async (input, init = {}) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname.endsWith('/self')) return new Headers(init.headers).has('Authorization')
       ? json({ principalId: 'operator', role: 'operator', permissions: ['GetCapabilities', ...reselectionOperations] }) : json({}, 401);
     if (url.pathname.endsWith('/discovery')) return json({ resourceOperations: { Operation: reselectionOperations } });
@@ -35,7 +36,7 @@ async function fixture(handler: (url: URL, init: RequestInit) => Promise<Respons
     return handler(url, init);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('PRIVATE-COMPONENT-BEARER');
+  await session.discover(); await session.signIn('PRIVATE-COMPONENT-BEARER-01234567890123456789012345678901');
   const rendered = render(<SessionBoundary session={session}><CollectionReselection id={id} onProgress={onProgress} /></SessionBoundary>);
   await screen.findByLabelText('Original collection files');
   return { session, requests, onProgress, ...rendered };
@@ -49,7 +50,7 @@ async function selectFile() {
 async function click(name: string) { const button = await screen.findByRole('button', { name }); await waitFor(() => expect(button).toBeEnabled()); await act(async () => { fireEvent.click(button); }); }
 const writes = (requests: { init: RequestInit }[]) => requests.filter(request => request.init.method !== 'GET');
 const puts = (requests: { init: RequestInit }[]) => requests.filter(request => request.init.method === 'PUT');
-function privateDOM() { for (const value of [contents, 'PRIVATE-FILENAME', 'PRIVATE-COMPONENT-BEARER', 'PRIVATE-ERROR']) expect(document.body.textContent).not.toContain(value); }
+function privateDOM() { for (const value of [contents, 'PRIVATE-FILENAME', 'PRIVATE-COMPONENT-BEARER-01234567890123456789012345678901', 'PRIVATE-ERROR']) expect(document.body.textContent).not.toContain(value); }
 
 it('rejects a stale200 source reply without sending a second PUT or automatic verify', async () => {
   const { requests } = await fixture(async (_, init) => json(original, init.method === 'POST' ? 201 : 200));

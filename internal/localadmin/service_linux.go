@@ -152,6 +152,18 @@ func nativeSecure(l installpath.Layout, account string) error {
 	return nil
 }
 
+func managementServiceReader(l installpath.Layout, account string) (*int, string, error) {
+	if l.Scope == "user" {
+		return nil, "", nil
+	}
+	identity, err := user.Lookup(account)
+	if err != nil {
+		return nil, "", err
+	}
+	group, err := strconv.Atoi(identity.Gid)
+	return &group, "", err
+}
+
 func systemctlArgs(l installpath.Layout, args ...string) []string {
 	if l.Scope == "user" {
 		return append([]string{"--user"}, args...)

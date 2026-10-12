@@ -10,14 +10,29 @@ import (
 )
 
 func notificationTransitionFixture(t *testing.T, unfinished ActionState) (Monitor, Action, Action) {
+	return notificationTransitionFixtureAtFormat(t, unfinished, DeliveryFormatVersion)
+}
+
+func notificationTransitionFixtureAtFormat(t *testing.T, unfinished ActionState, version int) (Monitor, Action, Action) {
 	t.Helper()
 	p := testMonitor().Policy
 	p.Unhealthy, p.Intervention, p.RecoveryMaxAttempts = 1, true, 3
 	p.Cooldown = time.Minute
 	p.Endpoints = map[string]int{"yellow": 2}
 	at := policyTime().Add(time.Second)
-	m := policyPulse(t, configuredPolicyMonitor(t, p), at, "failure")
-	m = policyStart(t, m, interventionAction(t, m), at)
+	config := testMonitor()
+	config.Policy = p
+	m := *transitionAtFormat(Monitor{}, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: policyTime()}, version).Monitor
+	apply := func(c Command) {
+		c.MonitorID, c.Revision = m.ID, m.Revision
+		r := transitionAtFormat(m, c, version)
+		if r.Err != nil || r.Monitor == nil {
+			t.Fatal("notification fixture transition failed", r.Err)
+		}
+		m = *r.Monitor
+	}
+	apply(Command{Kind: "pulse", Generation: 1, At: at, Outcome: "failure"})
+	apply(Command{Kind: "start", ActionID: interventionAction(t, m).ID, At: at})
 	var delivered, pending Action
 	for _, action := range m.Actions {
 		if action.Kind == "code" && action.Endpoint == 0 {
@@ -29,13 +44,13 @@ func notificationTransitionFixture(t *testing.T, unfinished ActionState) (Monito
 	if delivered.ID == "" || pending.ID == "" {
 		t.Fatal("fixture did not queue both notification endpoints")
 	}
-	m = policyStart(t, m, delivered, at.Add(time.Millisecond))
-	m = policyOutcome(t, m, delivered, at.Add(2*time.Millisecond), "success", false)
+	apply(Command{Kind: "start", ActionID: delivered.ID, At: at.Add(time.Millisecond)})
+	apply(Command{Kind: "result", ActionID: delivered.ID, At: at.Add(2 * time.Millisecond), Outcome: "success"})
 	if unfinished != Queued {
-		m = policyStart(t, m, pending, at.Add(3*time.Millisecond))
+		apply(Command{Kind: "start", ActionID: pending.ID, At: at.Add(3 * time.Millisecond)})
 	}
 	if unfinished == Unknown {
-		m = policyOutcome(t, m, pending, at.Add(4*time.Millisecond), "failure", true)
+		apply(Command{Kind: "result", ActionID: pending.ID, At: at.Add(4 * time.Millisecond), Outcome: "failure", Ambiguous: true})
 	}
 	return m, m.Actions[delivered.ID], m.Actions[pending.ID]
 }
@@ -66,18 +81,22 @@ func TestDeliveredNotificationSurvivesAnotherFailedCheck(t *testing.T) {
 }
 
 func TestNotificationHistoricalLogReplay(t *testing.T) {
-	for _, version := range []int{1, 2, 14, 31, 33, 35, NotificationFormatVersion} {
+	for _, version := range []int{1, 2, 14, 31, 33, 35, NotificationFormatVersion, DeliveryFormatVersion} {
 		t.Run(strconv.Itoa(version), func(t *testing.T) {
 			s := openCatalogMemory(t)
-			m, delivered, pending := notificationTransitionFixture(t, Started)
+			fixtureVersion := NotificationFormatVersion
+			if version == DeliveryFormatVersion {
+				fixtureVersion = DeliveryFormatVersion
+			}
+			m, delivered, pending := notificationTransitionFixtureAtFormat(t, Started, fixtureVersion)
 			s.fsm.image.Monitors[m.ID] = m.Clone()
 			r := applyCatalogFormat(t, s, version, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision,
 				Generation: m.Generation + 1, At: policyTime().Add(1250 * time.Millisecond), Outcome: "failure"})[0]
 			if r.Err != nil || r.Monitor == nil || !reflect.DeepEqual(r.Monitor.Actions[pending.ID], pending) {
 				t.Fatal("replay changed the unfinished endpoint", r.Err)
 			}
-			if version == NotificationFormatVersion {
-				if !reflect.DeepEqual(r.Monitor.Actions[delivered.ID], delivered) || s.fsm.image.Version != NotificationFormatVersion {
+			if notificationStorageFormat(version) {
+				if !reflect.DeepEqual(r.Monitor.Actions[delivered.ID], delivered) || s.fsm.image.Version != version {
 					t.Fatal("new observations lost delivery or did not preserve their storage contract")
 				}
 				return
@@ -107,14 +126,14 @@ func TestNotificationSnapshotThenNewObservation(t *testing.T) {
 	s.fsm.image.Monitors[m.ID] = m.Clone()
 	c := Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1,
 		At: policyTime().Add(1250 * time.Millisecond), Outcome: "failure"}
-	if commandWriteFormat(c) != NotificationFormatVersion || commandMinimumFormat(c) != FormatVersion {
+	if commandWriteFormat(c) != DeliveryFormatVersion || commandMinimumFormat(c) != FormatVersion {
 		t.Fatal("new writer policy changed the historical reader minimum")
 	}
 	if r := submit(t, s, c)[0]; r.Err != nil {
 		t.Fatal(r.Err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(notificationSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(deliverySnapshotMagic)) {
 		t.Fatal("snapshot did not preserve notification semantics")
 	}
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(raw))); err != nil {

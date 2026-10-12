@@ -65,7 +65,11 @@ func TestControllerContextReadsHonorLockDeadlines(t *testing.T) {
 				select {
 				case err := <-completed:
 					release()
-					if !errors.Is(err, context.DeadlineExceeded) {
+					if blocked == "fsm" && check.name == "health" {
+						if err != nil {
+							t.Fatal("routine health waited for the FSM writer", err)
+						}
+					} else if !errors.Is(err, context.DeadlineExceeded) {
 						t.Fatal("lock wait lost caller deadline", err)
 					}
 				case <-time.After(time.Second):
@@ -118,7 +122,11 @@ func TestStatusContextHonorsLockDeadlinesWithoutChangingHealth(t *testing.T) {
 				select {
 				case err := <-completed:
 					release()
-					if !errors.Is(err, context.DeadlineExceeded) {
+					if blocked == "fsm" {
+						if err != nil {
+							t.Fatal("routine diagnostic waited for the FSM writer", err)
+						}
+					} else if !errors.Is(err, context.DeadlineExceeded) {
 						t.Fatal("diagnostic wait lost caller deadline", err)
 					}
 				case <-time.After(time.Second):

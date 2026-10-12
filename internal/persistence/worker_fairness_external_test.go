@@ -155,7 +155,7 @@ func TestWorkerOfferSelectionFormat(t *testing.T) {
 	for version := 1; version <= WorkerQueueFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
 			t.Fatalf("selection format %d: %v", version, err)
 		}
 	}

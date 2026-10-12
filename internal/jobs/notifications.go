@@ -42,7 +42,12 @@ func notificationStatusError(status int) error {
 	if status >= 200 && status < 300 {
 		return nil
 	}
-	return &DeliveryError{Status: status, Retryable: status == 429 || status >= 500}
+	// A server or gateway failure can arrive after the remote effect. Returning
+	// DeliveryError here would authorize the controller to replay that effect.
+	if status >= 500 || status == http.StatusRequestTimeout {
+		return fmt.Errorf("notification outcome unknown (HTTP %d)", status)
+	}
+	return &DeliveryError{Status: status, Retryable: status == http.StatusTooManyRequests}
 }
 
 func truncateNotification(text string, limit int) string {
@@ -113,8 +118,9 @@ func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message 
 	return out.Close()
 }
 
-// DeliveryError marks a definite rejection that is safe to retry. Transport
-// errors and ambiguous timeouts do not opt into automatic notification replay.
+// DeliveryError marks a confirmed rejection. Only Retryable rejections permit
+// another controller-owned attempt. Server/gateway errors, transport errors and
+// ambiguous timeouts never opt into automatic notification replay.
 type DeliveryError struct {
 	Status    int
 	Retryable bool

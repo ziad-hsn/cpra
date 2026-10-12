@@ -225,7 +225,7 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 			Title:     "CRITICAL ALERT",
 			Status:    "FAILED",
 			Severity:  "critical",
-			Summary:   "Service outage detected after repeated health check failures and interventions",
+			Summary:   "Service outage detected after repeated health check failures",
 			Action:    "Escalate immediately and engage on-call responders",
 			NextSteps: "Perform manual recovery and review related service telemetry",
 		}
@@ -250,11 +250,11 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 	case "cyan":
 		return codeAlertTemplate{
 			Title:     "INTERVENTION SUCCESS",
-			Status:    "RESTORED",
+			Status:    "VERIFICATION_PENDING",
 			Severity:  "info",
-			Summary:   "Automated intervention completed and service health checks are passing",
-			Action:    "Confirm downstream systems are stable",
-			NextSteps: "Document intervention details and verify customer impact is resolved",
+			Summary:   "Automated intervention completed; health verification pending",
+			Action:    "Wait for the configured successful health checks",
+			NextSteps: "Review intervention details; health recovery is not yet confirmed",
 		}
 	case "gray":
 		return codeAlertTemplate{

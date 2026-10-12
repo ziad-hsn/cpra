@@ -9,7 +9,7 @@ async function fixture(permitted = true) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('{}', { status: 401 }))
     .mockResolvedValueOnce(new Response(JSON.stringify({ principalId: 'reader', role: 'reader', permissions: permitted ? ['GetMetrics'] : [] })));
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('private-metrics-token');
+  await session.discover(); await session.signIn('private-metrics-token-01234567890123456789012345678901');
   render(<SessionBoundary session={session}><MetricsView /></SessionBoundary>);
   return { session, fetcher };
 }

@@ -40,7 +40,7 @@ func mainAuthStatus(t *testing.T, f *mainManagementFixture, path, token string, 
 
 func TestMainCommittedAuthoritySkipsRemovedAndChangedBootstrapFiles(t *testing.T) {
 	f := newMainManagementFixture(t)
-	f.options.webAuth = "legacy-initial-fixture"
+	f.options.webAuth = "legacy-initial-fixture-01234567890123456789012345678901"
 	_, stop := startMainManagement(t, f)
 	if got := mainAuthStatus(t, f, "/api/v1/state", f.options.webAuth, true); got != 200 {
 		t.Fatal("legacy bootstrap", got)
@@ -49,13 +49,13 @@ func TestMainCommittedAuthoritySkipsRemovedAndChangedBootstrapFiles(t *testing.T
 	if err := os.Remove(f.settings.Management.PolicyFile); err != nil {
 		t.Fatal(err)
 	}
-	f.options.webAuth = "legacy-overwrite-fixture"
+	f.options.webAuth = "legacy-overwrite-fixture-01234567890123456789012345678901"
 	f.options.webAuthFile = f.settings.Management.PolicyFile + ".absent-token"
 	_, stop = startMainManagement(t, f)
 	if got := mainAuthStatus(t, f, "/api/v2/self", startupOperatorToken, false); got != 200 {
 		t.Fatal("retained named policy", got)
 	}
-	if got := mainAuthStatus(t, f, "/api/v1/state", "legacy-initial-fixture", true); got != 200 {
+	if got := mainAuthStatus(t, f, "/api/v1/state", "legacy-initial-fixture-01234567890123456789012345678901", true); got != 200 {
 		t.Fatal("retained legacy", got)
 	}
 	if got := mainAuthStatus(t, f, "/api/v1/state", f.options.webAuth, true); got != 401 {
@@ -90,7 +90,7 @@ func TestMainCommittedAuthoritySkipsRemovedAndChangedBootstrapFiles(t *testing.T
 	if err := os.WriteFile(f.settings.Management.PolicyFile, []byte("principals:\n  - id: obsolete\n    role: operator\n    token_sha256: "+oldVerifier+"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f.options.webAuthFile, []byte("legacy-initial-fixture"), 0600); err != nil {
+	if err := os.WriteFile(f.options.webAuthFile, []byte("legacy-initial-fixture-01234567890123456789012345678901"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	_, stop = startMainManagement(t, f)
@@ -99,7 +99,7 @@ func TestMainCommittedAuthoritySkipsRemovedAndChangedBootstrapFiles(t *testing.T
 		t.Fatal("new committed authority", got)
 	}
 	for _, path := range []string{"/api/v2/self", "/api/v1/state"} {
-		for _, token := range []string{startupOperatorToken, "legacy-initial-fixture", f.options.webAuth} {
+		for _, token := range []string{startupOperatorToken, "legacy-initial-fixture-01234567890123456789012345678901", f.options.webAuth} {
 			for _, basic := range []bool{false, true} {
 				if got := mainAuthStatus(t, f, path, token, basic); got != 401 {
 					t.Fatalf("revoked access accepted on %s basic=%v: %d", path, basic, got)
@@ -144,7 +144,7 @@ func TestMainCommittedAuthoritySkipsRemovedAndChangedBootstrapFiles(t *testing.T
 	if got := mainAuthStatus(t, f, "/api/v2/self", restoredToken, false); got != 200 {
 		t.Fatal("reprovisioned authority", got)
 	}
-	for _, token := range []string{startupOperatorToken, newToken, "legacy-initial-fixture"} {
+	for _, token := range []string{startupOperatorToken, newToken, "legacy-initial-fixture-01234567890123456789012345678901"} {
 		if got := mainAuthStatus(t, f, "/api/v2/self", token, false); got != 401 {
 			t.Fatal("restore resurrected old grant", got)
 		}
@@ -173,7 +173,7 @@ func TestMainLegacyAndAnonymousAuthorityCannotBeOverriddenOnRestart(t *testing.T
 			f := newMainManagementFixture(t)
 			f.settings.Management = runtimeconfig.Management{}
 			f.client = &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
-			f.options.webAuth = "legacy-startup-token"
+			f.options.webAuth = "legacy-startup-token-01234567890123456789012345678901"
 			if anonymous {
 				f.options.webAuth = ""
 			}
@@ -194,7 +194,7 @@ func TestMainLegacyAndAnonymousAuthorityCannotBeOverriddenOnRestart(t *testing.T
 			f.options.webAuth = "ignored-new-runtime-token"
 			f.options.webAuthFile = f.options.runtimeFile + ".missing-token"
 			_, stop = startMainManagement(t, f)
-			for _, token := range []string{"", "legacy-startup-token", "ignored-new-runtime-token"} {
+			for _, token := range []string{"", "legacy-startup-token-01234567890123456789012345678901", "ignored-new-runtime-token"} {
 				r, _ := http.NewRequest("GET", "http://"+f.options.webAddr+"/api/v1/state", nil)
 				if token != "" {
 					r.SetBasicAuth("cpra", token)
@@ -206,7 +206,7 @@ func TestMainLegacyAndAnonymousAuthorityCannotBeOverriddenOnRestart(t *testing.T
 				_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
 				response.Body.Close()
 				want := 401
-				if anonymous || token == "legacy-startup-token" {
+				if anonymous || token == "legacy-startup-token-01234567890123456789012345678901" {
 					want = 200
 				}
 				if response.StatusCode != want {

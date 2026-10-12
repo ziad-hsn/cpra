@@ -329,7 +329,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	err := s.store.ControllerHealthContext(ctx)
 	if err != nil {
-		s.recoveryError(err, ctx)
+		s.healthObservationError(err, ctx)
 		cancel()
 		return
 	}
@@ -377,7 +377,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		err := s.store.ControllerHealthContext(ctx)
 		if err != nil {
-			s.recoveryError(err, ctx)
+			s.healthObservationError(err, ctx)
 			cancel()
 			return
 		}
@@ -866,6 +866,16 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d.MonitorID, d.Revision, d.ActionID = m.ID, a.Revision, id
 			d.IncidentID, d.CatalogUID, d.Attempt = a.IncidentID, a.CatalogUID, a.Attempt
 			d.Scheduled = a.NotBefore
+			if a.Kind == "code" {
+				d.Deadline = a.Deadline
+				if d.Deadline.IsZero() {
+					d.Deadline = now.Add(jobs.NotificationBudget(d.Job))
+				} else if !now.Before(d.Deadline) {
+					// Let the start guard commit cancellation of expired queued
+					// work. An already-expired context would skip that guard.
+					d.Deadline = time.Time{}
+				}
+			}
 			if f := a.RecoveryFailure; f != nil {
 				d.RecoveryFailure = &jobs.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: f.Trigger, FailedAt: f.FailedAt, Outcome: "failure"}
 			}
@@ -887,9 +897,8 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				if s.recovering.Load() {
 					return jobs.ActionExecution{}, errAdmissionRecovering
 				}
-				if manifest.InMaintenance(maintenance, time.Now()) {
-					return jobs.ActionExecution{}, fmt.Errorf("action deferred during maintenance")
-				}
+				at := time.Now().UTC()
+				inMaintenance := manifest.InMaintenance(maintenance, at)
 				var connection *persistence.AgentConnection
 				if driver == "a2a" && s.catalogRuntime != nil {
 					if guard == nil {
@@ -910,7 +919,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 						return jobs.ActionExecution{}, err
 					}
 				}
-				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: time.Now().UTC(), Guard: guard, AgentConnection: connection})
+				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: at, Guard: guard, AgentConnection: connection, ActionDeadline: d.Deadline, Maintenance: inMaintenance})
 				if handle == nil {
 					return jobs.ActionExecution{}, err
 				}

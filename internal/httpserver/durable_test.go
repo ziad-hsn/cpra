@@ -26,13 +26,13 @@ func TestDurableAPIsAuthenticateAndRemainReadOnly(t *testing.T) {
 	defer store.Close()
 	s := newTestServer(t)
 	s.cfg.Store = store
-	s.cfg.AuthToken = "secret-for-test"
+	s.cfg.AuthToken = "secret-for-test-01234567890123456789012345678901"
 	h := s.authMiddleware(apiMux(s))
 	for _, path := range []string{"/api/v1/state", "/api/v1/slo", "/api/v1/history?monitor_id=m"} {
 		for _, auth := range []bool{false, true} {
 			r := httptest.NewRequest("GET", path, nil)
 			if auth {
-				r.Header.Set("Authorization", "Bearer secret-for-test")
+				r.Header.Set("Authorization", "Bearer secret-for-test-01234567890123456789012345678901")
 			}
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, r)
@@ -45,7 +45,7 @@ func TestDurableAPIsAuthenticateAndRemainReadOnly(t *testing.T) {
 			}
 		}
 		r := httptest.NewRequest("POST", path, nil)
-		r.Header.Set("Authorization", "Bearer secret-for-test")
+		r.Header.Set("Authorization", "Bearer secret-for-test-01234567890123456789012345678901")
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 		if w.Code != 405 {
@@ -102,9 +102,9 @@ func TestLegacyHistoryErrorsDoNotExposeStoragePaths(t *testing.T) {
 	}
 	s := newTestServer(t)
 	s.cfg.Store = store
-	s.cfg.AuthToken = "history-fixture"
+	s.cfg.AuthToken = "history-fixture-01234567890123456789012345678901"
 	r := httptest.NewRequest("GET", "/api/v1/history?monitor_id=one", nil)
-	r.Header.Set("Authorization", "Bearer history-fixture")
+	r.Header.Set("Authorization", "Bearer history-fixture-01234567890123456789012345678901")
 	w := httptest.NewRecorder()
 	s.authMiddleware(apiMux(s)).ServeHTTP(w, r)
 	if w.Code != 503 || strings.TrimSpace(w.Body.String()) != `{"error":"event history unavailable"}` {

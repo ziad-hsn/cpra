@@ -128,7 +128,7 @@ func (f *machine) workerOfferEligible(c WorkerStartCommand, r WorkerExecutionRec
 	}
 	return f.checkWorkerExecution(r.Intent, at)
 }
-func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
+func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version int) Result {
 	old, err := f.workerStartRecord(c, at)
 	if err != nil {
 		return Result{Err: err}
@@ -163,7 +163,11 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
 			disposition = "granted"
 			if r.Intent.Category != "check" {
 				previous := f.image.Monitors[r.Intent.MonitorID]
-				result := transition(previous, Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at})
+				command := Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
+				if deliveryStorageFormat(version) && r.Intent.Category == "notification" {
+					command.ActionDeadline = r.Intent.Deadline
+				}
+				result := transitionAtFormat(previous, command, version)
 				if !result.Allowed || result.Monitor == nil || result.Err != nil {
 					return Result{Err: ErrWorkerExecutionConflict}
 				}
@@ -225,6 +229,9 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time) Result {
 			previous := f.image.Monitors[monitor.ID]
 			events = append(events, f.installMonitor(previous, *monitor, at)...)
 			f.publishWorkerMonitor(previous, *monitor)
+			if deliveryStorageFormat(version) {
+				f.image.Version = joinStorageFormat(f.image.Version, version)
+			}
 		}
 		f.image.Version = max(f.image.Version, WorkerOfferFormatVersion)
 	}

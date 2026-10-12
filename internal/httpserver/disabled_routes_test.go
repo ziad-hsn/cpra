@@ -9,7 +9,7 @@ import (
 
 func TestDisabledManagementRoutesDoNotServeDashboard(t *testing.T) {
 	s := newTestServer(t)
-	s.cfg.AuthToken = "route-test-token"
+	s.cfg.AuthToken = "route-test-token-01234567890123456789012345678901"
 	mux := apiMux(s)
 	s.registerSPA(mux)
 	server := httptest.NewServer(s.authMiddleware(mux))

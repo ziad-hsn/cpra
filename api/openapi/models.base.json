@@ -2846,8 +2846,7 @@
           },
           "sourceTime": {
             "type": "string",
-            "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "format": "date-time"
           },
           "goVersion": {
             "type": "string",
@@ -4039,11 +4038,11 @@
           },
           "normalizationProfile": {
             "type": "string",
-            "pattern": "^cpra\\.file\\.base\\.v1$",
+            "pattern": "^(cpra\\.file\\.base\\.v1)?$",
             "maxLength": 96
           }
         },
-        "description": "Create a disposable attempt owned by the authenticated original operation owner. The explicit base file normalization profile must match the original operation. This request neither extends the original operation expiry nor creates a replacement operation. Attempts are process-local and unavailable after restart."
+        "description": "Create a disposable original-input verification attempt owned by the authenticated operation owner. The normalization profile must exactly match the original operation, including empty for ordinary SDK file inputs. Exact raw-source and ordered-resource identities are verified before continuation. Complete inactive uploads may be verified during validation; active and terminal operations cannot be changed by this attempt. This request neither extends the original operation expiry nor creates a replacement. Attempts are process-local and unavailable after restart."
       },
       "CollectionReselectionAttempt": {
         "type": "object",
@@ -4330,6 +4329,31 @@
           "failedAt"
         ],
         "additionalProperties": false
+      },
+      "AccessDiscovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "authenticationRequired"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "management",
+              "observation"
+            ],
+            "x-enum-varnames": [
+              "AccessDiscoveryModeManagement",
+              "AccessDiscoveryModeObservation"
+            ]
+          },
+          "authenticationRequired": {
+            "type": "boolean"
+          }
+        },
+        "description": "Non-sensitive process access mode. Discovery grants no permissions and never converts an authentication failure into observation access."
       }
     }
   }

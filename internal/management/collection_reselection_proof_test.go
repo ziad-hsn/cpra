@@ -273,13 +273,9 @@ func TestCollectionReselectionProofRequiresBothCommitments(t *testing.T) {
 }
 
 func TestCollectionReselectionProofAuthorizesBeforeUnwrap(t *testing.T) {
-	for _, change := range []string{"other-owner", "no-profile", "expired", "credential-expired", "canceled"} {
+	for _, change := range []string{"other-owner", "expired", "credential-expired", "canceled"} {
 		t.Run(change, func(t *testing.T) {
-			var alter func(*api.CollectionPrepareRequest)
-			if change == "no-profile" {
-				alter = func(r *api.CollectionPrepareRequest) { r.NormalizationProfile = "" }
-			}
-			f := newReselectionProofFixture(t, 1, alter, nil)
+			f := newReselectionProofFixture(t, 1, nil, nil)
 			spool, sources := f.stage(t, f.raw)
 			actor := "team/operator"
 			switch change {
@@ -300,6 +296,34 @@ func TestCollectionReselectionProofAuthorizesBeforeUnwrap(t *testing.T) {
 			p, err := f.prove(t.Context(), spool, sources, actor, nil)
 			if p != nil || err == nil || observed.unwraps != 0 {
 				t.Fatal("denied proof opened encrypted identity", err, observed.unwraps)
+			}
+		})
+	}
+}
+
+func TestCollectionReselectionProofCompleteOrdinaryInput(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("changed-%t", changed), func(t *testing.T) {
+			f := newReselectionProofFixture(t, 2, func(r *api.CollectionPrepareRequest) { r.NormalizationProfile = "" }, nil)
+			raw := append([][]byte(nil), f.raw...)
+			if changed {
+				raw[0] = append([]byte("# changed comment\n"), raw[0]...)
+			}
+			spool, sources := f.stage(t, raw)
+			before := f.store.Status().CommittedIndex
+			proof, err := f.prove(t.Context(), spool, sources, "team/operator", nil)
+			if changed {
+				if !errors.Is(err, errReselectionInput) || proof != nil {
+					t.Fatal("changed complete source was accepted", err)
+				}
+			} else {
+				if err != nil || proof == nil || len(proof.suffix) != 0 || proof.head.NormalizationProfile != "" {
+					t.Fatal("complete ordinary input failed", err)
+				}
+				proof.close()
+			}
+			if f.store.Status().CommittedIndex != before {
+				t.Fatal("input verification committed a mutation")
 			}
 		})
 	}

@@ -1,11 +1,11 @@
 import { operationContracts, type AccessInfo, type Problem } from './generated';
-import { allocationNotSubmitted, decodeErrorJSON } from './admission';
+import { admissionNotSubmitted, decodeErrorJSON } from './admission';
 export type { AccessInfo, Problem } from './generated';
 
 /** Only this tab's live session owns the token. It is never placed in React/query state. */
 
 export interface SessionState {
-  phase: 'discovering' | 'legacy' | 'signed-out' | 'signing-in' | 'authenticated' | 'unavailable';
+  phase: 'discovering' | 'observation' | 'signed-out' | 'signing-in' | 'authenticated' | 'unavailable';
   epoch: number;
   access?: AccessInfo;
   message?: string;
@@ -183,6 +183,7 @@ export class DashboardSession {
   private resets = new Set<() => void>();
   private pending = new Set<AbortController>();
   private discovered = false;
+  private mode: 'management' | 'observation' = 'management';
   readonly origin: string;
 
   constructor(private readonly options: { origin?: string; fetch?: Fetcher; maxResponseBytes?: number; timeoutMs?: number } = {}) {
@@ -218,16 +219,28 @@ export class DashboardSession {
     this.discovered = true;
     const epoch = this.state.epoch;
     try {
-      // Existing v1 servers protect every path with browser Basic auth, including
-      // unknown v2 paths. Preserve that read-only credential for this same-origin
-      // GET so the server can return its actual 404 instead of a misleading 401.
-      await this.request('/api/v2/self', { discovery: true, expireOn401: false });
-      if (this.state.epoch === epoch) this.publish({ phase: 'signed-out', epoch });
+      const response = await this.request<unknown>('/api/v2/access', { discovery: true, expireOn401: false, maxResponseBytes: 4096 });
+      const mode = response.data;
+      if (typeof mode !== 'object' || mode === null || Array.isArray(mode) ||
+        !('mode' in mode) || mode.mode !== 'management' && mode.mode !== 'observation' ||
+        !('authenticationRequired' in mode) || typeof mode.authenticationRequired !== 'boolean') {
+        throw new ManagementError('invalid', 'The server did not provide a supported access mode.');
+      }
+      if (this.state.epoch !== epoch) return;
+      this.mode = mode.mode;
+      if (mode.mode === 'observation') {
+        // Preserve browser-provided Basic authentication on read-only servers.
+        // A 401 only requests sign-in; it never grants an observation downgrade.
+        if (mode.authenticationRequired) {
+          await this.request('/api/v1/healthz', { legacy: true, discovery: true, expireOn401: false });
+        }
+        if (this.state.epoch === epoch) this.publish({ phase: 'observation', epoch });
+      } else this.publish({ phase: 'signed-out', epoch });
     } catch (error) {
       if (this.state.epoch !== epoch) return;
       const status = error instanceof ManagementError ? error.status : undefined;
-      this.publish({ phase: status === 404 ? 'legacy' : status === 401 || status === 403 ? 'signed-out' : 'unavailable', epoch,
-        ...(status === 404 || status === 401 || status === 403 ? {} : { message: 'Unable to discover server access. Retry when the server is available.' }) });
+      this.publish({ phase: status === 401 ? 'signed-out' : 'unavailable', epoch,
+        ...(status === 401 ? {} : { message: 'Unable to discover a supported server access mode. Retry when the server is available.' }) });
     }
   }
 
@@ -240,8 +253,15 @@ export class DashboardSession {
   async signIn(token: string): Promise<void> {
     const epoch = this.reset('signing-in');
     try {
-      if (!token || token.length > 8192 || /\s/.test(token)) throw new ManagementError('invalid', 'Enter a valid bearer token.');
+      if (token.length < 32 || token.length > 8192 || /[^\x21-\x7e]/.test(token)) throw new ManagementError('invalid', 'Enter a bearer token with at least 32 printable characters and no whitespace.');
       if (new URL(this.origin).protocol !== 'https:') throw new ManagementError('invalid', 'Bearer sign-in requires HTTPS. Use the configured TLS endpoint.');
+      if (this.mode === 'observation') {
+        await this.request('/api/v1/healthz', { token, legacy: true, expireOn401: false });
+        if (this.state.epoch !== epoch) return;
+        this.#token = token;
+        this.publish({ phase: 'observation', epoch });
+        return;
+      }
       const response = await this.request<unknown>('/api/v2/self', { token, expireOn401: false });
       const access = accessInfo(response.data);
       if (this.state.epoch !== epoch) return;
@@ -263,10 +283,10 @@ export class DashboardSession {
 
   /** Fixed same-origin read; it cannot carry a caller-selected URL or bearer query. */
   async prometheus(options: ReadOptions = {}): Promise<string> {
-    const legacy = this.state.phase === 'legacy';
+    const legacy = this.state.phase === 'observation';
     // The server maps /metrics to GetMetrics in AuthorizeObservation.
     if (!legacy && (!this.#token || !this.can('GetMetrics'))) throw new ManagementError('forbidden', 'Your identity cannot read metrics.');
-    return (await this.request<string>('/metrics', { ...options, metrics: true, legacy, token: legacy ? undefined : this.#token })).data;
+    return (await this.request<string>('/metrics', { ...options, metrics: true, legacy, token: this.#token })).data;
   }
 
   async mutate<T>(path: string, options: MutationOptions): Promise<APIResponse<T>> {
@@ -402,8 +422,9 @@ export class DashboardSession {
         // Only this complete, explicit server contract proves that allocation
         // failed before any resource/control/action command was submitted.
         // Generic 5xx or malformed/truncated problems remain uncertain writes.
-        if (mutation && !responseIssue && allocationNotSubmitted(response, value)) {
-          throw new ManagementError('not-admitted', 'The server could not confirm operation allocation. No resource change or action was submitted. No automatic retry was made.', response.status, problem, undefined, metadata);
+        if (mutation && !responseIssue && admissionNotSubmitted(response, value, url.pathname)) {
+          const guidance = metadata.operationID ? 'Inspect the original operation before explicitly continuing.' : 'No resource change or action was submitted.';
+          throw new ManagementError('not-admitted', `The server rejected this request before submission. ${guidance} No automatic retry was made.`, response.status, problem, undefined, metadata);
         }
         if (mutation && (response.status >= 500 || problem?.code === 'outcomeUnconfirmed' || problem?.code === 'requestInterrupted')) {
           throw new ManagementError('unconfirmed', 'The server could not confirm the mutation outcome. Reconcile its original operation before taking further action.', response.status, problem, responseIssue, metadata);

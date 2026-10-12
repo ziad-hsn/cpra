@@ -228,7 +228,7 @@ func (f *machine) checkWorkerExecution(in WorkerExecutionIntent, at time.Time) e
 	if err := f.checkWorkerActionIdentity(in); err != nil {
 		return err
 	}
-	result := transition(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at})
+	result := transitionAtFormat(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at}, f.image.Version)
 	if !result.Allowed || result.Err != nil {
 		return ErrWorkerExecutionConflict
 	}

@@ -9,7 +9,7 @@ import (
 // transition is pure. All timestamps and identities derive from the command
 // and the preceding committed record. No clock, random source or I/O is used.
 func transition(previous Monitor, c Command) Result {
-	return transitionAtFormat(previous, c, NotificationFormatVersion)
+	return transitionAtFormat(previous, c, DeliveryFormatVersion)
 }
 
 func transitionAtFormat(previous Monitor, c Command, version int) Result {
@@ -24,6 +24,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	emit := func(kind string, a *Action) {
 		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident()}
 		if a != nil {
+			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
 			if a.RecoveryFailure != nil {
 				v := *a.RecoveryFailure
 				e.RecoveryFailure = &v
@@ -91,6 +92,12 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			m.Policy = c.Config.Policy.Clone()
 		}
 		m.ensureControlIdentity()
+		if deliveryStorageFormat(version) {
+			m.upgradeNotifications(c.At, emit)
+			if m.Policy.InMaintenance(c.At) {
+				m.suppressMaintenanceNotifications(c.At, emit)
+			}
+		}
 		if !m.Policy.Enabled {
 			for _, id := range sortedActions(m.Actions) {
 				a := m.Actions[id]
@@ -128,6 +135,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		return r
 	}
 	if c.Kind == "recover" {
+		if deliveryStorageFormat(version) {
+			m.upgradeNotifications(c.At, emit)
+		}
 		for _, id := range sortedActions(m.Actions) {
 			a := m.Actions[id]
 			if a.State == Started {
@@ -141,12 +151,32 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	if m.ID == "" || m.Removed || m.Revision != c.Revision {
 		return Result{}
 	}
+	if deliveryStorageFormat(version) {
+		m.upgradeNotifications(c.At, emit)
+	}
 	if c.Kind == "start" || c.Kind == "result" {
 		a, ok := m.Actions[c.ActionID]
 		if !ok || a.Revision != c.Revision {
 			return Result{}
 		}
 		if c.Kind == "start" {
+			if m.NotificationVersion == DeliveryFormatVersion && a.Kind == "code" && a.State == Queued {
+				if c.Maintenance || m.Policy.InMaintenance(c.At) {
+					m.suppressMaintenanceNotifications(c.At, emit)
+					return r
+				}
+				if !m.notificationEligible(a) {
+					m.cancelNotification(a, "notification_superseded", c.At, emit)
+					return r
+				}
+				if !a.Deadline.IsZero() && !c.At.Before(a.Deadline) {
+					m.cancelNotification(a, "notification_deadline", c.At, emit)
+					return r
+				}
+				if !c.ActionDeadline.IsZero() && !a.Deadline.IsZero() && !c.ActionDeadline.Equal(a.Deadline) {
+					return Result{Err: ErrNotificationIdentity}
+				}
+			}
 			if c.AgentConnection != nil && c.AgentConnection.CatalogUID != a.CatalogUID {
 				return Result{Err: ErrAgentActionInvalid}
 			}
@@ -159,6 +189,12 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				return Result{}
 			}
 			a.State, a.StartedAt = Started, c.At
+			if m.NotificationVersion == DeliveryFormatVersion && a.Kind == "code" && a.Deadline.IsZero() {
+				a.Deadline = c.ActionDeadline
+				if a.Deadline.IsZero() {
+					a.Deadline = c.At.Add(NotificationTimeout)
+				}
+			}
 			if c.ExecutorSession != "" {
 				a.ExecutorKind, a.ExecutorSession = "local", c.ExecutorSession
 				if c.Driver == "a2a" {
@@ -203,10 +239,15 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.openIncident(c.At, emit)
 				m.queueRecoveryFailure(a, c.At, emit)
 			}
-		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && m.Policy.Enabled && !m.snoozed(c.At) && !m.suppressedNotification(a) {
+		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && m.Policy.Enabled && !m.snoozed(c.At) && !m.suppressedNotification(a) &&
+			(m.NotificationVersion != DeliveryFormatVersion || m.notificationEligible(a) && !m.Policy.InMaintenance(c.At) && !m.NotificationMaintenance && c.At.Add(time.Second*time.Duration(1<<(a.Attempt+1))).Before(a.Deadline)) {
 			delete(m.Actions, a.ID)
 			a.Attempt++
-			a.ID = identity(fmt.Sprintf("%s/retry/%d", a.ID, a.Attempt))
+			if m.NotificationVersion == DeliveryFormatVersion {
+				a.ID = identity(fmt.Sprintf("%s/attempt/%d", a.DeliveryID, a.Attempt))
+			} else {
+				a.ID = identity(fmt.Sprintf("%s/retry/%d", a.ID, a.Attempt))
+			}
 			a.State, a.Outcome, a.NotBefore = Queued, "", c.At.Add(time.Second*time.Duration(1<<a.Attempt))
 			a.StartedAt, a.FinishedAt, a.ExecutorFinishedAt = time.Time{}, time.Time{}, time.Time{}
 			a.ExecutorKind, a.ExecutorSession = "", ""
@@ -220,6 +261,12 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		return Result{}
 	}
 	c.Maintenance = c.Maintenance || m.Policy.InMaintenance(c.At)
+	if m.NotificationVersion == DeliveryFormatVersion {
+		m.NotificationMaintenance = c.Maintenance
+		if c.Maintenance {
+			m.suppressMaintenanceNotifications(c.At, emit)
+		}
+	}
 	m.TotalChecks++
 	if c.Outcome == "success" {
 		m.SuccessfulChecks++
@@ -239,6 +286,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	m.Warning = c.Warning
 	if c.Outcome != "success" {
 		m.beginIncident(c.At)
+		m.changeNotificationEpisode(identity("outage/"+m.IncidentID), c.At, emit)
 		m.ConsecutiveFailures++
 		m.PulseFailures++
 		m.Recovering, m.Warning, m.RecoveryStreak = true, false, 0
@@ -267,9 +315,13 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.ConsecutiveFailures, m.PulseFailures = 0, 0
 		m.LastSuccess = c.At
 		if m.Warning && !previousWarning {
+			if !m.Recovering && !m.Incident {
+				m.changeNotificationEpisode(identity(fmt.Sprintf("warning/%s/%s/%d", m.ID, m.CatalogUID, c.Generation)), c.At, emit)
+			}
 			m.queueColor("yellow", c.At, emit)
 		}
 		if previousWarning && !m.Warning && !m.Recovering && !m.Incident {
+			m.changeNotificationEpisode(identity("warning_recovered/"+m.NotificationEpisode), c.At, emit)
 			m.queueColor("green", c.At, emit)
 		}
 		if m.VerifyRemaining > 0 {
@@ -329,6 +381,7 @@ func (m *Monitor) openIncident(at time.Time, emit func(string, *Action)) {
 		return
 	}
 	m.beginIncident(at)
+	m.changeNotificationEpisode(identity("outage/"+m.IncidentID), at, emit)
 	m.Incident = true
 	emit("incident_opened", nil)
 	m.queueColor("red", at, emit)
@@ -340,6 +393,7 @@ func (m *Monitor) recovered(at time.Time, emit func(string, *Action)) {
 	}
 	m.Incident, m.Recovering, m.InterventionAttempted, m.RecoveryStreak = false, false, false, 0
 	m.InterventionAttempts, m.LastInterventionFailure = 0, time.Time{}
+	m.changeNotificationEpisode(identity("recovered/"+m.IncidentID), at, emit)
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
 		if a.CatalogUID == m.CatalogUID && a.Kind == "intervention" && a.State == Queued {
@@ -362,7 +416,8 @@ func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Acti
 }
 
 func (m *Monitor) queueNotification(color string, at time.Time, failure *RecoveryFailure, emit func(string, *Action)) {
-	if !m.Policy.Enabled || m.snoozed(at) || (m.Dismissed && m.notificationIncident() != "") {
+	if !m.Policy.Enabled || m.snoozed(at) || (m.Dismissed && m.notificationIncident() != "") ||
+		m.NotificationVersion == DeliveryFormatVersion && (m.NotificationMaintenance || m.Policy.InMaintenance(at)) {
 		return
 	}
 	if color == "green" && m.Warning {
@@ -374,6 +429,9 @@ func (m *Monitor) queueNotification(color string, at time.Time, failure *Recover
 	}
 	due := at
 	if last := m.Cooldowns[color]; !(color == "green" && m.Policy.RecoveryBypass) && due.Before(last.Add(m.Policy.Cooldown)) {
+		if m.NotificationVersion == DeliveryFormatVersion {
+			return // Suppress the repeat; never release it after its episode ends.
+		}
 		due = last.Add(m.Policy.Cooldown)
 	}
 	for n := 0; n < count; n++ {
@@ -407,6 +465,10 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 		id = identity(m.CatalogUID + "/" + id)
 	}
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
+	if kind == "code" && m.NotificationVersion == DeliveryFormatVersion {
+		a.DeliveryID, a.NotificationEpisode = id, m.NotificationEpisode
+		a.EndpointID = notificationEndpointIdentity(*m, color, endpoint)
+	}
 	if failure != nil {
 		v := *failure
 		a.RecoveryFailure = &v

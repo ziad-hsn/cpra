@@ -26,7 +26,7 @@ func TestJobTypeDefaultBuildExcludesWireAndMethods(t *testing.T) {
 			}
 		}
 	}
-	if supportedFormat(15) || supportedFormat(16) || LatestFormatVersion != NotificationFormatVersion {
+	if supportedFormat(15) || supportedFormat(16) || LatestFormatVersion != DeliveryFormatVersion {
 		t.Fatal("default enabled external format")
 	}
 	for _, name := range []string{"CommitJobType", "JobType", "JobTypeVersion", "JobTypes", "JobTypeIDs", "ReserveJobTypeOperation", "CommitJobTypeOperation", "JobTypeSnapshot"} {

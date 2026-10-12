@@ -123,6 +123,12 @@ func (l *collectionLedger) AppendBatch(operationID string, items []CollectionIte
 	if l.db != nil {
 		return l.db.Update(func(tx *bolt.Tx) error { return l.appendDisk(tx, operationID, items, encoded) })
 	}
+	return l.appendMemory(operationID, items, encoded)
+}
+
+// Caller holds l.mu. Validation completes before this memory transaction
+// installs any rows, matching the disk transaction's all-or-nothing append.
+func (l *collectionLedger) appendMemory(operationID string, items []CollectionItem, encoded [][]byte) error {
 	rows := make(map[uint64][]byte, len(items))
 	keys := make(map[CatalogKey]uint64, len(items))
 	previousRows, previousKeys := l.rows[operationID], l.keys[operationID]

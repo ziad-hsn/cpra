@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/httpauth"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
@@ -32,6 +33,8 @@ func initializeRuntimeAuthentication(ctx context.Context, store *persistence.Sto
 		if err != nil {
 			return state, nil, fmt.Errorf("authentication bootstrap: %w", err)
 		}
+	} else if settings.Management.PolicyFile != "" || options.webAuth != "" || options.webAuthFile != "" {
+		controller.SystemLogger.Warn("Authentication bootstrap sources are ignored because committed authority exists; use stopped local authentication administration to rotate access")
 	}
 	if state.ResetRequired {
 		return state, nil, persistence.ErrAuthenticationResetRequired
@@ -101,6 +104,9 @@ func loadAuthenticationBootstrap(ctx context.Context, settings runtimeconfig.Con
 		}
 	}
 	if legacy != "" {
+		if len(legacy) < 32 {
+			return persistence.AuthenticationCommand{}, errors.New("API tokens require at least 32 printable characters; rotate existing short tokens using stopped local administration")
+		}
 		if len(legacy) > httpauth.MaxTokenBytes {
 			return persistence.AuthenticationCommand{}, errors.New("legacy token exceeds authentication compatibility limit")
 		}

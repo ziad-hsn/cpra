@@ -37,6 +37,7 @@ async function fixture(options: { supported?: string[]; reader?: boolean; lostCr
   let validationReads = 0;
   const fetcher = vi.fn<typeof fetch>(async (input, init = {}) => {
     const url = new URL(String(input)), method = init.method ?? 'GET', headers = new Headers(init.headers);
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname.endsWith('/self')) return headers.has('Authorization') ? response({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions: Object.keys(operationContracts) }) : response({}, 401);
     if (url.pathname.endsWith('/discovery')) return response({ resourceOperations: { Collection: supported, Operation: supported } });
     if (method === 'GET' && url.pathname.endsWith('/validation')) {
@@ -74,7 +75,7 @@ async function fixture(options: { supported?: string[]; reader?: boolean; lostCr
     return response({}, 404);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('private-bearer');
+  await session.discover(); await session.signIn('private-bearer-01234567890123456789012345678901');
   const router = createMemoryRouter([{ path: '/import', element: <SessionBoundary session={session}><CollectionImport /></SessionBoundary> }, { path: '/elsewhere', element: <p>Elsewhere</p> }], { initialEntries: ['/import'] });
   render(<RouterProvider router={router} />);
   await waitFor(() => expect(fetcher.mock.calls.some(call => String(call[0]).endsWith('/discovery'))).toBe(true));

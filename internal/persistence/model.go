@@ -51,6 +51,10 @@ type Policy struct {
 }
 
 type Action struct {
+	DeliveryID          string              `json:"delivery_id,omitempty"`
+	NotificationEpisode string              `json:"notification_episode,omitempty"`
+	EndpointID          string              `json:"endpoint_id,omitempty"`
+	Deadline            time.Time           `json:"deadline,omitzero"`
 	AgentConnection     *AgentConnection    `json:"agent_connection,omitempty"`
 	RecoveryFailure     *RecoveryFailure    `json:"recovery_failure,omitempty"`
 	AgentReceipt        *AgentReceipt       `json:"agent_receipt,omitempty"`
@@ -78,6 +82,9 @@ type Action struct {
 }
 
 type Monitor struct {
+	NotificationVersion     int                  `json:"notification_version,omitempty"`
+	NotificationEpisode     string               `json:"notification_episode,omitempty"`
+	NotificationMaintenance bool                 `json:"notification_maintenance,omitempty"`
 	ownerObserved           ownerObservation     // Process-local acknowledgement; never serialized.
 	DependencyRevision      string               `json:"dependency_revision,omitempty"`
 	ManualRequests          []time.Time          `json:"manual_requests,omitempty"`
@@ -145,6 +152,7 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	ActionDeadline       time.Time                 `json:"action_deadline,omitzero"`
 	AgentConnection      *AgentConnection          `json:"agent_connection,omitempty"`
 	AgentObservation     *AgentObservationCommand  `json:"agent_observation,omitempty"`
 	AgentReceipt         *AgentReceiptCommand      `json:"agent_receipt,omitempty"`
@@ -183,6 +191,9 @@ type Command struct {
 }
 
 type Event struct {
+	DeliveryID                 string                       `json:"delivery_id,omitempty"`
+	NotificationEpisode        string                       `json:"notification_episode,omitempty"`
+	EndpointID                 string                       `json:"endpoint_id,omitempty"`
 	RecoveryFailure            *RecoveryFailure             `json:"recovery_failure,omitempty"`
 	AgentReceipt               *AgentReceipt                `json:"agent_receipt,omitempty"`
 	CollectionExecutionHistory *CollectionExecutionHistory  `json:"collection_execution_history,omitempty"`
@@ -235,6 +246,9 @@ func identity(parts string) string {
 func validateCommand(c Command) error {
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if !c.ActionDeadline.IsZero() && (c.Kind != "start" || !c.ActionDeadline.After(c.At) || c.ActionDeadline.Sub(c.At) > 24*time.Hour) {
+		return ErrNotificationIdentity
 	}
 	if c.Config != nil {
 		for _, a := range c.Config.Actions {

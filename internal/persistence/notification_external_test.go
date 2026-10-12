@@ -11,14 +11,18 @@ import (
 )
 
 func TestWorkerCheckNotificationReplayFormats(t *testing.T) {
-	for _, version := range []int{WorkerResultFormatVersion, WorkerQueueFormatVersion, NotificationWorkerFormatVersion} {
+	for _, version := range []int{WorkerResultFormatVersion, WorkerQueueFormatVersion, NotificationWorkerFormatVersion, DeliveryWorkerFormatVersion} {
 		t.Run(strconv.Itoa(version), func(t *testing.T) {
 			s, _, _, input := workerResultFixture(t, "check", "failure")
 			record, found, err := s.WorkerExecution(t.Context(), input.ExecutionID)
 			if err != nil || !found {
 				t.Fatal("worker fixture missing", err)
 			}
-			m, delivered, pending := notificationTransitionFixture(t, Unknown)
+			fixtureVersion := NotificationFormatVersion
+			if version == DeliveryWorkerFormatVersion {
+				fixtureVersion = DeliveryFormatVersion
+			}
+			m, delivered, pending := notificationTransitionFixtureAtFormat(t, Unknown, fixtureVersion)
 			s.fsm.image.Monitors[m.ID] = m.Clone()
 			// Isolate the observation transition from admission and encryption.
 			// The real fixture provides the started grant; protocol contracts test
@@ -30,7 +34,7 @@ func TestWorkerCheckNotificationReplayFormats(t *testing.T) {
 			if !applied || noData || held || updated == nil || !reflect.DeepEqual(updated.Actions[pending.ID], pending) {
 				t.Fatal("worker observation changed unfinished delivery")
 			}
-			if version != NotificationWorkerFormatVersion {
+			if !notificationStorageFormat(version) {
 				if _, retained := updated.Actions[delivered.ID]; retained {
 					t.Fatal("historical worker replay changed its original actions")
 				}
@@ -61,14 +65,14 @@ func TestNotificationWorkerStorageBoundary(t *testing.T) {
 	s, authority, _, input := workerResultFixture(t, "check", "success")
 	c := Command{Kind: "worker_result", At: time.Now().UTC(), commandExtensions: commandExtensions{
 		WorkerResult: &WorkerResultCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: authority, Input: input}}}
-	if commandWriteFormat(c) != NotificationWorkerFormatVersion || commandMinimumFormat(c) != WorkerResultFormatVersion {
+	if commandWriteFormat(c) != DeliveryWorkerFormatVersion || commandMinimumFormat(c) != WorkerResultFormatVersion {
 		t.Fatal("worker writer changed the historical replay minimum")
 	}
 	if _, err := s.CommitWorkerResult(t.Context(), authority, input); err != nil {
 		t.Fatal(err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(notificationWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(deliveryWorkerSnapshotMagic)) {
 		t.Fatal("worker snapshot lost its optional format boundary")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")
@@ -76,7 +80,7 @@ func TestNotificationWorkerStorageBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != NotificationWorkerFormatVersion || i.WorkerExecutions == nil {
+	if i.Version != DeliveryWorkerFormatVersion || i.WorkerExecutions == nil {
 		t.Fatal("worker snapshot lost execution state")
 	}
 	i.Version = NotificationFormatVersion

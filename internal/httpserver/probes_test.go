@@ -22,7 +22,7 @@ import (
 )
 
 func TestObservationRequestsReceiveBoundedContext(t *testing.T) {
-	const token = "read-deadline-fixture-token"
+	const token = "read-deadline-fixture-token-01234567890123456789012345678901"
 	for _, path := range []string{"/api/v1/readyz", "/api/v2/readyz", "/api/v1/state", "/api/v2/state", "/metrics"} {
 		t.Run(path, func(t *testing.T) {
 			server := New(ServerConfig{AuthToken: token, ReadTimeout: time.Second}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
@@ -52,7 +52,7 @@ func TestObservationRequestsReceiveBoundedContext(t *testing.T) {
 }
 
 func TestObservationDeadlineDoesNotShortenWorkerPolls(t *testing.T) {
-	server := New(ServerConfig{AuthToken: "read-deadline-fixture-token", ReadTimeout: time.Millisecond}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	server := New(ServerConfig{AuthToken: "read-deadline-fixture-token-01234567890123456789012345678901", ReadTimeout: time.Millisecond}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	handler := server.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := r.Context().Deadline(); ok {
 			t.Error("read deadline applied to a worker poll")
@@ -60,7 +60,7 @@ func TestObservationDeadlineDoesNotShortenWorkerPolls(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	request := httptest.NewRequest(http.MethodPost, "/api/v2/external-workers/poll", nil)
-	request.Header.Set("Authorization", "Bearer read-deadline-fixture-token")
+	request.Header.Set("Authorization", "Bearer read-deadline-fixture-token-01234567890123456789012345678901")
 	handler.ServeHTTP(httptest.NewRecorder(), request)
 }
 
@@ -75,8 +75,8 @@ func TestReadinessUsesRequestContext(t *testing.T) {
 		{"managed-state", "/api/v2/state", true},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			server := New(ServerConfig{AuthToken: "request-context-token"}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
-			token := "request-context-token"
+			server := New(ServerConfig{AuthToken: "request-context-token-01234567890123456789012345678901"}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+			token := "request-context-token-01234567890123456789012345678901"
 			if scenario.management {
 				fixture := newManagementFixture(t, true)
 				server, token = fixture.server, managementReaderToken
@@ -216,7 +216,7 @@ func TestTokenOnlyV2ProbesSDKAndCLI(t *testing.T) {
 }
 
 func TestTokenOnlyV2ProbesRequireExistingAuthentication(t *testing.T) {
-	for _, cfg := range []ServerConfig{{AuthToken: "probe-token"}, {}, {Addr: "127.0.0.1:0", AllowAnonymousLoopback: true}} {
+	for _, cfg := range []ServerConfig{{AuthToken: "probe-token-01234567890123456789012345678901"}, {}, {Addr: "127.0.0.1:0", AllowAnonymousLoopback: true}} {
 		server := New(cfg, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 		handler := server.authMiddleware(apiMux(server))
 		for _, path := range []string{"/api/v2/healthz", "/api/v2/readyz"} {
@@ -237,14 +237,14 @@ func TestTokenOnlyV2ProbesRequireExistingAuthentication(t *testing.T) {
 }
 
 func TestTokenOnlyV2ProbesAreNarrowReadRoutes(t *testing.T) {
-	server := New(ServerConfig{AuthToken: "probe-token", Ready: func(context.Context) bool { return true }}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
+	server := New(ServerConfig{AuthToken: "probe-token-01234567890123456789012345678901", Ready: func(context.Context) bool { return true }}, mkHolder(), nil, nil, nil, nil, nil, nil, nil, PublicConfig{})
 	handler := server.authMiddleware(apiMux(server))
 	for _, tc := range []struct {
 		method, path string
 		status       int
 	}{{"GET", "/api/v2/healthz?extra=true", 400}, {"GET", "/api/v2/readyz?extra=true", 400}, {"POST", "/api/v2/healthz", 405}, {"POST", "/api/v2/readyz", 405}, {"GET", "/api/v2/state", 404}, {"GET", "/api/v2/monitors", 404}} {
 		request := httptest.NewRequest(tc.method, tc.path, nil)
-		request.Header.Set("Authorization", "Bearer probe-token")
+		request.Header.Set("Authorization", "Bearer probe-token-01234567890123456789012345678901")
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 		if response.Code != tc.status {

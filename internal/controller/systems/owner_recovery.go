@@ -154,6 +154,13 @@ func (s *DurableSystem) recoveryError(err error, ctx context.Context) {
 	s.fail(err)
 }
 
+func (s *DurableSystem) healthObservationError(err error, ctx context.Context) {
+	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+		return // A read timeout says nothing about an unresolved write.
+	}
+	s.fail(err)
+}
+
 func (s *DurableSystem) resultsBuffered() bool {
 	if len(s.resultBacklog) != 0 {
 		return true

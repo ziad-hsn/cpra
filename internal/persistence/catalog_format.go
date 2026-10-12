@@ -27,8 +27,9 @@ func mutatesCatalog(c Command) bool {
 // format-2/3 replay contract.
 func commandWriteFormat(c Command) int {
 	version := joinStorageFormat(commandMinimumFormat(c), commandExtensionWriteFormat(c))
-	if c.Kind == "pulse" {
-		version = joinStorageFormat(version, NotificationFormatVersion)
+	switch c.Kind {
+	case "configure", "pulse", "start", "result", "recover", "remove":
+		version = joinStorageFormat(version, DeliveryFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
@@ -49,6 +50,9 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if !c.ActionDeadline.IsZero() || c.Config != nil && c.Config.NotificationVersion != 0 {
+		return joinStorageFormat(DeliveryFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.AgentConnection != nil || c.AgentObservation != nil || c.Kind == "agent_observation" {
 		return joinStorageFormat(AgentObservationFormatVersion, commandExtensionMinimumFormat(c))
 	}

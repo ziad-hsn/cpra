@@ -103,6 +103,7 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 		s.managementHTTP = m
 	})
 	m := s.managementHTTP
+	m.registerDiscovery(mux)
 	s.registerManagementExtensions(mux, m)
 	m.registerControls(mux)
 	m.registerHistory(mux)
@@ -148,6 +149,9 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 			return
 		}
 		result := api.Capabilities{APIVersions: []string{"v1", "v2"}, Drivers: map[string][]string{"check": {}, "recovery": {}, "notification": {}}, Resources: []string{}, PatchTypes: []string{"application/merge-patch+json"}, ResourceOperations: map[string][]string{}}
+		result.Resources = append(result.Resources, "Version", "Schema")
+		result.ResourceOperations["Version"] = []string{"GetVersion"}
+		result.ResourceOperations["Schema"] = []string{"ExplainResource"}
 		for _, capability := range jobs.Capabilities() {
 			if capability.Available {
 				result.Drivers[capability.Kind] = append(result.Drivers[capability.Kind], capability.Driver)
@@ -185,6 +189,7 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 
 func (m *managementHTTP) managementPermissions(permissions []string) []string {
 	supported := map[string]bool{"PrepareCollection": true, "CreateOperation": true, "UploadOperation": true, "CancelOperation": true, "ValidateOperation": true, "GetOperationValidation": true, "ActivateOperation": true, "PreflightCollection": true, "GetAccess": true, "GetCapabilities": true, "GetOperation": true, "ListOperations": true,
+		"GetVersion": true, "ExplainResource": true,
 		"ListIncidents": true, "GetIncident": true, "AcknowledgeIncident": true, "DismissIncident": true,
 		"ReopenIncident": true, "SnoozeMonitor": true, "UnsnoozeMonitor": true, "GetHistory": true, "GetAction": true, "ListActions": true, "ReviewAction": true, "RecoverMonitor": true}
 	for _, observation := range observationRoutes {
@@ -229,7 +234,15 @@ func writeManagementError(w http.ResponseWriter, err error) {
 	status, code, title, detail := http.StatusInternalServerError, "internalError", "Request failed", "The request could not be completed."
 	var authError *httpauth.Error
 	var failure *managementHTTPError
+	var notSubmitted *managementAdmissionError
 	switch {
+	case errors.Is(err, management.ErrOutcomeUnconfirmed) || errors.Is(err, persistence.ErrCommitUnconfirmed):
+		status, code, title, detail = 503, "outcomeUnconfirmed", "Service Unavailable", "The mutation outcome is unconfirmed. Reconcile the original operation; do not repeat the write automatically."
+		w.Header().Del("X-CPRa-Admission")
+	case errors.As(err, &notSubmitted):
+		status, code, title, detail = 503, "admissionUnavailable", "Service Unavailable", "Management is not accepting writes. This request was not admitted."
+		w.Header().Set("X-CPRa-Admission", "not-submitted")
+		w.Header().Set("Retry-After", "5")
 	case errors.As(err, &failure):
 		status, code, detail = failure.status, failure.code, failure.detail
 		title = http.StatusText(status)
@@ -298,8 +311,6 @@ func writeManagementError(w http.ResponseWriter, err error) {
 		status, code, title, detail = 422, "validationGraphLimit", "Unprocessable Content", "The affected graph exceeds synchronous validation capacity."
 	case errors.Is(err, management.ErrValidation):
 		status, code, title, detail = 422, "invalidResource", "Unprocessable Content", "Check resource fields, compiled drivers, references, and credential bindings."
-	case errors.Is(err, management.ErrOutcomeUnconfirmed):
-		status, code, title, detail = 503, "outcomeUnconfirmed", "Service Unavailable", "The mutation outcome is unconfirmed. Reconcile the original resource; do not repeat the write automatically."
 	case errors.Is(err, management.ErrUnavailable):
 		status, code, title, detail = 503, "unavailable", "Service Unavailable", "Durable management is unavailable."
 	case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):

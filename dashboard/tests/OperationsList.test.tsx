@@ -16,12 +16,13 @@ async function setup(reply: (url: URL) => Response, permissions = ['ListOperatio
   const reads: URL[] = [];
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const url = new URL(String(input));
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return new Headers(init?.headers).has('Authorization') ? json({ principalId: 'reader', role: 'reader', permissions }) : json({}, 401);
     reads.push(url);
     return reply(url);
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('private-tab-token');
+  await session.discover(); await session.signIn('private-tab-token-01234567890123456789012345678901');
   const router = createMemoryRouter([{ path: '/operations/:id?', element: <SessionBoundary session={session}><OperationDetail /></SessionBoundary> }], { initialEntries: ['/operations'] });
   render(<RouterProvider router={router} />);
   return { session, reads, fetcher, router };
@@ -55,7 +56,7 @@ it('uses an explicit exact monitor filter and resets the old cursor when changin
   expect(state.reads[2].searchParams.get('monitorID')).toBe('payments-api');
   expect(state.reads[2].searchParams.has('cursor')).toBe(false);
   expect(state.reads[2].searchParams.has('selector')).toBe(false);
-  expect(state.reads.every(url => !url.href.includes('private-tab-token'))).toBe(true);
+  expect(state.reads.every(url => !url.href.includes('private-tab-token-01234567890123456789012345678901'))).toBe(true);
 });
 
 it('does not request a list without its exact permission and preserves manual lookup', async () => {

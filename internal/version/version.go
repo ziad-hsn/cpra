@@ -17,11 +17,27 @@ var (
 // Info returns release identity, falling back to Go's module and VCS metadata
 // for builds made without the release tooling.
 func Info() string {
+	i := Current()
+	return fmt.Sprintf("%s (commit %s, source date %s)", i.Version, i.Commit, i.SourceDate)
+}
+
+type Identity struct {
+	Version, Commit, SourceDate string
+}
+
+// Current uses the same explicit or Go-recorded identity as version output.
+// A module version alone supplies no invented source commit or timestamp.
+func Current() Identity {
 	info, _ := debug.ReadBuildInfo()
-	return format(Version, Commit, Date, info)
+	return identity(Version, Commit, Date, info)
 }
 
 func format(version, commit, date string, info *debug.BuildInfo) string {
+	i := identity(version, commit, date, info)
+	return fmt.Sprintf("%s (commit %s, source date %s)", i.Version, i.Commit, i.SourceDate)
+}
+
+func identity(version, commit, date string, info *debug.BuildInfo) Identity {
 	if info != nil {
 		if version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			version = info.Main.Version
@@ -46,5 +62,5 @@ func format(version, commit, date string, info *debug.BuildInfo) string {
 			version += "-dirty"
 		}
 	}
-	return fmt.Sprintf("%s (commit %s, source date %s)", version, commit, date)
+	return Identity{Version: version, Commit: commit, SourceDate: date}
 }

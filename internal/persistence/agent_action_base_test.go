@@ -9,10 +9,10 @@ import (
 )
 
 func TestAgentStorageDefaultExcludesWorkers(t *testing.T) {
-	if LatestFormatVersion != NotificationFormatVersion || !supportedFormat(31) || !supportedFormat(33) || !supportedFormat(35) || !supportedFormat(38) {
+	if LatestFormatVersion != DeliveryFormatVersion || !supportedFormat(31) || !supportedFormat(33) || !supportedFormat(35) || !supportedFormat(38) || !supportedFormat(40) || supportedFormat(41) {
 		t.Fatal("missing common agent format")
 	}
-	for _, version := range []int{15, 20, 30, 32, 34, 36, 37, 39, 40} {
+	for _, version := range []int{15, 20, 30, 32, 34, 36, 37, 39, 41, 42} {
 		if supportedFormat(version) {
 			t.Fatal("default build accepted optional or future format", version)
 		}

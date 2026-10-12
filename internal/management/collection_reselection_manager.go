@@ -279,14 +279,14 @@ func (m *CollectionReselectionManager) createPreflight(ctx context.Context, id, 
 	if _, err := m.catalog.store.CollectionOperationAs(ctx, id, actor, m.now()); err != nil {
 		return empty, nil, noHead, err
 	}
-	view, head, err := m.catalog.store.CollectionUploadView(ctx, id, m.now())
+	view, head, err := m.catalog.store.CollectionInputView(ctx, id, m.now())
 	if err != nil {
 		return empty, nil, noHead, err
 	}
 	if head.Actor != actor || head.Owner == nil || head.Owner.Actor != actor || head.Owner.Epoch != authority.Epoch {
 		return empty, nil, noHead, ErrReselectionNotFound
 	}
-	if head.NormalizationProfile != collection.FileNormalizationProfile || head.ItemCount > 10_000 {
+	if head.NormalizationProfile != "" && head.NormalizationProfile != collection.FileNormalizationProfile || head.ItemCount > 10_000 {
 		return empty, nil, noHead, ErrReselectionConflict
 	}
 	current, err := m.catalog.store.ObserveOperatorAuthority(ctx, actor, m.now())
@@ -306,7 +306,7 @@ func (m *CollectionReselectionManager) createPreflight(ctx context.Context, id, 
 }
 
 func (m *CollectionReselectionManager) Create(ctx context.Context, id, actor, profile string, count int) (CollectionReselectionStatus, error) {
-	if ctx == nil || profile != collection.FileNormalizationProfile || count < 1 || count > 1000 {
+	if ctx == nil || profile != "" && profile != collection.FileNormalizationProfile || count < 1 || count > 1000 {
 		return CollectionReselectionStatus{}, ErrValidation
 	}
 	if err := m.begin(); err != nil {
@@ -316,6 +316,9 @@ func (m *CollectionReselectionManager) Create(ctx context.Context, id, actor, pr
 	authority, view, head, err := m.createPreflight(ctx, id, actor)
 	if err != nil {
 		return CollectionReselectionStatus{}, err
+	}
+	if profile != head.NormalizationProfile {
+		return CollectionReselectionStatus{}, ErrReselectionConflict
 	}
 	at := m.now()
 	expiry := reselectionAttemptExpiry(at, head.ExpiresAt)

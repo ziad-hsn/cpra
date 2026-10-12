@@ -80,6 +80,10 @@ var ErrReselectionObservation = errors.New("original upload recovery observation
 // themselves when their context is canceled.
 // Context cancellation stops this helper, never an admitted server operation.
 func Reselect(ctx context.Context, operations ReselectionOperations, operationID string, sources []Source, options ReselectionOptions) (result ReselectionResult, err error) {
+	return reselect(ctx, operations, operationID, sources, options, false)
+}
+
+func reselect(ctx context.Context, operations ReselectionOperations, operationID string, sources []Source, options ReselectionOptions, verifyComplete bool) (result ReselectionResult, err error) {
 	if !reselectionHandle(operationID, 128) {
 		return result, errors.New("an original operation handle is required")
 	}
@@ -99,16 +103,16 @@ func Reselect(ctx context.Context, operations ReselectionOperations, operationID
 	if err != nil {
 		return result, err
 	}
-	original, err := reselectionOperation(first, operationID)
+	original, err := reselectionOperation(first, operationID, verifyComplete)
 	if err != nil {
 		return result, err
 	}
 	result.Operation = original
-	if *original.Uploaded == *original.ItemCount {
+	if *original.Uploaded == *original.ItemCount && !verifyComplete {
 		result.Complete = true
 		return result, nil
 	}
-	if original.State != "uploading" || first.Data.ExecutionResult != nil || original.Committed != nil && *original.Committed != 0 || original.Applied != nil && *original.Applied != 0 {
+	if original.State != "uploading" && !(verifyComplete && (original.State == "validating" || original.State == "validated")) || first.Data.ExecutionResult != nil || original.Committed != nil && *original.Committed != 0 || original.Applied != nil && *original.Applied != 0 {
 		return result, ErrReselectionState
 	}
 	var response *cpra.Response[api.CollectionReselectionAttempt]
@@ -141,7 +145,7 @@ func Reselect(ctx context.Context, operations ReselectionOperations, operationID
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
-		response, err = operations.CreateReselection(ctx, operationID, api.CollectionReselectionCreateRequest{NormalizationProfile: FileNormalizationProfile, SourceCount: int64(len(spool.records))})
+		response, err = operations.CreateReselection(ctx, operationID, api.CollectionReselectionCreateRequest{NormalizationProfile: original.NormalizationProfile, SourceCount: int64(len(spool.records))})
 		if err != nil {
 			return result, err
 		}
@@ -201,7 +205,7 @@ func Reselect(ctx context.Context, operations ReselectionOperations, operationID
 			if readErr != nil {
 				return result, readErr
 			}
-			current, readErr := reselectionOperation(last, operationID)
+			current, readErr := reselectionOperation(last, operationID, verifyComplete)
 			if readErr != nil || current.IdentityFormat != original.IdentityFormat || current.NormalizationProfile != original.NormalizationProfile || current.ContentDigest != original.ContentDigest || current.ItemCount == nil || *current.ItemCount != *original.ItemCount || current.Uploaded == nil || *current.Uploaded != *original.ItemCount || prior.OperationUploaded != *current.Uploaded {
 				return result, ErrReselectionObservation
 			}

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardSession, ManagementError } from '../src/api/session';
 
-const operator = { principalId: 'alice', role: 'operator', permissions: ['CreateMonitor', 'PatchMonitor'] };
+const operator = { principalId: 'alice', role: 'operator', permissions: ['CreateMonitor', 'PatchMonitor', 'ValidateOperation'] };
 const json = (value: unknown, init?: ResponseInit) => new Response(JSON.stringify(value), init);
-const token = 'test-opaque-bearer';
+const token = 'test-opaque-bearer-01234567890123456789012345678901';
 const allocationProblem = '{"type":"about:blank","title":"Service Unavailable","status":503,"code":"operationAllocationUnconfirmed"}';
 
 async function signedIn(options: { maxResponseBytes?: number; timeoutMs?: number } = {}) {
@@ -112,6 +112,31 @@ describe('management transport', () => {
     expect(caught).toMatchObject({ reason: 'not-admitted', status: 503, response: { operationID: '' } });
     expect(String(caught)).toContain('No resource change or action was submitted');
     expect(String(caught)).not.toContain('private allocator context');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the original operation on a proven pre-submission rejection without retrying', async () => {
+    const { session, fetcher } = await signedIn();
+    const id = 'op.12345678-1234-1234-1234-123456789abc.00000000000000000001';
+    fetcher.mockResolvedValueOnce(json({ type: 'about:blank', title: 'Service Unavailable', status: 503, code: 'admissionUnavailable' }, {
+      status: 503, headers: { 'Content-Type': 'application/problem+json', 'X-CPRa-Admission': 'not-submitted', 'Retry-After': '5', 'X-Operation-ID': id },
+    }));
+    await expect(session.collectionRequest('ValidateOperation', undefined, id)).rejects.toMatchObject({ reason: 'not-admitted', response: { operationID: id, retryAfterMs: 5000 } });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['missing-delay', 'unbounded-delay', 'duplicate-delay', 'changed-operation', 'invalid-operation', 'missing-marker'])('keeps incomplete admission evidence uncertain: %s', async variant => {
+    const { session, fetcher } = await signedIn();
+    const id = 'op.12345678-1234-1234-1234-123456789abc.00000000000000000001';
+    const headers = new Headers({ 'Content-Type': 'application/problem+json', 'X-CPRa-Admission': 'not-submitted', 'Retry-After': '5', 'X-Operation-ID': id });
+    if (variant === 'missing-delay') headers.delete('Retry-After');
+    if (variant === 'unbounded-delay') headers.set('Retry-After', '61');
+    if (variant === 'duplicate-delay') headers.append('Retry-After', '5');
+    if (variant === 'changed-operation') headers.set('X-Operation-ID', id.slice(0, -1) + '2');
+    if (variant === 'invalid-operation') headers.set('X-Operation-ID', 'original-1');
+    if (variant === 'missing-marker') headers.delete('X-CPRa-Admission');
+    fetcher.mockResolvedValueOnce(json({ type: 'about:blank', title: 'Service Unavailable', status: 503, code: 'admissionUnavailable' }, { status: 503, headers }));
+    await expect(session.collectionRequest('ValidateOperation', undefined, id)).rejects.toMatchObject({ reason: 'unconfirmed' });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
@@ -275,11 +300,11 @@ describe('management transport', () => {
     expect(session.can('CreateMonitor')).toBe(false);
   });
 
-  it('falls back only on a missing v2 endpoint, without making any write request', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({}, { status: 404 })).mockResolvedValueOnce(json({ total: 1 }));
+  it('uses explicit observation discovery without making any write request', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })).mockResolvedValueOnce(json({ total: 1 }));
     const session = new DashboardSession({ origin: 'http://cpra.example', fetch: fetcher });
     await session.discover();
-    expect(session.getSnapshot().phase).toBe('legacy');
+    expect(session.getSnapshot().phase).toBe('observation');
     expect(await session.legacy('/api/v1/overview')).toEqual({ total: 1 });
     expect(new Headers(fetcher.mock.calls[1][1]?.headers).has('Authorization')).toBe(false);
     const failing = new DashboardSession({ origin: 'http://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(json({}, { status: 503 })) });
@@ -287,14 +312,24 @@ describe('management transport', () => {
     expect(failing.getSnapshot().phase).toBe('unavailable');
   });
 
-  it('preserves existing browser Basic authentication only for read-only discovery and legacy reads', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) =>
-      json({}, { status: init?.credentials === 'same-origin' ? 404 : 401 }));
+  it('preserves browser Basic authentication for explicitly discovered observation access', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url, init) =>
+      String(url).endsWith('/access') ? json({ mode: 'observation', authenticationRequired: true })
+        : json({}, { status: init?.credentials === 'same-origin' ? 200 : 401 }));
     const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
     await session.discover();
-    expect(session.getSnapshot().phase).toBe('legacy');
+    expect(session.getSnapshot().phase).toBe('observation');
     expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'same-origin', redirect: 'error' });
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+  });
+
+  it('does not downgrade unavailable, missing or malformed discovery into observation access', async () => {
+    for (const response of [json({}, { status: 404 }), json({}, { status: 503 }), json({ mode: 'observation' }), json({ mode: 'unknown', authenticationRequired: false })]) {
+      const session = new DashboardSession({ origin: 'https://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(response) });
+      await session.discover();
+      expect(session.getSnapshot().phase).toBe('unavailable');
+      expect(session.can('CreateMonitor')).toBe(false);
+    }
   });
 
   it('never writes the token to browser storage and a new tab session requires sign-in', async () => {

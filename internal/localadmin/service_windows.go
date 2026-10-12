@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/ziad-hsn/cpra/internal/installpath"
 	"golang.org/x/sys/windows"
@@ -105,6 +106,37 @@ func nativeSecure(l installpath.Layout, _ string) error {
 	return nil
 }
 
+func managementServiceReader(l installpath.Layout, _ string) (*int, string, error) {
+	if l.Scope == "user" {
+		return nil, "", nil
+	}
+	// Obtain the per-service identity without registering or starting a service.
+	// RtlCreateServiceSid derives the same SID used by SCM for this fixed name.
+	name, err := windows.UTF16FromString(windowsServiceName)
+	if err != nil {
+		return nil, "", err
+	}
+	unicodeName := struct {
+		Length, MaximumLength uint16
+		Buffer                *uint16
+	}{uint16((len(name) - 1) * 2), uint16(len(name) * 2), &name[0]}
+	var buffer [17]uint32 // Maximum native SID size, aligned for its DWORD fields.
+	size := uint32(len(buffer) * 4)
+	proc := windows.NewLazySystemDLL("ntdll.dll").NewProc("RtlCreateServiceSid")
+	if err := proc.Find(); err != nil {
+		return nil, "", err
+	}
+	status, _, _ := proc.Call(uintptr(unsafe.Pointer(&unicodeName)), uintptr(unsafe.Pointer(&buffer[0])), uintptr(unsafe.Pointer(&size)))
+	if status != 0 || size < 8 || size > uint32(len(buffer)*4) {
+		return nil, "", errors.New("native service identity resolution failed")
+	}
+	sid := (*windows.SID)(unsafe.Pointer(&buffer[0])).String()
+	if _, err := windows.StringToSid(sid); err != nil {
+		return nil, "", err
+	}
+	return nil, sid, nil
+}
+
 func openNativeService(l installpath.Layout) (*mgr.Mgr, *mgr.Service, error) {
 	if l.Scope != "system" {
 		return nil, nil, errors.New("Windows user mode runs in the foreground; SCM services require system scope")
@@ -154,6 +186,10 @@ func nativeRegister(ctx context.Context, l installpath.Layout, account string) e
 	if l.Scope != "system" {
 		return errors.New("Windows user mode runs in the foreground; no user service is registered")
 	}
+	args, err := serviceArgs(l)
+	if err != nil {
+		return err
+	}
 	manager, err := mgr.Connect()
 	if err != nil {
 		return err
@@ -162,7 +198,7 @@ func nativeRegister(ctx context.Context, l installpath.Layout, account string) e
 	cfg := mgr.Config{ServiceType: windows.SERVICE_WIN32_OWN_PROCESS, StartType: mgr.StartAutomatic, ErrorControl: mgr.ErrorNormal, DisplayName: windowsServiceName, Description: "CPRa monitoring and recovery controller", ServiceStartName: account, SidType: windows.SERVICE_SID_TYPE_UNRESTRICTED}
 	service, err := manager.OpenService(windowsServiceName)
 	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
-		service, err = manager.CreateService(windowsServiceName, binaryPath(l), cfg, serviceArgs(l)...)
+		service, err = manager.CreateService(windowsServiceName, binaryPath(l), cfg, args...)
 	} else if err == nil {
 		if _, err = installation(l); err != nil {
 			service.Close()
@@ -182,7 +218,7 @@ func nativeRegister(ctx context.Context, l installpath.Layout, account string) e
 			service.Close()
 			return err
 		}
-		cfg = updatedServiceConfig(cfg, binaryPath(l), serviceArgs(l))
+		cfg = updatedServiceConfig(cfg, binaryPath(l), args)
 		err = service.UpdateConfig(cfg)
 	}
 	if err != nil {

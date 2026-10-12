@@ -23,6 +23,7 @@ export async function fixture(type: ResourceType, id?: string, options: { reader
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
     const headers = new Headers(init?.headers);
+    if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname === '/api/v2/self') return headers.has('Authorization') ? response({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions }) : response({}, 401);
     if (url.pathname.startsWith('/api/v2/operations/')) { const operation = operations.get(decodeURIComponent(url.pathname.slice('/api/v2/operations/'.length))); return operation ? response(operation) : response({}, 404); }
     if (url.pathname === '/api/v2/discovery') return response({ apiVersions: ['cpra.io/v2'], drivers: options.drivers ?? { notification: Object.keys(notificationFields), check: Object.keys(checkFields), recovery: Object.keys(recoveryFields) }, resources: [], patchTypes: ['application/merge-patch+json'] });
@@ -67,7 +68,7 @@ export async function fixture(type: ResourceType, id?: string, options: { reader
     return writeResponse(next, 200, { ETag: '"rv-next"', 'X-Resource-Version': 'rv-next', 'X-Operation-ID': operation.id });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
-  await session.discover(); await session.signIn('test-token');
+  await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
   const route = resourceKinds[type].route;
   const router = createMemoryRouter([{ path: `${route}/:id?`, element: <SessionBoundary session={session}><ManagementResources type={type} /></SessionBoundary> }, { path: '/operations/:id?', element: <SessionBoundary session={session}><OperationDetail /></SessionBoundary> }, { path: '/elsewhere', element: <p>Elsewhere</p> }], { initialEntries: [id === 'new' ? `${route}?create=1` : `${route}${id ? `/${id}` : ''}`] });
   render(<RouterProvider router={router} />);

@@ -11,6 +11,11 @@ reproduction). R1 inspected `b293f34` for some claims; R2/R3 inspect `2ba7b73`.
 passing check or an independent sign-off for this branch. Original evidence and
 reproductions are retained separately; no raw credentials belong in this record.
 
+Current repairs and fresh local check outcomes are recorded in
+[release repair progress](release-repair-progress.md). Baseline dispositions
+below remain unchanged historical observations; they are not current completion
+claims.
+
 | ID | Finding | Baseline disposition and evidence | Repair / qualification |
 | --- | --- | --- | --- |
 | F01 | README first run requires an uncreated token; CLI/dashboard access fails | Reproduced (R2): v2 self/health return 401 without named authority. | Go-based management initialization, access discovery, executed quickstart. |

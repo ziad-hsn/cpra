@@ -488,6 +488,13 @@ After all Go builds/tests stopped, a further task-owned derived-cache cleanup
 removed 2,533,785,600 allocated bytes across 21,649 regular single-link entries.
 Four unrecognized/shared entries were preserved; tools, modules, source,
 executables and evidence remain. Scratch plus task-owned node_modules measures
-about 2.03 GiB. The latest physical C: read reports 26,549,837,824 bytes, about
-24.7 GiB, below the initial 35 GiB comparative-campaign prerequisite. This
+about 2.03 GiB before the final documentation build. A fresh physical C: read
+then reports 27,639,676,928 bytes, about 25.74 GiB, below the initial 35 GiB
+comparative-campaign prerequisite. This
 cleanup does not imply that WSL's virtual disk was compacted.
+
+The refreshed private documentation build passes with 171 content pages, 16
+redirects and 29,799 internal links/assets checked without errors. Its source
+inventory is unchanged during the build. The version notice records implementation
+checkpoint `2d2e355` before this documentation metadata refresh; it is not a
+frozen release identity. The separate gh-pages checkout remains untouched.

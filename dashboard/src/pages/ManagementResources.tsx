@@ -9,6 +9,7 @@ import { EndpointFields, ReferencePicker } from '../components/ResourceForms';
 import { DirtyDraftGuard } from '../components/DirtyDraftGuard';
 import { MutationReceipt, OperationLink } from '../components/OperationReceipt';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ProblemDetails } from '../components/ProblemDetails';
 import { LabelFields, MonitorFields, MonitorStatusDetails, validateMonitorDraft } from '../components/MonitorFields';
 import type { Capabilities, Metadata, Monitor } from '../api/generated';
 
@@ -165,7 +166,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
       {(id || creating) && <Link className="btn ghost" to={definition.route}>Back to {definition.title.toLowerCase()}</Link>}
     </div>
     {failure && <div className="card" role="alert" tabIndex={-1} ref={errorRef}><p>{failure}</p>
-      {mutation.error?.problem?.errors?.length ? <ul>{mutation.error.problem.errors.map((field, index) => <li key={index}>{/^[\w.[\]-]{1,160}$/.test(field.field) ? field.field : 'Resource field'}: validation failed.</li>)}</ul> : null}
+      <ProblemDetails error={mutation.error} />
       {(draft?.baseline || (creating && mutation.error?.reason === 'unconfirmed')) && <button className="btn" onClick={() => void compare()}>Compare latest resource</button>}
       <OperationLink id={mutation.error?.response?.operationID || mutation.error?.problem?.operationID} label="Reconcile original operation" />
     </div>}

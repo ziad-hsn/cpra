@@ -35,6 +35,18 @@ fields. Those machine formats retain the wire contract.
 `get state` reports controller and storage health. Use `get actions --monitor-id
 service-api` for a monitor's action state. `get overview` is not a current command.
 
+Request failures retain their SDK error classification. Human output includes
+the HTTP status, reviewed problem code, valid request/operation identities and
+up to ten field names with validation codes. Raw server detail, submitted values,
+provider bodies and filesystem paths are not printed. Use the operation ID to
+inspect the original receipt before explicit continuation; confirmed rejection
+before submission does not imply that an earlier operation was canceled.
+
+The dashboard reports the same bounded metadata for resource and monitor-control
+failures. Collection controls also identify the failed phase. Validation and
+activation continue the original immutable collection only after explicit
+operator action; displaying an error or rereading progress submits no write.
+
 ## Connection and authorization
 
 Start an explicitly enabled management server with named identities and TLS.

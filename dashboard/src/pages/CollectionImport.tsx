@@ -12,6 +12,7 @@ import { operationID } from '../api/operations';
 import { DirtyDraftGuard } from '../components/DirtyDraftGuard';
 import { CollectionExecution } from '../components/CollectionExecution';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ProblemDetails } from '../components/ProblemDetails';
 
 type PreviewItem = WorkerCollectionItemSummary & { sourceName: string };
 type PrivateImport = { collection?: BrowserCollection; ticket?: string; expiresAt?: string; createAttempted: boolean; validationAttempted?: boolean; activationAttempted?: boolean; sourceNames?: readonly string[]; operation?: Operation; busy: boolean; active: boolean; generation: number; controller?: AbortController };
@@ -28,6 +29,8 @@ export default function CollectionImport() {
   const [progress, setProgress] = useState<ImportProgress>();
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [problem, setProblem] = useState<ManagementError>();
+  const [failedPhase, setFailedPhase] = useState('');
   const [uncertain, setUncertain] = useState(false);
   const [preflight, setPreflight] = useState<Preflight>();
   const [validation, setValidation] = useState<CollectionValidationPage>();
@@ -66,6 +69,7 @@ export default function CollectionImport() {
     }
   };
   const failure = (error: unknown) => {
+    setProblem(error instanceof ManagementError ? error : undefined);
     if (error instanceof ManagementError) {
       if (error.reason === 'unconfirmed') {
         setUncertain(true);
@@ -87,7 +91,9 @@ export default function CollectionImport() {
     const owned = lifetime.current;
     if (!owned.active || owned.busy) return;
     owned.busy = true; owned.controller = new AbortController(); const generation = owned.generation;
-    stopWaiting(); setBusy(label); setFeedback('');
+    stopWaiting(); setBusy(label); setFeedback(''); setProblem(undefined);
+    const step = label.toLowerCase();
+    setFailedPhase(step.includes('upload') ? 'upload' : step.includes('validat') ? 'validation' : step.includes('activat') ? 'activation' : step.includes('cancel') ? 'cancellation' : 'observation');
     try { await task(owned.controller.signal); }
     catch (error) { if (owned.active && owned.generation === generation) failure(error); }
     finally { if (owned.active && owned.generation === generation) { owned.busy = false; setBusy(''); } }
@@ -299,6 +305,7 @@ export default function CollectionImport() {
       </>}
     </section>
     {feedback && <p role="alert">{feedback}</p>}
+    <ProblemDetails error={problem} phase={failedPhase} />
     {!!summary && <section className="card" aria-label="Collection preview">
       <h2>Source-attributed preview</h2><p>Resource contents are hidden. Create, update and unchanged outcomes appear after server validation; no resources are implicitly deleted.</p>
       <table><caption>Resources {preview.length ? offset + 1 : 0}–{offset + preview.length} of {summary.itemCount}</caption><thead><tr><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Outcome</th><th scope="col">Observed version</th></tr></thead><tbody>{preview.map(item => <tr key={item.id}><td>{item.id}</td><td>{item.sourceName}</td><td>{item.source.document} / {item.source.item}</td><td>{results.get(item.id)?.outcome ?? 'Not evaluated'}</td><td>{results.get(item.id)?.oldVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>

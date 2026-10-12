@@ -160,3 +160,30 @@ as a success. Independent source review remains required for this checkpoint.
 Source re-review of the dashboard projection correction at `b0bb4b8` closed the
 missing FailureDiagnostic shape with no new concrete finding. It did not execute
 tests or claim browser qualification.
+
+## Operator problem reporting checkpoint
+
+CLI and dashboard management failures now include bounded reviewed problem
+codes, valid correlation IDs, HTTP status and at most ten source field errors.
+Raw detail, field messages/values, unknown codes and unsafe identities are not
+rendered. Collection continuation controls identify validation/activation/
+cancellation failures while retaining the original operation and explicit-action
+policy. The non-admission CLI wording applies to the rejected request rather
+than claiming every failure was operation allocation.
+
+The complete CLI suite and 119 focused frontend regressions pass. A hostile
+metadata fixture first reproduced the dashboard's broader operation-ID helper;
+problem metadata now requires the actual bounded UUID/operation-handle shape.
+The corrected fixture passes. Frontend type checks passed while generating
+`tsconfig.tsbuildinfo`; that build-cache mutation is recorded in source inventory
+and is not a frozen-source pass. Embedded regeneration and independent source
+review are still required for this checkpoint.
+
+The pinned dashboard rebuild now passes all 536 tests, type checking and lint,
+and regenerates the embedded assets/parser/notices. Independent source review
+remains required; no real-browser qualification is implied.
+
+Provider source re-review closed the case-alias correction at `29b7ad8` and the
+Opsgenie acceptance/processing correction at `aaba1f3`, including unknown holds,
+no second POST, and retained snapshot/restart state. No further concrete defect
+was reported in those finite repairs. The reviewer ran no tests or provider calls.

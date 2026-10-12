@@ -228,6 +228,8 @@ it('enforces both discovery and identity permission and leaves readers/unknown p
 it('allows a confirmed busy validation rejection to retry only after read and explicit request', async () => {
   const state = await fixture({ busyValidation: true });
   await click('Validate original collection'); await screen.findByRole('alert');
+  expect(screen.getByText('admissionBusy')).toBeInTheDocument();
+  expect(screen.getByText('validation')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Validate original collection' })).toBeDisabled(); expect(writes(state.requests)).toHaveLength(1);
   await click('Read original progress'); await screen.findByText(/Original progress was read/);
   expect(screen.getByRole('button', { name: 'Validate original collection' })).toBeEnabled(); expect(writes(state.requests)).toHaveLength(1);

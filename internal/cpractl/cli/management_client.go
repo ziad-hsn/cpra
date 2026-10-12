@@ -119,7 +119,7 @@ func managementFailure(err error) error {
 	case errors.Is(err, cpra.ErrAmbiguous):
 		message = "mutation outcome is unconfirmed; inspect the original operation or resource before retrying"
 	case errors.Is(err, cpra.ErrNotAdmitted):
-		message = "operation allocation is unconfirmed; no resource or action mutation was submitted; request was not retried"
+		message = "no resource or action mutation was submitted by this request; inspect any original operation before explicit continuation; request was not retried"
 	case errors.Is(err, cpra.ErrConflict):
 		message = "resource version conflict; inspect the current resource and resolve the intended change"
 	case errors.Is(err, cpra.ErrUnauthorized):
@@ -153,6 +153,9 @@ func managementFailure(err error) error {
 	}
 	if errors.As(err, &problem) && operationID == "" {
 		operationID = problem.OperationID
+	}
+	if problem != nil {
+		message += managementProblemDetails(problem)
 	}
 	if safeManagementHandle(operationID) {
 		message += "; operation " + operationID

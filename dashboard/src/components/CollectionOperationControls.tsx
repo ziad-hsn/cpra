@@ -8,6 +8,7 @@ import { ManagementError } from '../api/session';
 import type { Operation } from '../api/generated';
 import { formatNumber } from '../lib/format';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ProblemDetails } from './ProblemDetails';
 
 type Action = 'ValidateOperation' | 'ActivateOperation' | 'CancelOperation';
 type Lifetime = { active: boolean; generation: number; busy: boolean; uncertain: boolean; validationAttempted: boolean; abort?: AbortController };
@@ -26,6 +27,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState('');
+  const [failure, setFailure] = useState<{ error: ManagementError; phase: string }>();
   const capabilities = useQuery({ queryKey: ['management', 'import-capabilities'], queryFn: ({ signal }) => session.get<unknown>('/api/v2/discovery', { signal }), enabled: session.can('GetCapabilities'), retry: false });
   const allowed = collectionPermissions(session, capabilities.data?.data);
   const operator = access.phase === 'authenticated' && access.access?.role === 'operator';
@@ -37,7 +39,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
   useEffect(() => {
     const state = owned.current;
     state.active = true; state.busy = false; state.uncertain = false; state.validationAttempted = false;
-    setBusy(false); setUncertain(false); setValidation(undefined); setConfirm(undefined); setMessage('');
+    setBusy(false); setUncertain(false); setValidation(undefined); setConfirm(undefined); setMessage(''); setFailure(undefined);
     const close = () => { state.active = false; state.generation++; state.abort?.abort(); state.abort = undefined; };
     const unsubscribe = session.onReset(close);
     return () => { unsubscribe(); close(); };
@@ -53,17 +55,18 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
     !!page?.supported && page.operationID === id && page.summary.valid && !page.summary.summaryOnly && page.summary.count === identity.itemCount &&
     !!page.summary.planID && !!page.summary.planDigest && Date.parse(page.summary.expiresAt) > Date.now();
 
-  const run = async (task: (signal: AbortSignal, current: () => boolean) => Promise<void>, mutation = false) => {
+  const run = async (task: (signal: AbortSignal, current: () => boolean) => Promise<void>, mutation = false, phase = 'observation') => {
     const state = owned.current;
     if (!state.active || state.busy || !supported) return;
     state.busy = true;
     const generation = ++state.generation;
     const controller = new AbortController(); state.abort = controller;
     const current = () => state.active && generation === state.generation && !controller.signal.aborted;
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setFailure(undefined);
     try { await task(controller.signal, current); }
     catch (error) {
       if (!current()) return;
+      if (error instanceof ManagementError) setFailure({ error, phase });
       if (mutation) { state.uncertain = true; setUncertain(true); setValidation(undefined); onProgress(); }
       setConfirm(undefined);
       setMessage(error instanceof ManagementError && error.reason === 'unconfirmed'
@@ -105,6 +108,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
     } catch (error) {
       if (!current()) return;
       setValidation(undefined);
+      if (error instanceof ManagementError) setFailure({ error, phase: 'validation' });
       const delay = collectionValidationPendingDelay(error, id);
       setMessage(delay === undefined ? collectionValidationMessage(error) : `Original validation is pending. Read again after ${Math.ceil(delay / 1000)} seconds; no validation request was resubmitted.`);
     }
@@ -131,7 +135,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
       setMessage(action === 'ValidateOperation' ? 'Validation was accepted for the original collection. Read its retained result before reviewing activation; no activation was requested.'
         : action === 'ActivateOperation' ? 'Activation was requested for the original collection. Committed changes and controller application are reported separately; partial results are possible.'
           : 'Cancellation was requested for the original operation. Previously committed changes and external actions are not reversed.');
-    }, true);
+    }, true, action === 'ValidateOperation' ? 'validation' : action === 'ActivateOperation' ? 'activation' : 'cancellation');
   };
 
   if (!operator) return <section className="card" aria-label="Original collection controls"><h2>Original collection controls</h2><p>Read-only access. Collection controls require an authorized operator.</p></section>;
@@ -148,6 +152,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
     </div>
     {busy && <p role="status">Reading or updating the original operation…</p>}
     {message && <p role={uncertain ? 'alert' : 'status'}>{message}</p>}
+    <ProblemDetails error={failure?.error} phase={failure?.phase} />
     {!can('ValidateOperation') && !can('ActivateOperation') && !can('CancelOperation') && <p role="status">This server and identity do not offer these collection controls.</p>}
     {validation && <section aria-label="Activation review results">
       <h3>Retained validation review</h3>

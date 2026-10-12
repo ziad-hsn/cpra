@@ -5,6 +5,7 @@ import { useDashboardSession } from '../auth/SessionBoundary';
 import { loadAction, loadActions } from '../api/actions';
 import type { Action, ActionReview } from '../api/generated';
 import { ManagementError } from '../api/session';
+import { ProblemDetails } from './ProblemDetails';
 import { mutationReceipt } from '../api/resources';
 import { useManagementMutation } from '../hooks/mutations';
 import { MutationReceipt, OperationLink } from './OperationReceipt';
@@ -56,6 +57,7 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
   };
   const feedback = <>
     {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The action changed since this review was opened. Close this draft and inspect its latest observation before reviewing again.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the original operation before taking another action.' : ''}</p>}
+    <ProblemDetails error={mutation.error} />
     {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted review" />}
     {mutation.response && <MutationReceipt response={mutation.response} />}
   </>;

@@ -4,7 +4,7 @@ description: Changes and verification for the CPRa current main source and the s
 cpra_scope: main
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](versions.md) for newer candidate work.
+> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
 
 
 # Current release notes
@@ -13,7 +13,7 @@ These documentation pages describe source commit [51a835a](https://github.com/zi
 
 ## Documentation refresh · 13 September 2026
 
-All reader guides are now canonical on main and synchronized to GitHub Pages. [Versions and availability](versions.md) separates current main from the newer durable, packaging and SDK candidates. The expanded docs include the management plan, full SDK references, four integration lessons and recorded qualification boundaries.
+All reader guides are now canonical on main and synchronized to GitHub Pages. [Versions and availability](../versions.md) separates current main from the newer durable, packaging and SDK candidates. The expanded docs include the management plan, full SDK references, four integration lessons and recorded qualification boundaries.
 
 ## Branding and appearance · 11 September 2026
 
@@ -47,4 +47,4 @@ Go scans found no affected reachable symbols or imported packages. Four advisori
 - No comparative performance benchmark or long-duration soak test was performed.
 - The queueing model estimates mean latency, not a percentile or SLA guarantee.
 
-[Start a local instance](tutorials/quickstart.md) · [Deploy with these limits](how-to/deploy-to-production.md)
+[Start a local instance](../tutorials/quickstart.md) · [Deploy with these limits](../how-to/deploy-to-production.md)

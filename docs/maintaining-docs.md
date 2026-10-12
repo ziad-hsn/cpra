@@ -18,9 +18,10 @@ template blocks, theme settings and redirects remain owned by gh-pages.
 ## Choose the source scope
 
 Read [versions and availability](versions.md) before changing a behavior claim.
-Main guides describe the reviewed main runtime. `candidate/` describes the pinned
-release commit. `sdk/` describes the identified unpublished SDK snapshot.
-`implementation/` records plans and historical qualification work. Keep the
+Current guides describe the identified development source and retain explicit
+qualification limits. `candidate/` preserves pinned historical candidate guides.
+`sdk/` describes the identified unpublished modules. `implementation/` and
+`review/` preserve plans and dated engineering records. Keep the
 scope in page notices, examples, source links and search descriptions.
 
 Record source changes in `docs/source-version.json`. Uncommitted candidates need
@@ -50,9 +51,14 @@ python _sources/rebuild.py
 python _sources/verify_site.py .
 ```
 
-Add each new Markdown page to `scripts/docs/navigation.json`. The source check
-requires every page exactly once, and rejects duplicates, missing pages and
-paths outside the docs. Redirects, theme configuration and build validation live
+Add each user-facing Markdown page to `scripts/docs/navigation.json`. The source
+check requires every non-archived page exactly once, and rejects duplicates,
+missing pages and paths outside the docs. Dated `candidate/`, `implementation/`
+and `review/` pages remain built and linkable outside the main navigation.
+Synchronization supplies MkDocs' bounded
+[`not_in_nav` patterns](https://www.mkdocs.org/user-guide/configuration/#not_in_nav)
+for those three directories without lowering missing-link or anchor validation.
+Redirects, theme configuration and build validation live
 under `_sources/` on gh-pages. The strict build checks links and anchors, titles,
 descriptions, one primary heading per page, project-prefixed URLs and search.
 It replaces only paths in `_sources/generated-files.txt`. Commit canonical
@@ -114,7 +120,9 @@ v2 server availability, public-module downloads or provider delivery.
 
 ## Publish and verify
 
-Push reviewed commits to main and gh-pages. The Pages workflow rebuilds from
+Keep candidate sources, logs and rendered artifacts private while release gates
+are open. After the required private qualification and source review, follow the
+approved publication sequence for main and gh-pages. The Pages workflow rebuilds from
 locked dependencies and deploys the site. Check its exact commit, then inspect
 the published homepage, main quickstart, candidate guide, SDK reference and a
 retained redirect. Exercise search, deep links, mobile layout, both themes,

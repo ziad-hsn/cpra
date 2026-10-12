@@ -13,6 +13,7 @@ import shutil
 ROOT = Path(__file__).resolve().parents[2]
 NAVIGATION = ROOT / "scripts/docs/navigation.json"
 ANNOUNCEMENT = ROOT / "scripts/docs/announcement.html.j2"
+ARCHIVE_PREFIXES = ("candidate/", "implementation/", "review/")
 
 
 def site_path(site: Path, value: str) -> Path:
@@ -52,7 +53,7 @@ def navigation(source: Path) -> tuple[list, list[str]]:
 
     visit(entries)
     pages = {p.relative_to(source).as_posix() for p in source.rglob("*.md")}
-    archived = {name for name in pages if name.startswith(("candidate/", "implementation/", "review/"))}
+    archived = {name for name in pages if name.startswith(ARCHIVE_PREFIXES)}
     if set(paths) - pages or pages - set(paths) - archived:
         raise ValueError("navigation must cover every Markdown page exactly once: " + json.dumps({
             "missing_pages": sorted(set(paths) - pages), "unlisted_pages": sorted(pages - set(paths) - archived)}))
@@ -67,7 +68,18 @@ def navigation_config(config: str, entries: list) -> str:
     matches = list(pattern.finditer(config))
     if len(matches) != 1:
         raise ValueError("site configuration must contain one top-level nav section")
-    return pattern.sub(lambda _: block, config, count=1)
+    config = pattern.sub(lambda _: block, config, count=1)
+    # MkDocs keeps these pages buildable and linkable without treating their
+    # intentional navigation omission as a strict-build warning. Other pages
+    # still require explicit navigation coverage above.
+    archives = "not_in_nav: |\n" + "".join("  /" + prefix + "**\n" for prefix in ARCHIVE_PREFIXES)
+    omitted = re.compile(r"(?m)^not_in_nav:[^\n]*\n(?:[ \t].*\n|\n)*")
+    matches = list(omitted.finditer(config))
+    if len(matches) > 1:
+        raise ValueError("site configuration must contain at most one not_in_nav section")
+    if matches:
+        return omitted.sub(lambda _: archives, config, count=1)
+    return config + "\n" + archives
 
 
 def version_config(config: str, metadata: dict) -> str:

@@ -6,7 +6,7 @@ cpra_scope: development
 
 # Versions and availability
 
-This source is under private release-repair qualification as of 12 October 2026.
+This source is under private release-repair qualification as of 13 October 2026.
 The intended first release is application/SDK/worker `v0.1.0-rc.1` and Helm chart
 `0.1.0-rc.1`. These are planned versions, not proof that installable public tags,
 assets or registry entries exist. Candidates remain access-controlled until the
@@ -16,6 +16,8 @@ Published documentation, Git branches, SDK tags and release artifacts advance
 separately. Use matching source and documentation; qualified artifacts carry
 their source identity in release metadata. Current development checks are tied
 to their actual source inventories. They are not a final frozen-release pass.
+
+## Current development source
 
 | Area | Current implementation | Qualification boundary |
 | --- | --- | --- |

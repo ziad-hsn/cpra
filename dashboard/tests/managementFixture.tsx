@@ -14,7 +14,7 @@ export function resource(type: ResourceType, id: string, spec: Record<string, un
   return { apiVersion: 'cpra.io/v2', kind: resourceKinds[type].kind, metadata: { id, name: id, uid: `uid-${id}`, resourceVersion: 'rv-1' }, spec };
 }
 
-export async function fixture(type: ResourceType, id?: string, options: { reader?: boolean; initial?: Resource[]; failWrite?: boolean; permissions?: string[]; drivers?: Record<string, string[]>; summaries?: boolean; lostResponseBody?: boolean } = {}) {
+export async function fixture(type: ResourceType, id?: string, options: { reader?: boolean; initial?: Resource[]; failWrite?: boolean; permissions?: string[]; drivers?: Record<string, string[]>; summaries?: boolean; lostResponseBody?: boolean; writeProblem?: Record<string, unknown> } = {}) {
   const records = new Map<string, Resource>((options.initial ?? []).map(item => [`${item.kind}:${item.metadata.id}`, item]));
   const operations = new Map<string, Operation>();
   const writes: { method: string; path: string; body: Record<string, unknown> | undefined; match: string | null }[] = [];
@@ -35,9 +35,10 @@ export async function fixture(type: ResourceType, id?: string, options: { reader
       : response({ items: [...records.values()].filter(item => item.kind === definition.kind).map(item => options.summaries ? { ...item, spec: {} } : item), snapshot: 'page-snapshot' });
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : undefined;
     writes.push({ method, path: url.pathname, body, match: headers.get('If-Match') });
+    if (options.writeProblem) return response(options.writeProblem, 503, { 'Content-Type': 'application/problem+json' });
     if (options.failWrite) throw new TypeError('lost response');
     const makeReceipt = (id: string, oldVersion?: string): Operation => {
-      const operation: Operation = { id: `operation-${writes.length}`, state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true,
+      const operation: Operation = { id: options.lostResponseBody ? 'c47948b9-084b-4109-a862-0312e7a77102' : `operation-${writes.length}`, state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true,
         items: [{ id, outcome: 'committed', committed: true, applied: false, oldVersion, newVersion: 'rv-next' }] };
       operations.set(operation.id, operation); return operation;
     };

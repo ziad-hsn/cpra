@@ -94,7 +94,7 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
   const feedback = <>
     {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The saved state changed. Close this draft and inspect the latest state before making another change.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the operation or current state before taking another action.' : ''}</p>}
     <ProblemDetails error={mutation.error} />
-    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} label="Inspect submitted operation" />}
+    {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} source="error" label="Inspect submitted operation" />}
     {mutation.response && <MutationReceipt response={mutation.response} />}
   </>;
   return <section className="card" aria-labelledby={`controls-${monitorID}`}>

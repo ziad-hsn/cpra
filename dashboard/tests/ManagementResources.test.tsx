@@ -1,11 +1,25 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { fieldsFor, resourceView } from '../src/api/resources';
-import { notificationFields } from '../src/api/generated';
+import { notificationFields, operationContracts } from '../src/api/generated';
 import { fixture, resource } from './managementFixture';
 
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+it.each([true, false])('rejects hostile error handles throughout resource feedback with operation read permission %s', async read => {
+  const secret = 'private-response-credential-value';
+  const permissions = Object.keys(operationContracts).filter(name => read || name !== 'GetOperation');
+  await fixture('credentials', 'new', { permissions, writeProblem: { code: 'outcomeUnconfirmed', status: 503, operationID: secret, requestID: secret, detail: secret } });
+  const form = await screen.findByRole('form', { name: 'Create secret' });
+  fireEvent.change(within(form).getByLabelText('Stable ID'), { target: { value: 'notification-token' } });
+  fireEvent.change(within(form).getByLabelText('New secret value'), { target: { value: 'operator-entered-secret-value' } });
+  fireEvent.submit(form);
+  await screen.findByRole('alert');
+  expect(document.body.textContent).not.toContain(secret);
+  expect(document.body.innerHTML).not.toContain(secret);
+  expect(screen.queryByRole('link', { name: 'Reconcile original operation' })).not.toBeInTheDocument();
+});
 
 it('creates an A2A notification with secret references and no task polling fields', async () => {
   const { writes } = await fixture('endpoints', 'new');

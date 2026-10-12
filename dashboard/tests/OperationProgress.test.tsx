@@ -268,7 +268,7 @@ it('retains a reconciliation link when headers arrive but the mutation response 
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('outcome is unconfirmed');
   const link = screen.getByRole('link', { name: 'Reconcile original operation' });
-  expect(link).toHaveAttribute('href', '/operations/operation-1');
+  expect(link).toHaveAttribute('href', '/operations/c47948b9-084b-4109-a862-0312e7a77102');
   expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   expect(screen.getByLabelText('New secret value')).toHaveValue('');
   fireEvent.click(link);

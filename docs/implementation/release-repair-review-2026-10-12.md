@@ -175,3 +175,24 @@ snapshot/restart retaining the hold. Focused jobs race checks pass. The initial
 controller fixture failed compilation and then selected the wrong action kind;
 the corrected correlated fixture passes and those failures remain recorded.
 Independent source re-review of this final Opsgenie repair remains required.
+
+Opsgenie source re-review at `aaba1f3` closed the receipt defect with no further
+concrete finding in the inspected repair.
+
+## Operator problem reporting checkpoint
+
+Review of `56f7409` found that surrounding operation links still used the broad
+observation-ID helper after ProblemDetails rejected unsafe error IDs. The
+resource editor could render the rejected ID or embed it in a URL, and an
+unconfirmed collection create could adopt it as its original handle. Actual
+resource-route tests reproduced both the text and URL leak. The first attempted
+fixture used the wrong input label; that failure is retained separately.
+
+Error-sourced links and collection-handle adoption now use one strict UUID/
+durable-operation validator. Validated observation receipts retain their
+existing future-ID behavior. A separate review finding covered handled
+validation/progress-read paths that discarded typed problem metadata. Those
+paths now report code, correlations and phase without changing admission or
+retry decisions. Resource-route, collection-create, manual validation-read and
+polling regressions pass; existing mutation counts and uncertainty controls
+remain intact. Independent source re-review is required for this correction.

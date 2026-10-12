@@ -168,7 +168,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
     {failure && <div className="card" role="alert" tabIndex={-1} ref={errorRef}><p>{failure}</p>
       <ProblemDetails error={mutation.error} />
       {(draft?.baseline || (creating && mutation.error?.reason === 'unconfirmed')) && <button className="btn" onClick={() => void compare()}>Compare latest resource</button>}
-      <OperationLink id={mutation.error?.response?.operationID || mutation.error?.problem?.operationID} label="Reconcile original operation" />
+      <OperationLink id={mutation.error?.response?.operationID || mutation.error?.problem?.operationID} source="error" label="Reconcile original operation" />
     </div>}
     {mutation.response && !draft && <div className="card" role="status">
       <MutationReceipt response={mutation.response} />

@@ -26,19 +26,19 @@ async function controls(options: { reader?: boolean; conflict?: boolean; lost?: 
     if (method === 'GET') {
       if (path === '/api/v2/monitors/checkout') return reply(monitor);
       if (path === '/api/v2/incidents/incident-1') return reply(incident);
-      if (path === '/api/v2/operations/control-operation') return reply({ id: 'control-operation', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true });
+      if (path === '/api/v2/operations/c47948b9-084b-4109-a862-0312e7a77102') return reply({ id: 'c47948b9-084b-4109-a862-0312e7a77102', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true });
       return reply({}, 404);
     }
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     writes.push({ method, path, match: new Headers(init?.headers).get('If-Match'), body });
     if (options.lost) throw new TypeError('private lost transport details');
-    if (options.lostBody) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('interrupted body')); } }), { status: 200, headers: { 'X-Operation-ID': 'control-operation' } });
+    if (options.lostBody) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('interrupted body')); } }), { status: 200, headers: { 'X-Operation-ID': 'c47948b9-084b-4109-a862-0312e7a77102' } });
     if (options.conflict) return reply({ code: 'conflict' }, 412);
     if (path.endsWith('/acknowledge')) { incident.acknowledgedBy = 'alice'; incident.acknowledgedAt = '2026-09-14T00:00:00Z'; }
     if (path.endsWith('/dismiss')) incident.dismissed = true;
     if (path.endsWith('/reopen')) incident.dismissed = false;
     if (method === 'PATCH') monitor.spec.enabled = (body.spec as { enabled: boolean }).enabled;
-    return reply(path.includes('/incidents/') ? incident : path.endsWith('/checkout') ? monitor : { id: 'control-operation', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true }, 200, { 'X-Operation-ID': 'control-operation' });
+    return reply(path.includes('/incidents/') ? incident : path.endsWith('/checkout') ? monitor : { id: 'c47948b9-084b-4109-a862-0312e7a77102', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true }, 200, { 'X-Operation-ID': 'c47948b9-084b-4109-a862-0312e7a77102' });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
@@ -150,7 +150,7 @@ it('links the original operation when its response body is lost', async () => {
   const { writes } = await controls({ lostBody: true });
   const dialog = await openDialog('Acknowledge');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Acknowledge' }));
-  expect(await screen.findByRole('link', { name: 'Inspect submitted operation' })).toHaveAttribute('href', '/operations/control-operation');
+  expect(await screen.findByRole('link', { name: 'Inspect submitted operation' })).toHaveAttribute('href', '/operations/c47948b9-084b-4109-a862-0312e7a77102');
   expect(writes).toHaveLength(1);
 });
 

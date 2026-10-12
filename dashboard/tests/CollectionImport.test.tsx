@@ -29,10 +29,10 @@ function frozen(count = 1) {
   vi.spyOn(BrowserCollection, 'prepare').mockResolvedValue(value as unknown as BrowserCollection);
   return value;
 }
-async function fixture(options: { supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; activationState?: string; operationRead?: (url: URL, operation: Operation) => unknown } = {}) {
+async function fixture(options: { operationID?: string; createErrorHandle?: string; supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; activationState?: string; operationRead?: (url: URL, operation: Operation) => unknown } = {}) {
   const supported = options.supported ?? steps, count = options.count ?? 1;
   const writes: { path: string; method: string; body?: Record<string, unknown>; match: string | null }[] = [];
-  const operation: Operation = { ...identity, itemCount: count, id: 'original-1', state: 'uploading', uploaded: 0, committed: 0, applied: 0 };
+  const operation: Operation = { ...identity, itemCount: count, id: options.operationID ?? 'original-1', state: 'uploading', uploaded: 0, committed: 0, applied: 0 };
   let createLost = options.lostCreate, uploadLost = options.lostUpload;
   let validationReads = 0;
   const fetcher = vi.fn<typeof fetch>(async (input, init = {}) => {
@@ -42,7 +42,7 @@ async function fixture(options: { supported?: string[]; reader?: boolean; lostCr
     if (url.pathname.endsWith('/discovery')) return response({ resourceOperations: { Collection: supported, Operation: supported } });
     if (method === 'GET' && url.pathname.endsWith('/validation')) {
       validationReads++;
-      const headers = { 'X-Operation-ID': operation.id, 'Retry-After': '12', ...options.validationHeaders };
+      const headers = { 'X-Operation-ID': operation.id, 'X-Request-ID': 'c47948b9-084b-4109-a862-0312e7a77102', 'Retry-After': '12', ...options.validationHeaders };
       if (options.validationError) return response({ code: options.validationError.code }, options.validationError.status, headers);
       if (validationReads <= (options.validationPending ?? 0)) return response({ code: 'validationPending' }, 409, headers);
       operation.state = options.afterValidationState ?? (options.invalidValidation ? 'rejected' : 'validated');
@@ -56,6 +56,7 @@ async function fixture(options: { supported?: string[]; reader?: boolean; lostCr
     writes.push({ path: url.pathname, method, body, match: headers.get('If-Match') });
     if (url.pathname.endsWith('/prepare')) return response({ ticket: 'original-private-ticket', expiresAt: '2099-01-01T00:00:00Z' });
     if (url.pathname === '/api/v2/operations') {
+      if (options.createErrorHandle) return response({ code: 'outcomeUnconfirmed', operationID: options.createErrorHandle }, 503, { 'X-Operation-ID': options.createErrorHandle });
       if (createLost) { createLost = false; throw new Error('response lost'); }
       return response(operation);
     }
@@ -92,6 +93,34 @@ async function reviewCollection() {
   await click('Validate whole collection'); await screen.findByText(/Validation was accepted/);
   await click('Read original validation result'); await screen.findByText(/The original validation passed/);
 }
+
+it('does not adopt a hostile create-error handle as an original operation', async () => {
+  const secret = 'private-response-credential-value';
+  frozen(); const { writes } = await fixture({ createErrorHandle: secret }); await select();
+  await click('Create inactive operation'); await screen.findByText(/Outcome unconfirmed/);
+  expect(document.body.innerHTML).not.toContain(secret);
+  expect(screen.queryByRole('link', { name: 'View original operation' })).not.toBeInTheDocument();
+  expect(writes.filter(write => write.path === '/api/v2/operations')).toHaveLength(1);
+  expect(writes.some(write => /\/(items|validate|activate)$/.test(write.path))).toBe(false);
+});
+
+it('retains safe validation error metadata after a polling read without repeating writes', async () => {
+  frozen(); const { writes, fetcher } = await fixture({ operationID: '964cbcb8-9bc9-43de-bd64-0c1169898c6d', validationError: { status: 503, code: 'historyUnavailable' } }); await select();
+  await click('Create inactive operation'); await screen.findByText(/Inactive operation created/);
+  await click('Upload remaining resources'); await screen.findByText(/All resources are staged/);
+  vi.useFakeTimers();
+  try {
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Validate whole collection' })));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(screen.getByText('historyUnavailable')).toBeInTheDocument();
+    expect(screen.getByText('validation')).toBeInTheDocument();
+    expect(screen.getByText('c47948b9-084b-4109-a862-0312e7a77102')).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+    expect(fetcher.mock.calls.filter(call => String(call[0]).includes('/validation?'))).toHaveLength(1);
+    expect(writes.filter(write => write.path.endsWith('/validate'))).toHaveLength(1);
+    expect(writes.some(write => /\/(activate|cancel)$/.test(write.path))).toBe(false);
+  } finally { vi.useRealTimers(); }
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it('offers real preflight on current capabilities and honestly disables durable writes; keeps values and keys out of DOM/storage', async () => {
@@ -310,11 +339,15 @@ it.each([
   [410, 'operationExpired', /validation evidence has expired/],
   [503, 'historyUnavailable', /validation history is unavailable/],
 ] as const)('keeps %s %s distinct from a sealed rejection and never revalidates', async (status, code, text) => {
-  frozen(); const { writes } = await fixture({ validationError: { status, code } }); await select();
+  frozen(); const { writes } = await fixture({ operationID: '964cbcb8-9bc9-43de-bd64-0c1169898c6d', validationError: { status, code } }); await select();
   await click('Create inactive operation'); await screen.findByText(/Inactive operation created/);
   await click('Upload remaining resources'); await screen.findByText(/All resources are staged/);
   await click('Validate whole collection'); await screen.findByText(/Validation was accepted/);
   await click('Read original validation result'); expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+  expect(screen.getByText(code)).toBeInTheDocument();
+  expect(screen.getByText('c47948b9-084b-4109-a862-0312e7a77102')).toBeInTheDocument();
+  expect(screen.getAllByText('964cbcb8-9bc9-43de-bd64-0c1169898c6d').length).toBeGreaterThan(0);
+  expect(screen.getByText('validation')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Original sealed validation result' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Validate whole collection' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();

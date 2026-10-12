@@ -27,16 +27,16 @@ async function actions(options: { agent?: boolean; reader?: boolean; unfenced?: 
       reads.push(url.pathname + url.search);
       if (url.pathname === '/api/v2/actions') return reply({ items: [{ ...action, ...(options.foreign ? { monitorID: 'another-monitor' } : {}), ...(url.searchParams.has('cursor') ? { id: 'execution-2' } : {}) }], ...(options.paged && !url.searchParams.has('cursor') ? { nextCursor: 'frozen-next-page' } : {}) });
       if (url.pathname === '/api/v2/actions/execution-1') return reply(action);
-      if (url.pathname === '/api/v2/operations/review-operation') return reply({ id: 'review-operation', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true });
+      if (url.pathname === '/api/v2/operations/964cbcb8-9bc9-43de-bd64-0c1169898c6d') return reply({ id: '964cbcb8-9bc9-43de-bd64-0c1169898c6d', state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true });
       return reply({}, 404);
     }
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     writes.push({ method, path: url.pathname, match: new Headers(init?.headers).get('If-Match'), body });
     if (options.conflict) return reply({ code: 'conflict' }, 412);
-    if (options.lost) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('private interrupted response')); } }), { status: 200, headers: { 'X-Operation-ID': 'review-operation' } });
-    action.review = { revision: 'review-operation', actor: 'alice', reviewedAt: '2026-09-14T00:00:00Z', resolution: body.resolution, reason: body.reason, note: body.note, evidenceRefs: body.evidenceRefs };
+    if (options.lost) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('private interrupted response')); } }), { status: 200, headers: { 'X-Operation-ID': '964cbcb8-9bc9-43de-bd64-0c1169898c6d' } });
+    action.review = { revision: '964cbcb8-9bc9-43de-bd64-0c1169898c6d', actor: 'alice', reviewedAt: '2026-09-14T00:00:00Z', resolution: body.resolution, reason: body.reason, note: body.note, evidenceRefs: body.evidenceRefs };
     action.held = body.resolution === 'inconclusive';
-    return reply(action, 200, { 'X-Operation-ID': 'review-operation' });
+    return reply(action, 200, { 'X-Operation-ID': '964cbcb8-9bc9-43de-bd64-0c1169898c6d' });
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover(); await session.signIn('test-token-01234567890123456789012345678901');
@@ -99,7 +99,7 @@ it('retains the original operation and prevents re-submission after a lost revie
   const dialog = await reviewDialog();
   fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Reviewed receipt' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Record review' }));
-  expect(await screen.findByRole('link', { name: 'Inspect submitted review' })).toHaveAttribute('href', '/operations/review-operation');
+  expect(await screen.findByRole('link', { name: 'Inspect submitted review' })).toHaveAttribute('href', '/operations/964cbcb8-9bc9-43de-bd64-0c1169898c6d');
   expect(within(dialog).getByRole('button', { name: 'Record review' })).toBeDisabled();
   expect(writes).toHaveLength(1);
 });

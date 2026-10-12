@@ -8,11 +8,11 @@ import type { WorkerCollectionItemSummary, WorkerCollectionSummary } from '../ap
 import { collectionCall, collectionDelay, collectionMutable, collectionCancelable, collectionPermissions, collectionTerminal, collectionProgressPending, prepareCollection, readCollection, readCollectionValidation, collectionValidationPendingDelay, collectionValidationMessage, type CollectionValidationPage } from '../api/collectionOperations';
 import { ManagementError, type APIResponse, type CollectionRequestOperation } from '../api/session';
 import type { ApplyResult, Operation, Preflight } from '../api/generated';
-import { operationID } from '../api/operations';
 import { DirtyDraftGuard } from '../components/DirtyDraftGuard';
 import { CollectionExecution } from '../components/CollectionExecution';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProblemDetails } from '../components/ProblemDetails';
+import { correlationID } from '../api/correlation';
 
 type PreviewItem = WorkerCollectionItemSummary & { sourceName: string };
 type PrivateImport = { collection?: BrowserCollection; ticket?: string; expiresAt?: string; createAttempted: boolean; validationAttempted?: boolean; activationAttempted?: boolean; sourceNames?: readonly string[]; operation?: Operation; busy: boolean; active: boolean; generation: number; controller?: AbortController };
@@ -74,7 +74,7 @@ export default function CollectionImport() {
       if (error.reason === 'unconfirmed') {
         setUncertain(true);
         const id = error.response?.operationID;
-        if (!lifetime.current.operation && operationID(id) && summary) storeOperation({ ...summary, id, state: 'unrecognized' });
+        if (!lifetime.current.operation && correlationID(id) && summary) storeOperation({ ...summary, id, state: 'unrecognized' });
         setFeedback(lifetime.current.activationAttempted && lifetime.current.operation
           ? 'Activation outcome unconfirmed. Read the original operation to reconcile it before another activation request. Accepted changes may already be applying; no automatic retry or new operation was submitted.'
           : 'Outcome unconfirmed. No automatic retry was made. Read the original operation before continuing. If creation returned no handle, only an explicit retry using this tab’s original admission ticket is available.');
@@ -183,11 +183,12 @@ export default function CollectionImport() {
     try {
       const response = await readCollection(session, value, value.operationID, signal);
       if (current(signal)) { storeOperation(response.data); setUncertain(false); }
-    } catch {
-      if (current(signal)) { setUncertain(true); setFeedback('The original sealed result is retained below, but current operation progress could not be confirmed. Read original progress before another step; no mutation was submitted.'); }
+    } catch (error) {
+      if (current(signal)) { setProblem(error instanceof ManagementError ? error : undefined); setFailedPhase('observation'); setUncertain(true); setFeedback('The original sealed result is retained below, but current operation progress could not be confirmed. Read original progress before another step; no mutation was submitted.'); }
     }
   }
   function validationFailure(error: unknown, id: string): number | undefined {
+    setProblem(error instanceof ManagementError ? error : undefined); setFailedPhase('validation');
     const delay = collectionValidationPendingDelay(error, id);
     if (delay !== undefined) { setValidationStatus('Pending — no verdict yet'); setFeedback('The original validation is pending. Waiting only reads its result; it never resubmits validation.'); return delay; }
     setUncertain(true);
@@ -263,7 +264,7 @@ export default function CollectionImport() {
         if (waitKind === 'validation') {
           const delay = validationFailure(error, operation.id);
           if (delay !== undefined) { schedule(delay); return; }
-        } else setFeedback('Waiting stopped because progress could not be read. The server operation was not canceled.');
+        } else { setProblem(error instanceof ManagementError ? error : undefined); setFailedPhase('observation'); setFeedback('Waiting stopped because progress could not be read. The server operation was not canceled.'); }
         setWaiting(false);
       }
     };

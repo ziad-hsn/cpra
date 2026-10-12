@@ -4,10 +4,11 @@ import { useOperation } from '../hooks/operations';
 import { operationID, operationMessage, operationView, type OperationObservation } from '../api/operations';
 import { object } from '../api/value';
 import type { APIResponse } from '../api/session';
+import { correlationID } from '../api/correlation';
 
-export function OperationLink({ id, label = 'View operation progress' }: { id?: string; label?: string }) {
+export function OperationLink({ id, label = 'View operation progress', source = 'observation' }: { id?: string; label?: string; source?: 'observation' | 'error' }) {
   const session = useDashboardSession();
-  if (!operationID(id)) return null;
+  if (typeof id !== 'string' || (source === 'error' ? !correlationID(id) : !operationID(id))) return null;
   return session.can('GetOperation') ? <Link className="btn" to={`/operations/${encodeURIComponent(id)}`}>{label}</Link> : <p>Operation ID: <span className="mono">{id}</span>. Your identity cannot read this receipt.</p>;
 }
 

@@ -183,6 +183,17 @@ The pinned dashboard rebuild now passes all 536 tests, type checking and lint,
 and regenerates the embedded assets/parser/notices. Independent source review
 remains required; no real-browser qualification is implied.
 
+The operator source review found two surrounding paths that bypassed the new
+problem formatter: error-sourced operation links and handled collection reads.
+The real resource-route reproduction exposed both text and URL leakage for
+hostile handles. Strict error-handle validation is now shared across those
+links and collection adoption. Manual/polled validation and progress-read errors
+retain safe problem metadata and phase. The corrected pinned rebuild passes
+all 540 tests, types and lint, with updated embedded assets. Intermediate type
+errors and an old synthetic non-UUID interrupted-response fixture are retained
+as failed runs; realistic identity fixtures pass after correction. Final source
+re-review of these fixes remains required.
+
 Provider source re-review closed the case-alias correction at `29b7ad8` and the
 Opsgenie acceptance/processing correction at `aaba1f3`, including unknown holds,
 no second POST, and retained snapshot/restart state. No further concrete defect

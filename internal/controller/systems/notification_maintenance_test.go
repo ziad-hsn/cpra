@@ -21,13 +21,15 @@ func TestNotificationMaintenanceBetweenChecksCommitsCancellation(t *testing.T) {
 	for _, scenario := range []struct {
 		name                     string
 		waiting, missed, restart bool
+		batchSize                int
 	}{
 		{name: "before_queue_admission"}, {name: "waiting_in_worker_queue", waiting: true},
 		{name: "missed_window", missed: true}, {name: "waiting_worker_missed_window", waiting: true, missed: true},
 		{name: "restart_across_window", missed: true, restart: true},
+		{name: "bounded_two_deliveries", batchSize: 1},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			testNotificationMaintenanceController(t, scenario.waiting, scenario.missed, scenario.restart)
+			testNotificationMaintenanceController(t, scenario.waiting, scenario.missed, scenario.restart, scenario.batchSize)
 		})
 	}
 }
@@ -41,12 +43,15 @@ func (s oneMaintenanceStart) Next(after time.Time) time.Time {
 	return time.Time{}
 }
 
-func testNotificationMaintenanceController(t *testing.T, waiting, missed, restart bool) {
+func testNotificationMaintenanceController(t *testing.T, waiting, missed, restart bool, batchSize int) {
 	t.Helper()
 	var calls atomic.Int32
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(http.StatusNoContent) }))
 	defer receiver.Close()
 	cfg := runtimeconfig.Default()
+	if batchSize > 0 {
+		cfg.Storage.BatchSize = batchSize
+	}
 	cfg.Storage.Directory = t.TempDir()
 	store, err := persistence.Open(t.Context(), cfg)
 	if err != nil {
@@ -69,6 +74,10 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 	state.Maintenance = windows
 	ecs.NewMap1[components.CodeConfig](&w).Get(ent).Configs = map[string]*components.ColorCodeConfig{"red": {Dispatch: true, Notify: "webhook"}}
 	ecs.NewMap1[components.JobStorage](&w).Get(ent).CodeJobs = map[string][]jobs.Job{"red": {&jobs.CodeWebhookJob{URL: receiver.URL, Color: "red"}}}
+	if batchSize == 1 {
+		ecs.NewMap1[components.CodeConfig](&w).Get(ent).Configs["yellow"] = &components.ColorCodeConfig{Dispatch: true, Notify: "webhook"}
+		ecs.NewMap1[components.JobStorage](&w).Get(ent).CodeJobs["yellow"] = []jobs.Job{&jobs.CodeWebhookJob{URL: receiver.URL, Color: "yellow"}}
+	}
 	ecs.NewMap1[components.PulseConfig](&w).Get(ent).Interval = time.Hour
 	code := &admissionQueue{}
 	s := NewDurableSystem(&w, store, cfg, &fleetview.Holder{}, noopLogger{}, &admissionQueue{full: true}, nil, code, nil, time.Minute, false)
@@ -132,9 +141,22 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 	} else {
 		s.dispatchActions(start.Add(time.Second))
 	}
+	if batchSize == 1 {
+		if s.lastError != nil || !store.Status().Ready || s.stopping.Load() {
+			t.Fatal("valid cancellation batch permanently stopped usable storage", s.lastError)
+		}
+		for turn := 2; turn <= 3; turn++ {
+			s.dispatchActions(start.Add(time.Duration(turn) * time.Second))
+		}
+	}
 	m, _ = store.Get(id)
 	if m.Actions[actionID].State != persistence.Cancelled || m.Actions[actionID].Outcome != "maintenance" {
 		t.Fatal("the actual controller deferred a notification covered by maintenance")
+	}
+	for _, a := range m.Actions {
+		if a.Kind == "code" && a.State != persistence.Cancelled {
+			t.Fatal("not every covered delivery was cancelled")
+		}
 	}
 	s.dispatchActions(start.Add(10 * time.Second))
 	if !waiting && len(code.admitted) != 0 || waiting && len(code.admitted) != 1 {
@@ -157,5 +179,10 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 	m, ok := restarted.Get(id)
 	if !ok || m.Generation != 1 || m.Actions[actionID].State != persistence.Cancelled {
 		t.Fatal("restart lost maintenance cancellation")
+	}
+	for _, a := range m.Actions {
+		if a.Kind == "code" && a.State != persistence.Cancelled {
+			t.Fatal("reopen lost a bounded cancellation prefix")
+		}
 	}
 }

@@ -866,6 +866,8 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		// Cancel only deliveries covered by a window. A notification created after
 		// its end keeps its first eligibility even when an older delivery is stale.
 		var cancellations []persistence.Command
+		maxCommands, maxBytes := s.store.CommandLimits()
+		encoded, remainingCancellation := 64, false
 		for _, id := range sortedMonitorActions(m) {
 			a := m.Actions[id]
 			if a.Kind != "code" || a.State != persistence.Queued || a.CatalogUID != m.CatalogUID || a.Revision != state.Revision ||
@@ -877,11 +879,22 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				g := projection.guard.Clone()
 				command.Guard = &g
 			}
+			bound, err := persistence.CommandEncodedBound(command)
+			if err != nil || bound+65 > maxBytes {
+				s.fail(errors.New("notification guard exceeds durable command capacity"))
+				return
+			}
+			if len(cancellations) >= maxCommands || encoded+bound+1 > maxBytes {
+				remainingCancellation = true
+				break
+			}
 			cancellations = append(cancellations, command)
+			encoded += bound + 1
 		}
 		if len(cancellations) > 0 {
 			results, err := s.store.Submit(ctx, cancellations)
 			if err != nil {
+				s.actionDue[ent] = now
 				s.actions.Requeue(ready[n:])
 				s.recoveryError(err, ctx)
 				return
@@ -907,6 +920,10 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			if s.index != nil {
 				s.index.Put(s.summary(ent, m))
 			}
+		}
+		if remainingCancellation {
+			s.scheduleActionAt(ent, now)
+			continue // Preserve the unsubmitted suffix for a bounded owner turn.
 		}
 		if maintenance {
 			// Recovery work remains queued; notifications have already been

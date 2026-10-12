@@ -73,6 +73,10 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
   retry due after the window. Current-time result processing also suppresses
   new notifications during maintenance. Focused default/tagged checks pass;
   source re-review of this extension remains open.
+- Missed-window source review passed. A further batch-one cancellation
+  regression was reproduced and repaired with command-count/encoded-byte
+  prefixes and continuation on the next owner turn. Its restart/no-effect/
+  storage-health regression passes and awaits final source re-review.
 - Artwork/release archive contracts, asset freshness contracts and frontend
   type checking passed after the licensing changes. The 702-test release-script
   run passed 700; its failures were an absent compiler on the check's PATH and

@@ -71,3 +71,12 @@ waiting in the local queue, reopening Raft before cancellation, a retry due afte
 the window and a new outage afterward. The focused default and `externaljobs`
 checks pass on Go 1.27.1. Independent source re-review of this final maintenance
 repair remains required.
+
+The next re-review closed the missed-window mechanism on source inspection but
+found that cancelling multiple destinations could exceed a valid configured
+batch size of one and mark usable storage unavailable. That regression was
+reproduced. Cancellation now respects both `CommandLimits` and the conservative
+encoded-byte bound, reconciles a committed prefix, and schedules the remaining
+suffix for another bounded owner turn. The two-destination/batch-one regression
+passes with healthy storage, zero receiver effects and retained cancellations
+after reopening. This final batching change still requires source re-review.

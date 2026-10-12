@@ -56,6 +56,7 @@ type Action struct {
 	DeliveryID              string              `json:"delivery_id,omitempty"`
 	NotificationEpisode     string              `json:"notification_episode,omitempty"`
 	EndpointID              string              `json:"endpoint_id,omitempty"`
+	QueuedAt                time.Time           `json:"queued_at,omitzero"`
 	Deadline                time.Time           `json:"deadline,omitzero"`
 	AgentConnection         *AgentConnection    `json:"agent_connection,omitempty"`
 	RecoveryFailure         *RecoveryFailure    `json:"recovery_failure,omitempty"`

@@ -161,8 +161,8 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if c.Kind == "start" {
 			if m.NotificationVersion == DeliveryFormatVersion && a.Kind == "code" && a.State == Queued {
-				if c.Maintenance || m.Policy.InMaintenance(c.At) {
-					m.suppressMaintenanceNotifications(c.At, emit)
+				if c.Maintenance || m.Policy.InMaintenance(c.At) || m.Policy.MaintenanceBetween(a.QueuedAt, c.At) {
+					m.cancelNotification(a, "maintenance", c.At, emit)
 					return r
 				}
 				if !m.notificationEligible(a) {
@@ -212,6 +212,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if a.State != Started {
 			return Result{}
+		}
+		if m.NotificationVersion == DeliveryFormatVersion && (c.Maintenance || m.Policy.InMaintenance(c.At)) {
+			m.suppressMaintenanceNotifications(c.At, emit)
 		}
 		a.State, a.Outcome, a.FinishedAt = Succeeded, "accepted", c.At
 		if c.Outcome != "success" {
@@ -477,6 +480,7 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 	}
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
 	if kind == "code" && m.NotificationVersion == DeliveryFormatVersion {
+		a.QueuedAt = at
 		a.NotificationCorrelation = m.NotificationCorrelation
 		a.DeliveryID, a.NotificationEpisode = id, m.NotificationEpisode
 		a.EndpointID = notificationEndpointIdentity(*m, color, endpoint)

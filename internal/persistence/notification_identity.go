@@ -23,7 +23,7 @@ func requiresDeliveryFormat(m Monitor) bool {
 		return true
 	}
 	for _, a := range m.Actions {
-		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.NotificationCorrelation != "" || a.EndpointID != "" || !a.Deadline.IsZero() {
+		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.NotificationCorrelation != "" || a.EndpointID != "" || !a.QueuedAt.IsZero() || !a.Deadline.IsZero() {
 			return true
 		}
 	}
@@ -34,6 +34,12 @@ func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action))
 	if m.NotificationVersion == DeliveryFormatVersion {
 		if m.NotificationCorrelation == "" {
 			m.NotificationCorrelation = m.NotificationEpisode
+		}
+		for _, id := range sortedActions(m.Actions) {
+			a := m.Actions[id]
+			if a.Kind == "code" && a.State == Queued && a.CatalogUID == m.CatalogUID && a.QueuedAt.IsZero() {
+				m.cancelNotification(a, "notification_identity_incomplete", at, emit)
+			}
 		}
 		return
 	}
@@ -127,17 +133,32 @@ func validateNotificationIdentity(m Monitor, version int) error {
 		if a.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(a.NotificationCorrelation, 256)) {
 			return ErrNotificationIdentity
 		}
-		hasIdentity := a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || !a.Deadline.IsZero()
+		hasIdentity := a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || !a.QueuedAt.IsZero() || !a.Deadline.IsZero()
 		if !hasIdentity {
 			continue // Retained pre-migration outcomes keep their original evidence.
 		}
 		if !deliveryStorageFormat(version) || m.NotificationVersion != DeliveryFormatVersion || a.Kind != "code" ||
 			!catalogIdentifier(a.DeliveryID, 256) || !catalogIdentifier(a.NotificationEpisode, 256) || !catalogIdentifier(a.EndpointID, 256) ||
+			!a.QueuedAt.IsZero() && (a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 || a.QueuedAt.After(a.NotBefore)) ||
 			!a.Deadline.IsZero() && (a.Deadline.Year() < 1 || a.Deadline.Year() > 9999 || !a.Deadline.After(a.NotBefore) && a.State == Started) {
 			return ErrNotificationIdentity
 		}
 	}
 	return nil
+}
+
+// MaintenanceBetween reports whether a queued delivery was covered by an
+// absolute window, including one missed while the controller was stopped.
+func (p Policy) MaintenanceBetween(from, through time.Time) bool {
+	if from.IsZero() || through.Before(from) {
+		return false
+	}
+	for _, window := range p.Maintenance {
+		if !window.Start.After(through) && window.End.After(from) {
+			return true
+		}
+	}
+	return false
 }
 
 func notificationEndpointIdentity(m Monitor, color string, endpoint int) string {

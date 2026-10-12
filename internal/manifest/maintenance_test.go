@@ -28,3 +28,27 @@ func TestMaintenanceRejectsInvalidConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestMaintenanceBetweenDetectsAWindowMissedByTheOwner(t *testing.T) {
+	windows, err := CompileMaintenance([]MaintenanceWindow{{Cron: "0 9 * * *", Duration: "5s", Timezone: "Africa/Cairo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	zone, _ := time.LoadLocation("Africa/Cairo")
+	start := time.Date(2026, 9, 8, 9, 0, 0, 0, zone)
+	for _, tc := range []struct {
+		from, through time.Time
+		covered       bool
+	}{
+		{start.Add(-time.Second), start.Add(-time.Nanosecond), false},
+		{start.Add(-time.Second), start, true},
+		{start.Add(-time.Second), start.Add(10 * time.Second), true},
+		{start, start.Add(10 * time.Second), true},
+		{start.Add(5 * time.Second), start.Add(10 * time.Second), false},
+		{time.Time{}, start.Add(10 * time.Second), false},
+	} {
+		if got := MaintenanceBetween(windows, tc.from, tc.through); got != tc.covered {
+			t.Fatalf("from %s through %s: covered=%t", tc.from, tc.through, got)
+		}
+	}
+}

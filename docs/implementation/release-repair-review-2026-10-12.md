@@ -48,3 +48,26 @@ field, malformed versions, and the current-format snapshot path.
 These are private development checks. A second independent review of the fixes
 and final release matrices remain required; local receivers are not provider
 account qualification.
+
+## Re-review and missed-window repair
+
+Source re-review of `ea81ade` closed the warning-correlation and format-gate
+findings, and found no concrete defect in the inspected licensing/release
+materials. It identified an additional maintenance schedule: the owner stops
+or stalls for an entire short window and releases a retained queued alert on
+resuming after the window. The first regression observed the window and restarted
+only after cancellation, so it did not cover this schedule.
+
+The subsequent repair persists the original notification queue time across
+retries, checks absolute and cron windows across that interval, and cancels only
+covered deliveries before start. A newly queued delivery after the window remains
+eligible. Missing queue identities in older development snapshots cancel unsent
+work conservatively; started, completed and unknown actions remain intact.
+Known intervention results inside maintenance retain their outcome while
+suppressing new notification intent.
+
+Regressions now cover a live owner missing the entire window, a worker already
+waiting in the local queue, reopening Raft before cancellation, a retry due after
+the window and a new outage afterward. The focused default and `externaljobs`
+checks pass on Go 1.27.1. Independent source re-review of this final maintenance
+repair remains required.

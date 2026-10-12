@@ -272,7 +272,14 @@ func TestPolicyAbsoluteMaintenanceAtPulseAndStart(t *testing.T) {
 		if r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: start}); r.Allowed {
 			t.Fatal("queued action bypassed durable maintenance", action.Kind)
 		}
-		_ = policyStart(t, m, action, end)
+		if action.Kind == "code" {
+			r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: end})
+			if r.Allowed || r.Monitor == nil || r.Monitor.Actions[action.ID].State != Cancelled {
+				t.Fatal("notification crossed maintenance and resumed afterward")
+			}
+		} else {
+			_ = policyStart(t, m, action, end)
+		}
 	}
 }
 

@@ -113,6 +113,7 @@ func TestNotificationConfigureRejectsOldEnvelopeFields(t *testing.T) {
 		"action_correlation": func(m *Monitor) { m.Actions = map[string]Action{"action": {NotificationCorrelation: "correlation"}} },
 		"action_endpoint":    func(m *Monitor) { m.Actions = map[string]Action{"action": {EndpointID: "endpoint"}} },
 		"action_deadline":    func(m *Monitor) { m.Actions = map[string]Action{"action": {Deadline: policyTime().Add(time.Minute)}} },
+		"action_queued_at":   func(m *Monitor) { m.Actions = map[string]Action{"action": {QueuedAt: policyTime()}} },
 	}
 	for name, mutate := range mutations {
 		t.Run(name, func(t *testing.T) {
@@ -174,6 +175,50 @@ func TestNotificationStartCommitsMaintenanceCancellation(t *testing.T) {
 	r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: at.Add(time.Second), Maintenance: true})
 	if r.Allowed || r.Monitor.Actions[a.ID].State != Cancelled || r.Monitor.Actions[a.ID].Outcome != "maintenance" {
 		t.Fatal("start merely deferred an alert covered by maintenance")
+	}
+}
+
+func TestNotificationRetryAfterMaintenanceRemainsSuppressed(t *testing.T) {
+	p := testMonitor().Policy
+	p.Intervention, p.Unhealthy, p.Healthy = false, 1, 1
+	p.Endpoints = map[string]int{"red": 1, "green": 1}
+	at := policyTime().Add(time.Second)
+	p.Maintenance = []MaintenanceWindow{{Start: at.Add(2 * time.Second), End: at.Add(3 * time.Second)}}
+	m := policyPulse(t, configuredPolicyMonitor(t, p), at, "failure")
+	a := notificationByColor(t, m, "red", Queued)
+	m = policyStart(t, m, a, at)
+	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: at.Add(time.Second), Outcome: "failure", Retryable: true})
+	m = *r.Monitor
+	retry := notificationByColor(t, m, "red", Queued)
+	if retry.NotBefore.Before(p.Maintenance[0].End) || !retry.QueuedAt.Equal(at) {
+		t.Fatal("fixture did not retain original delivery admission across the window")
+	}
+	r = transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: retry.ID, At: retry.NotBefore})
+	if r.Allowed || r.Monitor.Actions[retry.ID].State != Cancelled || r.Monitor.Actions[retry.ID].Outcome != "maintenance" {
+		t.Fatal("retry released a notification accumulated before maintenance")
+	}
+	m = policyPulse(t, *r.Monitor, at.Add(6*time.Second), "success")
+	m = policyPulse(t, m, at.Add(7*time.Second), "failure")
+	next := notificationByColor(t, m, "red", Queued)
+	_ = policyStart(t, m, next, next.NotBefore)
+}
+
+func TestNotificationMaintenanceSuppressesNewInterventionResultAlerts(t *testing.T) {
+	p := testMonitor().Policy
+	p.Intervention, p.Unhealthy = true, 1
+	p.Endpoints = map[string]int{"cyan": 1, "red": 1}
+	at := policyTime().Add(time.Second)
+	m := policyPulse(t, configuredPolicyMonitor(t, p), at, "failure")
+	a := interventionAction(t, m)
+	m = policyStart(t, m, a, at)
+	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: at.Add(time.Second), Outcome: "success", Maintenance: true})
+	if r.Monitor.VerifyRemaining == 0 {
+		t.Fatal("maintenance discarded the known intervention outcome")
+	}
+	for _, a := range r.Monitor.Actions {
+		if a.Kind == "code" && a.State == Queued {
+			t.Fatal("result committed a new notification inside maintenance")
+		}
 	}
 }
 

@@ -862,43 +862,55 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		if !ok || !m.Policy.Enabled || !m.SnoozedUntil.IsZero() {
 			continue
 		}
-		if m.Policy.InMaintenance(now) || manifest.InMaintenance(state.Maintenance, now) {
-			// The start transition cancels all covered unsent notifications. Commit
-			// it here, before queue/worker admission, so maintenance cannot defer
-			// alerts until its end. No execution marker or provider call is created.
-			for _, id := range sortedMonitorActions(m) {
-				a := m.Actions[id]
-				if a.Kind != "code" || a.State != persistence.Queued || a.CatalogUID != m.CatalogUID || a.Revision != state.Revision {
-					continue
-				}
-				command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: true}
-				if projection, ok := s.managed[m.ID]; ok {
-					g := projection.guard.Clone()
-					command.Guard = &g
-				}
-				results, err := s.store.Submit(ctx, []persistence.Command{command})
-				if err != nil {
-					s.actions.Requeue(ready[n:])
-					s.recoveryError(err, ctx)
-					return
-				}
-				if len(results) != 1 || results[0].Allowed {
+		maintenance := m.Policy.InMaintenance(now) || manifest.InMaintenance(state.Maintenance, now)
+		// Cancel only deliveries covered by a window. A notification created after
+		// its end keeps its first eligibility even when an older delivery is stale.
+		var cancellations []persistence.Command
+		for _, id := range sortedMonitorActions(m) {
+			a := m.Actions[id]
+			if a.Kind != "code" || a.State != persistence.Queued || a.CatalogUID != m.CatalogUID || a.Revision != state.Revision ||
+				!maintenance && !m.Policy.MaintenanceBetween(a.QueuedAt, now) && !manifest.MaintenanceBetween(state.Maintenance, a.QueuedAt, now) {
+				continue
+			}
+			command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: true}
+			if projection, ok := s.managed[m.ID]; ok {
+				g := projection.guard.Clone()
+				command.Guard = &g
+			}
+			cancellations = append(cancellations, command)
+		}
+		if len(cancellations) > 0 {
+			results, err := s.store.Submit(ctx, cancellations)
+			if err != nil {
+				s.actions.Requeue(ready[n:])
+				s.recoveryError(err, ctx)
+				return
+			}
+			if len(results) != len(cancellations) {
+				s.fail(errors.New("maintenance cancellation returned incomplete results"))
+				return
+			}
+			for _, result := range results {
+				if result.Allowed {
 					s.fail(errors.New("maintenance cancellation returned an execution grant"))
 					return
 				}
-				if err := results[0].Err; err != nil && !errors.Is(err, persistence.ErrCatalogDependency) && !errors.Is(err, persistence.ErrControlConflict) {
+				if err := result.Err; err != nil && !errors.Is(err, persistence.ErrCatalogDependency) && !errors.Is(err, persistence.ErrControlConflict) {
 					s.fail(err)
 					return
 				}
-				if updated := results[0].Monitor; updated != nil {
-					m = *updated
-					s.project(ent, m)
-					if s.index != nil {
-						s.index.Put(s.summary(ent, m))
-					}
+				if result.Monitor != nil {
+					m = *result.Monitor
 				}
-				break
 			}
+			s.project(ent, m)
+			if s.index != nil {
+				s.index.Put(s.summary(ent, m))
+			}
+		}
+		if maintenance {
+			// Recovery work remains queued; notifications have already been
+			// cancelled without an execution marker or provider admission.
 			for _, a := range m.Actions {
 				if a.State == persistence.Queued && a.CatalogUID == m.CatalogUID && a.Revision == state.Revision {
 					s.scheduleActionAt(ent, now.Add(time.Second))
@@ -970,7 +982,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 					return jobs.ActionExecution{}, errAdmissionRecovering
 				}
 				at := time.Now().UTC()
-				inMaintenance := manifest.InMaintenance(maintenance, at)
+				inMaintenance := manifest.InMaintenance(maintenance, at) || originalAction.Kind == "code" && manifest.MaintenanceBetween(maintenance, originalAction.QueuedAt, at)
 				var connection *persistence.AgentConnection
 				if driver == "a2a" && s.catalogRuntime != nil {
 					if guard == nil {

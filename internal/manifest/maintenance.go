@@ -50,3 +50,21 @@ func InMaintenance(windows []CompiledWindow, now time.Time) bool {
 	}
 	return false
 }
+
+// MaintenanceBetween includes a window that covered any part of a queued
+// delivery's lifetime, even if the owner was stopped for that entire window.
+func MaintenanceBetween(windows []CompiledWindow, from, through time.Time) bool {
+	if from.IsZero() || through.Before(from) {
+		return false
+	}
+	if InMaintenance(windows, from) {
+		return true
+	}
+	for _, window := range windows {
+		start := window.Schedule.Next(from)
+		if !start.IsZero() && !start.After(through) {
+			return true
+		}
+	}
+	return false
+}

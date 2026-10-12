@@ -18,14 +18,30 @@ import (
 )
 
 func TestNotificationMaintenanceBetweenChecksCommitsCancellation(t *testing.T) {
-	for _, waiting := range []bool{false, true} {
-		t.Run(map[bool]string{false: "before_queue_admission", true: "waiting_in_worker_queue"}[waiting], func(t *testing.T) {
-			testNotificationMaintenanceController(t, waiting)
+	for _, scenario := range []struct {
+		name                     string
+		waiting, missed, restart bool
+	}{
+		{name: "before_queue_admission"}, {name: "waiting_in_worker_queue", waiting: true},
+		{name: "missed_window", missed: true}, {name: "waiting_worker_missed_window", waiting: true, missed: true},
+		{name: "restart_across_window", missed: true, restart: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			testNotificationMaintenanceController(t, scenario.waiting, scenario.missed, scenario.restart)
 		})
 	}
 }
 
-func testNotificationMaintenanceController(t *testing.T, waiting bool) {
+type oneMaintenanceStart struct{ at time.Time }
+
+func (s oneMaintenanceStart) Next(after time.Time) time.Time {
+	if after.Before(s.at) {
+		return s.at
+	}
+	return time.Time{}
+}
+
+func testNotificationMaintenanceController(t *testing.T, waiting, missed, restart bool) {
 	t.Helper()
 	var calls atomic.Int32
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(http.StatusNoContent) }))
@@ -43,6 +59,11 @@ func testNotificationMaintenanceController(t *testing.T, waiting bool) {
 	windows, err := manifest.CompileMaintenance([]manifest.MaintenanceWindow{{Cron: "* * * * *", Duration: "5s"}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if missed {
+		// Queue execution uses real current time after this completed window.
+		start = time.Now().UTC().Add(-10 * time.Second)
+		windows = []manifest.CompiledWindow{{Schedule: oneMaintenanceStart{start}, Duration: 5 * time.Second}}
 	}
 	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
 	state.Maintenance = windows
@@ -74,16 +95,43 @@ func testNotificationMaintenanceController(t *testing.T, waiting bool) {
 	s.project(ent, m)
 	s.scheduleActions(ent, m)
 	if waiting {
+		if missed {
+			s.actions.EnqueueReady([]ecs.Entity{ent})
+		} // Past fixture time precedes the timing wheel's real creation time.
 		s.dispatchActions(start.Add(-time.Second))
 		if len(code.admitted) != 1 {
 			t.Fatal("notification did not enter the worker queue")
 		}
-		if due := s.actionDue[ent]; due.IsZero() || due.After(start) {
+		if due := s.actionDue[ent]; !missed && (due.IsZero() || due.After(start)) {
 			t.Fatal("queued worker notification has no maintenance cancellation wakeup")
 		}
 	}
 	// No health observation occurs inside or after the five-second window.
-	s.dispatchActions(start.Add(time.Second))
+	if restart {
+		if err := store.Close(); err != nil {
+			t.Fatal(err)
+		}
+		store, err = persistence.Open(t.Context(), cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s = NewDurableSystem(&w, store, cfg, &fleetview.Holder{}, noopLogger{}, &admissionQueue{full: true}, nil, code, nil, time.Minute, false)
+		if err := s.Load(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		s.Initialize(&w)
+	}
+	if missed {
+		if waiting {
+			for _, queued := range code.admitted {
+				queued.Execute()
+			}
+		} else {
+			s.dispatchActions(time.Now().UTC())
+		}
+	} else {
+		s.dispatchActions(start.Add(time.Second))
+	}
 	m, _ = store.Get(id)
 	if m.Actions[actionID].State != persistence.Cancelled || m.Actions[actionID].Outcome != "maintenance" {
 		t.Fatal("the actual controller deferred a notification covered by maintenance")

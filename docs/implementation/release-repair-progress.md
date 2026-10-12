@@ -318,3 +318,22 @@ the defect; complete-section replacement now accepts EOF, and all 25 tooling
 tests pass with duplicate-setting rejection intact. Source re-review of this
 small correction remains required. Focused notification, logger/caller,
 projection/replay and diagnostic checks also pass on Go 1.25.0.
+
+Source re-review at `d0cd5b3` closed the EOF archive-setting correction.
+
+## Runtime log integration
+
+Committed incident/action-result diagnostics now carry stable correlation and
+safe cause codes. Production no longer filters all informational lifecycle
+messages at the controller wrapper. Pool output uses the application sink and
+pool identity, and Raft diagnostics no longer disappear into io.Discard.
+Bounded Raft fields exclude arbitrary text/objects and classify errors without
+their paths; panic payloads are not printed. Duplicate results and real
+snapshot/reopen do not re-emit live lifecycle logs.
+
+Complete controller, controller-system, queue and logger suites pass on
+Go 1.27.1. Focused real-Raft, output and lifecycle race checks pass, alongside
+Go 1.25.0 checks. Intermediate printf-vet/interface compile failures are retained.
+The existing go-hclog dependency is now direct; no new dependency version or
+storage format was added. See [runtime logging](runtime-logging.md).
+Independent source review and final-source matrices remain required.

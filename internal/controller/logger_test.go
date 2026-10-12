@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"runtime"
@@ -67,5 +68,52 @@ func TestStructuredInitializationDoesNotCreateFallbackFiles(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("structured logging unexpectedly created a working-directory file: %v, %v", entries, err)
+	}
+}
+
+func TestProductionControllerRetainsInformationalLifecycleLogs(t *testing.T) {
+	t.Setenv("CPRA_ENV", "production")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = previous; _ = r.Close(); _ = w.Close() })
+	done := make(chan []byte, 1)
+	go func() { data, _ := io.ReadAll(r); done <- data }()
+	InitializeLoggers(false)
+	SystemLogger.Info("%s", "Incident opened")
+	CloseLoggers()
+	_ = w.Close()
+	if data := <-done; !strings.Contains(string(data), "Incident opened") || strings.Contains(string(data), "\x1b") {
+		t.Fatalf("production wrapper filtered committed lifecycle diagnostics: %q", data)
+	}
+}
+
+func TestWorkerDiagnosticsUseApplicationSinkAndPoolIdentity(t *testing.T) {
+	t.Setenv("CPRA_ENV", "production")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = previous; _ = r.Close(); _ = w.Close() })
+	done := make(chan []byte, 1)
+	go func() { data, _ := io.ReadAll(r); done <- data }()
+	InitializeLoggers(false)
+	_, _, line, _ := runtime.Caller(0)
+	WorkerPoolLogger.WithContext("pulse").Printf("Set target workers to %d", 7)
+	want := "controller/logger_test.go:" + strconv.Itoa(line+1)
+	CloseLoggers()
+	_ = w.Close()
+	data := <-done
+	var record map[string]interface{}
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal("worker diagnostics bypassed structured sink", err)
+	}
+	if record["pool"] != "pulse" || record["component"] != "WORKER" || record["msg"] != "Set target workers to 7" || record["caller"] != want {
+		t.Fatal("worker identity, message or caller lost", record)
 	}
 }

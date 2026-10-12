@@ -649,6 +649,7 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 		s.releaseResult(job)
 		p.completed++
 		s.processed++
+		s.logLifecycleEvents(r.Events)
 		// Duplicate lifecycle commands can return an empty result. A pulse is
 		// accepted only when the original generation, time, outcome and incarnation
 		// are still evidenced by committed state. Replaying is not that evidence.
@@ -1052,6 +1053,44 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			s.admitted[id] = true
 		}
 		s.scheduleActions(ent, m)
+	}
+}
+
+func (s *DurableSystem) logLifecycleEvents(events []persistence.Event) {
+	for _, event := range events {
+		message := ""
+		warning := false
+		switch event.Type {
+		case "incident_opened":
+			message = "Incident opened"
+		case "incident_closed", "incident_closed_configuration_removed":
+			message = "Incident closed"
+		case "action_succeeded", "action_failed", "action_unknown", "action_cancelled":
+			message = "Action outcome committed"
+			warning = event.Type == "action_failed" || event.Type == "action_unknown"
+		default:
+			continue
+		}
+		// Correlation and canonical cause codes are sufficient for operators.
+		// Provider bodies, configuration, addresses and operator notes are not
+		// inputs. History remains authoritative when diagnostic logs are sampled.
+		fields := []interface{}{"event_type", event.Type, "monitor_id", event.MonitorID,
+			"monitor_uid", event.CatalogUID, "incident_id", event.IncidentID}
+		if event.ActionID != "" {
+			fields = append(fields, "action_id", event.ActionID, "action_kind", event.Kind,
+				"delivery_id", event.DeliveryID, "endpoint_id", event.EndpointID, "outcome", event.Outcome)
+		}
+		if event.Failure.Code != "" {
+			fields = append(fields, "failure_code", event.Failure.Code)
+		}
+		if event.Cause.Code != "" {
+			fields = append(fields, "cause_code", event.Cause.Code)
+		}
+		if warning {
+			s.logger.Warn(message, fields...)
+		} else {
+			s.logger.Info(message, fields...)
+		}
 	}
 }
 

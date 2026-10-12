@@ -273,6 +273,10 @@ func (s *Store) openRaft(ctx context.Context) error {
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(node.ID)
 	c.LogOutput = io.Discard
+	c.Logger, err = newRaftLogger()
+	if err != nil {
+		return fmt.Errorf("initialize Raft diagnostics: %w", err)
+	}
 	c.HeartbeatTimeout = 100 * time.Millisecond
 	c.ElectionTimeout = 100 * time.Millisecond
 	c.LeaderLeaseTimeout = 100 * time.Millisecond

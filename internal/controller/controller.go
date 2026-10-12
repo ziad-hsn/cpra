@@ -12,7 +12,6 @@ import (
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -168,7 +167,7 @@ func NewController(config Config) *Controller {
 	pulseCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
 	pulseQueue, err := queue.NewQueue(pulseCfg)
 	if err != nil {
-		log.Fatalf("Failed to create pulse HybridQueue: %v", err)
+		SystemLogger.Fatal("Failed to create pulse HybridQueue: %v", err)
 	}
 	interventionCfg := queue.DefaultQueueConfig()
 	interventionCfg.Name = "intervention"
@@ -176,7 +175,7 @@ func NewController(config Config) *Controller {
 	interventionCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
 	interventionQueue, err := queue.NewQueue(interventionCfg)
 	if err != nil {
-		log.Fatalf("Failed to create intervention HybridQueue: %v", err)
+		SystemLogger.Fatal("Failed to create intervention HybridQueue: %v", err)
 	}
 	codeCfg := queue.DefaultQueueConfig()
 	codeCfg.Name = "code"
@@ -184,23 +183,23 @@ func NewController(config Config) *Controller {
 	codeCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
 	codeQueue, err := queue.NewQueue(codeCfg)
 	if err != nil {
-		log.Fatalf("Failed to create code HybridQueue: %v", err)
+		SystemLogger.Fatal("Failed to create code HybridQueue: %v", err)
 	}
 
-	pulseLogger := log.New(os.Stdout, "[PulsePool] ", log.LstdFlags)
+	pulseLogger := WorkerPoolLogger.WithContext("pulse")
 	pulsePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(pulseQueue), config.WorkerConfig, pulseLogger)
 	if err != nil {
-		log.Fatalf("Failed to create pulse worker pool: %v", err)
+		SystemLogger.Fatal("Failed to create pulse worker pool: %v", err)
 	}
-	interventionLogger := log.New(os.Stdout, "[InterventionPool] ", log.LstdFlags)
+	interventionLogger := WorkerPoolLogger.WithContext("intervention")
 	interventionPool, err := queue.NewDynamicWorkerPool(queue.NewHandle(interventionQueue), config.WorkerConfig, interventionLogger)
 	if err != nil {
-		log.Fatalf("Failed to create intervention worker pool: %v", err)
+		SystemLogger.Fatal("Failed to create intervention worker pool: %v", err)
 	}
-	codeLogger := log.New(os.Stdout, "[CodePool] ", log.LstdFlags)
+	codeLogger := WorkerPoolLogger.WithContext("code")
 	codePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(codeQueue), config.WorkerConfig, codeLogger)
 	if err != nil {
-		log.Fatalf("Failed to create code worker pool: %v", err)
+		SystemLogger.Fatal("Failed to create code worker pool: %v", err)
 	}
 
 	if config.Store != nil {

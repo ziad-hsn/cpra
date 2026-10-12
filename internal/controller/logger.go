@@ -67,9 +67,6 @@ func newLogger(component string, debugMode bool, base applogger.Logger) *Logger 
 
 	// Check environment for production mode
 	prodMode := strings.ToLower(os.Getenv("CPRA_ENV")) == "production"
-	if prodMode {
-		level = LogLevelWarn // More restrictive in production
-	}
 
 	// Enable colors for terminal output (disable in production)
 	enableColor := !prodMode && isTerminal()
@@ -342,7 +339,7 @@ func (l *Logger) Fatal(msg string, args ...interface{}) {
 
 // WithContext creates a new logger with additional context
 func (l *Logger) WithContext(context string) *Logger {
-	return &Logger{
+	derived := &Logger{
 		level:       l.level,
 		component:   fmt.Sprintf("%s:%s", l.component, context),
 		enableColor: l.enableColor,
@@ -353,6 +350,15 @@ func (l *Logger) WithContext(context string) *Logger {
 		tracer:      l.tracer,
 		base:        l.base,
 	}
+	if l.base != nil {
+		derived.base = l.base.With(applogger.Field{Key: "pool", Value: context})
+	}
+	return derived
+}
+
+// Printf accepts worker-framework diagnostics through the application sink.
+func (l *Logger) Printf(format string, args ...interface{}) {
+	l.withCallerSkip(1).Info(format, args...)
 }
 
 // StartTrace begins a new trace span with the logger's tracer

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/ziad-hsn/cpra/internal/jobs"
-	"log"
 	"math"
 	"runtime"
 	"sync"
@@ -15,13 +14,19 @@ import (
 	"github.com/puzpuzpuz/xsync/v4"
 )
 
+// Logger is the diagnostic interface shared with the worker-pool dependency.
+// Standard-library and application loggers both satisfy it.
+type Logger interface {
+	Printf(string, ...interface{})
+}
+
 // ResultRouter handles routing of job results to type-specific channels.
 // This enables decoupling result processing from the main worker pool.
 type ResultRouter struct {
 	PulseResultChan        chan []jobs.Result
 	InterventionResultChan chan []jobs.Result
 	CodeResultChan         chan []jobs.Result
-	logger                 *log.Logger
+	logger                 Logger
 	config                 WorkerPoolConfig
 	done                   <-chan struct{}
 	closeOnce              sync.Once
@@ -53,7 +58,7 @@ type WorkerPoolStats struct {
 }
 
 // NewResultRouter creates a new result router with buffered channels.
-func NewResultRouter(config WorkerPoolConfig, logger *log.Logger) *ResultRouter {
+func NewResultRouter(config WorkerPoolConfig, logger Logger) *ResultRouter {
 	bufferSize := config.ResultChannelDepth
 	return &ResultRouter{
 		PulseResultChan:        make(chan []jobs.Result, bufferSize),
@@ -152,7 +157,7 @@ type DynamicWorkerPool struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	antsPool        *ants.PoolWithFunc
-	logger          *log.Logger
+	logger          Logger
 	resultQueues    []*xsync.MPMCQueue[jobs.Result]
 	notifyChans     []chan struct{}
 	numShards       int
@@ -231,7 +236,7 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 }
 
 // NewDynamicWorkerPool creates a new dynamic worker pool.
-func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) (*DynamicWorkerPool, error) {
+func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*DynamicWorkerPool, error) {
 	if config.PreAlloc {
 		return nil, errors.New("preallocated workers do not support dynamic resizing")
 	}
@@ -356,7 +361,7 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger *log.Logger) 
 	}
 	antsOptions = append(antsOptions, ants.WithPanicHandler(func(err interface{}) {
 		if pool.logger != nil {
-			pool.logger.Printf("Worker panic: %v", err)
+			pool.logger.Printf("Worker panic: job_panicked")
 		}
 	}))
 
@@ -401,7 +406,7 @@ func (p *DynamicWorkerPool) Start() {
 		go p.autoScale()
 	}
 	if p.logger != nil {
-		p.logger.Println("DynamicWorkerPool started")
+		p.logger.Printf("DynamicWorkerPool started")
 	}
 }
 
@@ -790,7 +795,7 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 // Pause temporarily stops the worker pool from processing new tasks.
 func (p *DynamicWorkerPool) Pause() {
 	if p.logger != nil {
-		p.logger.Println("Pausing worker pool...")
+		p.logger.Printf("Pausing worker pool...")
 	}
 	if p.antsPool != nil {
 		p.antsPool.Tune(0) // Reduce capacity to 0 to pause processing
@@ -800,7 +805,7 @@ func (p *DynamicWorkerPool) Pause() {
 // Resume resumes worker pool processing after a pause.
 func (p *DynamicWorkerPool) Resume() {
 	if p.logger != nil {
-		p.logger.Println("Resuming worker pool...")
+		p.logger.Printf("Resuming worker pool...")
 	}
 	if p.antsPool != nil {
 		// Restore to minimum workers
@@ -867,7 +872,7 @@ func (p *DynamicWorkerPool) ReplaceQueue(newQueue Queue) error {
 	}
 
 	if p.logger != nil {
-		p.logger.Println("Replacing queue in worker pool...")
+		p.logger.Printf("Replacing queue in worker pool...")
 	}
 
 	// Swap the queue reference under the lock so the dispatcher and
@@ -904,7 +909,7 @@ func (p *DynamicWorkerPool) ReplaceQueue(newQueue Queue) error {
 	}
 
 	if p.logger != nil {
-		p.logger.Println("Queue replacement completed")
+		p.logger.Printf("Queue replacement completed")
 	}
 	return nil
 }

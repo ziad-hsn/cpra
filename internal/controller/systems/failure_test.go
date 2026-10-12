@@ -2,6 +2,7 @@ package systems
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +18,35 @@ import (
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+type lifecycleLogRecord struct {
+	message string
+	fields  map[string]interface{}
+}
+
+type lifecycleTestLogger struct {
+	noopLogger
+	records []lifecycleLogRecord
+}
+
+func (l *lifecycleTestLogger) record(message string, fields ...interface{}) {
+	record := lifecycleLogRecord{message: message, fields: map[string]interface{}{}}
+	for i := 0; i+1 < len(fields); i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			panic("test logger received an unstructured field")
+		}
+		record.fields[key] = fields[i+1]
+	}
+	l.records = append(l.records, record)
+}
+
+func (l *lifecycleTestLogger) Info(message string, fields ...interface{}) {
+	l.record(message, fields...)
+}
+func (l *lifecycleTestLogger) Warn(message string, fields ...interface{}) {
+	l.record(message, fields...)
+}
 
 func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 	var mu sync.Mutex
@@ -51,7 +81,8 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 	ecs.NewMap1[components.CodeConfig](&world).Get(ent).Configs = map[string]*components.ColorCodeConfig{"red": {Dispatch: true, Notify: "webhook"}}
 	ecs.NewMap1[components.JobStorage](&world).Get(ent).CodeJobs = map[string][]jobs.Job{"red": {&jobs.CodeWebhookJob{URL: receiver.URL, Color: "red", Message: "Service is unhealthy"}}}
 	queue := &admissionQueue{}
-	system := NewDurableSystem(&world, store, cfg, &fleetview.Holder{}, noopLogger{}, &admissionQueue{full: true}, nil, queue, nil, time.Minute, false)
+	logger := &lifecycleTestLogger{}
+	system := NewDurableSystem(&world, store, cfg, &fleetview.Holder{}, logger, &admissionQueue{full: true}, nil, queue, nil, time.Minute, false)
 	if err := system.Load(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -71,8 +102,9 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 	if len(queue.admitted) != 1 {
 		t.Fatal("notification not admitted", len(queue.admitted))
 	}
-	if result := queue.admitted[0].Execute(); result.Err != nil {
-		t.Fatal(result.Err)
+	result := queue.admitted[0].Execute()
+	if result.Err != nil || !system.commitResults([]jobs.Result{result}) {
+		t.Fatal(result.Err, system.lastError)
 	}
 	mu.Lock()
 	message := delivered
@@ -95,6 +127,40 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("committed incident event not retained")
+	}
+	if len(logger.records) != 2 || logger.records[0].message != "Incident opened" || logger.records[1].fields["event_type"] != "action_succeeded" {
+		t.Fatal("committed incident/action diagnostics missing", logger.records)
+	}
+	for _, record := range logger.records {
+		if record.fields["monitor_id"] != m.ID || record.fields["incident_id"] != m.IncidentID || strings.Contains(fmt.Sprint(record), "private-") {
+			t.Fatal("lifecycle log lacks identity or exposes provider text", record)
+		}
+	}
+	// A duplicate result is not a second committed outcome and must not
+	// produce another event log.
+	if !system.commitResults([]jobs.Result{result}) || len(logger.records) != 2 {
+		t.Fatal("duplicate result repeated the committed event log")
+	}
+	if err := store.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := persistence.Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restored.Close() })
+	restoredWorld := ecs.NewWorld()
+	releaseMonitor(t, &restoredWorld, 1, 1)
+	restoredSystem := NewDurableSystem(&restoredWorld, restored, cfg, &fleetview.Holder{}, logger, &admissionQueue{full: true}, nil, &admissionQueue{}, nil, time.Minute, false)
+	if err := restoredSystem.Load(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	restoredSystem.Initialize(&restoredWorld)
+	if len(logger.records) != 2 {
+		t.Fatal("snapshot replay or projection loading re-emitted lifecycle logs")
 	}
 }
 

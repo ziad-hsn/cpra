@@ -80,3 +80,9 @@ encoded-byte bound, reconciles a committed prefix, and schedules the remaining
 suffix for another bounded owner turn. The two-destination/batch-one regression
 passes with healthy storage, zero receiver effects and retained cancellations
 after reopening. This final batching change still requires source re-review.
+
+Source re-review at `e9bc6c54a11fa4a40d09b629dcebeeb6df18876c` closed the
+batching regression with no remaining concrete finding in that finite change.
+It verified count/byte/guard bounds, prefix reconciliation, suffix scheduling
+before dispatch, final queued-job authorization and pending-work restoration on
+submission error. It ran no tests and does not qualify the final release.

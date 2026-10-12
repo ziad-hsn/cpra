@@ -46,13 +46,13 @@ export function Topbar() {
   return (
     <header className="topbar">
       <div className="topbar-title">
-        <h1>{meta.title}</h1>
+        <strong>{meta.title}</strong>
         <span className="crumb">{meta.crumb}</span>
       </div>
 
       <div
         className={`status-banner ${ok ? 'ok' : critical > 0 ? 'critical' : 'pending'}`}
-        role="banner"
+        role="status"
         aria-label="Global fleet status"
       >
         <span className="dot" aria-hidden />

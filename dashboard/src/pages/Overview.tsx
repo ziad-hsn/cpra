@@ -9,7 +9,7 @@ import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { StatusChip } from '../components/StatusChip';
 import { Icon } from '../components/Icon';
-import { formatNumber, formatPercent, formatDurationNs, timeAgo } from '../lib/format';
+import { formatNumber, formatPercent, formatDurationNs, formatUptime, timeAgo } from '../lib/format';
 import type { MonitorSummary } from '../api/types';
 
 const CODE_COLORS: Record<string, string> = {
@@ -99,7 +99,7 @@ export default function Overview() {
           <span className='card-title' style={{ alignSelf: 'flex-start' }}>Current Fleet Health</span>
           <ProgressRing value={availFrac} size={128} thickness={12} color='var(--status-operational)' ariaLabel='Currently operational monitors'>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{formatPercent(upPct, 1)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{formatUptime(total > 0 ? availFrac : undefined)}</div>
               <div className='muted' style={{ fontSize: 11 }}>operational</div>
             </div>
           </ProgressRing>

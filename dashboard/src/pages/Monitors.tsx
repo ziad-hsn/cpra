@@ -31,6 +31,7 @@ export default function Monitors() {
 
   const monitors = data?.monitors ?? [];
   const total = data?.total ?? 0;
+  const filtered = Object.values(filters).some(value => value !== '');
   const startIdx = total > 0 ? (page - 1) * size + 1 : 0;
   const endIdx = Math.min(page * size, total);
 
@@ -49,7 +50,7 @@ export default function Monitors() {
       <div className="page-head">
         <div>
           <h1>Monitor Fleet</h1>
-          <div className="lead">Browse active monitors in the current snapshot</div>
+          <div className="lead">Live health and controls observed by the controller. Saved configurations are managed separately.</div>
         </div>
         {session.can('ListMonitors') && <Link className="btn" to="/monitor-configurations">Manage monitor configurations</Link>}
       </div>
@@ -68,7 +69,8 @@ export default function Monitors() {
         </div>
       ) : monitors.length === 0 ? (
         <div className="card">
-          <EmptyState title="No monitors found" message={total === 0 ? 'No monitors match your filters.' : undefined} />
+          <EmptyState title={filtered ? 'No matching monitors' : total > 0 ? 'No monitors on this page' : 'No live monitors'}
+            message={filtered ? 'No monitors match your filters.' : total > 0 ? 'Return to an earlier page to see remaining monitors.' : 'No monitor observations are available yet. Check configuration and controller readiness.'} />
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -172,7 +172,7 @@ a:hover { color: var(--accent-bright); }
   position: sticky; top: 0; z-index: 20;
 }
 .topbar-title { display: flex; flex-direction: column; line-height: 1.15; }
-.topbar-title h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.1px; }
+.topbar-title > strong { font-size: 16px; font-weight: 600; letter-spacing: 0.1px; }
 .topbar-title .crumb { font-size: 11px; color: var(--text-muted); letter-spacing: 0.4px; }
 
 .status-banner {

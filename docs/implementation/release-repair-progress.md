@@ -76,7 +76,8 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
 - Missed-window source review passed. A further batch-one cancellation
   regression was reproduced and repaired with command-count/encoded-byte
   prefixes and continuation on the next owner turn. Its restart/no-effect/
-  storage-health regression passes and awaits final source re-review.
+  storage-health regression passes; independent source re-review at `e9bc6c5`
+  closed the finding without a further concrete defect.
 - Artwork/release archive contracts, asset freshness contracts and frontend
   type checking passed after the licensing changes. The 702-test release-script
   run passed 700; its failures were an absent compiler on the check's PATH and
@@ -87,7 +88,7 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
 
 An independent reviewer agent reviewed checkpoint `b59d5b8` at the user's
 request. Correlation and format repairs passed source re-review; a further
-missed-window maintenance repair has passing regressions and awaits re-review;
+missed-window maintenance and bounded cancellation repairs passed source re-review;
 this is not a review
 of a final frozen release. No public branch, tag,
 release, module, image, chart or documentation promotion has been performed.

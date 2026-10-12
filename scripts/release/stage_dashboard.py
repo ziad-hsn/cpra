@@ -23,5 +23,6 @@ for name, content in sorted(notices.items()):
     text += '\n' + '=' * 72 + '\n' + name + '\n' + '=' * 72 + '\n'
     text += content.decode('utf-8') + '\n'
 (license_dir / 'dashboard.txt').write_text(text)
+(target / 'notices.txt').write_text(text)
 
 (license_dir / "dashboard.json").write_text(json.dumps(inventory, indent=2) + "\n")

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { createBrowserRouter, RouterProvider, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route, Link } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { SessionBoundary } from './auth/SessionBoundary';
@@ -25,6 +25,14 @@ function PageFallback() {
   );
 }
 
+function NotFound() {
+  return <div className="page">
+    <div className="page-head"><h1>Page not found</h1></div>
+    <p>This dashboard page does not exist. Choose a page from the navigation or return to the overview.</p>
+    <Link to="/" className="btn">Go to overview</Link>
+  </div>;
+}
+
 /** AppRoutes — the routes without a router wrapper, for testing. */
 export function AppRoutes() {
   return (
@@ -44,6 +52,7 @@ export function AppRoutes() {
         <Route path="/notification-endpoints/:id?" element={<ManagementResources key="endpoints" type="endpoints" />} />
         <Route path="/notification-groups/:id?" element={<ManagementResources key="groups" type="groups" />} />
         <Route path="/secrets/:id?" element={<ManagementResources key="credentials" type="credentials" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

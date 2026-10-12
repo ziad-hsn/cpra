@@ -21,7 +21,7 @@ export default function SystemHealth() {
       <div className="page-head">
         <div>
           <h1>System Health</h1>
-          <div className="lead">ECS system throughput, queue backpressure, and worker pool utilization</div>
+          <div className="lead">Controller throughput, queue saturation, and worker pool utilization</div>
         </div>
       </div>
 
@@ -31,7 +31,7 @@ export default function SystemHealth() {
       {/* Engine KPIs */}
       <div className="grid-kpis">
         <KpiTile
-          label="Entities / sec"
+          label="Controller items / sec"
           value={aggregate && !sysError ? formatNumber(Math.round(aggregate.entities_per_second)) : 'Unavailable'}
           code="cyan"
           icon="activity"
@@ -49,7 +49,7 @@ export default function SystemHealth() {
           value={aggregate && !sysError ? formatNumber(aggregate.system_count) : 'Unavailable'}
           code="gray"
           icon="layers"
-          sub="ECS systems loaded"
+          sub="controller systems loaded"
         />
         <KpiTile
           label="Avg Update Duration"
@@ -63,7 +63,7 @@ export default function SystemHealth() {
       {/* System metrics table */}
       <div className="card">
         <div className="card-head">
-          <span className="card-title">ECS System Metrics</span>
+          <span className="card-title">Controller System Metrics</span>
           <span className="card-sub">per-system throughput and timing</span>
         </div>
         {sysError ? (
@@ -79,7 +79,7 @@ export default function SystemHealth() {
                 <tr>
                   <th>System</th>
                   <th style={{ textAlign: 'right' }}>Updates</th>
-                  <th style={{ textAlign: 'right' }}>Entities</th>
+                  <th style={{ textAlign: 'right' }}>Items processed</th>
                   <th style={{ textAlign: 'right' }}>Avg</th>
                   <th style={{ textAlign: 'right' }}>Max</th>
                   <th style={{ textAlign: 'right' }}>Min</th>

@@ -20,7 +20,7 @@ afterEach(cleanup);
 
 it('never reports a TLS-warning-only fleet as operational',()=>{
  render(<MemoryRouter><Topbar /></MemoryRouter>);
- expect(screen.getByRole('banner',{name:'Global fleet status'})).not.toHaveTextContent('All systems operational');
+ expect(screen.getByRole('status',{name:'Global fleet status'})).not.toHaveTextContent('All systems operational');
 });
 it('includes degraded monitors in the status distribution',()=>{
  render(<MemoryRouter><Overview /></MemoryRouter>);

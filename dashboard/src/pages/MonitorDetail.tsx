@@ -26,10 +26,10 @@ export default function MonitorDetail() {
   );
 
   if (isError) {
-    return <div className='page'><div>{backBtn}</div><ErrorState message={'Monitor ' + id + ' not found'} onRetry={() => refetch()} /></div>;
+    return <div className='page'><h1>Monitor details</h1><div>{backBtn}</div><ErrorState message={'Monitor ' + id + ' not found'} onRetry={() => refetch()} /></div>;
   }
   if (isLoading || !monitor) {
-    return <div className='page'><div>{backBtn}</div><div className='card'><LoadingSkeleton lines={6} /></div></div>;
+    return <div className='page'><h1>Monitor details</h1><div>{backBtn}</div><div className='card'><LoadingSkeleton lines={6} /></div></div>;
   }
 
   const m = monitor;
@@ -46,7 +46,7 @@ export default function MonitorDetail() {
           <div className='row' style={{ gap: 14, minWidth: 0 }}>
             <span style={{ width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 18, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-soft)', textTransform: 'lowercase' }}>{m.pulse_type.slice(0,2)}</span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+              <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</h1>
               <div className='muted mono' style={{ fontSize: 12.5, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.target || m.pulse_type.toUpperCase()}</div>
             </div>
           </div>

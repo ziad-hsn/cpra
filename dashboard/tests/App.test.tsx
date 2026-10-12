@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { MemoryRouter } from 'react-router-dom';
@@ -125,13 +125,42 @@ function renderApp(initialRoute = '/') {
 }
 
 describe('App', () => {
+  it('keeps one primary page heading inside the shell', async () => {
+    renderApp('/');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Fleet Overview' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
+  it('shows a missing-route page with a working return link', async () => {
+    renderApp('/does-not-exist');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to overview' })).toHaveAttribute('href', '/');
+  });
+
+  it('distinguishes no live monitors from filters with no matches', async () => {
+    server.use(http.get('/api/v1/monitors', () => HttpResponse.json({ ...monitorsResponse, total: 0, monitors: [] })));
+    renderApp('/monitors');
+    expect(await screen.findByText('No live monitors')).toBeInTheDocument();
+    expect(screen.queryByText('No monitors match your filters.')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search monitors' }), { target: { value: 'missing-service' } });
+    expect(await screen.findByText('No matching monitors')).toBeInTheDocument();
+    expect(screen.getByText('No monitors match your filters.')).toBeInTheDocument();
+  });
+
+  it('uses a compact complete-health label inside the ring', async () => {
+    server.use(http.get('/api/v1/overview', () => HttpResponse.json({ ...overviewResponse, total: 1, disabled: 0, by_status: { up: 1 }, up_percent: 100 })));
+    renderApp('/');
+    await waitFor(() => expect(screen.getByRole('img', { name: 'Currently operational monitors' })).toHaveTextContent('100%'));
+    expect(screen.getByRole('img', { name: 'Currently operational monitors' })).not.toHaveTextContent('100.0%');
+  });
+
   it('does not report an unprobed fleet as operational', async () => {
     server.use(http.get('/api/v1/overview', () => HttpResponse.json({
       ...overviewResponse, total: 2, disabled: 0, by_status: { unknown: 2 }, up_percent: 0,
     })));
     renderApp('/');
     await waitFor(() => {
-      expect(screen.getByRole('banner', { name: 'Global fleet status' })).toHaveTextContent('Awaiting first check results');
+      expect(screen.getByRole('status', { name: 'Global fleet status' })).toHaveTextContent('Awaiting first check results');
     });
     expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
   });

@@ -54,6 +54,7 @@ export function timeAgo(iso: string): string {
   try {
     const d = new Date(iso);
     const diff = Date.now() - d.getTime();
+    if (!Number.isFinite(diff)) return '—';
     if (diff < 0) return 'in the future';
     const s = Math.floor(diff / 1000);
     if (s < 60) return `${s}s ago`;
@@ -87,7 +88,7 @@ export function formatMeasuredLatency(available: boolean | undefined, ms: number
 
 /** Format an uptime fraction (0..1) as a percentage string. */
 export function formatUptime(frac: number | undefined): string {
-  if (frac === undefined || frac === null || isNaN(frac)) return '—';
+  if (frac === undefined || frac === null || !Number.isFinite(frac) || frac < 0 || frac > 1) return '—';
   const pct = frac * 100;
   return pct >= 99.95 ? '100%' : pct.toFixed(1) + '%';
 }

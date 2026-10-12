@@ -100,3 +100,14 @@ source re-review of those changes remains required.
 
 Compact `100%` text is verified in the DOM. Responsive pixel fit, browser
 accessibility and embedded regeneration remain separate gates.
+
+Source re-review at `0fbeb69` closed both dashboard edge cases. It found that
+human monitor description asserted "not snoozed" while configuration projection
+was pending. Snooze is now unavailable without matching status and control
+identities; an observed zero deadline means not snoozed. Missing, pending and
+confirmed control-state regressions pass in the complete CLI suite. Source
+re-review of this final correction remains required.
+
+The pinned dashboard rebuild passed all 528 tests, type checking, lint and
+embedded-asset regeneration. This remains development evidence; the real-browser
+and final frozen-source qualification gates remain open.

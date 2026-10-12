@@ -197,18 +197,21 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 	if spec.Enabled != nil {
 		enabled = strconv.FormatBool(*spec.Enabled)
 	}
-	checked, snoozed := "unavailable", "not snoozed"
+	checked, snoozed := "unavailable", "unavailable"
 	if !status.LastCheckedAt.IsZero() {
 		checked = status.LastCheckedAt.UTC().Format(time.RFC3339Nano)
-	}
-	if !status.SnoozedUntil.IsZero() {
-		snoozed = status.SnoozedUntil.UTC().Format(time.RFC3339Nano)
 	}
 	latency := measurement(status.LastCheckLatencyMS)
 	observed, unknownActions := "unavailable", "unavailable"
 	if status.StatusRevision != "" {
 		observed = strconv.FormatInt(status.ObservedGeneration, 10)
 		unknownActions = strconv.FormatInt(status.UnknownActions, 10)
+		if status.ControlRevision != "" {
+			snoozed = "not snoozed"
+			if !status.SnoozedUntil.IsZero() {
+				snoozed = status.SnoozedUntil.UTC().Format(time.RFC3339Nano)
+			}
+		}
 	}
 	recovery := "not configured"
 	if spec.Recovery != nil {

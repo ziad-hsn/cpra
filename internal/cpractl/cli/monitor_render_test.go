@@ -71,3 +71,38 @@ func TestTableAndKeyValueEscapeTerminalControls(t *testing.T) {
 		}
 	}
 }
+
+func TestMonitorDescribeSnoozeAvailability(t *testing.T) {
+	until := time.Date(2026, 10, 12, 5, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name   string
+		status api.MonitorStatus
+		want   string
+	}{
+		{name: "missing", want: "unavailable"},
+		{name: "pending", status: api.MonitorStatus{Health: "configurationPending"}, want: "unavailable"},
+		{name: "no control identity", status: api.MonitorStatus{StatusRevision: "1"}, want: "unavailable"},
+		{name: "confirmed unsnoozed", status: api.MonitorStatus{StatusRevision: "1", ControlRevision: "1"}, want: "not snoozed"},
+		{name: "confirmed snoozed", status: api.MonitorStatus{StatusRevision: "1", ControlRevision: "1", SnoozedUntil: until}, want: until.Format(time.RFC3339Nano)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := cliResource("Monitor", "service")
+			r.Status, _ = json.Marshal(tc.status)
+			cmd := &cobra.Command{}
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			if err := describeMonitor(cmd, r, "service"); err != nil {
+				t.Fatal(err)
+			}
+			got := ""
+			for _, line := range strings.Split(out.String(), "\n") {
+				if value, ok := strings.CutPrefix(line, "Snoozed until:"); ok {
+					got = strings.TrimSpace(value)
+				}
+			}
+			if got != tc.want {
+				t.Fatal("incorrect snooze availability", out.String())
+			}
+		})
+	}
+}

@@ -89,6 +89,12 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
   the two subsequent review edge-case fixes passed in the eleven-test app suite.
   The reviewer confirmed the notices path without a pixel-fit/browser claim.
   Complete CLI tests pass with descriptive monitor output and terminal escaping.
+- The complete pinned dashboard rebuild passed with 528 tests, type checking,
+  lint, parser generation, embedded notices and asset freshness metadata. Source
+  review closed the two dashboard edge cases. The remaining CLI snooze finding
+  is repaired: pending or missing control observations render unavailable,
+  rather than asserting that a monitor is not snoozed. The complete CLI suite
+  passes with separate missing, pending, unsnoozed and snoozed regressions.
 
 An independent reviewer agent reviewed checkpoint `b59d5b8` at the user's
 request. Correlation and format repairs passed source re-review; a further

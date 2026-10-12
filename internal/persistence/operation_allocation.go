@@ -131,7 +131,8 @@ func operationTarget(c Command) (Command, OperationReceipt, string, error) {
 	return c, r, id, nil
 }
 func operationDigest(c Command) (OperationReservation, string, error) {
-	if hasCommandExtensions(c) || c.AgentReceipt != nil || c.AgentConnection != nil || c.AgentObservation != nil {
+	if hasCommandExtensions(c) || c.AgentReceipt != nil || c.AgentConnection != nil || c.AgentObservation != nil ||
+		c.Failure != (FailureDiagnostic{}) || c.RetryDelay != 0 || !c.ActionDeadline.IsZero() {
 		return OperationReservation{}, "", ErrOperationReservation
 	}
 	normalized, r, id, err := operationTarget(c)

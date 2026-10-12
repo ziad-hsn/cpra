@@ -276,3 +276,37 @@ and component-state caller regressions now exercise that path. The first
 fixture left debug verbosity disabled; the corrected enabled fixture reproduced
 the wrong performance caller. Helper-specific skips repair it, and focused race
 checks pass. Source re-review remains required for this final caller correction.
+
+Source re-review at `e2be211` closed the helper caller correction with no
+further concrete finding in that finite scope.
+
+## Complete persistence run and digest boundary
+
+The documented-budget persistence run completed in 803 seconds. It reported
+one failing field-projection guard: its reviewed exception inventory omitted
+the execution-only Failure and RetryDelay fields. The corrected guard checks
+their exact types/tags and preserves zero-field historical JSON bytes. A separate
+reproduction showed that the internal operation-digest helper silently omitted
+nonzero execution-only fields; it now rejects them before projection. Public
+reservation already validates command shape, and no historical digest bytes or
+storage format were changed. Focused golden/replay/diagnostic checks pass with
+race and externaljobs. Independent review and a complete corrected final-source
+persistence run remain required; the earlier full run is still failed evidence.
+
+## Current documentation preview
+
+Current release notes describe implemented development behavior and pending
+qualification instead of retaining the memory-only preview's limits. September
+runtime/provider notes remain dated archives. Source metadata identifies the
+preceding implementation checkpoint and an uncommitted documentation refresh;
+it is not a release attestation. MkDocs keeps archive pages buildable outside
+user navigation through explicit not_in_nav patterns. Other navigation, link,
+anchor, traversal and symlink guards remain active.
+
+Twenty-five documentation-tool tests and strict source checks pass. The pinned
+private site build renders 166 content pages and 16 redirects, with 29,316
+internal links/assets checked and no errors. Its first strict run found twelve
+removed heading anchors; current pages now preserve those inbound anchors and
+the corrected strict build passes. The separate gh-pages checkout is untouched.
+Independent source review remains required. The private artifact and dependency
+inventory remain in task-owned scratch; this is not published-site evidence.

@@ -472,6 +472,9 @@ func validateCommand(c Command) error {
 		if err := c.Config.Policy.Validate(); err != nil {
 			return err
 		}
+		if err := validateNotificationIdentity(*c.Config, commandMinimumFormat(c)); err != nil {
+			return err
+		}
 		if c.Config.CatalogUID != "" && (c.Guard == nil || c.Config.CatalogUID != c.Guard.monitorUID(c.MonitorID)) {
 			return fmt.Errorf("durable monitor incarnation requires its matching guard")
 		}

@@ -286,7 +286,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	m.Warning = c.Warning
 	if c.Outcome != "success" {
 		m.beginIncident(c.At)
-		if m.NotificationVersion == DeliveryFormatVersion {
+		if m.NotificationVersion == DeliveryFormatVersion && !previousWarning && !previousRecovering {
 			m.NotificationCorrelation = m.IncidentID
 		}
 		m.changeNotificationEpisode(identity("outage/"+m.IncidentID), c.At, emit)
@@ -388,10 +388,11 @@ func (m *Monitor) openIncident(at time.Time, emit func(string, *Action)) {
 		return
 	}
 	m.beginIncident(at)
-	if m.NotificationVersion == DeliveryFormatVersion {
+	episode := identity("outage/" + m.IncidentID)
+	if m.NotificationVersion == DeliveryFormatVersion && m.NotificationEpisode != episode && !m.Warning {
 		m.NotificationCorrelation = m.IncidentID
 	}
-	m.changeNotificationEpisode(identity("outage/"+m.IncidentID), at, emit)
+	m.changeNotificationEpisode(episode, at, emit)
 	m.Incident = true
 	emit("incident_opened", nil)
 	m.queueColor("red", at, emit)

@@ -69,6 +69,76 @@ func TestNotificationProviderCorrelationSurvivesRecoveryAndRenewal(t *testing.T)
 	}
 }
 
+func TestNotificationProviderCorrelationSurvivesWarningEscalation(t *testing.T) {
+	p := testMonitor().Policy
+	p.Intervention, p.Unhealthy, p.Healthy = false, 1, 1
+	p.Endpoints = map[string]int{"yellow": 1, "red": 1, "green": 1}
+	p.NotificationEndpointIDs = map[string][]string{"yellow": {"destination"}, "red": {"destination"}, "green": {"destination"}}
+	at := policyTime().Add(time.Second)
+	m := configuredPolicyMonitor(t, p)
+	r := transition(m, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: at, Outcome: "success", Warning: true})
+	m = *r.Monitor
+	yellow := notificationByColor(t, m, "yellow", Queued)
+	m = policyStart(t, m, yellow, at)
+	m = policyOutcome(t, m, yellow, at.Add(time.Millisecond), "success", false)
+	m = policyPulse(t, m, at.Add(time.Second), "failure")
+	red := notificationByColor(t, m, "red", Queued)
+	if red.NotificationEpisode == yellow.NotificationEpisode || red.NotificationCorrelation != yellow.NotificationCorrelation || red.EndpointID != yellow.EndpointID {
+		t.Fatalf("severity escalation orphaned the delivered provider warning or reused its notification episode: yellow=%+v red=%+v", yellow, red)
+	}
+	m = policyPulse(t, m, at.Add(2*time.Second), "success")
+	green := notificationByColor(t, m, "green", Queued)
+	if green.NotificationCorrelation != yellow.NotificationCorrelation || green.EndpointID != yellow.EndpointID {
+		t.Fatal("confirmed recovery cannot close the warning that began this failure episode")
+	}
+	m = policyPulse(t, m, at.Add(3*time.Second), "failure")
+	next := notificationByColor(t, m, "red", Queued)
+	if next.NotificationCorrelation == yellow.NotificationCorrelation {
+		t.Fatal("a subsequent outage inherited the recovered warning's provider identity")
+	}
+}
+
+func TestNotificationConfigureRejectsOldEnvelopeFields(t *testing.T) {
+	mutations := map[string]func(*Monitor){
+		"version":     func(m *Monitor) { m.NotificationVersion = DeliveryFormatVersion; m.NotificationEpisode = "episode" },
+		"episode":     func(m *Monitor) { m.NotificationEpisode = "episode" },
+		"correlation": func(m *Monitor) { m.NotificationCorrelation = "correlation" },
+		"maintenance": func(m *Monitor) { m.NotificationMaintenance = true },
+		"endpoints": func(m *Monitor) {
+			m.Policy.Endpoints = map[string]int{"red": 1}
+			m.Policy.NotificationEndpointIDs = map[string][]string{"red": {"destination"}}
+		},
+		"action_delivery":    func(m *Monitor) { m.Actions = map[string]Action{"action": {DeliveryID: "delivery"}} },
+		"action_episode":     func(m *Monitor) { m.Actions = map[string]Action{"action": {NotificationEpisode: "episode"}} },
+		"action_correlation": func(m *Monitor) { m.Actions = map[string]Action{"action": {NotificationCorrelation: "correlation"}} },
+		"action_endpoint":    func(m *Monitor) { m.Actions = map[string]Action{"action": {EndpointID: "endpoint"}} },
+		"action_deadline":    func(m *Monitor) { m.Actions = map[string]Action{"action": {Deadline: policyTime().Add(time.Minute)}} },
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			m := testMonitor()
+			mutate(&m)
+			c := Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()}
+			if !deliveryStorageFormat(commandMinimumFormat(c)) {
+				t.Fatal("delivery field missed minimum-format selection")
+			}
+			raw, err := json.Marshal(envelope{Version: NotificationFormatVersion, Commands: []Command{c}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := decodeEnvelope(raw); err == nil {
+				t.Fatal("old envelope accepted delivery-format configuration fields")
+			}
+		})
+	}
+	m := testMonitor()
+	m.NotificationVersion = DeliveryFormatVersion + 100
+	c := Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()}
+	if err := validateCommand(c); err == nil {
+		t.Fatal("malformed notification version reached committed application")
+	}
+}
+
 func TestNotificationMaintenanceCancelsUnsentWorkAndKeepsObservations(t *testing.T) {
 	p := testMonitor().Policy
 	p.Intervention, p.Unhealthy = false, 1
@@ -160,6 +230,7 @@ func TestNotificationIdentitySnapshotRejectsOldFormat(t *testing.T) {
 	m := testMonitor()
 	m.Policy.Unhealthy, m.Policy.Intervention = 1, false
 	m.Policy.Endpoints = map[string]int{"red": 1}
+	m.Policy.NotificationEndpointIDs = map[string][]string{"red": {"destination"}}
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, Outcome: "failure", At: policyTime().Add(time.Second)})
 	raw := captureSnapshotBytes(t, s.fsm)

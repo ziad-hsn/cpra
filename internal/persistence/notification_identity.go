@@ -18,6 +18,18 @@ func deliveryStorageFormat(version int) bool {
 	return version == DeliveryFormatVersion || version > DeliveryFormatVersion && externalStorageFormat(version)
 }
 
+func requiresDeliveryFormat(m Monitor) bool {
+	if m.NotificationVersion != 0 || m.NotificationEpisode != "" || m.NotificationCorrelation != "" || m.NotificationMaintenance || len(m.Policy.NotificationEndpointIDs) != 0 {
+		return true
+	}
+	for _, a := range m.Actions {
+		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.NotificationCorrelation != "" || a.EndpointID != "" || !a.Deadline.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action)) {
 	if m.NotificationVersion == DeliveryFormatVersion {
 		if m.NotificationCorrelation == "" {

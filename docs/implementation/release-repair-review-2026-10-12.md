@@ -27,3 +27,24 @@ Native macOS/Windows retirement and growth, service permissions, full crash,
 browser, compiler, provider, performance and distribution matrices remain open.
 Those exclusions are not passing evidence. All three findings require repair and
 review before the related work can be signed off.
+
+## Repair verification
+
+All three findings were reproduced with failing regression tests before the
+behavior changes. The repaired source passes the focused regressions and broader
+notification, policy, catalog-format and recovery-notification suites on Go
+1.27.1. Complete controller-system and built-in job suites also pass.
+
+Maintenance cancellation now commits in the controller before admission and
+wakes even for a notification already waiting in a worker queue. The test opens
+a real Raft store, places the maintenance window between health observations,
+observes cancellation with zero receiver calls, and reopens the store to verify
+that the cancellation survived. PagerDuty and Opsgenie tests execute warning,
+outage and confirmed recovery through the controller, committed action guard and
+production network driver; every trigger and final close uses the original
+provider identity. Old envelope tests cover each new monitor/action identity
+field, malformed versions, and the current-format snapshot path.
+
+These are private development checks. A second independent review of the fixes
+and final release matrices remain required; local receivers are not provider
+account qualification.

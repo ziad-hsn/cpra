@@ -793,9 +793,37 @@ func (s *DurableSystem) scheduleActions(ent ecs.Entity, m persistence.Monitor) {
 		return
 	}
 	var due time.Time
+	queuedNotification := false
 	for _, a := range m.Actions {
-		if a.State == persistence.Queued && a.CatalogUID == m.CatalogUID && !s.admitted[a.ID] && (due.IsZero() || a.NotBefore.Before(due)) {
-			due = a.NotBefore
+		if a.State == persistence.Queued && a.CatalogUID == m.CatalogUID {
+			queuedNotification = queuedNotification || a.Kind == "code"
+			if !s.admitted[a.ID] && (due.IsZero() || a.NotBefore.Before(due)) {
+				due = a.NotBefore
+			}
+		}
+	}
+	if queuedNotification && m.NotificationVersion == persistence.DeliveryFormatVersion {
+		// Wake for cancellation even when all notifications are already waiting
+		// in a worker queue, or a retry is not due until after maintenance ends.
+		now := time.Now().UTC()
+		boundary := time.Time{}
+		if m.Policy.InMaintenance(now) || manifest.InMaintenance(s.states.Get(ent).Maintenance, now) {
+			boundary = now
+		} else {
+			for _, window := range m.Policy.Maintenance {
+				if window.Start.After(now) && (boundary.IsZero() || window.Start.Before(boundary)) {
+					boundary = window.Start
+				}
+			}
+			for _, window := range s.states.Get(ent).Maintenance {
+				start := window.Schedule.Next(now)
+				if !start.IsZero() && (boundary.IsZero() || start.Before(boundary)) {
+					boundary = start
+				}
+			}
+		}
+		if !boundary.IsZero() && (due.IsZero() || boundary.Before(due)) {
+			due = boundary
 		}
 	}
 	if !due.IsZero() {
@@ -834,16 +862,52 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		if !ok || !m.Policy.Enabled || !m.SnoozedUntil.IsZero() {
 			continue
 		}
-		if manifest.InMaintenance(state.Maintenance, now) {
-			s.scheduleActionAt(ent, now.Add(time.Second))
+		if m.Policy.InMaintenance(now) || manifest.InMaintenance(state.Maintenance, now) {
+			// The start transition cancels all covered unsent notifications. Commit
+			// it here, before queue/worker admission, so maintenance cannot defer
+			// alerts until its end. No execution marker or provider call is created.
+			for _, id := range sortedMonitorActions(m) {
+				a := m.Actions[id]
+				if a.Kind != "code" || a.State != persistence.Queued || a.CatalogUID != m.CatalogUID || a.Revision != state.Revision {
+					continue
+				}
+				command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: true}
+				if projection, ok := s.managed[m.ID]; ok {
+					g := projection.guard.Clone()
+					command.Guard = &g
+				}
+				results, err := s.store.Submit(ctx, []persistence.Command{command})
+				if err != nil {
+					s.actions.Requeue(ready[n:])
+					s.recoveryError(err, ctx)
+					return
+				}
+				if len(results) != 1 || results[0].Allowed {
+					s.fail(errors.New("maintenance cancellation returned an execution grant"))
+					return
+				}
+				if err := results[0].Err; err != nil && !errors.Is(err, persistence.ErrCatalogDependency) && !errors.Is(err, persistence.ErrControlConflict) {
+					s.fail(err)
+					return
+				}
+				if updated := results[0].Monitor; updated != nil {
+					m = *updated
+					s.project(ent, m)
+					if s.index != nil {
+						s.index.Put(s.summary(ent, m))
+					}
+				}
+				break
+			}
+			for _, a := range m.Actions {
+				if a.State == persistence.Queued && a.CatalogUID == m.CatalogUID && a.Revision == state.Revision {
+					s.scheduleActionAt(ent, now.Add(time.Second))
+					break
+				}
+			}
 			continue
 		}
-		ids := make([]string, 0, len(m.Actions))
-		for id := range m.Actions {
-			ids = append(ids, id)
-		}
-		slices.Sort(ids)
-		for _, id := range ids {
+		for _, id := range sortedMonitorActions(m) {
 			if s.stopping.Load() {
 				return
 			}
@@ -955,6 +1019,15 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		}
 		s.scheduleActions(ent, m)
 	}
+}
+
+func sortedMonitorActions(m persistence.Monitor) []string {
+	ids := make([]string, 0, len(m.Actions))
+	for id := range m.Actions {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 func (s *DurableSystem) project(ent ecs.Entity, m persistence.Monitor) {

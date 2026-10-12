@@ -60,6 +60,13 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
   status-read failures after acceptance remain unknown. The mock-contract
   receiver and its twelve request-oracle tests were updated and pass. These
   fixtures are not provider-account delivery evidence.
+- The independent checkpoint review identified three notification/replay
+  findings, now reproduced and repaired. Controller maintenance cancellation
+  survives a real Raft restart and prevents calls from already queued workers.
+  Warning/outage/recovery dispatches keep PagerDuty/Opsgenie provider identity.
+  Old envelopes reject all newly introduced identity fields and malformed
+  notification versions. Focused replay/policy suites and complete controller
+  system/job suites pass. See the [checkpoint review](release-repair-review-2026-10-12.md).
 - Artwork/release archive contracts, asset freshness contracts and frontend
   type checking passed after the licensing changes. The 702-test release-script
   run passed 700; its failures were an absent compiler on the check's PATH and
@@ -68,8 +75,9 @@ evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
   are stale after the source repairs and must be regenerated before strict
   documentation qualification.
 
-An independent reviewer agent is inspecting checkpoint `b59d5b8` at the user's
-request. Its findings require repair before any sign-off; this is not a review
+An independent reviewer agent reviewed checkpoint `b59d5b8` at the user's
+request. Its three findings have passing repair regressions and await re-review;
+this is not a review
 of a final frozen release. No public branch, tag,
 release, module, image, chart or documentation promotion has been performed.
 

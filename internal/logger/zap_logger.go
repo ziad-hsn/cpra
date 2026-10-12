@@ -20,7 +20,7 @@ func NewZapLogger(cfg LoggerConfig) (*ZapLogger, error) {
 
 	if cfg.Development {
 		zapConfig = zap.NewDevelopmentConfig()
-		zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	} else {
 		zapConfig = zap.NewProductionConfig()
 	}
@@ -55,7 +55,7 @@ func NewZapLogger(cfg LoggerConfig) (*ZapLogger, error) {
 	// Stack traces: capture only at the configured level and above.
 	// The default (DPanic) keeps routine Error/Warn logs free of stack noise
 	// while still capturing stacks for genuine panics. "none" disables stacks.
-	opts := []zap.Option{zap.AddCaller()}
+	opts := []zap.Option{zap.AddCaller(), zap.AddCallerSkip(1)}
 	switch strings.ToLower(strings.TrimSpace(cfg.StacktraceLevel)) {
 	case "none", "off", "disabled":
 		zapConfig.DisableStacktrace = true
@@ -129,6 +129,12 @@ func (l *ZapLogger) With(fields ...Field) Logger {
 	return &ZapLogger{
 		zap: l.zap.With(convertFields(fields)...),
 	}
+}
+
+// WithCallerSkip derives a logger for a wrapper with skip additional call frames.
+// The underlying sink, configuration and structured fields remain shared.
+func (l *ZapLogger) WithCallerSkip(skip int) Logger {
+	return &ZapLogger{zap: l.zap.WithOptions(zap.AddCallerSkip(skip))}
 }
 
 func (l *ZapLogger) Sync() error {

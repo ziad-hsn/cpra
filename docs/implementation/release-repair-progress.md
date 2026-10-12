@@ -256,3 +256,15 @@ during a fresh recovery case, not an established deadlock. The repository's
 existing suite budget is 45 minutes; a complete persistence rerun uses that
 budget. Neither the timed-out run nor mixed working-source inventories count
 as final-source qualification.
+
+## Log formatting and caller checkpoint
+
+Captured development console and JSON output no longer contains ANSI level
+colour. Shared logger calls identify the application line, including controller
+and system adapters, instead of attributing every record to the sink wrapper.
+Structured controller initialization no longer creates unused fallback files
+in the working directory. Direct/derived logger, wrapper, JSON and no-file
+regressions pass, including focused race checks. The initial colour/caller
+reproduction failed as expected and is retained. Independent review remains
+required. Raft/pool integration and correlated lifecycle records remain open;
+this checkpoint does not complete the unified logging ticket.

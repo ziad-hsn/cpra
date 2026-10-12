@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -95,5 +97,49 @@ func TestErrorLogIsWellFormedJSON(t *testing.T) {
 	}
 	if m["monitor"] != "x" {
 		t.Fatalf("structured field not encoded: %v", m["monitor"])
+	}
+}
+
+func TestDevelopmentOutputHasNoANSISequences(t *testing.T) {
+	for _, format := range []string{"console", "json"} {
+		t.Run(format, func(t *testing.T) {
+			cfg := logger.DevelopmentConfig()
+			cfg.Format = format
+			out := captureStderr(t, func() {
+				l, err := logger.NewZapLogger(cfg)
+				if err != nil {
+					t.Fatal(err)
+				}
+				l.Info("plain level")
+			})
+			if strings.Contains(out, "\x1b") || strings.Contains(out, `\u001b`) {
+				t.Fatalf("colour escaped into captured %s output: %q", format, out)
+			}
+		})
+	}
+}
+
+func TestCallerIdentifiesTheApplicationLine(t *testing.T) {
+	for _, derived := range []bool{false, true} {
+		var want string
+		out := captureStderr(t, func() {
+			l, err := logger.NewZapLogger(defaultProdConfig())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var log logger.Logger = l
+			if derived {
+				log = log.With(logger.Field{Key: "component", Value: "test"})
+			}
+			_, _, line, _ := runtime.Caller(0)
+			log.Info("caller-check")
+			want = "logger/zap_logger_test.go:" + strconv.Itoa(line+1)
+		})
+		var record struct {
+			Caller string `json:"caller"`
+		}
+		if err := json.Unmarshal([]byte(out), &record); err != nil || record.Caller != want {
+			t.Fatalf("caller=%q, want=%q, error=%v", record.Caller, want, err)
+		}
 	}
 }

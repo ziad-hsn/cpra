@@ -3,11 +3,12 @@ package controller
 import (
 	"context"
 	"fmt"
-	applogger "github.com/ziad-hsn/cpra/internal/logger"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	applogger "github.com/ziad-hsn/cpra/internal/logger"
 )
 
 // LogLevel represents different logging levels
@@ -55,6 +56,10 @@ type Logger struct {
 
 // NewLogger creates a new logger instance
 func NewLogger(component string, debugMode bool) *Logger {
+	return newLogger(component, debugMode, nil)
+}
+
+func newLogger(component string, debugMode bool, base applogger.Logger) *Logger {
 	level := LogLevelInfo
 	if debugMode {
 		level = LogLevelDebug
@@ -82,10 +87,11 @@ func NewLogger(component string, debugMode bool) *Logger {
 		debugMode:   debugMode,
 		prodMode:    prodMode,
 		timezone:    timezone,
+		base:        base,
 	}
 
 	// Setup file logging for production
-	if prodMode {
+	if prodMode && base == nil {
 		logger.setupFileLogging()
 	}
 
@@ -95,6 +101,14 @@ func NewLogger(component string, debugMode bool) *Logger {
 	}
 
 	return logger
+}
+
+func (l *Logger) withCallerSkip(skip int) *Logger {
+	derived := *l
+	if base, ok := l.base.(interface{ WithCallerSkip(int) applogger.Logger }); ok {
+		derived.base = base.WithCallerSkip(skip)
+	}
+	return &derived
 }
 
 // getTimezone returns the timezone to use for logging
@@ -456,7 +470,7 @@ func InitializeLoggers(debugMode bool) {
 	}
 	base, err := applogger.NewZapLogger(cfg)
 	if err != nil {
-		// Fallback to legacy stdout loggers on failure
+		// Use the existing plain-output fallback if the structured sink cannot open.
 		SystemLogger = NewLogger("SYSTEM", debugMode)
 		SchedulerLogger = NewLogger("SCHEDULER", debugMode)
 		DispatchLogger = NewLogger("DISPATCH", debugMode)
@@ -468,16 +482,9 @@ func InitializeLoggers(debugMode bool) {
 
 	// Helper to create a controller logger bound to a zap sub-logger
 	bind := func(name string) *Logger {
-		l := NewLogger(name, debugMode)
-		// Close any opened file handles from legacy setup to avoid dup writes
-		if l.file != nil {
-			_ = l.file.Close()
-			l.file = nil
-		}
-		// Attach component field and set as sink
-		comp := base.With(applogger.Field{Key: "component", Value: name})
-		l.base = comp
-		return l
+		// Skip Logger.log and its public level method in addition to the sink wrapper.
+		comp := base.WithCallerSkip(2).With(applogger.Field{Key: "component", Value: name})
+		return newLogger(name, debugMode, comp)
 	}
 
 	SystemLogger = bind("SYSTEM")
@@ -501,7 +508,7 @@ func CloseLoggers() {
 			if logger.base != nil {
 				_ = logger.base.Sync()
 			}
-			// Close legacy file handle if present
+			// Close a fallback file handle if present.
 			logger.Close()
 		}
 	}

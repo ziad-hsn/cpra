@@ -214,7 +214,7 @@ func NewController(config Config) *Controller {
 	stateLogger := systems.NewStateLogger(config.Debug)
 	metricsAgg := NewMetricsAggregator()
 	snapshotHolder := fleetview.NewHolder()
-	logger := &LoggerAdapter{logger: SystemLogger, metrics: metricsAgg}
+	logger := &LoggerAdapter{logger: SystemLogger.withCallerSkip(1), metrics: metricsAgg}
 
 	// Construct the alert manager once and share it across the systems that
 	// trigger, enqueue, and observe code alerts.

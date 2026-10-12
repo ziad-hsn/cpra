@@ -1,5 +1,11 @@
 # Plan: Finalize the CPRa dashboard and ship the qualified release
 
+The approved [release repair addendum](release-repair-plan.md), dated 12 October
+2026, now governs repairs and final qualification on `codex/release-repairs`
+from `2ba7b73`. Its [finding inventory](release-review-findings.md) preserves
+review dispositions. Existing implementation and evidence below remain retained;
+the addendum neither resets storage formats nor reinstates endurance testing.
+
 Status: implementation in progress on the private local branch
 `codex/dashboard-finalization`; implementation and release gates remain open.
 Updated: 2026-10-01 (24-hour endurance test removed from the requested work).

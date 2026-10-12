@@ -6,6 +6,23 @@ cpra_scope: plan
 
 **Scope correction, 1 October 2026:** The user removed the 24-hour endurance run from the task and mandatory completion checks. No such run has been started or completed. Historical entries below record earlier requirements; they do not reinstate this test. Comparative performance remains separate from endurance, and documentation must not claim an unperformed endurance result.
 
+## Review repair baseline, 12 October 2026
+
+Implementation starts on the private local `codex/release-repairs` branch at
+`2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`. The approved
+[repair and qualification plan](release-repair-plan.md) adds incident correctness,
+collection admission/storage repairs, secure initialization, driver contracts,
+operator diagnostics and release-material updates. The
+[finding inventory](release-review-findings.md) distinguishes confirmed defects,
+corrected review claims, intentional behavior and pending reproduction.
+
+The baseline candidate, other reviewers' worktrees, original failing
+reproductions, retained evidence and separate documentation checkout are
+preserved. Saving this plan and creating the branch establish no new passing
+checks. Historical test results remain tied to their recorded source. Native,
+provider-account, comparative-performance and private publication gates remain
+open. The endpoint is `v0.1.0-rc.1`; no 24-hour run is authorized or required.
+
 ## Dashboard dependency and provenance correction, 4 October 2026
 
 A fresh audit found three `brace-expansion` denial-of-service advisories in two

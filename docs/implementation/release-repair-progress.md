@@ -466,3 +466,28 @@ Independent source review found no actionable defect in the finite extension.
 The tagged Linux suite also passes. Windows retirement, allocated-size accounting
 and all complete frozen-source gates remain open. The reviewer ran no tests,
 builds or native macOS operations.
+
+## Native smoke authentication fixture
+
+The native executable smoke harness now generates one URL-safe token from 32
+random bytes instead of its old 25-character static token. The new token meets
+the printable-length requirement and is reused across readiness/state reads and
+both process starts. No startup, source-identity or publication guard is changed.
+Independent source review found no concrete defect in the finite correction.
+
+A private real-process startup fixture reproduced refusal of the old short token,
+then authenticated readiness, graceful shutdown and stable node identity across
+a second start using the 43-character generated token. The retained development
+executable was used; 111 main/authentication/server source inputs match the
+current branch. This is not execution of the frozen native release harness and
+does not establish final-candidate or other-platform qualification. No jobs were
+configured. The existing 61 release identity/recipe/native-service contract tests
+pass. The reviewer did not execute them or independently verify the input hashes.
+
+After all Go builds/tests stopped, a further task-owned derived-cache cleanup
+removed 2,533,785,600 allocated bytes across 21,649 regular single-link entries.
+Four unrecognized/shared entries were preserved; tools, modules, source,
+executables and evidence remain. Scratch plus task-owned node_modules measures
+about 2.03 GiB. The latest physical C: read reports 26,549,837,824 bytes, about
+24.7 GiB, below the initial 35 GiB comparative-campaign prerequisite. This
+cleanup does not imply that WSL's virtual disk was compacted.

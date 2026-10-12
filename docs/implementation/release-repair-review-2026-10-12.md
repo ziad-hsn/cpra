@@ -240,3 +240,13 @@ Darwin `F_FULLFSYNC` implementation. See the
 [implementation record](macos-collection-retirement-2026-10-13.md). The reviewer
 ran no tests/builds and made no changes; native macOS execution, Windows cleanup
 and frozen-release qualification remain open.
+
+## Native smoke token follow-up, 2026-10-13
+
+Source review of the two-line correction after `a2d714c` found no concrete defect.
+The script generates 32 random bytes as a 43-character printable URL-safe token
+and reuses it across readiness/state reads and restarts. Existing source-identity
+gates, wrong-token rejection and node-identity assertions remain intact. The
+reviewer ran no tests/builds and did not independently verify the retained
+development-binary fixture or its 111-file input comparison. The reviewed
+correction is not final-candidate/native-release qualification.

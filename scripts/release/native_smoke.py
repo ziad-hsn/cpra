@@ -5,6 +5,7 @@ import json
 import os
 import platform
 from pathlib import Path
+import secrets
 import signal
 import socket
 import subprocess
@@ -33,7 +34,7 @@ def main():
         identity=subprocess.check_output([str(program),flag],text=True)
         if manifest['version'] not in identity or manifest['commit'] not in identity:raise RuntimeError('Release identity mismatch')
     capabilities=json.loads(subprocess.check_output([str(binary),'-capabilities'],text=True))
-    token='release-smoke-local-token'
+    token=secrets.token_urlsafe(32)
     with tempfile.TemporaryDirectory(prefix='cpra-native-smoke-') as temp:
         root=Path(temp);(root/'monitors.yaml').write_text('monitors: []\n');(root/'auth.token').write_text(token)
         with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]

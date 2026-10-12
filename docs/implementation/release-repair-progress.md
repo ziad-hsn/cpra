@@ -411,3 +411,38 @@ remaining race fixture finished with source inventory unchanged. This budget
 excursion is recorded rather than reported as continuous cap compliance.
 A fresh physical C: read returned 25,503,776,768 bytes, about 23.8 GiB, below
 the 35 GiB initial comparative-campaign prerequisite. No large campaign ran.
+
+Independent source review closed the finite test/audit extension at `dfec8ab`.
+The reviewer confirmed unchanged default process/request budgets, complete
+original-operation assertions, retained restart identity, cleanup and accurate
+audit boundaries. Tests, disk readings and elapsed times were not independently
+rerun by that reviewer.
+
+The final private documentation check renders 170 content pages and 16 redirects,
+with 29,692 internal links/assets checked and no errors. After all Go verification
+processes completed, task-owned derived cache cleanup removed 3,520,208,896
+allocated bytes (about 3.28 GiB) across 30,012 entries. Two unrecognized/shared
+entries were preserved; tools, modules, source, fixtures, payloads and evidence
+remain. Task scratch plus its workspace node_modules measured about 1.91 GiB.
+Physical C: then reported 26,388,611,072 bytes (about 24.6 GiB); reclaiming WSL
+files is not a promise of immediate virtual-disk compaction or host-space recovery.
+
+## Outstanding work at this checkpoint
+
+- Implement and natively verify macOS/Windows generation retirement; complete
+  allocated-storage accounting and Windows mapping-growth/footprint checks.
+- Migrate meaningful nil-Store/batch/alert regressions onto active owner/view
+  paths before removing the unused executable path's implementation.
+- Complete slow-upload/contention and interruption tests across collection
+  phases, plus the full process-crash, corruption, backup/restore and upgrade matrix.
+- Freeze a reviewed final source only after remaining changes, then run all
+  application/SDK/worker compiler/tag, race, vulnerability, generation, browser,
+  reproducibility and packaging checks against that identity.
+- Qualify all native platform/service/package targets, both OCI architectures,
+  Compose and Helm 3/4/storage/rotation/restore behavior on configured infrastructure.
+- Verify real effects for all required provider/agent roles using designated
+  accounts/resources; missing configuration remains not verified.
+- Complete the matched comparative fleet campaign after physical-host space
+  and measured headroom meet the prerequisite. The 24-hour run stays canceled.
+- Assemble, read back, sign and publish the qualified RC/modules/chart/docs only
+  after the private gates pass. No public promotion has occurred in this checkpoint.

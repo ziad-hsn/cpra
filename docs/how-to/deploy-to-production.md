@@ -28,7 +28,7 @@ files, while keeping the operator bearer separate. Services use absolute paths:
 ~~~sh
 cpra -yaml /etc/cpra/monitors.yaml \
   -runtime-config /etc/cpra/runtime.yaml \
-  -data-dir /var/lib/cpra -web.addr 0.0.0.0:8060
+  -data-dir /var/lib/cpra -web.addr 0.0.0.0:8060 -allow-empty
 ~~~
 
 Configure the runtime TLS certificate and exact permitted HTTPS origin for the
@@ -58,11 +58,6 @@ committed state and retained history on persistent storage, and use a complete
 [stopped backup](../durability.md) before replacing an artifact.
 
 ## Containers
-
-~~~sh
-docker build -f docker/Dockerfile -t cpra:local .
-docker compose -f docker/docker-compose.yml up --build
-~~~
 
 Use the [production Compose/Helm guide](../container-helm.md) for a versioned
 artifact, authenticated API, stable persistent volume and missing-mount checks.

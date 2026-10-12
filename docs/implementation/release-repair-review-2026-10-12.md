@@ -1,5 +1,19 @@
 # Independent repair checkpoint review — 2026-10-12
 
+## Current documentation checkpoint
+
+Source review of `29273ac..52f4e9d` found two deployment-command defects:
+the inherited container snippets omitted required release/Compose inputs, and
+the fresh management start command rejected the initializer's empty manifest.
+The incomplete snippets are removed in favour of the complete container guide;
+the native start command now includes `-allow-empty`. Re-review of these two
+corrections remains required.
+
+The reviewer reported no additional actionable contradiction in the bounded
+availability, dated archives, navigation exceptions or source-reference
+safeguards. This review ran no tests and does not qualify every historical
+guide, rendered documentation or a final release.
+
 Scope: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c` through
 `b59d5b8ba60ed82f0a5b6b57857be27a2e380725` on `codex/release-repairs`.
 Reviewer: a separate read-only reviewer agent, authorized by the user.

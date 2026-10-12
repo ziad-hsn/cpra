@@ -584,6 +584,9 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 			var rejection *jobs.DeliveryError
 			definite := errors.As(r.Err, &rejection) || r.Type == "intervention" && errors.Is(r.Err, jobs.ErrInterventionRejected)
 			c.Retryable = rejection != nil && rejection.Retryable
+			if c.Retryable {
+				c.RetryDelay = rejection.RetryAfter
+			}
 			c.Ambiguous = r.Err != nil && !definite
 		}
 		commands = append(commands, c)

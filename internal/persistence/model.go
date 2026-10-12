@@ -160,6 +160,7 @@ func (m Monitor) Clone() Monitor {
 type Command struct {
 	commandExtensions
 	Failure              FailureDiagnostic         `json:"failure,omitzero"`
+	RetryDelay           time.Duration             `json:"retry_delay,omitzero"`
 	ActionDeadline       time.Time                 `json:"action_deadline,omitzero"`
 	AgentConnection      *AgentConnection          `json:"agent_connection,omitempty"`
 	AgentObservation     *AgentObservationCommand  `json:"agent_observation,omitempty"`
@@ -256,6 +257,9 @@ func identity(parts string) string {
 func validateCommand(c Command) error {
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if c.RetryDelay < 0 || c.RetryDelay > 24*time.Hour || c.RetryDelay != 0 && (c.Kind != "result" || !c.Retryable || c.Outcome == "success") {
+		return ErrNotificationIdentity
 	}
 	if c.Failure != (FailureDiagnostic{}) {
 		if (c.Kind != "pulse" && c.Kind != "result") || c.Outcome == "success" {

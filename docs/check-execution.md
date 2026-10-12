@@ -67,3 +67,21 @@ the worker's private diagnostic payload is not copied into public state.
 A failure explanation does not prove whether an external effect occurred. The
 recorded action outcome and investigation hold remain authoritative, including
 unknown outcomes after transport interruption or process restart.
+
+## Notification rejection and retry delays
+
+The controller owns notification retries. An HTTP notification is retried only
+when the selected provider's response proves a retryable rejection. Generic
+webhooks, unrecognized errors, malformed acknowledgements, HTTP 408 and HTTP 5xx
+leave the action unknown; they do not authorize another invocation. Acceptance
+by a provider remains distinct from observed delivery.
+
+Provider-specific handling follows the
+[notification response contracts](implementation/notification-response-contracts.md).
+Documented rate-limit delays are committed with the result and survive restart.
+The next attempt preserves the original logical delivery identity and overall
+deadline. Its delay is the larger of the provider delay and CPRa's existing
+exponential delay; a delay that cannot fit the remaining deadline ends delivery
+without scheduling another attempt. Ordinary HTTP notifications have a
+45-second overall budget and at most three attempts. Each HTTP call is bounded
+by ten seconds or the remaining budget. No driver-level replay layer is added.

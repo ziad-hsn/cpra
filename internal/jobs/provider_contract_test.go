@@ -39,7 +39,10 @@ func notificationTestHTTP(t *testing.T, fn notificationTestTransport) {
 }
 func TestRetryableNotificationRejections(t *testing.T) {
 	notificationTestHTTP(t, func(r *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 429, Status: "429 Too Many Requests", Body: io.NopCloser(strings.NewReader("rejected")), Header: make(http.Header)}, nil
+		headers := make(http.Header)
+		headers.Set("Retry-After", "1")
+		body := `{"ok":false,"error_code":429,"parameters":{"retry_after":1},"retry_after":1,"status":0}`
+		return &http.Response{StatusCode: 429, Status: "429 Too Many Requests", Body: io.NopCloser(strings.NewReader(body)), Header: headers}, nil
 	})
 	cases := []struct {
 		name   string
@@ -62,8 +65,19 @@ func TestRetryableNotificationRejections(t *testing.T) {
 			}
 			result := j.Execute()
 			var delivery *DeliveryError
-			if !errors.As(result.Err, &delivery) || !delivery.Retryable {
-				t.Errorf("HTTP 429 will not retry: %T %v", result.Err, result.Err)
+			switch tt.name {
+			case "pushover":
+				if !errors.As(result.Err, &delivery) || delivery.Retryable {
+					t.Fatal("monthly quota rejection allowed retry", result.Err)
+				}
+			case "datadog", "mattermost", "victorops":
+				if result.Err == nil || errors.As(result.Err, &delivery) {
+					t.Fatal("unproven rejection allowed replay", result.Err)
+				}
+			default:
+				if !errors.As(result.Err, &delivery) || !delivery.Retryable {
+					t.Errorf("documented rejection lost retry permission: %T %v", result.Err, result.Err)
+				}
 			}
 		})
 	}
@@ -94,7 +108,7 @@ func TestPushoverEmergencyParameters(t *testing.T) {
 		_ = r.ParseForm()
 		retry = r.Form.Get("retry")
 		expire = r.Form.Get("expire")
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"status":1}`)), Header: make(http.Header)}, nil
 	})
 	j, err := CreateCodeJob("api", manifest.CodeConfig{Notify: "pushover", Config: &manifest.CodeNotificationPushover{AppToken: "fixture", UserKey: "fixture", Priority: 2}}, ecs.Entity{}, "red")
 	if err != nil {

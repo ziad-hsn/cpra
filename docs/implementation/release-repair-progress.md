@@ -139,3 +139,24 @@ That defect is reproduced and repaired through the actual resourceView path;
 generation now rejects missing references instead of dropping them silently.
 The regenerated dashboard passes 534 tests, types and lint. This follow-up awaits
 independent source re-review.
+
+## Provider rejection checkpoint
+
+Provider-specific response classification now replaces generic HTTP 429 replay.
+Documented retry delays are bounded, committed and preserved across snapshot/
+restart without extending the original deadline or changing logical delivery
+identity. Pushover quota rejection does not retry; Teams' documented throttling
+body is recognized even with HTTP 200. Generic webhook, Datadog, Mattermost and
+VictorOps non-success responses remain unknown without sufficient rejection
+proof. See [response contracts](notification-response-contracts.md).
+
+Complete jobs/controller-system suites, focused tagged provider checks, real
+Raft restart, Go 1.25 and focused race checks pass. Earlier fixture failures
+are retained: required acknowledgement bodies were missing, the strict decoder
+required explicit optional-field tags, and one restart fixture selected a
+different endpoint. Their corrected checks pass; no failed run is attributed
+as a success. Independent source review remains required for this checkpoint.
+
+Source re-review of the dashboard projection correction at `b0bb4b8` closed the
+missing FailureDiagnostic shape with no new concrete finding. It did not execute
+tests or claim browser qualification.

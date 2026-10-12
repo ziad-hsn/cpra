@@ -73,8 +73,8 @@ func (c *CodeTwilioJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	_ = resp.Body.Close()
-	if err := notificationStatusError(resp.StatusCode); err != nil {
+	defer resp.Body.Close()
+	if err := notificationResponseError("twilio", resp); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 

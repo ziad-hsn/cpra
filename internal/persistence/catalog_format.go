@@ -50,7 +50,7 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
-	if c.Failure != (FailureDiagnostic{}) || !c.ActionDeadline.IsZero() || c.Config != nil && requiresDeliveryFormat(*c.Config) {
+	if c.RetryDelay != 0 || c.Failure != (FailureDiagnostic{}) || !c.ActionDeadline.IsZero() || c.Config != nil && requiresDeliveryFormat(*c.Config) {
 		return joinStorageFormat(DeliveryFormatVersion, commandExtensionMinimumFormat(c))
 	}
 	if c.AgentConnection != nil || c.AgentObservation != nil || c.Kind == "agent_observation" {

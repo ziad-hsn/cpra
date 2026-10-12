@@ -118,7 +118,7 @@ func (c *CodeOpsgenieJob) opsgenieRequest(ctx context.Context, method, target st
 		return 0, nil, err
 	}
 	defer response.Body.Close()
-	if err := notificationStatusError(response.StatusCode); err != nil {
+	if err := notificationResponseError("opsgenie", response); err != nil {
 		return response.StatusCode, nil, err
 	}
 	raw, err := io.ReadAll(io.LimitReader(response.Body, (64<<10)+1))

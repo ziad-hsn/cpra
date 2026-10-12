@@ -89,7 +89,7 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if err := notificationStatusError(resp.StatusCode); err != nil {
+	if err := notificationResponseError("datadog", resp); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}

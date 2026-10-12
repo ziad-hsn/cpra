@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/manifest"
@@ -85,6 +86,9 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 	var count atomic.Int32
 	var code atomic.Int32
 	code.Store(http.StatusAccepted)
+	if tt.name == "telegram" || tt.name == "pushover" {
+		code.Store(http.StatusOK)
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count.Add(1)
 		if r.Method != http.MethodPost || r.URL.Path != "/operation/fixture-secret" || r.URL.Query().Get("key") != "query-secret" {
@@ -93,7 +97,20 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 		tt.verify(t, r)
 		w.Header().Set("Location", "/unexpected-redirect")
 		w.WriteHeader(int(code.Load()))
-		_, _ = io.WriteString(w, "{}")
+		body := "{}"
+		if tt.name == "telegram" {
+			body = `{"ok":true,"result":{}}`
+			if code.Load() == 429 {
+				body = `{"ok":false,"error_code":429,"parameters":{"retry_after":10}}`
+			}
+		}
+		if tt.name == "pushover" {
+			body = `{"status":1}`
+			if code.Load() == 429 {
+				body = `{"status":0}`
+			}
+		}
+		_, _ = io.WriteString(w, body)
 	}))
 	defer server.Close()
 	target := server.URL + "/operation/fixture-secret?key=query-secret"
@@ -109,8 +126,17 @@ func testNotificationEndpoint(t *testing.T, tt endpointCase) {
 	}
 	code.Store(http.StatusTooManyRequests)
 	var rejection *DeliveryError
-	if result := job.Execute(); !errors.As(result.Err, &rejection) || !rejection.Retryable {
-		t.Errorf("429 not classified as retryable rejection: %v", result.Err)
+	result := job.Execute()
+	if tt.name == "telegram" || tt.name == "twilio" {
+		if !errors.As(result.Err, &rejection) || !rejection.Retryable || tt.name == "telegram" && rejection.RetryAfter != 10*time.Second {
+			t.Errorf("documented flood rejection lost its wait: %v", result.Err)
+		}
+	} else if tt.name == "pushover" {
+		if !errors.As(result.Err, &rejection) || rejection.Retryable {
+			t.Errorf("monthly quota rejection authorized a short retry: %v", result.Err)
+		}
+	} else if result.Err == nil || errors.As(result.Err, &rejection) {
+		t.Errorf("unsupported rejection evidence was treated as certain: %v", result.Err)
 	}
 	code.Store(http.StatusTemporaryRedirect)
 	if result := job.Execute(); result.Err == nil {
@@ -182,7 +208,14 @@ func TestNotificationDefaultURLs(t *testing.T) {
 	var destination string
 	notificationTestHTTP(t, func(r *http.Request) (*http.Response, error) {
 		destination = r.URL.String()
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
+		body := "{}"
+		if r.URL.Host == "api.telegram.org" {
+			body = `{"ok":true,"result":{}}`
+		}
+		if r.URL.Host == "api.pushover.net" {
+			body = `{"status":1}`
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 	})
 	want := map[string]string{
 		"telegram":  "https://api.telegram.org/bot123:fixture/sendMessage",

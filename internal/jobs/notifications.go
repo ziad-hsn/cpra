@@ -17,7 +17,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
-func sendJSON(ctx context.Context, method, target string, headers map[string]string, data interface{}) error {
+func sendJSON(ctx context.Context, provider, method, target string, headers map[string]string, data interface{}) error {
 	body, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -35,19 +35,7 @@ func sendJSON(ctx context.Context, method, target string, headers map[string]str
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	return notificationStatusError(resp.StatusCode)
-}
-
-func notificationStatusError(status int) error {
-	if status >= 200 && status < 300 {
-		return nil
-	}
-	// A server or gateway failure can arrive after the remote effect. Returning
-	// DeliveryError here would authorize the controller to replay that effect.
-	if status >= 500 || status == http.StatusRequestTimeout {
-		return fmt.Errorf("notification outcome unknown (HTTP %d)", status)
-	}
-	return &DeliveryError{Status: status, Retryable: status == http.StatusTooManyRequests}
+	return notificationResponseError(provider, resp)
 }
 
 func truncateNotification(text string, limit int) string {
@@ -122,8 +110,11 @@ func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message 
 // another controller-owned attempt. Server/gateway errors, transport errors and
 // ambiguous timeouts never opt into automatic notification replay.
 type DeliveryError struct {
-	Status    int
-	Retryable bool
+	Status     int
+	Retryable  bool
+	RetryAfter time.Duration
 }
 
-func (e *DeliveryError) Error() string { return fmt.Sprintf("notification HTTP %d", e.Status) }
+func (e *DeliveryError) Error() string {
+	return fmt.Sprintf("notification rejected (HTTP %d)", e.Status)
+}

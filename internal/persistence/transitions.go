@@ -245,7 +245,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.queueRecoveryFailure(a, c.At, emit)
 			}
 		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && m.Policy.Enabled && !m.snoozed(c.At) && !m.suppressedNotification(a) &&
-			(m.NotificationVersion != DeliveryFormatVersion || m.notificationEligible(a) && !m.Policy.InMaintenance(c.At) && !m.NotificationMaintenance && c.At.Add(time.Second*time.Duration(1<<(a.Attempt+1))).Before(a.Deadline)) {
+			(m.NotificationVersion != DeliveryFormatVersion || m.notificationEligible(a) && !m.Policy.InMaintenance(c.At) && !m.NotificationMaintenance && notificationRetryAt(c, a.Attempt).Before(a.Deadline)) {
 			delete(m.Actions, a.ID)
 			a.Attempt++
 			if m.NotificationVersion == DeliveryFormatVersion {
@@ -253,7 +253,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			} else {
 				a.ID = identity(fmt.Sprintf("%s/retry/%d", a.ID, a.Attempt))
 			}
-			a.State, a.Outcome, a.NotBefore = Queued, "", c.At.Add(time.Second*time.Duration(1<<a.Attempt))
+			a.State, a.Outcome, a.NotBefore = Queued, "", notificationRetryAt(c, a.Attempt-1)
 			a.Failure = FailureDiagnostic{}
 			a.StartedAt, a.FinishedAt, a.ExecutorFinishedAt = time.Time{}, time.Time{}, time.Time{}
 			a.ExecutorKind, a.ExecutorSession = "", ""
@@ -360,6 +360,10 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	}
 	m.NextCheck = next
 	return r
+}
+
+func notificationRetryAt(command Command, attempt int) time.Time {
+	return command.At.Add(max(time.Second*time.Duration(1<<(attempt+1)), command.RetryDelay))
 }
 
 func sortedActions(actions map[string]Action) []string {

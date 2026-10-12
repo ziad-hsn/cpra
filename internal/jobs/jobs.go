@@ -1217,7 +1217,7 @@ func (c *CodePagerDutyJob) Execute() (result Result) {
 	}
 	data := map[string]interface{}{"routing_key": c.RoutingKey, "event_action": action, "dedup_key": key,
 		"payload": map[string]string{"summary": c.notificationMessage(c.Message), "source": c.Monitor, "severity": codeAlertTemplateFor(c.Color).Severity}}
-	result.Err = sendJSON(ctx, http.MethodPost, target, nil, data)
+	result.Err = sendJSON(ctx, "pagerduty", http.MethodPost, target, nil, data)
 	return
 }
 
@@ -1246,7 +1246,7 @@ func (c *CodeSlackJob) Execute() (result Result) {
 	ctx, cancel := operationContext(c.Context(), 10*time.Second)
 	defer cancel()
 	result = Result{ID: c.ID, Ent: c.Entity, Payload: map[string]interface{}{"type": "code", "driver": "slack", "color": c.Color}}
-	result.Err = sendJSON(ctx, http.MethodPost, c.WebhookURL, nil, map[string]string{"text": c.notificationMessage(c.Message)})
+	result.Err = sendJSON(ctx, "slack", http.MethodPost, c.WebhookURL, nil, map[string]string{"text": c.notificationMessage(c.Message)})
 	return
 }
 
@@ -1309,7 +1309,7 @@ func (c *CodeWebhookJob) Execute() (result Result) {
 	if method == "" {
 		method = http.MethodPost
 	}
-	result.Err = sendJSON(ctx, method, c.URL, c.Headers, map[string]string{"monitor": c.Monitor, "color": c.Color, "message": c.notificationMessage(c.Message)})
+	result.Err = sendJSON(ctx, "webhook", method, c.URL, c.Headers, map[string]string{"monitor": c.Monitor, "color": c.Color, "message": c.notificationMessage(c.Message)})
 	return
 }
 
@@ -1355,7 +1355,7 @@ func (c *CodeTelegramJob) Execute() (result Result) {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if err := notificationStatusError(resp.StatusCode); err != nil {
+	if err := notificationResponseError("telegram", resp); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}
@@ -1396,7 +1396,7 @@ func (c *CodeDiscordJob) Execute() (result Result) {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if err := notificationStatusError(resp.StatusCode); err != nil {
+	if err := notificationResponseError("discord", resp); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}

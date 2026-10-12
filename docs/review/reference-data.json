@@ -1613,9 +1613,9 @@
     },
     {
       "asset": "review/source/internal/persistence/store.go.txt",
-      "bytes": 23670,
+      "bytes": 23783,
       "path": "internal/persistence/store.go",
-      "sha256": "51f55a60e39f4bbc5c9dfccb9fc4f46498dc2d6bdb26398e10ef1b2d4ee7d0df"
+      "sha256": "9552f5bab07d2706654f67b72294e301fcd9fc9599dff82ffd8cedea118b89ad"
     },
     {
       "asset": "review/source/internal/persistence/worker_authority_external.go.txt",

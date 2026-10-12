@@ -1,20 +1,23 @@
 ---
 title: Add a check or action
 description: Extend CPRa through schema, execution and verification while respecting contexts and incident ownership.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for current source and
+qualification boundaries. Operator-owned handlers use the separate
+[external-worker library](../sdk/worker-library.md); they run outside CPRa and
+require the externaljobs tag in both consumer and server builds.
 
 
 # Add a check or action
 
 Start with an existing integration whose protocol and lifecycle are similar. The integration contract spans configuration, execution, and result handling.
 
-1. Add the concrete configuration fields and copy behavior in `internal/loader/schema`.
+1. Add the concrete built-in driver fields and copy behavior in `internal/manifest`, with shared static checks in `internal/manifestcheck`.
 2. Register YAML and JSON decoding and semantic validation. Exercise strict unknown-field behavior for polymorphic configuration.
 3. Implement execution in `internal/jobs` and connect the dispatch path.
-4. For optional SDK dependencies, add a build-tagged implementation and an explicit unavailable stub.
+4. For optional built-in dependencies, preserve the established driver-tag/capability contract. External-job types, implementation and routes are entirely excluded from normal builds; they must not receive untagged unavailable stubs.
 5. Verify result classification, deadline and cancellation behavior, and resource cleanup.
 6. Update the driver documentation and add a focused regression or protocol fixture.
 

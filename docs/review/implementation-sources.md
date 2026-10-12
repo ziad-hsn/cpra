@@ -65,7 +65,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/management_operation_view.go` | [Source](source/internal/persistence/management_operation_view.go.txt) | `b5f3bb3a55346bb7750c97e683b0fa4c3b4f9266877f1419d8519e6b2ada149c` |
 | `internal/persistence/model.go` | [Source](source/internal/persistence/model.go.txt) | `31b496ed020f96a1b4b44c135cff7e2fcdb018775bcf48fc1075022a51e7fca7` |
 | `internal/persistence/restore_reset.go` | [Source](source/internal/persistence/restore_reset.go.txt) | `88722ce69bca5f6ab85b2f6aa45e74473ccb3b72498399759bf0ee3d9b7fbd86` |
-| `internal/persistence/store.go` | [Source](source/internal/persistence/store.go.txt) | `51f55a60e39f4bbc5c9dfccb9fc4f46498dc2d6bdb26398e10ef1b2d4ee7d0df` |
+| `internal/persistence/store.go` | [Source](source/internal/persistence/store.go.txt) | `9552f5bab07d2706654f67b72294e301fcd9fc9599dff82ffd8cedea118b89ad` |
 | `internal/persistence/worker_authority_external.go` | [Source](source/internal/persistence/worker_authority_external.go.txt) | `890ab7ea9ea1389c586616223ed19ab8c8cf1f04dd32d43e52411728914b01f4` |
 | `internal/persistence/worker_policy_external.go` | [Source](source/internal/persistence/worker_policy_external.go.txt) | `75e6c5376ad97c56adb1ae73a3617df5fd060c45e491e4a4384fbf9f56060731` |
 | `internal/runtimeconfig/extensions_external.go` | [Source](source/internal/runtimeconfig/extensions_external.go.txt) | `d03b9c8ce4b1f75c8cae6ad53e532d99e3ffb200881223435391c8dac6d3a835` |

@@ -226,3 +226,17 @@ progress failure can still install its own problem. The existing pending-to-
 sealed polling regression now asserts the old code/request identity disappear.
 The focused 34-test import suite and pinned 540-test rebuild pass. This final
 lifecycle correction still requires source re-review.
+
+## macOS retirement follow-up, 2026-10-13
+
+Independent source review of the extension from `bde6cf1` found no actionable
+defect. The bounded Linux/macOS engine preserves the original intent, unlink,
+retention and pin protocol; Linux native identity is unchanged. Descriptor-based
+APFS identity and ACL rejection match the pinned x/sys and Apple layouts. Shared
+primitive, process and Store-generation assertions remain, with missing identity
+evidence failing when native verification is required. The proposed additional
+synchronization finding was withdrawn: both pinned Go toolchains select their
+Darwin `F_FULLFSYNC` implementation. See the
+[implementation record](macos-collection-retirement-2026-10-13.md). The reviewer
+ran no tests/builds and made no changes; native macOS execution, Windows cleanup
+and frozen-release qualification remain open.

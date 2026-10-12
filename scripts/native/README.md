@@ -1,5 +1,17 @@
 # Native service lifecycle verification
 
+Collection-generation cleanup is also a native filesystem gate. On Linux and
+macOS, run the persistence tests with `CPRA_REQUIRED_COLLECTION_GC=1`; the native
+CI and private release jobs set this flag. Missing identity evidence then fails
+instead of skipping the cleanup fixture. macOS cleanup currently supports local
+APFS with no extended ACL on the collection objects. Windows cleanup still
+reports unavailable and preserves its generations; passing its other native
+tests does not close the unfinished Windows retirement gate.
+
+```sh
+CPRA_REQUIRED_COLLECTION_GC=1 go test -timeout=45m ./internal/persistence
+```
+
 `service_lifecycle.py` runs actual local installation and supervisor commands.
 System tests require a disposable runner. A local Linux user test is available
 with the explicit mode below. Its production service name and default paths are

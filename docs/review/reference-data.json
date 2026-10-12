@@ -1576,6 +1576,18 @@
       "sha256": "bea1c5f29a2996cb85c1d8959884259550d827dba746384f539c0e516f35eafe"
     },
     {
+      "asset": "review/source/internal/persistence/collection_ledger_gc_darwin.go.txt",
+      "bytes": 3767,
+      "path": "internal/persistence/collection_ledger_gc_darwin.go",
+      "sha256": "ee0c4bfbd2d05ced86c30ba30dea352f1fa6c277c90b2b5e08920c77ae592e4e"
+    },
+    {
+      "asset": "review/source/internal/persistence/collection_ledger_gc_unix.go.txt",
+      "bytes": 17340,
+      "path": "internal/persistence/collection_ledger_gc_unix.go",
+      "sha256": "f3c3cde9a70af2b7f74df79d3189f89ee763e136115a54c1a252c98127a7c72a"
+    },
+    {
       "asset": "review/source/internal/persistence/collection_operation_access.go.txt",
       "bytes": 8510,
       "path": "internal/persistence/collection_operation_access.go",

@@ -14,7 +14,7 @@ independent review. Failed reproductions and intermediate failures are retained.
 | 1. Baseline | Approved plan saved; all three reviews mapped to F01-F56 with source and evidence dispositions; other checkouts and prior evidence preserved. | Final finding dispositions and independent review. |
 | 2. Notifications | Formats 40/41; episode, logical delivery and stable per-target endpoint identities; obsolete queued cancellation; maintenance cancellation; verification-pending wording; unknown HTTP 5xx; persisted overall deadlines and retry identity; canonical bounded failure causes in current state, intent, outcomes, retained events and operator interfaces. PagerDuty/Opsgenie receive committed incident/endpoint correlation; Opsgenie distinguishes acceptance from processing and closes the original alias. Focused lifecycle and real network receiver tests pass. | Complete process-crash/restart campaign and final-source matrix. Provider retry/receipt, diagnostics and maintenance checkpoints passed independent review; unsupported rejection evidence remains unknown. |
 | 3. Collections | Immutable routine health publication without the FSM lock; health-read cancellation does not poison write recovery; contiguous uploads use one synchronous transaction per 64 resources/1 MiB group; exact pre-submission marker classification in API/SDK; explicit `resume` with server verification of original raw and ordered resource identities, including complete uploads; `resume-upload` retains upload-only behavior. Real native CLI imports of 35/50 monitors complete and retain identity after graceful restart on both compilers and the tagged build. | Interruptions across all phases; full contention/restart campaign and final-source review. Existing original-operation dashboard continuation passed the required default browser campaign. |
-| 4. Storage | Store-owned completed-generation catalog, atomic reader/snapshot pins and Linux native retirement are integrated. Current/previous completed generations remain protected; retirement catalog publication precedes removal of the durable deletion intent. Sampled path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping is 64 MiB. Linux retention, restart, process interruption, publication failure and focused race checks pass. Existing lazy allocation, authenticated stopped backup/restore and synchronous writes remain. | Native macOS/Windows retirement implementation and execution; complete allocated-size accounting and Windows growth/footprint evidence; full backup/restore and corruption matrix after these changes; independent review. |
+| 4. Storage | Store-owned completed-generation catalog, atomic reader/snapshot pins and Linux native retirement are integrated. Current/previous completed generations remain protected; retirement catalog publication precedes removal of the durable deletion intent. Sampled path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping is 64 MiB. Linux retention, restart, process interruption, publication failure and focused race checks pass. Existing lazy allocation, authenticated stopped backup/restore and synchronous writes remain. | Native macOS execution and Windows retirement implementation/execution; complete allocated-size accounting and Windows growth/footprint evidence; full backup/restore and corruption matrix after these changes; independent review. macOS APFS identity/ACL checks are implemented with cross-builds and shared Linux tests; native qualification remains open. |
 | 5. Access | Go-based `local init --management`, exclusive protected files and localhost CA/leaf certificate; system token-output separation; mode-aware service arguments; minimum 32 printable token characters; explicit access discovery; ignored-bootstrap warning; loopback Host/origin guards; profiling cmdline removal; bounded failed-authentication throttling with 401/Retry-After; CSP/security headers. Local initialization, API/authentication and real application start/create/restart checks pass. Dashboard type checking, lint and tests pass across the full run and focused fixture repairs. | Remaining compiler/tag browser matrix, native system service/ACL checks, trusted-operator documentation and final security review. Current embedded rebuild and required Go1.27.1/default browser campaign pass. |
 | 6. Drivers/configuration | File parsers always reject unknown fields and duplicate JSON keys. Shared static driver settings validate required destinations, ranges, gRPC mode and Docker budgets in manifests, management and SDK preflight/new apply, while original-input normalization stays byte-compatible. gRPC health mode uses verified TLS by default, the configured service and SERVING-only success. Docker has separate stop grace and operation budgets. ICMP selects supported privilege mode or rejects the platform. PagerDuty/Opsgenie correlation, closure and severity fixtures pass. Complete jobs/manifest/loader/SDK API/collection suites and focused management checks pass. | Native service-identity ICMP checks; complete driver/provider and process campaign; independent review. |
 | 7. Interfaces/diagnostics | Version and canonical schema explanation routes implemented and authorized; SDK inventory and access discovery generated from canonical inputs; unavailable source time remains omitted. Dashboard primary headings, missing routes, empty/filtered/out-of-range page wording, compact health label and controller terminology repaired. CLI monitor lists show observed health; human describe renders safe summary fields and explicit unavailable times/counts. Terminal controls are escaped in table/key-value cells; safe check/action diagnostics are shown consistently. Raft/pool and committed incident/action diagnostics use the application logger with safe fields and corrected caller attribution. Result-shard timers and owner deadline waiting reduce measured idle CPU. | Remaining browser/compiler/tag matrix and dead-path audit. Source re-review closed the typed-nil pool correction and finite owner-waiting implementation. The short local CPU comparison is separate from fleet capacity and frozen release qualification. |
@@ -429,8 +429,9 @@ files is not a promise of immediate virtual-disk compaction or host-space recove
 
 ## Outstanding work at this checkpoint
 
-- Implement and natively verify macOS/Windows generation retirement; complete
-  allocated-storage accounting and Windows mapping-growth/footprint checks.
+- Natively verify macOS APFS generation retirement; implement and natively
+  verify Windows retirement; complete allocated-storage accounting and Windows
+  mapping-growth/footprint checks.
 - Migrate meaningful nil-Store/batch/alert regressions onto active owner/view
   paths before removing the unused executable path's implementation.
 - Complete slow-upload/contention and interruption tests across collection
@@ -446,3 +447,22 @@ files is not a promise of immediate virtual-disk compaction or host-space recove
   and measured headroom meet the prerequisite. The 24-hour run stays canceled.
 - Assemble, read back, sign and publish the qualified RC/modules/chart/docs only
   after the private gates pass. No public promotion has occurred in this checkpoint.
+
+## macOS generation-retirement checkpoint
+
+The shared Linux/macOS retirement engine preserves the existing Linux native
+identity check, strict intent format, current/previous retention and pinned
+reader protection. The macOS extension requires local APFS identity, private
+owner/mode, single-link files and descriptor-verified absence of an extended ACL.
+Unverifiable objects remain untouched. Shared primitive/process/Store tests
+now compile for Darwin; required native Linux/macOS jobs fail on missing
+identity evidence instead of satisfying the gate through a skip.
+
+Focused Linux/WSL checks pass on Go 1.27.1, its race build and Go 1.25.0, with no
+skipped cases. Go 1.27.1 cross-compiles both macOS test architectures; Go 1.25.0
+cross-compiles amd64; Darwin persistence vet passes. This is not native macOS
+execution. See the [implementation and evidence record](macos-collection-retirement-2026-10-13.md).
+Independent source review found no actionable defect in the finite extension.
+The tagged Linux suite also passes. Windows retirement, allocated-size accounting
+and all complete frozen-source gates remain open. The reviewer ran no tests,
+builds or native macOS operations.

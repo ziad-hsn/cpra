@@ -184,6 +184,8 @@ jobs:
         shell: bash
         run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
       - name: Native platform, preflight, administration and persistence tests
+        env:
+          CPRA_REQUIRED_COLLECTION_GC: ${{ runner.os != 'Windows' && '1' || '0' }}
         run: go test -timeout=45m ./internal/version ./internal/installpath ./internal/manifestcheck ./internal/secureconfig ./internal/localadmin ./internal/persistence
       - name: Compile all advertised drivers for native platform
         run: go build -mod=readonly -tags="redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio" ./...

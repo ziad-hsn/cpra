@@ -9,6 +9,15 @@ source matrix and independent review remain open. Earlier independent review
 covered the isolated primitive; it does not sign off the new Store integration.
 The [approved repair plan](release-repair-plan.md) governs these changes.
 
+**Update, 13 October 2026:** macOS native identity and ACL checks now feed the
+shared Linux/macOS bounded retirement protocol. The macOS test package
+cross-compiles for both architectures; its native APFS execution remains open.
+Linux focused restart/retirement and race checks pass on the shared code.
+Windows still preserves files with cleanup unavailable. See the
+[macOS implementation record](macos-collection-retirement-2026-10-13.md) for the
+exact checks and limitations. Allocation accounting and complete frozen-source
+qualification remain open.
+
 ## Invariant and ownership
 
 Raft logs and self-contained collection snapshots are authoritative. A collection
@@ -204,6 +213,10 @@ boundaries and surface remaining space rather than advertising a total disk cap.
   independent review confirms the ownership and filesystem boundaries.
 
 ## Implemented private primitive and evidence
+
+This section retains the earlier isolated-primitive checkpoint. Store integration
+and the macOS extension are described in the dated updates above; the earlier
+cross-builds and timings are not evidence for those later changes.
 
 `internal/persistence/collection_ledger_gc*.go` implements retirement of one supplied
 candidate through a mandatory trusted guard. The guard must protect the current

@@ -59,6 +59,8 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/collection_execution_retirement_checkpoint.go` | [Source](source/internal/persistence/collection_execution_retirement_checkpoint.go.txt) | `5c0e3bad3fef0ef88b24f937e16dc19c5ab495e4ce14842be84d391d6bd77438` |
 | `internal/persistence/collection_execution_retirement_tree.go` | [Source](source/internal/persistence/collection_execution_retirement_tree.go.txt) | `541f47bb97a877d1c1519ad5f36dae4429d5cd30ecbd8f2dfa12a8d9c4dcfb6d` |
 | `internal/persistence/collection_execution_snapshot.go` | [Source](source/internal/persistence/collection_execution_snapshot.go.txt) | `bea1c5f29a2996cb85c1d8959884259550d827dba746384f539c0e516f35eafe` |
+| `internal/persistence/collection_ledger_gc_darwin.go` | [Source](source/internal/persistence/collection_ledger_gc_darwin.go.txt) | `ee0c4bfbd2d05ced86c30ba30dea352f1fa6c277c90b2b5e08920c77ae592e4e` |
+| `internal/persistence/collection_ledger_gc_unix.go` | [Source](source/internal/persistence/collection_ledger_gc_unix.go.txt) | `f3c3cde9a70af2b7f74df79d3189f89ee763e136115a54c1a252c98127a7c72a` |
 | `internal/persistence/collection_operation_access.go` | [Source](source/internal/persistence/collection_operation_access.go.txt) | `3b0e5253f44037ef1f7633315b73ccae566c189f83c89f1c695bd9d859e7b202` |
 | `internal/persistence/command_digest_v1.go` | [Source](source/internal/persistence/command_digest_v1.go.txt) | `d8be70116f5a0766836418e9a67e536e372f98f3c642810a332997ebc0a13e66` |
 | `internal/persistence/job_type_external.go` | [Source](source/internal/persistence/job_type_external.go.txt) | `2b2ab001794f5bffdd55d75bc0736d1c2bf7d28c0d2309e4568b7d01d5e9cbe0` |

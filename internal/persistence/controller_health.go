@@ -28,7 +28,27 @@ func (f *machine) publishControllerHealth() {
 	state := f.controllerHealthState()
 	if current := f.health.Load(); current == nil || *current != state {
 		f.health.Store(&state)
+		select {
+		case f.controllerWakeups <- struct{}{}:
+		default:
+		}
 	}
+}
+
+// ControllerWakeups supplies coalesced committed-state hints to the single
+// controller owner. It carries no state or permission to execute. The channel
+// stays open through shutdown; the controller has its own stop channel and must
+// still observe authoritative state and bounded deadlines after each wakeup.
+func (s *Store) ControllerWakeups() <-chan struct{} {
+	if s == nil {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.fsm == nil {
+		return nil
+	}
+	return s.fsm.controllerWakeups
 }
 
 func (s *Store) lockHealthObservation(ctx context.Context) (func(), controllerHealthState, error) {

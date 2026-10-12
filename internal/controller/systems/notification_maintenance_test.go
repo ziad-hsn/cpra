@@ -60,11 +60,12 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 	t.Cleanup(func() { _ = store.Close() })
 	w := ecs.NewWorld()
 	ent := releaseMonitor(t, &w, 1, 1)
-	start := time.Now().UTC().Truncate(time.Minute).Add(time.Minute)
-	windows, err := manifest.CompileMaintenance([]manifest.MaintenanceWindow{{Cron: "* * * * *", Duration: "5s"}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// A next-minute wall boundary can pass during Load, placing start-1s
+	// behind the timing wheel before the test asks to enqueue the delivery.
+	// These scenarios drive the owner at explicit times; use a controlled
+	// one-shot boundary safely beyond initialization instead of a real cron.
+	start := time.Now().UTC().Add(time.Minute)
+	windows := []manifest.CompiledWindow{{Schedule: oneMaintenanceStart{start}, Duration: 5 * time.Second}}
 	if missed {
 		// Queue execution uses real current time after this completed window.
 		start = time.Now().UTC().Add(-10 * time.Second)

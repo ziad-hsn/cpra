@@ -80,6 +80,7 @@ type Controller struct {
 	running              bool
 	lifecycleMu          sync.Mutex
 	stopCh               chan struct{}
+	wakeups              chan struct{}
 	doneCh               chan struct{}
 	resultSystems        []app.System
 	initialized          chan struct{}
@@ -245,8 +246,13 @@ func NewController(config Config) *Controller {
 	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, codeSched, logger, stateLogger, alertMgr)
 
 	var durableSystem *systems.DurableSystem
+	wakeups := make(chan struct{}, 1)
 	if config.Store != nil {
 		durableSystem = systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
+		durableSystem.SetWakeup(wakeups)
+		for _, router := range []*queue.ResultRouter{pulseRouter, interventionRouter, codeRouter} {
+			router.SetWakeup(wakeups)
+		}
 		arkApp.AddSystem(durableSystem)
 	} else {
 		arkApp.AddSystem(pulseScheduleSystem)
@@ -302,6 +308,7 @@ func NewController(config Config) *Controller {
 		metricsAgg:           metricsAgg,
 		snapshotHolder:       snapshotHolder,
 		resultSystems:        resultSystems,
+		wakeups:              wakeups,
 	}
 }
 
@@ -510,11 +517,20 @@ func (c *Controller) run() {
 	c.lastProgress.Store(time.Now().UnixNano())
 	c.initializedState.Store(true)
 	close(c.initialized)
-	ticker := time.NewTicker(time.Second / time.Duration(c.app.TPS))
-	defer ticker.Stop()
+	interval := time.Second / time.Duration(c.app.TPS)
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	nextAllowed := time.Now().Add(interval)
+	var committed <-chan struct{}
+	if c.config.Store != nil {
+		committed = c.config.Store.ControllerWakeups()
+	}
 	for {
 		select {
 		case <-c.stopCh:
+			timer.Stop()
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
 			if c.durableSystem != nil {
 				c.durableSystem.StopAdmission()
 			}
@@ -548,13 +564,29 @@ func (c *Controller) run() {
 				case <-ticker.C:
 				}
 			}
-		case <-ticker.C:
-			c.app.Update()
-			if c.durableSystem != nil {
-				c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
-			}
-			c.lastProgress.Store(time.Now().UnixNano())
+		case <-timer.C:
+		case <-c.wakeups:
+		case <-committed:
 		}
+		now := time.Now()
+		if remaining := nextAllowed.Sub(now); remaining > 0 {
+			// Repeated hints cannot move the fixed earliest update boundary or
+			// turn sustained completions into an unbounded update loop.
+			timer.Reset(remaining)
+			continue
+		}
+		c.app.Update()
+		if c.durableSystem != nil {
+			c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
+		}
+		now = time.Now()
+		c.lastProgress.Store(now.UnixNano())
+		nextAllowed = now.Add(interval)
+		wait := interval
+		if c.durableSystem != nil {
+			wait = c.durableSystem.NextUpdate(now, interval)
+		}
+		timer.Reset(wait)
 	}
 }
 

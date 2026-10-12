@@ -80,6 +80,7 @@ type DurableSystem struct {
 	lastSLO             time.Time
 	lastError           error
 	logger              Logger
+	wakeup              chan<- struct{}
 }
 
 func NewDurableSystem(w *ecs.World, store *persistence.Store, cfg runtimeconfig.Config, holder *fleetview.Holder, logger Logger, pq, iq, cq queue.Queue, channels []<-chan []jobs.Result, cooldown time.Duration, bypass bool) *DurableSystem {

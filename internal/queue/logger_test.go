@@ -49,3 +49,26 @@ func TestResultRouterNilLogger(t *testing.T) {
 		router.Close()
 	}
 }
+
+func TestResultRouterWakeupFollowsDeliveryAndCoalesces(t *testing.T) {
+	wakeup := make(chan struct{}, 1)
+	router := NewResultRouter(DefaultWorkerPoolConfig(), nil)
+	router.SetWakeup(wakeup)
+	defer router.Close()
+	for range 2 {
+		router.RouteResults([]jobs.Result{{Type: "pulse"}})
+	}
+	select {
+	case <-wakeup:
+		if len(router.PulseResultChan) != 2 {
+			t.Fatal("hint preceded result delivery")
+		}
+	default:
+		t.Fatal("result delivery did not wake owner")
+	}
+	select {
+	case <-wakeup:
+		t.Fatal("result hints accumulated instead of coalescing")
+	default:
+	}
+}

@@ -3,6 +3,7 @@
 package scheduler
 
 import (
+	"math/bits"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
@@ -96,6 +97,7 @@ const (
 // the overflow min-heap.
 type timingWheel struct {
 	slots     [][]entry
+	occupied  [wheelNumSlots / 64]uint64
 	tick      int64
 	overflow  minHeap
 	count     int
@@ -132,6 +134,7 @@ func (w *timingWheel) insert(e entry) {
 	idx := slot & wheelMask
 	w.locations[e.entity] = location{int(idx), len(w.slots[idx])}
 	w.slots[idx] = append(w.slots[idx], e)
+	w.occupied[idx/64] |= uint64(1) << (idx % 64)
 	w.count++
 }
 
@@ -151,6 +154,9 @@ func (w *timingWheel) cancel(entity ecs.Entity) bool {
 		}
 		bucket[last] = entry{}
 		w.slots[loc.slot] = bucket[:last]
+		if last == 0 {
+			w.occupied[loc.slot/64] &^= uint64(1) << (loc.slot % 64)
+		}
 		delete(w.locations, entity)
 	}
 	w.count--
@@ -174,6 +180,7 @@ func (w *timingWheel) popDue(now int64) []ecs.Entity {
 			}
 			clear(w.slots[idx])
 			w.slots[idx] = w.slots[idx][:0]
+			w.occupied[idx/64] &^= uint64(1) << (idx % 64)
 		}
 		w.tick++
 	}
@@ -244,6 +251,46 @@ func (s *Scheduler) Due(now time.Time) []ecs.Entity {
 // Len returns the number of scheduled monitors.
 func (s *Scheduler) Len() int {
 	return s.wheel.len()
+}
+
+// NextWake returns the first occupied wheel bucket's start or the earliest
+// overflow deadline. It may precede a wheel entry by less than one resolution
+// tick, matching Due's bucket semantics. It examines at most 129 bitmap words
+// and the heap root, regardless of fleet size. Callers must serialize access.
+func (s *Scheduler) NextWake() (time.Time, bool) {
+	w := s.wheel
+	if w.count == 0 {
+		return time.Time{}, false
+	}
+	start := int(w.tick & wheelMask)
+	slot, found := w.firstOccupied(start, wheelNumSlots)
+	if !found {
+		slot, found = w.firstOccupied(0, start)
+	}
+	var at int64
+	if found {
+		offset := (int64(slot) - int64(start) + wheelNumSlots) & wheelMask
+		at = (w.tick + offset) * wheelResolution
+	}
+	if w.overflow.Len() > 0 && (!found || w.overflow.entries[0].due < at) {
+		at, found = w.overflow.entries[0].due, true
+	}
+	return time.Unix(0, at), found
+}
+
+func (w *timingWheel) firstOccupied(start, end int) (int, bool) {
+	for start < end {
+		word := start / 64
+		occupied := w.occupied[word] & (^uint64(0) << (start % 64))
+		if end/64 == word && end%64 != 0 {
+			occupied &= (uint64(1) << (end % 64)) - 1
+		}
+		if occupied != 0 {
+			return word*64 + bits.TrailingZeros64(occupied), true
+		}
+		start = (word + 1) * 64
+	}
+	return 0, false
 }
 
 // Peek returns the earliest due time without removing it.

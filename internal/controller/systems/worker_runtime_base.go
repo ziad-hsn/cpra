@@ -32,6 +32,7 @@ func (*DurableSystem) startWorkerDispatch()                                     
 func (*DurableSystem) stopWorkerDispatch()                                      {}
 func (*DurableSystem) finishWorkerDispatch()                                    {}
 func (*DurableSystem) receiveWorkerDispatch()                                   {}
+func (*DurableSystem) workerNeedsUpdate() bool                                  { return false }
 func (*DurableSystem) workerCheck(ecs.Entity) bool                              { return false }
 func (*DurableSystem) dispatchWorkerAction(ecs.Entity, persistence.Action) bool { return false }
 

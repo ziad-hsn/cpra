@@ -80,6 +80,7 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
+	controllerWakeups     chan struct{} // Coalesced hints; never replay authority.
 	collectionGenerations *collectionGenerations
 	collectionUpload      *collectionUploadTransaction // Apply-owned; never snapshot authority.
 	health                atomic.Pointer[controllerHealthState]

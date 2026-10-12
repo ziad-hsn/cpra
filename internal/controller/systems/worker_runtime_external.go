@@ -15,6 +15,12 @@ import (
 )
 
 type systemExtensions struct{ workerRuntime *workerRuntime }
+
+func (s *DurableSystem) workerNeedsUpdate() bool {
+	r := s.workerRuntime
+	return r != nil && (r.ready.Len() != 0 || len(r.pending) != 0)
+}
+
 type checkScheduleExtensions struct {
 	workerSchedule persistence.WorkerScheduleTicket
 }

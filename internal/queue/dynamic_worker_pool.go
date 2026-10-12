@@ -46,6 +46,7 @@ type ResultRouter struct {
 	logger                 Logger
 	config                 WorkerPoolConfig
 	done                   <-chan struct{}
+	wakeup                 chan<- struct{}
 	closeOnce              sync.Once
 }
 
@@ -86,6 +87,10 @@ func NewResultRouter(config WorkerPoolConfig, logger Logger) *ResultRouter {
 		logger:                 logger,
 	}
 }
+
+// SetWakeup connects a coalescing owner hint before the pool starts. The router
+// never closes the channel; the owner must keep it open until all pools stop.
+func (r *ResultRouter) SetWakeup(wakeup chan<- struct{}) { r.wakeup = wakeup }
 
 // resultType returns the job class of a result, preferring the typed Result.Type
 // field and falling back to Payload["type"] for results created before the field
@@ -147,6 +152,10 @@ func (r *ResultRouter) sendWithBackpressure(ch chan []jobs.Result, batch []jobs.
 	for {
 		select {
 		case ch <- batch:
+			select {
+			case r.wakeup <- struct{}{}:
+			default:
+			}
 			return
 		case <-r.done:
 			return

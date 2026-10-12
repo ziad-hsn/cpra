@@ -59,3 +59,6 @@ func (p *PulseScheduler) Len() int { return p.heap.Len() }
 
 // ReadyLen returns the number of entities awaiting dispatch.
 func (p *PulseScheduler) ReadyLen() int { return p.ready.Len() }
+
+// NextWake returns the next due bucket/deadline without scanning monitor rows.
+func (p *PulseScheduler) NextWake() (time.Time, bool) { return p.heap.NextWake() }

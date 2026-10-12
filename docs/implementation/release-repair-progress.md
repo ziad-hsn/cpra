@@ -13,7 +13,7 @@ independent review. Failed reproductions and intermediate failures are retained.
 | --- | --- | --- |
 | 1. Baseline | Approved plan saved; all three reviews mapped to F01-F56 with source and evidence dispositions; other checkouts and prior evidence preserved. | Final finding dispositions and independent review. |
 | 2. Notifications | Formats 40/41; episode, logical delivery and stable per-target endpoint identities; obsolete queued cancellation; maintenance cancellation; verification-pending wording; unknown HTTP 5xx; persisted overall deadlines and retry identity; canonical bounded failure causes in current state, intent, outcomes, retained events and operator interfaces. PagerDuty/Opsgenie receive committed incident/endpoint correlation; Opsgenie distinguishes acceptance from processing and closes the original alias. Focused lifecycle and real network receiver tests pass. | Complete process-crash/restart campaign and final-source matrix. Provider retry/receipt, diagnostics and maintenance checkpoints passed independent review; unsupported rejection evidence remains unknown. |
-| 3. Collections | Immutable routine health publication without the FSM lock; health-read cancellation does not poison write recovery; contiguous uploads use one synchronous transaction per 64 resources/1 MiB group; exact pre-submission marker classification in API/SDK; explicit `resume` with server verification of original raw and ordered resource identities, including complete uploads; `resume-upload` retains upload-only behavior. | Real 35-50-monitor imports and interruptions across all phases; full contention/restart campaign and final-source review. Existing original-operation dashboard continuation passed the required default browser campaign. |
+| 3. Collections | Immutable routine health publication without the FSM lock; health-read cancellation does not poison write recovery; contiguous uploads use one synchronous transaction per 64 resources/1 MiB group; exact pre-submission marker classification in API/SDK; explicit `resume` with server verification of original raw and ordered resource identities, including complete uploads; `resume-upload` retains upload-only behavior. Real native CLI imports of 35/50 monitors complete and retain identity after graceful restart on both compilers and the tagged build. | Interruptions across all phases; full contention/restart campaign and final-source review. Existing original-operation dashboard continuation passed the required default browser campaign. |
 | 4. Storage | Store-owned completed-generation catalog, atomic reader/snapshot pins and Linux native retirement are integrated. Current/previous completed generations remain protected; retirement catalog publication precedes removal of the durable deletion intent. Sampled path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping is 64 MiB. Linux retention, restart, process interruption, publication failure and focused race checks pass. Existing lazy allocation, authenticated stopped backup/restore and synchronous writes remain. | Native macOS/Windows retirement implementation and execution; complete allocated-size accounting and Windows growth/footprint evidence; full backup/restore and corruption matrix after these changes; independent review. |
 | 5. Access | Go-based `local init --management`, exclusive protected files and localhost CA/leaf certificate; system token-output separation; mode-aware service arguments; minimum 32 printable token characters; explicit access discovery; ignored-bootstrap warning; loopback Host/origin guards; profiling cmdline removal; bounded failed-authentication throttling with 401/Retry-After; CSP/security headers. Local initialization, API/authentication and real application start/create/restart checks pass. Dashboard type checking, lint and tests pass across the full run and focused fixture repairs. | Remaining compiler/tag browser matrix, native system service/ACL checks, trusted-operator documentation and final security review. Current embedded rebuild and required Go1.27.1/default browser campaign pass. |
 | 6. Drivers/configuration | File parsers always reject unknown fields and duplicate JSON keys. Shared static driver settings validate required destinations, ranges, gRPC mode and Docker budgets in manifests, management and SDK preflight/new apply, while original-input normalization stays byte-compatible. gRPC health mode uses verified TLS by default, the configured service and SERVING-only success. Docker has separate stop grace and operation budgets. ICMP selects supported privilege mode or rejects the platform. PagerDuty/Opsgenie correlation, closure and severity fixtures pass. Complete jobs/manifest/loader/SDK API/collection suites and focused management checks pass. | Native service-identity ICMP checks; complete driver/provider and process campaign; independent review. |
@@ -383,3 +383,31 @@ pass. This campaign explicitly uses fixture responses, invokes no providers,
 and does not replace the real-server browser/compiler/tag campaigns or establish
 full WCAG conformance. The failed artifact is retained. Independent source
 review of this fixture and documentation correction remains required.
+
+Source review closed the finite documentation/accessibility fixture correction
+at `37ee8e6`. The reviewer inspected the CPU script/counters but did not rerun
+the comparison or browser campaigns.
+
+Ordinary 35/50-monitor imports now run through freshly built native CLI
+subprocesses against normal TLS/Raft startup. Default Go 1.27.1, Go 1.25.0,
+matching externaljobs and race-server cases pass complete original-operation
+results, per-monitor projection and graceful restart identity checks. The final
+race run also explicitly checks controller/storage readiness. The initial
+50-monitor attempt hit the fixture's 12-second wait limit and remains failed;
+the completed cases use a 30-second operation wait and 45-second process budget.
+No provider call occurs. See the [dated import observation](collection-import-observation-2026-10-13.md).
+Independent source review remains required for this extension.
+
+The [alert path audit](alert-path-audit-2026-10-13.md) confirms that normal
+executable startup supplies a Store and installs the committed owner. The
+nil-Store batch/alert path remains in internal tests, and its objects are still
+constructed before branch selection. Meaningful regression migration/removal
+is open; no broad package change or speculative deletion is made.
+
+A race-build peak exceeded the 6 GiB task scratch cap by an observed 117.3 MiB.
+After compilation ended, 806.7 MiB of identified derived Go cache was removed;
+source, modules, tools, executables and retained evidence stayed intact. The
+remaining race fixture finished with source inventory unchanged. This budget
+excursion is recorded rather than reported as continuous cap compliance.
+A fresh physical C: read returned 25,503,776,768 bytes, about 23.8 GiB, below
+the 35 GiB initial comparative-campaign prerequisite. No large campaign ran.

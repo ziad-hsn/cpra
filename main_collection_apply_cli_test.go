@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -104,4 +106,85 @@ func TestMainManagementCollectionApplyCLI(t *testing.T) {
 	}
 	scanMainCLIPrivateState(t, fixture.settings.Storage.Directory, cli.secret)
 	t.Logf("native collection apply evidence: cli_sha256=%s calls=%d public_activation=true dry_run_allocations=0 controller_applied=2 retained_pages=2 owner_restarted=true provider_calls=%d", binaryHash, cli.calls, checks.Load())
+	for _, count := range []int{35, 50} {
+		t.Run(fmt.Sprintf("import_%d_monitors", count), func(t *testing.T) {
+			testMainMonitorCollectionImport(t, binary, binaryHash, count)
+		})
+	}
+}
+
+func testMainMonitorCollectionImport(t *testing.T, binary, binaryHash string, count int) {
+	t.Helper()
+	fixture := newMainManagementFixture(t)
+	private := filepath.Dir(fixture.options.runtimeFile)
+	tokenPath := filepath.Join(private, "operator.token")
+	if err := os.WriteFile(tokenPath, []byte(startupOperatorToken), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+	client, stop := startMainManagement(t, fixture)
+	cli := &mainCLIRunner{binary: binary, origin: "https://" + fixture.options.webAddr, ca: fixture.settings.Management.TLS.CertFile, token: tokenPath, secret: "private-sized-import-marker", processTimeout: 45 * time.Second}
+	ids := make([]string, count)
+	args := []string{"apply"}
+	// Exercise one manifest and team-separated manifests, using the same public
+	// existing manifest loader and collection protocol as an operator's import.
+	perFile := count
+	if count == 50 {
+		perFile = 10
+	}
+	for first := 0; first < count; first += perFile {
+		var content strings.Builder
+		content.WriteString("monitors:\n")
+		for n := first; n < min(count, first+perFile); n++ {
+			ids[n] = fmt.Sprintf("import-service-%03d", n)
+			fmt.Fprintf(&content, "  - id: %s\n    name: Imported service %d\n    enabled: false\n    pulse_check:\n      type: http\n      interval: 60s\n      timeout: 1s\n      unhealthy_threshold: 1\n      healthy_threshold: 1\n      config:\n        url: %s/health\n", ids[n], n, target.URL)
+		}
+		path := filepath.Join(private, fmt.Sprintf("team-%03d.yaml", first/perFile))
+		if err := os.WriteFile(path, []byte(content.String()), 0600); err != nil {
+			t.Fatal(err)
+		}
+		args = append(args, "-f", path)
+	}
+	args = append(args, "-o", "json")
+	started := time.Now()
+	admission := decodeMainCLI[api.Operation](t, cli.success(t, nil, args...).stdout)
+	if admission.ID == "" || admission.ItemCount == nil || *admission.ItemCount != int64(count) || admission.Uploaded == nil || *admission.Uploaded != int64(count) {
+		t.Fatal("sized import did not retain its complete original admission")
+	}
+	result := decodeMainCLI[api.Operation](t, cli.success(t, nil, "wait", "operation/"+admission.ID, "--timeout=30s", "-o", "json").stdout)
+	if result.ID != admission.ID || result.ContentDigest != admission.ContentDigest || result.ExecutionResult == nil || result.ExecutionResult.State != "ready" || result.ExecutionResult.Summary == nil || result.ExecutionResult.Summary.Outcome != "completed" || result.ExecutionResult.Summary.Accepted != int64(count) || result.ExecutionResult.Summary.ChildApplied != int64(count) || len(result.Items) != count {
+		t.Fatal("sized import did not complete the original collection with every child applied")
+	}
+	state, err := client.State(t.Context())
+	if err != nil || !state.Data.Ready || !state.Data.ControllerAvailable || !state.Data.ControllerReady || !state.Data.Storage.Available {
+		t.Fatal("ordinary import left controller or storage admission unavailable", err)
+	}
+	identities := make(map[string]api.Metadata, count)
+	for _, id := range ids {
+		read, err := client.Monitors.Get(t.Context(), id)
+		if err != nil || read.Data.Spec.Enabled == nil || *read.Data.Spec.Enabled || read.Data.Metadata.Generation != 1 || read.Data.Status.ObservedGeneration != read.Data.Metadata.Generation {
+			t.Fatal("sized import did not project each original monitor exactly once", id, err)
+		}
+		identities[id] = read.Data.Metadata
+	}
+	elapsed := time.Since(started)
+	stop()
+	restarted, stopRestarted := startMainManagement(t, fixture)
+	for _, id := range ids {
+		read, err := restarted.Monitors.Get(t.Context(), id)
+		original := identities[id]
+		if err != nil || read.Data.Metadata.UID != original.UID || read.Data.Metadata.ResourceVersion != original.ResourceVersion || read.Data.Status.ObservedGeneration != original.Generation {
+			t.Fatal("sized import restart changed original identity or lost owner projection", id, err)
+		}
+	}
+	stopRestarted()
+	if calls.Load() != 0 {
+		t.Fatal("disabled sized import or reads caused a provider operation", calls.Load())
+	}
+	t.Logf("sized CLI import evidence: monitors=%d files=%d cli_sha256=%s original_operation=%s applied=%d elapsed_ms=%d owner_restarted=true provider_calls=0", count, (count+perFile-1)/perFile, binaryHash, admission.ID, count, elapsed.Milliseconds())
 }

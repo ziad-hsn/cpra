@@ -357,12 +357,17 @@ func assertMainCLIOperationPages(t *testing.T, reader *mainCLIRunner, patchedVer
 type mainCLIRunner struct {
 	binary, origin, ca, token, secret string
 	calls                             int
+	processTimeout                    time.Duration
 }
 
 func (c *mainCLIRunner) invoke(t *testing.T, input []byte, args ...string) mainCLIResult {
 	t.Helper()
 	c.calls++
-	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	budget := c.processTimeout
+	if budget == 0 {
+		budget = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), budget)
 	defer cancel()
 	command := exec.CommandContext(ctx, c.binary, append([]string{"--server", c.origin, "--ca-file", c.ca, "--token-file", c.token, "--request-timeout", "5s"}, args...)...)
 	command.Stdin = bytes.NewReader(input)

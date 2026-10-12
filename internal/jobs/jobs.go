@@ -84,6 +84,9 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 			payload: map[string]interface{}{"type": "pulse", "driver": "tcp"},
 		}, nil
 	case *manifest.PulseICMPConfig:
+		if _, err := icmpPrivileged(runtime.GOOS, cfg.Privilege); err != nil {
+			return nil, err
+		}
 		return &PulseICMPJob{
 			ID:              uuid.New(),
 			Entity:          jobID,
@@ -123,14 +126,18 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 		}, nil
 	case *manifest.PulseGRPCConfig:
 		return &PulseGRPCJob{
-			ID:      uuid.New(),
-			Entity:  jobID,
-			Host:    cfg.Host,
-			Port:    cfg.Port,
-			Service: cfg.Service,
-			Timeout: timeout,
-			Retries: cfg.Retries,
-			payload: map[string]interface{}{"type": "pulse", "driver": "grpc"},
+			ID:            uuid.New(),
+			Entity:        jobID,
+			Host:          cfg.Host,
+			Port:          cfg.Port,
+			Service:       cfg.Service,
+			Mode:          cfg.Mode,
+			AllowInsecure: cfg.AllowInsecure,
+			ServerName:    cfg.ServerName,
+			CAFile:        cfg.CAFile,
+			Timeout:       timeout,
+			Retries:       cfg.Retries,
+			payload:       map[string]interface{}{"type": "pulse", "driver": "grpc"},
 		}, nil
 	case *manifest.PulseDockerConfig:
 		return &PulseDockerJob{
@@ -173,12 +180,21 @@ func CreateInterventionJob(interventionSchema manifest.Intervention, jobID ecs.E
 			RequestTimeout: t.RequestTimeout, TaskTimeout: t.TaskTimeout, PollInterval: t.PollInterval,
 			AllowInsecureHTTP: t.AllowInsecureHTTP}, "intervention")
 	case "docker":
+		target, ok := interventionSchema.Target.(*manifest.InterventionTargetDocker)
+		if !ok || target == nil {
+			return nil, fmt.Errorf("intervention docker requires a Docker target")
+		}
+		budget, err := dockerOperationBudget(target.Timeout, target.OperationTimeout)
+		if err != nil {
+			return nil, err
+		}
 		return &InterventionDockerJob{
-			ID:        uuid.New(),
-			Entity:    jobID,
-			Container: interventionSchema.Target.(*manifest.InterventionTargetDocker).Container,
-			Retries:   retries,
-			Timeout:   interventionSchema.Target.(*manifest.InterventionTargetDocker).Timeout,
+			ID:               uuid.New(),
+			Entity:           jobID,
+			Container:        target.Container,
+			Retries:          retries,
+			Timeout:          target.Timeout,
+			OperationTimeout: budget,
 		}, nil
 	case "kubernetes":
 		t, ok := interventionSchema.Target.(*manifest.InterventionTargetKubernetes)
@@ -681,13 +697,16 @@ type PulseICMPJob struct {
 	payload         map[string]interface{}
 }
 
-//var errICMPPrivilege = errors.New("icmp requires elevated privileges")
-
 func (p *PulseICMPJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 	result = Result{ID: p.ID, Ent: p.Entity, Payload: p.payload}
+	privileged, err := icmpPrivileged(runtime.GOOS, p.IgnorePrivilege)
+	if err != nil {
+		result.Err = err
+		return
+	}
 	select {
 	case icmpPingerSem <- struct{}{}:
 		defer func() { <-icmpPingerSem }()
@@ -721,7 +740,7 @@ func (p *PulseICMPJob) Execute() (result Result) {
 			pr.Count = 1
 		}
 		pr.Timeout = remaining(ctx)
-		pr.SetPrivileged(runtime.GOOS != "linux")
+		pr.SetPrivileged(privileged)
 		err = pr.RunWithContext(ctx)
 		if err == nil && pr.Statistics().PacketsRecv > 0 {
 			result.Err = nil
@@ -870,22 +889,32 @@ func (p *PulseUDPJob) IsNil() bool                { return p == nil }
 // endpoint is listening.
 type PulseGRPCJob struct {
 	Execution
-	EnqueueTime time.Time
-	StartTime   time.Time
-	Host        string
-	Port        int
-	Service     string
-	Timeout     time.Duration
-	Retries     int
-	Entity      ecs.Entity
-	ID          uuid.UUID
-	payload     map[string]interface{}
+	EnqueueTime   time.Time
+	StartTime     time.Time
+	Host          string
+	Port          int
+	Service       string
+	Mode          string
+	AllowInsecure bool
+	ServerName    string
+	CAFile        string
+	Timeout       time.Duration
+	Retries       int
+	Entity        ecs.Entity
+	ID            uuid.UUID
+	payload       map[string]interface{}
 }
 
 func (p *PulseGRPCJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
+	if p.Mode == "health" {
+		return p.healthCheck(ctx)
+	}
+	if p.Mode != "" && p.Mode != "tcp" {
+		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("unsupported gRPC check mode"), Payload: p.payload}
+	}
 
 	payload := p.payload
 	attempts := newPulseAttempts(ctx, p.Retries)
@@ -972,18 +1001,23 @@ func (p *PulseDockerJob) IsNil() bool                { return p == nil }
 
 type InterventionDockerJob struct {
 	Execution
-	EnqueueTime time.Time
-	StartTime   time.Time
-	Container   string
-	Timeout     time.Duration
-	Retries     int
-	Entity      ecs.Entity
-	ID          uuid.UUID
+	EnqueueTime      time.Time
+	StartTime        time.Time
+	Container        string
+	Timeout          time.Duration
+	OperationTimeout time.Duration
+	Retries          int
+	Entity           ecs.Entity
+	ID               uuid.UUID
 }
 
 func (i *InterventionDockerJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
-	ctx, cancel := operationContext(i.Context(), i.Timeout)
+	budget, err := dockerOperationBudget(i.Timeout, i.OperationTimeout)
+	if err != nil {
+		return Result{ID: i.ID, Ent: i.Entity, Err: err}
+	}
+	ctx, cancel := operationContext(i.Context(), budget)
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "intervention"}
@@ -1016,6 +1050,29 @@ func (i *InterventionDockerJob) Execute() (result Result) {
 		lastErr = err
 	}
 	return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("docker intervention on '%s' failed after %d attempt(s): %w", i.Container, attempts, lastErr), Payload: payload}
+}
+
+func dockerOperationBudget(grace, configured time.Duration) (time.Duration, error) {
+	if grace < 0 || grace > 24*time.Hour {
+		return 0, fmt.Errorf("Docker stop grace must be between zero and 24h")
+	}
+	if configured == 0 {
+		return max(60*time.Second, grace+20*time.Second), nil
+	}
+	if configured < grace+20*time.Second || configured > 24*time.Hour {
+		return 0, fmt.Errorf("Docker operation timeout must permit the stop grace plus 20s and be at most 24h")
+	}
+	return configured, nil
+}
+
+func icmpPrivileged(platform string, ignorePrivilege bool) (bool, error) {
+	if ignorePrivilege {
+		if platform != "linux" && platform != "darwin" {
+			return false, fmt.Errorf("ICMP ignore_privilege is unsupported on this platform")
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func (i *InterventionDockerJob) Copy() Job                  { job := *i; return &job }

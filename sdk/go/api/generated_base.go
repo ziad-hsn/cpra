@@ -210,6 +210,24 @@ func (e PreflightRequestIdentityFormat) Valid() bool {
 	}
 }
 
+// Defines values for PulseGRPCConfigMode.
+const (
+	PulseGRPCConfigModeHealth PulseGRPCConfigMode = "health"
+	PulseGRPCConfigModeTcp    PulseGRPCConfigMode = "tcp"
+)
+
+// Valid indicates whether the value is a known member of the PulseGRPCConfigMode enum.
+func (e PulseGRPCConfigMode) Valid() bool {
+	switch e {
+	case PulseGRPCConfigModeHealth:
+		return true
+	case PulseGRPCConfigModeTcp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RecoveryFailureOutcome.
 const (
 	Failure RecoveryFailureOutcome = "failure"
@@ -969,7 +987,10 @@ type InterventionTargetAWS struct {
 type InterventionTargetDocker struct {
 	Container *string `json:"container,omitempty"`
 
-	// Timeout Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
+	// OperationTimeout Overall restart budget. Defaults to max(60s, stop grace + 20s). An explicit budget must permit the stop grace plus 20s.
+	OperationTimeout *Duration `json:"operationTimeout,omitempty"`
+
+	// Timeout Docker stop grace, independent of the total operation deadline.
 	Timeout *Duration `json:"timeout,omitempty"`
 	Type    *string   `json:"type,omitempty"`
 }
@@ -1317,13 +1338,23 @@ type PulseDockerConfig struct {
 	Retries   *int64  `json:"retries,omitempty"`
 }
 
-// PulseGRPCConfig defines model for PulseGRPCConfig.
+// PulseGRPCConfig Omitted mode preserves TCP reachability. Health mode uses grpc.health.v1.Health/Check and requires SERVING, with TLS unless allowInsecure is explicitly true.
 type PulseGRPCConfig struct {
-	Host    *string `json:"host,omitempty"`
-	Port    *int64  `json:"port,omitempty"`
-	Retries *int64  `json:"retries,omitempty"`
-	Service *string `json:"service,omitempty"`
+	// AllowInsecure Permit cleartext for health mode explicitly; TLS is the default.
+	AllowInsecure *bool `json:"allowInsecure,omitempty"`
+
+	// CAFile Optional PEM trust roots read by the server at check execution.
+	CAFile     *string              `json:"caFile,omitempty"`
+	Host       *string              `json:"host,omitempty"`
+	Mode       *PulseGRPCConfigMode `json:"mode,omitempty"`
+	Port       *int64               `json:"port,omitempty"`
+	Retries    *int64               `json:"retries,omitempty"`
+	ServerName *string              `json:"serverName,omitempty"`
+	Service    *string              `json:"service,omitempty"`
 }
+
+// PulseGRPCConfigMode defines model for PulseGRPCConfig.Mode.
+type PulseGRPCConfigMode string
 
 // PulseHTTPConfig defines model for PulseHTTPConfig.
 type PulseHTTPConfig struct {

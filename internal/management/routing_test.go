@@ -13,7 +13,19 @@ import (
 func routingCatalog() NotificationCatalog {
 	c := NotificationCatalog{Endpoints: map[string]api.NotificationEndpoint{}, Recipients: map[string]api.Recipient{}, Groups: map[string]api.NotificationGroup{}}
 	for id, kind := range map[string]string{"mail-a": "email", "mail-b": "email", "sms": "twilio", "chat": "telegram"} {
-		c.Endpoints[id] = api.NotificationEndpoint{APIVersion: api.APIVersion, Kind: "NotificationEndpoint", Metadata: api.Metadata{ID: id, UID: id + "-uid", ResourceVersion: "rv-1"}, Spec: api.DriverConfig{Type: kind, Config: json.RawMessage(`{}`)}}
+		spec := api.DriverConfig{Type: kind}
+		switch kind {
+		case "email":
+			spec.Config = json.RawMessage(`{"from":"cpra@example.com","to":"ops@example.com"}`)
+			spec.CredentialRefs = api.Pointer(map[string]string{"server": "smtp"})
+		case "twilio":
+			spec.Config = json.RawMessage(`{"from":"+15555550100","to":"+15555550101"}`)
+			spec.CredentialRefs = api.Pointer(map[string]string{"accountSid": "sid", "authToken": "token"})
+		case "telegram":
+			spec.Config = json.RawMessage(`{"chatId":"fixture-chat"}`)
+			spec.CredentialRefs = api.Pointer(map[string]string{"botToken": "bot"})
+		}
+		c.Endpoints[id] = api.NotificationEndpoint{APIVersion: api.APIVersion, Kind: "NotificationEndpoint", Metadata: api.Metadata{ID: id, UID: id + "-uid", ResourceVersion: "rv-1"}, Spec: spec}
 	}
 	c.Recipients["alice"] = api.Recipient{APIVersion: api.APIVersion, Kind: "Recipient", Metadata: api.Metadata{ID: "alice", UID: "alice-uid", ResourceVersion: "rv-1"}, Spec: api.RecipientSpec{EndpointRefs: []string{"sms", "mail-b", "mail-a"}}}
 	c.Recipients["bob"] = api.Recipient{APIVersion: api.APIVersion, Kind: "Recipient", Metadata: api.Metadata{ID: "bob", UID: "bob-uid", ResourceVersion: "rv-1"}, Spec: api.RecipientSpec{EndpointRefs: []string{"mail-a"}}}

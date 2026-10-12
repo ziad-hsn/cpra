@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"net/url"
 	"reflect"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -168,6 +169,9 @@ func decodeRuntimeDriver(category string, driver api.DriverConfig) (any, error) 
 // connectivity, file readability, credential validity, or delivery. Those remain
 // runtime/preflight evidence and never become side effects of API validation.
 func ValidateResolvedDriver(category string, driver api.DriverConfig) error {
+	if err := api.ValidateDriverSettings(category, driver); err != nil {
+		return runtimeInvalid("driver target, required field, or range is invalid")
+	}
 	config, err := decodeRuntimeDriver(category, driver)
 	if err != nil {
 		return err
@@ -195,7 +199,7 @@ func ValidateResolvedDriver(category string, driver api.DriverConfig) error {
 	case *manifest.PulseTCPConfig:
 		valid = hostPort(cfg.Host, cfg.Port)
 	case *manifest.PulseICMPConfig:
-		valid = networkHost(cfg.Host)
+		valid = networkHost(cfg.Host) && (!cfg.Privilege || runtime.GOOS == "linux" || runtime.GOOS == "darwin")
 	case *manifest.PulseDNSConfig:
 		valid = networkHost(cfg.Host) && (cfg.Server == "" || dnsAddress(cfg.Server))
 	case *manifest.PulseUDPConfig:

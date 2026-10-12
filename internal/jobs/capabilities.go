@@ -72,6 +72,11 @@ func ValidateDriver(kind, driver string) error {
 }
 
 func ValidateCapabilities(m *manifest.Monitor) error {
+	if cfg, ok := m.Pulse.Config.(*manifest.PulseICMPConfig); ok {
+		if _, err := icmpPrivileged(runtime.GOOS, cfg.Privilege); err != nil {
+			return err
+		}
+	}
 	if err := ValidateDriver("check", m.Pulse.Type); err != nil {
 		return err
 	}

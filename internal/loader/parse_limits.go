@@ -8,6 +8,9 @@ import (
 )
 
 func normalizedParseConfig(c ParseConfig) ParseConfig {
+	// Operational manifests have one strict contract. An omitted setting must
+	// not silently turn misspelled fields into ignored configuration.
+	c.StrictUnknownFields = true
 	if c.BatchSize <= 0 {
 		c.BatchSize = 1000
 	}

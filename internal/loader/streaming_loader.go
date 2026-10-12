@@ -89,7 +89,7 @@ func DefaultStreamingConfig() StreamingConfig {
 		ProgressInterval:    1 * time.Second,
 		GCInterval:          5 * time.Second,
 		MemoryLimit:         2 * 1024 * 1024 * 1024,
-		StrictUnknownFields: false,
+		StrictUnknownFields: true,
 		JSONUseNumber:       false,
 	}
 }

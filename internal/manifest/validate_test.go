@@ -42,7 +42,7 @@ func TestValidateMonitor(t *testing.T) {
 func TestValidateGroups(t *testing.T) {
 	valid := &Manifest{
 		Endpoints: map[string]Endpoint{
-			"ops_email": {Type: "email", Config: &CodeNotificationEmail{To: "ops@example.com"}},
+			"ops_email": {Type: "email", Config: &CodeNotificationEmail{To: "ops@example.com", From: "cpra@example.com", Server: "mail.example.com:587"}},
 		},
 		NotificationGroups: NotificationGroups{
 			"oncall": {"ops_email"},

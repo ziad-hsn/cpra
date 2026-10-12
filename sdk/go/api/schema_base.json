@@ -1931,8 +1931,14 @@
             "type": "string",
             "x-go-name": "Container"
           },
+          "operationTimeout": {
+            "$ref": "#/components/schemas/Duration",
+            "description": "Overall restart budget. Defaults to max(60s, stop grace + 20s). An explicit budget must permit the stop grace plus 20s.",
+            "x-go-name": "OperationTimeout"
+          },
           "timeout": {
             "$ref": "#/components/schemas/Duration",
+            "description": "Docker stop grace, independent of the total operation deadline.",
             "x-go-name": "Timeout"
           },
           "type": {
@@ -3032,10 +3038,29 @@
       },
       "PulseGRPCConfig": {
         "additionalProperties": false,
+        "description": "Omitted mode preserves TCP reachability. Health mode uses grpc.health.v1.Health/Check and requires SERVING, with TLS unless allowInsecure is explicitly true.",
         "properties": {
+          "allowInsecure": {
+            "description": "Permit cleartext for health mode explicitly; TLS is the default.",
+            "type": "boolean",
+            "x-go-name": "AllowInsecure"
+          },
+          "caFile": {
+            "description": "Optional PEM trust roots read by the server at check execution.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "host": {
             "type": "string",
             "x-go-name": "Host"
+          },
+          "mode": {
+            "enum": [
+              "tcp",
+              "health"
+            ],
+            "type": "string",
+            "x-go-name": "Mode"
           },
           "port": {
             "format": "int64",
@@ -3046,6 +3071,10 @@
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "type": "string",
+            "x-go-name": "ServerName"
           },
           "service": {
             "type": "string",

@@ -28,7 +28,7 @@ Set `pulse_check.type` and put driver-specific fields under `pulse_check.config`
 | `icmp` | ICMP reachability; OS privileges may be needed | default |
 | `dns` | DNS resolution | default |
 | `udp` | Send a payload and await a reply | default |
-| `grpc` | TCP port reachability only | default |
+| `grpc` | TCP reachability by default; explicit unary health mode | default |
 | `docker` | Inspect whether a container is running | default |
 | `tls` | TLS handshake and certificate-expiry thresholds | default |
 | `redis` | RESP PING, with optional authentication/database selection | `redis` |
@@ -38,7 +38,7 @@ Set `pulse_check.type` and put driver-specific fields under `pulse_check.config`
 | `rabbitmq` | AMQP connection/channel | `rabbitmq` |
 | `kafka` | Broker connection and metadata request | `kafka` |
 
-The `grpc` check does not call the gRPC health service; the `service` field does not add that behavior. UDP needs a payload and response. MongoDB requires `mongodb://`; SRV discovery with `mongodb+srv://` is rejected because its initial discovery cannot be bounded by the check deadline.
+The `grpc` check preserves TCP reachability when `mode` is omitted. With `mode: health`, it calls `grpc.health.v1.Health/Check` for the configured `service` and accepts only `SERVING`. An absent health RPC or unknown service fails; there is no TCP fallback. Health mode uses verified TLS by default; use `allow_insecure: true` only for explicitly selected cleartext targets. This follows the [gRPC health contract](https://grpc.io/docs/guides/health-checking/). UDP needs a payload and response. MongoDB requires `mongodb://`; SRV discovery with `mongodb+srv://` is rejected because its initial discovery cannot be bounded by the check deadline.
 
 TLS `warn_days` produces a yellow warning and degraded state without recovery. `critical_days` fails the check and follows the configured incident policy. Leave certificate verification enabled for normal use.
 
@@ -77,6 +77,13 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4
 | `count` | integer |
 | `retries` | integer |
 
+`ignore_privilege: true` selects UDP-based unprivileged ICMP on Linux or macOS.
+Linux must permit the service account's group in `net.ipv4.ping_group_range`.
+The default uses privileged mode; Windows requires that library mode even when
+the operating system does not require elevation. Other unprivileged platform
+combinations are rejected before dispatch. CPRa does not grant capabilities or
+change host settings. See the [pro-bing platform requirements](https://github.com/prometheus-community/pro-bing/tree/v0.9.1#supported-operating-systems).
+
 ### dns
 
 Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/manifest/manifest.go)
@@ -108,6 +115,28 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4
 | `port` | integer |
 | `service` | string |
 | `retries` | integer |
+| `mode` | `tcp` or `health`; omitted selects `tcp` |
+| `allow_insecure` | boolean; health mode only |
+| `server_name` | optional TLS server name; health mode only |
+| `ca_file` | optional PEM trust roots, at most 1 MiB; health mode only |
+
+```yaml
+monitors:
+  - name: billing-health
+    pulse_check:
+      type: grpc
+      interval: 60s
+      timeout: 5s
+      config:
+        host: billing.example.com
+        port: 443
+        mode: health
+        service: billing.v1.Billing
+```
+
+Validation checks the configuration without reading `ca_file` or making an RPC.
+The service identity must be able to read an explicitly configured CA file at
+execution. The check timeout bounds the whole RPC and its configured attempts.
 
 ### docker
 
@@ -213,7 +242,7 @@ Set `intervention.action` and put fields under `intervention.target`.
 | `systemd` | Restart a local systemd unit | `systemd` |
 | `a2a` | Request and observe an agent intervention | default; local candidate |
 
-Docker recovery always restarts the container; the schema's `type` field does not select start or stop operations. Omitting Docker `timeout` preserves the daemon's stop grace. For Kubernetes, use `kind` values `deployment`, `statefulset`, or `replicaset`. Omitting `replicas` requests a rollout restart; setting it requests scaling. Token, certificate, and in-cluster credentials are supported. Kubeconfig exec credential plugins are rejected.
+Docker recovery always restarts the container; the schema's `type` field does not select start or stop operations. Omitting Docker `timeout` preserves the daemon's stop grace. Its separate `operation_timeout` defaults to the larger of 60s and explicit stop grace plus 20s. An explicitly shorter overall budget is rejected. Interrupted operations retain an unknown outcome and are not repeated automatically. Kubernetes recovery currently supports `kind: deployment`. Omitting `replicas` requests a rollout restart; setting it requests scaling. Token, certificate, and in-cluster credentials are supported. Kubeconfig exec credential plugins are rejected.
 
 AWS supports `operation: reboot-instance`. Use the process's configured AWS credential chain. Systemd needs access to the host's system bus and permission for the unit operation.
 
@@ -228,6 +257,7 @@ Build: default. [Schema](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4
 | `type` | string |
 | `container` | string |
 | `timeout` | duration, such as 10s |
+| `operation_timeout` | overall duration, such as 60s |
 
 ### webhook
 

@@ -1,8 +1,11 @@
 package manifest
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 // Validate checks a manifest for semantic errors: required fields on each
@@ -38,6 +41,17 @@ func ValidateMonitor(m *Monitor) error {
 	if m.Pulse.Config == nil {
 		return fmt.Errorf("monitor %q: pulse_check.config is required", m.Name)
 	}
+	if err := validateDriverSettings("check", m.Pulse.Type, m.Pulse.Config); err != nil {
+		return fmt.Errorf("monitor %q pulse_check: %w", m.Name, err)
+	}
+	if m.Intervention.Action != "" {
+		if m.Intervention.Target == nil {
+			return fmt.Errorf("monitor %q intervention.target is required", m.Name)
+		}
+		if err := validateDriverSettings("recovery", m.Intervention.Action, m.Intervention.Target); err != nil {
+			return fmt.Errorf("monitor %q intervention: %w", m.Name, err)
+		}
+	}
 	if m.Intervention.Action == "a2a" {
 		cfg, ok := m.Intervention.Target.(*InterventionTargetA2A)
 		if !ok {
@@ -51,6 +65,11 @@ func ValidateMonitor(m *Monitor) error {
 		return fmt.Errorf("intervention max_attempts is outside the supported range")
 	}
 	for color, notification := range m.Codes {
+		if notification.Notify != "" && notification.NotifyGroup == "" {
+			if err := validateDriverSettings("notification", notification.Notify, notification.Config); err != nil {
+				return fmt.Errorf("monitor %q codes.%s: %w", m.Name, color, err)
+			}
+		}
 		switch notification.Trigger {
 		case "", "state_change":
 		case "recovery_failed", "recovery_exhausted":
@@ -111,6 +130,9 @@ func ValidateMonitor(m *Monitor) error {
 // defined group whose endpoints all exist.
 func validateGroups(m *Manifest) error {
 	for _, endpoint := range m.Endpoints {
+		if err := validateDriverSettings("notification", endpoint.Type, endpoint.Config); err != nil {
+			return fmt.Errorf("notification endpoint: %w", err)
+		}
 		if endpoint.Type == "a2a" {
 			cfg, ok := endpoint.Config.(*CodeNotificationA2A)
 			if !ok {
@@ -118,6 +140,13 @@ func validateGroups(m *Manifest) error {
 			}
 			if err := cfg.Validate(); err != nil {
 				return err
+			}
+		}
+	}
+	for _, endpoints := range m.NotificationGroups {
+		for _, name := range endpoints {
+			if _, ok := m.Endpoints[name]; !ok {
+				return fmt.Errorf("notification group references an undefined endpoint")
 			}
 		}
 	}
@@ -139,4 +168,24 @@ func validateGroups(m *Manifest) error {
 		}
 	}
 	return nil
+}
+
+// Normalize into the same inert schema used by the SDK and management API.
+// Provider secrets are never included in validation error messages.
+func validateDriverSettings(category, kind string, config any) error {
+	raw, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("driver configuration cannot be encoded")
+	}
+	if target, ok := config.(*InterventionTargetDocker); ok && target.OperationTimeout == 0 {
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal(raw, &fields)
+		delete(fields, "operation_timeout") // Zero selects the manifest default.
+		raw, _ = json.Marshal(fields)
+	}
+	normalized, err := api.NormalizeManifestDriver(category, kind, raw)
+	if err != nil {
+		return fmt.Errorf("driver configuration has unsupported fields or types")
+	}
+	return api.ValidateDriverSettings(category, api.DriverConfig{Type: kind, Config: normalized})
 }

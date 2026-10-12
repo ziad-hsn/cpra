@@ -15,6 +15,8 @@ endpoints:
     type: email
     config:
       to: ops@example.com
+      from: cpra@example.com
+      server: mail.example.com:587
   status_hook:
     type: webhook
     config:

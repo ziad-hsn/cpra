@@ -41,7 +41,7 @@ func validateProtectedDriver(category string, driver api.DriverConfig) error {
 	if err := validateDriverCredentialScope(driver); err != nil {
 		return err
 	}
-	if err := api.ValidateDriver(category, driver); err != nil {
+	if err := api.ValidateDriverSettings(category, driver); err != nil {
 		return errors.New("invalid or unsupported driver configuration")
 	}
 	var config map[string]json.RawMessage

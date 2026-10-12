@@ -172,6 +172,9 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 			return fmt.Errorf("manifest must contain one YAML document")
 		}
 	}
+	if err := manifest.Validate(&manifest.Manifest{Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}); err != nil {
+		return fmt.Errorf("invalid manifest metadata: %w", err)
+	}
 	if _, err := spool.Seek(0, io.SeekStart); err != nil {
 		return err
 	}

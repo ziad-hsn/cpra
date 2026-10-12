@@ -136,12 +136,17 @@ func (c *PulseUDPConfig) Copy() PulseConfig {
 
 func (*PulseUDPConfig) isPulseConfigs() {}
 
-// PulseGRPCConfig checks a gRPC endpoint via the standard health service.
+// PulseGRPCConfig checks TCP reachability by default. Health mode calls the
+// standard unary health service over verified TLS unless cleartext is explicit.
 type PulseGRPCConfig struct {
-	Host    string `yaml:"host" json:"host"`
-	Port    int    `yaml:"port" json:"port"`
-	Service string `yaml:"service" json:"service"`
-	Retries int    `yaml:"retries" json:"retries"`
+	Host          string `yaml:"host" json:"host"`
+	Port          int    `yaml:"port" json:"port"`
+	Service       string `yaml:"service" json:"service"`
+	Retries       int    `yaml:"retries" json:"retries"`
+	Mode          string `yaml:"mode" json:"mode,omitempty"`
+	AllowInsecure bool   `yaml:"allow_insecure" json:"allow_insecure"`
+	ServerName    string `yaml:"server_name" json:"server_name"`
+	CAFile        string `yaml:"ca_file" json:"ca_file"`
 }
 
 func (c *PulseGRPCConfig) Copy() PulseConfig {
@@ -648,7 +653,7 @@ func decodeDriverDurationsJSON(data []byte, target any) error {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-	for _, field := range []string{"timeout", "request_timeout", "task_timeout", "poll_interval"} {
+	for _, field := range []string{"timeout", "operation_timeout", "request_timeout", "task_timeout", "poll_interval"} {
 		if raw := fields[field]; len(raw) > 0 && raw[0] == '"' {
 			var text string
 			if err := json.Unmarshal(raw, &text); err != nil {
@@ -677,16 +682,18 @@ type InterventionTarget interface {
 }
 
 type InterventionTargetDocker struct {
-	Type      string        `yaml:"type" json:"type"`
-	Container string        `yaml:"container" json:"container"`
-	Timeout   time.Duration `yaml:"timeout" json:"timeout"`
+	Type             string        `yaml:"type" json:"type"`
+	Container        string        `yaml:"container" json:"container"`
+	Timeout          time.Duration `yaml:"timeout" json:"timeout"`
+	OperationTimeout time.Duration `yaml:"operation_timeout" json:"operation_timeout"`
 }
 
 func (i *InterventionTargetDocker) Copy() InterventionTarget {
 	return &InterventionTargetDocker{
-		Type:      strings.Clone(i.Type),
-		Container: strings.Clone(i.Container),
-		Timeout:   i.Timeout,
+		Type:             strings.Clone(i.Type),
+		Container:        strings.Clone(i.Container),
+		Timeout:          i.Timeout,
+		OperationTimeout: i.OperationTimeout,
 	}
 }
 

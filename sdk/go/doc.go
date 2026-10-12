@@ -2,8 +2,9 @@
 //
 // This unpublished candidate has local server integration for resource management,
 // controls, action review, operation reads, observations and bounded ephemeral
-// collection preflight. Resumable collections
-// and external-worker server integration remain unfinished. Discover the connected
+// collection preflight. Resumable collections and tagged external-worker server
+// integration have private implementation checks; release qualification is open.
+// Discover the connected
 // server's capabilities; a client method alone does not establish server support.
 //
 // # Getting started

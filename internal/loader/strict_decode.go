@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,7 +21,7 @@ func decodeJSONValue(decoder *json.Decoder, target any, strict bool) error {
 	if err := decoder.Decode(&raw); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(raw, target); err != nil {
+	if err := api.StrictDecode(raw, target); err != nil {
 		return err
 	}
 	// Parse JSON with its own escape rules before constructing validation nodes.
@@ -108,6 +109,7 @@ func knownFields(node *yaml.Node, value reflect.Value, path, format string, dept
 	if err != nil {
 		return err
 	}
+	seenFields := make(map[int]bool)
 	for n := 0; n < len(entries); n += 2 {
 		key, child := entries[n], entries[n+1]
 		childPath := path + "." + key.Value
@@ -127,6 +129,10 @@ func knownFields(node *yaml.Node, value reflect.Value, path, format string, dept
 			if !ok {
 				return fmt.Errorf("unknown configuration field %q", strings.TrimPrefix(childPath, "."))
 			}
+			if seenFields[index] {
+				return fmt.Errorf("duplicate configuration field %q", strings.TrimPrefix(childPath, "."))
+			}
+			seenFields[index] = true
 			if err := knownFields(child, value.Field(index), childPath, format, depth+1); err != nil {
 				return err
 			}

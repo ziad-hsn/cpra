@@ -7,7 +7,7 @@ import (
 )
 
 func TestRecoveryNotificationManifestPolicy(t *testing.T) {
-	input := []byte(`{"name":"test","pulse_check":{"type":"http","interval":"60s","timeout":"5s","config":{"url":"https://test.example"}},"intervention":{"action":"docker","max_attempts":2,"target":{"container":"designated-test"}},"codes":{"red":{"trigger":"recovery_exhausted","notify":"log","config":{"file":""}}}}`)
+	input := []byte(`{"name":"test","pulse_check":{"type":"http","interval":"60s","timeout":"5s","config":{"url":"https://test.example"}},"intervention":{"action":"docker","max_attempts":2,"target":{"container":"designated-test"}},"codes":{"red":{"trigger":"recovery_exhausted","notify":"log","config":{"file":"fixture.log"}}}}`)
 	for _, decode := range []func([]byte, any) error{json.Unmarshal, yaml.Unmarshal} {
 		var monitor Monitor
 		if err := decode(input, &monitor); err != nil {

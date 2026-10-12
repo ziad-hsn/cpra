@@ -89,6 +89,9 @@ func Preflight(ctx context.Context, operations Operations, frozen *Frozen) (*api
 	}
 	encodedBytes := len(initial)
 	err = frozen.Range(ctx, func(item Item) error {
+		if err := api.ValidateResourceSettings(item.Resource); err != nil {
+			return fmt.Errorf("%s: %w", item.Location, err)
+		}
 		value := applyItem(item)
 		raw, err := json.Marshal(value)
 		if err != nil {
@@ -158,6 +161,14 @@ func Apply(ctx context.Context, operations Operations, frozen *Frozen) (Result, 
 	}
 	if operations == nil {
 		return Result{}, fmt.Errorf("operations client is required")
+	}
+	if err := frozen.Range(ctx, func(item Item) error {
+		if err := api.ValidateResourceSettings(item.Resource); err != nil {
+			return fmt.Errorf("%s: %w", item.Location, err)
+		}
+		return nil
+	}); err != nil {
+		return Result{}, err
 	}
 	if request.AdmissionTicket == "" {
 		prepared, err := operations.Prepare(ctx, api.CollectionPrepareRequest{IdentityFormat: api.CollectionPrepareRequestIdentityFormat(request.IdentityFormat), IdentityKey: request.IdentityKey, SourceFingerprint: request.SourceFingerprint, ContentDigest: request.ContentDigest, ItemCount: request.ItemCount, NormalizationProfile: request.NormalizationProfile})

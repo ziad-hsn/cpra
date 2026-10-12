@@ -152,6 +152,9 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 	if _, err := decoder.Token(); err != io.EOF {
 		return nil, nil, fmt.Errorf("unexpected trailing JSON data")
 	}
+	if err := manifest.Validate(&manifest.Manifest{Endpoints: endpoints, NotificationGroups: groups}); err != nil {
+		return nil, nil, fmt.Errorf("invalid manifest metadata: %w", err)
+	}
 	return endpoints, groups, nil
 }
 

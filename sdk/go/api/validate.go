@@ -94,8 +94,11 @@ func ValidateResourceValue(v any) error {
 	if err != nil {
 		return err
 	}
-	_, err = DecodeResource(raw)
-	return err
+	r, err := DecodeResource(raw)
+	if err != nil {
+		return err
+	}
+	return ValidateResourceSettings(r)
 }
 
 // ValidateResource checks a resource envelope, spec, and selected driver shapes.
@@ -270,6 +273,10 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 		k := strings.Split(t.Field(i).Tag.Get("json"), ",")[0]
 		names[strings.ToLower(strings.ReplaceAll(k, "_", ""))] = k
 	}
+	if category == "check" && kind == "icmp" {
+		// Existing JSON manifests use the Go field name; YAML uses the tag.
+		names["privilege"] = "ignorePrivilege"
+	}
 	result := map[string]json.RawMessage{}
 	for k, v := range fields {
 		n, ok := names[strings.ToLower(strings.ReplaceAll(k, "_", ""))]
@@ -279,7 +286,7 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 		if _, exists := result[n]; exists {
 			return nil, errors.New("duplicate normalized driver field")
 		}
-		if (n == "timeout" || n == "requestTimeout" || n == "taskTimeout" || n == "pollInterval") && len(v) > 0 && v[0] != '"' && string(v) != "null" {
+		if (n == "timeout" || n == "operationTimeout" || n == "requestTimeout" || n == "taskTimeout" || n == "pollInterval") && len(v) > 0 && v[0] != '"' && string(v) != "null" {
 			var nanos int64
 			if err := json.Unmarshal(v, &nanos); err != nil {
 				return nil, err

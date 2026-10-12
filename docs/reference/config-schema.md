@@ -1,15 +1,20 @@
 ---
 title: Monitor configuration
 description: Configure CPRa YAML manifests, check thresholds, alert groups, maintenance windows and recovery targets.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for implementation and
+qualification boundaries.
 
 
 # Monitor configuration
 
-Pass a YAML or JSON monitor manifest to `cpra -yaml PATH`. `-config` is an alias for the same manifest; it does not select a separate server-settings file. Configuration is loaded at startup. Changes require restarting the process.
+Pass a YAML or JSON monitor manifest to `cpra -yaml PATH`. `-config` is an alias
+for the same manifest. `-runtime-config` selects separate server/storage settings.
+Management imports its configured bootstrap manifest once; later edits use
+explicit [apply operations](../cpractl-management.md). Source files do not reload
+automatically. File-only operation reconciles its manifest at startup.
 
 ## A complete minimal manifest
 
@@ -40,6 +45,7 @@ monitors:
 
 | Field | Meaning |
 | --- | --- |
+| `id` | Optional stable monitor identity. Keep it across renames; otherwise identity derives deterministically from `name`. Duplicate effective IDs are rejected. |
 | `name` | Required monitor name; use a descriptive name you can search for. |
 | `enabled` | Whether the monitor runs; defaults to true when omitted. |
 | `tags` | Optional list of labels attached to the monitor. |
@@ -53,7 +59,10 @@ monitors:
 | `intervention` | Optional recovery action and target. |
 | `maintenance` | Optional scheduled suppression windows. |
 
-Use the threshold fields above for new configurations. Legacy `max_failures` and per-driver `retries` fields are compatibility inputs, not a promise to replay a recovery action. Consult the [incident lifecycle](../explanation/incident-lifecycle.md) for the actual behavior.
+Use the threshold fields above for new configurations. Accepted `max_failures`
+and per-driver `retries` inputs do not grant permission to repeat ambiguous
+external actions. Consult the [incident lifecycle](../explanation/incident-lifecycle.md)
+for attempt limits, provider rejection and verification behavior.
 
 ## Alert destinations and groups
 
@@ -113,12 +122,24 @@ intervention:
     timeout: 10s
 ~~~
 
-`recovery.example.com` is a placeholder. CPRa admits one recovery operation per incident; a timeout can leave the external result unknown. The target object is named `target`, not `config`. [Recovery fields](jobs-reference.md#recovery-actions)
+`recovery.example.com` is a placeholder. The per-incident recovery attempt limit
+defaults to one. A timeout can leave the external result unknown and held across
+restart. The manifest field is `target`, not `config`.
+[Recovery fields](jobs-reference.md#recovery-actions)
 
 ## Parsing and limits
 
 YAML monitors must be a block sequence. Each monitor entry and metadata section has a 1 MiB limit. JSON is decoded incrementally. Both paths have a decompressed-input budget; streaming does not make memory use independent of monitor count.
 
-Missing, malformed, and semantically invalid manifests fail startup. An empty manifest requires `-allow-empty`. The programmatic streaming loader has an optional strict unknown-field mode; the server does not expose a `--strict` flag.
+Missing, malformed, and semantically invalid manifests fail startup. Unknown
+fields, duplicate keys, wrong types, required-setting omissions and unavailable
+compiled/platform drivers are rejected. An empty manifest requires
+`-allow-empty`. `cpra -validate` performs static validation without opening
+storage, constructing operational clients or contacting providers.
 
-Treat configuration as trusted input: it authorizes outbound requests, notifications, and actions with the process account's permissions. Keep credentials in private manifests and token files.
+Configuration authorizes outbound requests, notifications and actions with the
+process account's permissions. In management mode, use protected Credential
+resources and references rather than embedding values in shared manifests.
+Operators with credential-use/configuration permissions are trusted to select
+destinations. Keep bearer tokens and wrapping keys in protected files outside
+the state directory; include retained keys separately in your backup procedure.

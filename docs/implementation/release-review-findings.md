@@ -86,3 +86,28 @@ External prerequisites remain native runners for every claimed OS/architecture,
 private staging infrastructure, configured provider accounts/designated targets,
 and sufficient measured physical host disk for the comparative campaign. No
 24-hour endurance run is included.
+
+## Current implementation status, 2026-10-13
+
+The baseline table above retains the supplied review's original evidence. This
+status summarizes repair work and its limits; local checks do not close the
+final source, platform, provider or publication gates.
+
+| Findings | Current disposition |
+| --- | --- |
+| F01–F09 | Protected initialization, current quickstart, episode/cooldown/maintenance policy, verification wording, safe diagnostics, unknown HTTP effects, Docker budgets and strict validation are implemented with focused regressions. Complete process/provider qualification remains open. |
+| F10–F12 | Linux generation retirement/restart/pin tests pass; lazy allocation is preserved; Windows initial mapping is 64 MiB. Native macOS/Windows retirement implementation/execution, footprint/growth and full backup/corruption qualification remain open. |
+| F13–F16 | Corrections/rejected reset recommendation stand. Approved collections/worker features and historical formats remain; explicit nested-module and build-tag qualification still needs the frozen source. |
+| F17–F21, F41–F42 | Host/origin, bootstrap warning, profiling restrictions, token length/throttling, CSP and trusted-operator boundaries are implemented. Default real-server browser evidence and focused local security checks exist; remaining matrix/native service evidence and final security review remain open. |
+| F22–F27, F51–F52 | Current/historical documentation boundaries, security/contribution/conduct material and artwork licensing are implemented. Main-navigation runtime guides are refreshed. Public module installation, complete packaged notices, native distribution and release identity still require final qualification/promotion. Unrelated remote branches remain untouched. |
+| F28–F31, F43, F46–F50 | Descriptive interfaces, observations, problem details, discovery, headings, percentages and missing routes are repaired. Current automated fixture accessibility/keyboard checks pass; they are distinct from real-server and native browser evidence. Final-source matrix/review coverage remains open. |
+| F32–F36 | Redirect/proxy defaults remain intentional. Correlated PagerDuty/Opsgenie, privilege-mode ICMP and explicit gRPC health behavior have production-path fixture coverage. Account effects and native service-identity checks remain unverified. |
+| F37 | Permanent failure remaining unavailable is intentional; stopped repair/restore is documented. It is not permission to delete state or reopen it speculatively. |
+| F38–F40 | Application/pool/Raft diagnostics and caller/color corrections passed finite source review; the resulting typed-nil regression is reproduced and closed. Owner deadline waiting passed finite source review and short paired CPU measurements. Broader logging coverage and frozen performance qualification remain separate. |
+| F44 | The executable selects the Store-backed owner; nil-Store internal tests still exercise the old batch/alert path. Production/tag reachability and meaningful regression migration must be completed before removal. No code is deleted on a line-count argument. |
+| F45 | The documented 45-minute budget remains. A full development persistence run completed with one guard failure; that guard/digest correction passed focused tests/review. A complete corrected frozen-source matrix is still required. |
+| F53–F56 | Health/write-recovery separation, synchronous accepted-prefix grouping, exact non-admission handling and original-operation continuation are implemented. Worker demand refresh remains active, including after idle-loop changes. Full import/contention/interruption campaigns remain open. |
+
+Exact checkpoint identities, failed runs, scoped passing checks and independent
+review dispositions are retained in [repair progress](release-repair-progress.md)
+and the dated implementation records linked from it.

@@ -1,10 +1,11 @@
 ---
 title: Architecture
-description: How CPRa connects its ECS controller, check and recovery workers, notifications and read-only snapshots.
-cpra_scope: main
+description: How CPRa commits configuration and lifecycle state, schedules work and serves management and observation clients.
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for the current implementation,
+qualification and publication boundaries.
 
 
 # Architecture
@@ -12,15 +13,17 @@ cpra_scope: main
 One CPRa process owns an Entity-Component-System (ECS) world and three job pipelines. The controller schedules work and consumes results; job workers perform network or local operations.
 
 ~~~text
-Manifest → validation and entities → controller schedules work
+Manifest or management apply → validation → committed configuration
+                                                ↓
+                                     controller projection
                                       ↓
                            pulse / intervention / code
                                       ↓
                               queues and workers
                                       ↓
-                          results update monitor state
+                          results commit monitor state
                                       ↓
-                           snapshots → API / dashboard
+                       incremental view → API / CLI / dashboard
 ~~~
 
 ## The three pipelines
@@ -31,24 +34,56 @@ Manifest → validation and entities → controller schedules work
 | Intervention | Perform an admitted recovery action. |
 | Code | Deliver configured incident notifications. |
 
-Each pipeline has a queue and a worker pool. Separating work prevents slow target I/O from becoming controller state mutation inside each network call. Result application remains coordinated by the controller.
+Each pipeline has a queue and a worker pool. Workers perform external I/O on
+private job copies. Incident transitions and action intent commit before
+dispatch; an external action's started marker commits before invocation.
+Results return to the controller owner for committed projection updates.
 
 ## Scheduling and state
 
-The loader validates YAML or JSON and creates monitor entities and their components. Schedulers identify work that is due; result systems update health, incident, and notification state.
+The controller owner alone reads and changes the Ark ECS world. Raft applies
+serializable commands without executable jobs, contexts, channels or provider
+calls. The operational projection rebuilds jobs from configuration after restart.
+Interrupted started actions become unknown and are held; health checks resume.
 
-Configuration is loaded before startup. Live reload and runtime queue migration are unsupported. A startup entity-count threshold can select the queue type before workers begin.
+Management mode imports its configured bootstrap manifest once. Subsequent
+changes use explicit API, CLI, SDK or dashboard operations; editing a source
+file does not reload it. Configuration revisions fence queued work from changed
+targets. See [configuration management](../cpractl-management.md).
 
-## Read-only inspection
+Scheduling uses timing-wheel buckets and overflow deadlines. The owner waits
+until the next scheduling or operational deadline when idle, with a one-second
+progress fallback. Committed-state changes, worker results and prepared
+configuration wake it. Ready work retains the configured update interval;
+wakeups carry hints, not permission to execute or mutable ECS state.
 
-A snapshot system publishes an immutable fleet projection every five seconds by default. The API and dashboard read this projection rather than changing the ECS world. Queue and pool telemetry expose worker demand, capacity, observations, and model state.
+## Management and inspection { #read-only-inspection }
 
-Snapshot generation scans the fleet. Above the detailed-index limit, aggregate counts remain available, but detailed monitor and incident lists return unavailable. The index limit is not an independently verified fleet-capacity claim.
+Named operators manage monitors, notification contacts/groups, protected
+credentials and incident controls through authenticated v2 operations. Reader
+identities observe their granted resources. HTTP handlers never mutate the ECS
+world directly. Probe requests inspect process/storage/controller health and
+perform no provider operations.
+
+An incremental index publishes immutable monitor rows as committed state
+changes. API filtering and serialization run outside the owner loop, and normal
+pages construct only the requested rows. History, queue saturation, worker
+capacity and measured SLO windows have separate bounded observations. This
+architecture alone does not establish a measured fleet-capacity claim.
 
 ## Concurrency and lifecycle
 
-Go contexts and deadlines bound supported operations. Shutdown stops the web server before draining the controller. Queues and workers have explicit ownership of completion and cancellation.
+Go contexts and deadlines bound supported operations. Shutdown rejects new
+admission, drains or cancels accepted work while diagnostics remain available,
+commits known outcomes and closes dependencies. Ambiguous external effects
+remain held. Queues, background preparation and workers have explicit completion
+and cancellation owners.
 
-CPRa coordinates within one process. It does not provide leader election, cross-instance locks, a persistent incident database, or multi-tenant hosted operation.
+Single-node Raft restores committed state, with an exclusive lock protecting
+the selected data directory. Thirty-day incident/action history lives alongside
+it and belongs in a complete stopped backup. Separate data directories do not
+coordinate one fleet, and single-node Raft provides no distributed failover.
+Configuration operators are trusted to choose provider destinations; CPRa does
+not provide multi-tenant credential/destination isolation.
 
 [Worker sizing](queueing-theory.md) · [Incident lifecycle](incident-lifecycle.md) · [Source layout](../developer-guide.md)

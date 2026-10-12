@@ -23,7 +23,9 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `dashboard/src/components/OperationsList.tsx` | [Source](source/dashboard/src/components/OperationsList.tsx.txt) | `6894dd72aec2df2a95083ca4a9d41b13cad28d1cac1a5ed21f2de81253b17e79` |
 | `dashboard/src/import/README.md` | [Source](source/dashboard/src/import/README.md.txt) | `a44a3be9f0273cc2b8f1d497d788e14b9c5a35daa361d6d4e1cc6d240c98192e` |
 | `dashboard/src/pages/OperationDetail.tsx` | [Source](source/dashboard/src/pages/OperationDetail.tsx.txt) | `016ce61243e60c20678dd8278f101a4aa86ac77dde8222a7d81f7e589739caad` |
-| `internal/controller/systems/catalog_runtime.go` | [Source](source/internal/controller/systems/catalog_runtime.go.txt) | `50b6afa835ef5ee755fb4abab737bafd19acb78209c018358771c084b2ae9e17` |
+| `internal/controller/controller.go` | [Source](source/internal/controller/controller.go.txt) | `5108d59794b3d538a6b15cdb2b0ddd223762afaa37957d8f3917d43881669f7e` |
+| `internal/controller/systems/catalog_runtime.go` | [Source](source/internal/controller/systems/catalog_runtime.go.txt) | `84bfebe2e466d2325774937a2d619b295c5f4cf46e8f4896bc251f391bea8d86` |
+| `internal/controller/systems/owner_wait.go` | [Source](source/internal/controller/systems/owner_wait.go.txt) | `a27e400d8cd77f24ecd49accfcc906f2c142a5c3601d6781fae5e3198a473acb` |
 | `internal/httpauth/worker_external.go` | [Source](source/internal/httpauth/worker_external.go.txt) | `c53ea0fac6cf98b30981c2caf0ba0584ba5592d91e799c8d30adfc18e49bd6e7` |
 | `internal/httpserver/extensions_external.go` | [Source](source/internal/httpserver/extensions_external.go.txt) | `26a5446292dea8c33f31a313b54bf76617522e1b078d4722506cc0fb79dfa509` |
 | `internal/httpserver/management_collection_execution.go` | [Source](source/internal/httpserver/management_collection_execution.go.txt) | `98f75f34be890a8c5c09a7c4c132c832a5b349b8bdf0276f63ba69ca88af0c59` |
@@ -65,10 +67,11 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/management_operation_view.go` | [Source](source/internal/persistence/management_operation_view.go.txt) | `b5f3bb3a55346bb7750c97e683b0fa4c3b4f9266877f1419d8519e6b2ada149c` |
 | `internal/persistence/model.go` | [Source](source/internal/persistence/model.go.txt) | `31b496ed020f96a1b4b44c135cff7e2fcdb018775bcf48fc1075022a51e7fca7` |
 | `internal/persistence/restore_reset.go` | [Source](source/internal/persistence/restore_reset.go.txt) | `88722ce69bca5f6ab85b2f6aa45e74473ccb3b72498399759bf0ee3d9b7fbd86` |
-| `internal/persistence/store.go` | [Source](source/internal/persistence/store.go.txt) | `9552f5bab07d2706654f67b72294e301fcd9fc9599dff82ffd8cedea118b89ad` |
+| `internal/persistence/store.go` | [Source](source/internal/persistence/store.go.txt) | `87dba08c451c7c1307f339ad35f808348652e2cb839f73bb592a0cd890a789cc` |
 | `internal/persistence/worker_authority_external.go` | [Source](source/internal/persistence/worker_authority_external.go.txt) | `890ab7ea9ea1389c586616223ed19ab8c8cf1f04dd32d43e52411728914b01f4` |
 | `internal/persistence/worker_policy_external.go` | [Source](source/internal/persistence/worker_policy_external.go.txt) | `75e6c5376ad97c56adb1ae73a3617df5fd060c45e491e4a4384fbf9f56060731` |
 | `internal/runtimeconfig/extensions_external.go` | [Source](source/internal/runtimeconfig/extensions_external.go.txt) | `d03b9c8ce4b1f75c8cae6ad53e532d99e3ffb200881223435391c8dac6d3a835` |
+| `internal/scheduler/scheduler.go` | [Source](source/internal/scheduler/scheduler.go.txt) | `ce92d41227993aaa3340490dcce62cc7828ffa4c7d6632718d2c9fcf2137fc50` |
 | `main_externaljobs.go` | [Source](source/main_externaljobs.go.txt) | `bad710999db478f05d3a6b5ba9fddf6b90777602c764064c93b96fc12b39194c` |
 | `scripts/packaging/helm_management.py` | [Source](source/scripts/packaging/helm_management.py.txt) | `237e176af881a42f1d1a5b453f9aa087596dbe6afd724867f5caaf9974083eb5` |
 | `scripts/release/chart.py` | [Source](source/scripts/release/chart.py.txt) | `147c977c21deee9ddb5646adc48bce6d34fc6e762232b08149186d65b34f1dfe` |

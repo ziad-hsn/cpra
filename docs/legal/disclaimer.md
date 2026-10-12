@@ -1,17 +1,22 @@
 ---
 title: License and project scope
 description: CPRa is free software under MIT, with dependency notices and a defined single-process operational scope.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for implementation and
+qualification boundaries.
 
 
 # License and project scope
 
-CPRa is free software under the [MIT license](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/LICENSE). The repository license states its permissions, notice requirements, and warranty terms.
+CPRa application code is free software under the MIT license. The LICENSE
+included with the selected source or distribution states its permissions,
+notice requirements and warranty terms.
 
-The embedded dashboard has [dependency notices](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/LICENSES/dashboard.txt). Packaged binaries include dependency notices for their selected build.
+The embedded dashboard includes dependency notices. Packaged binaries include
+target-specific dependency notices; third-party license obligations remain
+separate from CPRa's code and artwork licenses.
 
 CPRa-authored artwork by Ziad Hassan is licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), with credit and an

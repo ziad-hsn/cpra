@@ -141,7 +141,7 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	if err != nil {
 		return nil, err
 	}
-	s.fsm = &machine{image: image{Version: FormatVersion, Monitors: make(map[string]Monitor)}, history: h}
+	s.fsm = &machine{image: image{Version: FormatVersion, Monitors: make(map[string]Monitor)}, history: h, controllerWakeups: make(chan struct{}, 1)}
 	s.fsm.publishControllerHealth()
 	if config.Storage.Mode == "raft" {
 		s.fsm.collectionDirectory = filepath.Join(config.Storage.Directory, "collections")

@@ -17,7 +17,7 @@ independent review. Failed reproductions and intermediate failures are retained.
 | 4. Storage | Store-owned completed-generation catalog, atomic reader/snapshot pins and Linux native retirement are integrated. Current/previous completed generations remain protected; retirement catalog publication precedes removal of the durable deletion intent. Sampled path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping is 64 MiB. Linux retention, restart, process interruption, publication failure and focused race checks pass. Existing lazy allocation, authenticated stopped backup/restore and synchronous writes remain. | Native macOS/Windows retirement implementation and execution; complete allocated-size accounting and Windows growth/footprint evidence; full backup/restore and corruption matrix after these changes; independent review. |
 | 5. Access | Go-based `local init --management`, exclusive protected files and localhost CA/leaf certificate; system token-output separation; mode-aware service arguments; minimum 32 printable token characters; explicit access discovery; ignored-bootstrap warning; loopback Host/origin guards; profiling cmdline removal; bounded failed-authentication throttling with 401/Retry-After; CSP/security headers. Local initialization, API/authentication and real application start/create/restart checks pass. Dashboard type checking, lint and tests pass across the full run and focused fixture repairs. | Remaining compiler/tag browser matrix, native system service/ACL checks, trusted-operator documentation and final security review. Current embedded rebuild and required Go1.27.1/default browser campaign pass. |
 | 6. Drivers/configuration | File parsers always reject unknown fields and duplicate JSON keys. Shared static driver settings validate required destinations, ranges, gRPC mode and Docker budgets in manifests, management and SDK preflight/new apply, while original-input normalization stays byte-compatible. gRPC health mode uses verified TLS by default, the configured service and SERVING-only success. Docker has separate stop grace and operation budgets. ICMP selects supported privilege mode or rejects the platform. PagerDuty/Opsgenie correlation, closure and severity fixtures pass. Complete jobs/manifest/loader/SDK API/collection suites and focused management checks pass. | Native service-identity ICMP checks; complete driver/provider and process campaign; independent review. |
-| 7. Interfaces/diagnostics | Version and canonical schema explanation routes implemented and authorized; SDK inventory and access discovery generated from canonical inputs; unavailable source time remains omitted. Dashboard primary headings, missing routes, empty/filtered/out-of-range page wording, compact health label and controller terminology repaired. CLI monitor lists show observed health; human describe renders safe summary fields and explicit unavailable times/counts. Terminal controls are escaped in table/key-value cells; safe check/action diagnostics are shown consistently. Raft/pool and committed incident/action diagnostics use the application logger with safe fields and corrected caller attribution. | Remaining browser/compiler/tag matrix and dead-path audit. Source review found a typed-nil pool logger regression; reproduced and repaired, with re-review required. Safe problem reporting and final dashboard correction passed source review. Measured result-shard idle polling repair passed tests and review; owner-loop wakeups remain a separate open change. |
+| 7. Interfaces/diagnostics | Version and canonical schema explanation routes implemented and authorized; SDK inventory and access discovery generated from canonical inputs; unavailable source time remains omitted. Dashboard primary headings, missing routes, empty/filtered/out-of-range page wording, compact health label and controller terminology repaired. CLI monitor lists show observed health; human describe renders safe summary fields and explicit unavailable times/counts. Terminal controls are escaped in table/key-value cells; safe check/action diagnostics are shown consistently. Raft/pool and committed incident/action diagnostics use the application logger with safe fields and corrected caller attribution. Result-shard timers and owner deadline waiting reduce measured idle CPU. | Remaining browser/compiler/tag matrix and dead-path audit. Source re-review closed the typed-nil pool correction and finite owner-waiting implementation. The short local CPU comparison is separate from fleet capacity and frozen release qualification. |
 | 8. Materials/qualification | README begins with protected management initialization. Private compiler/frontend tools installed from recorded checksums. CC BY 4.0 artwork license, Ziad Hassan attribution and separate name-use note added, with archive/package/image/dashboard notice inputs. Security reporting, contribution and conduct guidance added. | Remaining documentation consolidation, generated assets/notices and packaging verification, final source freeze and all release gates. |
 
 ## Recorded local checks
@@ -350,3 +350,36 @@ The refreshed private documentation build renders 167 content pages and 16
 redirects. It checks 29,409 internal links/assets with no errors, and the later
 source-copy check agrees with its preview. The separate documentation checkout
 and public site remain untouched.
+
+Source re-review closed the typed-nil correction at `fdb6b14` and found no
+concrete defect in the finite owner-waiting change at `748fe4d`. Deadline/wakeup
+tests, default/tagged complete controller/system/scheduler/queue suites and
+focused race checks pass. Go 1.25 passed three packages but failed a maintenance
+fixture that crossed the wall-minute boundary during initialization. Its controlled
+one-shot boundary passes three repeats and the complete system rerun; the failed
+run remains failed evidence.
+
+The short owner-wait comparison completed twelve process measurements: empty
+CPU averaged 8.43% to 4.80% of one core; one HTTP monitor at 60-second cadence
+averaged 9.00% to 4.17%. All empty measurement windows received zero requests,
+all one-monitor windows received one, and all processes stopped cleanly. Normal
+builds, exact source/input and executable identities, host interference and
+measurement limits are recorded in the [dated observation](owner-wait-observation-2026-10-13.md).
+This is not the comparative fleet campaign or an endurance result.
+
+Six primary user guides now describe current architecture, explicit apply,
+strict validation, durable recovery, measured SLO feedback and protected access
+instead of the old main preview. The strict private build renders 168 content
+pages plus 16 redirects, checks 29,521 internal links/assets and reports no
+errors. Twenty-five documentation-tool tests pass. Selected source references
+were regenerated from the working implementation; the preceding implementation
+commit in source metadata is not a release freeze.
+
+The frontend accessibility campaign initially failed before sign-in because
+its HTTP fixture did not implement the new access discovery response. Adding
+the management/authentication-required response repairs the fixture. Fifteen
+automated browser scans, keyboard/dialog checks and thirty dashboard-tool tests
+pass. This campaign explicitly uses fixture responses, invokes no providers,
+and does not replace the real-server browser/compiler/tag campaigns or establish
+full WCAG conformance. The failed artifact is retained. Independent source
+review of this fixture and documentation correction remains required.

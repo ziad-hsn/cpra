@@ -1,10 +1,11 @@
 ---
 title: Worker sizing and queueing
 description: The runtime Erlang C and Allen–Cunneen model, observed variability, headroom, fallback and capacity limits in CPRa.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for implementation and
+qualification boundaries.
 
 
 # Worker sizing and queueing
@@ -24,7 +25,10 @@ The runtime `desiredCapacity` path calls `FindCForSLO`, using Erlang C with an A
 
 The queue retains the latest 256 arrival-interval observations; the pool retains the latest 256 execution-time observations. Missing variability uses the M/M/c baseline of one. A measured zero remains a valid observation.
 
-The pool prefers an external demand estimate when available, then queue enqueue and dequeue rates. It uses observed service time when available and startup estimates otherwise.
+The pool prefers an external demand estimate when available, then queue enqueue
+and dequeue rates. The controller refreshes configured check demand after
+management changes, disable/enable and snooze/unsnooze. It uses observed service
+time when available and startup estimates otherwise.
 
 ## Mean waiting time
 
@@ -57,10 +61,32 @@ The result is then bounded by minimum and maximum workers, limited to twofold gr
 
 The fallback uses offered load `λτ` with headroom. When the maximum worker count is the constraint, the pool requests that maximum, still subject to growth limits. When the latency target cannot accommodate service time itself, additional workers cannot make that target feasible.
 
+## Percentile observations and feedback
+
+The mean model provides an initial recommendation. Separately, bounded rolling
+histograms and exact threshold counters observe scheduling-plus-queue delay,
+execution time and scheduled-to-committed-result latency. Five-minute windows
+report p50/p95/p99, sample coverage, missed work, timeouts and threshold
+attainment. The default health-check targets are 250 ms queue delay and five
+seconds to committed result. Missing coverage is not success.
+
+Feedback evaluates recent observations every five seconds over a 30-second
+control window, requiring at least 1,000 observations. Queue delay with queued
+work can raise capacity within the existing bounds and twofold growth limit.
+Reduction requires a 60-second healthy hold, is limited to 10% per adjustment,
+and stays above the model recommendation. Downstream/controller limitations
+are reported where adding workers cannot address them. See [SLO definitions](../slo.md).
+
 ## What the model does not prove
 
-This is a mean-latency approximation, not a p95 or p99 guarantee. Network failures, correlated bursts, slow targets, scheduling work, and resource contention can differ from its assumptions. Measure your workload and inspect target saturation before increasing worker limits.
+The analytical recommendation remains a mean-latency approximation. Observed
+percentiles are measurements of covered work, not future guarantees or a
+contractual SLA. Network failures, bursts, slow targets, scheduling and resource
+contention can differ from the model's assumptions. Measure the workload and
+inspect target saturation before increasing worker limits.
 
-The current release review observed the model in a running process. It did not establish a million-monitor capacity benchmark or a long-duration production soak result.
+Focused runtime tests and short idle observations are development evidence.
+The agreed comparative fleet campaign remains outstanding; the 24-hour run is
+canceled. Neither source design nor helper benchmarks qualify fleet capacity.
 
-[Runtime implementation](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/queue/dynamic_worker_pool.go) · [Sizing mathematics](https://github.com/ziad-hsn/cpra/blob/51a835a29f2fb7af2e0301910042a52e308cbb24/internal/queue/sizing.go)
+[Capacity and diagnostics](../how-to/performance-tuning.md) · [SLO measurements](../slo.md)

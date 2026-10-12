@@ -34,4 +34,5 @@ retained separately from the corrected passes. Source review found a typed-nil
 standard logger startup regression at the new interface boundary. Constructor
 normalization and optional-output guards repair it; the failing reproduction,
 complete queue suite, focused race checks and minimum-Go checks are recorded.
-Re-review of this correction and final-source qualification remain required.
+Source re-review at `fdb6b14` closed that correction with no further concrete
+finding in its finite scope. Final-source qualification remains required.

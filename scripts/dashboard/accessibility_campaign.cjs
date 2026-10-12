@@ -77,6 +77,7 @@ const secret = 'frontend-fixture-private-value-0123456789';
     if (!url.pathname.startsWith('/api/')) return route.continue();
     const reply = (body, status = 200, headers = {}) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers });
     const name = url.pathname;
+    if (name === '/api/v2/access' && request.method() === 'GET') return reply({ mode: 'management', authenticationRequired: true });
     if (name === '/api/v2/self') return request.headers().authorization === `Bearer ${token}` ? reply({ principalId: 'frontend-fixture', role: 'operator', permissions }) : reply({}, 401);
     if (name === '/api/v2/discovery') return reply({ apiVersions: ['cpra.io/v2'], drivers: { check: ['http', 'tcp'], recovery: ['webhook'], notification: ['webhook'] }, resources: [], patchTypes: ['application/merge-patch+json'] });
     if (request.method() !== 'GET') {

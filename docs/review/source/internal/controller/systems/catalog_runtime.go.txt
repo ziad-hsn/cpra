@@ -45,6 +45,7 @@ type catalogRuntime struct {
 	cursor    persistence.CatalogCursor
 	known     map[string]bool
 	updates   chan catalogProjection
+	wakeup    chan<- struct{}
 	cancel    context.CancelFunc
 	ctx       context.Context
 	done      chan struct{}
@@ -63,7 +64,7 @@ func (s *DurableSystem) LoadCatalog(ctx context.Context, catalog *management.Cat
 	if err != nil {
 		return err
 	}
-	r := &catalogRuntime{catalog: catalog, config: s.config, store: s.store, mapper: mapper, cursor: view.ChangeCursor(), known: map[string]bool{}, updates: make(chan catalogProjection, 1), done: make(chan struct{})}
+	r := &catalogRuntime{catalog: catalog, config: s.config, store: s.store, mapper: mapper, cursor: view.ChangeCursor(), known: map[string]bool{}, updates: make(chan catalogProjection, 1), done: make(chan struct{}), wakeup: s.wakeup}
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	s.catalogRuntime = r
 	s.agentObserver = newAgentObserver(catalog, s.store)
@@ -136,6 +137,10 @@ func (r *catalogRuntime) handoff(p catalogProjection) error {
 	p.done = make(chan error, 1)
 	select {
 	case r.updates <- p:
+		select {
+		case r.wakeup <- struct{}{}:
+		default:
+		}
 	case <-r.ctx.Done():
 		if p.prepared != nil {
 			_ = p.prepared.Close()

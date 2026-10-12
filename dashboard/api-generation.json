@@ -234,6 +234,7 @@
     "AlertRule",
     "Duration",
     "MonitorStatus",
-    "Measurement"
+    "Measurement",
+    "FailureDiagnostic"
   ]
 }

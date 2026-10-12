@@ -68,6 +68,28 @@ def wire_type(schema, names):
     return "unknown"
 
 
+def validate_monitor_shapes(schemas, selected):
+    # DriverConfig has a dedicated category/credential-aware projection.
+    # Every other reference must resolve in the emitted shape registry.
+    known = set(selected) | {"DriverConfig"}
+
+    def visit(value):
+        if isinstance(value, dict):
+            if "$ref" in value:
+                prefix = "#/components/schemas/"
+                reference = value["$ref"]
+                if not reference.startswith(prefix) or reference[len(prefix):] not in known:
+                    raise ValueError("Unregistered monitor projection reference: " + reference)
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    for name in selected:
+        visit(schemas[name])
+
+
 def generate():
     config = json.loads(CONFIG.read_text())
     if config["format"] != 1:
@@ -77,6 +99,7 @@ def generate():
     contract_path = ROOT / config["contract"]
     contract = json.loads(contract_path.read_text())
     schemas = json.loads(schema_path.read_text())["components"]["schemas"]
+    validate_monitor_shapes(schemas, config["monitorShapes"])
     names = set(schemas)
     if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in names):
         raise ValueError("Unsupported TypeScript schema name")

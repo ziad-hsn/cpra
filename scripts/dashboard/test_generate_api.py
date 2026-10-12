@@ -16,6 +16,12 @@ spec.loader.exec_module(generator)
 
 
 class BrowserGenerationTests(unittest.TestCase):
+    def test_monitor_projection_references_cannot_be_silently_dropped(self):
+        schemas = {"MonitorStatus": {"properties": {"lastFailure": {"$ref": "#/components/schemas/FailureDiagnostic"}}}, "FailureDiagnostic": {"type": "object"}}
+        with self.assertRaisesRegex(ValueError, "Unregistered monitor projection reference"):
+            generator.validate_monitor_shapes(schemas, ["MonitorStatus"])
+        generator.validate_monitor_shapes(schemas, ["MonitorStatus", "FailureDiagnostic"])
+
     def test_optional_values_do_not_become_required_defaults(self):
         result = generator.wire_type({"type": "object", "properties": {"enabled": {"type": "boolean"}, "count": {"type": ["integer", "null"]}}, "additionalProperties": False}, set())
         self.assertIn('"enabled"?: boolean', result)

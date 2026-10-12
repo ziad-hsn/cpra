@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { Monitor, MonitorStatus } from '../src/api/generated';
 import { MonitorStatusDetails } from '../src/components/MonitorFields';
+import { resourceView } from '../src/api/resources';
 
 afterEach(cleanup);
 
@@ -42,5 +43,17 @@ it('renders a safe failure and removes it after successful observation', () => {
   expect(screen.getByText('dns_failed')).toBeVisible();
   expect(screen.getByText(/The target name could not be resolved/)).toBeVisible();
   rerender(<MonitorStatusDetails monitor={monitor({ health: 'healthy' })} />);
+  expect(screen.queryByText('dns_failed')).toBeNull();
+});
+
+it('preserves the server diagnostic through the production resource projection', () => {
+  const response = monitor({ health: 'unhealthy', lastFailure: { code: 'dns_failed', message: 'The target name could not be resolved.' } });
+  response.spec.check.driver.config = { url: 'https://example.test/health' };
+  const projected = resourceView(response, 'monitors').resource as Monitor;
+  expect(projected.status?.lastFailure).toEqual(response.status?.lastFailure);
+  const { rerender } = render(<MonitorStatusDetails monitor={projected} />);
+  expect(screen.getByText('dns_failed')).toBeVisible();
+  const healthy = resourceView({ ...response, status: { health: 'healthy' } }, 'monitors').resource as Monitor;
+  rerender(<MonitorStatusDetails monitor={healthy} />);
   expect(screen.queryByText('dns_failed')).toBeNull();
 });

@@ -133,3 +133,9 @@ review for this checkpoint remains required.
 The final snooze correction at `23989e3` passed independent source re-review.
 The reviewer also confirmed the embedded notice path and manifest digest, without
 claiming a real-browser or final-release pass.
+
+The diagnostic source review identified a missing browser projection shape.
+That defect is reproduced and repaired through the actual resourceView path;
+generation now rejects missing references instead of dropping them silently.
+The regenerated dashboard passes 534 tests, types and lint. This follow-up awaits
+independent source re-review.

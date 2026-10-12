@@ -126,3 +126,17 @@ real Raft snapshot/restart and an HTTP check followed by the production webhook.
 Complete controller, jobs, CLI and SDK API suites pass on Go 1.27.1. The pinned
 frontend rebuild passes 533 tests, types and lint. Independent source review of
 this new checkpoint remains required; these are not frozen release matrices.
+
+The source reviewer found one production dashboard gap at `382c65e`: the explicit
+monitor shape registry lacked the new FailureDiagnostic reference, so normal
+resource loading dropped lastFailure. The direct component fixture did not cover
+that path. The reviewed generated projection reproduced the missing field after
+the fixture's argument order was corrected; both intermediate fixture failures
+are retained as failed checks, not successful reproductions.
+
+The registry now includes the diagnostic. Generation rejects unresolved monitor
+references, with the existing category-aware DriverConfig projection as its only
+explicit exception. A resourceView-to-render regression preserves the returned
+failure and removes it after success. The seven generator tests and 47-test
+monitor regression suites pass. The rebuilt embedded dashboard passes all 534
+tests, type checks and lint. Source re-review of this correction remains pending.

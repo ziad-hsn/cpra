@@ -73,7 +73,7 @@ def navigation_config(config: str, entries: list) -> str:
     # intentional navigation omission as a strict-build warning. Other pages
     # still require explicit navigation coverage above.
     archives = "not_in_nav: |\n" + "".join("  /" + prefix + "**\n" for prefix in ARCHIVE_PREFIXES)
-    omitted = re.compile(r"(?m)^not_in_nav:[^\n]*\n(?:[ \t].*\n|\n)*")
+    omitted = re.compile(r"(?m)^not_in_nav:[^\n]*(?:\n|$)(?:[ \t].*(?:\n|$)|\n)*")
     matches = list(omitted.finditer(config))
     if len(matches) > 1:
         raise ValueError("site configuration must contain at most one not_in_nav section")

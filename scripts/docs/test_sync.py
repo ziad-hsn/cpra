@@ -85,21 +85,29 @@ class NavigationSyncTests(unittest.TestCase):
         self.assertIn("not_found: warn", self.config.read_text())
 
     def test_archive_patterns_replace_stale_settings_without_weakening_link_validation(self):
-        self.config.write_text(self.config.read_text() + "not_in_nav: |\n  /**\n")
-        sync.sync(self.site)
-        text = self.config.read_text()
-        self.assertEqual(text.count("not_in_nav:"), 1)
-        self.assertNotIn("  /**\n", text)
-        self.assertIn("not_found: warn", text)
-        self.assertTrue(sync.sync(self.site, check=True)["copies_match"])
+        original = self.config.read_text()
+        for setting in ("not_in_nav: |\n  /**", "not_in_nav: /**"):
+            for ending in ("\n", ""):
+                with self.subTest(setting=setting, ending=ending):
+                    self.config.write_text(original + setting + ending)
+                    sync.sync(self.site)
+                    text = self.config.read_text()
+                    self.assertEqual(text.count("not_in_nav:"), 1)
+                    self.assertEqual(text.partition("not_in_nav: |\n")[2].splitlines(),
+                                     ["  /" + prefix + "**" for prefix in sync.ARCHIVE_PREFIXES])
+                    self.assertIn("not_found: warn", text)
+                    self.assertTrue(sync.sync(self.site, check=True)["copies_match"])
 
     def test_duplicate_archive_settings_are_rejected_before_mutation(self):
-        text = self.config.read_text() + "not_in_nav: |\n  /one\nnot_in_nav: |\n  /two\n"
-        self.config.write_text(text)
-        with self.assertRaisesRegex(ValueError, "at most one not_in_nav"):
-            sync.sync(self.site)
-        self.assertEqual(self.config.read_text(), text)
-        self.assertFalse((self.site / "_sources/docs").exists())
+        original = self.config.read_text()
+        for second in ("not_in_nav: |\n  /two\n", "not_in_nav: |\n  /two", "not_in_nav: /two"):
+            with self.subTest(second=second):
+                text = original + "not_in_nav: |\n  /one\n" + second
+                self.config.write_text(text)
+                with self.assertRaisesRegex(ValueError, "at most one not_in_nav"):
+                    sync.sync(self.site)
+                self.assertEqual(self.config.read_text(), text)
+                self.assertFalse((self.site / "_sources/docs").exists())
 
     def test_source_version_and_announcement_drift_are_rejected_without_overwrite(self):
         sync.sync(self.site)

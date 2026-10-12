@@ -310,3 +310,11 @@ removed heading anchors; current pages now preserve those inbound anchors and
 the corrected strict build passes. The separate gh-pages checkout is untouched.
 Independent source review remains required. The private artifact and dependency
 inventory remain in task-owned scratch; this is not published-site evidence.
+
+Source re-review closed the digest correction at `7ae5204`. Documentation review
+found an EOF case that left a stale broad not_in_nav exemption or a duplicate
+inline setting. Block/inline inputs with and without final newlines reproduce
+the defect; complete-section replacement now accepts EOF, and all 25 tooling
+tests pass with duplicate-setting rejection intact. Source re-review of this
+small correction remains required. Focused notification, logger/caller,
+projection/replay and diagnostic checks also pass on Go 1.25.0.

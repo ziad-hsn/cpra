@@ -140,3 +140,22 @@ explicit exception. A resourceView-to-render regression preserves the returned
 failure and removes it after success. The seven generator tests and 47-test
 monitor regression suites pass. The rebuilt embedded dashboard passes all 534
 tests, type checks and lint. Source re-review of this correction remains pending.
+
+Source re-review of `b0bb4b8` closed the diagnostic projection gap. The reviewer
+verified the explicit shape, generation guard and embedded notice/asset path;
+no additional concrete finding was reported. It ran no checks.
+
+## Provider response checkpoint
+
+Review of `68d9804` found a mixed-case JSON alias defect: the SDK's exact
+duplicate-key guard precedes Go's case-insensitive struct decoding. An additional
+`RETRY_AFTER` could overwrite `retry_after`, authorizing a shorter retry than
+the provider specified. Equivalent aliases could change Telegram/Pushover
+outcome evidence. Four regression cases reproduce the defect; their failed run
+is retained separately.
+
+The classifier now rejects non-exact aliases of its recognized top-level and
+nested parameter fields before binding typed values. Duplicate, depth, trailing
+value and body-size guards remain intact. The complete jobs suite passes after
+this correction. The provider repair's identity/deadline/replay checks had passed
+before it; source re-review of the final correction remains required.

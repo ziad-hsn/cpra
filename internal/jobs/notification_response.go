@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -97,7 +98,7 @@ func notificationResponseError(provider string, response *http.Response) error {
 		if provider == "discord" && accepted || provider == "twilio" && accepted {
 			return nil
 		}
-		if api.DecodeResponse(raw, &result) != nil {
+		if decodeNotificationResponse(raw, &result) != nil {
 			return unknownNotificationResponse(status)
 		}
 		switch provider {
@@ -144,6 +145,36 @@ func notificationResponseError(provider string, response *http.Response) error {
 		}
 	}
 	return unknownNotificationResponse(status)
+}
+
+func decodeNotificationResponse(raw []byte, out any) error {
+	var fields map[string]json.RawMessage
+	if err := api.DecodeResponse(raw, &fields); err != nil {
+		return err
+	}
+	// encoding/json binds struct fields case-insensitively. These providers use
+	// exact wire names; aliases must not overwrite outcome or retry evidence.
+	if !notificationExactKeys(fields, "ok", "status", "error_code", "code", "retry_after", "parameters") {
+		return fmt.Errorf("notification response has ambiguous fields")
+	}
+	if parameters, exists := fields["parameters"]; exists {
+		var nested map[string]json.RawMessage
+		if err := json.Unmarshal(parameters, &nested); err != nil || !notificationExactKeys(nested, "retry_after") {
+			return fmt.Errorf("notification response has ambiguous parameters")
+		}
+	}
+	return json.Unmarshal(raw, out)
+}
+
+func notificationExactKeys(fields map[string]json.RawMessage, known ...string) bool {
+	for key := range fields {
+		for _, name := range known {
+			if key != name && strings.EqualFold(key, name) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func notificationRetryAfter(headers http.Header, now time.Time) (time.Duration, bool) {

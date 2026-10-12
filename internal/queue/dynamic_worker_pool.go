@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"math"
+	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,22 @@ import (
 // Standard-library and application loggers both satisfy it.
 type Logger interface {
 	Printf(string, ...interface{})
+}
+
+// optionalLogger preserves the nil-pointer behavior of the former *log.Logger
+// argument when a caller supplies a typed nil through the interface.
+func optionalLogger(logger Logger) Logger {
+	if logger == nil {
+		return nil
+	}
+	value := reflect.ValueOf(logger)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		if value.IsNil() {
+			return nil
+		}
+	}
+	return logger
 }
 
 // ResultRouter handles routing of job results to type-specific channels.
@@ -59,6 +76,7 @@ type WorkerPoolStats struct {
 
 // NewResultRouter creates a new result router with buffered channels.
 func NewResultRouter(config WorkerPoolConfig, logger Logger) *ResultRouter {
+	logger = optionalLogger(logger)
 	bufferSize := config.ResultChannelDepth
 	return &ResultRouter{
 		PulseResultChan:        make(chan []jobs.Result, bufferSize),
@@ -100,7 +118,9 @@ func (r *ResultRouter) RouteResults(results []jobs.Result) {
 		case "code":
 			codeResults = append(codeResults, result)
 		default:
-			r.logger.Printf("Unknown job type in result: %v", resultType(result))
+			if r.logger != nil {
+				r.logger.Printf("Unknown job type in result: %v", resultType(result))
+			}
 		}
 	}
 
@@ -131,7 +151,9 @@ func (r *ResultRouter) sendWithBackpressure(ch chan []jobs.Result, batch []jobs.
 		case <-r.done:
 			return
 		case <-ticker.C:
-			r.logger.Printf("Backpressure: %s results stalled (%d jobs waiting)", label, len(batch))
+			if r.logger != nil {
+				r.logger.Printf("Backpressure: %s results stalled (%d jobs waiting)", label, len(batch))
+			}
 		}
 	}
 }
@@ -237,6 +259,7 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 
 // NewDynamicWorkerPool creates a new dynamic worker pool.
 func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*DynamicWorkerPool, error) {
+	logger = optionalLogger(logger)
 	if config.PreAlloc {
 		return nil, errors.New("preallocated workers do not support dynamic resizing")
 	}
@@ -484,7 +507,7 @@ func (p *DynamicWorkerPool) dispatcher() {
 				if errors.Is(err, ErrQueueClosed) && p.stopping.Load() != 0 {
 					return
 				}
-				if !errors.Is(err, ErrQueueClosed) {
+				if !errors.Is(err, ErrQueueClosed) && p.logger != nil {
 					p.logger.Printf("Error dequeuing job batch: %v", err)
 				}
 				time.Sleep(100 * time.Millisecond) // Wait a bit if there's an error

@@ -30,4 +30,8 @@ have regression coverage. Focused race and minimum-Go checks pass; complete
 controller, controller-system, queue and logger suites pass on Go 1.27.1.
 The first integration check exposed printf-vet inference in its test and an
 incomplete framework interface (Println call sites); both failed checks are
-retained separately from the corrected passes. Independent review is required.
+retained separately from the corrected passes. Source review found a typed-nil
+standard logger startup regression at the new interface boundary. Constructor
+normalization and optional-output guards repair it; the failing reproduction,
+complete queue suite, focused race checks and minimum-Go checks are recorded.
+Re-review of this correction and final-source qualification remain required.

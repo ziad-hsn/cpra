@@ -159,3 +159,19 @@ nested parameter fields before binding typed values. Duplicate, depth, trailing
 value and body-size guards remain intact. The complete jobs suite passes after
 this correction. The provider repair's identity/deadline/replay checks had passed
 before it; source re-review of the final correction remains required.
+
+Source re-review of `29b7ad8` closed the mixed-case classifier finding and found
+no concrete defect in the inspected retry-delay identity/deadline/replay paths.
+It found an adjacent older Opsgenie receipt decoder that could report success
+from duplicate or case-aliased processing evidence, or poll a substituted request
+ID. Accepted-POST/contradictory-GET regressions reproduced all three processing
+cases; those failed checks are retained.
+
+Opsgenie acceptance and processing receipts now retain strict whole-body
+duplicate/depth/trailing guards and reject aliases of recognized exact names.
+Request-ID contradictions stop before polling. Real HTTP regressions pass,
+including committed unknown action state, no repeated POST, and a real Raft
+snapshot/restart retaining the hold. Focused jobs race checks pass. The initial
+controller fixture failed compilation and then selected the wrong action kind;
+the corrected correlated fixture passes and those failures remain recorded.
+Independent source re-review of this final Opsgenie repair remains required.

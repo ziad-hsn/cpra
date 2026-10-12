@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
@@ -56,7 +57,7 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 	var receipt struct {
 		RequestID string `json:"requestId"`
 	}
-	if json.Unmarshal(raw, &receipt) != nil {
+	if decodeOpsgenieReceipt(raw, &receipt) != nil {
 		return fmt.Errorf("Opsgenie acceptance receipt is invalid")
 	}
 	id, err := uuid.Parse(receipt.RequestID)
@@ -82,7 +83,7 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 			} `json:"data"`
 		}
 		if status == http.StatusOK {
-			if json.Unmarshal(raw, &result) != nil {
+			if decodeOpsgenieReceipt(raw, &result) != nil {
 				return fmt.Errorf("Opsgenie processing receipt is invalid")
 			}
 			if result.Data.Success != nil && result.Data.IsSuccess != nil {
@@ -100,6 +101,23 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+func decodeOpsgenieReceipt(raw []byte, out any) error {
+	var fields map[string]json.RawMessage
+	if err := api.DecodeResponse(raw, &fields); err != nil {
+		return err
+	}
+	if !notificationExactKeys(fields, "requestId", "data") {
+		return fmt.Errorf("Opsgenie receipt has ambiguous fields")
+	}
+	if data, exists := fields["data"]; exists {
+		var nested map[string]json.RawMessage
+		if json.Unmarshal(data, &nested) != nil || !notificationExactKeys(nested, "success", "isSuccess") {
+			return fmt.Errorf("Opsgenie receipt has ambiguous processing fields")
+		}
+	}
+	return api.DecodeResponse(raw, out)
 }
 
 func (c *CodeOpsgenieJob) opsgenieRequest(ctx context.Context, method, target string, data map[string]string) (int, []byte, error) {

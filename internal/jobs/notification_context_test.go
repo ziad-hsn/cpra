@@ -106,3 +106,53 @@ func TestOpsgenieStatusFailureHoldsAcceptedAction(t *testing.T) {
 		t.Fatal("status-read failure reclassified the accepted effect", result.Err, posts)
 	}
 }
+
+func TestOpsgenieContradictoryReceiptsHoldAcceptedAction(t *testing.T) {
+	for _, body := range []string{
+		`{"data":{"success":false,"success":true,"isSuccess":true}}`,
+		`{"data":{"success":false,"SUCCESS":true,"isSuccess":true}}`,
+		`{"data":{"success":true,"isSuccess":false,"ISSUCCESS":true}}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			posts, reads := 0, 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					reads++
+					_, _ = w.Write([]byte(body))
+					return
+				}
+				posts++
+				w.WriteHeader(http.StatusAccepted)
+				_, _ = w.Write([]byte(`{"requestId":"11111111-1111-4111-8111-111111111111"}`))
+			}))
+			defer server.Close()
+			result := (&CodeOpsgenieJob{URL: server.URL, APIKey: "fixture", Color: "red"}).Execute()
+			var rejection *DeliveryError
+			if result.Err == nil || errors.As(result.Err, &rejection) || posts != 1 || reads != 1 {
+				t.Fatal("contradictory receipt confirmed or repeated accepted effect", result.Err, posts, reads)
+			}
+		})
+	}
+}
+
+func TestOpsgenieContradictoryAcceptanceDoesNotSelectReceipt(t *testing.T) {
+	for _, field := range []string{"requestId", "REQUESTID"} {
+		posts, reads := 0, 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				reads++
+				_, _ = w.Write([]byte(`{"data":{"success":true,"isSuccess":true}}`))
+				return
+			}
+			posts++
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"requestId":"11111111-1111-4111-8111-111111111111","` + field + `":"22222222-2222-4222-8222-222222222222"}`))
+		}))
+		result := (&CodeOpsgenieJob{URL: server.URL, APIKey: "fixture", Color: "red"}).Execute()
+		server.Close()
+		var rejection *DeliveryError
+		if result.Err == nil || errors.As(result.Err, &rejection) || posts != 1 || reads != 0 {
+			t.Fatal("ambiguous acceptance selected a receipt or repeated delivery", result.Err, posts, reads)
+		}
+	}
+}

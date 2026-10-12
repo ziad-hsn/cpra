@@ -85,3 +85,16 @@ exponential delay; a delay that cannot fit the remaining deadline ends delivery
 without scheduling another attempt. Ordinary HTTP notifications have a
 45-second overall budget and at most three attempts. Each HTTP call is bounded
 by ten seconds or the remaining budget. No driver-level replay layer is added.
+
+## Result batching while idle
+
+An empty result shard waits for its producer notification or cancellation.
+A partial batch starts one flush deadline with its first result; later results
+do not postpone that deadline. A full batch routes immediately and stops its
+timer. Cancellation still drains queued results and flushes the remaining batch.
+The configured batch timeout remains the bound for an otherwise idle partial
+batch, rather than a periodic wakeup for every empty shard.
+
+The controller's scheduling cadence and worker-demand refresh are unchanged by
+this result-path repair. The [local idle comparison](implementation/idle-profile-2026-10-12.md)
+records measured CPU changes and their limited workload scope.

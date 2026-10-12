@@ -518,8 +518,9 @@ func (p *DynamicWorkerPool) resultProcessor(shard int) {
 	q := p.resultQueues[shard]
 	notify := p.notifyChans[shard]
 	batch := p.getResultBatch()
-	ticker := time.NewTicker(p.config.ResultBatchTimeout)
-	defer ticker.Stop()
+	timer := time.NewTimer(p.config.ResultBatchTimeout)
+	timer.Stop()
+	defer timer.Stop()
 
 	for {
 		// Drain all available results lock-free (no hchan lock).
@@ -529,10 +530,14 @@ func (p *DynamicWorkerPool) resultProcessor(shard int) {
 				break
 			}
 			p.pendingResults.Add(-1)
-			batch = p.handleResult(batch, result, ticker)
+			batch = p.handleResult(batch, result, timer)
 		}
 
 		// Queue empty. Block for a wakeup, a partial-batch timeout, or shutdown.
+		var deadline <-chan time.Time
+		if len(batch) > 0 {
+			deadline = timer.C
+		}
 		select {
 		case <-p.ctx.Done():
 			for {
@@ -541,13 +546,13 @@ func (p *DynamicWorkerPool) resultProcessor(shard int) {
 					break
 				}
 				p.pendingResults.Add(-1)
-				batch = p.handleResult(batch, result, ticker)
+				batch = p.handleResult(batch, result, timer)
 			}
 			p.flushResultBatch(batch)
 			return
 		case <-notify:
 			// A worker enqueued; drain again.
-		case <-ticker.C:
+		case <-deadline:
 			// Route partial batches on timeout.
 			if len(batch) > 0 {
 				p.router.RouteResults(batch)
@@ -570,15 +575,19 @@ func (p *DynamicWorkerPool) notify(shard int) {
 
 // handleResult appends a result to the batch and routes it when full.
 // It returns the (possibly new) batch slice.
-func (p *DynamicWorkerPool) handleResult(batch []jobs.Result, result jobs.Result, ticker *time.Ticker) []jobs.Result {
+func (p *DynamicWorkerPool) handleResult(batch []jobs.Result, result jobs.Result, timer *time.Timer) []jobs.Result {
 	p.tasksCompleted.Add(1)
+	if len(batch) == 0 {
+		// Start one flush deadline with the first result. Idle shards wait only
+		// for notification/cancellation, and later results cannot defer it.
+		timer.Reset(p.config.ResultBatchTimeout)
+	}
 	batch = append(batch, result)
 	if len(batch) >= p.config.ResultBatchSize {
 		p.router.RouteResults(batch)
 		p.putResultBatch(batch)
 		batch = p.getResultBatch()
-		// Reset the ticker to prevent immediate firing
-		ticker.Reset(p.config.ResultBatchTimeout)
+		timer.Stop()
 	}
 	return batch
 }

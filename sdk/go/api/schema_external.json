@@ -1282,6 +1282,63 @@
         ],
         "type": "object"
       },
+      "CollectionStorageAccounting": {
+        "additionalProperties": false,
+        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.",
+        "properties": {
+          "active": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "cleanupCondition": {
+            "type": "string"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "pinned": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "retained": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "retired": {
+            "minimum": 0,
+            "type": "integer",
+            "x-go-type": "uint64"
+          },
+          "stepDurationMs": {
+            "format": "double",
+            "minimum": 0,
+            "type": "number",
+            "x-go-name": "StepDurationMS"
+          },
+          "unlinkedBytes": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "active",
+          "retained",
+          "pinned",
+          "retired",
+          "unlinkedBytes",
+          "stepDurationMs"
+        ],
+        "type": "object"
+      },
       "ControlRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4715,6 +4772,9 @@
             "type": "boolean",
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
+          },
+          "collectionGenerations": {
+            "$ref": "#/components/schemas/CollectionStorageAccounting"
           },
           "commitIndex": {
             "description": "Compatibility observation of the FSM-applied log index; not an independently sampled Raft commit index.",

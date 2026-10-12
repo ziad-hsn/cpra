@@ -52,11 +52,7 @@ func openCollectionLedger(directory string, maxBytes int64) (_ *collectionLedger
 	// ordinary concurrent appends do not require remapping beneath that reader.
 	// Windows may also preallocate this mapped size; it must be included in native
 	// filesystem qualification. This is not a total RSS/physical disk limit.
-	mmap := maxBytes*2 + 16<<20
-	if mmap > int64(^uint(0)>>1) {
-		mmap = int64(^uint(0) >> 1)
-	}
-	db, err := bolt.Open(filepath.Join(path, "ledger.db"), 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: int(mmap)})
+	db, err := bolt.Open(filepath.Join(path, "ledger.db"), 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: collectionInitialMapping(runtime.GOOS, maxBytes)})
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +87,16 @@ func openCollectionLedger(directory string, maxBytes int64) (_ *collectionLedger
 		return nil, err
 	}
 	return l, nil
+}
+
+func collectionInitialMapping(platform string, maxBytes int64) int {
+	if platform == "windows" {
+		// bbolt extends Windows files to the mapping size. Do not preallocate
+		// the entire collection quota for an initially empty generation.
+		return 64 << 20
+	}
+	mapping := min(maxBytes*2+16<<20, int64(^uint(0)>>1))
+	return int(mapping)
 }
 
 func validateCollectionLedgerSelection(directory string) error {

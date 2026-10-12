@@ -10,10 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
 )
 
@@ -43,15 +41,6 @@ type collectionGCCandidate struct {
 }
 
 func (c *collectionGCCandidate) close() { _ = c.root.Close(); _ = c.dir.Close() }
-
-func collectionGCUUID(value string) bool {
-	id, err := uuid.Parse(value)
-	return err == nil && id != uuid.Nil && id.String() == value
-}
-
-func collectionGCName(name string) bool {
-	return strings.HasPrefix(name, "generation-") && collectionGCUUID(strings.TrimPrefix(name, "generation-"))
-}
 
 // statx supplies mount identity even for same-device bind mounts. Birth time
 // guards persisted intents against ordinary inode reuse. Missing kernel/filesystem
@@ -415,7 +404,7 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 	}
 	entry, err := r.openCandidate(name, intent != nil)
 	if errors.Is(err, os.ErrNotExist) && intent != nil {
-		return r.finishIntent(ctx, deadline, result, intentRaw)
+		return r.finishIntent(ctx, deadline, result, intentRaw, p)
 	}
 	if err != nil {
 		return result, err
@@ -524,9 +513,17 @@ func (r *collectionRetirement) syncIntent(expected []byte) error {
 	return errors.Join(file.Sync(), file.Close(), r.dir.Sync())
 }
 
-func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.Time, result collectionGCStep, intentRaw []byte) (collectionGCStep, error) {
+func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.Time, result collectionGCStep, intentRaw []byte, protection collectionGCProtection) (collectionGCStep, error) {
 	if err := r.syncIntent(intentRaw); err != nil {
 		return result, err
+	}
+	if err := collectionGCBefore(ctx, deadline); err != nil {
+		return result, err
+	}
+	if protection.RecordRetired != nil {
+		if err := protection.RecordRetired(result.Generation); err != nil {
+			return result, err
+		}
 	}
 	if err := collectionGCBefore(ctx, deadline); err != nil {
 		return result, err

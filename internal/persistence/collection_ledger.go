@@ -9,6 +9,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/btree"
 	bolt "go.etcd.io/bbolt"
@@ -38,6 +39,8 @@ var (
 // Recovery always writes a fresh generation from a snapshot and committed logs;
 // the selected generation is never used to decide the outcome of log replay.
 type collectionLedger struct {
+	viewPins                 atomic.Int64 // Native lifetime accounting, never serialized.
+	closedNative             atomic.Bool
 	mu                       sync.RWMutex
 	db                       *bolt.DB
 	directory, generation    string
@@ -352,12 +355,18 @@ func (l *collectionLedger) Close() error {
 	l.validationRows, l.validationOperationBytes = nil, nil
 	l.executionRows, l.executionStats, l.executionOrder = nil, nil, nil
 	if l.db != nil {
-		return l.db.Close()
+		err := l.db.Close()
+		if err == nil {
+			l.closedNative.Store(true)
+		}
+		return err
 	}
+	l.closedNative.Store(true)
 	return nil
 }
 
 type collectionLedgerView struct {
+	ledger                   *collectionLedger
 	mu                       sync.Mutex // bbolt read transactions are not safe for concurrent access.
 	tx                       *bolt.Tx
 	rows                     map[string]map[uint64][]byte
@@ -414,6 +423,8 @@ func (l *collectionLedger) freezeLocked() (*collectionLedgerView, error) {
 			_ = v.tx.Rollback()
 			return nil, err
 		}
+		l.viewPins.Add(1)
+		v.ledger = l
 		return v, nil
 	}
 	// Encoded rows are immutable. Copy only the bounded index maps; reads decode
@@ -456,7 +467,12 @@ func (v *collectionLedgerView) Close() error {
 	v.validationRows, v.validationOperationBytes = nil, nil
 	v.executionRows, v.executionStats, v.executionOrder = nil, nil, nil
 	if v.tx != nil {
-		return v.tx.Rollback()
+		err := v.tx.Rollback()
+		if v.ledger != nil {
+			v.ledger.viewPins.Add(-1)
+			v.ledger = nil
+		}
+		return err
 	}
 	return nil
 }

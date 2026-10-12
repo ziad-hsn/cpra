@@ -120,16 +120,25 @@ These limits are safety boundaries, not a demonstrated fleet capacity or an
 increase to the public synchronous preflight limit.
 
 Logical accounting does not bound allocated bbolt space, Raft logs, retained
-snapshots, old ledger generations, or filesystem overhead. Physical accounting,
-automatic generation cleanup and maximum-input resource measurements remain
-separate qualification work. Public validation, conditional activation,
+snapshots, or filesystem overhead. As of the 12 October 2026 repair branch,
+[Linux generation retirement](implementation/collection-generation-cleanup.md)
+is connected to Store maintenance. A durable `generations.json` catalog keeps
+the current and previous completed generations; open readers and snapshots pin
+additional generations. Bounded maintenance scans at most 16 names per step and
+removes at most one verified entry. It commits retirement metadata before
+removing the deletion intent, so interruption cannot lose that checkpoint.
+State responses report sampled counts and cleanup conditions without paths.
+Apparent unlinked byte counts do not establish physical space reclamation.
+Native macOS/Windows retirement and complete allocated-size qualification remain
+open. Windows now starts new ledger mappings at 64 MiB; growth and snapshot
+overlap still require native evidence. Public validation, conditional activation,
 retained per-item outcomes and cancellation during activation have scoped
-evidence in the linked lifecycle contracts. The separate
-[Linux retirement primitive](implementation/collection-generation-cleanup.md)
-is not yet connected to Store maintenance. Inactive cancellation and its
+evidence in the linked lifecycle contracts. Inactive cancellation and its
 30-day terminal receipt retention are distinct from cancellation after partial
 application, which cannot undo committed changes or external actions.
-Windows mapping/allocation behavior still requires native qualification.
+Backups include the complete stopped directory, including generation metadata,
+Raft state, snapshots and retained history. Cleanup never removes those
+authoritative files or a pinned generation.
 
 Partial cleanup leaves a contiguous encrypted prefix. Its header retains the
 original inventory identity and separate removed-row/byte counters; the original

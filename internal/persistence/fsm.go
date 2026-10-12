@@ -80,8 +80,9 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
-	collectionUpload *collectionUploadTransaction // Apply-owned; never snapshot authority.
-	health           atomic.Pointer[controllerHealthState]
+	collectionGenerations *collectionGenerations
+	collectionUpload      *collectionUploadTransaction // Apply-owned; never snapshot authority.
+	health                atomic.Pointer[controllerHealthState]
 	// Apply owns this across its outside-mu verification and mutation phases.
 	// Restore takes the same gate before replacing the authoritative generation.
 	transition                    sync.Mutex
@@ -588,6 +589,9 @@ func (f *machine) Restore(reader io.ReadCloser) error {
 		}
 	}
 	f.collections = ledger
+	if f.collectionGenerations != nil {
+		f.collectionGenerations.track(ledger)
+	}
 	for _, prefix := range f.planPrefixes {
 		prefix.close()
 	}

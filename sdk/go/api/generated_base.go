@@ -679,6 +679,19 @@ type CollectionReselectionCreateRequest struct {
 	SourceCount          int64  `json:"sourceCount"`
 }
 
+// CollectionStorageAccounting Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.
+type CollectionStorageAccounting struct {
+	Active           int64      `json:"active"`
+	Available        bool       `json:"available"`
+	CleanupCondition *string    `json:"cleanupCondition,omitempty"`
+	ObservedAt       *time.Time `json:"observedAt,omitempty"`
+	Pinned           int64      `json:"pinned"`
+	Retained         int64      `json:"retained"`
+	Retired          uint64     `json:"retired"`
+	StepDurationMS   float64    `json:"stepDurationMs"`
+	UnlinkedBytes    int64      `json:"unlinkedBytes"`
+}
+
 // ControlRequest defines model for ControlRequest.
 type ControlRequest struct {
 	// Duration Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
@@ -1636,6 +1649,9 @@ type StorageState struct {
 	Available      bool  `json:"available"`
 	Bytes          int64 `json:"bytes,omitempty"`
 	BytesAvailable bool  `json:"bytesAvailable"`
+
+	// CollectionGenerations Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.
+	CollectionGenerations *CollectionStorageAccounting `json:"collectionGenerations,omitempty"`
 
 	// CommitIndex Compatibility observation of the FSM-applied log index; not an independently sampled Raft commit index.
 	CommitIndex   int64       `json:"commitIndex,omitempty"`

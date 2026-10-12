@@ -47,6 +47,7 @@ type reply struct {
 var ErrCommitUnconfirmed = errors.New("durable commit outcome unknown")
 
 type Store struct {
+	collectionGenerations *collectionGenerations
 	storeExtensions
 	administrative  bool
 	opening         bool
@@ -80,14 +81,15 @@ type Store struct {
 }
 
 type Status struct {
-	Mode               string  `json:"mode"`
-	Ready              bool    `json:"ready"`
-	NodeID             string  `json:"node_id,omitempty"`
-	SingleNode         bool    `json:"single_node"`
-	CommittedIndex     uint64  `json:"committed_index"`
-	Error              string  `json:"error,omitempty"`
-	CommitLatencyMS    float64 `json:"commit_latency_ms"`
-	SnapshotDurationMS float64 `json:"snapshot_duration_ms"`
+	Collections        *CollectionStorageAccounting `json:"collections,omitempty"`
+	Mode               string                       `json:"mode"`
+	Ready              bool                         `json:"ready"`
+	NodeID             string                       `json:"node_id,omitempty"`
+	SingleNode         bool                         `json:"single_node"`
+	CommittedIndex     uint64                       `json:"committed_index"`
+	Error              string                       `json:"error,omitempty"`
+	CommitLatencyMS    float64                      `json:"commit_latency_ms"`
+	SnapshotDurationMS float64                      `json:"snapshot_duration_ms"`
 }
 
 func Open(ctx context.Context, config runtimeconfig.Config) (*Store, error) {
@@ -160,7 +162,7 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	// The generation is selected only after complete snapshot/log recovery and
 	// explicit restore fencing. An old materialization never decides replay.
 	if s.fsm.collections != nil {
-		if err = s.fsm.collections.Publish(); err != nil {
+		if err = s.collectionGenerations.publish(s.fsm.collections); err != nil {
 			_ = s.Close()
 			return nil, err
 		}
@@ -230,6 +232,11 @@ func (s *Store) openRaft(ctx context.Context) error {
 		}
 	}
 	s.nodeID = node.ID
+	s.collectionGenerations, err = newCollectionGenerations(filepath.Join(dir, "collections"), node.ID)
+	if err != nil {
+		return err
+	}
+	s.fsm.collectionGenerations = s.collectionGenerations
 	s.restoreMarker, err = readRestoreMarker(dir, node)
 	if err != nil {
 		return err
@@ -585,6 +592,10 @@ func (s *Store) StatusContext(ctx context.Context) (Status, error) {
 // Administrative inspection remains available without runtime admission.
 func (s *Store) statusObserved(state controllerHealthState) Status {
 	status := Status{Mode: s.config.Storage.Mode, NodeID: s.nodeID, SingleNode: true, Ready: s.err == nil && !state.failed, CommittedIndex: state.index, CommitLatencyMS: float64(s.lastCommit) / float64(time.Millisecond), SnapshotDurationMS: float64(s.lastSnapshot) / float64(time.Millisecond)}
+	if s.collectionGenerations != nil {
+		accounting := s.collectionGenerations.accounting()
+		status.Collections = &accounting
+	}
 	select {
 	case <-s.stop:
 		status.Ready = false
@@ -642,6 +653,12 @@ func (s *Store) maintain() {
 		case <-s.stop:
 			return
 		case <-collectionTicker.C:
+			gcContext, gcCancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+			gcErr := s.collectionGenerations.maintain(gcContext)
+			gcCancel()
+			if gcErr != nil {
+				s.MarkUnavailable(gcErr)
+			}
 			if err := s.maintainExtensions(time.Now().UTC()); err != nil {
 				s.MarkUnavailable(err)
 			}
@@ -689,6 +706,7 @@ func (s *Store) Close() error {
 }
 func (s *Store) closeResources() error {
 	var err error
+	err = errors.Join(err, s.collectionGenerations.close())
 	if s.raft != nil {
 		err = errors.Join(err, s.raft.Shutdown().Error())
 	}

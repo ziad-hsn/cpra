@@ -2150,6 +2150,9 @@
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false,
             "description": "Current durable-store observation."
+          },
+          "collectionGenerations": {
+            "$ref": "#/components/schemas/CollectionStorageAccounting"
           }
         },
         "required": [
@@ -4383,6 +4386,63 @@
           }
         },
         "description": "Non-sensitive process access mode. Discovery grants no permissions and never converts an authentication failure into observation access."
+      },
+      "CollectionStorageAccounting": {
+        "type": "object",
+        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "retained": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pinned": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "retired": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64"
+          },
+          "unlinkedBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cleanupCondition": {
+            "type": "string"
+          },
+          "stepDurationMs": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "x-go-name": "StepDurationMS"
+          }
+        },
+        "required": [
+          "available",
+          "active",
+          "retained",
+          "pinned",
+          "retired",
+          "unlinkedBytes",
+          "stepDurationMs"
+        ],
+        "additionalProperties": false
       }
     }
   }

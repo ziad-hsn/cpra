@@ -36,10 +36,18 @@ export function RuntimeDiagnostics() {
         <dt>FSM-applied log position</dt><dd>{current.storage.appliedIndex === undefined ? 'Unavailable' : formatNumber(current.storage.appliedIndex)}</dd>
         <dt>Last recorded commit latency</dt><dd>{milliseconds(current.storage.commitLatencyMs)}</dd>
         <dt>Last recorded snapshot duration</dt><dd>{milliseconds(current.storage.snapshotDurationMs)}</dd>
+        {current.storage.generations && <>
+          <dt>Active collection generations</dt><dd>{current.storage.generations.active === undefined ? 'Unavailable' : formatNumber(current.storage.generations.active)}</dd>
+          <dt>Retained collection generations</dt><dd>{current.storage.generations.retained === undefined ? 'Unavailable' : formatNumber(current.storage.generations.retained)}</dd>
+          <dt>Pinned collection generations</dt><dd>{current.storage.generations.pinned === undefined ? 'Unavailable' : formatNumber(current.storage.generations.pinned)}</dd>
+          <dt>Retired collection generations</dt><dd>{current.storage.generations.retired === undefined ? 'Unavailable' : formatNumber(current.storage.generations.retired)}</dd>
+          <dt>Last cleanup step</dt><dd>{milliseconds(current.storage.generations.stepDurationMs)}</dd>
+        </>}
       </dl>
       {current.readinessReason && <p role="status">{current.readinessReason}</p>}
       {current.controllerReason && <p className="muted">{current.controllerReason}</p>}
       {current.storage.error && <p role="alert">Storage reports an error. Consult protected server diagnostics.</p>}
+      {current.storage.generations?.condition && <p role="status">{current.storage.generations.condition}</p>}
     </>}
     <p className="muted">Readiness includes initialization, usable storage and admission. An intentionally empty configuration can be ready when the server permits it. Monitored service failures do not by themselves make CPRa unready.</p>
     <p className="muted">Projection freshness describes the dashboard snapshot, separately from controller progress and storage availability. A stale projection does not prove a disk failure. These endpoints are separate observations and can differ during a transition.</p>

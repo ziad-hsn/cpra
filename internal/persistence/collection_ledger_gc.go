@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -13,7 +16,7 @@ var (
 	errCollectionGCBudget      = errors.New("collection generation cleanup step budget exhausted")
 )
 
-// collectionGCProtection is supplied by the future generation lifecycle owner
+// collectionGCProtection is supplied by the Store's generation lifecycle owner
 // after a completed retention-selection pass. Previous is the selected completed
 // generation to retain; Pinned includes every live ledger/snapshot generation.
 // These names are trusted selection inputs, not proof supplied by an HTTP caller.
@@ -21,14 +24,25 @@ type collectionGCProtection struct {
 	StoreID, NodeID   string
 	Current, Previous string
 	Pinned            []string
+	// RecordRetired commits owner metadata before the native intent disappears.
+	// It runs within the local generation guard, never within FSM ownership.
+	RecordRetired func(string) error `json:"-"`
 }
 
 // collectionGCGuard holds a dedicated ownership/generation guard while use runs.
 // It guarantees the main Raft ownership lock remains held and protects generation
 // selection and reader pins for the complete callback. It must NOT hold the
 // controller or FSM mutex: use performs synchronous filesystem maintenance.
-// This slice adds no Store integration, scanner, or reader-pin registration.
 type collectionGCGuard func(context.Context, func(collectionGCProtection) error) error
+
+func collectionGCUUID(value string) bool {
+	id, err := uuid.Parse(value)
+	return err == nil && id != uuid.Nil && id.String() == value
+}
+
+func collectionGCName(name string) bool {
+	return strings.HasPrefix(name, "generation-") && collectionGCUUID(strings.TrimPrefix(name, "generation-"))
+}
 
 type collectionGCStep struct {
 	Generation    string

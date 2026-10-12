@@ -18,6 +18,9 @@ func (f *machine) ensureCollectionLedger() error {
 	} else {
 		f.collections, err = openCollectionLedger(f.collectionDirectory, maxCollectionLedgerBytes)
 	}
+	if err == nil && f.collectionGenerations != nil {
+		f.collectionGenerations.track(f.collections)
+	}
 	return err
 }
 

@@ -64,6 +64,19 @@ it('keeps optional or invalid measurements unavailable instead of inventing succ
   expect(invalidFlags.projectionAgeMs).toBeUndefined();
 });
 
+it('reports sampled cleanup accounting without exposing unknown diagnostics or changing admission readiness', async () => {
+  const wire = stateWire();
+  const stateBody = { ...wire, storage: { ...wire.storage, collectionGenerations: { available: true, active: 1, retained: 1, pinned: 0, retired: 4, unlinkedBytes: 4096, cleanupCondition: 'blocked', stepDurationMs: 12 } } };
+  await fixture({ stateBody });
+  await screen.findByText('Ready for new work');
+  expect(valueFor('Retired collection generations')).toHaveTextContent(/^4$/);
+  expect(valueFor('Pinned collection generations')).toHaveTextContent(/^0$/);
+  expect(screen.getByText(/Cleanup is held/)).toBeInTheDocument();
+  const unknown = runtimeView({ ...stateBody, storage: { ...stateBody.storage, collectionGenerations: { ...stateBody.storage.collectionGenerations, cleanupCondition: '/private/state/path' } } });
+  expect(JSON.stringify(unknown)).not.toContain('/private/');
+  expect(unknown.ready).toBe(true);
+});
+
 it.each([null, {}, { ...stateWire(), ready: 'yes' }, { ...stateWire(), live: null }, { ...stateWire(), generatedAt: 'not-a-time' }, { ...stateWire(), generatedAt: '0001-01-01T00:00:00Z' }, { ...stateWire(), storage: { available: 'true', mode: 'raft' } }])('rejects unsupported required state fields safely: %j', value => {
   expect(() => runtimeView(value)).toThrow('The runtime observation has an unsupported format.');
 });

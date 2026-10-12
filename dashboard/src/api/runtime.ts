@@ -11,7 +11,8 @@ export interface RuntimeObservation {
   controllerReason?: string;
   projectionFresh?: boolean;
   projectionAgeMs?: number;
-  storage: { available: boolean; mode: string; appliedIndex?: number; commitLatencyMs?: number; snapshotDurationMs?: number; error: boolean };
+  storage: { available: boolean; mode: string; appliedIndex?: number; commitLatencyMs?: number; snapshotDurationMs?: number; error: boolean;
+    generations?: { observedAt?: string; active?: number; retained?: number; pinned?: number; retired?: number; unlinkedBytes?: number; stepDurationMs?: number; condition?: string } };
 }
 
 const boolean = (value: unknown) => typeof value === 'boolean' ? value : undefined;
@@ -20,6 +21,7 @@ const count = (value: unknown) => typeof value === 'number' && Number.isSafeInte
 const timestamp = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/.test(value) && !/^0001-01-01T00:00:00(?:\.0+)?(?:Z|[+-]00:00)$/.test(value) && Number.isFinite(Date.parse(value)) ? value : undefined;
 const measurement = (value: unknown) => object(value) && value.available === true ? nonnegative(value.value) : undefined;
 const storageMode = (value: unknown) => value === 'raft' ? 'Raft' : value === 'memory' ? 'Memory (not persistent)' : value === 'unavailable' ? 'Unavailable' : 'Unrecognized storage mode';
+const cleanupConditions: Record<string, string> = { unavailable: 'Native cleanup is unavailable on this filesystem or platform.', blocked: 'Cleanup is held. Inspect protected local storage diagnostics.', budget_exhausted: 'Cleanup reached its cooperative step budget and will continue later.', budget_exceeded: 'A filesystem operation exceeded the cleanup step budget.' };
 const readinessReasons: Record<string, string> = {
   'Controller initialization or progress is unavailable.': 'Controller initialization or progress is unavailable.',
   'The durable management catalog is unavailable.': 'The durable management catalog is unavailable.',
@@ -54,6 +56,12 @@ export function runtimeView(value: unknown, legacy = false): RuntimeObservation 
   storage.appliedIndex = count(store.appliedIndex);
   storage.commitLatencyMs = measurement(store.commitLatency);
   storage.snapshotDurationMs = measurement(store.snapshotDuration);
+  if (object(store.collectionGenerations) && store.collectionGenerations.available === true) {
+    const generations = store.collectionGenerations;
+    storage.generations = { observedAt: timestamp(generations.observedAt), active: count(generations.active), retained: count(generations.retained),
+      pinned: count(generations.pinned), retired: count(generations.retired), unlinkedBytes: count(generations.unlinkedBytes),
+      stepDurationMs: nonnegative(generations.stepDurationMs), condition: reason(generations.cleanupCondition, cleanupConditions) };
+  }
   return { legacy: false, generatedAt, ready: value.ready, live: value.live, storage,
     readinessReason: reason(value.readinessReason, readinessReasons),
     controllerReady: value.controllerAvailable === true ? boolean(value.controllerReady) : undefined,

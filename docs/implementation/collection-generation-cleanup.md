@@ -1,12 +1,13 @@
 # Collection generation cleanup: implementation handoff
 
-**Status: isolated Linux retirement primitive implemented and reviewed; automatic
-generation cleanup remains unfinished and disabled.** The running Store still
-preserves previous materialized generations. The primitive's passing tests do
-not establish a bound on physical disk consumption or qualify automatic cleanup.
-This document records both that implementation and the remaining storage work
-under the [approved management API plan](api-management-plan.md); it does not
-replace that plan or satisfy release gates.
+**Status, 12 October 2026: Linux retirement is connected to Store maintenance on
+`codex/release-repairs`.** Completed generation metadata, frozen-reader pins and
+path-free accounting are implemented. Five real Store restart/snapshot cycles,
+interrupted retirement, failed catalog publication and focused race checks pass.
+Native macOS/Windows deletion, allocated-size measurement, the complete final
+source matrix and independent review remain open. Earlier independent review
+covered the isolated primitive; it does not sign off the new Store integration.
+The [approved repair plan](release-repair-plan.md) governs these changes.
 
 ## Invariant and ownership
 
@@ -24,17 +25,16 @@ administrative authentication operations do not invoke cleanup. Use a separate
 maintenance worker; neither the controller owner loop nor request handlers do
 directory scanning, unlinking or synchronous filesystem maintenance.
 
-Initially keep **the selected current generation plus one other completed
-generation**, choosing the latest completion-marker modification time and using
-the canonical generation name as a deterministic tie breaker. This timestamp is
-only a cache-retention preference; it is not a source revision, Raft index or
-recovery authority. Exclude generations already under an admitted retirement
-intent from the set of completed retention candidates.
+Keep **the selected current generation and the previous completed selection**
+in the local durable generation catalog, plus every live/pinned generation.
+Completion-marker modification time remains a conservative native eligibility
+check; it is not replay authority. A selector published just before an interrupted
+catalog update remains protected when the next recovered generation is published.
 
-Start with startup-originated collection: all earlier process generations are
-closed, and `machine.Restore` closes a replaced ledger before installation. Do
-not generalize this to deletion during a future live generation replacement
-without tracking and retaining every pinned database/snapshot handle.
+`machine.Restore` closes the replaced ledger before installation. Native reader
+pin counts remain registered until frozen transactions release their handles.
+Routine controller/status reads use immutable sampled accounting and perform no
+cleanup or filesystem scan.
 
 ## Candidate eligibility and anchored access
 

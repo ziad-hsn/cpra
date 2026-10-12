@@ -163,6 +163,19 @@ func (s *Server) managementState(ctx context.Context, now time.Time) (api.State,
 		result.Storage = api.StorageState{Available: status.Ready, Mode: status.Mode, FormatVersion: int64(settings.SnapshotFormat),
 			CommitIndex: int64(status.CommittedIndex), AppliedIndex: int64(status.CommittedIndex), SingleNode: status.SingleNode, Error: status.Error,
 			CommitLatency: unavailableMeasurement("not_recorded"), SnapshotDuration: unavailableMeasurement("not_recorded")}
+		if accounting := status.Collections; accounting != nil {
+			result.Storage.CollectionGenerations = &api.CollectionStorageAccounting{
+				Available: accounting.Available, Active: int64(accounting.Active), Retained: int64(accounting.Retained),
+				Pinned: int64(accounting.Pinned), Retired: accounting.Retired, UnlinkedBytes: accounting.UnlinkedBytes,
+				StepDurationMS: accounting.StepDurationMS,
+			}
+			if !accounting.ObservedAt.IsZero() {
+				result.Storage.CollectionGenerations.ObservedAt = &accounting.ObservedAt
+			}
+			if accounting.CleanupCondition != "" {
+				result.Storage.CollectionGenerations.CleanupCondition = &accounting.CleanupCondition
+			}
+		}
 		if !status.Ready {
 			result.Ready, result.ReadinessReason = false, "Durable storage is unavailable."
 		}

@@ -196,3 +196,11 @@ paths now report code, correlations and phase without changing admission or
 retry decisions. Resource-route, collection-create, manual validation-read and
 polling regressions pass; existing mutation counts and uncertainty controls
 remain intact. Independent source re-review is required for this correction.
+
+Source re-review of `66b2be1` closed both operator findings, then found stale
+polling error metadata beside a later successful sealed verdict. Successful
+validation/progress reads and discard now clear that prior metadata; a later
+progress failure can still install its own problem. The existing pending-to-
+sealed polling regression now asserts the old code/request identity disappear.
+The focused 34-test import suite and pinned 540-test rebuild pass. This final
+lifecycle correction still requires source re-review.

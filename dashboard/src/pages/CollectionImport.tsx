@@ -130,7 +130,7 @@ export default function CollectionImport() {
     if (lifetime.current.busy) return;
     stopWaiting(); lifetime.current.collection?.close(); lifetime.current.collection = undefined;
     lifetime.current.ticket = undefined; lifetime.current.expiresAt = undefined; lifetime.current.createAttempted = false; lifetime.current.validationAttempted = false; lifetime.current.activationAttempted = false; lifetime.current.operation = undefined; lifetime.current.sourceNames = undefined;
-    setSummary(undefined); setPreview([]); setProgress(undefined); setPreflight(undefined); setValidation(undefined); setValidationStatus('Not requested'); setOperation(undefined); setResultPage([]); setCursor(''); setFeedback(''); setUncertain(false);
+    setSummary(undefined); setPreview([]); setProgress(undefined); setPreflight(undefined); setValidation(undefined); setValidationStatus('Not requested'); setOperation(undefined); setResultPage([]); setCursor(''); setFeedback(''); setUncertain(false); setProblem(undefined); setFailedPhase('');
   }
   async function previewServer() {
     await run('Previewing on server', async signal => {
@@ -175,6 +175,7 @@ export default function CollectionImport() {
     });
   }
   async function retainValidation(value: CollectionValidationPage, signal: AbortSignal) {
+    setProblem(undefined); setFailedPhase('');
     setValidation(value); setValidationStatus(!value.supported ? 'Unsupported result vocabulary — read only' : value.summary.valid ? 'Passed — original sealed result' : 'Rejected — original sealed result');
     setFeedback(!value.supported ? 'This retained result uses unsupported vocabulary. It is read only and cannot authorize activation.' : value.summary.valid ? 'The original validation passed. No activation was requested.' : 'The original validation was rejected. Review its source-attributed results; changed intent requires a new operation.');
     // A sealed verdict does not determine today's operation state: cancellation
@@ -256,7 +257,7 @@ export default function CollectionImport() {
         }
         const response: APIResponse<Operation> = await readCollection(session, summary, operation.id, controller.signal);
         if (!lifetime.current.active || controller.signal.aborted) return;
-        storeOperation(response.data);
+        storeOperation(response.data); setProblem(undefined); setFailedPhase('');
         if (!collectionProgressPending(response.data)) { setWaiting(false); return; }
         schedule(collectionDelay(response));
       } catch (error) {

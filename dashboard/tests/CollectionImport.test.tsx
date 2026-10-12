@@ -310,10 +310,13 @@ it('polls only original validation GET after202, honors confirmed pending Retry-
     await act(async () => { await vi.advanceTimersByTimeAsync(4999); }); expect(reads()).toBe(0);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); }); expect(reads()).toBe(1);
     expect(screen.getByText('Pending — no verdict yet')).toBeInTheDocument();
+    expect(screen.getByText('validationPending')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Original sealed validation result' })).not.toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(11999); }); expect(reads()).toBe(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); }); expect(reads()).toBe(2);
     expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+    expect(screen.queryByText('validationPending')).not.toBeInTheDocument();
+    expect(screen.queryByText('c47948b9-084b-4109-a862-0312e7a77102')).not.toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(30000); }); expect(reads()).toBe(2);
     expect(writes.filter(write => write.path.endsWith('/validate'))).toHaveLength(1);
     expect(writes.some(write => /\/(activate|cancel)$/.test(write.path))).toBe(false);

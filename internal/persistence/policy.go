@@ -20,6 +20,10 @@ type MaintenanceWindow struct {
 func (p Policy) Clone() Policy {
 	p.policyExtensions = clonePolicyExtensions(p)
 	p.Endpoints = maps.Clone(p.Endpoints)
+	p.NotificationEndpointIDs = maps.Clone(p.NotificationEndpointIDs)
+	for color, ids := range p.NotificationEndpointIDs {
+		p.NotificationEndpointIDs[color] = slices.Clone(ids)
+	}
 	p.NotificationTriggers = maps.Clone(p.NotificationTriggers)
 	p.Maintenance = slices.Clone(p.Maintenance)
 	return p
@@ -41,6 +45,16 @@ func (p Policy) Validate() error {
 	for _, count := range p.Endpoints {
 		if count < 0 || count > math.MaxInt32 {
 			return errors.New("invalid durable notification endpoint count")
+		}
+	}
+	for color, ids := range p.NotificationEndpointIDs {
+		if len(ids) != p.Endpoints[color] {
+			return ErrNotificationIdentity
+		}
+		for _, id := range ids {
+			if !catalogIdentifier(id, 256) {
+				return ErrNotificationIdentity
+			}
 		}
 	}
 	for _, window := range p.Maintenance {

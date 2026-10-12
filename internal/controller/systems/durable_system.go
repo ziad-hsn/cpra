@@ -140,6 +140,12 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 			for color, c := range cc.Configs {
 				if c.Dispatch {
 					policy.Endpoints[color] = len(js.CodeJobs[color])
+					if len(c.EndpointIDs) != 0 {
+						if policy.NotificationEndpointIDs == nil {
+							policy.NotificationEndpointIDs = make(map[string][]string)
+						}
+						policy.NotificationEndpointIDs[color] = slices.Clone(c.EndpointIDs)
+					}
 					setRecoveryNotification(&policy, color, c.Trigger, recoveryDriver)
 				}
 			}
@@ -865,6 +871,8 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d := jobs.NewDispatch(prototype, ent, a.Kind, a.Color, 0, a.Endpoint)
 			d.MonitorID, d.Revision, d.ActionID = m.ID, a.Revision, id
 			d.IncidentID, d.CatalogUID, d.Attempt = a.IncidentID, a.CatalogUID, a.Attempt
+			d.DeliveryID, d.EndpointID = a.DeliveryID, a.EndpointID
+			d.NotificationCorrelation = a.NotificationCorrelation
 			d.Scheduled = a.NotBefore
 			if a.Kind == "code" {
 				d.Deadline = a.Deadline

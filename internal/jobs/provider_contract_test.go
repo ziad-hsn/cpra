@@ -71,8 +71,11 @@ func TestRetryableNotificationRejections(t *testing.T) {
 func TestOpsgenieMessageLimit(t *testing.T) {
 	var payload map[string]string
 	notificationTestHTTP(t, func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodGet {
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":{"success":true,"isSuccess":true}}`)), Header: make(http.Header)}, nil
+		}
 		_ = json.NewDecoder(r.Body).Decode(&payload)
-		return &http.Response{StatusCode: 202, Body: io.NopCloser(strings.NewReader("{}")), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: 202, Body: io.NopCloser(strings.NewReader(`{"requestId":"11111111-1111-4111-8111-111111111111"}`)), Header: make(http.Header)}, nil
 	})
 	j, err := CreateCodeJob("api", manifest.CodeConfig{Notify: "opsgenie", Config: &manifest.CodeNotificationOpsgenie{APIKey: "fixture"}}, ecs.Entity{}, "red")
 	if err != nil {

@@ -49,6 +49,26 @@ func TestNotificationEpisodeCancelsObsoleteWorkAndBypassesOldCooldown(t *testing
 	}
 }
 
+func TestNotificationProviderCorrelationSurvivesRecoveryAndRenewal(t *testing.T) {
+	p := testMonitor().Policy
+	p.Intervention, p.Unhealthy, p.Healthy = false, 1, 1
+	p.Endpoints = map[string]int{"red": 1, "green": 1}
+	p.NotificationEndpointIDs = map[string][]string{"red": {"destination"}, "green": {"destination"}}
+	at := policyTime().Add(time.Second)
+	m := policyPulse(t, configuredPolicyMonitor(t, p), at, "failure")
+	red := notificationByColor(t, m, "red", Queued)
+	m = policyPulse(t, m, at.Add(time.Second), "success")
+	green := notificationByColor(t, m, "green", Queued)
+	if red.NotificationCorrelation == "" || red.NotificationCorrelation != green.NotificationCorrelation || red.EndpointID != green.EndpointID {
+		t.Fatal("confirmed recovery cannot close the original provider incident")
+	}
+	m = policyPulse(t, m, at.Add(2*time.Second), "failure")
+	next := notificationByColor(t, m, "red", Queued)
+	if next.NotificationCorrelation == red.NotificationCorrelation {
+		t.Fatal("new outage inherited old provider correlation")
+	}
+}
+
 func TestNotificationMaintenanceCancelsUnsentWorkAndKeepsObservations(t *testing.T) {
 	p := testMonitor().Policy
 	p.Intervention, p.Unhealthy = false, 1

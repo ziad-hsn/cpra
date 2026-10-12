@@ -33,16 +33,17 @@ const (
 // Policy is deliberately an allowlist of non-secret decision inputs.
 type Policy struct {
 	policyExtensions
-	Interval             time.Duration     `json:"interval"`
-	Unhealthy            int               `json:"unhealthy"`
-	Healthy              int               `json:"healthy"`
-	Intervention         bool              `json:"intervention"`
-	Enabled              bool              `json:"enabled"`
-	Cooldown             time.Duration     `json:"cooldown"`
-	RecoveryBypass       bool              `json:"recovery_bypass"`
-	Endpoints            map[string]int    `json:"endpoints,omitempty"`
-	NotificationTriggers map[string]string `json:"notification_triggers,omitempty"`
-	RecoveryDriver       string            `json:"recovery_driver,omitempty"`
+	Interval                time.Duration       `json:"interval"`
+	Unhealthy               int                 `json:"unhealthy"`
+	Healthy                 int                 `json:"healthy"`
+	Intervention            bool                `json:"intervention"`
+	Enabled                 bool                `json:"enabled"`
+	Cooldown                time.Duration       `json:"cooldown"`
+	RecoveryBypass          bool                `json:"recovery_bypass"`
+	Endpoints               map[string]int      `json:"endpoints,omitempty"`
+	NotificationEndpointIDs map[string][]string `json:"notification_endpoint_ids,omitempty"`
+	NotificationTriggers    map[string]string   `json:"notification_triggers,omitempty"`
+	RecoveryDriver          string              `json:"recovery_driver,omitempty"`
 	// Zero retains the legacy one-attempt policy; cooldown applies only to a
 	// subsequent attempt after a confirmed recovery failure.
 	RecoveryCooldown    time.Duration       `json:"recovery_cooldown,omitempty"`
@@ -51,37 +52,39 @@ type Policy struct {
 }
 
 type Action struct {
-	DeliveryID          string              `json:"delivery_id,omitempty"`
-	NotificationEpisode string              `json:"notification_episode,omitempty"`
-	EndpointID          string              `json:"endpoint_id,omitempty"`
-	Deadline            time.Time           `json:"deadline,omitzero"`
-	AgentConnection     *AgentConnection    `json:"agent_connection,omitempty"`
-	RecoveryFailure     *RecoveryFailure    `json:"recovery_failure,omitempty"`
-	AgentReceipt        *AgentReceipt       `json:"agent_receipt,omitempty"`
-	ConflictingEvidence *LateActionEvidence `json:"conflicting_evidence,omitempty"`
-	OperationID         string              `json:"operation_id,omitempty"`
-	Manual              bool                `json:"manual,omitempty"`
-	Review              *ActionReview       `json:"review,omitempty"`
-	ExecutorKind        string              `json:"executor_kind,omitempty"`
-	ExecutorSession     string              `json:"executor_session,omitempty"`
-	ExecutorFinishedAt  time.Time           `json:"executor_finished_at,omitempty"`
-	IncidentID          string              `json:"incident_id,omitempty"`
-	LateEvidence        *LateActionEvidence `json:"late_evidence,omitempty"`
-	CatalogUID          string              `json:"catalog_uid,omitempty"`
-	ID                  string              `json:"id"`
-	Revision            string              `json:"revision"`
-	Kind                string              `json:"kind"`
-	Color               string              `json:"color,omitempty"`
-	Endpoint            int                 `json:"endpoint"`
-	Attempt             int                 `json:"attempt"`
-	State               ActionState         `json:"state"`
-	NotBefore           time.Time           `json:"not_before"`
-	StartedAt           time.Time           `json:"started_at,omitempty"`
-	FinishedAt          time.Time           `json:"finished_at,omitempty"`
-	Outcome             string              `json:"outcome,omitempty"`
+	NotificationCorrelation string              `json:"notification_correlation,omitempty"`
+	DeliveryID              string              `json:"delivery_id,omitempty"`
+	NotificationEpisode     string              `json:"notification_episode,omitempty"`
+	EndpointID              string              `json:"endpoint_id,omitempty"`
+	Deadline                time.Time           `json:"deadline,omitzero"`
+	AgentConnection         *AgentConnection    `json:"agent_connection,omitempty"`
+	RecoveryFailure         *RecoveryFailure    `json:"recovery_failure,omitempty"`
+	AgentReceipt            *AgentReceipt       `json:"agent_receipt,omitempty"`
+	ConflictingEvidence     *LateActionEvidence `json:"conflicting_evidence,omitempty"`
+	OperationID             string              `json:"operation_id,omitempty"`
+	Manual                  bool                `json:"manual,omitempty"`
+	Review                  *ActionReview       `json:"review,omitempty"`
+	ExecutorKind            string              `json:"executor_kind,omitempty"`
+	ExecutorSession         string              `json:"executor_session,omitempty"`
+	ExecutorFinishedAt      time.Time           `json:"executor_finished_at,omitempty"`
+	IncidentID              string              `json:"incident_id,omitempty"`
+	LateEvidence            *LateActionEvidence `json:"late_evidence,omitempty"`
+	CatalogUID              string              `json:"catalog_uid,omitempty"`
+	ID                      string              `json:"id"`
+	Revision                string              `json:"revision"`
+	Kind                    string              `json:"kind"`
+	Color                   string              `json:"color,omitempty"`
+	Endpoint                int                 `json:"endpoint"`
+	Attempt                 int                 `json:"attempt"`
+	State                   ActionState         `json:"state"`
+	NotBefore               time.Time           `json:"not_before"`
+	StartedAt               time.Time           `json:"started_at,omitempty"`
+	FinishedAt              time.Time           `json:"finished_at,omitempty"`
+	Outcome                 string              `json:"outcome,omitempty"`
 }
 
 type Monitor struct {
+	NotificationCorrelation string               `json:"notification_correlation,omitempty"`
 	NotificationVersion     int                  `json:"notification_version,omitempty"`
 	NotificationEpisode     string               `json:"notification_episode,omitempty"`
 	NotificationMaintenance bool                 `json:"notification_maintenance,omitempty"`

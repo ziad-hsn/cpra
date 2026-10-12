@@ -4,6 +4,7 @@ package components
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -218,6 +219,7 @@ type CodeConfig struct {
 }
 
 type ColorCodeConfig struct {
+	EndpointIDs []string
 	Trigger     string
 	Config      manifest.CodeNotification
 	Notify      string
@@ -230,6 +232,7 @@ func (c *ColorCodeConfig) Copy() *ColorCodeConfig {
 		return nil
 	}
 	cpy := &ColorCodeConfig{
+		EndpointIDs: slices.Clone(c.EndpointIDs),
 		Dispatch:    c.Dispatch,
 		MaxFailures: c.MaxFailures,
 		Notify:      strings.Clone(c.Notify),

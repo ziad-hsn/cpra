@@ -286,6 +286,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	m.Warning = c.Warning
 	if c.Outcome != "success" {
 		m.beginIncident(c.At)
+		if m.NotificationVersion == DeliveryFormatVersion {
+			m.NotificationCorrelation = m.IncidentID
+		}
 		m.changeNotificationEpisode(identity("outage/"+m.IncidentID), c.At, emit)
 		m.ConsecutiveFailures++
 		m.PulseFailures++
@@ -316,7 +319,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.LastSuccess = c.At
 		if m.Warning && !previousWarning {
 			if !m.Recovering && !m.Incident {
-				m.changeNotificationEpisode(identity(fmt.Sprintf("warning/%s/%s/%d", m.ID, m.CatalogUID, c.Generation)), c.At, emit)
+				episode := identity(fmt.Sprintf("warning/%s/%s/%d", m.ID, m.CatalogUID, c.Generation))
+				m.changeNotificationEpisode(episode, c.At, emit)
+				if m.NotificationVersion == DeliveryFormatVersion {
+					m.NotificationCorrelation = episode
+				}
 			}
 			m.queueColor("yellow", c.At, emit)
 		}
@@ -381,6 +388,9 @@ func (m *Monitor) openIncident(at time.Time, emit func(string, *Action)) {
 		return
 	}
 	m.beginIncident(at)
+	if m.NotificationVersion == DeliveryFormatVersion {
+		m.NotificationCorrelation = m.IncidentID
+	}
 	m.changeNotificationEpisode(identity("outage/"+m.IncidentID), at, emit)
 	m.Incident = true
 	emit("incident_opened", nil)
@@ -466,6 +476,7 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 	}
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
 	if kind == "code" && m.NotificationVersion == DeliveryFormatVersion {
+		a.NotificationCorrelation = m.NotificationCorrelation
 		a.DeliveryID, a.NotificationEpisode = id, m.NotificationEpisode
 		a.EndpointID = notificationEndpointIdentity(*m, color, endpoint)
 	}

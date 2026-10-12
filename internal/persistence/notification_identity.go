@@ -20,6 +20,9 @@ func deliveryStorageFormat(version int) bool {
 
 func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action)) {
 	if m.NotificationVersion == DeliveryFormatVersion {
+		if m.NotificationCorrelation == "" {
+			m.NotificationCorrelation = m.NotificationEpisode
+		}
 		return
 	}
 	// Old queued deliveries have no episode or immutable logical identity.
@@ -33,6 +36,10 @@ func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action))
 	}
 	m.NotificationVersion = DeliveryFormatVersion
 	m.NotificationEpisode = identity("notification/" + m.ID + "/" + m.CatalogUID + "/" + m.IncidentID)
+	m.NotificationCorrelation = m.NotificationEpisode
+	if m.IncidentID != "" && m.IncidentClosedAt.IsZero() {
+		m.NotificationCorrelation = m.IncidentID
+	}
 	m.Cooldowns = nil
 }
 
@@ -91,6 +98,12 @@ func (m Monitor) notificationEligible(a Action) bool {
 }
 
 func validateNotificationIdentity(m Monitor, version int) error {
+	if m.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(m.NotificationCorrelation, 256)) {
+		return ErrNotificationIdentity
+	}
+	if len(m.Policy.NotificationEndpointIDs) != 0 && !deliveryStorageFormat(version) {
+		return ErrNotificationIdentity
+	}
 	if m.NotificationVersion != 0 {
 		if !deliveryStorageFormat(version) || m.NotificationVersion != DeliveryFormatVersion || !catalogIdentifier(m.NotificationEpisode, 256) {
 			return ErrNotificationIdentity
@@ -99,6 +112,9 @@ func validateNotificationIdentity(m Monitor, version int) error {
 		return ErrNotificationIdentity
 	}
 	for _, a := range m.Actions {
+		if a.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(a.NotificationCorrelation, 256)) {
+			return ErrNotificationIdentity
+		}
 		hasIdentity := a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || !a.Deadline.IsZero()
 		if !hasIdentity {
 			continue // Retained pre-migration outcomes keep their original evidence.
@@ -113,6 +129,9 @@ func validateNotificationIdentity(m Monitor, version int) error {
 }
 
 func notificationEndpointIdentity(m Monitor, color string, endpoint int) string {
+	if ids := m.Policy.NotificationEndpointIDs[color]; endpoint >= 0 && endpoint < len(ids) {
+		return identity(fmt.Sprintf("endpoint/%s/%s/%s", m.ID, m.CatalogUID, ids[endpoint]))
+	}
 	// Revision pins the endpoint configuration; the ordinal belongs to its
 	// immutable color-specific destination list. No target or credential enters
 	// this identity or the Raft record.

@@ -23,12 +23,12 @@ def request_data(driver, mode='success'):
     headers = {'Content-Type': 'application/json'}
     body = {
         'slack': {'text': message},
-        'pagerduty': {'routing_key': 'local-routing-key', 'event_action': 'trigger', 'dedup_key': 'cpra:' + monitor,
-                     'payload': {'summary': message, 'source': monitor, 'severity': 'error'}},
+        'pagerduty': {'routing_key': 'local-routing-key', 'event_action': 'trigger', 'dedup_key': 'cpra:' + RUN_ID,
+                     'payload': {'summary': message, 'source': monitor, 'severity': 'critical'}},
         'webhook': {'message': message, 'monitor': monitor, 'color': 'red'},
         'telegram': {'text': message, 'chat_id': '424242'},
         'discord': {'content': message},
-        'opsgenie': {'message': 'Urgent', 'description': message, 'alias': RUN_ID},
+        'opsgenie': {'message': 'Urgent', 'description': message, 'alias': 'cpra:' + RUN_ID, 'priority': 'P1'},
         'mattermost': {'text': message, 'channel': 'cpra-fixture', 'username': 'cpra-verifier'},
         'victorops': {'state_message': message, 'message_type': 'CRITICAL', 'entity_id': 'local-entity'},
         'pushover': {'message': message, 'token': 'local-app-token', 'user': 'local-user', 'title': 'CPRa fixture',

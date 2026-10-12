@@ -62,7 +62,7 @@ def success_response(driver):
         'telegram': (200, 'application/json', {'ok': True, 'result': {'message_id': 1, 'date': 1700000000,
                                                                   'chat': {'id': 424242, 'type': 'private'}, 'text': 'fixture'}}),
         'discord': (204, 'application/json', b''),
-        'opsgenie': (202, 'application/json', {'result': 'Request will be processed', 'took': 0.001, 'requestId': 'local-fixture-request'}),
+        'opsgenie': (202, 'application/json', {'result': 'Request will be processed', 'took': 0.001, 'requestId': '11111111-1111-4111-8111-111111111111'}),
         'mattermost': (200, 'text/plain', b'ok'),
         'victorops': (200, 'application/json', {'result': 'success', 'entity_id': 'local-entity'}),
         'pushover': (200, 'application/json', {'status': 1, 'request': 'local-fixture-request', 'receipt': 'local-fixture-receipt'}),
@@ -141,14 +141,14 @@ def validate_request(driver, method, path, headers, raw, expected_path, monitor)
                      'priority': '2', 'retry': '60', 'expire': '1800', 'sound': 'pushover'},
         'twilio': {'From': '+15005550006', 'To': '+15005550009'},
         'datadog': {'title': 'CPRA alert: ' + monitor_name, 'alert_type': 'error', 'tags': ['fixture:cpra']},
-        'pagerduty': {'routing_key': 'local-routing-key', 'event_action': 'trigger', 'dedup_key': 'cpra:' + monitor_name},
+        'pagerduty': {'routing_key': 'local-routing-key', 'event_action': 'trigger'},
     }
     if any(body.get(key) != value for key, value in fields.get(driver, {}).items()):
         raise ValueError('provider body fields mismatch')
-    if driver == 'pagerduty' and (body['payload']['source'] != monitor_name or body['payload']['severity'] != 'error'):
+    if driver == 'pagerduty' and (body['payload']['source'] != monitor_name or body['payload']['severity'] != 'critical' or not re.fullmatch(r'cpra:(?:[0-9a-f]{64}|[0-9a-f-]{36})', body.get('dedup_key', ''))):
         raise ValueError('PagerDuty payload mismatch')
     if driver == 'opsgenie' and (len(body['message']) > 130 or not body['message'] or
-                                not re.fullmatch(r'[0-9a-f-]{36}', body['alias'])):
+                                not re.fullmatch(r'cpra:(?:[0-9a-f]{64}|[0-9a-f-]{36})', body['alias']) or body.get('priority') != 'P1'):
         raise ValueError('Opsgenie limits or identity mismatch')
     return run_id
 
@@ -180,6 +180,20 @@ class ContractHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         if not self.path.startswith('/audit/'):
+            key = self.path.split('/')[1]
+            try:
+                state = self.server.audit(key)
+            except KeyError:
+                self.send_error(404)
+                return
+            if state['driver'] == 'opsgenie' and self.path == state['path'] + '/requests/11111111-1111-4111-8111-111111111111' and self.headers.get('Authorization') == 'GenieKey local-api-key':
+                data = b'{"data":{"success":true,"isSuccess":true}}'
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             self.send_error(404)
             return
         try:
@@ -251,7 +265,7 @@ def run(binary, out):
     suite = {'evidence_type': 'mock_contract', 'provider_certification': False,
              'binary_sha256': hashlib.sha256(pathlib.Path(binary).read_bytes()).hexdigest(),
              'scenarios': [], 'limitations': ['Mocks check request contracts and HTTP failure handling; they do not prove provider delivery.',
-                                              'Malformed HTTP framing is tested; successful response bodies are not parsed by current notification drivers.']}
+                                              'Malformed HTTP framing is tested; Opsgenie acceptance and request-status bodies are checked separately.']}
     try:
         with tempfile.TemporaryDirectory(prefix='cpra-contract-') as directory:
             for mode in MODES:

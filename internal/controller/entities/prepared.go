@@ -2,6 +2,9 @@ package entities
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -38,8 +41,18 @@ type preparedComponents struct {
 
 func (p *PreparedMonitor) MonitorID() string { return p.id }
 func (p *PreparedMonitor) Revision() string  { return p.revision }
-func (p *PreparedMonitor) String() string    { return "PreparedMonitor{private configuration}" }
-func (p *PreparedMonitor) GoString() string  { return p.String() }
+
+// NotificationEndpointIDs returns copied opaque identities for prepared targets.
+func (p *PreparedMonitor) NotificationEndpointIDs(color string) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle == nil || p.bundle.codes == nil || p.bundle.codes.Configs[color] == nil {
+		return nil
+	}
+	return slices.Clone(p.bundle.codes.Configs[color].EndpointIDs)
+}
+func (p *PreparedMonitor) String() string   { return "PreparedMonitor{private configuration}" }
+func (p *PreparedMonitor) GoString() string { return p.String() }
 func (p *PreparedMonitor) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("prepared monitor configuration cannot be serialized")
 }
@@ -184,11 +197,31 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		if err != nil {
 			return nil, fmt.Errorf("prepare notification: %w", err)
 		}
+		if code.NotifyGroup != "" {
+			for _, name := range privateGroups[code.NotifyGroup] {
+				b.codes.Configs[color].EndpointIDs = append(b.codes.Configs[color].EndpointIDs, notificationTargetID("endpoint/"+name))
+			}
+		} else if len(b.jobs.CodeJobs[color]) != 0 {
+			raw, err := json.Marshal(struct {
+				Type   string
+				Config manifest.CodeNotification
+			}{code.Notify, code.Config})
+			if err != nil {
+				return nil, errors.New("notification identity cannot be encoded")
+			}
+			b.codes.Configs[color].EndpointIDs = []string{notificationTargetID("inline/" + string(raw))}
+			clear(raw)
+		}
 	}
 	if err := preparer.finish(&b.jobs); err != nil {
 		return nil, err
 	}
 	return &PreparedMonitor{id: id, revision: revision, bundle: b}, nil
+}
+
+func notificationTargetID(input string) string {
+	digest := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(digest[:])
 }
 
 // The default preparer constructs only local jobs. Optional preparers may retain

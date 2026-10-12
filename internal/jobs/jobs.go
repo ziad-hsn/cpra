@@ -1182,6 +1182,7 @@ func (c *CodeLogJob) IsNil() bool                { return c == nil }
 
 // CodePagerDutyJob implements a PagerDuty notification job.
 type CodePagerDutyJob struct {
+	CorrelationKey  string
 	URL, RoutingKey string
 	Execution
 	EnqueueTime time.Time
@@ -1210,8 +1211,12 @@ func (c *CodePagerDutyJob) Execute() (result Result) {
 	if c.Color == "green" {
 		action = "resolve"
 	}
-	data := map[string]interface{}{"routing_key": c.RoutingKey, "event_action": action, "dedup_key": "cpra:" + c.Monitor,
-		"payload": map[string]string{"summary": c.Message, "source": c.Monitor, "severity": "error"}}
+	key := c.CorrelationKey
+	if key == "" {
+		key = "cpra:" + c.ID.String()
+	}
+	data := map[string]interface{}{"routing_key": c.RoutingKey, "event_action": action, "dedup_key": key,
+		"payload": map[string]string{"summary": c.Message, "source": c.Monitor, "severity": codeAlertTemplateFor(c.Color).Severity}}
 	result.Err = sendJSON(ctx, http.MethodPost, target, nil, data)
 	return
 }
@@ -1406,6 +1411,7 @@ func (c *CodeDiscordJob) IsNil() bool                { return c == nil }
 
 // CodeOpsgenieJob delivers an alert to Opsgenie via the v2 alerts API.
 type CodeOpsgenieJob struct {
+	CorrelationKey string
 	Execution
 	EnqueueTime time.Time
 	StartTime   time.Time
@@ -1420,37 +1426,10 @@ type CodeOpsgenieJob struct {
 
 func (c *CodeOpsgenieJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
-	ctx, cancel := operationContext(c.Context(), 10*time.Second)
+	ctx, cancel := operationContext(c.Context(), 45*time.Second)
 	defer cancel()
-
 	payload := map[string]interface{}{"type": "code", "driver": "opsgenie", "color": c.Color}
-	url := c.URL
-	if url == "" {
-		url = "https://api.opsgenie.com/v2/alerts"
-	}
-	body, err := json.Marshal(map[string]string{
-		"message":     truncateNotification(c.Message, 130),
-		"description": truncateNotification(c.Message, 15000),
-		"alias":       c.ID.String(),
-	})
-	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(body)))
-	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	req.Header.Set("Authorization", "GenieKey "+c.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := GetHTTPClient(10 * time.Second).Do(req)
-	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if err := notificationStatusError(resp.StatusCode); err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}
+	return Result{ID: c.ID, Ent: c.Entity, Err: c.deliverOpsgenie(ctx), Payload: payload}
 }
 
 func (c *CodeOpsgenieJob) Copy() Job                  { job := *c; return &job }

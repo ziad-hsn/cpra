@@ -39,14 +39,15 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
-	RecoveryFailure                       *RecoveryFailure
-	ProjectionVersion                     string
-	CheckControlRevision                  string
-	Scheduled                             time.Time
-	MonitorID, Revision, ActionID, Driver string
-	IncidentID, CatalogUID                string
-	Attempt                               int
-	Before                                func(context.Context) error
+	RecoveryFailure                                 *RecoveryFailure
+	ProjectionVersion                               string
+	CheckControlRevision                            string
+	Scheduled                                       time.Time
+	MonitorID, Revision, ActionID, Driver           string
+	IncidentID, CatalogUID                          string
+	DeliveryID, EndpointID, NotificationCorrelation string
+	Attempt                                         int
+	Before                                          func(context.Context) error
 	// Authorize returns an invocation-local completion callback, including on
 	// uncertain admission. Dispatch copies never share mutable execution handles.
 	Authorize func(context.Context) (ActionExecution, error)
@@ -137,6 +138,7 @@ func (d *Dispatch) Execute() (r Result) {
 	if j, ok := d.Job.(interface{ SetContext(context.Context) }); ok {
 		j.SetContext(ctx)
 	}
+	bindNotificationContext(d.Job, d)
 	return d.Job.Execute()
 }
 

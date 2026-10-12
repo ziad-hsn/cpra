@@ -332,6 +332,17 @@ A rule uses `notify` plus `config`, or references a reusable `notify_group`. End
 All listed notifications are included by default except `teams` and `twilio`, which require their respective tags.
 
 - PagerDuty needs an Events API v2 routing key.
+
+PagerDuty trigger and resolve requests use the committed incident and endpoint
+identity, so retries and recovery keep the same `dedup_key`. The configured
+Code severity maps to `critical`, `warning` or `info`. Opsgenie uses the matching
+incident/endpoint alias for create and close, maps critical/warning/informational
+Codes to P1/P3/P5, and checks the asynchronous request status after a 202 receipt.
+An unreadable or unsuccessful processing receipt holds the outcome as unknown;
+it does not authorize repetition of the accepted request. These boundaries follow
+[PagerDuty's event contract](https://docs.pagerduty.com/developer/send-alert-event)
+and the [Opsgenie alert API](https://docs.opsgenie.com/docs/alert-api).
+Provider processing success does not prove a human received the notification.
 - Email uses an SMTP relay with STARTTLS. Username/password SMTP authentication is not implemented.
 - Teams uses a Workflow incoming webhook.
 - Pushover emergency priority needs `retry` and `expire` in seconds, defaulting to 60 and 1800.

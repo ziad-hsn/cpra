@@ -141,7 +141,7 @@ func TestStagedRoutingMetadataHonorsAuthorityLifetimeAndWorkBounds(t *testing.T)
 func TestStagedRoutingMetadataChecksAfterBorrow(t *testing.T) {
 	for _, mode := range []string{"cancel", "expire"} {
 		t.Run(mode, func(t *testing.T) {
-			f := stagedValidationFixture(t, resource("NotificationEndpoint", "chat", api.DriverConfig{Type: "log", Config: json.RawMessage(`{}`)}))
+			f := stagedValidationFixture(t, resource("NotificationEndpoint", "chat", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"never-opened.log"}`)}))
 			v := stagedRoutingValidator(t, &f)
 			key := f.items[0].Key
 			lookup := stagedSelectedLookup{validator: v, selected: map[persistence.CatalogKey]bool{key: true}}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ziad-hsn/cpra/internal/persistence"
-	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +12,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
 func TestStopDeadlineCancelsWorkAndRetainsUnknownAction(t *testing.T) {
@@ -32,7 +33,7 @@ func TestStopDeadlineCancelsWorkAndRetainsUnknownAction(t *testing.T) {
 	}))
 	defer target.Close()
 	path := filepath.Join(t.TempDir(), "monitors.yaml")
-	manifest := fmt.Sprintf("monitors:\n  - id: shutdown-test\n    name: Shutdown test\n    pulse_check:\n      type: http\n      interval: 10ms\n      timeout: 1s\n      unhealthy_threshold: 1\n      config: {url: %q}\n    codes:\n      red:\n        notify: webhook\n        config: {url: %q, timeout: 10s}\n", target.URL, target.URL+"/notify")
+	manifest := fmt.Sprintf("monitors:\n  - id: shutdown-test\n    name: Shutdown test\n    pulse_check:\n      type: http\n      interval: 10ms\n      timeout: 1s\n      unhealthy_threshold: 1\n      config: {url: %q}\n    codes:\n      red:\n        notify: webhook\n        config: {url: %q}\n", target.URL, target.URL+"/notify")
 	if err := os.WriteFile(path, []byte(manifest), 0600); err != nil {
 		t.Fatal(err)
 	}

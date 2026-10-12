@@ -228,6 +228,10 @@ Go 1.27.1. The initial added test omitted an import; that failed compile is
 retained separately from its corrected passing check. Independent review of
 this follow-up remains required.
 
-The broader run also found failures in shutdown and collection-routing fixtures.
-They remain open while their production paths and input validity are inspected.
-That run is not a passing final-source matrix.
+The broader run also found invalid shutdown and collection-routing fixtures.
+The webhook fixture supplied an unsupported per-endpoint timeout, while the
+post-borrow routing fixture omitted its required log destination and therefore
+never reached the callback. Both now use valid static configurations; their
+intended cancellation, expiry and unknown-delivery checks pass three repeated
+runs. No production shutdown or routing guard was relaxed. The broader run
+remains failed evidence, not a passing final-source matrix.

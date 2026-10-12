@@ -16,7 +16,7 @@ import (
 const maxNotificationResponse = 64 << 10
 
 func unknownNotificationResponse(status int) error {
-	return fmt.Errorf("notification outcome unknown (HTTP %d)", status)
+	return fmt.Errorf("notification outcome unknown: %w", &HTTPStatusError{Status: status})
 }
 
 // notificationResponseError interprets only the selected provider's rejection

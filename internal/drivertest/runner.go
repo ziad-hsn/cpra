@@ -77,7 +77,8 @@ type Record struct {
 	Accepted            bool      `json:"accepted"`
 	Observed            bool      `json:"observed"`
 	Invoked             bool      `json:"operation_invoked"`
-	HTTPStatus          int       `json:"http_status,omitempty"` // Typed HTTP rejection only; zero for transport/setup failures.
+	Outcome             string    `json:"outcome,omitempty"`     // Effect certainty, independent of HTTP status or observed delivery.
+	HTTPStatus          int       `json:"http_status,omitempty"` // Observed response status; zero when no status is available.
 	MonitorID           string    `json:"monitor_id,omitempty"`
 	ActionID            string    `json:"action_id,omitempty"`
 	ActionState         string    `json:"action_state,omitempty"`
@@ -361,6 +362,9 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 	result := d.Execute()
 	r.Invoked = !result.ExecutionStart.IsZero()
 	r.Accepted = result.Err == nil
+	if r.Accepted {
+		r.Outcome = "accepted"
+	}
 	r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond)
 	if agent != nil {
 		r.ActionState, err = agent.finish(result)
@@ -371,8 +375,18 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 	}
 	if result.Err != nil {
 		var rejection *jobs.DeliveryError
+		var status *jobs.HTTPStatusError
+		r.Outcome = "unknown"
+		if driver.Kind == "pulse" {
+			r.Outcome = "failed"
+		}
 		if errors.As(result.Err, &rejection) {
 			r.HTTPStatus = rejection.Status
+			r.Outcome = "rejected"
+		} else if errors.Is(result.Err, jobs.ErrInterventionRejected) {
+			r.Outcome = "rejected"
+		} else if errors.As(result.Err, &status) {
+			r.HTTPStatus = status.Status
 		}
 		r.Reason = "production driver returned an error; inspect designated provider records"
 		return r

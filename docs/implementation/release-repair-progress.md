@@ -214,3 +214,20 @@ in [idle observations](idle-profile-2026-10-12.md). The roughly one-third CPU
 reduction is limited to empty/one-monitor Linux/WSL runs; no capacity or memory
 claim follows. The complete queue suite, focused Go1.25 and race/drain/demand
 checks pass. Further owner-loop scheduling work remains open.
+
+## Verification report follow-up
+
+The broader application run found that the verification report lost the HTTP
+status for generic webhook failures after those effects became unknown. The
+report now records the observed status separately from accepted, rejected or
+unknown effect certainty. A documented Slack rejection remains rejected and
+is invoked only once; HTTP 400/404/429/500 webhook responses and transport
+failures remain unknown. Accepted operations still require an independent
+observer before the case passes. Complete drivertest and jobs suites pass on
+Go 1.27.1. The initial added test omitted an import; that failed compile is
+retained separately from its corrected passing check. Independent review of
+this follow-up remains required.
+
+The broader run also found failures in shutdown and collection-routing fixtures.
+They remain open while their production paths and input validity are inspected.
+That run is not a passing final-source matrix.

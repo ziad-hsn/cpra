@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -126,7 +127,7 @@ func TestLocalAndMockEvidenceUsesProductionDriverAndIndependentObserver(t *testi
 				t.Fatal(err)
 			}
 			row := r.Records[0]
-			if count.Load() != 1 || row.Status != "pass" || !row.Accepted || !row.Observed || !row.Invoked || row.EvidenceType != evidenceType || row.ObservationBoundary != BoundaryEffect {
+			if count.Load() != 1 || row.Status != "pass" || row.Outcome != "accepted" || !row.Accepted || !row.Observed || !row.Invoked || row.EvidenceType != evidenceType || row.ObservationBoundary != BoundaryEffect {
 				t.Fatal(row, count.Load())
 			}
 			if r.Complete || !r.AllConfiguredPassed || r.AllDriversTested || r.PassedCases != 1 || r.NotConfiguredCases != len(Inventory())-1 || r.PassedByEvidenceType[evidenceType] != 1 {
@@ -166,12 +167,12 @@ func TestAcceptanceWithoutObservedEffectDoesNotPass(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := r.Records[0]
-	if count.Load() != 1 || row.Status != "fail" || !row.Accepted || row.Observed || r.AllConfiguredPassed {
+	if count.Load() != 1 || row.Status != "fail" || row.Outcome != "accepted" || !row.Accepted || row.Observed || r.AllConfiguredPassed {
 		t.Fatal(row)
 	}
 }
 
-func TestReportDistinguishesHTTPRejectionFromTransportFailure(t *testing.T) {
+func TestReportDistinguishesObservedHTTPStatusFromEffectCertainty(t *testing.T) {
 	for _, status := range []int{400, 404, 429, 500} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			cfg, count := localHTTPScenarioStatus(t, status)
@@ -184,8 +185,8 @@ func TestReportDistinguishesHTTPRejectionFromTransportFailure(t *testing.T) {
 			}
 			for _, row := range r.Records {
 				if row.Kind == "code" && row.Name == "webhook" {
-					if row.Status != "fail" || row.HTTPStatus != status || !row.Invoked || row.Accepted || row.Observed || count.Load() != 1 {
-						t.Fatal("HTTP rejection not retained accurately", row)
+					if row.Status != "fail" || row.HTTPStatus != status || row.Outcome != "unknown" || !row.Invoked || row.Accepted || row.Observed || count.Load() != 1 {
+						t.Fatal("HTTP status was lost or asserted effect rejection", row)
 					}
 				}
 			}
@@ -210,10 +211,36 @@ func TestReportDistinguishesHTTPRejectionFromTransportFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range r.Records {
-		if row.Kind == "code" && row.Name == "webhook" && (row.Status != "fail" || row.HTTPStatus != 0 || !row.Invoked || count.Load() != 0) {
+		if row.Kind == "code" && row.Name == "webhook" && (row.Status != "fail" || row.HTTPStatus != 0 || row.Outcome != "unknown" || !row.Invoked || count.Load() != 0) {
 			t.Fatal("transport failure presented as HTTP rejection", row)
 		}
 	}
+}
+
+func TestReportRecordsProvenRejectionWithoutRetrying(t *testing.T) {
+	cfg, _ := localHTTPScenario(t)
+	var invoked atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		invoked.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, "action_prohibited")
+	}))
+	t.Cleanup(target.Close)
+	cfg.Manifest.Monitors[0].Codes = manifest.Codes{"red": {Notify: "slack", Dispatch: true, Config: &manifest.CodeNotificationSlack{WebHook: target.URL}}}
+	cfg.Cases[0].Kind, cfg.Cases[0].Driver, cfg.Cases[0].Color = "code", "slack", "red"
+	r, err := Run(context.Background(), cfg, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range r.Records {
+		if row.Kind == "code" && row.Name == "slack" {
+			if row.Status != "fail" || row.HTTPStatus != http.StatusForbidden || row.Outcome != "rejected" || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
+				t.Fatal("documented rejection was lost or repeated", row, invoked.Load())
+			}
+			return
+		}
+	}
+	t.Fatal("configured Slack case missing from the report")
 }
 
 func TestReferencedEndpointPlaceholdersAreNotInvoked(t *testing.T) {

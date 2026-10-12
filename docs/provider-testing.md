@@ -18,8 +18,11 @@ effect. Twilio's official test credentials alone allow
 so that report always has `observed: false`.
 
 Reports retain `configured`, `operation_invoked`, `accepted`, `observed`, timing,
-classification and evidence hashes. Typed HTTP rejections include `http_status`;
-network failures do not invent a status.
+classification and evidence hashes. `http_status` records a received HTTP status;
+network failures do not invent one. `outcome` reports accepted, rejected or
+unknown effect certainty (failed for a check). A generic webhook HTTP 500 or 429
+can retain its observed status while leaving the effect unknown. That status
+does not authorize replay or establish delivery.
 
 Each CLI invocation requires a new report path and a new adjacent `.evidence`
 directory. Both are reserved before observers or drivers run. An existing report,

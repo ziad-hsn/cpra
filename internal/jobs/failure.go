@@ -12,7 +12,8 @@ import (
 
 var ErrJobPanic = errors.New("job panicked")
 
-// HTTPStatusError reports check failure without retaining the response body.
+// HTTPStatusError retains an observed status without a response body. It does
+// not establish rejection of an external effect or authorize another attempt.
 type HTTPStatusError struct{ Status int }
 
 func (e *HTTPStatusError) Error() string {

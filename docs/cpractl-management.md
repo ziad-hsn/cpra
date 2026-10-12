@@ -25,6 +25,13 @@ cpractl get state
 
 Continue a list with its returned `--cursor` and the original page limit. Monitor
 lists accept `--selector`; they do not use numeric entity IDs or page numbers.
+Human monitor lists include `OBSERVED HEALTH`: `up`, `down`, `degraded` or
+`unknown`, based on the latest reported check. This is distinct from saved
+configuration, incident controls and pending health verification. `describe`
+shows configuration identity, check/recovery settings and observed timing;
+absent measurements appear as `unavailable`, and terminal controls are escaped.
+Use `-o json` or `-o yaml` for the canonical resource, including full configured
+fields. Those machine formats retain the wire contract.
 `get state` reports controller and storage health. Use `get actions --monitor-id
 service-api` for a monitor's action state. `get overview` is not a current command.
 

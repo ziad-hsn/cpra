@@ -69,8 +69,8 @@ export default function Monitors() {
         </div>
       ) : monitors.length === 0 ? (
         <div className="card">
-          <EmptyState title={filtered ? 'No matching monitors' : total > 0 ? 'No monitors on this page' : 'No live monitors'}
-            message={filtered ? 'No monitors match your filters.' : total > 0 ? 'Return to an earlier page to see remaining monitors.' : 'No monitor observations are available yet. Check configuration and controller readiness.'} />
+          <EmptyState title={total > 0 ? 'No monitors on this page' : filtered ? 'No matching monitors' : 'No live monitors'}
+            message={total > 0 ? 'Return to an earlier page to see remaining monitors.' : filtered ? 'No monitors match your filters.' : 'No monitor observations are available yet. Check configuration and controller readiness.'} />
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

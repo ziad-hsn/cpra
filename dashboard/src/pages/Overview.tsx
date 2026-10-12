@@ -58,6 +58,7 @@ export default function Overview() {
   if (isError) {
     return (
       <div className='page'>
+        <div className='page-head'><h1>Fleet Overview</h1></div>
         <ErrorState message='Failed to load fleet overview' onRetry={() => refetch()} />
       </div>
     );

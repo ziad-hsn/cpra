@@ -86,3 +86,17 @@ batching regression with no remaining concrete finding in that finite change.
 It verified count/byte/guard bounds, prefix reconciliation, suffix scheduling
 before dispatch, final queued-job authorization and pending-work restoration on
 submission error. It ran no tests and does not qualify the final release.
+
+## Dashboard checkpoint
+
+Source review of `5e820d7` found two display edge cases: an overview failure had
+no primary heading, and an empty later filtered page could claim no matches
+despite a positive filtered total. Both now have repairs and passing application
+route regressions. No concrete defect was found in the other inspected missing
+route, finite formatting, controller terminology, artwork attribution or
+embedded-notices paths. The complete 526-test frontend run, type check and lint
+passed; the two subsequent repairs passed in the eleven-test app suite. Final
+source re-review of those changes remains required.
+
+Compact `100%` text is verified in the DOM. Responsive pixel fit, browser
+accessibility and embedded regeneration remain separate gates.

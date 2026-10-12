@@ -71,7 +71,11 @@ func table(w io.Writer, headers []string, rows [][]string) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, strings.Join(headers, "\t"))
 	for _, row := range rows {
-		fmt.Fprintln(tw, strings.Join(row, "\t"))
+		cells := make([]string, len(row))
+		for i, cell := range row {
+			cells[i] = managementDisplay(cell)
+		}
+		fmt.Fprintln(tw, strings.Join(cells, "\t"))
 	}
 	return tw.Flush()
 }
@@ -80,7 +84,7 @@ func table(w io.Writer, headers []string, rows [][]string) error {
 func kv(w io.Writer, rows [][2]string) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	for _, r := range rows {
-		fmt.Fprintf(tw, "%s:\t%s\n", r[0], r[1])
+		fmt.Fprintf(tw, "%s:\t%s\n", managementDisplay(r[0]), managementDisplay(r[1]))
 	}
 	return tw.Flush()
 }

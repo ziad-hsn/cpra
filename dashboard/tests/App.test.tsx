@@ -131,6 +131,30 @@ describe('App', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
+  it('keeps one primary heading when the overview request fails', async () => {
+    server.use(http.get('/api/v1/overview', () => new HttpResponse(null, { status: 503 })));
+    renderApp('/');
+    expect(await screen.findByText('Failed to load fleet overview', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fleet Overview');
+  });
+
+  it('identifies an empty later filtered page while earlier matches remain', async () => {
+    server.use(http.get('/api/v1/monitors', ({ request }) => {
+      const query = new URL(request.url).searchParams;
+      return HttpResponse.json({ ...monitorsResponse, total: query.get('page') === '2' ? 1 : 51,
+        monitors: query.get('page') === '2' ? [] : Array.from({ length: 50 }, (_, n) => ({ ...monitorsResponse.monitors[0], id: n + 1, name: `db-${n}` })) });
+    }));
+    renderApp('/monitors');
+    await screen.findByRole('searchbox', { name: 'Search monitors' });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search monitors' }), { target: { value: 'db' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(await screen.findByText('No monitors on this page')).toBeInTheDocument();
+    expect(screen.getByText('Return to an earlier page to see remaining monitors.')).toBeInTheDocument();
+    expect(screen.queryByText('No monitors match your filters.')).not.toBeInTheDocument();
+  });
+
   it('shows a missing-route page with a working return link', async () => {
     renderApp('/does-not-exist');
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();

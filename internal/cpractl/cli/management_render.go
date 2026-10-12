@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/google/uuid"
@@ -36,7 +37,7 @@ func safeManagementHandle(value string) bool {
 	return err == nil && parsed != uuid.Nil && parsed.String() == epoch
 }
 func managementDisplay(value string) string {
-	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+	if strings.IndexFunc(value, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) >= 0 {
 		return strconv.Quote(value)
 	}
 	return value
@@ -121,9 +122,19 @@ func writeManagementTable(cmd *cobra.Command, o *options, data []byte, describe 
 		if status == "" || status == "{}" || status == "null" {
 			status = "unavailable (the server did not report resource status)"
 		}
+		if resource.Kind == "Monitor" {
+			return describeMonitor(cmd, resource, name)
+		}
 		return kv(cmd.OutOrStdout(), [][2]string{{"API version", managementDisplay(resource.APIVersion)}, {"Kind", managementDisplay(resource.Kind)}, {"Stable ID", managementDisplay(resource.Metadata.ID)}, {"Name", managementDisplay(name)}, {"UID", managementDisplay(resource.Metadata.UID)}, {"Resource version", managementDisplay(resource.Metadata.ResourceVersion)}, {"Generation", strconv.FormatInt(resource.Metadata.Generation, 10)}, {"Configuration", string(resource.Spec)}, {"Status", status}})
 	}
 	headers := []string{"KIND", "ID", "NAME", "RESOURCE VERSION"}
+	monitorPage := false
+	for _, resource := range resources {
+		monitorPage = monitorPage || resource.Kind == "Monitor"
+	}
+	if monitorPage {
+		headers = append(headers, "OBSERVED HEALTH")
+	}
 	if o.output == formatWide {
 		headers = append(headers, "UID", "GENERATION")
 	}
@@ -134,6 +145,13 @@ func writeManagementTable(cmd *cobra.Command, o *options, data []byte, describe 
 			name = *resource.Metadata.Name
 		}
 		row := []string{managementDisplay(resource.Kind), managementDisplay(resource.Metadata.ID), managementDisplay(name), managementDisplay(resource.Metadata.ResourceVersion)}
+		if monitorPage {
+			state := "-"
+			if resource.Kind == "Monitor" {
+				state = monitorHealth(resource.Status)
+			}
+			row = append(row, state)
+		}
 		if o.output == formatWide {
 			row = append(row, managementDisplay(resource.Metadata.UID), strconv.FormatInt(resource.Metadata.Generation, 10))
 		}
@@ -149,6 +167,62 @@ func writeManagementTable(cmd *cobra.Command, o *options, data []byte, describe 
 		return err
 	}
 	return nil
+}
+
+func monitorHealth(raw json.RawMessage) string {
+	var status api.MonitorStatus
+	if json.Unmarshal(raw, &status) != nil || status.LastCheckedAt.IsZero() {
+		return "unknown"
+	}
+	switch status.Health {
+	case "healthy":
+		return "up"
+	case "unhealthy":
+		return "down"
+	case "warning":
+		return "degraded"
+	default:
+		return "unknown"
+	}
+}
+
+func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) error {
+	var spec api.MonitorSpec
+	if json.Unmarshal(resource.Spec, &spec) != nil {
+		return errors.New("invalid monitor configuration response")
+	}
+	var status api.MonitorStatus
+	_ = json.Unmarshal(resource.Status, &status)
+	enabled := "true (default)"
+	if spec.Enabled != nil {
+		enabled = strconv.FormatBool(*spec.Enabled)
+	}
+	checked, snoozed := "unavailable", "not snoozed"
+	if !status.LastCheckedAt.IsZero() {
+		checked = status.LastCheckedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if !status.SnoozedUntil.IsZero() {
+		snoozed = status.SnoozedUntil.UTC().Format(time.RFC3339Nano)
+	}
+	latency := measurement(status.LastCheckLatencyMS)
+	observed, unknownActions := "unavailable", "unavailable"
+	if status.StatusRevision != "" {
+		observed = strconv.FormatInt(status.ObservedGeneration, 10)
+		unknownActions = strconv.FormatInt(status.UnknownActions, 10)
+	}
+	recovery := "not configured"
+	if spec.Recovery != nil {
+		recovery = managementDisplay(spec.Recovery.Driver.Type)
+	}
+	return kv(cmd.OutOrStdout(), [][2]string{
+		{"Kind", "Monitor"}, {"Stable ID", resource.Metadata.ID}, {"Name", name}, {"UID", resource.Metadata.UID},
+		{"Resource version", resource.Metadata.ResourceVersion}, {"Configuration generation", strconv.FormatInt(resource.Metadata.Generation, 10)},
+		{"Observed generation", observed}, {"Enabled", enabled},
+		{"Check driver", spec.Check.Driver.Type}, {"Check interval", spec.Check.Interval}, {"Check timeout", spec.Check.Timeout},
+		{"Recovery driver", recovery}, {"Observed health", monitorHealth(resource.Status)}, {"Last checked", checked}, {"Latency ms", latency},
+		{"Snoozed until", snoozed}, {"Incident", strOrDash(status.IncidentID)}, {"Control version", strOrDash(status.ControlRevision)},
+		{"Unknown actions", unknownActions},
+	})
 }
 
 func operationCount(value *int64) string {

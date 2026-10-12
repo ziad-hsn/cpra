@@ -1,26 +1,39 @@
 ---
 title: Quickstart
-description: Build CPRa, run a local HTTP target and inspect your first monitor through the dashboard and CLI.
-cpra_scope: main
+description: Initialize protected management access, run a local target and apply your first monitor.
+cpra_scope: development
 ---
-
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
-
 
 # Run your first monitor
 
-This walkthrough uses a local HTTP target and a log notification. You need Git, Go 1.25 or later, Make, and Python 3 for the demo target. The dashboard assets are already included in the Go source.
+Use the source checkout or qualified archive that matches these documentation
+sources. [Versions and availability](../versions.md) distinguishes the current
+implementation from published artifacts. Public module and release versions
+remain gated by qualification and publication.
 
-## 1. Build CPRa
+You need Go 1.25 or later, Make and Python 3. The built dashboard is included;
+Node is needed only when changing its sources.
+
+## 1. Build and initialize
+
+From the CPRa checkout:
 
 ~~~sh
-git clone --branch main https://github.com/ziad-hsn/cpra.git
-cd cpra
 make
-./bin/cpra -version
+export PATH="$PWD/bin:$PATH"
+cpra -version
+cpractl local init --management
 ~~~
 
-The build produces `bin/cpra` and `bin/cpractl`. See [installation](getting-started.md) for optional drivers and container builds.
+Make selects the repository's local SDK workspace while its module candidates
+are unpublished. Initialization creates an empty manifest, named operator token,
+token hash policy, wrapping key and localhost TLS material in the platform's
+standard locations. It prints paths and exact server/client commands, never the
+token value. It refuses existing configuration/state and starts no service.
+
+This walkthrough is a fresh user installation. An existing installation needs
+the documented stopped upgrade/rotation procedure; initialization does not
+convert its authority or erase its data.
 
 ## 2. Start a local target
 
@@ -32,35 +45,65 @@ printf 'ok\n' > /tmp/cpra-demo/health
 python3 -m http.server 8080 --bind 127.0.0.1 --directory /tmp/cpra-demo
 ~~~
 
-This serves `http://127.0.0.1:8080/health`.
+This serves http://127.0.0.1:8080/health. Keep it running.
 
-## 3. Start CPRa
+## 3. Start CPRa and connect
 
-In the CPRa checkout:
+Run the exact **server command** printed by initialization. It selects the
+generated runtime settings, empty bootstrap manifest and -allow-empty.
+Keep that process in the foreground in its own terminal.
 
-~~~sh
-cp examples/monitors.yaml monitors.yaml
-./bin/cpra -yaml monitors.yaml
-~~~
-
-The example checks the target every 30 seconds, uses a five-second timeout, and writes incident transitions to `alerts.jsonl`. Keep both processes running.
-
-## 4. Inspect the monitor
-
-Open [the local dashboard](http://localhost:8060), or use another terminal:
+For CLI requests, reuse the initializer's --server, --ca-file and --token-file
+arguments. The following commands are the operation portion of that printed
+client command:
 
 ~~~sh
-./bin/cpractl health
-./bin/cpractl get monitors
-./bin/cpractl get overview -o json
+cpractl ready
+cpractl get state
 ~~~
 
-A new monitor can appear as `unknown` before its first check. Allow a check interval and a dashboard snapshot refresh before assessing its state.
+Include those connection arguments with each command, or configure the matching
+CPRA_SERVER, CPRA_CA_FILE and CPRA_AUTH_TOKEN_FILE variables using the printed
+paths. Do not put a bearer in a URL or command argument.
 
-## 5. Observe a failure and recovery
+For the dashboard, manually trust the generated local CA in your browser, open
+https://localhost:8060, and sign in using the protected operator token read
+locally from its file. Initialization does not install trust roots. The
+[management startup guide](../management-startup.md) explains trust and rotation.
 
-Stop the demo HTTP server. After the configured consecutive failures, inspect the dashboard and `alerts.jsonl`. Restart the same demo server and allow the configured consecutive healthy checks for recovery.
+## 4. Apply and inspect a monitor
 
-This example has no recovery action configured: you restart the target yourself. [Add an action deliberately](../reference/config-schema.md#recovery) after confirming the monitoring and notification behavior.
+From the checkout, with the connection arguments or variables configured:
 
-Use Ctrl+C to stop CPRa and the demo target. The default listener is local; use the [authenticated deployment guide](../how-to/deploy-to-production.md) for remote access.
+~~~sh
+cpractl apply -f examples/monitors.yaml
+cpractl get monitors
+cpractl describe monitor/example-service
+cpractl get queues
+cpractl get slo
+~~~
+
+The example checks the local target every 30 seconds and writes incident
+notifications to the configured alerts.jsonl file. It has no recovery action.
+Management imports its bootstrap manifest once. Later file edits require an
+explicit apply; editing the original file does not reload active configuration.
+The dashboard can also create and edit monitors, receivers, groups and secrets.
+Notification receivers are contacts, separate from login identities.
+
+Before the first result, observed health is unknown. Wait for a check interval
+and projection refresh. A committed resource may still await controller
+application; inspect the original operation receipt if application is pending.
+
+## 5. Observe an incident and stop
+
+Stop the target server. After the configured failure threshold, inspect the
+incident, action outcomes and monitor timeline. Restart the target and wait for
+the healthy threshold. Intervention completion means verification is pending;
+restored-health wording follows confirmed checks. Maintenance keeps checks
+running while suppressing notifications/recovery, with no deferred alert burst.
+
+Use Ctrl+C to stop CPRa and the target. Keep the state directory for restart
+recovery. Unknown action outcomes are held for investigation and are not replayed
+automatically. Follow [persistence and recovery](../durability.md) for complete
+stopped backup/restore and [deployment](../how-to/deploy-to-production.md) for
+native services and container storage.

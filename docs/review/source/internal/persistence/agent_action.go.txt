@@ -91,6 +91,7 @@ func validateAgentStart(c Command) error {
 	extra := c
 	extra.Kind, extra.MonitorID, extra.ActionID, extra.Revision, extra.ExecutorSession, extra.Driver = "", "", "", "", "", ""
 	extra.At, extra.Guard, extra.Maintenance = time.Time{}, nil, false
+	extra.ActionDeadline = time.Time{}
 	extra.AgentConnection = nil
 	if extra != (Command{}) {
 		return ErrAgentActionInvalid

@@ -1,10 +1,11 @@
 ---
 title: Deploy a CPRa instance
 description: Run a single CPRa owner with authenticated access, private manifests, target permissions and clear restart semantics.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for current support and
+qualification boundaries.
 
 
 # Deploy a CPRa instance
@@ -19,28 +20,42 @@ Keep manifests containing credentials outside version control. A manifest author
 
 ## Protect remote access
 
-Create a token file readable by the service account, then start the server:
+Initialize named management and TLS with the [tested setup](../management-startup.md).
+System installations require a protected operator-token output outside service
+configuration/state. Give the service access to its policy, wrapping key and TLS
+files, while keeping the operator bearer separate. Services use absolute paths:
 
 ~~~sh
-./bin/cpra -yaml /etc/cpra/monitors.yaml \
-  -web.addr 0.0.0.0:8060 \
-  -web.auth-file /run/secrets/cpra-token
+cpra -yaml /etc/cpra/monitors.yaml \
+  -runtime-config /etc/cpra/runtime.yaml \
+  -data-dir /var/lib/cpra -web.addr 0.0.0.0:8060
 ~~~
 
-Put an HTTPS reverse proxy in front of this HTTP listener. Browser login is username `cpra` with the token as password.
+Configure the runtime TLS certificate and exact permitted HTTPS origin for the
+published name. The generated localhost certificate is for local use; it is not
+a remote service certificate. An explicitly configured trusted reverse proxy
+requires its own documented identity/origin contract.
 
 ~~~sh
-./bin/cpractl --server https://monitor.example.com \
-  --token-file /run/secrets/cpra-token get overview
+cpractl --server https://monitor.example.com \
+  --token-file /protected/operator.token get state
 ~~~
 
-`monitor.example.com` is a placeholder for your protected endpoint. A token file overrides `CPRA_AUTH_TOKEN`. Liveness, readiness, and metrics requests also need the token when authentication is enabled.
+The hostname and token path are placeholders for your protected installation.
+Supply a CA file when the certificate uses a private authority. Token files are
+reread per CLI request. Authentication failure never grants a less privileged
+write path. Operator configuration privileges include choosing outbound targets;
+CPRa does not enforce per-credential destination isolation or multi-tenancy.
 
 ## Observe before enabling recovery
 
 Confirm that checks classify your target correctly and notifications reach a test destination. Then add the intended recovery action and verify its effect.
 
-Each incident admits one operation. If a response is lost, inspect the target's actual state before repeating the action. Restarting CPRa resets in-memory incident state and can change what is admitted next.
+Recovery observes the configured per-incident attempt limit. Unknown external
+outcomes remain held across restart. Verify provider evidence and use audited
+review; restarting is not permission to repeat an interrupted action. Keep
+committed state and retained history on persistent storage, and use a complete
+[stopped backup](../durability.md) before replacing an artifact.
 
 ## Containers
 
@@ -49,17 +64,29 @@ docker build -f docker/Dockerfile -t cpra:local .
 docker compose -f docker/docker-compose.yml up --build
 ~~~
 
-The supplied Compose example disables the web listener. Edit the manifest for addresses reachable from the container; its loopback address refers to the container itself.
+Use the [production Compose/Helm guide](../container-helm.md) for a versioned
+artifact, authenticated API, stable persistent volume and missing-mount checks.
+Container loopback refers to that container, not the host.
 
-The image runs as UID 1001 and expects `/etc/cpra/monitors.yaml`. Mount configuration read-only and provide writable storage for file-based notifications. Docker actions need access to the intended Docker daemon; mounting its socket grants substantial control over that daemon.
+The image runs as UID 1001, reads configuration under /etc/cpra and writes state
+under /var/lib/cpra. Mount configuration read-only and retain the state volume.
+Use bounded writable space/logs. Enable host integrations only with designated
+permissions; Docker socket access gives control of the corresponding daemon.
 
 ## Health and shutdown
 
-- `/api/v1/healthz` reports process liveness.
-- `/api/v1/readyz` requires a recent nonempty snapshot.
+- Liveness reports the process and does not fail because monitored services are down.
+- Readiness requires initialized admission, usable storage and controller progress;
+  intentionally empty configurations are supported.
 - `/metrics` exposes runtime and pipeline metrics.
-- SIGINT or SIGTERM starts graceful shutdown; the web server stops before the controller.
+- Shutdown stops admission/readiness first, drains bounded work and retains
+  diagnostics during draining before closing dependencies.
 
-Choose service-manager stop timeouts with enough room for your configured operation deadlines. Use an external supervisor to restart a failed process and an external observer for CPRa itself.
+The initial Unix/container application budget is 45 seconds within a 60-second
+supervisor allowance. Confirm shutdown behavior for the actual deployment.
+Use the [native service](../native-installation.md) and [single-owner Kubernetes](../container-helm.md)
+procedures for upgrades, fencing and restore. Permanent storage failure keeps
+admission unavailable until stopped repair or restore; no automatic deletion is
+performed.
 
 [Current limits](../release-notes.md#current-boundaries) · [Troubleshooting](common-tasks.md)

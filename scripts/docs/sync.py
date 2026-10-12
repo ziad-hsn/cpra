@@ -52,9 +52,10 @@ def navigation(source: Path) -> tuple[list, list[str]]:
 
     visit(entries)
     pages = {p.relative_to(source).as_posix() for p in source.rglob("*.md")}
-    if pages != set(paths):
+    archived = {name for name in pages if name.startswith(("candidate/", "implementation/", "review/"))}
+    if set(paths) - pages or pages - set(paths) - archived:
         raise ValueError("navigation must cover every Markdown page exactly once: " + json.dumps({
-            "missing_pages": sorted(set(paths) - pages), "unlisted_pages": sorted(pages - set(paths))}))
+            "missing_pages": sorted(set(paths) - pages), "unlisted_pages": sorted(pages - set(paths) - archived)}))
     return entries, paths
 
 

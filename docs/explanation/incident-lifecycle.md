@@ -1,10 +1,11 @@
 ---
 title: Incident lifecycle
 description: Understand failure thresholds, recovery admission, verification, maintenance and notification delivery in CPRa.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](../versions.md) for newer candidate work.
+See [versions and availability](../versions.md) for implementation and
+qualification boundaries.
 
 
 # Incident lifecycle
@@ -26,24 +27,46 @@ A newly loaded monitor has no observed result yet. Successful checks establish h
 
 Read the state together with the most recent check and pending notification. An empty incident list alone does not establish that every monitor is healthy.
 
-## Recovery is admitted once per incident
+## Recovery admission and verification
 
-When configured and eligible, one recovery operation is admitted. More failed checks during that incident do not continuously replay it. A successful action response is followed by the configured number of consecutive healthy checks before recovery is confirmed.
+Eligible recovery is subject to the configured per-incident attempt limit,
+which defaults to one. Additional failures do not continuously replay the same
+action. Completion means **health verification pending**; configured successful
+checks must confirm health before restored-health wording is emitted.
 
-A lost response or deadline expiry can leave the action's external outcome unknown. Inspect the target before manually repeating the action or restarting CPRa. This is not durable, cross-process exactly-once execution.
+A lost response, interrupted start or deadline can leave the external outcome
+unknown. That hold survives restart. Check observations resume, while the
+interrupted action is not automatically repeated. Inspect provider evidence and
+use the audited review procedure. This does not provide provider-independent
+exactly-once execution.
 
 ## Warnings and maintenance
 
 TLS `warn_days` raises a yellow warning and degraded state without starting recovery. `critical_days` fails the check and follows the normal failure policy.
 
-Maintenance windows keep checks running while suppressing notifications and new recovery admissions. They do not roll back actions already running at the target.
+Maintenance keeps checks running while suppressing new notifications and
+recovery admissions. Covered queued notifications are canceled, including work
+that waited through the entire window. Started, completed and unknown actions
+retain their evidence. Ending maintenance does not release accumulated alerts.
 
 ## Delivery and cooldown
 
-Red, yellow, green, cyan, and gray notification rules are configuration keys. Configure only the transitions and transports you intend to use. A group counts as delivered when at least one destination accepts it.
+Red, yellow, green, cyan and gray rules are configuration keys. Endpoint outcomes
+are tracked independently with stable logical delivery identities. Confirmed
+delivery to one destination is not repeated because another was unfinished.
 
-Retryable HTTP rejections can receive up to three delivery attempts. Transport acceptance does not confirm that a human read the alert. The default alert cooldown is five minutes; confirmed green recovery notifications can bypass it.
+Only proven retryable provider rejection can authorize another HTTP attempt,
+up to three within the original deadline. Generic server errors remain unknown.
+Ordinary HTTP notifications use a 45-second overall budget; documented delays
+do not extend it. Provider acceptance does not establish observed delivery.
+Cooldown suppresses repeated notifications within one episode. A new outage or
+distinct severity transition receives its first eligible notification promptly.
 
 ## Restart and ownership
 
-Incident, cooldown, and delivery state is in memory. Restarting CPRa resets this state. Independent instances do not share monitor ownership or coordinate actions; use one owner for a monitor configuration.
+Raft restores committed incidents, cooldowns, verification, attempt limits,
+controls and delivery outcomes. Replay performs no provider operations. Each
+data directory has one exclusively locked owner. Separate instances do not
+coordinate a shared monitor fleet; single-node Raft is persistence, not failover.
+Memory mode is explicit and disposable. Back up the complete stopped directory,
+including retained history and generation metadata.

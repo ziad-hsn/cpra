@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -383,6 +384,17 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 	for color, c := range p.Monitor.Codes {
 		if c.Dispatch {
 			policy.Endpoints[color] = len(p.NotificationTargets[color])
+			if policy.NotificationEndpointIDs == nil {
+				policy.NotificationEndpointIDs = make(map[string][]string)
+			}
+			if len(p.NotificationTargets[color]) == 1 && strings.HasPrefix(p.NotificationTargets[color][0].EndpointID, "$inline/") {
+				policy.NotificationEndpointIDs[color] = update.prepared.NotificationEndpointIDs(color)
+			}
+			for _, target := range p.NotificationTargets[color] {
+				if !strings.HasPrefix(target.EndpointID, "$inline/") {
+					policy.NotificationEndpointIDs[color] = append(policy.NotificationEndpointIDs[color], target.EndpointUID)
+				}
+			}
 			setRecoveryNotification(&policy, color, c.Trigger, p.Monitor.Intervention.Action)
 		}
 	}

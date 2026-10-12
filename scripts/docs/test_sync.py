@@ -71,6 +71,16 @@ class NavigationSyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "symlink"):
             sync.sync(self.site)
 
+    def test_engineering_records_remain_available_outside_user_navigation(self):
+        for name in ("implementation/review.md", "review/version-review.md", "candidate/index.md"):
+            path = self.docs / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("# Dated engineering record\n")
+        result = sync.sync(self.site)
+        self.assertEqual(result["navigation_pages"], 1)
+        self.assertTrue((self.site / "_sources/docs/implementation/review.md").is_file())
+        self.assertNotIn("Dated engineering", self.config.read_text())
+
     def test_source_version_and_announcement_drift_are_rejected_without_overwrite(self):
         sync.sync(self.site)
         metadata = self.site / "_sources/source-version.json"

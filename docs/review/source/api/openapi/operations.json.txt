@@ -988,5 +988,17 @@
     "sdkMethod": "OperationsService.DiscardReselection",
     "contractTest": "TestReselectionOperationInventory",
     "availability": "implemented"
+  },
+  {
+    "operationID": "DiscoverAccess",
+    "method": "GET",
+    "path": "/api/v2/access",
+    "schema": "AccessDiscovery",
+    "request": "",
+    "cas": false,
+    "listing": false,
+    "buildTag": "",
+    "sdkMethod": "Client.DiscoverAccess",
+    "contractTest": "TestOperationInventory"
   }
 ]

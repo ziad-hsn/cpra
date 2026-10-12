@@ -20,8 +20,11 @@ health checks against your services on a schedule, opens and closes incidents
 against configurable thresholds, sends notifications, and executes a recovery
 action — restart a container, call a webhook, restart or scale a Kubernetes
 workload, reboot an EC2 instance, restart a systemd unit — when a service
-fails. It ships as a single server binary with an embedded read-only dashboard,
-an HTTP API, and the `cpractl` command-line client. It is MIT-licensed.
+fails. It ships as a single server binary with an embedded dashboard, an HTTP
+API, and the `cpractl` command-line client. Named management access enables
+monitor, destination, group and secret editing; observation mode remains
+read-only. Application code is MIT-licensed; [CPRa artwork](brand/ATTRIBUTION.md)
+uses CC BY 4.0.
 
 **Documentation:** [ziad-hsn.github.io/cpra](https://ziad-hsn.github.io/cpra/) —
 [quickstart](https://ziad-hsn.github.io/cpra/tutorials/quickstart/) ·
@@ -48,8 +51,9 @@ and explicitly dated guides for earlier revisions. The
   revision and are not a release qualification for this development branch.
 
 The [shipping plan](docs/implementation/dashboard-shipping-plan.md) governs
-publication. Source availability does not establish completed provider or
-endurance verification.
+publication, together with the [approved review repairs](docs/implementation/release-repair-plan.md).
+Source availability does not establish provider-account, native-platform or
+comparative-performance qualification. The 24-hour run is cancelled.
 
 ## Quick start
 
@@ -107,15 +111,21 @@ The example checks an HTTP endpoint and writes incident transitions to `alerts.j
 
 | Function | Default build | Optional build tags |
 | --- | --- | --- |
-| Checks | HTTP, TCP, ICMP, DNS, UDP, TLS, Docker, gRPC port reachability | `redis postgres mysql mongo rabbitmq kafka` |
-| Recovery | Docker, HTTP webhook | `kubernetes aws systemd` |
-| Alerts | Log, Slack, PagerDuty, email, webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, Datadog | `teams twilio` |
+| Checks | HTTP, TCP, ICMP, DNS, UDP, TLS, Docker, gRPC | `redis postgres mysql mongo rabbitmq kafka` |
+| Recovery | Docker, HTTP webhook, A2A agent task | `kubernetes aws systemd` |
+| Alerts | Log, Slack, PagerDuty, email, webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, Datadog, A2A | `teams twilio` |
 
 ```sh
 make BUILD_TAGS='redis postgres kubernetes'
 ```
 
-The `grpc` check tests the TCP port; it does not call the gRPC health service. UDP checks require a payload and a reply. PagerDuty requires an Events API v2 routing key. Email uses an SMTP relay with STARTTLS; SMTP username/password authentication is not implemented.
+The `grpc` check preserves TCP reachability when `mode` is omitted. Explicit
+`mode: health` calls the unary gRPC health service and requires `SERVING`; it
+uses verified TLS unless cleartext is explicitly selected. UDP checks require
+a payload and a reply. PagerDuty requires an Events API v2 routing key. Email
+uses an SMTP relay with STARTTLS; SMTP username/password authentication is not
+implemented. See [driver configuration](docs/reference/jobs-reference.md) and
+[notification response contracts](docs/implementation/notification-response-contracts.md).
 
 TLS `warn_days` produces a yellow alert and a degraded monitor status without starting recovery; `critical_days` fails the check and follows the normal recovery policy. Pushover emergency priority accepts `retry` and `expire` in seconds, defaulting to 60 and 1800. Docker recovery preserves the daemon's stop grace when its timeout is omitted.
 

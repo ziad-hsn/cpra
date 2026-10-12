@@ -4,12 +4,10 @@ description: Run CPRa to check services, send alerts and perform configured reco
 cpra_scope: main
 ---
 
-> **Development source:** includes durable management and the writable dashboard.
-> Individual guides identify their source revision; several tutorials below retain
-> the historical `51a835a` instructions. See [versions and availability](versions.md)
-> and [implementation progress](implementation/dashboard-implementation-progress.md)
-> before selecting installation instructions.
-
+> **Current development:** includes durable management and the writable dashboard.
+> Start with the [protected management quickstart](tutorials/quickstart.md).
+> [Versions and availability](versions.md) distinguishes implemented behavior
+> from completed qualification and published artifacts.
 
 <div class="cpra-hero" markdown>
 
@@ -31,10 +29,10 @@ Go · MIT · self-hosted
 
 CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against your services on a schedule, opens and closes incidents against thresholds you set, sends notifications, and executes a configured recovery action when a service fails. It is free software under the MIT license, distributed as a single static binary.
 
-The current development source includes a management dashboard, an HTTP API,
-and the `cpractl` command-line client. Tutorials explicitly pinned to `51a835a`
-describe the earlier read-only application published on **11 September 2026**;
-use the current references and implementation status for the management features.
+The current source includes a management dashboard, an HTTP API and the
+`cpractl` command-line client. Named operators manage configuration and controls;
+read-only identities observe their granted resources. Dated engineering records
+retain their historical scope and are outside the main user navigation.
 
 ## What you can do
 

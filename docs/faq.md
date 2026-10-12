@@ -1,17 +1,22 @@
 ---
 title: Frequently asked questions
 description: Short, direct answers about what CPRa is, what it checks, what it does when a service fails, and what it deliberately does not do.
-cpra_scope: main
+cpra_scope: development
 ---
 
-> **Current main:** applies to the application at [`51a835a`](https://github.com/ziad-hsn/cpra/commit/51a835a29f2fb7af2e0301910042a52e308cbb24). See [version and availability](versions.md) for newer candidate work.
+See [versions and availability](versions.md) for current implementation and
+qualification boundaries.
 
 
 # Frequently asked questions
 
 ## What is CPRa?
 
-CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recovery agent written in Go. It runs health checks against services on a schedule, tracks incidents against failure and recovery thresholds, sends notifications, and runs a configured recovery action when a service fails. It ships as one static binary with an embedded read-only dashboard, an HTTP API, and the `cpractl` command-line client.
+CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and
+recovery agent written in Go. It checks services, tracks incidents, notifies
+configured destinations and runs eligible recovery actions. Its embedded
+dashboard and CLI can manage configuration with named operator access;
+observation access remains read-only.
 
 ## Is CPRa free and open source?
 
@@ -19,7 +24,11 @@ Yes. CPRa is licensed under the [MIT license](https://github.com/ziad-hsn/cpra/b
 
 ## What can CPRa check?
 
-The default build checks HTTP, TCP, ICMP, DNS, UDP, TLS certificate expiry, Docker container state, and gRPC port reachability. Optional build tags add Redis, PostgreSQL, MySQL, MongoDB, RabbitMQ, and Kafka checks. See [drivers and fields](reference/jobs-reference.md).
+The default build checks HTTP, TCP, ICMP, DNS, UDP, TLS certificate expiry,
+Docker container state and gRPC. Omitted gRPC mode checks TCP reachability;
+explicit health mode checks the configured unary health service. Optional tags
+add Redis, PostgreSQL, MySQL, MongoDB, RabbitMQ and Kafka. See
+[drivers and fields](reference/jobs-reference.md).
 
 ## What does CPRa do when a check fails?
 
@@ -27,7 +36,11 @@ An initial failure can send a configured yellow notification. At the failure thr
 
 ## Where can CPRa send alerts?
 
-Log, Slack, PagerDuty, email (SMTP with STARTTLS), generic webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, and Datadog in the default build; Microsoft Teams and Twilio with build tags. Destinations can be grouped; a group succeeds when at least one destination accepts delivery.
+Log, Slack, PagerDuty, email (SMTP with STARTTLS), generic webhook, Telegram,
+Discord, Opsgenie, Mattermost, VictorOps, Pushover, Datadog and A2A are in the
+default build; Microsoft Teams and Twilio use build tags. Receivers and groups
+reuse destinations. Each endpoint retains its delivery outcome, including
+unknown effects; provider acceptance does not prove a human read the alert.
 
 ## How does CPRa differ from a metrics stack like Prometheus?
 
@@ -35,35 +48,59 @@ CPRa is not a time-series database and does not store metric history. It perform
 
 ## How does CPRa differ from an uptime monitor?
 
-Uptime monitors typically stop at notification. CPRa also runs a recovery action you configure, with one attempt per incident and thresholds that must be met before the incident closes. The trade-off is that it is designed for a single process per configuration, not for a hosted multi-region service.
+CPRa also runs a configured recovery action, subject to its per-incident attempt
+limit and subsequent healthy-check verification. It operates as a single owner
+for a configuration. It does not provide multi-region failover.
 
 ## Does CPRa support high availability or clustering?
 
-No. Run one process for a monitor configuration. Incident and delivery state is held in memory, resets on restart, and separate processes do not coordinate ownership. See [behavior and limits](https://github.com/ziad-hsn/cpra#behavior-and-limits).
+No. One process owns a monitor configuration and exclusively locks its data
+directory. Single-node Raft preserves committed state across restart; it does
+not provide distributed failover or cross-instance monitor coordination. Use
+[persistent deployment storage](durability.md).
 
 ## Does CPRa keep history?
 
-Not per monitor. The dashboard reports a healthy-sample percentage for the current process run and incident transitions are written to the configured log destinations, but there is no retained time series.
+Each monitor has a retained incident/action/notification timeline, normally
+30 days. Successful raw checks and per-monitor percentile histories are not
+retained. Rolling SLO distributions and threshold counters describe current
+measurement windows, with availability and restart coverage reported explicitly.
 
 ## How is the dashboard secured?
 
-The server listens on loopback by default. Binding to any other address requires an authentication token read from a file or environment variable; the browser login uses username `cpra` with the token as the password and the API accepts a Bearer token. The built-in listener serves HTTP, so remote access needs an HTTPS reverse proxy. See [deployment](how-to/deploy-to-production.md).
+The recommended first run initializes named management access and localhost
+TLS. Sign in with the protected operator bearer after manually trusting the
+generated local CA. Management writes require granted permissions and approved
+HTTPS origin; authentication failure never downgrades a write to observation
+mode. The API also supports separately configured read-only access. See
+[management startup](management-startup.md) and [deployment](how-to/deploy-to-production.md).
 
 ## What platforms does CPRa run on?
 
-Release builds produce Linux amd64 and arm64 archives for the server and CLI, and the repository includes a Dockerfile for a container that runs as UID 1001. Building from source needs Go 1.25 or later; rebuilding the dashboard needs Node.js 24 and pnpm.
+The planned matrix includes Linux/macOS/Windows amd64 and arm64 archives, Linux
+DEB/RPM packages, two Linux OCI architectures, Compose and Helm. Native and
+deployment execution gates remain open. Source supports Go 1.25; dashboard
+rebuilds use pinned Node and pnpm. [Availability](versions.md) distinguishes a
+build recipe from a qualified public artifact.
 
 ## How do I install it?
 
-Follow the [quickstart](tutorials/quickstart.md): build, copy the example manifest, set a service address, run `./bin/cpra -yaml monitors.yaml`, and open `http://localhost:8060`.
+Follow the [quickstart](tutorials/quickstart.md): build matching source, initialize
+protected management, start with its printed command, connect with its CA/token
+files, then apply the example monitor. It includes the explicit browser trust
+step and durable restart behavior.
 
 ## Where does the name come from?
 
 "CPR" is the pulse line: the agent keeps taking the pulse of a service and resuscitates it when it flatlines. The lowercase "a" is "agent". The gold loop in the mark is a nod to Ra, the sun that makes the same circuit every day.
 
-## Are persistence, native services and the Go SDK available on main?
+## Are the implementation and public releases the same thing?
 
-They are documented as [separate candidates](versions.md). Main still resets incident state on restart and exposes read-only v1. The release candidate adds local persistence and native operations. The SDK and approved management plan include proposed v2 writes and external workers, whose server implementation and publication are pending.
+Current source implements persistence, management and SDK/worker contracts.
+Public module tags and release artifacts require their separate qualification
+and downloaded-asset checks. Candidates remain private while gates are open.
+Local provider fixtures are contract evidence; actual account delivery/effects
+require designated resources and credentials. The 24-hour test is cancelled.
 
 ## How do I change the appearance?
 

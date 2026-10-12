@@ -268,3 +268,11 @@ regressions pass, including focused race checks. The initial colour/caller
 reproduction failed as expected and is retained. Independent review remains
 required. Raft/pool integration and correlated lifecycle records remain open;
 this checkpoint does not complete the unified logging ticket.
+
+The logger/controller/server suites pass at the initial caller checkpoint.
+Source review closed the notification metadata and fixture-validity fixes, and
+found an extra frame in performance helper calls. Direct and system performance
+and component-state caller regressions now exercise that path. The first
+fixture left debug verbosity disabled; the corrected enabled fixture reproduced
+the wrong performance caller. Helper-specific skips repair it, and focused race
+checks pass. Source re-review remains required for this final caller correction.

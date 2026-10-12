@@ -403,7 +403,7 @@ func (l *Logger) GetTracingStats() map[string]interface{} {
 func (l *Logger) LogSystemPerformance(component string, duration time.Duration, entitiesProcessed int) {
 	if l.debugMode {
 		rate := float64(entitiesProcessed) / duration.Seconds()
-		l.Debug("Performance: %s processed %d entities in %v (%.1f/sec)",
+		l.withCallerSkip(1).Debug("Performance: %s processed %d entities in %v (%.1f/sec)",
 			component, entitiesProcessed, duration, rate)
 	}
 }
@@ -411,7 +411,7 @@ func (l *Logger) LogSystemPerformance(component string, duration time.Duration, 
 // LogEntityOperation logs entity-level operations in debug mode
 func (l *Logger) LogEntityOperation(operation string, entityID uint64, details string) {
 	if l.debugMode {
-		l.Debug("Entity[%d] %s: %s", entityID, operation, details)
+		l.withCallerSkip(1).Debug("Entity[%d] %s: %s", entityID, operation, details)
 	}
 }
 
@@ -423,7 +423,7 @@ func (l *Logger) LogWorkerPool(_ string, _ map[string]interface{}) {
 // LogComponentState logs component state changes
 func (l *Logger) LogComponentState(entityID uint32, component string, state string) {
 	if l.debugMode {
-		l.Debug("Entity[%d] %s -> %s", entityID, component, state)
+		l.withCallerSkip(1).Debug("Entity[%d] %s -> %s", entityID, component, state)
 	}
 }
 
@@ -431,10 +431,10 @@ func (l *Logger) LogComponentState(entityID uint32, component string, state stri
 func (l *Logger) LogChannelState(channelName string, depth, capacity int) {
 	if l.debugMode {
 		utilization := float64(depth) / float64(capacity) * 100
-		l.Debug("Channel[%s] depth: %d/%d (%.1f%% full)",
+		l.withCallerSkip(1).Debug("Channel[%s] depth: %d/%d (%.1f%% full)",
 			channelName, depth, capacity, utilization)
 	} else if depth == capacity {
-		l.Warn("Channel[%s] is full (%d/%d)", channelName, depth, capacity)
+		l.withCallerSkip(1).Warn("Channel[%s] is full (%d/%d)", channelName, depth, capacity)
 	}
 }
 
@@ -445,7 +445,7 @@ func (l *Logger) LogJobExecution(jobType string, entityID uint64, duration time.
 		if !success {
 			status = "FAILED"
 		}
-		l.Debug("Job[%s] Entity[%d] %s in %v", jobType, entityID, status, duration)
+		l.withCallerSkip(1).Debug("Job[%s] Entity[%d] %s in %v", jobType, entityID, status, duration)
 	}
 }
 

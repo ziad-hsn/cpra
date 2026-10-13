@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux || darwin || windows
 
 package persistence
 
@@ -15,6 +15,7 @@ import (
 
 func generationOwnerFixture(t *testing.T, directory, node string) *collectionGenerations {
 	t.Helper()
+	collectionGCTestPrivate(t, filepath.Dir(directory))
 	owner, err := newCollectionGenerations(directory, node)
 	if err != nil {
 		t.Fatal(err)
@@ -100,14 +101,22 @@ func TestCollectionGenerationRetirementResumesOriginalIntent(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := owner.maintain(context.Background()); err != nil {
-		t.Fatal(err)
+	intentPath := filepath.Join(directory, collectionGCIntentName)
+	for step := 0; step < 100; step++ {
+		if err := owner.maintain(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(intentPath); err == nil {
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
 	}
 	if owner.pending == "" {
 		t.Fatal("retirement intent was not admitted")
 	}
-	if _, err := os.Stat(filepath.Join(directory, collectionGCIntentName)); err != nil {
-		t.Fatal(err)
+	if _, err := os.Stat(intentPath); err != nil {
+		t.Fatal("retirement repeatedly exhausted cooperative work budget", err)
 	}
 	if err := owner.close(); err != nil {
 		t.Fatal(err)
@@ -255,6 +264,7 @@ func TestCollectionInitialWindowsMappingIsBounded(t *testing.T) {
 
 func TestStoreCollectionGenerationsStabilizeAcrossRestarts(t *testing.T) {
 	config := testConfig(t)
+	collectionGCTestPrivate(t, config.Storage.Directory)
 	var operation string
 	for cycle := 0; cycle < 5; cycle++ {
 		store, err := Open(t.Context(), config)

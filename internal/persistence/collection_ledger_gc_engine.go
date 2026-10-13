@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux || darwin || windows
 
 package persistence
 
@@ -13,8 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 const collectionGCIntentName = "gc-retirement.json"
@@ -83,7 +81,7 @@ func newCollectionRetirement(directory string, guard collectionGCGuard) (_ *coll
 			_ = root.Close()
 		}
 	}()
-	dir, err := root.OpenFile(".", os.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
+	dir, err := collectionGCOpenDirectory(root)
 	if err != nil {
 		return nil, errCollectionGCBlocked
 	}
@@ -120,6 +118,10 @@ func collectionGCRead(root *os.Root, name string, mount collectionGCIdentity) ([
 }
 
 func collectionGCOpenFile(root *os.Root, name string, mount collectionGCIdentity) (*os.File, os.FileInfo, collectionGCIdentity, error) {
+	return collectionGCOpenVerified(root, name, mount, false)
+}
+
+func collectionGCOpenVerified(root *os.Root, name string, mount collectionGCIdentity, writable bool) (*os.File, os.FileInfo, collectionGCIdentity, error) {
 	before, err := root.Lstat(name)
 	if err != nil {
 		return nil, nil, collectionGCIdentity{}, err
@@ -127,7 +129,7 @@ func collectionGCOpenFile(root *os.Root, name string, mount collectionGCIdentity
 	if !before.Mode().IsRegular() {
 		return nil, nil, collectionGCIdentity{}, errCollectionGCBlocked
 	}
-	file, err := root.OpenFile(name, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	file, err := collectionGCOpenRegular(root, name, writable)
 	if err != nil {
 		return nil, nil, collectionGCIdentity{}, errCollectionGCBlocked
 	}
@@ -219,7 +221,7 @@ func (r *collectionRetirement) openCandidate(name string, interrupted bool) (_ *
 			}
 		}
 	}()
-	candidate.dir, err = root.OpenFile(".", os.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
+	candidate.dir, err = collectionGCOpenDirectory(root)
 	if err != nil {
 		return nil, errCollectionGCBlocked
 	}
@@ -414,10 +416,10 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 	}
 	// An earlier call may have written all bytes then failed its final sync.
 	// Re-establish the external intent durably before every destructive transition.
-	if err := r.syncIntent(intentRaw); err != nil {
+	if _, err := r.syncIntent(intentRaw); err != nil {
 		return result, err
 	}
-	if err := entry.dir.Sync(); err != nil {
+	if err := collectionGCDirectoryCheckpoint(entry.dir); err != nil {
 		return result, err
 	}
 	if err := collectionGCBefore(ctx, deadline); err != nil {
@@ -433,22 +435,26 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 		if err != nil || !os.SameFile(info, current) {
 			return result, errCollectionGCBlocked
 		}
-		if err := entry.root.Remove(leaf); err != nil {
+		identity := entry.database
+		if leaf == "generation.json" {
+			identity = entry.marker
+		}
+		if err := collectionGCRemove(entry.root, entry.dir, leaf, identity, false); err != nil {
 			return result, err
 		}
 		result.UnlinkedBytes, result.Phase = info.Size(), "removed-"+leaf
-		return result, entry.dir.Sync()
+		return result, collectionGCDirectoryCheckpoint(entry.dir)
 	}
 	current, err := r.root.Lstat(name)
 	anchored, statErr := entry.dir.Stat()
 	if err != nil || statErr != nil || !os.SameFile(current, anchored) {
 		return result, errCollectionGCBlocked
 	}
-	if err = r.root.Remove(name); err != nil {
+	if err = collectionGCRemove(r.root, r.dir, name, entry.identity, true); err != nil {
 		return result, err
 	}
 	result.Phase = "removed-directory"
-	return result, r.dir.Sync()
+	return result, collectionGCDirectoryCheckpoint(r.dir)
 }
 
 func (r *collectionRetirement) publishIntent(intent *collectionGCIntent) error {
@@ -456,42 +462,29 @@ func (r *collectionRetirement) publishIntent(intent *collectionGCIntent) error {
 	if err != nil || len(raw) > 4096 {
 		return errCollectionGCBlocked
 	}
-	file, err := r.root.OpenFile(collectionGCIntentName, os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW, 0600)
-	if err != nil {
-		return errCollectionGCBlocked
-	}
-	// Never delete an incomplete intent automatically. It cannot have authorized
-	// an unlink and requires attention; silently replacing it would lose evidence.
-	_, err = file.Write(raw)
-	if err == nil {
-		err = file.Sync()
-	}
-	err = errors.Join(err, file.Close())
-	if err != nil {
-		return err
-	}
-	return r.dir.Sync()
+	return collectionGCPublishIntent(r, raw)
 }
 
-func (r *collectionRetirement) syncIntent(expected []byte) error {
-	file, info, _, err := collectionGCOpenFile(r.root, collectionGCIntentName, r.identity)
+func (r *collectionRetirement) syncIntent(expected []byte) (collectionGCIdentity, error) {
+	file, info, identity, err := collectionGCOpenVerified(r.root, collectionGCIntentName, r.identity, true)
 	if err != nil {
-		return err
+		return collectionGCIdentity{}, err
 	}
 	if info.Size() != int64(len(expected)) || len(expected) > 4096 {
 		_ = file.Close()
-		return errCollectionGCBlocked
+		return collectionGCIdentity{}, errCollectionGCBlocked
 	}
 	actual, err := io.ReadAll(io.LimitReader(file, 4097))
 	if err != nil || !bytes.Equal(actual, expected) {
 		_ = file.Close()
-		return errCollectionGCBlocked
+		return collectionGCIdentity{}, errCollectionGCBlocked
 	}
-	return errors.Join(file.Sync(), file.Close(), r.dir.Sync())
+	return identity, errors.Join(file.Sync(), file.Close(), collectionGCDirectoryCheckpoint(r.dir))
 }
 
 func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.Time, result collectionGCStep, intentRaw []byte, protection collectionGCProtection) (collectionGCStep, error) {
-	if err := r.syncIntent(intentRaw); err != nil {
+	intentIdentity, err := r.syncIntent(intentRaw)
+	if err != nil {
 		return result, err
 	}
 	if err := collectionGCBefore(ctx, deadline); err != nil {
@@ -505,9 +498,13 @@ func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.T
 	if err := collectionGCBefore(ctx, deadline); err != nil {
 		return result, err
 	}
-	if err := r.root.Remove(collectionGCIntentName); err != nil {
+	currentRaw, _, identity, err := collectionGCRead(r.root, collectionGCIntentName, r.identity)
+	if err != nil || identity != intentIdentity || !bytes.Equal(currentRaw, intentRaw) {
+		return result, errCollectionGCBlocked
+	}
+	if err := collectionGCRemove(r.root, r.dir, collectionGCIntentName, intentIdentity, false); err != nil {
 		return result, err
 	}
 	result.Phase = "complete"
-	return result, r.dir.Sync()
+	return result, collectionGCDirectoryCheckpoint(r.dir)
 }

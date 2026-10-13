@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux || darwin || windows
 
 package persistence
 
@@ -33,7 +33,7 @@ func TestCollectionGCKillAfterCompletedTransition(t *testing.T) {
 			t.Fatal(err)
 		}
 		for {
-			time.Sleep(time.Hour) // Parent kills the process with native SIGKILL.
+			time.Sleep(time.Hour) // Parent forcibly terminates the native process.
 		}
 	}
 	for count := 1; count <= 4; count++ {

@@ -1582,10 +1582,16 @@
       "sha256": "ee0c4bfbd2d05ced86c30ba30dea352f1fa6c277c90b2b5e08920c77ae592e4e"
     },
     {
-      "asset": "review/source/internal/persistence/collection_ledger_gc_unix.go.txt",
-      "bytes": 17340,
-      "path": "internal/persistence/collection_ledger_gc_unix.go",
-      "sha256": "f3c3cde9a70af2b7f74df79d3189f89ee763e136115a54c1a252c98127a7c72a"
+      "asset": "review/source/internal/persistence/collection_ledger_gc_engine.go.txt",
+      "bytes": 17724,
+      "path": "internal/persistence/collection_ledger_gc_engine.go",
+      "sha256": "8bbd966ef2b4cf0fee6d8e05fd2a2d8a3e8750e0d3893b4444acb0cfc76f6348"
+    },
+    {
+      "asset": "review/source/internal/persistence/collection_ledger_gc_windows.go.txt",
+      "bytes": 8277,
+      "path": "internal/persistence/collection_ledger_gc_windows.go",
+      "sha256": "b686416c735a2ce3d8b47f947c9252d051d0d0ec7cd660e5100a5184761606ae"
     },
     {
       "asset": "review/source/internal/persistence/collection_operation_access.go.txt",

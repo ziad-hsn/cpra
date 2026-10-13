@@ -3,7 +3,7 @@
 Plan: [approved release repairs](release-repair-plan.md).
 Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
-Updated: 2026-10-13. The candidate is not frozen or publicly qualified.
+Updated: 2026-10-14. The candidate is not frozen or publicly qualified.
 
 All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
@@ -14,7 +14,7 @@ independent review. Failed reproductions and intermediate failures are retained.
 | 1. Baseline | Approved plan saved; all three reviews mapped to F01-F56 with source and evidence dispositions; other checkouts and prior evidence preserved. | Final finding dispositions and independent review. |
 | 2. Notifications | Formats 40/41; episode, logical delivery and stable per-target endpoint identities; obsolete queued cancellation; maintenance cancellation; verification-pending wording; unknown HTTP 5xx; persisted overall deadlines and retry identity; canonical bounded failure causes in current state, intent, outcomes, retained events and operator interfaces. PagerDuty/Opsgenie receive committed incident/endpoint correlation; Opsgenie distinguishes acceptance from processing and closes the original alias. Focused lifecycle and real network receiver tests pass. | Complete process-crash/restart campaign and final-source matrix. Provider retry/receipt, diagnostics and maintenance checkpoints passed independent review; unsupported rejection evidence remains unknown. |
 | 3. Collections | Immutable routine health publication without the FSM lock; health-read cancellation does not poison write recovery; contiguous uploads use one synchronous transaction per 64 resources/1 MiB group; exact pre-submission marker classification in API/SDK; explicit `resume` with server verification of original raw and ordered resource identities, including complete uploads; `resume-upload` retains upload-only behavior. Real native CLI imports of 35/50 monitors complete and retain identity after graceful restart on both compilers and the tagged build. | Interruptions across all phases; full contention/restart campaign and final-source review. Existing original-operation dashboard continuation passed the required default browser campaign. |
-| 4. Storage | Store-owned completed-generation catalog, atomic reader/snapshot pins and Linux native retirement are integrated. Current/previous completed generations remain protected; retirement catalog publication precedes removal of the durable deletion intent. Sampled path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping is 64 MiB. Linux retention, restart, process interruption, publication failure and focused race checks pass. Existing lazy allocation, authenticated stopped backup/restore and synchronous writes remain. | Native macOS execution and Windows retirement implementation/execution; complete allocated-size accounting and Windows growth/footprint evidence; full backup/restore and corruption matrix after these changes; independent review. macOS APFS identity/ACL checks are implemented with cross-builds and shared Linux tests; native qualification remains open. |
+| 4. Storage | Store-owned generation catalog, reader/snapshot pins and bounded Linux/APFS/NTFS retirement are implemented. Current/previous/pinned generations remain protected; catalog publication precedes removal of the same verified intent. Path-free counts and cleanup conditions are exposed through state, SDK and dashboard. Windows initial mapping remains 64 MiB. Linux minimum/tagged/race checks pass. Native Windows x64 retention, snapshot pins, catalog ordering, five Store restart/snapshot cycles and four process-termination boundaries pass in a subset with four explicit symlink-fixture exclusions, on both compilers. Finite source review closed the intent replacement repair. Existing lazy allocation, stopped backup/restore and synchronous writes remain. | Complete allocated-size accounting and Windows growth/footprint evidence; native Windows symlink and service-identity cases, Windows arm64 and macOS execution; full backup/restore and corruption matrix after these changes; complete final-source review/qualification. The retained full Windows run is failed evidence, not superseded by the passing subset. |
 | 5. Access | Go-based `local init --management`, exclusive protected files and localhost CA/leaf certificate; system token-output separation; mode-aware service arguments; minimum 32 printable token characters; explicit access discovery; ignored-bootstrap warning; loopback Host/origin guards; profiling cmdline removal; bounded failed-authentication throttling with 401/Retry-After; CSP/security headers. Local initialization, API/authentication and real application start/create/restart checks pass. Dashboard type checking, lint and tests pass across the full run and focused fixture repairs. | Remaining compiler/tag browser matrix, native system service/ACL checks, trusted-operator documentation and final security review. Current embedded rebuild and required Go1.27.1/default browser campaign pass. |
 | 6. Drivers/configuration | File parsers always reject unknown fields and duplicate JSON keys. Shared static driver settings validate required destinations, ranges, gRPC mode and Docker budgets in manifests, management and SDK preflight/new apply, while original-input normalization stays byte-compatible. gRPC health mode uses verified TLS by default, the configured service and SERVING-only success. Docker has separate stop grace and operation budgets. ICMP selects supported privilege mode or rejects the platform. PagerDuty/Opsgenie correlation, closure and severity fixtures pass. Complete jobs/manifest/loader/SDK API/collection suites and focused management checks pass. | Native service-identity ICMP checks; complete driver/provider and process campaign; independent review. |
 | 7. Interfaces/diagnostics | Version and canonical schema explanation routes implemented and authorized; SDK inventory and access discovery generated from canonical inputs; unavailable source time remains omitted. Dashboard primary headings, missing routes, empty/filtered/out-of-range page wording, compact health label and controller terminology repaired. CLI monitor lists show observed health; human describe renders safe summary fields and explicit unavailable times/counts. Terminal controls are escaped in table/key-value cells; safe check/action diagnostics are shown consistently. Raft/pool and committed incident/action diagnostics use the application logger with safe fields and corrected caller attribution. Result-shard timers and owner deadline waiting reduce measured idle CPU. | Remaining browser/compiler/tag matrix and dead-path audit. Source re-review closed the typed-nil pool correction and finite owner-waiting implementation. The short local CPU comparison is separate from fleet capacity and frozen release qualification. |
@@ -498,3 +498,25 @@ redirects and 29,799 internal links/assets checked without errors. Its source
 inventory is unchanged during the build. The version notice records implementation
 checkpoint `2d2e355` before this documentation metadata refresh; it is not a
 frozen release identity. The separate gh-pages checkout remains untouched.
+
+## Windows retirement checkpoint, 14 October
+
+Commit `9bd89cb` adds local NTFS retirement and shares the existing bounded
+engine/tests across Linux, macOS and Windows. Review found a final-intent
+replacement bug; the corrected engine preserves the original proof through
+catalog publication and refuses substitution before removal. The finite source
+review and bounded test follow-up are closed.
+
+Native Windows x64 tests passed on Go 1.27.1 and Go 1.25.0 with four explicitly
+omitted symlink-creation fixtures. The full requested native run remains failed
+evidence because this account lacks that privilege; a corrected test also removes
+an invalid single-maintenance-step assumption. Retention, pins, five Store
+restart/snapshot cycles and four forced-termination boundaries passed. Linux
+minimum, tagged and race checks pass; Windows arm64/macOS amd64 checks are
+cross-builds. Windows vet passes. See the
+[implementation and evidence record](windows-collection-retirement-2026-10-14.md).
+
+Allocated-size accounting and Windows growth/footprint tests remain the next
+storage work. Native platform/service/link cases, complete recovery/packaging
+matrices, provider accounts and comparative performance remain open. No public
+promotion or 24-hour run was performed.

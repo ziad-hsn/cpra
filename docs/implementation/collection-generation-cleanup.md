@@ -18,6 +18,16 @@ Windows still preserves files with cleanup unavailable. See the
 exact checks and limitations. Allocation accounting and complete frozen-source
 qualification remain open.
 
+**Update, 14 October 2026:** local NTFS retirement is implemented through the
+shared engine and has native Windows x64 development evidence for retention,
+snapshot pins, catalog ordering and four process-termination boundaries. The
+full native run remains failed because four symlink fixtures require permission
+this account does not have; the corrected subset records those omissions.
+Independent review also found and closed a shared final-intent replacement
+defect. See the [Windows implementation record](windows-collection-retirement-2026-10-14.md).
+Allocated-size accounting, native service identities and full release gates
+remain open.
+
 ## Invariant and ownership
 
 Raft logs and self-contained collection snapshots are authoritative. A collection

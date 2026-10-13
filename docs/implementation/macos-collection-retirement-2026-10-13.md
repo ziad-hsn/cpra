@@ -18,7 +18,7 @@ reads metadata from open descriptors. It requires local APFS, matching filesyste
 and device identity, nonzero persistent file ID and birth time, the executing
 owner, private modes and a single regular-file link. It rejects symlinks,
 unexpected entries, replacement identities and unverifiable candidates through
-the [shared engine](../review/source/internal/persistence/collection_ledger_gc_unix.go.txt).
+the [shared engine](../review/source/internal/persistence/collection_ledger_gc_engine.go.txt).
 
 An additional descriptor-based `fgetattrlist` call verifies the absence of an
 extended ACL. The response buffer is fixed; full-size reporting distinguishes a
@@ -87,3 +87,7 @@ initial synchronization concern was withdrawn after checking the pinned Go
 Darwin build constraints and `F_FULLFSYNC` implementation. No tests, builds or
 native macOS operations were run by that reviewer. This disposition closes the
 finite source review, not native execution or release qualification.
+
+The [14 October Windows record](windows-collection-retirement-2026-10-14.md)
+describes subsequent engine extraction and a final-intent replacement correction.
+The checks above remain evidence for the 13 October checkpoint.

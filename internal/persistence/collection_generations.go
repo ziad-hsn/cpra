@@ -34,15 +34,22 @@ type collectionGenerationCatalog struct {
 // CollectionStorageAccounting is a sampled, path-free observation. Unlinked
 // bytes describe apparent file sizes; they do not promise physical reclamation.
 type CollectionStorageAccounting struct {
-	Available        bool      `json:"available"`
-	ObservedAt       time.Time `json:"observed_at,omitzero"`
-	Active           int       `json:"active"`
-	Retained         int       `json:"retained"`
-	Pinned           int       `json:"pinned"`
-	Retired          uint64    `json:"retired"`
-	UnlinkedBytes    int64     `json:"unlinked_bytes"`
-	CleanupCondition string    `json:"cleanup_condition,omitempty"`
-	StepDurationMS   float64   `json:"step_duration_ms"`
+	Available           bool      `json:"available"`
+	ObservedAt          time.Time `json:"observed_at,omitzero"`
+	Active              int       `json:"active"`
+	Retained            int       `json:"retained"`
+	Pinned              int       `json:"pinned"`
+	Retired             uint64    `json:"retired"`
+	UnlinkedBytes       int64     `json:"unlinked_bytes"`
+	CleanupCondition    string    `json:"cleanup_condition,omitempty"`
+	StepDurationMS      float64   `json:"step_duration_ms"`
+	UsageCoverage       string    `json:"usage_coverage"`
+	UsageGenerations    int       `json:"usage_generations"`
+	UsageExpected       int       `json:"usage_expected"`
+	UsageOldestAt       time.Time `json:"usage_oldest_at,omitzero"`
+	KnownApparentBytes  int64     `json:"known_apparent_bytes"`
+	KnownAllocatedBytes int64     `json:"known_allocated_bytes"`
+	AllocationAvailable bool      `json:"allocation_available"`
 }
 
 type collectionGenerations struct {
@@ -57,6 +64,9 @@ type collectionGenerations struct {
 	pending                    string
 	retirementPublicationError error
 	closed                     bool
+	usage                      map[string]collectionUsageSample
+	usageCursor                int
+	usageAttempted             bool
 }
 
 func newCollectionGenerations(directory, nodeID string) (*collectionGenerations, error) {
@@ -259,6 +269,7 @@ func (g *collectionGenerations) publishStatus(condition string, duration time.Du
 		}
 		return true
 	})
+	g.publishUsage(&status)
 	g.status.Store(&status)
 }
 
@@ -286,6 +297,11 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 	condition := ""
 	g.retirementPublicationError = nil
 	defer func() {
+		// One generation at most, outside controller/FSM ownership. File calls
+		// are cooperative; their time is included in the observed step duration.
+		if ctx.Err() == nil && time.Since(started) < 25*time.Millisecond {
+			g.sampleUsage(ctx)
+		}
 		if errors.Is(err, errCollectionGCUnavailable) {
 			condition, err = "unavailable", nil
 		}
@@ -312,13 +328,7 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 		return nil
 	}
 	if g.retirement == nil {
-		g.retirement, err = newCollectionRetirement(g.directory, func(ctx context.Context, use func(collectionGCProtection) error) error {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			return use(g.protection()) // g.mu and Store ownership remain held.
-		})
-		if err != nil {
+		if err := g.openRetirement(); err != nil {
 			return err
 		}
 	}
@@ -427,6 +437,22 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 		g.pending = ""
 	}
 	return g.save()
+}
+
+// openRetirement requires g.mu and Store ownership. The same native boundary
+// is used for read-only file sampling and destructive retirement eligibility.
+func (g *collectionGenerations) openRetirement() error {
+	if g.retirement != nil {
+		return nil
+	}
+	var err error
+	g.retirement, err = newCollectionRetirement(g.directory, func(ctx context.Context, use func(collectionGCProtection) error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return use(g.protection())
+	})
+	return err
 }
 
 func (g *collectionGenerations) close() error {

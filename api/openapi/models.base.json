@@ -4404,7 +4404,7 @@
       },
       "CollectionStorageAccounting": {
         "type": "object",
-        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.",
+        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation. File usage samples cover only ledger.db and generation.json in catalogued completed generations, not incomplete generations, directory metadata, Raft, snapshots, history, or host disk usage. Samples are incremental, not an atomic filesystem snapshot.",
         "properties": {
           "available": {
             "type": "boolean"
@@ -4446,6 +4446,51 @@
             "format": "double",
             "minimum": 0,
             "x-go-name": "StepDurationMS"
+          },
+          "usageCoverage": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "partial",
+              "complete",
+              "unavailable"
+            ],
+            "description": "Coverage of catalogued completed generations; complete is not a full data-directory inventory.",
+            "x-enum-varnames": [
+              "CollectionUsagePending",
+              "CollectionUsagePartial",
+              "CollectionUsageComplete",
+              "CollectionUsageUnavailable"
+            ]
+          },
+          "usageGenerations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Completed generations included in the known byte subtotal."
+          },
+          "usageExpected": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Completed generations in the current catalog."
+          },
+          "usageOldestAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Oldest file sample contributing to the subtotal; omitted when no file was sampled."
+          },
+          "knownApparentBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Apparent lengths of the sampled files; omitted when unavailable."
+          },
+          "knownAllocatedBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Filesystem-reported allocation of the sampled files; omitted when unavailable. Not physical host allocation or proven reclamation."
           }
         },
         "required": [

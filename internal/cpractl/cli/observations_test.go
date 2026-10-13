@@ -123,6 +123,47 @@ func TestStateAndConfigHonorAvailability(t *testing.T) {
 	}
 }
 
+func TestStateShowsCollectionUsageCoverageAndAvailability(t *testing.T) {
+	value := api.State{Storage: api.StorageState{CollectionGenerations: &api.CollectionStorageAccounting{
+		Available: true, UsageCoverage: api.Pointer(api.CollectionUsagePartial), UsageGenerations: api.Pointer(int64(1)), UsageExpected: api.Pointer(int64(2)), KnownApparentBytes: api.Pointer(int64(0)),
+	}}}
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/api/v2/state" {
+			t.Error("unexpected state operation")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(value)
+	})
+	for _, format := range []string{"table", "json", "yaml"} {
+		out, _, err := fixture.run(t, nil, "get", "state", "-o", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if format != "table" {
+			assertObservationEncoding(t, out, format, value)
+			continue
+		}
+		for _, want := range []string{"partial", "1 / 2", "Known collection file lengths (bytes)", "Known collection file allocation (bytes)"} {
+			if !strings.Contains(out, want) {
+				t.Fatal("file accounting missing from human output", out)
+			}
+		}
+		if !strings.Contains(out, "unavailable") {
+			t.Fatal("unknown allocation rendered as a measurement", out)
+		}
+		for _, line := range strings.Split(out, "\n") {
+			if strings.Contains(line, "Known collection file lengths (bytes)") && !strings.HasSuffix(strings.TrimSpace(line), "0") {
+				t.Fatal("measured zero omitted from human output", out)
+			}
+			if strings.Contains(line, "Known collection file allocation (bytes)") && !strings.HasSuffix(strings.TrimSpace(line), "unavailable") {
+				t.Fatal("unavailable allocation fabricated in human output", out)
+			}
+		}
+	}
+}
+
 func TestHistoryAndIncidentsUseCurrentResourceReads(t *testing.T) {
 	var requests atomic.Int32
 	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {

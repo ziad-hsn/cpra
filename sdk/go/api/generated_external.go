@@ -150,6 +150,30 @@ func (e CollectionReselectionAttemptPhase) Valid() bool {
 	}
 }
 
+// Defines values for CollectionStorageAccountingUsageCoverage.
+const (
+	CollectionUsageComplete    CollectionStorageAccountingUsageCoverage = "complete"
+	CollectionUsagePartial     CollectionStorageAccountingUsageCoverage = "partial"
+	CollectionUsagePending     CollectionStorageAccountingUsageCoverage = "pending"
+	CollectionUsageUnavailable CollectionStorageAccountingUsageCoverage = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the CollectionStorageAccountingUsageCoverage enum.
+func (e CollectionStorageAccountingUsageCoverage) Valid() bool {
+	switch e {
+	case CollectionUsageComplete:
+		return true
+	case CollectionUsagePartial:
+		return true
+	case CollectionUsagePending:
+		return true
+	case CollectionUsageUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OperationIdentityFormat.
 const (
 	OperationIdentityFormatCpraCollectionHmacSha256JsonBytesV1 OperationIdentityFormat = "cpra.collection.hmac-sha256-json-bytes.v1"
@@ -784,18 +808,39 @@ type CollectionReselectionCreateRequest struct {
 	SourceCount          int64  `json:"sourceCount"`
 }
 
-// CollectionStorageAccounting Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.
+// CollectionStorageAccounting Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation. File usage samples cover only ledger.db and generation.json in catalogued completed generations, not incomplete generations, directory metadata, Raft, snapshots, history, or host disk usage. Samples are incremental, not an atomic filesystem snapshot.
 type CollectionStorageAccounting struct {
-	Active           int64      `json:"active"`
-	Available        bool       `json:"available"`
-	CleanupCondition *string    `json:"cleanupCondition,omitempty"`
-	ObservedAt       *time.Time `json:"observedAt,omitempty"`
-	Pinned           int64      `json:"pinned"`
-	Retained         int64      `json:"retained"`
-	Retired          uint64     `json:"retired"`
-	StepDurationMS   float64    `json:"stepDurationMs"`
-	UnlinkedBytes    int64      `json:"unlinkedBytes"`
+	Active           int64   `json:"active"`
+	Available        bool    `json:"available"`
+	CleanupCondition *string `json:"cleanupCondition,omitempty"`
+
+	// KnownAllocatedBytes Filesystem-reported allocation of the sampled files; omitted when unavailable. Not physical host allocation or proven reclamation.
+	KnownAllocatedBytes *int64 `json:"knownAllocatedBytes,omitempty"`
+
+	// KnownApparentBytes Apparent lengths of the sampled files; omitted when unavailable.
+	KnownApparentBytes *int64     `json:"knownApparentBytes,omitempty"`
+	ObservedAt         *time.Time `json:"observedAt,omitempty"`
+	Pinned             int64      `json:"pinned"`
+	Retained           int64      `json:"retained"`
+	Retired            uint64     `json:"retired"`
+	StepDurationMS     float64    `json:"stepDurationMs"`
+	UnlinkedBytes      int64      `json:"unlinkedBytes"`
+
+	// UsageCoverage Coverage of catalogued completed generations; complete is not a full data-directory inventory.
+	UsageCoverage *CollectionStorageAccountingUsageCoverage `json:"usageCoverage,omitempty"`
+
+	// UsageExpected Completed generations in the current catalog.
+	UsageExpected *int64 `json:"usageExpected,omitempty"`
+
+	// UsageGenerations Completed generations included in the known byte subtotal.
+	UsageGenerations *int64 `json:"usageGenerations,omitempty"`
+
+	// UsageOldestAt Oldest file sample contributing to the subtotal; omitted when no file was sampled.
+	UsageOldestAt *time.Time `json:"usageOldestAt,omitempty"`
 }
+
+// CollectionStorageAccountingUsageCoverage Coverage of catalogued completed generations; complete is not a full data-directory inventory.
+type CollectionStorageAccountingUsageCoverage string
 
 // ControlRequest defines model for ControlRequest.
 type ControlRequest struct {
@@ -1907,7 +1952,7 @@ type StorageState struct {
 	Bytes          int64 `json:"bytes,omitempty"`
 	BytesAvailable bool  `json:"bytesAvailable"`
 
-	// CollectionGenerations Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.
+	// CollectionGenerations Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation. File usage samples cover only ledger.db and generation.json in catalogued completed generations, not incomplete generations, directory metadata, Raft, snapshots, history, or host disk usage. Samples are incremental, not an atomic filesystem snapshot.
 	CollectionGenerations *CollectionStorageAccounting `json:"collectionGenerations,omitempty"`
 
 	// CommitIndex Compatibility observation of the FSM-applied log index; not an independently sampled Raft commit index.

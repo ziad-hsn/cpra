@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ziad-hsn/cpra/internal/management"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/slo"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -164,17 +165,8 @@ func (s *Server) managementState(ctx context.Context, now time.Time) (api.State,
 			CommitIndex: int64(status.CommittedIndex), AppliedIndex: int64(status.CommittedIndex), SingleNode: status.SingleNode, Error: status.Error,
 			CommitLatency: unavailableMeasurement("not_recorded"), SnapshotDuration: unavailableMeasurement("not_recorded")}
 		if accounting := status.Collections; accounting != nil {
-			result.Storage.CollectionGenerations = &api.CollectionStorageAccounting{
-				Available: accounting.Available, Active: int64(accounting.Active), Retained: int64(accounting.Retained),
-				Pinned: int64(accounting.Pinned), Retired: accounting.Retired, UnlinkedBytes: accounting.UnlinkedBytes,
-				StepDurationMS: accounting.StepDurationMS,
-			}
-			if !accounting.ObservedAt.IsZero() {
-				result.Storage.CollectionGenerations.ObservedAt = &accounting.ObservedAt
-			}
-			if accounting.CleanupCondition != "" {
-				result.Storage.CollectionGenerations.CleanupCondition = &accounting.CleanupCondition
-			}
+			observation := collectionStorageObservation(*accounting)
+			result.Storage.CollectionGenerations = &observation
 		}
 		if !status.Ready {
 			result.Ready, result.ReadinessReason = false, "Durable storage is unavailable."
@@ -189,6 +181,35 @@ func (s *Server) managementState(ctx context.Context, now time.Time) (api.State,
 	// No fleet-wide scan is justified to fill an unavailable aggregate. Actions
 	// have their separate indexed, bounded ListActions endpoint.
 	return result, nil
+}
+
+func collectionStorageObservation(accounting persistence.CollectionStorageAccounting) api.CollectionStorageAccounting {
+	result := api.CollectionStorageAccounting{
+		Available: accounting.Available, Active: int64(accounting.Active), Retained: int64(accounting.Retained),
+		Pinned: int64(accounting.Pinned), Retired: accounting.Retired, UnlinkedBytes: accounting.UnlinkedBytes,
+		StepDurationMS: accounting.StepDurationMS,
+	}
+	if !accounting.ObservedAt.IsZero() {
+		result.ObservedAt = &accounting.ObservedAt
+	}
+	if accounting.CleanupCondition != "" {
+		result.CleanupCondition = &accounting.CleanupCondition
+	}
+	if accounting.UsageCoverage != "" {
+		coverage := api.CollectionStorageAccountingUsageCoverage(accounting.UsageCoverage)
+		generations, expected := int64(accounting.UsageGenerations), int64(accounting.UsageExpected)
+		result.UsageCoverage, result.UsageGenerations, result.UsageExpected = &coverage, &generations, &expected
+	}
+	if accounting.UsageGenerations > 0 || accounting.UsageCoverage == "complete" {
+		result.KnownApparentBytes = &accounting.KnownApparentBytes
+		if accounting.AllocationAvailable {
+			result.KnownAllocatedBytes = &accounting.KnownAllocatedBytes
+		}
+	}
+	if !accounting.UsageOldestAt.IsZero() {
+		result.UsageOldestAt = &accounting.UsageOldestAt
+	}
+	return result
 }
 
 func queueObservation(name string, source queue.Queue) api.Queue {

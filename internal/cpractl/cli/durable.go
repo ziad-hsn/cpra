@@ -57,8 +57,37 @@ func addDurableCommands(get *cobra.Command, o *options) {
 }
 func writeState(p *printer, s api.State) error {
 	return p.render(s, func(w io.Writer) error {
-		return kv(w, [][2]string{{"Live", fmtBool(s.Live)}, {"Ready", fmtBool(s.Ready)}, {"Readiness reason", managementDisplay(s.ReadinessReason)}, {"Controller ready", observedBool(s.ControllerAvailable, s.ControllerReady)}, {"Controller reason", observedText(s.ControllerAvailable, s.ControllerReason)}, {"Storage mode", observedText(s.Storage.Available, s.Storage.Mode)}, {"Applied index", observedCount(s.Storage.Available, s.Storage.AppliedIndex)}, {"Storage bytes", observedCount(s.Storage.Available && s.Storage.BytesAvailable, s.Storage.Bytes)}, {"Unknown actions", observedCount(s.UnknownActionsAvailable, s.UnknownActions)}, {"Projection fresh", observedBool(s.ProjectionAvailable, s.ProjectionFresh)}, {"Projection age ms", observedNumber(s.ProjectionAvailable, s.ProjectionAgeMS)}})
+		rows := [][2]string{{"Live", fmtBool(s.Live)}, {"Ready", fmtBool(s.Ready)}, {"Readiness reason", managementDisplay(s.ReadinessReason)}, {"Controller ready", observedBool(s.ControllerAvailable, s.ControllerReady)}, {"Controller reason", observedText(s.ControllerAvailable, s.ControllerReason)}, {"Storage mode", observedText(s.Storage.Available, s.Storage.Mode)}, {"Applied index", observedCount(s.Storage.Available, s.Storage.AppliedIndex)}, {"Storage bytes", observedCount(s.Storage.Available && s.Storage.BytesAvailable, s.Storage.Bytes)}, {"Unknown actions", observedCount(s.UnknownActionsAvailable, s.UnknownActions)}, {"Projection fresh", observedBool(s.ProjectionAvailable, s.ProjectionFresh)}, {"Projection age ms", observedNumber(s.ProjectionAvailable, s.ProjectionAgeMS)}}
+		if generations := s.Storage.CollectionGenerations; generations != nil {
+			coverage, measured := "unavailable", "unavailable"
+			oldest := generations.UsageOldestAt
+			if !generations.Available {
+				oldest = nil
+			} else {
+				if generations.UsageCoverage != nil {
+					coverage = "unrecognized"
+					if generations.UsageCoverage.Valid() {
+						coverage = string(*generations.UsageCoverage)
+					}
+				}
+				if generations.UsageGenerations != nil && generations.UsageExpected != nil && *generations.UsageGenerations >= 0 && *generations.UsageExpected >= 0 {
+					measured = fmt.Sprintf("%d / %d", *generations.UsageGenerations, *generations.UsageExpected)
+				}
+			}
+			rows = append(rows, [2]string{"Collection file usage coverage", coverage}, [2]string{"Measured collection generations", measured},
+				[2]string{"Known collection file lengths (bytes)", observedCountPointer(generations.Available, generations.KnownApparentBytes)},
+				[2]string{"Known collection file allocation (bytes)", observedCountPointer(generations.Available, generations.KnownAllocatedBytes)},
+				[2]string{"Oldest collection file sample", optionalManagementTime(oldest)})
+		}
+		return kv(w, rows)
 	})
+}
+
+func observedCountPointer(available bool, value *int64) string {
+	if value == nil {
+		return "unavailable"
+	}
+	return observedCount(available, *value)
 }
 func writeSLO(p *printer, s api.SLOView) error {
 	return p.render(s, func(w io.Writer) error {

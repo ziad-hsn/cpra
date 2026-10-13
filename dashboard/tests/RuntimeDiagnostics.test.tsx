@@ -81,6 +81,21 @@ it.each([null, {}, { ...stateWire(), ready: 'yes' }, { ...stateWire(), live: nul
   expect(() => runtimeView(value)).toThrow('The runtime observation has an unsupported format.');
 });
 
+it('shows partial file allocation with explicit unavailable values and a bounded subtotal', async () => {
+  const wire = stateWire();
+  const generations = { available: true, active: 1, retained: 1, pinned: 0, retired: 4, unlinkedBytes: 4096, stepDurationMs: 1,
+    usageCoverage: 'partial', usageGenerations: 1, usageExpected: 2, knownApparentBytes: 0, usageOldestAt: '2026-09-19T11:59:00Z' };
+  await fixture({ stateBody: { ...wire, storage: { ...wire.storage, collectionGenerations: generations } } });
+  await screen.findByText('Ready for new work');
+  expect(valueFor('Measured collection generations')).toHaveTextContent(/^1 \/ 2$/);
+  expect(valueFor('Known collection file lengths')).toHaveTextContent(/^0 bytes$/);
+  expect(valueFor('Known collection file allocation')).toHaveTextContent(/^Unavailable$/);
+  expect(screen.getByText(/Collection file usage covers part/)).toHaveTextContent('exclude incomplete collections');
+  const unknown = runtimeView({ ...wire, storage: { ...wire.storage, collectionGenerations: { ...generations, usageCoverage: '/private/file/path', knownAllocatedBytes: -1 } } });
+  expect(unknown.storage.generations?.knownAllocatedBytes).toBeUndefined();
+  expect(JSON.stringify(unknown)).not.toContain('/private/');
+});
+
 it('shows ready controller and storage separately from stale dashboard projection with GET-only reads', async () => {
   const { requests } = await fixture();
   await screen.findByText('Ready for new work');

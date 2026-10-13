@@ -4,6 +4,7 @@ import { loadReadiness, loadRuntime } from '../api/runtime';
 import { formatDateTime, formatNumber } from '../lib/format';
 
 const milliseconds = (value?: number) => value === undefined ? 'Unavailable' : `${formatNumber(value)} ms`;
+const bytes = (value?: number) => value === undefined ? 'Unavailable' : `${formatNumber(value)} bytes`;
 const status = (value: boolean | undefined, yes: string, no: string) => value === undefined ? 'Unavailable' : value ? yes : no;
 
 export function RuntimeDiagnostics() {
@@ -42,12 +43,17 @@ export function RuntimeDiagnostics() {
           <dt>Pinned collection generations</dt><dd>{current.storage.generations.pinned === undefined ? 'Unavailable' : formatNumber(current.storage.generations.pinned)}</dd>
           <dt>Retired collection generations</dt><dd>{current.storage.generations.retired === undefined ? 'Unavailable' : formatNumber(current.storage.generations.retired)}</dd>
           <dt>Last cleanup step</dt><dd>{milliseconds(current.storage.generations.stepDurationMs)}</dd>
+          <dt>Measured collection generations</dt><dd>{current.storage.generations.usageGenerations === undefined || current.storage.generations.usageExpected === undefined ? 'Unavailable' : `${formatNumber(current.storage.generations.usageGenerations)} / ${formatNumber(current.storage.generations.usageExpected)}`}</dd>
+          <dt>Known collection file lengths</dt><dd>{bytes(current.storage.generations.knownApparentBytes)}</dd>
+          <dt>Known collection file allocation</dt><dd>{bytes(current.storage.generations.knownAllocatedBytes)}</dd>
+          <dt>Oldest collection file sample</dt><dd>{current.storage.generations.usageOldestAt ? formatDateTime(current.storage.generations.usageOldestAt) : 'Unavailable'}</dd>
         </>}
       </dl>
       {current.readinessReason && <p role="status">{current.readinessReason}</p>}
       {current.controllerReason && <p className="muted">{current.controllerReason}</p>}
       {current.storage.error && <p role="alert">Storage reports an error. Consult protected server diagnostics.</p>}
       {current.storage.generations?.condition && <p role="status">{current.storage.generations.condition}</p>}
+      {current.storage.generations?.usageCoverage && <p role="status">{current.storage.generations.usageCoverage} These byte subtotals exclude incomplete collections, Raft state, snapshots, history and other files. Filesystem allocation does not measure physical host disk usage or prove reclaimed space.</p>}
     </>}
     <p className="muted">Readiness includes initialization, usable storage and admission. An intentionally empty configuration can be ready when the server permits it. Monitored service failures do not by themselves make CPRa unready.</p>
     <p className="muted">Projection freshness describes the dashboard snapshot, separately from controller progress and storage availability. A stale projection does not prove a disk failure. These endpoints are separate observations and can differ during a transition.</p>

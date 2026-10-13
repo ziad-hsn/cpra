@@ -1290,7 +1290,7 @@
       },
       "CollectionStorageAccounting": {
         "additionalProperties": false,
-        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation.",
+        "description": "Sampled collection generation accounting. Cleanup conditions are separate from Raft admission health; unlinked bytes are apparent sizes rather than physical disk reclamation. File usage samples cover only ledger.db and generation.json in catalogued completed generations, not incomplete generations, directory metadata, Raft, snapshots, history, or host disk usage. Samples are incremental, not an atomic filesystem snapshot.",
         "properties": {
           "active": {
             "format": "int64",
@@ -1302,6 +1302,18 @@
           },
           "cleanupCondition": {
             "type": "string"
+          },
+          "knownAllocatedBytes": {
+            "description": "Filesystem-reported allocation of the sampled files; omitted when unavailable. Not physical host allocation or proven reclamation.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "knownApparentBytes": {
+            "description": "Apparent lengths of the sampled files; omitted when unavailable.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
           },
           "observedAt": {
             "format": "date-time",
@@ -1332,6 +1344,39 @@
             "format": "int64",
             "minimum": 0,
             "type": "integer"
+          },
+          "usageCoverage": {
+            "description": "Coverage of catalogued completed generations; complete is not a full data-directory inventory.",
+            "enum": [
+              "pending",
+              "partial",
+              "complete",
+              "unavailable"
+            ],
+            "type": "string",
+            "x-enum-varnames": [
+              "CollectionUsagePending",
+              "CollectionUsagePartial",
+              "CollectionUsageComplete",
+              "CollectionUsageUnavailable"
+            ]
+          },
+          "usageExpected": {
+            "description": "Completed generations in the current catalog.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "usageGenerations": {
+            "description": "Completed generations included in the known byte subtotal.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "usageOldestAt": {
+            "description": "Oldest file sample contributing to the subtotal; omitted when no file was sampled.",
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [

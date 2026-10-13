@@ -12,7 +12,8 @@ export interface RuntimeObservation {
   projectionFresh?: boolean;
   projectionAgeMs?: number;
   storage: { available: boolean; mode: string; appliedIndex?: number; commitLatencyMs?: number; snapshotDurationMs?: number; error: boolean;
-    generations?: { observedAt?: string; active?: number; retained?: number; pinned?: number; retired?: number; unlinkedBytes?: number; stepDurationMs?: number; condition?: string } };
+    generations?: { observedAt?: string; active?: number; retained?: number; pinned?: number; retired?: number; unlinkedBytes?: number; stepDurationMs?: number; condition?: string;
+      usageCoverage?: string; usageGenerations?: number; usageExpected?: number; usageOldestAt?: string; knownApparentBytes?: number; knownAllocatedBytes?: number } };
 }
 
 const boolean = (value: unknown) => typeof value === 'boolean' ? value : undefined;
@@ -22,6 +23,7 @@ const timestamp = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}
 const measurement = (value: unknown) => object(value) && value.available === true ? nonnegative(value.value) : undefined;
 const storageMode = (value: unknown) => value === 'raft' ? 'Raft' : value === 'memory' ? 'Memory (not persistent)' : value === 'unavailable' ? 'Unavailable' : 'Unrecognized storage mode';
 const cleanupConditions: Record<string, string> = { unavailable: 'Native cleanup is unavailable on this filesystem or platform.', blocked: 'Cleanup is held. Inspect protected local storage diagnostics.', budget_exhausted: 'Cleanup reached its cooperative step budget and will continue later.', budget_exceeded: 'A filesystem operation exceeded the cleanup step budget.' };
+const usageCoverage: Record<string, string> = { pending: 'Collection file usage has not been sampled yet.', partial: 'Collection file usage covers part of the completed-generation catalog.', complete: 'Collection file usage covers the completed-generation catalog.', unavailable: 'Collection file usage could not be sampled.' };
 const readinessReasons: Record<string, string> = {
   'Controller initialization or progress is unavailable.': 'Controller initialization or progress is unavailable.',
   'The durable management catalog is unavailable.': 'The durable management catalog is unavailable.',
@@ -60,7 +62,9 @@ export function runtimeView(value: unknown, legacy = false): RuntimeObservation 
     const generations = store.collectionGenerations;
     storage.generations = { observedAt: timestamp(generations.observedAt), active: count(generations.active), retained: count(generations.retained),
       pinned: count(generations.pinned), retired: count(generations.retired), unlinkedBytes: count(generations.unlinkedBytes),
-      stepDurationMs: nonnegative(generations.stepDurationMs), condition: reason(generations.cleanupCondition, cleanupConditions) };
+      stepDurationMs: nonnegative(generations.stepDurationMs), condition: reason(generations.cleanupCondition, cleanupConditions),
+      usageCoverage: reason(generations.usageCoverage, usageCoverage), usageGenerations: count(generations.usageGenerations), usageExpected: count(generations.usageExpected),
+      usageOldestAt: timestamp(generations.usageOldestAt), knownApparentBytes: count(generations.knownApparentBytes), knownAllocatedBytes: count(generations.knownAllocatedBytes) };
   }
   return { legacy: false, generatedAt, ready: value.ready, live: value.live, storage,
     readinessReason: reason(value.readinessReason, readinessReasons),

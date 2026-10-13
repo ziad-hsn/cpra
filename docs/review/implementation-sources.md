@@ -14,7 +14,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | --- | --- | --- |
 | `Makefile` | [Source](source/Makefile.txt) | `545a94af08fbe8bd3663541d2d81ee9cdac40350ae2903af18c98d85335d311d` |
 | `api/openapi/externaljobs.json` | [Source](source/api/openapi/externaljobs.json.txt) | `4f3008c3c58874970b95f9ee679b6477454ed1e2aa76f9865881905e857249bb` |
-| `api/openapi/models.base.json` | [Source](source/api/openapi/models.base.json.txt) | `2d67b3867386df37e0f7bed6a0304f6795e3f8c2ac5be91572ee4001b10cca4d` |
+| `api/openapi/models.base.json` | [Source](source/api/openapi/models.base.json.txt) | `1e553c54717de9b7971e5d03f04a71c42f58a06aa5f3c61f58a95a1737d668c7` |
 | `api/openapi/operations.json` | [Source](source/api/openapi/operations.json.txt) | `f676ba620526646b5a7cacf9c352cebff73c8caeaf76f1e22fce54834dcb34f3` |
 | `dashboard/src/api/collectionOperations.ts` | [Source](source/dashboard/src/api/collectionOperations.ts.txt) | `80a7d95cfee70c4f4bf09af1d18cc44d7100c32ac160dcb08346f3bcfea21b2d` |
 | `dashboard/src/api/executionResults.ts` | [Source](source/dashboard/src/api/executionResults.ts.txt) | `4df136ae8d8b59eea6cadfc54401b14e705a2b088da7b48997deee009767af02` |
@@ -63,6 +63,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/collection_ledger_gc_engine.go` | [Source](source/internal/persistence/collection_ledger_gc_engine.go.txt) | `8bbd966ef2b4cf0fee6d8e05fd2a2d8a3e8750e0d3893b4444acb0cfc76f6348` |
 | `internal/persistence/collection_ledger_gc_windows.go` | [Source](source/internal/persistence/collection_ledger_gc_windows.go.txt) | `b686416c735a2ce3d8b47f947c9252d051d0d0ec7cd660e5100a5184761606ae` |
 | `internal/persistence/collection_operation_access.go` | [Source](source/internal/persistence/collection_operation_access.go.txt) | `3b0e5253f44037ef1f7633315b73ccae566c189f83c89f1c695bd9d859e7b202` |
+| `internal/persistence/collection_usage_native.go` | [Source](source/internal/persistence/collection_usage_native.go.txt) | `4a6ae94dd775334e19a8cf40dc2b5f3932d96589a14af58c7a2815e72f0b1477` |
 | `internal/persistence/command_digest_v1.go` | [Source](source/internal/persistence/command_digest_v1.go.txt) | `d8be70116f5a0766836418e9a67e536e372f98f3c642810a332997ebc0a13e66` |
 | `internal/persistence/job_type_external.go` | [Source](source/internal/persistence/job_type_external.go.txt) | `2b2ab001794f5bffdd55d75bc0736d1c2bf7d28c0d2309e4568b7d01d5e9cbe0` |
 | `internal/persistence/local_executor.go` | [Source](source/internal/persistence/local_executor.go.txt) | `8767b5990751abdd41fef5164f2e1cddf629c8b8e52934230d0047765f875412` |

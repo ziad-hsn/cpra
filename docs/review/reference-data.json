@@ -1307,9 +1307,9 @@
     },
     {
       "asset": "review/source/api/openapi/models.base.json.txt",
-      "bytes": 135385,
+      "bytes": 137355,
       "path": "api/openapi/models.base.json",
-      "sha256": "2d67b3867386df37e0f7bed6a0304f6795e3f8c2ac5be91572ee4001b10cca4d"
+      "sha256": "1e553c54717de9b7971e5d03f04a71c42f58a06aa5f3c61f58a95a1737d668c7"
     },
     {
       "asset": "review/source/api/openapi/operations.json.txt",
@@ -1598,6 +1598,12 @@
       "bytes": 8510,
       "path": "internal/persistence/collection_operation_access.go",
       "sha256": "3b0e5253f44037ef1f7633315b73ccae566c189f83c89f1c695bd9d859e7b202"
+    },
+    {
+      "asset": "review/source/internal/persistence/collection_usage_native.go.txt",
+      "bytes": 2385,
+      "path": "internal/persistence/collection_usage_native.go",
+      "sha256": "4a6ae94dd775334e19a8cf40dc2b5f3932d96589a14af58c7a2815e72f0b1477"
     },
     {
       "asset": "review/source/internal/persistence/command_digest_v1.go.txt",

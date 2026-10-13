@@ -1,7 +1,7 @@
 {
   "updated": "2026-10-14",
   "repository": "https://github.com/ziad-hsn/cpra",
-  "source_commit": "9bd89cb0bc50705d9ca6b0655dcdb2e93fe2da30",
+  "source_commit": "df82cf85108dd15b66d23de3ded03dcc4a547ba9",
   "source_branch": "codex/release-repairs",
   "source_commit_role": "Implementation checkpoint before this documentation refresh; not frozen release source or complete working-tree identity",
   "uncommitted_changes": true,
@@ -16,7 +16,7 @@
   },
   "documentation_scope": "Current development guides plus explicitly dated historical candidate and engineering records",
   "historical_review_date": "2026-09-13",
-  "development_commit": "9bd89cb0bc50705d9ca6b0655dcdb2e93fe2da30",
+  "development_commit": "df82cf85108dd15b66d23de3ded03dcc4a547ba9",
   "integrated_main_commit": "b293f34dd57ee61c78371643de6d0ebaa75c626e",
   "referenced_source_inventory": "review/reference-data.json",
   "referenced_source_inventory_scope": "selected linked source files only; not the full working candidate or a release attestation"

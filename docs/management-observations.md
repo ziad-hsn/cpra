@@ -61,6 +61,41 @@ available only after the source records a positive elapsed duration. Filesystem
 bytes and a fleet-wide unknown-action count are currently marked unavailable;
 use indexed action observations for investigation rather than inferring a zero.
 
+### Collection file accounting
+
+`storage.collectionGenerations` reports active, retained, pinned and retired
+generation counts, the cleanup condition and cached file measurements. The
+maintenance worker samples at most one completed generation per step. Reading
+state through the API, SDK, CLI or dashboard performs no filesystem scan.
+
+| Field | Meaning |
+| --- | --- |
+| `usageGenerations` / `usageExpected` | Measured generations versus the current completed-generation catalog. |
+| `usageCoverage` | `pending`, `partial`, `complete` or `unavailable` coverage of that catalog. |
+| `usageOldestAt` | Oldest file sample contributing to the cached subtotal. |
+| `knownApparentBytes` | Sampled file lengths, omitted when unavailable. |
+| `knownAllocatedBytes` | Filesystem-reported allocation, omitted when unavailable. |
+
+The subtotal covers `ledger.db` and `generation.json` in catalogued completed
+generations. It excludes incomplete generations, unknown files, directory
+metadata, Raft, snapshots and event history. `complete` describes coverage of
+this catalog; it does not describe all data-directory or host disk usage.
+Measurements are incremental and can have different sample times. A failed
+refresh removes that generation's cached sample, so partial/unavailable data
+cannot silently become a measured zero. Retired samples leave the subtotal.
+
+Linux/macOS read allocated block counts from open file descriptors. Windows
+reads `FILE_STANDARD_INFO.AllocationSize` from verified local NTFS handles.
+These numbers differ from apparent length and from physical host allocation,
+especially with sparse files or virtual disks. Unlinked bytes likewise do not
+prove reclaimed space. Cleanup/accounting conditions remain separate from Raft
+admission health.
+
+Use `cpractl get state -o json`, `Client.State(ctx)` or the dashboard's runtime
+diagnostics to inspect the same measurements. The dashboard preserves measured
+zero and labels missing measurements unavailable. The complete native-platform
+and storage qualification matrix remains open.
+
 ## Shared queue and worker diagnostics
 
 The three pipeline names are `pulse`, `intervention`, and `code`. Queue depth,

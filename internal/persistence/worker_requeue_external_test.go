@@ -200,7 +200,7 @@ func TestWorkerRequeueSnapshotAndCommandBounds(t *testing.T) {
 		t.Fatal("requeue", result.Err)
 	}
 	snapshot := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(snapshot, []byte(notificationWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(snapshot, []byte(deliveryWorkerSnapshotMagic)) {
 		t.Fatal("snapshot format")
 	}
 	restored, _, err := decodeSnapshot(bytes.NewReader(snapshot), "")

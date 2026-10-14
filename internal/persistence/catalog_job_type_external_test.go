@@ -207,7 +207,7 @@ func TestCatalogJobTypeCanonicalShapeAndFormats(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		want := version >= 18 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion
+		want := version >= 18 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion
 		if (err == nil) != want {
 			t.Fatal("format gate", version, err)
 		}

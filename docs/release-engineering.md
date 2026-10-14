@@ -148,6 +148,11 @@ schema-3 report retains the candidate's release linker fields.
 The compatibility job uses the extracted frozen source and records all seven
 application/SDK/worker module and tag combinations, including all built-in drivers
 together with `externaljobs`. Both compilers run race-enabled tests and vet.
+Each package keeps a 45-minute Go test timeout. The recorder allows up to
+90 minutes for an all-package test command, including compilation and time
+waiting for a test slot, within a five-hour limit for the complete matrix.
+The workflow allows a further 30 minutes for preparation and evidence capture.
+Deadline expiry leaves failed or incomplete evidence; it never implies a pass.
 The release compiler also records two-root SDK regeneration, formatting, pinned
 frontend tools, frozen-lockfile installation, dashboard types/lint/tests and a
 matching embedded-asset rebuild. The [build verification procedure](validation.md#frozen-build-verification)

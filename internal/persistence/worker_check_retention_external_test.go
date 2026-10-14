@@ -375,8 +375,11 @@ func TestWorkerCheckRetentionPreservesStateAndExpiredPollFence(t *testing.T) {
 		t.Fatal("snapshot validation", err)
 	}
 	encoded := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(encoded, []byte(notificationWorkerSnapshotMagic)) || bytes.Contains(encoded, []byte("private-check-parameters")) {
-		t.Fatal("snapshot format or secret")
+	if !bytes.HasPrefix(encoded, []byte(deliveryWorkerSnapshotMagic)) {
+		t.Fatal("snapshot does not preserve the delivery worker format")
+	}
+	if bytes.Contains(encoded, []byte("private-check-parameters")) {
+		t.Fatal("snapshot contains plaintext check parameters")
 	}
 	restored, ledger, err := decodeSnapshot(bytes.NewReader(encoded), "")
 	if err != nil {

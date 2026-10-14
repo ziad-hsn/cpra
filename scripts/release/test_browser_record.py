@@ -55,7 +55,7 @@ class BrowserRecordTests(unittest.TestCase):
         directory = args.out.with_name(args.out.stem + '.artifacts')
         screenshots = directory / 'screenshots'; screenshots.mkdir(parents=True)
         scan = {'checkpoint': 'sign-in', 'scanner': '4.13.0', 'automatedOnly': True,
-                'violations': [], 'needsReview': [], 'passedRules': ['label']}
+                'violations': [], 'needsReview': [], 'contrastPasses': [], 'passedRules': ['label']}
         (screenshots / 'accessibility-verify_browser-01-sign-in.json').write_bytes(release.encoded(scan))
         report = {'result': 'passed', 'release_qualified': False, 'workspace': {'path': 'off', 'sha256': None}}
         args.out.write_bytes(release.encoded(report)); args.out.chmod(0o600)

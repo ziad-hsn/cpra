@@ -3,7 +3,7 @@
 Plan: [approved release repairs](release-repair-plan.md).
 Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
-Updated: 2026-10-14. The candidate is not frozen or publicly qualified.
+Updated: 2026-10-15. The candidate is not frozen or publicly qualified.
 
 The [compiler/dependency security checkpoint](dependency-security-2026-10-14.md)
 updates the release compiler to Go 1.27.2 and gRPC to 1.83.2. Five `x/net`
@@ -816,3 +816,73 @@ compiler, browser, distribution, provider and comparative-performance gates.
 Physical C: free space was 14.88 GiB during this check, below the large campaign's
 initial 35 GiB requirement. Publication remains withheld and the 24-hour run
 remains cancelled.
+
+## Snapshot expectations and matrix deadlines, 15 October
+
+The private `72d86f9` Go 1.27.2 matrix passes the default and all-built-in
+application package, vet and race-test selections. The external-worker selection
+finds stale format expectations, then reaches the recorder's 47-minute process
+limit before its persistence package completes. Its original report remains
+failed/incomplete, with unchanged frozen source and release metadata.
+
+The finite follow-up repairs two supported-command format allowlists and nine
+current snapshot expectations. Current configuration writes select delivery
+format 40; combining that state with optional worker records selects 41.
+Assertions still reject unsupported formats, and confidentiality, corruption,
+snapshot isolation, cancellation and replay checks remain present. Separate
+format and confidentiality assertions identify which condition fails.
+
+The historical SLO test requires a different fixture correction. Its setup now
+replays explicit retained configuration and worker-admission envelopes, instead
+of calling today's configuration writer. It still requires the older snapshot
+format, unavailable timing and no invented measurement window or result target.
+No production storage format or transition changed.
+
+The focused 15-test selection passes with Go 1.27.2 and race detection under
+both `externaljobs` and all built-in drivers plus `externaljobs`. The first
+combined attempt reaches the scratch guard during compilation and remains a
+failed record. Removing five obsolete task-owned compiled persistence test
+archives permits the retry; the two newest archives, dependencies, source and
+original evidence are retained. Independent source and retained-evidence review
+closes these finite corrections. A separate preflight of all 45 top-level tests
+unfinished in the interrupted run also completes: 44 pass, and the dedicated
+child-process entry point skips outside its parent fixture. Including subtests,
+the log contains 165 passing events with no failures. This does not combine with
+the interrupted frozen run to form a matrix pass; complete final-source compiler
+matrices remain required.
+
+The recorder now allows 90 minutes for an all-package test command and five
+hours for the complete matrix, with a 330-minute workflow allowance. Go's
+45-minute per-package timeout remains unchanged. The previous 47-minute command
+limit included roughly 17 minutes before persistence started, leaving that
+package less than its configured budget. Recorder and reader share the aggregate
+limit; each command is clamped to remaining time. Twenty recorder/reader tests
+pass, including simulated package queueing, aggregate deadline expiry and
+retention of failed evidence. Independent review is closed. The longer bound
+does not convert any previous interrupted result into a pass.
+The broader build, security, browser, accessibility and release-evidence
+selection passes all 87 Python contract tests. Canonical documentation and its
+103 source references validate without errors.
+
+## Accessibility evidence detail, 15 October
+
+Contrast evidence now retains bounded, allowlisted measurement fields and the
+reason axe could not calculate a result. It includes measured passing contrast
+nodes, while excluding HTML, selectors, free-form diagnostics and form values.
+The strict evidence reader validates the same nested structure. Four Node
+privacy/measurement cases and 45 focused Python evidence contracts pass.
+
+The browser recorder captures guarded-recovery and unknown-outcome dialogs
+while open, and a keyboard-scrolled mobile incident view. Its required screenshot
+inventory increases from seven to eleven. A fixture campaign passes 15 scans
+and twelve keyboard checks. Separately, the actual TLS/Raft server recovery and
+review browser case passes with Go 1.27.2 race detection, ten scans and eleven
+screenshots, including restart behavior.
+
+The desktop incident identifier has a measured contrast ratio of 15.43:1. The
+mobile identifier can be scrolled by keyboard to its far end, but its full cell
+is wider than the viewport; evidence explicitly records `fullyVisible=false`.
+Obscured-node and dialog contrast findings remain `needsReview`. No dashboard
+CSS was changed and no accessibility-conformance pass is claimed. Independent
+source and evidence review is closed; all fourteen required manual cases and
+the complete browser matrix against the next frozen source remain outstanding.

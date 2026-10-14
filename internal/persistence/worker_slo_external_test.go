@@ -75,8 +75,39 @@ func TestWorkerSLOReceiptTimingAndConcurrentDuplicates(t *testing.T) {
 
 func TestWorkerSLOHistoricalAdmissionUnavailable(t *testing.T) {
 	s := openCatalogMemory(t)
-	in, _ := workerExecutionFixture(t, s, "check")
-	result := workerExecutionSubmitAt(t, s, in, s.executorSession, time.Now().UTC())
+	job := commitJobType(t, s, jobTypeFixture(t, s, "historical-check"))
+	monitor := testMonitor()
+	monitor.Policy.Endpoints = nil
+	source := createCatalog(t, s, catalogJobTypeRecord(t, s, monitor.ID, job.Current))
+	guard := CatalogGuard{Conditions: catalogConditions(t, s, []CatalogKey{source.Key})}
+	at := time.Now().UTC()
+	// Replaying retained envelopes must not use the current configure writer,
+	// which deliberately upgrades new state to the delivery format.
+	configured := applyCatalogFormat(t, s, CatalogFormatVersion, Command{
+		Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision,
+		Config: &monitor, Guard: &guard, At: at,
+	})[0]
+	if configured.Err != nil || !configured.Allowed {
+		t.Fatal("historical configuration", configured.Err)
+	}
+	monitor, _ = s.Get(monitor.ID)
+	in := WorkerExecutionIntent{
+		ID: "historical-execution", Revision: "execution-v1", MonitorID: monitor.ID,
+		MonitorUID: monitor.CatalogUID, MonitorRevision: monitor.Revision,
+		ControlRevision: monitor.ControlRevision, Generation: monitor.Generation + 1,
+		Category: "check", Source: source.Key, SourceUID: source.UID, SourceRevision: source.Revision,
+		JobType: catalogJobTypeRef(job.Current), Guard: guard, Scheduled: at, Deadline: at.Add(time.Hour),
+	}
+	var err error
+	in.Payload, err = catalogSealer(t).Seal(t.Context(), in.Binding(s.nodeID), []byte("private-historical-check"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := applyCatalogFormat(t, s, WorkerExecutionFormatVersion, Command{
+		Kind: "worker_execution", At: at, commandExtensions: commandExtensions{
+			WorkerExecution: &WorkerExecutionCommand{Intent: in, OwnerEpoch: s.executorSession},
+		},
+	})[0]
 	if result.Err != nil || !result.Allowed {
 		t.Fatal(result.Err)
 	}
@@ -302,8 +333,11 @@ func TestWorkerSLOSnapshotIsolationAndCorruption(t *testing.T) {
 	if err := snapshot.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(notificationWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("canary")) {
-		t.Fatal("format or plaintext")
+	if !bytes.HasPrefix(sink.Bytes(), []byte(deliveryWorkerSnapshotMagic)) {
+		t.Fatal("snapshot does not preserve the delivery worker format")
+	}
+	if bytes.Contains(sink.Bytes(), []byte("canary")) {
+		t.Fatal("snapshot contains plaintext worker data")
 	}
 	frozen, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
 	if err != nil {

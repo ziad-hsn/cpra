@@ -121,6 +121,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     await controls.getByRole('button', { name: 'Request recovery', exact: true }).click();
     const recovery = page.getByRole('dialog', { name: 'Request recovery', exact: true });
     await auditAccessibility(page, 'guarded-recovery', accessibility);
+    await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'guarded-recovery-dialog.png'), fullPage: true });
     check(await recovery.getByRole('button', { name: 'Request recovery', exact: true }).isDisabled(), 'recovery accepted without a reason');
     await recovery.getByLabel('Reason', { exact: true }).fill('Investigated the local target before requesting recovery');
     await recovery.getByRole('button', { name: 'Request recovery', exact: true }).click();
@@ -139,6 +140,7 @@ function check(value, message) { if (!value) throw new Error(message); }
       await dialog.getByLabel('Note (optional)', { exact: true }).fill('Operator browser qualification note');
       await dialog.getByLabel(/^Evidence references \(optional\)/).fill('local-fixture-receipt-1');
       await auditAccessibility(page, `unknown-review-${resolution}`, accessibility);
+      await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, `unknown-review-${resolution}-dialog.png`), fullPage: true });
       await dialog.getByRole('button', { name: 'Record review', exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
       await actions.getByText('Saved durably and applied by the controller.', { exact: true }).waitFor();
@@ -272,6 +274,28 @@ function check(value, message) { if (!value) throw new Error(message); }
     await checkMobileOverflow('Incidents');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'mobile-reader-incidents.png'), fullPage: true });
     await auditAccessibility(page, 'mobile-reader-incidents', accessibility);
+    await keyboardActivate(incidentRegion, 'Incident page scrolling');
+    const incidentCell = incidentRegion.locator('tbody tr').first().locator('td').nth(1);
+    const cellBounds = () => incidentCell.evaluate(element => {
+      const cell = element.getBoundingClientRect(), region = element.closest('[role="region"]');
+      const viewport = region.getBoundingClientRect();
+      return { cellLeft: cell.left, cellRight: cell.right, cellWidth: cell.width, regionLeft: viewport.left,
+        regionRight: viewport.right, regionWidth: viewport.width, scrollLeft: region.scrollLeft,
+        focused: region === document.activeElement };
+    });
+    const initialCell = await cellBounds();
+    let scrolledCell = initialCell;
+    for (let presses = 0; presses < 80 && scrolledCell.cellRight > scrolledCell.regionRight; presses++) {
+      await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(25);
+      scrolledCell = await cellBounds();
+    }
+    check(scrolledCell.focused && scrolledCell.scrollLeft > initialCell.scrollLeft, 'Focused incident region did not scroll with the keyboard');
+    check(scrolledCell.cellRight <= scrolledCell.regionRight + 1, 'Keyboard scrolling could not reach the incident cell');
+    keyboardSteps.push({ control: 'Incident cell horizontal scrolling', initial: initialCell, scrolled: scrolledCell,
+      fullyVisible: scrolledCell.cellLeft >= scrolledCell.regionLeft - 1 && scrolledCell.cellRight <= scrolledCell.regionRight + 1 });
+    await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'mobile-reader-incidents-scrolled.png'), fullPage: true });
+    await auditAccessibility(page, 'mobile-reader-incidents-scrolled', accessibility);
     await keyboardActivate(incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }), 'Stable monitor identity');
     await savedIdentity.waitFor();
     check(new URL(page.url()).pathname === '/monitors/by-id/browser-recovery', 'mobile keyboard incident navigation lost stable identity');

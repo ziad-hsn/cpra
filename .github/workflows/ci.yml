@@ -146,7 +146,9 @@ jobs:
           node node_modules/playwright/cli.js install --with-deps chromium
       - name: Verify frontend accessibility and native dialog behavior
         timeout-minutes: 5
-        run: node scripts/dashboard/accessibility_campaign.cjs --out "$RUNNER_TEMP/browser/frontend-accessibility"
+        run: |
+          node --test scripts/dashboard/accessibility.test.cjs
+          node scripts/dashboard/accessibility_campaign.cjs --out "$RUNNER_TEMP/browser/frontend-accessibility"
       - name: Run required browser security and normal startup campaigns
         timeout-minutes: 180
         env:

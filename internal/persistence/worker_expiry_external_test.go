@@ -263,8 +263,11 @@ func TestWorkerExpiryCommandAndSnapshotValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(notificationWorkerSnapshotMagic)) || bytes.Contains(raw, []byte("private-execution-parameters-canary")) {
-		t.Fatal("snapshot format or confidentiality")
+	if !bytes.HasPrefix(raw, []byte(deliveryWorkerSnapshotMagic)) {
+		t.Fatal("snapshot does not preserve the delivery worker format")
+	}
+	if bytes.Contains(raw, []byte("private-execution-parameters-canary")) {
+		t.Fatal("snapshot contains plaintext execution parameters")
 	}
 	saved, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")
 	if err != nil {

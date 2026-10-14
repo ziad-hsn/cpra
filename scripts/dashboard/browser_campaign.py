@@ -18,6 +18,8 @@ TESTS = {
     "github.com/ziad-hsn/cpra/internal/httpserver": ["TestManagementBrowser"],
 }
 SCREENSHOTS = (
+    'guarded-recovery-dialog.png', 'unknown-review-inconclusive-dialog.png',
+    'unknown-review-accepted-dialog.png', 'mobile-reader-incidents-scrolled.png',
     "operator-review.png", "reader-operations.png", "reader-monitor-state.png",
     "reader-incidents.png", "reader-metrics.png", "mobile-reader-incidents.png",
     "mobile-reader-metrics.png",

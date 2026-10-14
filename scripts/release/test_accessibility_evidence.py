@@ -16,6 +16,14 @@ import release
 import test_browser_evidence as browser_fixtures
 
 
+def contrast_finding():
+    location = 'html:nth-of-type(1) > body:nth-of-type(1)'
+    return {'rule': 'color-contrast', 'impact': 'serious', 'nodeCount': 1, 'locations': [location],
+            'contrast': [{'location': location, 'checks': [{'group': 'any', 'reason': 'bgOverlap',
+                'foreground': None, 'background': None, 'shadow': None, 'ratio': None, 'expectedRatio': 4.5,
+                'fontSizePt': 9.8, 'fontSizePx': 13, 'fontWeight': 'normal'}]}]}
+
+
 def scanner_fixture():
     package = release.encoded({'version': accessibility.SCANNER_VERSION})
     script = b'synthetic scanner fixture; this is not executable axe-core'
@@ -62,10 +70,9 @@ class AccessibilityEvidenceTests(unittest.TestCase):
                 for ordinal, label in enumerate(sorted(labels), 1):
                     target = directory / 'screenshots' / f'accessibility-{script}-{ordinal:02d}-{label}.json'
                     value = {'checkpoint': label, 'scanner': accessibility.SCANNER_VERSION, 'violations': [],
-                             'needsReview': [], 'passedRules': ['aria-allowed-attr', 'label'], 'automatedOnly': True}
+                             'needsReview': [], 'contrastPasses': [], 'passedRules': ['aria-allowed-attr', 'label'], 'automatedOnly': True}
                     if label == 'guarded-recovery':
-                        value['needsReview'] = [{'rule': 'color-contrast', 'impact': 'serious', 'nodeCount': 1,
-                                                 'locations': ['html:nth-of-type(1) > body:nth-of-type(1)']}]
+                        value['needsReview'] = [contrast_finding()]
                     target.write_bytes(release.encoded(value))
                     scans[target.relative_to(self.root).as_posix()] = fixture.record(target)
                     self.scans[target] = value
@@ -139,7 +146,7 @@ class AccessibilityEvidenceTests(unittest.TestCase):
 
     def test_confirmed_violations_remain_incomplete_even_with_passing_manual_cases(self):
         self.replace_scan(lambda scan: scan['violations'].append({
-            'rule': 'label', 'impact': 'serious', 'nodeCount': 1, 'locations': ['input:nth-of-type(1)']}))
+            'rule': 'label', 'impact': 'serious', 'nodeCount': 1, 'locations': ['input:nth-of-type(1)'], 'contrast': []}))
         result = self.verify(manual=False)
         self.assertIn('confirmed accessibility violation', [item['requirement'] for item in result['unverified']])
 
@@ -161,12 +168,37 @@ class AccessibilityEvidenceTests(unittest.TestCase):
     def test_scan_html_selectors_and_private_field_values_are_rejected(self):
         for change in (lambda s: s.update(html='<input value="private">'),
                        lambda s: s['needsReview'].append({'rule': 'label', 'impact': 'serious', 'nodeCount': 1,
-                                                        'locations': ['input[value="private"]']})):
+                                                        'locations': ['input[value="private"]'], 'contrast': []})):
             scan = {'checkpoint': 'secret-editor', 'scanner': accessibility.SCANNER_VERSION, 'violations': [],
-                    'needsReview': [], 'passedRules': ['label'], 'automatedOnly': True}
+                    'needsReview': [], 'contrastPasses': [], 'passedRules': ['label'], 'automatedOnly': True}
             change(scan)
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'unredacted|private'):
                 accessibility.scan_report(scan)
+
+    def test_contrast_measurements_are_bounded_allowlisted_and_not_manual_proof(self):
+        scan = {'checkpoint': 'guarded-recovery', 'scanner': accessibility.SCANNER_VERSION, 'violations': [],
+                'needsReview': [contrast_finding()], 'contrastPasses': [contrast_finding()],
+                'passedRules': ['color-contrast'], 'automatedOnly': True}
+        accessibility.scan_report(scan)
+        mutations = [lambda c: c.update(html='private-value'), lambda c: c.update(reason='private-value'),
+                     lambda c: c.update(foreground='private-value'), lambda c: c.update(fontWeight='private-value'),
+                     lambda c: c.update(group='private-value'), lambda c: c.update(ratio=5),
+                     lambda c: c.update(expectedRatio=0), lambda c: c.update(expectedRatio=True),
+                     lambda c: c.update(expectedRatio=float('inf')), lambda c: c.update(fontSizePx=4097),
+                     lambda c: c.update(ratio=22, foreground='#ffffff', background='#000000')]
+        for name in ('needsReview', 'contrastPasses'):
+            for change in mutations:
+                altered = copy.deepcopy(scan)
+                change(altered[name][0]['contrast'][0]['checks'][0])
+                with self.subTest(section=name, change=change), self.assertRaises(ValueError):
+                    accessibility.scan_report(altered)
+        for change in (lambda f: f['contrast'].clear(),
+                       lambda f: f['contrast'][0].update(location='input[value="private"]'),
+                       lambda f: f['contrast'][0]['checks'].append(f['contrast'][0]['checks'][0])):
+            altered = copy.deepcopy(scan)
+            change(altered['needsReview'][0])
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                accessibility.scan_report(altered)
 
     def test_catalog_cannot_omit_relabel_or_repeat_required_checkpoints(self):
         name, record = next(iter(self.reports[0]['accessibility']['scans'].items()))

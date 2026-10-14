@@ -242,6 +242,17 @@ class BuildEvidenceTests(unittest.TestCase):
                 self.reports[0] = original
                 self.save()
 
+    def test_recorded_duration_stays_within_the_campaign_deadline(self):
+        self.reports[0]['seconds'] = build.MAX_CAMPAIGN_SECONDS
+        self.save()
+        self.verify()
+        for seconds in (build.MAX_CAMPAIGN_SECONDS + 0.1, float('inf'), float('nan')):
+            with self.subTest(seconds=seconds):
+                self.reports[0]['seconds'] = seconds
+                self.save()
+                with self.assertRaises(ValueError):
+                    self.verify()
+
     def recorder_fixture(self, compiler, output):
         root = self.root / 'recorded-source'
         (root / 'sdk/go/worker').mkdir(parents=True, exist_ok=True)
@@ -345,6 +356,55 @@ class BuildEvidenceTests(unittest.TestCase):
         self.assertEqual(len([command for command in commands if command[1:3] == ['mod', 'verify']]), 3)
         self.assertFalse(any(command[1] in ('vet', 'test') for command in commands))
         self.assertEqual(json.loads(output.read_bytes())['result'], 'failed')
+
+    def test_recorder_allows_package_queueing_without_changing_package_timeout(self):
+        output = self.root / 'queued-packages.json'
+        args, observe, capture = self.recorder_fixture(build.MINIMUM_COMPILER, output)
+        clock, application_runs = [0], []
+
+        def queued_capture(command, cwd, environment, stdout, stderr, timeout):
+            if command[1] == 'test':
+                self.assertIn('-timeout=45m', command)
+                self.assertEqual(timeout, build_campaign.TEST_COMMAND_SECONDS)
+                if cwd == args.source_dir:
+                    application_runs.append(command)
+                    clock[0] += 50 * 60
+            return capture(command, cwd, environment, stdout, stderr, timeout)
+
+        with patch.object(build, 'source_snapshot', return_value=build.source_inputs(self.manifest)), \
+                patch.object(build_campaign.dependencies, 'cache_environment', return_value={
+                    'GOMODCACHE': str(self.fixture.fixture.cache / 'modules'), 'GOPATH': str(self.fixture.fixture.cache / 'go-path')}), \
+                patch.object(build_campaign.subprocess, 'check_output', side_effect=observe), \
+                patch.object(build_campaign.worker_campaign, 'capture', side_effect=queued_capture), \
+                patch.object(build_campaign.time, 'monotonic', side_effect=lambda: clock[0]):
+            result = build_campaign.campaign(args)
+        self.assertEqual(result['result'], 'passed')
+        self.assertEqual(len(application_runs), 4)
+        self.assertEqual(result['seconds'], 200 * 60)
+
+    def test_recorder_caps_commands_at_remaining_time_and_preserves_timeout_failure(self):
+        output = self.root / 'deadline-expired.json'
+        args, observe, capture = self.recorder_fixture(build.MINIMUM_COMPILER, output)
+        clock, limits = [0], []
+
+        def timed_capture(command, cwd, environment, stdout, stderr, timeout):
+            limits.append(timeout)
+            clock[0] = build.MAX_CAMPAIGN_SECONDS - 10 if len(limits) == 1 else build.MAX_CAMPAIGN_SECONDS + 1
+            return capture(command, cwd, environment, stdout, stderr, timeout)
+
+        with patch.object(build, 'source_snapshot', return_value=build.source_inputs(self.manifest)), \
+                patch.object(build_campaign.dependencies, 'cache_environment', return_value={
+                    'GOMODCACHE': str(self.fixture.fixture.cache / 'modules'), 'GOPATH': str(self.fixture.fixture.cache / 'go-path')}), \
+                patch.object(build_campaign.subprocess, 'check_output', side_effect=observe), \
+                patch.object(build_campaign.worker_campaign, 'capture', side_effect=timed_capture), \
+                patch.object(build_campaign.time, 'monotonic', side_effect=lambda: clock[0]):
+            result = build_campaign.campaign(args)
+        self.assertEqual(limits, [120, 10])
+        self.assertEqual(result['result'], 'failed')
+        self.assertEqual(result['error'], 'Incomplete or inconsistent build matrix evidence: matrix exceeded its five-hour process deadline')
+        self.assertEqual(json.loads(output.read_bytes())['result'], 'failed')
+        self.assertEqual(result['variants'], [])
+        self.assertTrue((output.with_name(output.stem + '.artifacts') / 'application-verify-stdout.log').is_file())
 
     def test_recorder_preserves_failed_final_source_inspection(self):
         output = self.root / 'source-failed.json'

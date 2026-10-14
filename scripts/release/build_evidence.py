@@ -24,6 +24,7 @@ MAX_LOG_BYTES = worker.MAX_LOG_BYTES
 MAX_LINE_BYTES = worker.MAX_LINE_BYTES
 MAX_SOURCE_FILES = worker.MAX_SOURCE_FILES
 MAX_TEST_EVENTS = 100000
+MAX_CAMPAIGN_SECONDS = 5 * 60 * 60
 ENVIRONMENT = dict(worker.ENVIRONMENT)
 ENVIRONMENT.pop('CPRA_WORKER_LOAD')
 ENVIRONMENT.update(CPRA_WORKER_PROCESS_RACE='1', CPRA_RUN_CLI_INTEGRATION='1')
@@ -327,7 +328,7 @@ def verify_build_campaigns(manifest, paths):
         except (KeyError, ValueError, TypeError, AttributeError) as error:
             raise ValueError('Invalid build recording timestamp') from error
         require(recorded.utcoffset() is not None and type(report.get('seconds')) in (int, float)
-                and math.isfinite(report['seconds']) and 0 <= report['seconds'] <= 10800,
+                and math.isfinite(report['seconds']) and 0 <= report['seconds'] <= MAX_CAMPAIGN_SECONDS,
                 'campaign duration or recording time is invalid')
         source = browser_evidence.retained_path(path.parent, report.get('source_inventory'))
         require(browser_evidence.digest(report.get('source_inventory_sha256')), 'source inventory digest is missing')

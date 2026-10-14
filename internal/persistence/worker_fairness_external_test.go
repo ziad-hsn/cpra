@@ -132,7 +132,7 @@ func TestWorkerOfferSelectionReplay(t *testing.T) {
 				t.Fatal("retry replaced a committed assignment", err)
 			}
 			snapshot := captureSnapshotBytes(t, s.fsm)
-			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(notificationWorkerSnapshotMagic)) {
+			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(deliveryWorkerSnapshotMagic)) {
 				t.Fatal("queue snapshot did not carry its format")
 			}
 			if err := replayed.Restore(io.NopCloser(bytes.NewReader(snapshot))); err != nil {

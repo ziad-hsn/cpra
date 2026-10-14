@@ -329,7 +329,7 @@ func TestWorkerOfferFormatsSnapshotsAndCancelledRequests(t *testing.T) {
 		}
 	}
 	snap := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(snap, []byte(workerQueueSnapshotMagic)) {
+	if !bytes.HasPrefix(snap, []byte(deliveryWorkerSnapshotMagic)) {
 		t.Fatal("snapshot frame")
 	}
 	restored, ledger, err := decodeSnapshot(bytes.NewReader(snap), "")

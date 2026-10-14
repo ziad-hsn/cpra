@@ -125,7 +125,7 @@ class BrowserEvidenceTests(unittest.TestCase):
         self.assertFalse(report['release_gate_passed'])
         self.assertEqual(report['release_identity'], release.evidence_identity(self.manifest))
         self.assertEqual(len(report['reports']), 4)
-        self.assertEqual(len(report['input_sha256']), 44)
+        self.assertEqual(len(report['input_sha256']), 60)
 
     def test_archive_producer_inventory_matches_reader_and_tracks_dashboard_notices(self):
         with tempfile.TemporaryDirectory() as temporary:

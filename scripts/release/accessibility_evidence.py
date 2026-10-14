@@ -10,6 +10,7 @@ import base64
 from datetime import datetime
 import hashlib
 import io
+import math
 import os
 from pathlib import Path
 import re
@@ -27,7 +28,7 @@ CHECKPOINTS = {
     'verify_browser': {'sign-in', 'secret-editor', 'monitor-conflict', 'delete-confirmation', 'reader-monitor'},
     'verify_actions_browser': {'guarded-recovery', 'unknown-review-inconclusive', 'unknown-review-accepted',
                                'reader-operations', 'reader-monitor-state', 'reader-incidents', 'reader-metrics',
-                               'mobile-reader-incidents', 'mobile-reader-metrics'},
+                               'mobile-reader-incidents', 'mobile-reader-incidents-scrolled', 'mobile-reader-metrics'},
     'verify_controls_browser': {'control-acknowledge', 'control-dismiss', 'control-reopen-notifications',
                                 'control-snooze', 'control-disable', 'control-end-snooze', 'control-enable'},
 }
@@ -40,6 +41,11 @@ MANUAL_CASES = {
 }
 TOOL_FILES = {'lock': 'browser-package-lock.json', 'archive': 'axe-core.tgz',
               'package': 'axe-package.json', 'script': 'axe.min.js'}
+CONTRAST_REASONS = {
+    'unreported', 'bgImage', 'bgGradient', 'imgNode', 'bgOverlap', 'complexTextShadows',
+    'fgAlpha', 'elmPartiallyObscured', 'elmPartiallyObscuring', 'outsideViewport', 'equalRatio',
+    'shortTextContent', 'nonBmp', 'pseudoContent', 'colorParse', 'fgOnShadowColor', 'shadowOnBgColor', 'hidden',
+}
 
 
 def require(condition, detail):
@@ -88,20 +94,39 @@ def verify_scanner(lock, archive, package, script):
             'executed scanner package version differs')
 
 
+def contrast_check(value):
+    require(isinstance(value, dict) and set(value) == {
+        'group', 'reason', 'foreground', 'background', 'shadow', 'ratio', 'expectedRatio',
+        'fontSizePt', 'fontSizePx', 'fontWeight'}, 'contrast check contains unredacted or missing fields')
+    require(value['group'] in ('any', 'all', 'none') and isinstance(value['reason'], str)
+            and value['reason'] in CONTRAST_REASONS, 'contrast reason or check group is not allowlisted')
+    for name in ('foreground', 'background', 'shadow'):
+        require(value[name] is None or isinstance(value[name], str)
+                and re.fullmatch('#[a-f0-9]{6}', value[name]), 'contrast color contains invalid or private data')
+    for name, minimum, maximum in (('ratio', 1, 21), ('expectedRatio', 1, 21),
+                                   ('fontSizePt', 0, 4096), ('fontSizePx', 0, 4096)):
+        item = value[name]
+        require(item is None or type(item) in (int, float) and math.isfinite(item)
+                and minimum <= item <= maximum, 'contrast measurement is invalid or out of bounds')
+    require(value['fontWeight'] in (None, 'normal', 'bold'), 'contrast font weight contains private data')
+    require(value['ratio'] is None or value['foreground'] is not None and value['background'] is not None,
+            'contrast ratio has no measured foreground or background')
+
+
 def scan_report(value):
     require(isinstance(value, dict) and set(value) == {
-        'checkpoint', 'scanner', 'violations', 'needsReview', 'passedRules', 'automatedOnly'},
+        'checkpoint', 'scanner', 'violations', 'needsReview', 'contrastPasses', 'passedRules', 'automatedOnly'},
         'scan contains missing fields or unredacted payloads')
     require(value['scanner'] == SCANNER_VERSION and value['automatedOnly'] is True,
             'scan identity or measurement boundary differs')
     require(isinstance(value['passedRules'], list) and value['passedRules']
             and all(isinstance(rule, str) and re.fullmatch('[a-z0-9-]{1,100}', rule)
                     for rule in value['passedRules']), 'scan omitted passing rule coverage')
-    for name in ('violations', 'needsReview'):
+    for name in ('violations', 'needsReview', 'contrastPasses'):
         require(isinstance(value[name], list) and len(value[name]) <= 1000, 'unbounded scan findings')
         seen = set()
         for item in value[name]:
-            require(isinstance(item, dict) and set(item) == {'rule', 'impact', 'nodeCount', 'locations'},
+            require(isinstance(item, dict) and set(item) == {'rule', 'impact', 'nodeCount', 'locations', 'contrast'},
                     'finding contains unredacted DOM data or missing fields')
             rule = item['rule']
             require(isinstance(rule, str) and re.fullmatch('[a-z0-9-]{1,100}', rule) and rule not in seen,
@@ -114,6 +139,23 @@ def scan_report(value):
                     and all(isinstance(location, str) and re.fullmatch(
                         r'[a-z][a-z0-9-]*:nth-of-type\([1-9][0-9]*\)( > [a-z][a-z0-9-]*:nth-of-type\([1-9][0-9]*\)){0,7}',
                         location) for location in item['locations']), 'finding locations are absent or contain private selectors')
+            require(isinstance(item['contrast'], list), 'contrast measurements are missing')
+            if name == 'contrastPasses':
+                require(rule == 'color-contrast' and rule in value['passedRules'], 'non-contrast or unreported passing rule')
+            if rule != 'color-contrast':
+                require(not item['contrast'], 'non-contrast finding contains measurement payloads')
+                continue
+            require(len(item['contrast']) == len(item['locations']), 'contrast locations are incomplete')
+            for location, measurement in zip(item['locations'], item['contrast']):
+                require(isinstance(measurement, dict) and set(measurement) == {'location', 'checks'}
+                        and measurement['location'] == location, 'contrast location differs or contains unredacted data')
+                checks = measurement['checks']
+                require(isinstance(checks, list) and 0 < len(checks) <= 3, 'contrast check count is invalid')
+                groups = set()
+                for check in checks:
+                    contrast_check(check)
+                    require(check['group'] not in groups, 'contrast check group is repeated')
+                    groups.add(check['group'])
 
 
 def verify_accessibility(manifest, paths, manual_review=None):

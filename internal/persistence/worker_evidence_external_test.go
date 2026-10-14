@@ -182,8 +182,11 @@ func TestWorkerEvidenceSnapshotIsFrozenAndRejectsCorruption(t *testing.T) {
 	if err := snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(notificationWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-worker-result-canary")) {
-		t.Fatal("snapshot format or plaintext leak")
+	if !bytes.HasPrefix(sink.Bytes(), []byte(deliveryWorkerSnapshotMagic)) {
+		t.Fatal("snapshot does not preserve the delivery worker format")
+	}
+	if bytes.Contains(sink.Bytes(), []byte("private-worker-result-canary")) {
+		t.Fatal("snapshot contains plaintext worker results")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
 	if err != nil {

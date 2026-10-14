@@ -25,6 +25,11 @@ import management_evidence as management
 import a2a_evidence as a2a
 
 
+# Go's 45-minute test timeout applies to each package binary. An all-package
+# command also includes compilation and packages waiting for a test slot.
+TEST_COMMAND_SECONDS = 90 * 60
+
+
 def fingerprint(path, parent=None):
     value, size = build.browser_evidence.hash_file(path, build.MAX_LOG_BYTES)
     record = {'sha256': value, 'bytes': size}
@@ -204,8 +209,8 @@ def campaign(args):
             report['module_inputs'] = {name: fingerprint(artifacts / name) for name in ('sdk.zip', 'sdk.mod', 'sdk.info')}
 
             def capture(command, relative, name, env, timeout):
-                remaining = 10800 - (time.monotonic() - started)
-                build.require(remaining > 0, 'matrix exceeded its three-hour process deadline')
+                remaining = build.MAX_CAMPAIGN_SECONDS - (time.monotonic() - started)
+                build.require(remaining > 0, 'matrix exceeded its five-hour process deadline')
                 output, errors = (artifacts / (name + '-' + channel + '.log') for channel in ('stdout', 'stderr'))
                 status = worker_campaign.capture(command, root / relative, env, output, errors, min(timeout, remaining))
                 return {'exit_code': status, 'stdout': fingerprint(output, out.parent),
@@ -234,7 +239,7 @@ def campaign(args):
                        'environment': policy, 'source_changed': [], 'logs': {}}
                 report['variants'].append(row)
                 worker_campaign.write_report(stream, report)
-                for action, timeout in (('packages', 180), ('vet', 900), ('tests', 2820)):
+                for action, timeout in (('packages', 180), ('vet', 900), ('tests', TEST_COMMAND_SECONDS)):
                     row['logs'][action] = capture(invocation[action], relative, name + '-' + action, env, timeout)
                     worker_campaign.write_report(stream, report)
                     build.require(row['logs'][action]['exit_code'] == 0, name + ': ' + action + ' failed')

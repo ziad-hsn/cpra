@@ -208,8 +208,11 @@ func TestWorkerScheduleCheckpointValidationAndSnapshot(t *testing.T) {
 	if err := snapshot.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(workerScheduleSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
-		t.Fatal("snapshot version or plaintext")
+	if !bytes.HasPrefix(sink.Bytes(), []byte(deliveryWorkerSnapshotMagic)) {
+		t.Fatal("snapshot does not preserve the delivery worker format")
+	}
+	if bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
+		t.Fatal("snapshot contains plaintext execution parameters")
 	}
 	saved, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
 	if err != nil {

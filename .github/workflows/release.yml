@@ -807,7 +807,7 @@ jobs:
   compatibility:
     needs: [private-staging, build]
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:

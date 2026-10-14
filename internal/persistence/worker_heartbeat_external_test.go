@@ -167,8 +167,11 @@ func TestWorkerHeartbeatSnapshotAndCommandFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != WorkerQueueFormatVersion || validateWorkerExecutionImage(i) != nil {
-		t.Fatal("heartbeat snapshot invalid")
+	if i.Version != DeliveryWorkerFormatVersion {
+		t.Fatalf("heartbeat snapshot format: got %d, want %d", i.Version, DeliveryWorkerFormatVersion)
+	}
+	if err := validateWorkerExecutionImage(i); err != nil {
+		t.Fatal("heartbeat snapshot invalid", err)
 	}
 	state := i.WorkerExecutions.Records[input.ExecutionID]
 	if !reflect.DeepEqual(state.Lifecycle.Heartbeat, frozen.Lifecycle.Heartbeat) {

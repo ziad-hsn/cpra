@@ -811,7 +811,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [go1.25.0, go1.27.2]
+        compiler: [go1.26.0, go1.27.2]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install the release compiler for dependency preparation
@@ -883,8 +883,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {compiler: go1.25.0, tags: '', variant: default, race: '--no-race'}
-          - {compiler: go1.25.0, tags: externaljobs, variant: externaljobs, race: '--no-race'}
+          - {compiler: go1.26.0, tags: '', variant: default, race: '--no-race'}
+          - {compiler: go1.26.0, tags: externaljobs, variant: externaljobs, race: '--no-race'}
           - {compiler: go1.27.2, tags: '', variant: default, race: '--race'}
           - {compiler: go1.27.2, tags: externaljobs, variant: externaljobs, race: '--race'}
     steps:
@@ -929,7 +929,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [go1.25.0, go1.27.2]
+        compiler: [go1.26.0, go1.27.2]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install release compiler for dependency preparation
@@ -968,7 +968,7 @@ jobs:
           path: ${{ runner.temp }}/sdk-evidence/dependencies
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: sdk-consumer-go1.25.0
+          name: sdk-consumer-go1.26.0
           path: ${{ runner.temp }}/sdk-evidence/consumers
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -976,7 +976,7 @@ jobs:
           path: ${{ runner.temp }}/sdk-evidence/consumers
       - name: Inspect retained payloads against frozen source and dependencies
         run: |
-          python3 scripts/release/sdk_evidence.py --release "$RUNNER_TEMP/sdk-evidence/release/RELEASE.json" --dependencies "$RUNNER_TEMP/sdk-evidence/dependencies" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.25.0.json" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.27.2.json" --out "$RUNNER_TEMP/sdk-evidence/sdk-consumer-evidence.json"
+          python3 scripts/release/sdk_evidence.py --release "$RUNNER_TEMP/sdk-evidence/release/RELEASE.json" --dependencies "$RUNNER_TEMP/sdk-evidence/dependencies" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.26.0.json" --consumer "$RUNNER_TEMP/sdk-evidence/consumers/consumer-go1.27.2.json" --out "$RUNNER_TEMP/sdk-evidence/sdk-consumer-evidence.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

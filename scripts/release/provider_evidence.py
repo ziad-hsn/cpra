@@ -115,7 +115,7 @@ def build_verifier(go, out, *, manifest=None, dependencies=None, cache=None):
         require(target in ('linux_amd64', 'linux_arm64'), 'all-driver verification requires a supported Linux target')
         require(target == metadata['GOHOSTOS'] + '_' + metadata['GOHOSTARCH'], 'verifier must be built for its native host')
         require(metadata['GOWORK'] == 'off', 'verifier must not use a workspace')
-        require(metadata['GOVERSION'] in ('go1.25.0', release.RECIPE['go_version']), 'unsupported verifier compiler')
+        require(metadata['GOVERSION'] in (release.RECIPE['minimum_go_version'], release.RECIPE['go_version']), 'unsupported verifier compiler')
         if manifest:
             require(metadata['GOVERSION'] == manifest['recipe']['go_version'], 'frozen verifier uses a different compiler')
         report.update(go_version=metadata['GOVERSION'], target=target,

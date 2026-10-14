@@ -745,9 +745,9 @@ execution and real signature/readback qualification remain open.
 
 ## Source and build identity
 
-The canonical module is `github.com/ziad-hsn/cpra`. Its `go.mod` retains `go 1.25.0`; official binaries use **Go 1.27.2**. A separate minimum-compiler job tests Go 1.25.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
+The canonical module is `github.com/ziad-hsn/cpra`. All repository modules declare the same `go 1.26.0` minimum; official binaries use **Go 1.27.2**. A separate minimum-compiler job tests Go 1.26.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
 
-`scripts/release/recipe.json` is the build contract and `.goreleaser.yaml` matches it. The release recipe uses:
+`scripts/release/recipe.json` is the build contract and `.goreleaser.yaml` matches it. Its `minimum_go_version` selects the common compatibility compiler for the application, SDK, worker and verification readers. The release recipe uses:
 
 - Normal optimization, `-trimpath`, `-mod=readonly`, `-pgo=off`, `-buildvcs=false` and bounded build parallelism (`-p=2`).
 - `CGO_ENABLED=0`, `GOAMD64=v1` and `GOARM64=v8.0`.
@@ -974,7 +974,7 @@ Benchmark preparation can select `/absolute/new/cpra-dependencies/modules` with
 
 Private release build, native-platform and compiler-compatibility jobs each prepare
 their cache from the frozen source archive. Compatibility preparation uses the
-release compiler before selecting Go 1.25 or the release compiler for application,
+release compiler before selecting Go 1.26 or the release compiler for application,
 SDK and worker tests. Jobs export only the cache paths; the public proxy/checksum
 settings and `GOWORK=off` remain in effect. Preparation reports and proposed
 module-file changes are retained privately even when preparation fails.

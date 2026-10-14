@@ -4,7 +4,82 @@ Scope: private development checks after source checkpoint
 `73d479794fb3112db0dd53c3920c6d8ade068fba`. This is not frozen release
 qualification, a reproduced exploit, or permission to publish.
 
-## Findings and selected updates
+## Common minimum and HTTP/2 repair
+
+The user approved **Go 1.26.0 as the common minimum for every repository Go
+module** on 14 October. The application, SDK, worker, integration examples,
+generator, module-archive tool and A2A reference fixture now use that minimum.
+The release compiler remains Go 1.27.2. The release recipe records both values;
+compiler matrices, evidence readers and current installation documentation use
+the common minimum. A contract test checks all seven module declarations and
+the six official minimum-compiler archive pins against that policy.
+
+The application and integration examples now select `x/net v0.60.0` and its
+required dependency versions, including `x/text v0.42.0`. Go recalculated the
+private SDK archive and module-definition checksums after its `go.mod` changed;
+the preparation tool now refreshes both explicitly, while preserving unrelated
+checksum entries. Public module verification remains enabled. An independent
+reviewer verified the private archive contents, all four SDK/worker checksum
+values, selected public module checksums and official compiler archive pins.
+
+Nine fresh source/symbol scans with Go 1.27.2 and `govulncheck v1.7.0` report no
+affected imported-package or called-symbol findings: application default,
+all built-in drivers, `externaljobs`, combined tags, SDK default/tagged, worker
+tagged and examples default/tagged. The five reachable HTTP/2 findings from the
+earlier checkpoint are absent. The all-built-in and combined application
+selections retain GO-2026-5932 at required-module level: `x/crypto` is present,
+but its affected OpenPGP packages are not imported. The advisory has no fixed
+version; it is not suppressed. See the
+[upstream OpenPGP advisory](https://pkg.go.dev/vuln/GO-2026-5932).
+
+The scan report and original JSON streams are retained privately. Their
+database timestamp is `2026-10-08T22:31:09Z`; the scan wrapper log SHA-256 is
+`962dec289c3c0080cedb6184e1839cae971d5817346bdc49569cf9cc955e2ce0`.
+These are working-source development results, not final frozen-commit release
+qualification or proof of exploitation. Historical checks below retain their
+original compilers and dependency graphs.
+
+### Verification of the common minimum
+
+Both Go 1.26.0 and Go 1.27.2 pass the SDK default/tagged suites (943/1,085
+test and subtest pass events), the tagged worker suite (126), and the jobs,
+authentication and HTTP-server suites in default/tagged builds (684/852).
+Each server suite excludes the opt-in browser campaign; this is recorded as
+one skip per build and does not qualify browser behavior. These are ordinary
+Linux/WSL amd64 builds, not a new race or native-platform matrix.
+
+Both compilers also pass the examples in default/tagged builds (105/135) and
+the module-archive tool's eight tests. The A2A reference fixture compiles on
+both compilers and has no package tests; this does not
+establish agent interoperability. SDK regeneration from two separate source
+roots matches all ten checked-in outputs on each compiler. The dashboard
+rebuild passes 541 tests, type checking and lint; its embedded assets and
+notices match their input/output inventory.
+
+The preparation tests pass all 48 cases, including changed SDK archive and
+module-definition checksums. The 15 release-policy, 39 documentation and
+48 benchmark-tool contract tests pass. The complete release-tool suite passes
+703 tests after correcting its negative compiler fixture to reject Go 1.25;
+the first stale-fixture failure remains retained.
+
+Additional unsuccessful attempts remain separate evidence. The initial cache
+copy mistakenly omitted source-controlled `Gopkg.lock` files, and Go's module
+verification rejected it. The corrected copy retains those files and passes
+verification. Running the generator dependency's own tests fails because its
+published module omits the test's external example fixture; CPRa's two-root
+schema regeneration provides the direct generator check. Two concurrent
+Go 1.27.2 checks were stopped by the scratch guard during compilation. Their
+completed SDK/worker subcommands remain distinguishable from the interrupted
+examples/application commands. After task-cache cleanup, the application
+default/tagged suites and remaining examples/tool checks pass sequentially;
+the original interrupted reports are not rewritten as passes.
+
+The independent review verifies all seven module declarations, six official
+compiler pins, final SDK/worker archive contents and checksums, 188 dashboard
+inputs, 43 outputs, and all nine scanner streams. It found no actionable source
+defect. This finite review did not execute tests or qualify a frozen release.
+
+## Earlier findings and selected updates
 
 A retained `govulncheck v1.7.0` source/symbol scan of the default application
 build found 14 distinct advisories with called-symbol traces. The scan used
@@ -30,9 +105,9 @@ management listener. Sources: [Go 1.27.2 release history](https://go.dev/doc/dev
 [gRPC 1.83.2](https://github.com/grpc/grpc-go/releases/tag/v1.83.2) and
 [`x/text` advisory](https://pkg.go.dev/vuln/GO-2026-6629).
 
-## Remaining compatibility decision
+## Earlier compatibility decision, now resolved
 
-The application still declares Go 1.25.0. The updated gRPC dependency selects
+At the earlier checkpoint the application declared Go 1.25.0. The updated gRPC dependency selected
 `x/net v0.58.0`, which is the latest inspected upstream release supporting
 Go 1.25. A fresh Go 1.27.2 default-build scan removes the compiler/gRPC findings
 but still reports called-symbol findings for GO-2026-6603, GO-2026-6610,
@@ -41,10 +116,10 @@ GO-2026-6611, GO-2026-6612 and GO-2026-6617 in `x/net`.
 The upstream fixes require `x/net v0.60.0`, whose module declares Go 1.26.0 and
 selects `x/text v0.42.0` and `x/sys v0.48.0`. An independent reviewer checked
 upstream tags and the Go proxy metadata and found no published patched
-Go 1.25-compatible release. Raising the application's and integration examples'
-minimum to Go 1.26 requires the user's decision because the approved plan
-explicitly preserves Go 1.25. The independent SDK and worker module currently
-retain their separate Go 1.25 source requirement.
+Go 1.25-compatible release. The original plan preserved Go 1.25, so this change
+required the user's decision. The subsequent approval applies Go 1.26.0 to all
+modules; the proposed split application/SDK minimum was rejected and is not the
+implemented policy.
 
 Sources: [HTTP/2 advisory](https://pkg.go.dev/vuln/GO-2026-6611),
 [`x/net v0.58.0` module](https://github.com/golang/net/blob/v0.58.0/go.mod),
@@ -121,6 +196,7 @@ The generator's initial invocations failed because its module root contains no
 Go package and because module-only scanning does not accept package patterns.
 Those invocations are retained as unsuccessful attempts; the command-specific
 source scan above supplies the reachability assessment. JSON exit status alone
-does not establish an empty finding inventory. These finite tool results do not
-close the application's separate, reachable HTTP/2 findings or qualify a frozen
-release.
+does not establish an empty finding inventory. Those finite tool results did not
+close the application's then-reachable HTTP/2 findings. The later application
+scans above assess the repaired graph separately; a frozen release remains
+unqualified.

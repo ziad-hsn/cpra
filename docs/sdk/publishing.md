@@ -75,7 +75,7 @@ The runnable examples use finite local fixtures or pure construction and never
 require an account or contact a production service.
 [Testable examples in Go](https://go.dev/blog/examples).
 
-Run these commands from a repository checkout with Go 1.25 or later on `PATH`:
+Run these commands from a repository checkout with Go 1.26 or later on `PATH`:
 
 ```bash
 export GOTOOLCHAIN=local
@@ -112,7 +112,7 @@ the documented [pkg.go.dev build contexts](https://pkg.go.dev/about#build-contex
 and the official [package loader source](https://go.googlesource.com/pkgsite/+/master/internal/fetch/load.go).
 
 The `go doc` command also does not apply `GOFLAGS=-tags=externaljobs` to its
-documentation selection in the tested Go 1.25/1.27 toolchains. The archive check
+documentation selection in the earlier Go 1.25/1.27 development checks. The archive check
 therefore uses the standard-library `go/doc` renderer on the exact source files
 selected by `go list -tags=externaljobs`. This validates tagged overviews locally
 without pretending that hosted pkg.go.dev will display those symbols.
@@ -143,7 +143,7 @@ python3 scripts/sdk/verify.py \
   --out "$CPRA_PREPARATION/consumer-release.json"
 ```
 
-Select versions explicitly and repeat consumer verification with Go 1.25 using
+Select versions explicitly and repeat consumer verification with Go 1.26 using
 a different output name. The preparer captures current tracked and nonignored
 source files into a private directory outside the checkout. It rejects links,
 private dotenv inputs, changed source, module replacements and version drift.
@@ -202,7 +202,7 @@ python3 scripts/sdk/verify.py --go /path/to/go --out evidence/local/sdk-consumer
 python3 scripts/sdk/regenerate_check.py --go /path/to/go --out evidence/local/sdk-generation.json
 ```
 
-Repeat with the minimum Go 1.25 compiler and the selected release compiler. The
+Repeat with the minimum Go 1.26 compiler and the selected release compiler. The
 normal SDK CI matrix runs these checks and the full default/tagged tests, race
 checks, and vet. The generator check rebuilds outputs in two independent source
 roots. It includes the postprocessing that gives the public `api` package one
@@ -225,7 +225,7 @@ their retained inputs:
 python3 scripts/release/sdk_evidence.py \
   --release /absolute/private-release/RELEASE.json \
   --dependencies /absolute/private-dependencies \
-  --consumer /absolute/private-evidence/consumer-go1.25.0.json \
+  --consumer /absolute/private-evidence/consumer-go1.26.0.json \
   --consumer /absolute/private-evidence/consumer-go1.27.2.json \
   --out /absolute/private-evidence/sdk-consumer-evidence.json
 ```

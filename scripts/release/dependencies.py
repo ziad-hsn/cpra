@@ -240,7 +240,7 @@ def bootstrap(source_archive, go, worker_version, out):
         report['private_modules'] = archives
         # Explicit downloads use a disposable consumer, outside frozen source.
         consumer = out / 'download'; consumer.mkdir()
-        (consumer / 'go.mod').write_text('module example.com/cpra-dependency-bootstrap\n\ngo 1.25.0\n')
+        (consumer / 'go.mod').write_text('module example.com/cpra-dependency-bootstrap\n\ngo 1.26.0\n')
         downloads = json_records(go_output(go, ['mod', 'download', '-json',
                                     CORE + '@' + sdk_version, WORKER + '@' + worker_version],
                                     cwd=consumer, env=private, out=out, label='private-download'))

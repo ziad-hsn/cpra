@@ -6,6 +6,13 @@ cpra_scope: plan
 
 **Scope correction, 1 October 2026:** The user removed the 24-hour endurance run from the task and mandatory completion checks. No such run has been started or completed. Historical entries below record earlier requirements; they do not reinstate this test. Comparative performance remains separate from endurance, and documentation must not claim an unperformed endurance result.
 
+**Compatibility correction, 14 October 2026:** All repository Go modules share
+the user-approved Go 1.26.0 minimum: application, SDK, worker, examples, build
+tools and reference fixture. The release compiler is Go 1.27.2. Earlier Go 1.25
+results below remain historical evidence. The
+[dependency security record](dependency-security-2026-10-14.md) describes the
+patched HTTP/2 dependency graph and current scoped verification.
+
 ## Review repair baseline, 12 October 2026
 
 Implementation starts on the private local `codex/release-repairs` branch at

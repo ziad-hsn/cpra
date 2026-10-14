@@ -152,7 +152,7 @@ def campaign(args, root=ROOT, *, source_files=None, source_commit=None, environm
                         "chromium": subprocess.check_output([str(browser), "--version"], env=environment, text=True, timeout=20).strip(),
                         "playwright": version}
             report.update(versions)
-            if versions["go"] not in ("go1.25.0", recipe["go_version"]):
+            if versions["go"] not in (recipe["minimum_go_version"], recipe["go_version"]):
                 raise ValueError("browser compiler differs from the supported verification matrix")
             if versions["node"] != recipe["frontend"]["node_version"]:
                 raise ValueError("Node differs from the release pin")

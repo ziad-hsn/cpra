@@ -18,6 +18,19 @@ class PrivateReleasePolicyTests(unittest.TestCase):
     def setUpClass(cls):
         cls.workflow = yaml.safe_load((ROOT / '.github/workflows/release.yml').read_text())
 
+    def test_every_module_uses_the_common_minimum_compiler(self):
+        recipe = json.loads((ROOT / 'scripts/release/recipe.json').read_text())
+        minimum = recipe['minimum_go_version']
+        self.assertEqual(minimum, 'go1.26.0')
+        pins = json.loads((ROOT / 'scripts/release/toolchains.json').read_text())
+        self.assertEqual(set(pins[minimum]), set(recipe['targets']))
+        for directory in ('', 'sdk/go', 'sdk/go/worker', 'examples/sdk',
+                          'tools/modulezip', 'tools/sdkgen', 'internal/jobs/testdata/a2aagent'):
+            with self.subTest(module=directory or '.'):
+                definition = (ROOT / directory / 'go.mod').read_text()
+                self.assertEqual(re.findall(r'^go (\S+)$', definition, re.MULTILINE),
+                                 [minimum.removeprefix('go')])
+
     def test_provider_verifier_uses_frozen_inputs_and_retains_exact_build(self):
         steps = self.workflow['jobs']['build']['steps']
         build = next(step for step in steps if step.get('name') == 'Build provider verifier from frozen release inputs')
@@ -119,7 +132,7 @@ class PrivateReleasePolicyTests(unittest.TestCase):
     def test_ci_invokes_all_opt_in_cli_cases_in_both_server_builds(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
         job = workflow['jobs']['go']
-        self.assertEqual(set(job['strategy']['matrix']['go']), {'1.25.0', '1.27.2'})
+        self.assertEqual(set(job['strategy']['matrix']['go']), {'1.26.0', '1.27.2'})
         required = {'TestMainManagementRealCLI', 'TestMainManagementRealCLIDiff',
                     'TestMainManagementCollectionApplyCLI',
                     'TestMainManagementCollectionReselectionCLI',
@@ -148,7 +161,7 @@ class PrivateReleasePolicyTests(unittest.TestCase):
     def test_ci_executes_sustained_worker_load_on_both_compilers(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
         job = workflow['jobs']['go']
-        self.assertEqual(set(job['strategy']['matrix']['go']), {'1.25.0', '1.27.2'})
+        self.assertEqual(set(job['strategy']['matrix']['go']), {'1.26.0', '1.27.2'})
         steps = [step for step in job['steps']
                  if step.get('env', {}).get('CPRA_WORKER_LOAD') == '1']
         self.assertEqual(len(steps), 1)
@@ -206,7 +219,7 @@ class PrivateReleasePolicyTests(unittest.TestCase):
         self.assertNotIn('if', campaign)
         self.assertNotIn('continue-on-error', campaign)
         self.assertEqual(campaign.get('working-directory', '.'), '.')
-        self.assertEqual(job['strategy']['matrix']['compiler'], ['go1.25.0', 'go1.27.2'])
+        self.assertEqual(job['strategy']['matrix']['compiler'], ['go1.26.0', 'go1.27.2'])
         # Execute the workflow wrapper with a recording interpreter. This checks
         # frozen source/cache binding and shell quoting, not Go test execution.
         # test_build_evidence covers each module/tag selection and rejects
@@ -270,14 +283,14 @@ class PrivateReleasePolicyTests(unittest.TestCase):
             go = tools / 'go'; go.write_text('#!/bin/sh\nexit 99\n'); go.chmod(0o755)
             env = {'PATH': str(tools) + ':' + os.defpath, 'RUNNER_TEMP': directory,
                    'WORKER_VERSION': 'v0.8.0-rc.3', 'CPRA_TEST_CALLS': str(calls)}
-            command = consumer['run'].replace('${{ matrix.compiler }}', 'go1.25.0')
+            command = consumer['run'].replace('${{ matrix.compiler }}', 'go1.26.0')
             result = subprocess.run(['bash', '-euo', 'pipefail', '-c', command], env=env,
                                     capture_output=True, text=True, timeout=5)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(calls.read_text()), [
                 'scripts/sdk/verify.py', '--go', str(go), '--sdk-version', 'v0.7.0-rc.2',
                 '--worker-version', 'v0.8.0-rc.3', '--out',
-                str(root / 'sdk-consumers/consumer-go1.25.0.json')])
+                str(root / 'sdk-consumers/consumer-go1.26.0.json')])
             calls.unlink()
             (root / 'cpra-dependencies/dependencies.json').write_text('{}')
             failed = subprocess.run(['bash', '-euo', 'pipefail', '-c', command], env=env,
@@ -291,10 +304,10 @@ class PrivateReleasePolicyTests(unittest.TestCase):
         downloads = {step['with']['name'] for step in job['steps']
                      if step.get('uses', '').startswith('actions/download-artifact@')}
         self.assertEqual(downloads, {'release-metadata', 'dependency-preparation-build',
-                                     'sdk-consumer-go1.25.0', 'sdk-consumer-go1.27.2'})
+                                     'sdk-consumer-go1.26.0', 'sdk-consumer-go1.27.2'})
         reader = next(step['run'] for step in job['steps'] if 'sdk_evidence.py' in step.get('run', ''))
         self.assertEqual(reader.count('--consumer '), 2)
-        self.assertIn('/consumer-go1.25.0.json', reader)
+        self.assertIn('/consumer-go1.26.0.json', reader)
         self.assertIn('/consumer-go1.27.2.json', reader)
         self.assertIn('--release ', reader)
         self.assertIn('--dependencies ', reader)
@@ -312,7 +325,7 @@ class PrivateReleasePolicyTests(unittest.TestCase):
     def test_private_worker_job_preserves_original_evidence_and_never_enables_endurance(self):
         job = self.workflow['jobs']['worker-evidence']
         self.assertEqual(set(job['needs']), {'private-staging', 'build'})
-        self.assertEqual(job['strategy']['matrix']['compiler'], ['go1.25.0', 'go1.27.2'])
+        self.assertEqual(job['strategy']['matrix']['compiler'], ['go1.26.0', 'go1.27.2'])
         commands = '\n'.join(step.get('run', '') for step in job['steps'])
         self.assertIn('--source-dir "$RUNNER_TEMP/cpra-worker-dependencies/source"', commands)
         self.assertIn('--release "$RUNNER_TEMP/worker-source/RELEASE.json"', commands)

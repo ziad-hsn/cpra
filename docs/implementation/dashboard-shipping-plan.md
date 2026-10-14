@@ -5,6 +5,9 @@ The approved [release repair addendum](release-repair-plan.md), dated 12 October
 from `2ba7b73`. Its [finding inventory](release-review-findings.md) preserves
 review dispositions. Existing implementation and evidence below remain retained;
 the addendum neither resets storage formats nor reinstates endurance testing.
+Its 14 October compatibility amendment sets Go 1.26.0 as the common minimum
+for all repository Go modules, superseding the Go 1.25 requirements retained
+in this earlier plan. The release compiler is separately pinned to Go 1.27.2.
 
 Status: implementation in progress on the private local branch
 `codex/dashboard-finalization`; implementation and release gates remain open.

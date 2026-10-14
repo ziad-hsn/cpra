@@ -21,7 +21,7 @@ go install github.com/ziad-hsn/cpra@VERSION
 go install github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
 ```
 
-Go 1.25 source compatibility is tested separately from the supported compiler
+Go 1.26 source compatibility is tested separately from the supported compiler
 used for official binaries. The embedded dashboard and starter files require
 no Node, pnpm, Git, or generation step during installation. Plain Go installation
 retains the default driver subset. To compile every applicable driver:

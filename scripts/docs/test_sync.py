@@ -146,7 +146,7 @@ class FrozenSourceSyncTests(NavigationSyncTests):
         for module in ("go.mod", "sdk/go/go.mod", "sdk/go/worker/go.mod"):
             path = self.root / module
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("module example.com/test\n\ngo 1.25.0\n")
+            path.write_text("module example.com/test\n\ngo 1.26.0\n")
         assets = self.root / "internal/httpserver/assets"
         assets.mkdir(parents=True)
         (assets / "index.html").write_text("<main>fixture</main>")

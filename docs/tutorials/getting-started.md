@@ -12,7 +12,7 @@ or native platform has been qualified. Use matching source, metadata and guides.
 
 ## Build from source
 
-Use Go 1.25 or later, Make and Python 3 in the selected checkout:
+Use Go 1.26 or later, Make and Python 3 in the selected checkout:
 
 ~~~sh
 make

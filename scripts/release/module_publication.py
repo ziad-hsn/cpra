@@ -184,7 +184,7 @@ def public_download(go, module, version, compiler, work, *, timeout=120):
                        'GOMODCACHE': str(directory / 'module-cache')}
         selected = process([str(go), 'env', 'GOVERSION'], directory, environment, timeout=timeout).decode().strip()
         require(selected == compiler, 'selected compiler differs from the recorded release')
-        (directory / 'go.mod').write_text('module cpra-release-readback\n\ngo 1.25.0\n')
+        (directory / 'go.mod').write_text('module cpra-release-readback\n\ngo 1.26.0\n')
         raw = process([str(go), 'mod', 'download', '-json', module + '@' + version],
                       directory, environment, timeout=timeout)
         value = decode_report(raw, 'public module download')

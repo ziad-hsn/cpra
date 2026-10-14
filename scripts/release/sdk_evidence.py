@@ -24,7 +24,7 @@ from release import RECIPE, encoded, evidence_identity, valid_version
 MAX_ARCHIVE_BYTES = 500 * 1024 ** 2
 MAX_METADATA_BYTES = 16 * 1024 ** 2
 MAX_ARCHIVE_FILES = 100000
-MINIMUM_COMPILER = 'go1.25.0'
+MINIMUM_COMPILER = RECIPE['minimum_go_version']
 MODULE_ROOTS = {CORE: 'sdk/go', WORKER: 'sdk/go/worker'}
 CHECKS = {
     'external consumer', 'independent default dependency graph',

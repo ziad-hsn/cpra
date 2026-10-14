@@ -19,7 +19,7 @@ class PreparationTests(unittest.TestCase):
         root.mkdir()
         subprocess.run(['git', 'init', '-q', str(root)], check=True)
         (root / '.gitignore').write_text('ignored/\n')
-        (root / 'go.mod').write_text('module cpra.invalid/fixture\n\ngo 1.25.0\n')
+        (root / 'go.mod').write_text('module cpra.invalid/fixture\n\ngo 1.26.0\n')
         (root / 'removed.go').write_text('package fixture\n')
         (root / 'run.sh').write_text('#!/bin/sh\n')
         (root / 'run.sh').chmod(0o755)
@@ -29,7 +29,7 @@ class PreparationTests(unittest.TestCase):
     def test_captures_current_edits_new_files_deletions_and_modes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.repository(directory)
-            (root / 'go.mod').write_text('module cpra.invalid/edited\n\ngo 1.25.0\n')
+            (root / 'go.mod').write_text('module cpra.invalid/edited\n\ngo 1.26.0\n')
             (root / 'removed.go').unlink()
             (root / 'new.go').write_text('package edited\n')
             (root / 'ignored').mkdir()
@@ -80,7 +80,7 @@ class PreparationTests(unittest.TestCase):
                 prepare.proposals(source, before)
 
     def test_module_contract_rejects_version_replacement_and_dependency_cycles(self):
-        base = {'Module': {'Path': prepare.WORKER}, 'Go': '1.25.0',
+        base = {'Module': {'Path': prepare.WORKER}, 'Go': '1.26.0',
                 'Require': [{'Path': prepare.CORE, 'Version': 'v0.1.0-rc.1'}]}
         self.assertEqual(prepare.module_contract(base, prepare.WORKER, 'v0.1.0-rc.1'),
                          {prepare.CORE: 'v0.1.0-rc.1'})
@@ -170,17 +170,19 @@ class PreparationTests(unittest.TestCase):
                 prepare.prepare(sys.executable, Path(directory) / 'output', 'latest', root)
 
     def test_archives_cover_final_graph_and_checksum_refresh_is_explicit(self):
-        for refresh in (False, True):
-            with self.subTest(refresh=refresh), tempfile.TemporaryDirectory() as directory:
+        for refresh, changed_definition in ((False, False), (True, False), (False, True), (True, True)):
+            with self.subTest(refresh=refresh, changed_definition=changed_definition), tempfile.TemporaryDirectory() as directory:
                 root = self.repository(directory)
                 version = 'v0.1.0-rc.1'
                 stale = prepare.CORE + ' ' + version + ' h1:old-fixture-content\n'
                 definition = prepare.CORE + ' ' + version + '/go.mod h1:fixture-definition\n'
+                previous_definition = definition.replace('fixture-definition', 'previous-definition') if changed_definition else definition
+                unrelated = 'example.com/unrelated v1.0.0 h1:untouched-fixture\n'
                 for module, relative in prepare.MODULES.items():
                     path = root / relative
                     path.mkdir(parents=True, exist_ok=True)
-                    (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.25.0\n')
-                    (path / 'go.sum').write_text('leaf fixture\n' if module == prepare.CORE else stale + definition)
+                    (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.26.0\n')
+                    (path / 'go.sum').write_text('leaf fixture\n' if module == prepare.CORE else stale + previous_definition + unrelated)
                 subprocess.run(['git', 'add', '.'], cwd=root, check=True)
                 subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                                 '-c', 'commit.gpgSign=false', 'commit', '-qm', 'Fixture'], cwd=root, check=True)
@@ -207,7 +209,7 @@ class PreparationTests(unittest.TestCase):
                     if args[:2] == ['mod', 'edit']:
                         module = next(module for module, relative in prepare.MODULES.items()
                                       if path == out / 'source' / relative)
-                        value = {'Module': {'Path': module}, 'Go': '1.25.0',
+                        value = {'Module': {'Path': module}, 'Go': '1.26.0',
                                  'Require': [] if module == prepare.CORE else [{'Path': prepare.CORE, 'Version': version}]}
                         result = json.dumps(value)
                         (destination / (name + '.stdout')).write_text(result)
@@ -216,8 +218,10 @@ class PreparationTests(unittest.TestCase):
                         (path / 'go.sum').write_text('leaf fixture\n')
                     elif name in ('application-tidy', 'worker-tidy'):
                         contents = (path / 'go.sum').read_text()
-                        if stale in contents:
+                        if stale in contents or (changed_definition and previous_definition in contents):
                             raise ValueError('checksum mismatch in copied dependent module')
+                        if definition not in contents:
+                            contents += definition
                         (path / 'go.sum').write_text(contents + prepare.CORE + ' ' + version + ' ' + archives[prepare.CORE]['Sum'] + '\n')
                     elif args == ['mod', 'download', '-json', 'all']:
                         with (path / 'go.sum').open('a') as stream:
@@ -243,6 +247,10 @@ class PreparationTests(unittest.TestCase):
                         worker = out / 'source/sdk/go/worker/go.sum'
                         self.assertEqual(Path(archives[prepare.WORKER]['Zip']).read_bytes(), worker.read_bytes())
                         self.assertIn(definition, worker.read_text())
+                        self.assertIn(unrelated, worker.read_text())
+                        self.assertNotIn(stale, worker.read_text())
+                        if changed_definition:
+                            self.assertNotIn(previous_definition, worker.read_text())
                 self.assertEqual(prepare.source_inventory(root), original)
 
     @unittest.skipIf(os.name == 'nt', 'process group boundary uses the WSL release host')

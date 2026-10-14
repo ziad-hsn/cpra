@@ -7,7 +7,7 @@ out of reports; vulnerabilities follow [SECURITY.md](SECURITY.md).
 
 ## Development
 
-Use Go 1.25 or newer for source compatibility. Official artifacts use the exact
+Use Go 1.26 or newer for source compatibility. Official artifacts use the exact
 compiler and build recipe in `scripts/release/recipe.json`. The dashboard uses
 the pinned Node and pnpm versions in the same file. Do not change dependencies
 or generated files just to make an unrelated change pass.

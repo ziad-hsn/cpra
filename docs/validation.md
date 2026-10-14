@@ -24,7 +24,7 @@ python3 -B scripts/release/build_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.25.0/bin/go \
+  --go /path/to/go1.26.0/bin/go \
   --security \
   --a2a-reference-go /path/to/go1.27.2/bin/go \
   --out /private/builds/build-minimum.json
@@ -101,7 +101,7 @@ evidence. This reader cannot authorize publication or start an endurance run.
 The explicit A2A mode builds the upstream SDK reference server with the pinned
 release compiler, while each interoperability test runs with the selected CPRa
 compiler. The reference module requires Go 1.26; it is a separate test process
-and never enters CPRa's Go 1.25 application dependency graph. The recorder keeps
+and never enters CPRa's application dependency graph. The recorder keeps
 the original reference sources, module verification and graph, vet output,
 executable, build information, package selection and full jobs-package test
 events. Source and executable fingerprints must remain unchanged. Only this
@@ -191,7 +191,7 @@ python3 -B scripts/release/worker_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.25.0/bin/go \
+  --go /path/to/go1.26.0/bin/go \
   --out /private/workers/worker-minimum.json
 
 python3 -B scripts/release/worker_campaign.py \
@@ -308,8 +308,8 @@ python3 -B scripts/dashboard/asset_manifest.py
 python3 scripts/sdk/workspace.py --output /private/cpra-sdk.work --no-github-env
 GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --out evidence/local/browser-release-default.json
 GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --tags externaljobs --out evidence/local/browser-release-external.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.25.0/bin/go --node /path/to/pinned/node --no-race --out evidence/local/browser-minimum-default.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.25.0/bin/go --node /path/to/pinned/node --no-race --tags externaljobs --out evidence/local/browser-minimum-external.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.0/bin/go --node /path/to/pinned/node --no-race --out evidence/local/browser-minimum-default.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.0/bin/go --node /path/to/pinned/node --no-race --tags externaljobs --out evidence/local/browser-minimum-external.json
 ```
 
 The development workspace above is explicit evidence of local source integration.

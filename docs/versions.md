@@ -31,7 +31,7 @@ to their actual source inventories. They are not a final frozen-release pass.
 | Drivers | 14 checks, six recovery roles and 15 notification roles across applicable build tags | Fixture contracts, provider acceptance and observed real effects are distinct evidence levels |
 | gRPC | TCP reachability when mode is omitted; explicit verified-TLS unary health mode | Only SERVING succeeds in health mode; it never falls back to TCP |
 | Distributions | Go-install contract, archive/package/image/Compose/Helm recipes and local administration | Native OS/architecture, service, filesystem and deployment matrices remain required |
-| Dependency security | Release compiler updated to Go 1.27.2 and gRPC to 1.83.2 | Five `x/net` HTTP/2 advisories remain; applying the upstream fix needs a decision on the Go 1.25 application minimum |
+| Dependency security | Common Go 1.26.0 minimum; release compiler Go 1.27.2; gRPC 1.83.2 and `x/net` 0.60.0; nine working-source scans have no affected imported-package or called-symbol findings | One module-level OpenPGP advisory remains for packages not imported by the built-in-driver application; complete final-source security qualification remains required |
 | Artwork and code | MIT code; CPRa-authored artwork under CC BY 4.0 with attribution | Third-party notices and the separate project-name note remain applicable |
 
 The [quickstart](tutorials/quickstart.md) uses protected management initialization

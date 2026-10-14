@@ -10,7 +10,7 @@ qualification gates.
 
 # Development guide
 
-CPRa preserves Go 1.25 source compatibility. The release recipe pins Go 1.27.2;
+CPRa preserves Go 1.26 source compatibility. The release recipe pins Go 1.27.2;
 minimum-version tests are a separate check. Before nested-module publication,
 Make uses a command-local workspace for the application, SDK and worker modules.
 That workspace supports development; it does not prove public module downloads

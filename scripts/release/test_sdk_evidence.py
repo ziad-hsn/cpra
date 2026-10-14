@@ -39,7 +39,7 @@ class SDKEvidenceTests(unittest.TestCase):
         for module, relative in sdk_evidence.MODULE_ROOTS.items():
             contents = {name: ('fixture input: ' + module + '/' + name + '\n').encode()
                         for name in sdk_evidence.documentation_inputs(module)}
-            contents['go.mod'] = ('module ' + module + '\n\ngo 1.25.0\n' +
+            contents['go.mod'] = ('module ' + module + '\n\ngo 1.26.0\n' +
                                   (f'require {CORE} {self.versions[CORE]}\n' if module == WORKER else '')).encode()
             contents['client.go' if module == CORE else 'runner.go'] = b'package fixture\n'
             if module == WORKER:
@@ -188,7 +188,9 @@ class SDKEvidenceTests(unittest.TestCase):
         self.reports[0] = original; self.save()
 
     def test_same_compiler_or_a_missing_report_is_not_minimum_coverage(self):
-        for compiler in ('go version go1.26.0 linux/amd64', self.reports[1]['compiler']):
+        # The superseded minimum and a duplicate release compiler cannot stand
+        # in for a run of the current minimum compiler.
+        for compiler in ('go version go1.25.0 linux/amd64', self.reports[1]['compiler']):
             with self.subTest(compiler=compiler):
                 self.reports[0]['compiler'] = compiler; self.save()
                 with self.assertRaisesRegex(ValueError, 'compiler coverage'):

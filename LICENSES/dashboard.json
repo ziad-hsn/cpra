@@ -58,9 +58,9 @@
     "scope": "dashboard-wasm",
     "name": "CPRa collection parser",
     "version": "source",
-    "sha256": "e7f7bd4874f965533ccf25bcd4dcf2b1615096ee6cd03cf288d410ca350d8636",
+    "sha256": "b1fac5afef1d0eec787ec5b5503bd15708fa570c0707f44b52221084bff60f8b",
     "source_file": "dashboard/src/import/generated/collection-parser.wasm",
-    "source_identity": "f6128cc7734502d199c700809f9791accb392e2602980d60ee1b1e9601196849",
+    "source_identity": "1942bdd756aa170ffea5eeecb93e417ac6a41d50bff17d9de7f6e9c9a43421ef",
     "declared_license": "MIT",
     "license_files": [
       "sdk/go/LICENSE"
@@ -140,7 +140,7 @@
     ],
     "name": "github.com/ziad-hsn/cpra/sdk/go",
     "scope": "dashboard-wasm",
-    "source_sha256": "f6128cc7734502d199c700809f9791accb392e2602980d60ee1b1e9601196849",
+    "source_sha256": "1942bdd756aa170ffea5eeecb93e417ac6a41d50bff17d9de7f6e9c9a43421ef",
     "version": "source"
   },
   {

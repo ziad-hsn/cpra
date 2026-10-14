@@ -22,7 +22,7 @@ jobs:
       GOTOOLCHAIN: local
     strategy:
       matrix:
-        go: ['1.25.0', '1.27.2']
+        go: ['1.26.0', '1.27.2']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -76,7 +76,7 @@ jobs:
       GOENV: 'off'
     strategy:
       matrix:
-        go: ['1.25.0', '1.27.2']
+        go: ['1.26.0', '1.27.2']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -86,7 +86,7 @@ jobs:
       - name: Prepare the CPRa source workspace
         run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
       - name: Install the separate upstream fixture compiler
-        # Keep the selected CPRa compiler on PATH, including Go 1.25.
+        # Keep the selected CPRa compiler on PATH, including Go 1.26.
         run: GITHUB_PATH= python3 scripts/release/install_go.py --out "$RUNNER_TEMP/cpra-a2a-go"
       - name: Build the pinned upstream A2A server
         working-directory: internal/jobs/testdata/a2aagent
@@ -153,12 +153,12 @@ jobs:
           GOTOOLCHAIN: local
         run: |
           python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work" --no-github-env
-          GITHUB_PATH= python3 scripts/release/install_go.py --version go1.25.0 --out "$RUNNER_TEMP/cpra-browser-minimum-go"
+          GITHUB_PATH= python3 scripts/release/install_go.py --version go1.26.0 --out "$RUNNER_TEMP/cpra-browser-minimum-go"
           export GOWORK="$RUNNER_TEMP/cpra-sdk.work"
           python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --out "$RUNNER_TEMP/browser/go1.27.2-default.json"
           python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --tags externaljobs --out "$RUNNER_TEMP/browser/go1.27.2-externaljobs.json"
-          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --out "$RUNNER_TEMP/browser/go1.25.0-default.json"
-          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --tags externaljobs --out "$RUNNER_TEMP/browser/go1.25.0-externaljobs.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --out "$RUNNER_TEMP/browser/go1.26.0-default.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --tags externaljobs --out "$RUNNER_TEMP/browser/go1.26.0-externaljobs.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && github.event.repository.private == true && github.event.repository.visibility == 'private'
         with:
@@ -221,7 +221,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.25.0', '1.27.2']
+        go: ['1.26.0', '1.27.2']
     env:
       GOTOOLCHAIN: local
       GOENV: off

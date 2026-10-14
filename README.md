@@ -11,7 +11,7 @@ Checks services, sends alerts, and runs the recovery actions you configure.</p>
 <p align="center">
   <a href="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml"><img src="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a262e" alt="MIT license"></a>
-  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25%2B-1a262e" alt="Go 1.25+"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26%2B-1a262e" alt="Go 1.26+"></a>
   <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-8A5A00" alt="Documentation"></a>
 </p>
 
@@ -57,7 +57,7 @@ comparative-performance qualification. The 24-hour run is cancelled.
 
 ## Quick start
 
-Requires Go 1.25 or later, Make, and Python 3 for the source workspace below.
+Requires Go 1.26 or later, Make, and Python 3 for the source workspace below.
 The repository already contains the built dashboard assets.
 
 Make creates an ignored `bin/cpra-sdk.work` for the application and its local
@@ -173,7 +173,7 @@ make release VERSION=v0.1.0-rc.1
 The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned
 Go 1.27.2 compiler and explicit source identity. It produces unstripped,
 optimized server/client archives for Linux, macOS and Windows on amd64/arm64,
-Linux packages, a source archive and evidence inventories. Go 1.25 compatibility
+Linux packages, a source archive and evidence inventories. Go 1.26 compatibility
 is a separate test. Native execution gates qualify each platform; a successful
 cross-build alone does not establish support.
 

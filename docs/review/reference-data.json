@@ -1481,9 +1481,9 @@
     },
     {
       "asset": "review/source/internal/jobs/testdata/a2aagent/README.md.txt",
-      "bytes": 2735,
+      "bytes": 2737,
       "path": "internal/jobs/testdata/a2aagent/README.md",
-      "sha256": "3a884f14467471ac3261cf99be04d21db1192773222973e0158153964122f6d9"
+      "sha256": "1acbb00c874eef68f965f554a646ff7929ab288204bb9c8e7d12038281e556c5"
     },
     {
       "asset": "review/source/internal/management/collection_admission.go.txt",
@@ -1795,7 +1795,7 @@
       "asset": "review/source/scripts/release/module_publication.py.txt",
       "bytes": 17313,
       "path": "scripts/release/module_publication.py",
-      "sha256": "0a164ee4a44c25aa9b685bc85e3728fb049e4dcda2d261bd26338b0d6c1c7a7f"
+      "sha256": "a43b80d09c847f4d84ada91af3a6430c71351393bb4e00bdea42c668706637c9"
     },
     {
       "asset": "review/source/scripts/release/oci_assembly.py.txt",
@@ -1883,9 +1883,9 @@
     },
     {
       "asset": "review/source/sdk/go/worker/README.md.txt",
-      "bytes": 18870,
+      "bytes": 18882,
       "path": "sdk/go/worker/README.md",
-      "sha256": "fee212faa849bb04f826f36e169fb1d2a15102f7e5464d57de39ca7596398ac8"
+      "sha256": "cdd7ea5e95b37bcbf485e489668298b2d46585b80b72767e1069fea1ff1b3476"
     },
     {
       "asset": "review/source/sdk/go/worker/journal.go.txt",

@@ -141,7 +141,7 @@ def run_go(go, source, args, env, out, name, commands, timeout=900):
 
 def module_contract(metadata, module, sdk_version=None):
     if not isinstance(metadata, dict) or metadata.get('Module', {}).get('Path') != module \
-            or metadata.get('Go') != '1.25.0':
+            or metadata.get('Go') != '1.26.0':
         raise ValueError('Module path or Go compatibility changed: ' + module)
     if metadata.get('Replace') or metadata.get('Exclude') or metadata.get('Toolchain'):
         raise ValueError('Preparation forbids replace, exclude and toolchain directives')
@@ -309,7 +309,7 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
         module_contract(json.loads((out / 'module-before-2.stdout').read_text()), WORKER, sdk_version)
         report['versions'] = {CORE: sdk_version, WORKER: worker_version}
         # Normalize the leaf first: its final bytes determine dependent sums.
-        run(source / 'sdk/go', ['mod', 'tidy', '-compat=1.25'], 'sdk-tidy')
+        run(source / 'sdk/go', ['mod', 'tidy', '-compat=1.26'], 'sdk-tidy')
         run(source / 'sdk/go', ['mod', 'download', '-json', 'all'], 'sdk-download')
         archiver = build_archiver(go, out / 'archiver', source)
         report['archiver_sha256'] = sha256(archiver)
@@ -323,23 +323,26 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
         env.update(GOPROXY=proxy.as_uri() + ',https://proxy.golang.org', GONOSUMDB=CORE + ',' + WORKER)
         for name, relative in [('application', '.'), ('worker', 'sdk/go/worker')]:
             if refresh_sdk_checksum:
-                # This is a proposal in the disposable source copy. Keep the
-                # module-definition checksum and every unrelated checksum.
-                # Go calculates the new content checksum from the staged SDK.
+                # This is a proposal in the disposable source copy. Refresh
+                # only this SDK version's changed archive/definition checksums;
+                # Go verifies the new values against the staged source bytes.
                 path = source / relative / 'go.sum'
                 if path.exists():
                     original_rows = path.read_bytes().splitlines(keepends=True)
-                    selected = (CORE + ' ' + sdk_version + ' ').encode()
-                    stale = [row for row in original_rows if row.startswith(selected)
-                             and row.strip().split()[-1].decode() != sdk['Sum']]
+                    selected = {(CORE + ' ' + sdk_version + ' ').encode(): sdk['Sum'],
+                                (CORE + ' ' + sdk_version + '/go.mod ').encode(): sdk['GoModSum']}
+                    stale = [row for row in original_rows
+                             if any(row.startswith(prefix) and row.strip().split()[-1].decode() != expected
+                                    for prefix, expected in selected.items())]
                     if stale:
                         report.setdefault('sdk_checksum_refresh', []).append({
                             'path': path.relative_to(source).as_posix(),
                             'version': sdk_version, 'source_archive_sum': sdk['Sum'],
+                            'source_module_sum': sdk['GoModSum'],
                             'previous_rows': [row.decode().strip() for row in stale],
                         })
                         path.write_bytes(b''.join(row for row in original_rows if row not in stale))
-            run(source / relative, ['mod', 'tidy', '-compat=1.25'], name + '-tidy')
+            run(source / relative, ['mod', 'tidy', '-compat=1.26'], name + '-tidy')
             run(source / relative, ['mod', 'download', '-json', 'all'], name + '-download')
         for index, (module, relative) in enumerate(MODULES.items()):
             metadata = json.loads(run(source / relative, ['mod', 'edit', '-json'], 'module-after-' + str(index)))
@@ -350,7 +353,7 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
         report['module_archives'][WORKER] = worker
         consumer = out / 'consumer'
         consumer.mkdir()
-        (consumer / 'go.mod').write_text('module cpra.invalid/dependency-consumer\n\ngo 1.25.0\n')
+        (consumer / 'go.mod').write_text('module cpra.invalid/dependency-consumer\n\ngo 1.26.0\n')
         raw = run(consumer, ['mod', 'download', '-json', CORE + '@' + sdk_version,
                              WORKER + '@' + worker_version], 'private-module-download')
         decoder, rows, remainder = json.JSONDecoder(), [], raw.lstrip()
@@ -399,7 +402,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--worker-version', required=True)
     parser.add_argument('--refresh-sdk-checksum', action='store_true',
-                        help='propose refreshed SDK content checksums for an unpublished private candidate; only copied files change')
+                        help='propose refreshed SDK archive and go.mod checksums for an unpublished private candidate; only copied files change')
     args = parser.parse_args()
     try:
         report = prepare(args.go, args.out, args.worker_version,

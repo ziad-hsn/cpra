@@ -21,7 +21,7 @@ from release import RECIPE, encoded, evidence_identity
 
 
 PACKAGE = 'github.com/ziad-hsn/cpra'
-MINIMUM_COMPILER = 'go1.25.0'
+MINIMUM_COMPILER = RECIPE['minimum_go_version']
 TESTS = ('TestMainWorkerProcesses', 'TestMainWorkerLoad')
 PREFIXES = ('internal/', 'cmd/', 'sdk/go/', 'api/', 'examples/', 'scripts/release/')
 EXACT = {'go.mod', 'go.sum', '.github/workflows/ci.yml', '.github/workflows/release.yml'}

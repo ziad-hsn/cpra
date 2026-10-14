@@ -28,7 +28,7 @@ account is created or contacted by these finite demos.
 
 ## Reproduce the checks
 
-From the repository root, with Go 1.25 or later on `PATH`:
+From the repository root, with Go 1.26 or later on `PATH`:
 
 ```bash
 export GOTOOLCHAIN=local

@@ -18,7 +18,7 @@ import sys
 from evidence import read_report
 from release import RECIPE, encoded, evidence_identity
 
-MINIMUM_COMPILER = 'go1.25.0'
+MINIMUM_COMPILER = RECIPE['minimum_go_version']
 MAX_METADATA_BYTES = 16 * 1024 ** 2
 MAX_LOG_BYTES = 64 * 1024 ** 2
 MAX_LINE_BYTES = 1024 * 1024

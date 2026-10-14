@@ -4,6 +4,11 @@ Approved: 2026-10-12. Implementation branch: `codex/release-repairs`.
 Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Status: implementation in progress; qualification and publication remain gated.
 
+**Compatibility amendment, 2026-10-14:** the user approved Go 1.26 as the common
+minimum for all repository modules, including the application, SDK, worker,
+examples and build tools. This supersedes the original Go 1.25 compatibility
+requirements below. The release compiler remains separately pinned to Go 1.27.2.
+
 ## Summary
 
 Repair all applicable findings from the three reviews, then qualify and publish

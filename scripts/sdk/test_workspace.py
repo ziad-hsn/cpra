@@ -31,11 +31,11 @@ class WorkspaceTests(unittest.TestCase):
         self.modules = [self.root / path for path in (".", "sdk/go", "sdk/go/worker", "examples/sdk")]
         for index, module in enumerate(self.modules):
             module.mkdir(parents=True, exist_ok=True)
-            (module / "go.mod").write_text(f"module example.com/fixture{index}\n\ngo 1.25.0\n")
+            (module / "go.mod").write_text(f"module example.com/fixture{index}\n\ngo 1.26.0\n")
             (module / "go.sum").write_text("unchanged fixture\n")
-        (self.modules[0] / "go.mod").write_text("module example.com/fixture0\n\ngo 1.25.0\n\nrequire example.com/fixture1 v0.2.0-rc.8\n")
+        (self.modules[0] / "go.mod").write_text("module example.com/fixture0\n\ngo 1.26.0\n\nrequire example.com/fixture1 v0.2.0-rc.8\n")
         (self.modules[2] / "go.mod").write_text("module example.com/fixture2\n\ngo 1.26.0\n\nrequire (\n example.com/fixture1 v0.2.0-rc.9\n)\n")
-        (self.modules[3] / "go.mod").write_text("module example.com/fixture3\n\ngo 1.25.0\n\nrequire example.com/fixture2 v0.3.0\n")
+        (self.modules[3] / "go.mod").write_text("module example.com/fixture3\n\ngo 1.26.0\n\nrequire example.com/fixture2 v0.3.0\n")
         subprocess.run([sys.executable, str(manifest_helper), "--write"], check=True)
         self.module_bytes = {path: path.read_bytes() for module in self.modules
                              for path in (module / "go.mod", module / "go.sum")}
@@ -134,7 +134,7 @@ if workspace == "off" and os.environ.get("FAIL_OFF"):
         self.assertIn("replace example.com/fixture1 v0.2.0-rc.9 =>", content)
         self.assertNotIn("v0.1.0-rc.1", content)
         self.assertNotIn("replace example.com/fixture2", content)
-        (self.modules[0] / "go.mod").write_text("module example.com/fixture0\n\ngo 1.25.0\nrequire example.com/fixture1 v0.4.0\n")
+        (self.modules[0] / "go.mod").write_text("module example.com/fixture0\n\ngo 1.26.0\nrequire example.com/fixture1 v0.4.0\n")
         self.make("dev-workspace")
         self.assertIn("replace example.com/fixture1 v0.4.0 =>", (self.root / "bin/cpra-sdk.work").read_text())
 

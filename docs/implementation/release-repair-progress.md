@@ -7,8 +7,19 @@ Updated: 2026-10-14. The candidate is not frozen or publicly qualified.
 
 The [compiler/dependency security checkpoint](dependency-security-2026-10-14.md)
 updates the release compiler to Go 1.27.2 and gRPC to 1.83.2. Five `x/net`
-HTTP/2 advisories remain: their upstream fix requires Go 1.26, and the approved
-Go 1.25 application minimum has not been changed without a user decision.
+HTTP/2 findings are cleared from fresh working-source scans after updating
+`x/net` to 0.60.0. The user approved Go 1.26.0 as the common minimum across
+the application, SDK, worker, examples and tools; no split minimum remains.
+Nine application/SDK/worker/example selections report no affected imported
+packages or called symbols. The all-built-in application selections retain
+one module-level OpenPGP advisory for packages they do not import.
+The scoped Go 1.26.0/1.27.2 application, SDK, worker and example checks pass;
+the generator produces identical code/schema outputs from two roots on both
+compilers. The refreshed dashboard passes 541 tests, type checking and lint.
+Release-tool checks pass all 703 cases, and independent source/archive/asset
+review finds no actionable defect. Interrupted scratch-budget runs remain
+separate evidence, followed by passing sequential checks. Browser campaigns
+and complete frozen-source matrices remain required.
 The earlier `73d4797` qualification prefix is incomplete and does not qualify
 the changed recipe or dependency graph.
 
@@ -53,8 +64,9 @@ subsequent compiler/dependency changes.
 ## Recorded local checks
 
 The release compiler used for new checks is Go 1.27.2, checksum-pinned by the
-repository installer. Earlier Go 1.27.0/1.27.1 checks remain earlier development
-evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
+repository installer; the common minimum is Go 1.26.0. Earlier Go 1.25.0 and
+Go 1.27.0/1.27.1 checks remain earlier development evidence. Frontend
+qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
 
 - API/SDK admission classification and original-handle tests passed.
 - SDK original-file continuation and mismatch/lost-reply tests passed.

@@ -227,7 +227,7 @@ class BuildEvidenceTests(unittest.TestCase):
 
     def test_source_compiler_workspace_and_checksum_overrides_cannot_pass(self):
         for change in (lambda r: r.update(source_changed=['main.go']),
-                       lambda r: r.update(go='go1.25.1'),
+                       lambda r: r.update(go='go1.26.1'),
                        lambda r: r.update(workspace='/private/go.work'),
                        lambda r: r['environment'].update(GONOSUMDB=build.sdk_evidence.CORE),
                        lambda r: r['variants'][0]['environment'].update(GOPROXY='https://private.invalid'),
@@ -435,7 +435,7 @@ class BuildEvidenceTests(unittest.TestCase):
             self.fail('Go must be available for the native event-format regression')
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / 'go.mod').write_text('module github.com/ziad-hsn/cpra\n\ngo 1.25.0\n')
+            (root / 'go.mod').write_text('module github.com/ziad-hsn/cpra\n\ngo 1.26.0\n')
             (root / 'fixture_test.go').write_text('''package fixture
 import "testing"
 func TestA(t *testing.T) { t.Parallel(); t.Run("sub",func(t *testing.T) {}) }

@@ -31,7 +31,7 @@ production-server, cloud-account, cluster, or SMS delivery certification.
 | [Kubernetes Services](kubernetes-services.md) | Namespace discovery for all Services | DNS checks for every Service and TCP checks for usable TCP ports; disabled monitors stay disabled |
 | [DAO and SMS worker](dao-sms.md) | A read-only governance RPC check and internal SMS handler | A stale chain head triggers a fixture notification; replaying a result receipt does not resend SMS |
 
-Begin in a checkout containing `examples/sdk`. Select Go 1.25 or later, then run:
+Begin in a checkout containing `examples/sdk`. Select Go 1.26 or later, then run:
 
 ```bash
 export GOTOOLCHAIN=local

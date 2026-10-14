@@ -79,7 +79,7 @@ mode. The API also supports separately configured read-only access. See
 
 The planned matrix includes Linux/macOS/Windows amd64 and arm64 archives, Linux
 DEB/RPM packages, two Linux OCI architectures, Compose and Helm. Native and
-deployment execution gates remain open. Source supports Go 1.25; dashboard
+deployment execution gates remain open. Source supports Go 1.26; dashboard
 rebuilds use pinned Node and pnpm. [Availability](versions.md) distinguishes a
 build recipe from a qualified public artifact.
 

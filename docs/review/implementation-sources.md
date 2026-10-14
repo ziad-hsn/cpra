@@ -43,7 +43,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/jobs/a2a.go` | [Source](source/internal/jobs/a2a.go.txt) | `22e7479825ec4c235f4ab79150809aa4388133cdf45b32f579c06e080fabd8ff` |
 | `internal/jobs/a2a_job.go` | [Source](source/internal/jobs/a2a_job.go.txt) | `7d8212081d624c1c99d6fb48d9d392a64093163ef850ec757cd583684e973a05` |
 | `internal/jobs/capabilities.go` | [Source](source/internal/jobs/capabilities.go.txt) | `787f23f9d2276849e410a2f2e2917aa39601aa3f1faf1a79230099ea85633629` |
-| `internal/jobs/testdata/a2aagent/README.md` | [Source](source/internal/jobs/testdata/a2aagent/README.md.txt) | `3a884f14467471ac3261cf99be04d21db1192773222973e0158153964122f6d9` |
+| `internal/jobs/testdata/a2aagent/README.md` | [Source](source/internal/jobs/testdata/a2aagent/README.md.txt) | `1acbb00c874eef68f965f554a646ff7929ab288204bb9c8e7d12038281e556c5` |
 | `internal/management/collection_admission.go` | [Source](source/internal/management/collection_admission.go.txt) | `1893ee1e9d241999641c6f91c9237768c77d1ed1f17dd769806b2d87ca0fbc53` |
 | `internal/management/collection_execution_coordinator.go` | [Source](source/internal/management/collection_execution_coordinator.go.txt) | `91ef5fe84cbb3a0c36823419274c124e60586a60fe1e54f6c4afe67ed6a41473` |
 | `internal/management/collection_execution_results.go` | [Source](source/internal/management/collection_execution_results.go.txt) | `0c89a43adcd0848522b8c0fb000e63256933e5f92e926977cfaa1b72cd2d6066` |
@@ -95,7 +95,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `scripts/release/chart.py` | [Source](source/scripts/release/chart.py.txt) | `147c977c21deee9ddb5646adc48bce6d34fc6e762232b08149186d65b34f1dfe` |
 | `scripts/release/image_sbom.py` | [Source](source/scripts/release/image_sbom.py.txt) | `189da198791480f72bd018664abc2af6335dbfb6ec43cc9e8fb629f2b9cf2005` |
 | `scripts/release/image_signing.py` | [Source](source/scripts/release/image_signing.py.txt) | `b24c10fe0c3b7799da6313ca201193d3f044bf0255d947a1c2b23d0b671d6ec5` |
-| `scripts/release/module_publication.py` | [Source](source/scripts/release/module_publication.py.txt) | `0a164ee4a44c25aa9b685bc85e3728fb049e4dcda2d261bd26338b0d6c1c7a7f` |
+| `scripts/release/module_publication.py` | [Source](source/scripts/release/module_publication.py.txt) | `a43b80d09c847f4d84ada91af3a6430c71351393bb4e00bdea42c668706637c9` |
 | `scripts/release/oci_assembly.py` | [Source](source/scripts/release/oci_assembly.py.txt) | `5ea04ce52e1b379ab8fe2b3e687fd1492904a33b2ab9ec59282b68ced9b0caa9` |
 | `scripts/release/publication_evidence.py` | [Source](source/scripts/release/publication_evidence.py.txt) | `e5db341115547e0955a777374f73d9db60cfcef9b71d268ee396b47b1a8e1291` |
 | `scripts/release/publish.py` | [Source](source/scripts/release/publish.py.txt) | `78389ec3a12373d3a3b8a21e85b50be4d794f1b7f8a28af0caa72c42a95f0157` |
@@ -110,7 +110,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `sdk/go/external_test.go` | [Source](source/sdk/go/external_test.go.txt) | `2bb48aa59099a9ed68d2f125f2be38eb8c154d250824550fd24d9de6ffa7cbae` |
 | `sdk/go/operation_execution.go` | [Source](source/sdk/go/operation_execution.go.txt) | `e6fe75dce72eafbaebc746452dbf24d45eaa99a58c68f87f7f2106014f1b6f4b` |
 | `sdk/go/services_external.go` | [Source](source/sdk/go/services_external.go.txt) | `7f40cd89023a60048b37b7365c5971295187bbff9ef609b50e5e4fcf9624fbc3` |
-| `sdk/go/worker/README.md` | [Source](source/sdk/go/worker/README.md.txt) | `fee212faa849bb04f826f36e169fb1d2a15102f7e5464d57de39ca7596398ac8` |
+| `sdk/go/worker/README.md` | [Source](source/sdk/go/worker/README.md.txt) | `cdd7ea5e95b37bcbf485e489668298b2d46585b80b72767e1069fea1ff1b3476` |
 | `sdk/go/worker/journal.go` | [Source](source/sdk/go/worker/journal.go.txt) | `111805e9ab08c692537976bc5f944f3a83cf1fa78a92db14f98970864b17607f` |
 | `sdk/go/worker/runner.go` | [Source](source/sdk/go/worker/runner.go.txt) | `e095a232fd8117c9fd6c9d23f8d45bbeae76a63f0b22567924b87a2ebe123998` |
 | `sdk/go/worker/worker_test.go` | [Source](source/sdk/go/worker/worker_test.go.txt) | `34e5174995839c6061a7353d3de78aaeb9aa6e9a2906c0865154aeef79100e35` |

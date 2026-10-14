@@ -35,6 +35,46 @@ the required real-browser matrix must still run against the corrected frozen
 source. The original failing regression and prior campaign identity are retained
 privately.
 
+At private frozen checkpoint `2790f7f`, all four required real-browser campaigns
+pass: Go 1.26.0 and Go 1.27.2, with default and `externaljobs` builds. Each runs
+all eight required tests with no failures or skips; the Go 1.27.2 runs include
+race detection. Independent inspection of raw execution, source/compiler/assets,
+screenshots and retained hashes closes the bounded browser-evidence review.
+The 128 automated accessibility scans contain no confirmed violations, but 48
+contrast findings need review and fourteen manual cases remain untested.
+This does not close accessibility or the overall release gate.
+
+The same checkpoint's private documentation render passes with 195 generated
+pages and 30,896 checked links/assets. Its 703 release-tool, 48 SDK-tool, 39
+documentation-tool and 48 benchmark-tool contract tests pass. The complete Go
+matrix stops before correctness tests when a cold all-driver boundary build
+exceeds the helper's 180-second command limit; the failed report is retained.
+These checks retain `2790f7f` identity. The subsequently reviewed README
+correction at `8eddb37` clarifies named Bearer/native HTTPS management access and
+removes a shared-token observation startup paired with an unsupported management
+command. No public promotion occurred.
+
+The cold-build follow-up keeps inspection commands bounded at 180 seconds and
+allows compilation up to 900 seconds, inside the existing 1,800-second campaign
+deadline. The selected Go boundary tests retain their 120-second test deadline.
+Timed-out commands retain their original partial output and cannot count as
+successful symbol-exclusion checks. The actual cold-cache rerun passes all forty
+commands and verifies 135 excluded symbols across default and all-built-in
+selections; its longest build takes 204.185 seconds. All 705 release-tool tests
+and 32 browser-recorder tests pass. The browser fixture now exercises the common
+Go 1.26 minimum and rejects Go 1.25 before starting a campaign. Independent source
+review closes both repairs. The earlier timeout and scratch-guard interruption
+remain failed/incomplete evidence; the successful rerun stays below the 6 GiB
+task allowance.
+
+At unchanged checkpoint `2790f7f`, the 62 provider-verification-tool tests and
+48 packaging tests with each of Helm 3 and Helm 4 pass. The packaging suite's first archive-based
+run cannot execute one pre-freeze Git-checkout test; the complete repeat uses
+the original frozen checkout and verifies its source before and after execution.
+These are tooling and chart-rendering contracts, not provider-account or live
+Kubernetes qualification. The changed harness and README still require a new
+source freeze before complete release qualification.
+
 The [collection backup/restore follow-up](collection-backup-restore-2026-10-14.md)
 repairs a reproduced pending-cleanup restore failure. The authenticated private
 restore copy now completes the original admitted retirement before publication;

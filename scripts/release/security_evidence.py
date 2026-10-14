@@ -159,7 +159,10 @@ def verify_exclusion(report, manifest, compiler, go):
         row = next(rows, None)
         require(isinstance(row, dict) and row.get('command') == [go, *arguments]
                 and type(row.get('exitCode')) is int and type(row.get('seconds')) in (int, float)
-                and math.isfinite(row['seconds']) and 0 <= row['seconds'] <= 180
+                and type(row.get('timeoutSeconds')) is int
+                and row['timeoutSeconds'] == exclusion.command_timeout(arguments)
+                and row.get('timedOut', False) is False
+                and math.isfinite(row['seconds']) and 0 <= row['seconds'] <= row['timeoutSeconds']
                 and all(isinstance(row.get(key), str) and len(row[key].encode()) <= build.MAX_LOG_BYTES
                         for key in ('stdout', 'stderr')), 'exclusion command or original output is missing')
         if contents is not None:

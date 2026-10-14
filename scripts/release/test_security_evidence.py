@@ -38,7 +38,8 @@ def exclusion_report(manifest, compiler, go):
     result['goEnvironment']['GOFLAGS'] = ''
 
     def row(args, **fields):
-        value = dict(command=[go, *args], exitCode=0, seconds=1, stdout='', stderr='', **fields)
+        value = dict(command=[go, *args], exitCode=0, seconds=1,
+                     timeoutSeconds=helper.command_timeout(args), stdout='', stderr='', **fields)
         result['checks'].append(value)
         return value
 
@@ -254,6 +255,24 @@ class SecurityEvidenceTests(unittest.TestCase):
             self.save()
             with self.assertRaises((ValueError, RuntimeError)): self.verify()
         self.exclusions[0] = original
+
+    def test_exclusion_cold_build_budget_remains_bounded(self):
+        original = copy.deepcopy(self.exclusions[0])
+        compiler, go = self.reports[0]['go'], self.reports[0]['compiler']
+        original['checks'][1]['seconds'] = 181
+        security.verify_exclusion(original, self.manifest, compiler, go)
+        for change in (
+            lambda rows: rows[1].update(seconds=901),
+            lambda rows: rows[1].update(timeoutSeconds=901),
+            lambda rows: rows[1].update(timedOut=True),
+            lambda rows: rows[0].update(seconds=181),
+            lambda rows: rows[0].update(timeoutSeconds=900),
+            lambda rows: rows[1].pop('timeoutSeconds'),
+        ):
+            changed = copy.deepcopy(original)
+            change(changed['checks'])
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                security.verify_exclusion(changed, self.manifest, compiler, go)
 
     def test_changed_original_bytes_and_links_are_rejected(self):
         path = self.paths[1].with_name(self.paths[1].stem + '.artifacts') / 'application-default-vulnerabilities-stdout.log'

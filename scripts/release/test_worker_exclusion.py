@@ -1,13 +1,49 @@
+import json
 import subprocess
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import verify_worker_exclusion as exclusion
 from verify_worker_exclusion import (MODULE, SDK_MODULE, builtin_tags, json_stream,
                                     require_symbol_absent, require_symbols_absent, selected_source_files)
 
 
 class WorkerExclusionOracleTests(unittest.TestCase):
+    def test_timed_out_build_retains_failure_and_partial_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'Makefile').write_text('ALL_DRIVER_TAGS = redis\n')
+            go = root / 'fixture-go'
+            go.write_text('compiler identity fixture; never executed')
+            output = root / 'result.json'
+
+            def run(command, **options):
+                if command[1] == 'version':
+                    self.assertEqual(options['timeout'], 180)
+                    return subprocess.CompletedProcess(command, 0, 'go version go1.27.2 linux/amd64\n', '')
+                self.assertEqual(command[1], 'build')
+                self.assertEqual(options['timeout'], 900)
+                raise subprocess.TimeoutExpired(command, options['timeout'],
+                    output=b'compiler progress\n', stderr=b'undefined: excluded.WorkerAuthority\n')
+
+            with patch.object(exclusion, 'ROOT', root), patch.object(subprocess, 'run', side_effect=run), \
+                    self.assertRaises(subprocess.TimeoutExpired):
+                exclusion.verify(str(go), 'off', output)
+            report = json.loads(output.read_text())
+            self.assertEqual(report['status'], 'failed')
+            self.assertEqual(len(report['checks']), 2)
+            failure = report['checks'][-1]
+            self.assertTrue(failure['timedOut'])
+            self.assertIsNone(failure['exitCode'])
+            self.assertEqual(failure['timeoutSeconds'], 900)
+            self.assertEqual(failure['stdout'], 'compiler progress\n')
+            self.assertEqual(failure['stderr'], 'undefined: excluded.WorkerAuthority\n')
+            self.assertNotIn('expectedUnavailableSymbols', failure)
+            self.assertIn('sourceSHA256', failure)
+            self.assertEqual(list((root / 'bin').iterdir()), [])
+
     def test_downloaded_sdk_sources_use_the_repository_source_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"

@@ -99,7 +99,8 @@ class RecordedCampaignTests(unittest.TestCase):
         self.root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
         for name, value in (
             ('scripts/dashboard/browser/package.json', {'dependencies': {'playwright': '1.56.1'}}),
-            ('scripts/release/recipe.json', {'go_version': 'go1.27.1', 'frontend': {'node_version': 'v24.21.0'}}),
+            ('scripts/release/recipe.json', {'minimum_go_version': 'go1.26.0', 'go_version': 'go1.27.2',
+                                            'frontend': {'node_version': 'v24.21.0'}}),
             ('playwright/package.json', {'version': '1.56.1'}),
         ):
             path = self.root / name
@@ -111,6 +112,7 @@ class RecordedCampaignTests(unittest.TestCase):
                                     node=str(self.root/'node'), go=str(self.root/'go'), browser=str(self.root/'chrome'),
                                     race=True, tags='', timeout='45m')
         self.events = self.results()
+        self.go_version = 'go1.27.2'
         self.raw = None
         self.exit_code = 0
         self.images = True
@@ -126,7 +128,7 @@ class RecordedCampaignTests(unittest.TestCase):
         if command[0] == 'git':
             return 'a'*40 + '\n'
         if 'GOVERSION' in command:
-            return 'go1.27.1\n'
+            return self.go_version + '\n'
         if command[0] == self.args.node:
             return 'v24.21.0\n'
         return 'Chromium fixture\n'
@@ -171,6 +173,19 @@ class RecordedCampaignTests(unittest.TestCase):
         if os.name != 'nt':
             self.assertEqual(self.args.out.stat().st_mode & 0o777, 0o600)
             self.assertEqual((self.root/'report.artifacts').stat().st_mode & 0o777, 0o700)
+
+    def test_recorded_minimum_compiler_is_accepted(self):
+        self.go_version = 'go1.26.0'
+        self.args.race = False
+        self.assertEqual(self.run_campaign()['result'], 'passed')
+        self.process.assert_called_once()
+
+    def test_unselected_compiler_fails_before_browser_execution(self):
+        self.go_version = 'go1.25.0'
+        report = self.run_campaign()
+        self.assertEqual(report['result'], 'failed')
+        self.assertIn('compiler', report['error'])
+        self.process.assert_not_called()
 
     def test_existing_report_is_never_replaced(self):
         self.args.out.write_bytes(b'original evidence')

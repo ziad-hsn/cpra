@@ -236,6 +236,12 @@ def selected_source_files(package: dict, root: Path = ROOT) -> dict[str, Path]:
     return selected
 
 
+def command_timeout(arguments):
+    # Compilation of all optional provider SDKs needs a cold-cache budget.
+    # The selected boundary tests retain their separate 120-second Go deadline.
+    return 900 if arguments[0] in ("build", "test") else 180
+
+
 def verify(go: str, workspace: str | None, output: Path | None) -> dict:
     selected_go = Path(shutil.which(go) or go).resolve()
     if not selected_go.is_file():
@@ -254,14 +260,26 @@ def verify(go: str, workspace: str | None, output: Path | None) -> dict:
 
     def run(args, *, absent=None, source_text=None):
         started = time.monotonic()
-        result = subprocess.run([str(selected_go), *args], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=180)
-        item = {"command": [str(selected_go), *args], "exitCode": result.returncode,
-                "seconds": round(time.monotonic() - started, 3),
-                "stdout": result.stdout, "stderr": result.stderr}
+        command = [str(selected_go), *args]
+        timeout = command_timeout(args)
+        item = {"command": command, "exitCode": None, "timeoutSeconds": timeout,
+                "stdout": "", "stderr": ""}
         if source_text is not None:
             item.update(source=source_text, sourceSHA256=hashlib.sha256(source_text.encode()).hexdigest())
         report["checks"].append(item)
+        try:
+            result = subprocess.run(command, cwd=ROOT, env=env,
+                                    capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            item["timedOut"] = True
+            for channel in ("stdout", "stderr"):
+                value = getattr(error, channel) or ""
+                item[channel] = value.decode(errors="replace") if isinstance(value, bytes) else value
+            raise
+        else:
+            item.update(exitCode=result.returncode, stdout=result.stdout, stderr=result.stderr)
+        finally:
+            item["seconds"] = round(time.monotonic() - started, 3)
         if absent:
             require_symbols_absent(result, absent)
             item["expectedUnavailableSymbols"] = list(absent)

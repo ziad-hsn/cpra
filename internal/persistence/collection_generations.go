@@ -343,6 +343,26 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 			return err
 		}
 	}
+	if g.catalog.Previous != "" {
+		// An admitted retirement has its own complete eligibility proof. Finish
+		// one transition before scanning for more work, so directory discovery
+		// cannot consume its budget or block it on an unrelated incomplete file.
+		step, err := g.retirement.Step(ctx, g.pending)
+		if g.retirementPublicationError != nil {
+			return g.retirementPublicationError
+		}
+		if err != nil {
+			return err
+		}
+		if step.Phase != "idle" {
+			g.pending = step.Generation
+			g.catalog.UnlinkedBytes += step.UnlinkedBytes
+			if step.Phase == "complete" {
+				g.pending = ""
+			}
+			return g.save()
+		}
+	}
 	if g.scan == nil {
 		g.scan, err = g.retirement.root.Open(".")
 		if err != nil {
@@ -405,49 +425,16 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 	if g.catalog.Previous == "" {
 		return nil
 	}
-	// Resume a durable intent first, including after restart. Choosing another
-	// candidate before reading it could permanently wedge safe continuation.
-	step, err := g.retirement.Step(ctx, g.pending)
-	if g.retirementPublicationError != nil {
-		return g.retirementPublicationError
-	}
-	if err != nil {
-		return err
-	}
-	if g.pending == "" {
-		if step.Phase != "idle" {
-			g.pending = step.Generation
-		} else {
-			protected := g.protection()
-			for _, name := range g.catalog.Completed {
-				if name != protected.Current && name != protected.Previous && !slices.Contains(protected.Pinned, name) {
-					g.pending = name
-					break
-				}
-			}
-			if g.pending == "" {
-				return nil
-			}
-			step, err = g.retirement.Step(ctx, g.pending)
-			if g.retirementPublicationError != nil {
-				return g.retirementPublicationError
-			}
-			if err != nil {
-				return err
-			}
+	// Admission runs on the next maintenance turn with a fresh budget and the
+	// same authoritative native/protection checks. Selection alone deletes nothing.
+	protected := g.protection()
+	for _, name := range g.catalog.Completed {
+		if name != protected.Current && name != protected.Previous && !slices.Contains(protected.Pinned, name) {
+			g.pending = name
+			break
 		}
 	}
-	if step.Phase == "idle" {
-		return nil
-	}
-	if g.pending == "" {
-		g.pending = step.Generation
-	}
-	g.catalog.UnlinkedBytes += step.UnlinkedBytes
-	if step.Phase == "complete" {
-		g.pending = ""
-	}
-	return g.save()
+	return nil
 }
 
 // openRetirement requires g.mu and Store ownership. The same native boundary

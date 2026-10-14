@@ -129,6 +129,77 @@ func TestCollectionGenerationRetirementResumesOriginalIntent(t *testing.T) {
 	}
 }
 
+func TestCollectionGenerationResumesIntentBeforeScanning(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "collections")
+	node := uuid.NewString()
+	owner := generationOwnerFixture(t, directory, node)
+	for range 3 {
+		ledger := publishGenerationFixture(t, owner)
+		if err := ledger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	intentPath := filepath.Join(directory, collectionGCIntentName)
+	for range 30 {
+		if err := owner.maintain(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(intentPath); err == nil {
+			break
+		}
+	}
+	if _, err := os.Stat(intentPath); err != nil || owner.pending == "" {
+		t.Fatal("fixture did not admit a retirement", err)
+	}
+	admitted := owner.pending
+	if err := owner.close(); err != nil {
+		t.Fatal(err)
+	}
+	owner = generationOwnerFixture(t, directory, node)
+	// A failed unrelated recovery can leave an incomplete generation. Its
+	// discovery must not precede finishing an already admitted retirement.
+	incomplete := filepath.Join(directory, "generation-"+uuid.NewString())
+	if err := os.Mkdir(incomplete, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for range 30 {
+		if err := owner.maintain(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if condition := owner.accounting().CleanupCondition; condition == "blocked" || condition == "unavailable" {
+			t.Fatal("unrelated scan prevented admitted retirement", condition)
+		}
+		if _, err := os.Stat(intentPath); errors.Is(err, os.ErrNotExist) {
+			break
+		}
+	}
+	if _, err := os.Stat(intentPath); !errors.Is(err, os.ErrNotExist) || owner.catalog.Retired != 1 {
+		t.Fatal("admitted retirement did not finish exactly once", err)
+	}
+	if _, err := os.Stat(filepath.Join(directory, admitted)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("admitted candidate remained", err)
+	}
+	for _, retained := range []string{owner.catalog.Current, owner.catalog.Previous} {
+		if _, err := os.Stat(filepath.Join(directory, retained, "ledger.db")); err != nil {
+			t.Fatal("retained ledger changed", err)
+		}
+	}
+	for range 10 {
+		if err := owner.maintain(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if owner.accounting().CleanupCondition == "blocked" {
+			break
+		}
+	}
+	if owner.accounting().CleanupCondition != "blocked" {
+		t.Fatal("subsequent scan did not report the incomplete generation")
+	}
+	if entries, err := os.ReadDir(incomplete); err != nil || len(entries) != 0 {
+		t.Fatal("incomplete generation was removed or modified", err)
+	}
+}
+
 func TestCollectionRetirementPublishesCatalogBeforeRemovingIntent(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "collections")
 	node := uuid.NewString()

@@ -111,3 +111,15 @@ final source, platform, provider or publication gates.
 Exact checkpoint identities, failed runs, scoped passing checks and independent
 review dispositions are retained in [repair progress](release-repair-progress.md)
 and the dated implementation records linked from it.
+
+## Scoped follow-up, 14 October
+
+F12 now has native Windows x64 snapshot-overlap growth checks on Go 1.27.1 and
+1.25.0, plus a Linux race regression. Other native/service/recovery requirements
+remain open; see the [growth record](collection-snapshot-growth-2026-10-14.md).
+
+F44's production/tag reachability audit, meaningful regression migration and
+unused batch/alert removal are complete for this working implementation.
+Independent review and scoped default/tagged/minimum/race checks pass with the
+boundaries recorded in the [audit follow-up](alert-path-audit-2026-10-13.md).
+This closes the finite code repair, not the final frozen release matrix.

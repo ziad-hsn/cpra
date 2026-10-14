@@ -1,8 +1,6 @@
 package systems
 
 import (
-	"github.com/ziad-hsn/cpra/internal/controller/components"
-	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"net"
 	"net/http"
@@ -20,43 +18,39 @@ func TestTLSWarningAlertsWithoutRecoveryAndCriticalStillFails(t *testing.T) {
 	probe := &jobs.PulseTLSJob{Host: address.IP.String(), Port: address.Port, WarnDays: 1000000, CriticalDays: 1, InsecureSkipVerify: true, Timeout: time.Second}
 	w := ecs.NewWorld()
 	ent := interventionMonitor(t, &w, server.URL)
-	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
-	pulse := NewBatchPulseResultSystem(&w, nil, NewPulseScheduler(), &ReadyQueue{}, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
+	pulse := newIncidentSystem(t, &w, &admissionQueue{}, &admissionQueue{})
+	state := pulse.states.Get(ent)
 	apply := func() jobs.Result {
 		result := probe.Execute()
-		state.PulseGeneration++
-		state.SetPulsePending(true)
-		result.Ent, result.Generation = ent, state.PulseGeneration
-		pulse.ProcessBatch([]jobs.Result{result})
+		applyIncidentPulse(t, pulse, ent, result)
 		return result
 	}
 	if result := apply(); result.Err != nil || result.Warning == "" {
 		t.Fatalf("warning threshold was ignored: %+v", result)
 	}
 	apply()
-	if state.IsInterventionNeeded() || state.ConsecutiveFailures != 0 || classifyStatus(state) != "degraded" {
+	if state.IsInterventionPending() || state.ConsecutiveFailures != 0 || classifyStatus(state) != "degraded" {
 		t.Fatalf("warning triggered failure/recovery: %+v", state)
 	}
-	if len(state.PendingAlerts) != 1 || state.PendingAlerts[0].Color != "yellow" {
-		t.Fatalf("warning must produce one yellow alert: %+v", state.PendingAlerts)
+	monitor, _ := pulse.store.Get(state.MonitorID)
+	if len(incidentActions(monitor, "code", "yellow")) != 1 {
+		t.Fatal("warning did not produce one yellow delivery")
 	}
-	holder := fleetview.NewHolder()
-	snapshots := NewBatchStatsSnapshotSystem(&w, noopLogger{}, holder, time.Second, 100)
-	snapshots.Initialize(&w)
-	snapshots.Update(&w)
-	if holder.Get().Monitors[0].Warning == "" {
+	row, ok := pulse.index.Get(ent.ID())
+	if !ok || row.Warning == "" {
 		t.Fatal("warning detail was not exposed")
 	}
 	probe.WarnDays = 0
 	apply()
-	if classifyStatus(state) != "up" || len(state.PendingAlerts) != 2 || state.PendingAlerts[1].Color != "green" {
+	monitor, _ = pulse.store.Get(state.MonitorID)
+	if classifyStatus(state) != "up" || len(incidentActions(monitor, "code", "green")) != 1 {
 		t.Fatalf("warning clearance was not observed: %+v", state)
 	}
 	probe.CriticalDays = 1000000
 	if result := apply(); result.Err == nil {
 		t.Fatal("critical threshold did not fail")
 	}
-	if !state.IsInterventionNeeded() || state.ConsecutiveFailures != 1 {
+	if !state.IsInterventionPending() || state.ConsecutiveFailures != 1 {
 		t.Fatal("critical failure did not follow the recovery policy")
 	}
 }

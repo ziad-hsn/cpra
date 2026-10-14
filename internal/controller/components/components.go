@@ -31,50 +31,32 @@ type ControlState struct {
 	NotificationsDismissed       bool
 }
 
-// AlertRequest records a notification waiting for dispatch.
-type AlertRequest struct {
-	Color     string
-	NotBefore time.Time
-	Attempts  int
-}
-type CodeDelivery struct {
-	Generation                   uint64
-	Next, Seen, Failed, Attempts int
-	Completed                    []bool
-	Retryable                    bool
-	Deadline                     time.Time
-}
-
 type MonitorState struct {
 	MonitorID         string
 	Revision          string
 	LastLatency       time.Duration
 	LatencyAvailable  bool
 	Maintenance       []manifest.CompiledWindow
-	PendingAlerts     []AlertRequest
-	Deliveries        map[string]*CodeDelivery
-	CodeSequence      uint64
 	VerificationAfter uint64
 
-	MissedChecks           uint64
-	QueueRejections        uint64
-	PulseGeneration        uint64
-	InterventionGeneration uint64
-	InterventionAttempted  bool
-	Recovering             bool
-	LastCheckTime          time.Time
-	LastSuccessTime        time.Time
-	NextCheckTime          time.Time
-	LastError              error
-	PulseWarning           string
-	Name                   string
-	PendingCode            string
-	ConsecutiveFailures    int
-	PulseFailures          int
-	InterventionFailures   int
-	RecoveryStreak         int
-	VerifyRemaining        int
-	Flags                  uint32
+	MissedChecks          uint64
+	QueueRejections       uint64
+	PulseGeneration       uint64
+	InterventionAttempted bool
+	Recovering            bool
+	LastCheckTime         time.Time
+	LastSuccessTime       time.Time
+	NextCheckTime         time.Time
+	LastError             error
+	PulseWarning          string
+	Name                  string
+	PendingCode           string
+	ConsecutiveFailures   int
+	PulseFailures         int
+	InterventionFailures  int
+	RecoveryStreak        int
+	VerifyRemaining       int
+	Flags                 uint32
 }
 
 // StatePulseNeeded is a state flag constant; additional related flags follow in this block.

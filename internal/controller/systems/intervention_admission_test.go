@@ -2,18 +2,18 @@ package systems
 
 import (
 	"errors"
-	"github.com/mlange-42/ark/ecs"
-	"github.com/ziad-hsn/cpra/internal/controller/components"
-	"github.com/ziad-hsn/cpra/internal/fleetview"
-	"github.com/ziad-hsn/cpra/internal/jobs"
-	"github.com/ziad-hsn/cpra/internal/manifest"
-	"github.com/ziad-hsn/cpra/internal/queue"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 )
 
 func interventionMonitor(t *testing.T, w *ecs.World, target string) ecs.Entity {
@@ -24,57 +24,38 @@ func interventionMonitor(t *testing.T, w *ecs.World, target string) ecs.Entity {
 	return ent
 }
 
-func applyPulseResult(system *BatchPulseResultSystem, state *components.MonitorState, ent ecs.Entity, err error) {
-	state.PulseGeneration++
-	state.SetPulsePending(true)
-	system.ProcessBatch([]jobs.Result{{Ent: ent, Generation: state.PulseGeneration, Err: err}})
-}
-
 func TestRecoveryCancelsUnadmittedIntervention(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(200) }))
 	defer server.Close()
 	world := ecs.NewWorld()
 	ent := interventionMonitor(t, &world, server.URL)
-	state := ecs.NewMap1[components.MonitorState](&world).Get(ent)
-	storage := ecs.NewMap1[components.JobStorage](&world).Get(ent)
-	ready := &ReadyQueue{}
-	pulse := NewBatchPulseResultSystem(&world, nil, NewPulseScheduler(), ready, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-	q, _ := queue.NewHybridQueue(queue.HybridQueueConfig{RingCapacity: 2})
-	defer q.Close()
-	dispatch := NewBatchInterventionSystem(&world, q, ready, 1, noopLogger{}, NewStateLogger(false))
-	for i := 0; i < 2; i++ {
-		if err := q.Enqueue(storage.InterventionJob.Copy()); err != nil {
-			t.Fatal(err)
-		}
+	queue := &admissionQueue{rejected: true}
+	system := newIncidentSystem(t, &world, queue, &admissionQueue{})
+	m := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("target down")})
+	system.dispatchActions(time.Now())
+	actions := incidentActions(m, "intervention", "")
+	if len(actions) != 1 || actions[0].State != persistence.Queued || len(queue.admitted) != 0 {
+		t.Fatal("fixture did not retain unadmitted recovery")
 	}
-	applyPulseResult(pulse, state, ent, errors.New("target down"))
-	dispatch.Update(&world)
-	if !state.IsInterventionNeeded() || state.IsInterventionPending() {
-		t.Fatal("setup did not leave intervention awaiting admission")
+	applyIncidentPulse(t, system, ent, jobs.Result{})
+	m = applyIncidentPulse(t, system, ent, jobs.Result{})
+	if m.Recovering || m.Actions[actions[0].ID].State != persistence.Cancelled {
+		t.Fatal("confirmed health did not cancel unsent recovery")
 	}
-	applyPulseResult(pulse, state, ent, nil)
-	applyPulseResult(pulse, state, ent, nil)
-	if state.Recovering || state.LastError != nil {
-		t.Fatal("setup did not recover monitor")
+	queue.rejected = false
+	system.actions.EnqueueReady([]ecs.Entity{ent})
+	system.dispatchActions(time.Now())
+	for _, job := range queue.admitted {
+		job.Execute()
 	}
-	q.DequeueBatch(2)
-	dispatch.Update(&world)
-	batch, _ := q.DequeueBatch(2)
-	for _, job := range batch {
-		result := job.Execute()
-		if err := result.Error(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if calls.Load() != 0 {
-		t.Fatalf("recovered target received %d stale recovery action(s), pending=%t", calls.Load(), state.IsInterventionPending())
+	if len(queue.admitted) != 0 || calls.Load() != 0 {
+		t.Fatal("recovered target received a stale intervention")
 	}
 }
 
 func TestMaintenanceSuppressesDelayedIntervention(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Leave the initial ten-second maintenance window and trigger an outage.
 		time.Sleep(11 * time.Second)
 		world := ecs.NewWorld()
 		ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
@@ -84,69 +65,67 @@ func TestMaintenanceSuppressesDelayedIntervention(t *testing.T) {
 			t.Fatal(err)
 		}
 		state.Maintenance = windows
-		if manifest.InMaintenance(state.Maintenance, time.Now()) {
-			t.Fatal("setup inside maintenance")
+		if manifest.InMaintenance(windows, time.Now()) {
+			t.Fatal("fixture began inside maintenance")
 		}
-		ready := &ReadyQueue{}
-		pulse := NewBatchPulseResultSystem(&world, nil, NewPulseScheduler(), ready, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-		q, _ := queue.NewHybridQueue(queue.HybridQueueConfig{RingCapacity: 2})
-		defer q.Close()
-		storage := ecs.NewMap1[components.JobStorage](&world).Get(ent)
-		for i := 0; i < 2; i++ {
-			if err := q.Enqueue(storage.InterventionJob.Copy()); err != nil {
-				t.Fatal(err)
-			}
-		}
-		dispatch := NewBatchInterventionSystem(&world, q, ready, 1, noopLogger{}, NewStateLogger(false))
-		applyPulseResult(pulse, state, ent, errors.New("target down"))
-		dispatch.Update(&world)
+		queue := &admissionQueue{rejected: true}
+		system := newIncidentSystem(t, &world, queue, &admissionQueue{})
+		m := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("target down")})
+		system.dispatchActions(time.Now())
 		time.Sleep(50 * time.Second)
-		if !manifest.InMaintenance(state.Maintenance, time.Now()) {
-			t.Fatal("setup did not enter maintenance")
+		if !manifest.InMaintenance(windows, time.Now()) {
+			t.Fatal("fixture did not enter maintenance")
 		}
-		q.DequeueBatch(2)
-		dispatch.Update(&world)
-		if got := q.Stats().QueueDepth; got != 0 {
-			t.Fatalf("admitted %d recovery action(s) after maintenance began", got)
+		queue.rejected = false
+		system.dispatchActions(time.Now())
+		if len(queue.admitted) != 0 {
+			t.Fatal("maintenance admitted an intervention")
 		}
-		if !state.IsInterventionNeeded() || ready.Len() != 1 {
-			t.Fatal("maintenance lost the pending recovery request")
+		current, _ := system.store.Get(m.ID)
+		actions := incidentActions(current, "intervention", "")
+		if len(actions) != 1 || actions[0].State != persistence.Queued {
+			t.Fatal("maintenance discarded queued recovery")
 		}
 		time.Sleep(10 * time.Second)
-		dispatch.Update(&world)
-		if got := q.Stats().QueueDepth; got != 1 || !state.IsInterventionPending() {
-			t.Fatalf("unhealthy target did not resume recovery after maintenance: depth=%d", got)
+		system.dispatchActions(time.Now())
+		if len(queue.admitted) != 1 {
+			t.Fatal("still-unhealthy target did not resume recovery after maintenance")
 		}
 	})
 }
 
-func TestSnapshotReportsConsecutivePulseFailures(t *testing.T) {
+func TestProjectionReportsConsecutivePulseFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	defer server.Close()
 	world := ecs.NewWorld()
-	ent := releaseMonitor(t, &world, 5, 2)
-	state := ecs.NewMap1[components.MonitorState](&world).Get(ent)
-	pulse := NewBatchPulseResultSystem(&world, nil, NewPulseScheduler(), &ReadyQueue{}, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-	applyPulseResult(pulse, state, ent, errors.New("target down"))
-	applyPulseResult(pulse, state, ent, errors.New("still down"))
-	holder := fleetview.NewHolder()
-	ss := NewBatchStatsSnapshotSystem(&world, noopLogger{}, holder, time.Second, 100)
-	ss.Initialize(&world)
-	ss.Update(&world)
-	snap := holder.Get()
-	if got := snap.Monitors[0].ConsecutiveFailures; got != 2 {
-		t.Fatalf("snapshot reports %d consecutive failures after two failed pulses (PulseFailures=%d)", got, state.PulseFailures)
+	ent := interventionMonitor(t, &world, server.URL)
+	queue := &admissionQueue{}
+	system := newIncidentSystem(t, &world, queue, &admissionQueue{})
+	applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("down")})
+	m := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("still down")})
+	row, ok := system.index.Get(ent.ID())
+	if !ok || row.ConsecutiveFailures != 2 {
+		t.Fatal("projection lost consecutive failed checks")
 	}
-	state.SetInterventionPending(true)
-	intervention := NewBatchInterventionResultSystem(&world, nil, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-	intervention.ProcessBatch([]jobs.Result{{Ent: ent, Generation: state.InterventionGeneration}})
-	if state.ConsecutiveFailures != 2 {
-		t.Fatal("action acceptance reset failed check count without a healthy check")
+	system.dispatchActions(time.Now())
+	if len(queue.admitted) != 1 {
+		t.Fatal("recovery was not dispatched")
 	}
-	applyPulseResult(pulse, state, ent, nil)
-	if state.ConsecutiveFailures != 0 {
-		t.Fatal("successful check did not reset consecutive failures")
+	result := queue.admitted[0].Execute()
+	if result.Err != nil || !system.commitResults([]jobs.Result{result}) {
+		t.Fatal("recovery result failed", result.Err, system.lastError)
 	}
-	applyPulseResult(pulse, state, ent, errors.New("failed again"))
-	if state.ConsecutiveFailures != 1 {
-		t.Fatal("new failure did not begin a new consecutive count")
+	m, _ = system.store.Get(m.ID)
+	row, _ = system.index.Get(ent.ID())
+	if m.ConsecutiveFailures != 2 || row.ConsecutiveFailures != 2 || row.Status != "verifying" {
+		t.Fatal("intervention success reset failures or claimed restored health")
+	}
+	m = applyIncidentPulse(t, system, ent, jobs.Result{})
+	if m.ConsecutiveFailures != 0 {
+		t.Fatal("healthy observation did not reset failures")
+	}
+	m = applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("failed again")})
+	if m.ConsecutiveFailures != 1 {
+		t.Fatal("new failure did not start a fresh consecutive count")
 	}
 }

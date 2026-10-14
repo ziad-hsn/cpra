@@ -1223,3 +1223,5 @@ func setRecoveryNotification(policy *persistence.Policy, color, trigger, driver 
 	policy.NotificationTriggers[color] = trigger
 	policy.RecoveryDriver = driver
 }
+
+func isNilJob(j jobs.Job) bool { return j == nil || j.IsNil() }

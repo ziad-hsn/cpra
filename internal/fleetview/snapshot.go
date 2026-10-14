@@ -12,8 +12,8 @@ import (
 )
 
 // MonitorSummary is a lightweight projection of a single monitor used by the
-// dashboard list and detail endpoints. It is built inside an ECS system tick
-// (see systems.BatchStatsSnapshotSystem) and never mutated after publication,
+// dashboard list and detail endpoints. The controller publishes it after applying
+// committed state and never mutates it after publication,
 // so it is safe to read concurrently from HTTP handler goroutines.
 type MonitorSummary struct {
 	CheckAdmission      string    `json:"check_admission,omitempty"`
@@ -43,10 +43,10 @@ type MonitorSummary struct {
 }
 
 // StatsSnapshot is an immutable point-in-time projection of fleet state.
-// A new instance is produced on each snapshot tick and atomically swapped into
-// the Holder, so readers always observe a consistent snapshot.
+// Index.Overview copies aggregate counters under its read lock, so readers
+// observe consistent counts without building a full monitor list.
 type StatsSnapshot struct {
-	// Generated is when this snapshot was produced (inside the ECS tick).
+	// Generated is when the controller last refreshed this projection.
 	Generated time.Time `json:"generated"`
 
 	// Aggregate counts.
@@ -57,7 +57,7 @@ type StatsSnapshot struct {
 	ByCode      map[string]int `json:"by_code"`       // color -> entities with that pending code
 
 	// Monitors is the summary index used for listing and detail lookups.
-	// It may be empty when the index exceeds MaxIndex (aggregates-only mode).
+	// The live Index serves bounded pages separately from aggregate responses.
 	Monitors []MonitorSummary `json:"monitors,omitempty"`
 
 	// ByID maps entity ID -> index into Monitors, for O(1) detail lookups.
@@ -87,7 +87,7 @@ func (h *Holder) Get() *StatsSnapshot {
 	return h.snap
 }
 
-// Set replaces the current snapshot. Called from the snapshot system tick.
+// Set replaces a static snapshot. Live controllers publish through SetIndex.
 func (h *Holder) Set(s *StatsSnapshot) {
 	h.mu.Lock()
 	h.snap = s

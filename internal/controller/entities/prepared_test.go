@@ -205,11 +205,9 @@ func TestReplacePreservesIncarnationStateAndControl(t *testing.T) {
 	}
 	state := manager.MonitorState.Get(entity)
 	state.Flags = components.StateIncidentOpen | components.StatePulsePending
-	state.PulseGeneration, state.InterventionGeneration, state.CodeSequence = 91, 32, 7
+	state.PulseGeneration, state.VerificationAfter = 91, 32
 	state.ConsecutiveFailures, state.VerifyRemaining = 3, 2
 	state.LastCheckTime, state.NextCheckTime = time.Unix(100, 0), time.Unix(200, 0)
-	state.PendingAlerts = []components.AlertRequest{{Color: "red", Attempts: 2}}
-	state.Deliveries = map[string]*components.CodeDelivery{"red": {Generation: 7, Completed: []bool{true, false}}}
 	before := *state
 	code := manager.CodeStatus.Get(entity).Status["red"]
 	code.ConsecutiveFailures, code.NotBefore = 2, time.Unix(300, 0)
@@ -256,7 +254,7 @@ func TestReplacePreservesIncarnationStateAndControl(t *testing.T) {
 	if manager.CodeConfig.HasAll(entity) || manager.CodeStatus.HasAll(entity) || manager.InterventionConfig.HasAll(entity) {
 		t.Fatal("removed optional configuration retained")
 	}
-	if !reflect.DeepEqual(manager.MonitorState.Get(entity).Deliveries, before.Deliveries) {
+	if state := manager.MonitorState.Get(entity); state.PulseGeneration != before.PulseGeneration || state.VerificationAfter != before.VerificationAfter || state.VerifyRemaining != before.VerifyRemaining {
 		t.Fatal("archetype moves lost lifecycle data")
 	}
 }

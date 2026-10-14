@@ -62,3 +62,11 @@ func (p *PulseScheduler) ReadyLen() int { return p.ready.Len() }
 
 // NextWake returns the next due bucket/deadline without scanning monitor rows.
 func (p *PulseScheduler) NextWake() (time.Time, bool) { return p.heap.NextWake() }
+
+// staggerPhase maps an entity deterministically to an offset in [0, interval).
+func staggerPhase(entityID uint32, interval time.Duration) time.Duration {
+	if interval <= 0 {
+		return 0
+	}
+	return time.Duration(uint64(entityID) * 0x9E3779B97F4A7C15 % uint64(interval))
+}

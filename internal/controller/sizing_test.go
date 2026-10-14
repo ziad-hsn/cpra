@@ -14,7 +14,7 @@ func TestStartPreservesLatencyAwareInitialCapacity(t *testing.T) {
 	t.Setenv("CPRA_SIZING_TAU_MS", "")
 	t.Setenv("CPRA_SIZING_SLO_MS", "")
 	t.Setenv("CPRA_SIZING_HEADROOM_PCT", "")
-	cfg := DefaultConfig()
+	cfg := controllerTestConfig(t)
 	cfg.WorkerConfig.MinWorkers, cfg.WorkerConfig.MaxWorkers, cfg.WorkerConfig.NumShards = 1, 64, 1
 	cfg.WorkerConfig.AdjustmentInterval = 0
 	cfg.SizingServiceTime = 100 * time.Millisecond

@@ -2,15 +2,20 @@ package systems
 
 import (
 	"errors"
+	"fmt"
+	"testing"
+	"testing/synctest"
+	"time"
+
 	"github.com/mlange-42/ark/ecs"
-	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/manifest"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
-	"testing"
-	"time"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
 func releaseMonitor(t *testing.T, w *ecs.World, unhealthy, healthy int) ecs.Entity {
@@ -30,130 +35,246 @@ func releaseMonitor(t *testing.T, w *ecs.World, unhealthy, healthy int) ecs.Enti
 	}
 	return ent
 }
+
+func newIncidentSystem(t *testing.T, world *ecs.World, intervention, notification queue.Queue) *DurableSystem {
+	t.Helper()
+	cfg := runtimeconfig.Default()
+	cfg.Storage.Mode = "memory"
+	store, err := persistence.Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	system := NewDurableSystem(world, store, cfg, fleetview.NewHolder(), noopLogger{}, &admissionQueue{full: true}, intervention, notification, nil, time.Minute, true)
+	if err := system.Load(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	system.Initialize(world)
+	return system
+}
+
+func applyIncidentPulse(t *testing.T, system *DurableSystem, ent ecs.Entity, result jobs.Result) persistence.Monitor {
+	t.Helper()
+	state := system.states.Get(ent)
+	result.Ent, result.Type = ent, "pulse"
+	result.MonitorID, result.Revision, result.Generation = state.MonitorID, state.Revision, state.PulseGeneration+1
+	if !system.commitResults([]jobs.Result{result}) || system.lastError != nil {
+		t.Fatal("observation did not commit", system.lastError)
+	}
+	monitor, ok := system.store.Get(state.MonitorID)
+	if !ok {
+		t.Fatal("committed monitor missing")
+	}
+	return monitor
+}
+
+func incidentActions(m persistence.Monitor, kind, color string) []persistence.Action {
+	var actions []persistence.Action
+	for _, action := range m.Actions {
+		if action.Kind == kind && action.Color == color {
+			actions = append(actions, action)
+		}
+	}
+	return actions
+}
+
 func TestRecoveryRequiresConsecutiveSuccesses(t *testing.T) {
 	for _, unhealthy := range []int{1, 5} {
-		t.Run(string(rune('0'+unhealthy)), func(t *testing.T) {
-			w := ecs.NewWorld()
-			ent := releaseMonitor(t, &w, unhealthy, 2)
-			state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
-			system := NewBatchPulseResultSystem(&w, nil, NewPulseScheduler(), &ReadyQueue{}, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-			apply := func(err error) { state.SetPulsePending(true); system.ProcessBatch([]jobs.Result{{Ent: ent, Err: err}}) }
-			hasGreen := func() bool {
-				for _, r := range state.PendingAlerts {
-					if r.Color == "green" {
-						return true
-					}
-				}
-				return false
+		t.Run(fmt.Sprint(unhealthy), func(t *testing.T) {
+			world := ecs.NewWorld()
+			ent := releaseMonitor(t, &world, unhealthy, 2)
+			system := newIncidentSystem(t, &world, nil, &admissionQueue{})
+			failure := jobs.Result{Err: errors.New("unhealthy")}
+			applyIncidentPulse(t, system, ent, failure)
+			applyIncidentPulse(t, system, ent, jobs.Result{})
+			applyIncidentPulse(t, system, ent, failure)
+			m := applyIncidentPulse(t, system, ent, jobs.Result{})
+			if len(incidentActions(m, "code", "green")) != 0 {
+				t.Fatal("recovered without consecutive successful checks")
 			}
-			apply(errors.New("unhealthy"))
-			apply(nil)
-			apply(errors.New("failed again"))
-			apply(nil)
-			if hasGreen() {
-				t.Fatal("recovered without consecutive healthy checks")
+			m = applyIncidentPulse(t, system, ent, jobs.Result{})
+			if len(incidentActions(m, "code", "green")) != 1 || m.Recovering {
+				t.Fatal("consecutive successful checks did not recover")
 			}
-			apply(nil)
-			if !hasGreen() || state.Recovering {
-				t.Fatal("consecutive healthy checks did not recover")
+			if system.states.Get(ent).Recovering {
+				t.Fatal("controller projection did not apply recovery")
 			}
 		})
 	}
 }
+
 func TestInterventionIsSingleFlightPerIncident(t *testing.T) {
-	w := ecs.NewWorld()
-	ent := releaseMonitor(t, &w, 1, 2)
-	ecs.NewMap1[components.InterventionConfig](&w).Add(ent, &components.InterventionConfig{Action: "webhook", MaxFailures: 1})
-	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
-	ready := &ReadyQueue{}
-	system := NewBatchPulseResultSystem(&w, nil, NewPulseScheduler(), ready, NewCodeScheduler(), noopLogger{}, NewStateLogger(false), nil)
-	for i := 0; i < 10; i++ {
-		state.SetPulsePending(true)
-		system.ProcessBatch([]jobs.Result{{Ent: ent, Err: errors.New("unhealthy")}})
+	world := ecs.NewWorld()
+	ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
+	interventions := &admissionQueue{}
+	system := newIncidentSystem(t, &world, interventions, &admissionQueue{})
+	var monitor persistence.Monitor
+	for range 10 {
+		monitor = applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("unhealthy")})
 	}
-	if ready.Len() != 1 {
-		t.Fatalf("scheduled %d overlapping interventions", ready.Len())
+	actions := incidentActions(monitor, "intervention", "")
+	if len(actions) != 1 || actions[0].State != persistence.Queued {
+		t.Fatal("repeated failures admitted overlapping interventions", actions)
 	}
-	state.SetInterventionNeeded(false)
-	state.SetInterventionPending(true)
-	for i := 0; i < 10; i++ {
-		state.SetPulsePending(true)
-		system.ProcessBatch([]jobs.Result{{Ent: ent, Err: errors.New("unhealthy")}})
+	system.dispatchActions(time.Now().UTC())
+	if len(interventions.admitted) != 1 {
+		t.Fatal("queued intervention was not dispatched exactly once")
 	}
-	if ready.Len() != 1 {
-		t.Fatal("scheduled while intervention was pending")
+	results, err := system.store.Submit(t.Context(), []persistence.Command{{Kind: "start", MonitorID: monitor.ID, Revision: monitor.Revision, ActionID: actions[0].ID, At: time.Now().UTC()}})
+	if err != nil || len(results) != 1 || !results[0].Allowed {
+		t.Fatal("start was not committed", err)
+	}
+	for range 10 {
+		monitor = applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("still unhealthy")})
+		system.dispatchActions(time.Now().UTC())
+	}
+	actions = incidentActions(monitor, "intervention", "")
+	if len(actions) != 1 || actions[0].State != persistence.Started || len(interventions.admitted) != 1 {
+		t.Fatal("started intervention was duplicated")
 	}
 }
-func TestAlertFanoutAndColorsRetainIndependentDelivery(t *testing.T) {
-	w := ecs.NewWorld()
-	ent := releaseMonitor(t, &w, 1, 1)
-	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
-	storage := ecs.NewMap1[components.JobStorage](&w).Get(ent)
-	storage.CodeJobs["red"] = []jobs.Job{storage.CodeJobs["red"][0], storage.CodeJobs["red"][0], storage.CodeJobs["red"][0]}
-	q, err := queue.NewHybridQueue(queue.HybridQueueConfig{RingCapacity: 2})
+
+func TestAlertFanoutRetainsIndependentDelivery(t *testing.T) {
+	world := ecs.NewWorld()
+	mgr := entities.NewEntityManager(&world)
+	mgr.Endpoints = map[string]manifest.Endpoint{}
+	for i := range 3 {
+		mgr.Endpoints[fmt.Sprintf("endpoint-%d", i)] = manifest.Endpoint{Type: "log", Config: &manifest.CodeNotificationLog{File: fmt.Sprintf("%s/endpoint-%d.jsonl", t.TempDir(), i)}}
+	}
+	mgr.NotificationGroups = manifest.NotificationGroups{"oncall": {"endpoint-0", "endpoint-1", "endpoint-2"}}
+	monitor := manifest.Monitor{Name: "fanout", Enabled: true, Pulse: manifest.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: 1, HealthyThreshold: 1, Config: &manifest.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: manifest.Codes{
+		"red":   {Dispatch: true, NotifyGroup: "oncall"},
+		"green": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: t.TempDir() + "/recovery.jsonl"}},
+	}}
+	if err := mgr.CreateEntityFromMonitor(&monitor, &world); err != nil {
+		t.Fatal(err)
+	}
+	q := ecs.NewFilter1[components.MonitorState](&world).Query()
+	var ent ecs.Entity
+	for q.Next() {
+		ent = q.Entity()
+	}
+	notifications, err := queue.NewHybridQueue(queue.HybridQueueConfig{RingCapacity: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer q.Close()
-	sched := NewCodeScheduler()
-	mgr := alerts.NewManager(&w, alerts.NewDefaultPolicy(&w, true), time.Minute)
-	cfg := ecs.NewMap1[components.CodeConfig](&w).Get(ent)
-	dispatch := NewBatchCodeSystem(&w, q, sched, 20, noopLogger{}, NewStateLogger(false), mgr)
-	results := NewBatchCodeResultSystem(&w, nil, sched, noopLogger{}, NewStateLogger(false), mgr)
-	requestCode(ent, state, "red", cfg, sched, mgr)
-	requestCode(ent, state, "green", cfg, sched, mgr)
-	seen := map[string]map[int]bool{}
-	var last jobs.Result
-	for tick := 0; tick < 5; tick++ {
-		dispatch.Update(&w)
-		batch, _ := q.DequeueBatch(20)
+	defer notifications.Close()
+	system := newIncidentSystem(t, &world, nil, notifications)
+	m := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("unhealthy")})
+	seen := map[string]bool{}
+	for turn := 0; turn < 5; turn++ {
+		// Dispatch only at the owner's retained deadline. Manually inserting
+		// readiness here would hide a lost suffix after queue saturation.
+		now := time.Now().UTC()
+		if due, ok := system.actionDue[ent]; ok && due.After(now) {
+			time.Sleep(time.Until(due))
+		}
+		system.dispatchActions(time.Now().UTC())
+		batch, err := notifications.DequeueBatch(20)
+		if err != nil {
+			t.Fatal(err)
+		}
 		for _, job := range batch {
-			d := job.(*jobs.Dispatch)
-			if seen[d.Color] == nil {
-				seen[d.Color] = map[int]bool{}
+			result := job.Execute()
+			if seen[result.ActionID] || result.Err != nil {
+				t.Fatal("duplicate or failed endpoint", result.ActionID, result.Err)
 			}
-			if seen[d.Color][d.Endpoint] {
-				t.Fatalf("duplicate %s endpoint %d after partial admission", d.Color, d.Endpoint)
+			seen[result.ActionID] = true
+			if !system.commitResults([]jobs.Result{result, result}) {
+				t.Fatal("endpoint result did not commit", system.lastError)
 			}
-			seen[d.Color][d.Endpoint] = true
-			var outcome error
-			if d.Color == "green" {
-				outcome = errors.New("permanent rejection")
-			}
-			last = jobs.Result{Ent: ent, Color: d.Color, Endpoint: d.Endpoint, Generation: d.Generation, Err: outcome}
-			results.ProcessBatch([]jobs.Result{last, last}) // duplicate delivery must be ignored
 		}
 	}
-	if len(seen["red"]) != 3 || len(seen["green"]) != 1 {
-		t.Fatalf("fanout lost endpoints: %v", seen)
+	m, _ = system.store.Get(m.ID)
+	red := incidentActions(m, "code", "red")
+	if len(red) != 3 || len(seen) != 3 {
+		t.Fatal("fanout lost endpoints", len(red), len(seen))
 	}
-	if state.IsCodePending() {
-		t.Fatal("completed deliveries left pending state")
+	for _, a := range red {
+		if a.State != persistence.Succeeded || a.Attempt != 1 {
+			t.Fatal("endpoint result was repeated or lost", a.State, a.Attempt)
+		}
 	}
-	status := ecs.NewMap1[components.CodeStatus](&w).Get(ent)
-	if status.Status["red"].LastStatus != "success" || status.Status["green"].LastStatus != "failed" {
-		t.Fatalf("color results mixed: %+v %+v", status.Status["red"], status.Status["green"])
+	// A distinct recovery color must get its own delivery, even inside the
+	// outage cooldown; successful outage endpoints must stay completed.
+	m = applyIncidentPulse(t, system, ent, jobs.Result{})
+	green := incidentActions(m, "code", "green")
+	if len(green) != 1 || green[0].State != persistence.Queued {
+		t.Fatal("recovery notification was suppressed")
 	}
-	results.ProcessBatch([]jobs.Result{last})
-	if status.Status["green"].ConsecutiveFailures != 1 {
-		t.Fatal("late duplicate applied twice")
+	for _, a := range incidentActions(m, "code", "red") {
+		if a.State != persistence.Succeeded {
+			t.Fatal("recovery altered a completed endpoint")
+		}
 	}
 }
-func TestAlertFailureRetriesAreBounded(t *testing.T) {
-	w := ecs.NewWorld()
-	ent := releaseMonitor(t, &w, 1, 1)
-	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
-	sched := NewCodeScheduler()
-	results := NewBatchCodeResultSystem(&w, nil, sched, noopLogger{}, NewStateLogger(false), nil)
-	for attempt := 1; attempt <= maxAlertAttempts; attempt++ {
-		state.Deliveries = map[string]*components.CodeDelivery{"red": {Generation: uint64(attempt), Next: 1, Completed: make([]bool, 1), Attempts: attempt, Retryable: true}}
-		results.ProcessBatch([]jobs.Result{{Ent: ent, Color: "red", Generation: uint64(attempt), Err: &jobs.DeliveryError{Status: 503, Retryable: true}}})
-		if attempt < maxAlertAttempts && len(state.PendingAlerts) != 1 {
-			t.Fatal("missing retry")
+
+// rejectedNotification models a confirmed rejection, after committed start.
+// Provider-specific transport classification is covered by the jobs tests.
+type rejectedNotification struct {
+	jobs.Job
+	calls *int
+}
+
+func (j *rejectedNotification) Copy() jobs.Job { copy := *j; return &copy }
+func (j *rejectedNotification) Execute() jobs.Result {
+	*j.calls++
+	return jobs.Result{Err: &jobs.DeliveryError{Status: 429, Retryable: true}}
+}
+
+func TestNotificationConfirmedRejectionStopsAfterThreeAttempts(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		world := ecs.NewWorld()
+		ent := releaseMonitor(t, &world, 1, 1)
+		calls := 0
+		storage := ecs.NewMap1[components.JobStorage](&world).Get(ent)
+		storage.CodeJobs = map[string][]jobs.Job{"red": {&rejectedNotification{Job: storage.CodeJobs["red"][0], calls: &calls}}}
+		codes := ecs.NewMap1[components.CodeConfig](&world).Get(ent)
+		codes.Configs = map[string]*components.ColorCodeConfig{"red": codes.Configs["red"]}
+		notifications := &admissionQueue{}
+		system := newIncidentSystem(t, &world, nil, notifications)
+		monitor := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("unhealthy")})
+		var first persistence.Action
+		for attempt := 1; attempt <= 3; attempt++ {
+			actions := incidentActions(monitor, "code", "red")
+			if len(actions) != 1 || actions[0].State != persistence.Queued || actions[0].Attempt != attempt {
+				t.Fatal("incorrect retry admission", actions)
+			}
+			action := actions[0]
+			if attempt > 1 && (action.DeliveryID != first.DeliveryID || action.Deadline != first.Deadline) {
+				t.Fatal("retry changed logical delivery or overall deadline")
+			}
+			if wait := time.Until(action.NotBefore); wait > 0 {
+				time.Sleep(wait)
+			}
+			system.actions.EnqueueReady([]ecs.Entity{ent})
+			system.dispatchActions(time.Now().UTC())
+			if len(notifications.admitted) != attempt {
+				t.Fatal("retry dispatched more than once", len(notifications.admitted))
+			}
+			result := notifications.admitted[attempt-1].Execute()
+			if calls != attempt {
+				t.Fatal("started handler invocation count", calls)
+			}
+			started, _ := system.store.Get(monitor.ID)
+			if attempt == 1 {
+				first = started.Actions[action.ID]
+			}
+			if !system.commitResults([]jobs.Result{result, result}) {
+				t.Fatal("rejection did not commit", system.lastError)
+			}
+			monitor, _ = system.store.Get(monitor.ID)
 		}
-		if attempt == maxAlertAttempts && len(state.PendingAlerts) != 0 {
-			t.Fatal("unbounded retries")
+		time.Sleep(time.Minute)
+		system.actions.EnqueueReady([]ecs.Entity{ent})
+		system.dispatchActions(time.Now().UTC())
+		actions := incidentActions(monitor, "code", "red")
+		if len(actions) != 1 || actions[0].State != persistence.Failed || actions[0].Attempt != 3 || calls != 3 || len(notifications.admitted) != 3 {
+			t.Fatal("exhausted notification restarted", actions, calls)
 		}
-		state.PendingAlerts = nil
-	}
+	})
 }

@@ -48,10 +48,11 @@ func openCollectionLedger(directory string, maxBytes int64) (_ *collectionLedger
 		return nil, err
 	}
 	// bbolt holds a read lock on the mmap throughout a snapshot transaction.
-	// Reserve virtual address space for the bounded logical quota and indexes so
-	// ordinary concurrent appends do not require remapping beneath that reader.
-	// Windows may also preallocate this mapped size; it must be included in native
-	// filesystem qualification. This is not a total RSS/physical disk limit.
+	// Unix reserves virtual address space for the logical quota and indexes.
+	// Windows starts at 64 MiB because its writable mapping expands the file;
+	// a writer crossing that boundary waits for frozen readers to be released.
+	// Snapshot export/release must not depend on the blocked writer. Neither
+	// mapping size is a total RSS or physical disk limit.
 	db, err := bolt.Open(filepath.Join(path, "ledger.db"), 0600, &bolt.Options{Timeout: time.Second, InitialMmapSize: collectionInitialMapping(runtime.GOOS, maxBytes)})
 	if err != nil {
 		return nil, err

@@ -554,3 +554,20 @@ directory, within the 6 GiB budget. Tools, dependency inputs and evidence remain
 A fresh host C: read reports 19,493,507,072 free bytes, about 18.16 GiB, below the
 35 GiB initial comparative-campaign prerequisite. No WSL disk compaction or
 large comparative run was performed. Native temporary fixtures were removed.
+
+## Snapshot-overlap growth, 14 October
+
+The production ledger opener now has a real growth regression covering a frozen
+snapshot reader and concurrent writes beyond the Windows 64 MiB mapping. Native
+Windows x64/NTFS runs pass on Go 1.27.1 and 1.25.0; the corrected Linux race
+fixture passes. Independent review corrected two initial fixture gaps and closed
+the finite source review. No storage algorithm or format changed. See the
+[scoped growth record](collection-snapshot-growth-2026-10-14.md).
+
+The old temporary evidence directory was absent when this continuation resumed;
+its committed summaries remain historical, without a current raw-log availability
+claim. New evidence is kept in a private persistent task directory. The complete
+untagged persistence suite passed before the growth fixture's final strengthening;
+it is not represented as final-source qualification. Full native/service/link,
+recovery/distribution, provider and performance gates remain open. Publication
+remains withheld; the 24-hour run remains cancelled.

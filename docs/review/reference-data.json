@@ -1360,6 +1360,48 @@
       "sha256": "016ce61243e60c20678dd8278f101a4aa86ac77dde8222a7d81f7e589739caad"
     },
     {
+      "asset": "review/source/examples/cpractl/disable.json.txt",
+      "bytes": 27,
+      "path": "examples/cpractl/disable.json",
+      "sha256": "fe869dbc14f4d1669175c62d9bd7645289069b3d4da2df05eb4d0b76120acd4f"
+    },
+    {
+      "asset": "review/source/examples/cpractl/endpoint.yaml.txt",
+      "bytes": 186,
+      "path": "examples/cpractl/endpoint.yaml",
+      "sha256": "0d8b22d7ef78153c84788033efc36ee78bad5e4ff766d5f0437e2f4881a076b8"
+    },
+    {
+      "asset": "review/source/examples/cpractl/group.yaml.txt",
+      "bytes": 141,
+      "path": "examples/cpractl/group.yaml",
+      "sha256": "298b5e4e49f23425dd6c94574c96db7ed3a65ed51f63108d614fc5b8e0b15352"
+    },
+    {
+      "asset": "review/source/examples/cpractl/monitor.yaml.txt",
+      "bytes": 438,
+      "path": "examples/cpractl/monitor.yaml",
+      "sha256": "4c799054ffdd2366d9201b12644fee0a843ce3ecb5a50eed0f58400402f91ef7"
+    },
+    {
+      "asset": "review/source/examples/cpractl/recipient.yaml.txt",
+      "bytes": 137,
+      "path": "examples/cpractl/recipient.yaml",
+      "sha256": "6a3c9241c4270c65052fae54e9d95ae4f0fb6b4c9fb89688ae4537de5776e4ae"
+    },
+    {
+      "asset": "review/source/examples/management/README.md.txt",
+      "bytes": 4393,
+      "path": "examples/management/README.md",
+      "sha256": "6c2e7ce00aea272b1e5c85fd49b373ad3eec08843e6b7ab28dc4f6b6b4d93c63"
+    },
+    {
+      "asset": "review/source/examples/verification/sandboxes.yaml.txt",
+      "bytes": 4512,
+      "path": "examples/verification/sandboxes.yaml",
+      "sha256": "debfe0e1c25364d4e83196296d4018ced17176e5e73b63d087cf8235eac879fb"
+    },
+    {
       "asset": "review/source/internal/controller/controller.go.txt",
       "bytes": 26011,
       "path": "internal/controller/controller.go",
@@ -1376,6 +1418,12 @@
       "bytes": 1476,
       "path": "internal/controller/systems/owner_wait.go",
       "sha256": "a27e400d8cd77f24ecd49accfcc906f2c142a5c3601d6781fae5e3198a473acb"
+    },
+    {
+      "asset": "review/source/internal/encryptionsetup/README.md.txt",
+      "bytes": 8870,
+      "path": "internal/encryptionsetup/README.md",
+      "sha256": "44119cb9e8c2f1a95d1f4a3f94c4c5ecd5ab0134403c19fd81a759dc3af3a54a"
     },
     {
       "asset": "review/source/internal/httpauth/worker_external.go.txt",
@@ -1400,6 +1448,12 @@
       "bytes": 14610,
       "path": "internal/httpserver/management_operations.go",
       "sha256": "a6e5fa667cbef19387ca1cf2e380217017b6c1df9cc70370e7de5ab04c876a2b"
+    },
+    {
+      "asset": "review/source/internal/httpserver/types.go.txt",
+      "bytes": 4674,
+      "path": "internal/httpserver/types.go",
+      "sha256": "30f95ffb36f70962cbd16e7596bf127c335f9a449a48dc6d8e75adbb1455485a"
     },
     {
       "asset": "review/source/internal/httpserver/worker_routes_external.go.txt",
@@ -1478,6 +1532,36 @@
       "bytes": 1548,
       "path": "internal/management/operation_access.go",
       "sha256": "321aad8ed5a9390f58e8569b8f41cd41ade6a76e6e9da6f22849d2ea60293bd2"
+    },
+    {
+      "asset": "review/source/internal/manifest/groups.go.txt",
+      "bytes": 8058,
+      "path": "internal/manifest/groups.go",
+      "sha256": "eb2102787c1645e0d2116bb7127c29c9ac272e04f37740bb45c799f5fcafa443"
+    },
+    {
+      "asset": "review/source/internal/manifest/intervention_types_new.go.txt",
+      "bytes": 3579,
+      "path": "internal/manifest/intervention_types_new.go",
+      "sha256": "5ce42eeed3399397f0a5ac2dcad44d59085ee17d2cf81f99b7a708635968775f"
+    },
+    {
+      "asset": "review/source/internal/manifest/manifest.go.txt",
+      "bytes": 26811,
+      "path": "internal/manifest/manifest.go",
+      "sha256": "8a8323e81de24cb99b690af646e3216ff040462b27fb8bbe0a83fdfeadf6d2cc"
+    },
+    {
+      "asset": "review/source/internal/manifest/notification_types_new.go.txt",
+      "bytes": 4965,
+      "path": "internal/manifest/notification_types_new.go",
+      "sha256": "48ad9759612fb1518b3b765c429b9d4a1f9b25c6835283b3a4e24d14b6d34e8d"
+    },
+    {
+      "asset": "review/source/internal/manifest/pulse_types_new.go.txt",
+      "bytes": 4533,
+      "path": "internal/manifest/pulse_types_new.go",
+      "sha256": "93075d8cdfaa31864209aad1d24f4656bdc0d84734d54d018e1995b17fc8aa11"
     },
     {
       "asset": "review/source/internal/persistence/agent_action.go.txt",

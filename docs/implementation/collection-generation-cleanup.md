@@ -1,5 +1,15 @@
 # Collection generation cleanup: implementation handoff
 
+**Current follow-up, 14 October 2026:** Store integration, native identity checks
+for Linux/APFS/NTFS, bounded allocation observations and authenticated restore
+of an interrupted retirement are implemented. The maintenance-order regression
+and focused restore proof cases pass on Linux and natively on Windows x64/local
+NTFS. Both Windows stopped-backup/restore scenarios pass with an observer that
+does not hold live directory handles. These are private development checks;
+native macOS, Windows arm64/service identities and complete frozen-source
+qualification remain open. See the [backup/restore record](collection-backup-restore-2026-10-14.md).
+The dated entries below retain earlier implementation and verification scope.
+
 **Status, 12 October 2026: Linux retirement is connected to Store maintenance on
 `codex/release-repairs`.** Completed generation metadata, frozen-reader pins and
 path-free accounting are implemented. Five real Store restart/snapshot cycles,
@@ -130,6 +140,15 @@ cannot be promised to finish within 25 ms; run them outside controller/Raft
 execution and account for elapsed time. Schedule the next step after one second
 while there is actionable work, and after 60 seconds when idle or blocked.
 Cancellation closes scan handles after the current filesystem call returns.
+
+An existing admitted retirement gets one transition before discovery scans.
+Successful transition work returns after its catalog/accounting checkpoint;
+it does not scan the directory again in the same turn. When no intent is active,
+bounded discovery selects a candidate for admission on the next turn with a
+fresh cooperative budget. Selection alone authorizes no deletion. The native
+eligibility checks run again at admission and each destructive step. An
+unrelated incomplete generation remains preserved and reported by subsequent
+scans without blocking completion of the already-admitted intent.
 
 Complete the retention-selection pass before admitting a new retirement. Resume
 an existing valid intent first. If the current selection or native directory

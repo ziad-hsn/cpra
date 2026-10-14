@@ -87,7 +87,7 @@ private staging infrastructure, configured provider accounts/designated targets,
 and sufficient measured physical host disk for the comparative campaign. No
 24-hour endurance run is included.
 
-## Current implementation status, 2026-10-13
+## Current implementation status, 2026-10-14
 
 The baseline table above retains the supplied review's original evidence. This
 status summarizes repair work and its limits; local checks do not close the
@@ -96,7 +96,7 @@ final source, platform, provider or publication gates.
 | Findings | Current disposition |
 | --- | --- |
 | F01–F09 | Protected initialization, current quickstart, episode/cooldown/maintenance policy, verification wording, safe diagnostics, unknown HTTP effects, Docker budgets and strict validation are implemented with focused regressions. Complete process/provider qualification remains open. |
-| F10–F12 | Linux generation retirement/restart/pin tests pass; lazy allocation is preserved; Windows initial mapping is 64 MiB. macOS APFS identity/ACL retirement is implemented and cross-builds; native macOS execution, Windows retirement implementation/execution, footprint/growth and full backup/corruption qualification remain open. |
+| F10–F12 | Store-owned Linux/APFS/NTFS retirement, bounded allocation accounting and pending-retirement restore are implemented; lazy allocation and the Windows 64 MiB initial mapping are preserved. Focused Linux and native Windows x64/local-NTFS retention, snapshot-growth and backup/restore checks pass with finite independent review. Failed native runs and link-fixture exclusions remain explicit. Native macOS, Windows arm64/service identities, full corruption and frozen-source qualification remain open. See the [backup/restore record](collection-backup-restore-2026-10-14.md) and its linked storage evidence. |
 | F13–F16 | Corrections/rejected reset recommendation stand. Approved collections/worker features and historical formats remain; explicit nested-module and build-tag qualification still needs the frozen source. |
 | F17–F21, F41–F42 | Host/origin, bootstrap warning, profiling restrictions, token length/throttling, CSP and trusted-operator boundaries are implemented. Default real-server browser evidence and focused local security checks exist; remaining matrix/native service evidence and final security review remain open. |
 | F22–F27, F51–F52 | Current/historical documentation boundaries, security/contribution/conduct material and artwork licensing are implemented. Main-navigation runtime guides are refreshed. Public module installation, complete packaged notices, native distribution and release identity still require final qualification/promotion. Unrelated remote branches remain untouched. |
@@ -104,9 +104,9 @@ final source, platform, provider or publication gates.
 | F32–F36 | Redirect/proxy defaults remain intentional. Correlated PagerDuty/Opsgenie, privilege-mode ICMP and explicit gRPC health behavior have production-path fixture coverage. Account effects and native service-identity checks remain unverified. |
 | F37 | Permanent failure remaining unavailable is intentional; stopped repair/restore is documented. It is not permission to delete state or reopen it speculatively. |
 | F38–F40 | Application/pool/Raft diagnostics and caller/color corrections passed finite source review; the resulting typed-nil regression is reproduced and closed. Owner deadline waiting passed finite source review and short paired CPU measurements. Broader logging coverage and frozen performance qualification remain separate. |
-| F44 | The executable selects the Store-backed owner; nil-Store internal tests still exercise the old batch/alert path. Production/tag reachability and meaningful regression migration must be completed before removal. No code is deleted on a line-count argument. |
-| F45 | The documented 45-minute budget remains. A full development persistence run completed with one guard failure; that guard/digest correction passed focused tests/review. A complete corrected frozen-source matrix is still required. |
-| F53–F56 | Health/write-recovery separation, synchronous accepted-prefix grouping, exact non-admission handling and original-operation continuation are implemented. Worker demand refresh remains active, including after idle-loop changes. Full import/contention/interruption campaigns remain open. |
+| F44 | The unused nil-Store batch/alert path is removed after production/tag reachability analysis and migration of meaningful tests to the active Store-backed owner. Focused default/tagged/minimum/race checks and independent review pass. The [audit follow-up](alert-path-audit-2026-10-13.md) records the finite code repair and its remaining final-matrix boundary. |
+| F45 | The documented 45-minute budget remains. The complete working-source persistence and local-administration suites pass on Go 1.27.2 with race detection after the generation/restore repairs. Three subprocess helper entries skip outside their parent fixtures; no functional case is omitted. A complete frozen-source matrix is still required. |
+| F53–F56 | Health/write-recovery separation, synchronous accepted-prefix grouping, exact non-admission handling and original-operation continuation are implemented. Real 35/50-monitor CLI imports, reply-loss/continuation and Raft/bbolt contention regressions pass within the [continuation](collection-continuation-2026-10-14.md) and [contention](collection-contention-2026-10-14.md) evidence scopes; independent review is closed for those repairs. Worker demand refresh remains active. Measured slow-disk throughput and the complete frozen compiler/tag matrices remain open. |
 
 Exact checkpoint identities, failed runs, scoped passing checks and independent
 review dispositions are retained in [repair progress](release-repair-progress.md)

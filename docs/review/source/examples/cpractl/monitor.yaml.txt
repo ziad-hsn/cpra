@@ -1,0 +1,21 @@
+apiVersion: cpra.io/v2
+kind: Monitor
+metadata:
+  id: service-api
+  name: Service API
+  labels:
+    team: service-team
+spec:
+  # Replace the example target and review the complete configuration before enabling.
+  enabled: false
+  check:
+    interval: 60s
+    timeout: 5s
+    driver:
+      type: http
+      config:
+        url: https://example.invalid/health
+  notifications:
+    red:
+      notifyType: webhook
+      groupRef: service-team

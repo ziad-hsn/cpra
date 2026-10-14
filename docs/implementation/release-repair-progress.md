@@ -16,8 +16,14 @@ The [collection backup/restore follow-up](collection-backup-restore-2026-10-14.m
 repairs a reproduced pending-cleanup restore failure. The authenticated private
 restore copy now completes the original admitted retirement before publication;
 the original backup and ordinary runtime identity checks remain intact. Focused
-Linux regression/race checks and independent source review pass. Native checks
-and the remaining final-source matrices are recorded separately.
+Linux regression/race checks and independent source review pass. The subsequent
+maintenance-order repair lets admitted cleanup proceed before scanning. Focused
+Windows x64/local-NTFS proof cases and both stopped-backup/restore scenarios pass;
+the native runner's directory-handle interference and failed attempts remain
+recorded separately. The complete Linux persistence and local-administration
+suites now pass with Go 1.27.2 race detection, along with their static analysis.
+Focused Go 1.25 and Go 1.27.2 `externaljobs`/race follow-ups also pass. The
+final-source matrices remain required.
 
 All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
@@ -684,3 +690,30 @@ Independent source review closed the metadata correction without another
 concrete finding; the reviewer did not run tests. A real render from the newly frozen source
 and the complete updated matrices remain required; no public documentation
 checkout or publication was changed.
+
+## HTTP status and current-source references, 14 October
+
+The final local acceptance audit found missing F32 regression coverage, rather
+than a demonstrated HTTP execution defect. Nine real HTTP-check cases now use
+the production constructor and transport to cover default/empty-list 2xx
+success, default redirect rejection, explicitly accepted 302/307, mismatched
+redirect codes and replacement of the default status rule. Each requires one
+request to the configured origin and zero to the redirect destination. They
+pass on Go 1.25 and Go 1.27.2 with `externaljobs` and race detection. The HTTP
+reference now explains expected statuses, redirect handling and direct
+connections without ambient proxies.
+
+Five current guides also linked an older schema revision missing the health/TLS
+fields they documented. Those links now use the existing local source-download
+mechanism. Fourteen additional authored source/example files are included by
+exact path; their recorded bytes, sizes and hashes match the originals.
+Historical revision links and private evidence metadata remain unchanged.
+The reference inventory contains 103 selected files; it is not a complete
+source distribution or a qualification result.
+
+All 39 documentation-tool tests pass, including stale-copy rejection,
+preserved historical links and rejection of unapproved operator/credential
+examples. Independent source review closed both finite findings without another
+concrete issue; the reviewer ran no tests or builds. Canonical and rendered-site
+checks are retained separately. Final frozen-source qualification and the
+dependency-security decision remain open.

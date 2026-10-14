@@ -40,7 +40,10 @@ def safe_path(root: Path, value: str) -> Path:
 
 
 def source_asset(value: str) -> str:
-    if value not in {"Makefile", "main_externaljobs.go"}:
+    if value not in {"Makefile", "main_externaljobs.go", "examples/management/README.md",
+                     "examples/verification/sandboxes.yaml", "examples/cpractl/endpoint.yaml",
+                     "examples/cpractl/recipient.yaml", "examples/cpractl/group.yaml",
+                     "examples/cpractl/monitor.yaml", "examples/cpractl/disable.json"}:
         if not value.startswith(SOURCE_PREFIXES) or Path(value).suffix not in SOURCE_SUFFIXES:
             raise ValueError(f"reference is not an approved source file: {value}")
     if any(part.lower() in {"secrets", "credentials"} for part in PurePosixPath(value).parts):
@@ -77,7 +80,7 @@ def page(title: str, description: str) -> str:
 
 
 def source_index(records: list[dict]) -> bytes:
-    text = page("Referenced implementation sources", "Content-identified source downloads linked by CPRa implementation records.")
+    text = page("Referenced implementation sources", "Content-identified source downloads linked by CPRa documentation.")
     text += ("These downloads contain the exact source bytes used to prepare this documentation. "
              "They can include uncommitted development changes. They are selected references, "
              "not a complete source distribution, reviewed release, or verification result.\n\n"

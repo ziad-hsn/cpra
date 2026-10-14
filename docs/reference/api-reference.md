@@ -70,7 +70,7 @@ The dashboard offers runtime observations and, when management is enabled, confi
 
 The healthy-sample percentage uses committed cumulative check counters. It is not an external SLA measurement. Incident, recovery, and notification history is retained according to runtime history configuration; raw check records are not retained. Pool and queue histories are separate, bounded, in-memory series. Unavailable durable state, history, or SLO data returns HTTP 503.
 
-[CLI reference](cli.md) · [Response types in source](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/internal/httpserver/types.go)
+[CLI reference](cli.md) · [Response types in source](../review/source/internal/httpserver/types.go.txt)
 
 ## Management contracts
 

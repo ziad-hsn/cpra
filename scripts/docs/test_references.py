@@ -50,6 +50,32 @@ class PortableReferenceTests(unittest.TestCase):
         shutil.rmtree(self.root / "bin")
         self.assertEqual(references.prepare(self.root, check=True), result)
 
+    def test_current_examples_are_exact_and_historical_revision_links_are_preserved(self):
+        examples = {
+            "examples/management/README.md": b"# Current management setup\n",
+            "examples/verification/sandboxes.yaml": b"# Configure your own test resources.\ncases: []\n",
+            "examples/cpractl/disable.json": b'{"spec":{"enabled":false}}\n',
+        }
+        for name, content in examples.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        current = self.docs / "current.md"
+        current.write_text("".join(f"[Example](../{name})\n" for name in examples))
+        historical = self.docs / "review/previous.md"
+        historical.parent.mkdir()
+        original = "[Previous schema](https://github.com/ziad-hsn/cpra/blob/" + "a" * 40 + "/internal/server.go)\n"
+        historical.write_text(original)
+
+        result = references.prepare(self.root)
+        for name, content in examples.items():
+            self.assertEqual((self.docs / references.source_asset(name)).read_bytes(), content)
+        self.assertEqual(historical.read_text(), original)
+        self.assertEqual(references.prepare(self.root, check=True), result)
+        (self.root / "examples/management/README.md").write_text("# Updated setup\n")
+        with self.assertRaisesRegex(ValueError, "references differ"):
+            references.prepare(self.root, check=True)
+
     def test_stale_source_download_and_new_evidence_fail_check(self):
         self.record.write_text("[Server](../../internal/server.go)\n")
         references.prepare(self.root)
@@ -62,7 +88,8 @@ class PortableReferenceTests(unittest.TestCase):
             references.prepare(self.root, check=True)
 
     def test_repository_escape_and_credential_files_are_rejected_before_writes(self):
-        for link in ("../../../outside.go", "../../.env", "../../internal/credentials/key.json"):
+        for link in ("../../../outside.go", "../../.env", "../../internal/credentials/key.json",
+                     "../../examples/verification/operator.yaml", "../../examples/cpractl/credential.yaml"):
             with self.subTest(link=link):
                 self.record.write_text(f"[Unsafe]({link})\n")
                 with self.assertRaises(ValueError):

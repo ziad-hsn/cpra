@@ -1,0 +1,8 @@
+apiVersion: cpra.io/v2
+kind: Recipient
+metadata:
+  id: service-oncall
+  name: Service on-call
+spec:
+  endpointRefs:
+    - oncall-webhook

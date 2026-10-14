@@ -1,6 +1,6 @@
 ---
 title: Referenced implementation sources
-description: Content-identified source downloads linked by CPRa implementation records.
+description: Content-identified source downloads linked by CPRa documentation.
 cpra_scope: docs
 ---
 
@@ -23,13 +23,22 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `dashboard/src/components/OperationsList.tsx` | [Source](source/dashboard/src/components/OperationsList.tsx.txt) | `6894dd72aec2df2a95083ca4a9d41b13cad28d1cac1a5ed21f2de81253b17e79` |
 | `dashboard/src/import/README.md` | [Source](source/dashboard/src/import/README.md.txt) | `a44a3be9f0273cc2b8f1d497d788e14b9c5a35daa361d6d4e1cc6d240c98192e` |
 | `dashboard/src/pages/OperationDetail.tsx` | [Source](source/dashboard/src/pages/OperationDetail.tsx.txt) | `016ce61243e60c20678dd8278f101a4aa86ac77dde8222a7d81f7e589739caad` |
+| `examples/cpractl/disable.json` | [Source](source/examples/cpractl/disable.json.txt) | `fe869dbc14f4d1669175c62d9bd7645289069b3d4da2df05eb4d0b76120acd4f` |
+| `examples/cpractl/endpoint.yaml` | [Source](source/examples/cpractl/endpoint.yaml.txt) | `0d8b22d7ef78153c84788033efc36ee78bad5e4ff766d5f0437e2f4881a076b8` |
+| `examples/cpractl/group.yaml` | [Source](source/examples/cpractl/group.yaml.txt) | `298b5e4e49f23425dd6c94574c96db7ed3a65ed51f63108d614fc5b8e0b15352` |
+| `examples/cpractl/monitor.yaml` | [Source](source/examples/cpractl/monitor.yaml.txt) | `4c799054ffdd2366d9201b12644fee0a843ce3ecb5a50eed0f58400402f91ef7` |
+| `examples/cpractl/recipient.yaml` | [Source](source/examples/cpractl/recipient.yaml.txt) | `6a3c9241c4270c65052fae54e9d95ae4f0fb6b4c9fb89688ae4537de5776e4ae` |
+| `examples/management/README.md` | [Source](source/examples/management/README.md.txt) | `6c2e7ce00aea272b1e5c85fd49b373ad3eec08843e6b7ab28dc4f6b6b4d93c63` |
+| `examples/verification/sandboxes.yaml` | [Source](source/examples/verification/sandboxes.yaml.txt) | `debfe0e1c25364d4e83196296d4018ced17176e5e73b63d087cf8235eac879fb` |
 | `internal/controller/controller.go` | [Source](source/internal/controller/controller.go.txt) | `2ff1613d3b673b3f85e5873f30ea00da49765aed0a1366ef46020e3d62baecd1` |
 | `internal/controller/systems/catalog_runtime.go` | [Source](source/internal/controller/systems/catalog_runtime.go.txt) | `84bfebe2e466d2325774937a2d619b295c5f4cf46e8f4896bc251f391bea8d86` |
 | `internal/controller/systems/owner_wait.go` | [Source](source/internal/controller/systems/owner_wait.go.txt) | `a27e400d8cd77f24ecd49accfcc906f2c142a5c3601d6781fae5e3198a473acb` |
+| `internal/encryptionsetup/README.md` | [Source](source/internal/encryptionsetup/README.md.txt) | `44119cb9e8c2f1a95d1f4a3f94c4c5ecd5ab0134403c19fd81a759dc3af3a54a` |
 | `internal/httpauth/worker_external.go` | [Source](source/internal/httpauth/worker_external.go.txt) | `c53ea0fac6cf98b30981c2caf0ba0584ba5592d91e799c8d30adfc18e49bd6e7` |
 | `internal/httpserver/extensions_external.go` | [Source](source/internal/httpserver/extensions_external.go.txt) | `26a5446292dea8c33f31a313b54bf76617522e1b078d4722506cc0fb79dfa509` |
 | `internal/httpserver/management_collection_execution.go` | [Source](source/internal/httpserver/management_collection_execution.go.txt) | `98f75f34be890a8c5c09a7c4c132c832a5b349b8bdf0276f63ba69ca88af0c59` |
 | `internal/httpserver/management_operations.go` | [Source](source/internal/httpserver/management_operations.go.txt) | `a6e5fa667cbef19387ca1cf2e380217017b6c1df9cc70370e7de5ab04c876a2b` |
+| `internal/httpserver/types.go` | [Source](source/internal/httpserver/types.go.txt) | `30f95ffb36f70962cbd16e7596bf127c335f9a449a48dc6d8e75adbb1455485a` |
 | `internal/httpserver/worker_routes_external.go` | [Source](source/internal/httpserver/worker_routes_external.go.txt) | `7a1d48547f89a6600decd9e9456ad81de9fa05d328f95cbdcf02ce7f31a3eac7` |
 | `internal/jobs/a2a.go` | [Source](source/internal/jobs/a2a.go.txt) | `22e7479825ec4c235f4ab79150809aa4388133cdf45b32f579c06e080fabd8ff` |
 | `internal/jobs/a2a_job.go` | [Source](source/internal/jobs/a2a_job.go.txt) | `7d8212081d624c1c99d6fb48d9d392a64093163ef850ec757cd583684e973a05` |
@@ -43,6 +52,11 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/management/job_types_external.go` | [Source](source/internal/management/job_types_external.go.txt) | `2612b610b611d8b1c8f3f3509f27d133a3325ddbcb77e21dc2dbe1fb768f6f0a` |
 | `internal/management/management_operation_observations.go` | [Source](source/internal/management/management_operation_observations.go.txt) | `dd4214ba695a83e616a0795f63cda09ae310fac3dc617c10f99d23e69f2a807c` |
 | `internal/management/operation_access.go` | [Source](source/internal/management/operation_access.go.txt) | `321aad8ed5a9390f58e8569b8f41cd41ade6a76e6e9da6f22849d2ea60293bd2` |
+| `internal/manifest/groups.go` | [Source](source/internal/manifest/groups.go.txt) | `eb2102787c1645e0d2116bb7127c29c9ac272e04f37740bb45c799f5fcafa443` |
+| `internal/manifest/intervention_types_new.go` | [Source](source/internal/manifest/intervention_types_new.go.txt) | `5ce42eeed3399397f0a5ac2dcad44d59085ee17d2cf81f99b7a708635968775f` |
+| `internal/manifest/manifest.go` | [Source](source/internal/manifest/manifest.go.txt) | `8a8323e81de24cb99b690af646e3216ff040462b27fb8bbe0a83fdfeadf6d2cc` |
+| `internal/manifest/notification_types_new.go` | [Source](source/internal/manifest/notification_types_new.go.txt) | `48ad9759612fb1518b3b765c429b9d4a1f9b25c6835283b3a4e24d14b6d34e8d` |
+| `internal/manifest/pulse_types_new.go` | [Source](source/internal/manifest/pulse_types_new.go.txt) | `93075d8cdfaa31864209aad1d24f4656bdc0d84734d54d018e1995b17fc8aa11` |
 | `internal/persistence/agent_action.go` | [Source](source/internal/persistence/agent_action.go.txt) | `ce0eeefc007c325b16d30693d5f1fab8463e835cc90ab0a8879d0190303970d2` |
 | `internal/persistence/catalog_format.go` | [Source](source/internal/persistence/catalog_format.go.txt) | `aeed2f688e3b4cae3787aef8113c18bb7cf28db97133a7a0497cc3cba3b58b59` |
 | `internal/persistence/collection_cancel.go` | [Source](source/internal/persistence/collection_cancel.go.txt) | `44827ebf971af7b3ddbe6ab8d7f81a2cfb12c0cc82a86bc40d8cd31035ba9ee3` |

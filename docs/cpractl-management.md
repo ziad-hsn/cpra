@@ -50,7 +50,7 @@ operator action; displaying an error or rereading progress submits no write.
 ## Connection and authorization
 
 Start an explicitly enabled management server with named identities and TLS.
-The [local management example](https://github.com/ziad-hsn/cpra/blob/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/management/README.md) creates a
+The [local management example](review/source/examples/management/README.md.txt) creates a
 private example installation. Connect to it without putting a bearer token in
 the command line:
 
@@ -93,8 +93,12 @@ needed by old records and backups.
 
 ## Create contacts, destinations, and a monitor
 
-The [example files](https://github.com/ziad-hsn/cpra/tree/4c6baf58df8bf7fd4e02e0399fbe092ba867b20f/examples/cpractl) contain one resource per file. Apply the
-dependencies in this order: credential, endpoint, recipient, group, monitor.
+The [endpoint](review/source/examples/cpractl/endpoint.yaml.txt),
+[recipient](review/source/examples/cpractl/recipient.yaml.txt),
+[group](review/source/examples/cpractl/group.yaml.txt), and
+[monitor](review/source/examples/cpractl/monitor.yaml.txt) examples contain one resource per
+file. Apply the dependencies in this order: credential, endpoint, recipient,
+group, monitor.
 These commands use the connection environment above.
 
 A `Credential` holds a write-only protected value. In an interactive terminal,
@@ -165,8 +169,9 @@ omit server-assigned UID, resourceVersion and generation. Stable IDs identify
 resources across display-name changes; delete/recreate produces a new
 incarnation and version.
 
-Use a JSON merge-patch file for a targeted edit. The supplied example disables
-the monitor by explicitly setting `spec.enabled` to `false`:
+Use a JSON merge-patch file for a targeted edit. The
+[patch example](review/source/examples/cpractl/disable.json.txt) disables the monitor by
+explicitly setting `spec.enabled` to `false`:
 
 ```bash
 cpractl patch monitor/service-api --patch-file examples/cpractl/disable.json \

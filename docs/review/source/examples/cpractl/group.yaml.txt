@@ -1,0 +1,8 @@
+apiVersion: cpra.io/v2
+kind: NotificationGroup
+metadata:
+  id: service-team
+  name: Service team
+spec:
+  recipientRefs:
+    - service-oncall

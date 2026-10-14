@@ -1000,6 +1000,7 @@ jobs:
           path: release-metadata
       - name: Verify source identity, strict build and local links
         run: |
+          python3 scripts/docs/sync.py --site docs-site --release release-metadata/RELEASE.json --check
           python3 -c 'import json,os; assert json.load(open("docs-site/_sources/source-version.json"))["source_commit"] == os.environ["GITHUB_SHA"], "Documentation is not bound to this source candidate"'
           python3 -m pip install -r docs-site/_sources/requirements.txt
           python3 docs-site/_sources/rebuild.py --output "$RUNNER_TEMP/rendered-docs"

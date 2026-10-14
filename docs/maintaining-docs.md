@@ -30,6 +30,23 @@ change the runtime revision. Synchronization updates the matching fields in
 `_sources/source-version.json` and `extra` in `_sources/mkdocs.yml`; keep
 `documentation_commit` separate from `source_commit`.
 
+For a frozen release, supply its generated `RELEASE.json` to both synchronization
+and the copy check:
+
+```sh
+python3 scripts/docs/sync.py --site /work/cpra-pages --release /work/private-release/RELEASE.json
+python3 scripts/docs/sync.py --site /work/cpra-pages --release /work/private-release/RELEASE.json --check
+```
+
+Use the source checkout or extracted archive that matches that manifest. The
+command rejects changed recorded inputs, unrecorded documentation, and dirty or
+experimental release metadata before writing the site. It derives the site's
+source commit, source date, version and release identity from the frozen metadata.
+The committed checkpoint metadata remains untouched; the generated site's two
+`source-version.json` copies agree. This establishes which source is documented,
+not whether qualification or publication has passed. The release workflow checks
+these copies and the canonical content before its strict site build.
+
 ## Edit, synchronize and build
 
 Use separate checkouts such as `/work/cpra-main` and `/work/cpra-pages`. From main:

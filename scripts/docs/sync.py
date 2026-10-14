@@ -9,6 +9,11 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import re
 import shutil
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "release"))
+from evidence import read_report
+import release
 
 ROOT = Path(__file__).resolve().parents[2]
 NAVIGATION = ROOT / "scripts/docs/navigation.json"
@@ -108,7 +113,26 @@ def announcement_template(template: str) -> str:
     return pattern.sub(lambda _: ANNOUNCEMENT.read_text().rstrip(), template, count=1)
 
 
-def sync(site: Path, check: bool = False) -> dict:
+def frozen_metadata(metadata: dict, path: Path, files: dict[str, Path]) -> dict:
+    manifest = read_report(path)
+    identity = release.evidence_identity(manifest)
+    required = {"docs/source-version.json", "scripts/docs/sync.py", "scripts/docs/navigation.json",
+                "scripts/docs/announcement.html.j2"}
+    if not required.issubset(manifest["source_files"]):
+        raise ValueError("frozen release omits documentation rendering inputs")
+    release.check_manifest(manifest)
+    # Extra archived pages also count as changed input. The release validator
+    # checks recorded bytes; this exact set prevents adding unrecorded guides.
+    expected = {name.removeprefix("docs/") for name in manifest["source_files"] if name.startswith("docs/")}
+    if set(files) != expected:
+        raise ValueError("documentation files differ from the frozen release")
+    return dict(metadata, source_commit=manifest["commit"], updated=manifest["source_date"][:10],
+                source_commit_role="Frozen private release source; qualification and publication pending",
+                release_status=f"Private {manifest['version']} candidate; qualification and publication pending",
+                uncommitted_changes=False, release_version=manifest["version"], release_identity=identity)
+
+
+def sync(site: Path, check: bool = False, release_path: Path | None = None) -> dict:
     source = ROOT / "docs"
     site = site.resolve()
     target = site_path(site, "_sources/docs")
@@ -117,6 +141,12 @@ def sync(site: Path, check: bool = False) -> dict:
     if target.is_relative_to(source) or source.is_relative_to(target):
         raise ValueError("application and documentation checkouts must be separate")
     entries, pages = navigation(source)
+    files = {}
+    for path in sorted(source.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"documentation must not contain symlinks: {path}")
+        if path.is_file():
+            files[path.relative_to(source).as_posix()] = path
     config_path = site_path(site, "_sources/mkdocs.yml")
     if config_path.is_symlink():
         raise ValueError("site configuration must not be a symlink")
@@ -124,6 +154,10 @@ def sync(site: Path, check: bool = False) -> dict:
     updated_config = navigation_config(config, entries)
     metadata_path = source / "source-version.json"
     metadata = json.loads(metadata_path.read_bytes())
+    metadata_bytes = metadata_path.read_bytes()
+    if release_path is not None:
+        metadata = frozen_metadata(metadata, release_path, files)
+        metadata_bytes = release.encoded(metadata)
     for field in ("source_commit", "release_candidate_commit"):
         if not re.fullmatch(r"[a-f0-9]{40}", metadata.get(field, "")):
             raise ValueError(f"source metadata requires a full commit: {field}")
@@ -136,20 +170,16 @@ def sync(site: Path, check: bool = False) -> dict:
         raise ValueError("site metadata and template must not be symlinks")
     template = template_path.read_text()
     updated_template = announcement_template(template)
-    metadata_changed = not site_metadata.is_file() or site_metadata.read_bytes() != metadata_path.read_bytes()
-    files = {}
-    for path in sorted(source.rglob("*")):
-        if path.is_symlink():
-            raise ValueError(f"documentation must not contain symlinks: {path}")
-        if path.is_file():
-            files[path.relative_to(source).as_posix()] = path
+    metadata_changed = not site_metadata.is_file() or site_metadata.read_bytes() != metadata_bytes
+    def content(name, path):
+        return metadata_bytes if name == "source-version.json" else path.read_bytes()
     for path in target.rglob("*"):
         site_path(site, path.relative_to(site).as_posix())
     # This subtree is the complete canonical document set. Removing an obsolete
     # page here is deliberate; generated root files remain owned by rebuild.py.
     obsolete = sorted(p for p in target.rglob("*") if p.is_file() and p.relative_to(target).as_posix() not in files)
     changed = [name for name, path in files.items()
-               if not (target / name).is_file() or path.read_bytes() != (target / name).read_bytes()]
+               if not (target / name).is_file() or content(name, path) != (target / name).read_bytes()]
     if check and (obsolete or changed or updated_config != config or metadata_changed or updated_template != template):
         raise ValueError("documentation copies differ: " + json.dumps({
             "changed": changed, "obsolete": [p.relative_to(target).as_posix() for p in obsolete],
@@ -161,29 +191,36 @@ def sync(site: Path, check: bool = False) -> dict:
         for name in changed:
             destination = target / name
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(files[name], destination)
+            if name == "source-version.json":
+                destination.write_bytes(metadata_bytes)
+            else:
+                shutil.copyfile(files[name], destination)
         if updated_config != config:
             config_path.write_text(updated_config)
         if metadata_changed:
-            shutil.copyfile(metadata_path, site_metadata)
+            site_metadata.write_bytes(metadata_bytes)
         if updated_template != template:
             template_path.write_text(updated_template)
     digest = hashlib.sha256()
     for name, path in files.items():
-        digest.update(name.encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
-    return {"files": len(files), "markdown_pages": sum(n.endswith(".md") for n in files),
+        digest.update(name.encode() + b"\0" + hashlib.sha256(content(name, path)).digest())
+    result = {"files": len(files), "markdown_pages": sum(n.endswith(".md") for n in files),
             "content_sha256": digest.hexdigest(), "copies_match": True,
             "navigation_pages": len(pages), "navigation_matches": True,
             "navigation_sha256": hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest(),
             "source_metadata_matches": True, "announcement_matches": True}
+    if release_path is not None:
+        result["release_identity"] = metadata["release_identity"]
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site", required=True, type=Path)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--release", type=Path, help="render metadata from the matching clean, frozen RELEASE.json")
     args = parser.parse_args()
-    print(json.dumps(sync(args.site, args.check), indent=2))
+    print(json.dumps(sync(args.site, args.check, args.release), indent=2))
 
 
 if __name__ == "__main__":

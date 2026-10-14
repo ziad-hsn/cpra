@@ -188,6 +188,8 @@ class EvidenceIdentityTests(unittest.TestCase):
         self.assertTrue(any(item.get('name') == 'release-metadata'
                             and item.get('path') == 'dist/release/RELEASE.json' for item in uploads))
         script = next(step['run'] for step in job['steps'] if step.get('name') == 'Verify source identity, strict build and local links')
+        self.assertEqual(script.splitlines()[0],
+                         'python3 scripts/docs/sync.py --site docs-site --release release-metadata/RELEASE.json --check')
         body = script.split("python3 - <<'PY'\n", 1)[1].split('\nPY', 1)[0]
         manifest = manifest_fixture()
         with tempfile.TemporaryDirectory() as directory:

@@ -1,3 +1,5 @@
+import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -129,6 +131,105 @@ class NavigationSyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "symlinks"):
             sync.sync(self.site)
         self.assertEqual(list(outside.iterdir()), [])
+
+
+class FrozenSourceSyncTests(NavigationSyncTests):
+    def setUp(self):
+        super().setUp()
+        tools = self.root / "scripts/docs"
+        tools.mkdir(parents=True)
+        self.nav.rename(tools / "navigation.json")
+        self.nav = tools / "navigation.json"
+        self.announcement = tools / "announcement.html.j2"
+        self.announcement.write_bytes(sync.ANNOUNCEMENT.read_bytes())
+        (tools / "sync.py").write_text("# isolated rendering input\n")
+        for module in ("go.mod", "sdk/go/go.mod", "sdk/go/worker/go.mod"):
+            path = self.root / module
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("module example.com/test\n\ngo 1.25.0\n")
+        assets = self.root / "internal/httpserver/assets"
+        assets.mkdir(parents=True)
+        (assets / "index.html").write_text("<main>fixture</main>")
+        persistence = self.root / "internal/persistence"
+        persistence.mkdir(parents=True)
+        (persistence / "extensions_base.go").write_text(
+            "//go:build !externaljobs\n\npackage persistence\nconst LatestFormatVersion = " +
+            str(sync.release.RECIPE["storage_format_version"]) + "\n")
+        for target, name, value in ((sync, "NAVIGATION", self.nav),
+                                    (sync, "ANNOUNCEMENT", self.announcement),
+                                    (sync.release, "ROOT", self.root)):
+            patcher = patch.object(target, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.manifest = {"schema_version": 1, "candidate": False, "dirty": False,
+            "version": "v0.1.0-rc.1", "commit": "c" * 40, "source_date_epoch": 123,
+            "source_date": "1970-01-01T00:02:03Z", "recipe": copy.deepcopy(sync.release.RECIPE),
+            "toolchain_archives": copy.deepcopy(sync.release.TOOLCHAINS[sync.release.RECIPE["go_version"]]),
+            "storage_format_version": sync.release.RECIPE["storage_format_version"],
+            "dashboard_sha256": sync.release.tree_digest(assets),
+            "source_files": {p.relative_to(self.root).as_posix():
+                {"mode": "100644", "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+                for p in self.root.rglob("*") if p.is_file()}}
+        self.release_path = self.root.parent / "RELEASE.json"
+        self.release_path.write_bytes(sync.release.encoded(self.manifest))
+
+    def test_release_metadata_renders_without_changing_source(self):
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        result = sync.sync(self.site, release_path=self.release_path)
+        self.assertEqual(result["release_identity"], sync.release.evidence_identity(self.manifest))
+        metadata = self.site / "_sources/source-version.json"
+        actual = json.loads(metadata.read_bytes())
+        self.assertEqual(actual["source_commit"], "c" * 40)
+        self.assertEqual(actual["updated"], "1970-01-01")
+        self.assertEqual(actual["release_version"], "v0.1.0-rc.1")
+        self.assertFalse(actual["uncommitted_changes"])
+        self.assertIn("pending", actual["release_status"])
+        self.assertEqual(actual["release_candidate_commit"], "b" * 40)
+        self.assertEqual(metadata.read_bytes(), (self.site / "_sources/docs/source-version.json").read_bytes())
+        self.assertIn('source_commit: "' + "c" * 40 + '"', self.config.read_text())
+        self.assertEqual(sync.sync(self.site, check=True, release_path=self.release_path), result)
+        self.assertEqual({p: p.read_bytes() for p in before}, before)
+
+    def test_wrong_or_changed_release_inputs_fail_before_site_mutation(self):
+        mutations = (
+            lambda m: m.update(dirty=True), lambda m: m.update(candidate=True),
+            lambda m: m.update(source_date="wrong"),
+            lambda m: m["source_files"]["docs/index.md"].update(sha256="0" * 64),
+            lambda m: m["source_files"].pop("scripts/docs/sync.py"),
+            lambda m: m["source_files"].pop("docs/index.md"),
+        )
+        original = self.config.read_bytes()
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                manifest = copy.deepcopy(self.manifest)
+                mutate(manifest)
+                self.release_path.write_bytes(sync.release.encoded(manifest))
+                with self.assertRaises(ValueError):
+                    sync.sync(self.site, release_path=self.release_path)
+                self.assertEqual(self.config.read_bytes(), original)
+                self.assertFalse((self.site / "_sources/docs").exists())
+
+    def test_unrecorded_archived_document_is_rejected(self):
+        extra = self.docs / "implementation/unrecorded.md"
+        extra.parent.mkdir()
+        extra.write_text("# Not part of the selected source\n")
+        with self.assertRaisesRegex(ValueError, "documentation files differ"):
+            sync.sync(self.site, release_path=self.release_path)
+        self.assertFalse((self.site / "_sources/docs").exists())
+
+    def test_release_check_rejects_site_drift_without_repair(self):
+        sync.sync(self.site, release_path=self.release_path)
+        metadata = self.site / "_sources/source-version.json"
+        metadata.write_text("{}")
+        with self.assertRaisesRegex(ValueError, "source_metadata_changed"):
+            sync.sync(self.site, check=True, release_path=self.release_path)
+        self.assertEqual(metadata.read_text(), "{}")
+        sync.sync(self.site, release_path=self.release_path)
+        content = self.site / "_sources/docs/index.md"
+        content.write_text("# Changed after generation\n")
+        with self.assertRaisesRegex(ValueError, "documentation copies differ"):
+            sync.sync(self.site, check=True, release_path=self.release_path)
+        self.assertEqual(content.read_text(), "# Changed after generation\n")
 
 
 if __name__ == "__main__":

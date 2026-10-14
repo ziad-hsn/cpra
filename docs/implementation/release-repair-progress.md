@@ -9,6 +9,15 @@ All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
 independent review. Failed reproductions and intermediate failures are retained.
 
+The branch now includes published `main` at `b293f34`; merge `4516d1d` adds the
+missing merge history without a content change. Its clean private source archive
+and isolated dependency bootstrap pass, including the refreshed nested-module
+checksums. The first complete compiler matrix starts against that archive with
+`GOWORK=off`, race detection and an explicit scratch-budget governor. While it
+runs, independent review identified the documentation metadata gap recorded at
+the end of this file; that correction requires a new source freeze. Results for
+`4516d1d` must retain that identity and cannot qualify the corrected source.
+
 | Ticket | Implemented in this repair branch | Still required |
 | --- | --- | --- |
 | 1. Baseline | Approved plan saved; all three reviews mapped to F01-F56 with source and evidence dispositions; other checkouts and prior evidence preserved. | Final finding dispositions and independent review. |
@@ -640,3 +649,23 @@ after their recorded original and resulting hashes matched. Independent review
 recomputed the private SDK ZIP and module digests and matched its 118 archived
 files to the current SDK. No dependency versions changed; no public download or
 release qualification is claimed.
+
+## Frozen documentation identity, 14 October
+
+The canonical synchronization command previously copied a committed checkpoint
+identity while the release workflow required the final source commit. Editing
+the site identity manually then failed canonical copy validation. The new
+`--release` option derives the site's metadata from matching clean `RELEASE.json`
+inputs, checks recorded source bytes and the exact documentation file set, and
+preserves the committed checkpoint metadata. Both generated metadata copies and
+the site configuration agree. The workflow checks canonical content using that
+same option before building the site.
+
+All 38 documentation-tool tests and eight release-evidence/workflow tests pass
+on the working source. Changed or missing inputs, extra archived documents,
+dirty metadata and drift in generated copies fail without an attempted repair
+in check mode. The canonical documentation/source-reference check also passes.
+Independent source review closed the metadata correction without another
+concrete finding; the reviewer did not run tests. A real render from the newly frozen source
+and the complete updated matrices remain required; no public documentation
+checkout or publication was changed.

@@ -131,6 +131,12 @@ class BrowserEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             manifest = copy.deepcopy(self.manifest)
+            assets = json.loads((release.ROOT / 'dashboard/build-manifest.json').read_text())
+            for section in ('inputs', 'outputs'):
+                for name in assets[section]:
+                    manifest['source_files'][name] = {'mode': '100644', 'sha256': sha(name.encode())}
+            for name in ('brand/README.md', 'brand/dist/svg/ignored.txt', 'brand/fonts/archive/old.ttf'):
+                manifest['source_files'][name] = {'mode': '100644', 'sha256': sha(name.encode())}
             for name, record in manifest['source_files'].items():
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -141,6 +147,15 @@ class BrowserEvidenceTests(unittest.TestCase):
                               side_effect=AssertionError('source archive invoked Git')):
                 observed = browser_record.browser_campaign.source_inventory(root, manifest['source_files'])
                 self.assertEqual(observed, browser_evidence.source_inputs(manifest))
+                for name in ('brand/LICENSE', 'brand/ATTRIBUTION.md', 'brand/fonts/LICENSE.txt',
+                             'brand/fonts/RobotoSlab-Bold.ttf'):
+                    self.assertIn(name, observed)
+                    manifest['source_files'][name]['sha256'] = '0' * 64
+                    self.assertNotEqual(observed, browser_evidence.source_inputs(manifest))
+                    manifest['source_files'][name]['sha256'] = observed[name]
+                self.assertNotIn('brand/README.md', observed)
+                self.assertNotIn('brand/dist/svg/ignored.txt', observed)
+                self.assertNotIn('brand/fonts/archive/old.ttf', observed)
                 (root / 'LICENSES/dashboard.txt').write_bytes(b'updated dashboard notices')
                 changed = browser_record.browser_campaign.source_inventory(root, manifest['source_files'])
             self.assertNotEqual(observed['LICENSES/dashboard.txt'], changed['LICENSES/dashboard.txt'])

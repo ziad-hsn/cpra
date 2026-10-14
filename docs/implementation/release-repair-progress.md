@@ -23,6 +23,18 @@ and complete frozen-source matrices remain required.
 The earlier `73d4797` qualification prefix is incomplete and does not qualify
 the changed recipe or dependency graph.
 
+The next independent preflight found a browser-evidence inventory mismatch:
+the recorder includes twelve artwork, font and attribution inputs that the
+reader omitted. A regression using the actual dashboard input/output inventory
+reproduces the rejection. The corrected reader matches all 1,582 recorded input
+hashes at checkpoint `2a48d59`, including licence and font changes, while excluding
+unrelated artwork files and nested font archives. All 31 browser recorder/reader
+tests and 70 downstream accessibility/release-gate tests pass. Independent
+source re-review closes this finite repair. These are evidence-contract tests;
+the required real-browser matrix must still run against the corrected frozen
+source. The original failing regression and prior campaign identity are retained
+privately.
+
 The [collection backup/restore follow-up](collection-backup-restore-2026-10-14.md)
 repairs a reproduced pending-cleanup restore failure. The authenticated private
 restore copy now completes the original admitted retirement before publication;

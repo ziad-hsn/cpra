@@ -88,7 +88,10 @@ def source_inputs(manifest):
                     or path.parent == PurePosixPath('dashboard')
                     and path.suffix in ('.json', '.yaml', '.ts', '.js', '.html')
                     and not path.name.endswith('.tsbuildinfo'))
-        if (name.startswith(prefixes) or name in exact or frontend
+        artwork = (name in ('brand/LICENSE', 'brand/ATTRIBUTION.md')
+                   or path.parent == PurePosixPath('brand/dist/svg') and path.suffix == '.svg'
+                   or path.parent == PurePosixPath('brand/fonts'))
+        if (name.startswith(prefixes) or name in exact or frontend or artwork
                 or '/' not in name and name.endswith('.go')):
             selected[name] = record['sha256']
     require(exact <= selected.keys() and 'main.go' in selected

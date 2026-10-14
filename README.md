@@ -105,7 +105,7 @@ such as `cpractl get monitors`; those commands use stable resource IDs. Missing
 or malformed configuration stops startup. Empty configurations require
 `-allow-empty`, included in the initialized start command.
 
-The example checks an HTTP endpoint and writes incident transitions to `alerts.jsonl`. Each monitor can specify a check interval, timeout, failure threshold, recovery threshold, notification destinations, and a recovery action. Maintenance windows suppress alerts and recovery while checks continue; they use five-field cron expressions, a duration, and an IANA timezone.
+The [sample manifest](examples/monitors.yaml) checks an HTTP endpoint and writes incident transitions to `alerts.jsonl`; replace its target before applying it. The initialized manifest is empty. Each monitor can specify a check interval, timeout, failure threshold, recovery threshold, notification destinations, and a recovery action. Maintenance windows suppress alerts and recovery while checks continue; they use five-field cron expressions, a duration, and an IANA timezone.
 
 ## Drivers
 
@@ -133,14 +133,24 @@ MongoDB checks require a direct `mongodb://` URI. The selected driver cannot bou
 
 ## Access
 
-The server listens on loopback by default. Other bind addresses require an authentication token. Keep the token in a file readable by the service account:
+The server listens on loopback by default. The management quickstart uses native
+HTTPS and a named Bearer token. Enter the operator token in the dashboard; no
+username is required. Use the initializer's HTTPS address, `--ca-file` and
+`--token-file` arguments for CLI access. The operator bearer stays with the
+operator, outside service-owned configuration and state.
 
-```sh
-./bin/cpra -yaml monitors.yaml -web.addr 0.0.0.0:8060 -web.auth-file /run/secrets/cpra-token
-./bin/cpractl --server https://monitor.example.com --token-file /run/secrets/cpra-token get monitors
-```
+For remote management, configure a certificate for the intended hostname or an
+explicitly trusted HTTPS proxy using [management startup](docs/management-startup.md).
+The generated localhost certificate is only for local access. Do not pass a
+named management token through `-web.auth-file`; management loads its committed
+named authority after the initial policy import.
 
-Browser login uses username `cpra` and the token as the password. The API accepts a Bearer token. The server and CLI also read `CPRA_AUTH_TOKEN` and `CPRA_AUTH_TOKEN_FILE`. Remote access needs an HTTPS reverse proxy; the built-in listener serves HTTP.
+File-configured observation-only deployments can instead use `-web.auth-file`
+for a shared read-only token. This mode accepts Bearer authentication or Basic
+authentication with username `cpra` and the token as the password; it does not
+enable management commands. A plaintext listener needs an HTTPS reverse proxy
+before remote use. The server and CLI also support `CPRA_AUTH_TOKEN` and
+`CPRA_AUTH_TOKEN_FILE`. Keep bearer values out of URLs and command arguments.
 
 Manifests authorize checks, notification destinations, and recovery actions with the process account's permissions. Use trusted configuration. `-ssrf-protect` blocks non-public HTTP destinations at connection time; it does not restrict other protocols or local actions. Profiling is opt-in. Keep token files and manifests containing credentials outside version control.
 

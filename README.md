@@ -171,7 +171,7 @@ make release VERSION=v0.1.0-rc.1
 ```
 
 The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned
-Go 1.27.1 compiler and explicit source identity. It produces unstripped,
+Go 1.27.2 compiler and explicit source identity. It produces unstripped,
 optimized server/client archives for Linux, macOS and Windows on amd64/arm64,
 Linux packages, a source archive and evidence inventories. Go 1.25 compatibility
 is a separate test. Native execution gates qualify each platform; a successful

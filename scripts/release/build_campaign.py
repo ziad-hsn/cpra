@@ -220,6 +220,12 @@ def campaign(args):
                     shutil.copyfile(original, artifacts / name)
                     report['module_inputs'][name] = fingerprint(artifacts / name)
 
+            # Reject affected dependencies before the long-running correctness
+            # matrix. Keep the original scanner messages in failed evidence.
+            if getattr(args, 'security', False):
+                record_security(args, manifest, root, artifacts, compiler, go, environment, capture, report,
+                                lambda: worker_campaign.write_report(stream, report))
+
             for name, relative, _module, tags in build.VARIANTS:
                 invocation = build.commands(go, tags)
                 policy = dict(build.ENVIRONMENT, CPRA_CLI_BUILD_TAGS=tags)
@@ -238,10 +244,6 @@ def campaign(args):
                 row['source_changed'] = sorted(path for path in set(expected) | set(after) if expected.get(path) != after.get(path))
                 build.require(not row['source_changed'], 'source changed during ' + name)
                 worker_campaign.write_report(stream, report)
-
-            if getattr(args, 'security', False):
-                record_security(args, manifest, root, artifacts, compiler, go, environment, capture, report,
-                                lambda: worker_campaign.write_report(stream, report))
 
             if getattr(args, 'a2a_reference_go', None):
                 record_a2a(args, manifest, root, artifacts, environment, capture, report,

@@ -40,8 +40,8 @@ shipped runtime is pinned to 1.6.0. Generator dependencies are isolated in the
 From the repository root:
 
 ```sh
-GO=/path/to/go1.27.1/bin/go python3 tools/sdkgen/generate.py
-GO=/path/to/go1.27.1/bin/go python3 tools/sdkgen/generate.py --check
+GO=/path/to/go1.27.2/bin/go python3 tools/sdkgen/generate.py
+GO=/path/to/go1.27.2/bin/go python3 tools/sdkgen/generate.py --check
 ```
 
 The second command generates only in temporary storage and fails on differences;

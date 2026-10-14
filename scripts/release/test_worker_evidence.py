@@ -214,7 +214,7 @@ class WorkerEvidenceTests(unittest.TestCase):
                 rows = copy.deepcopy(original)
                 if change == 'missing': rows.pop(0)
                 elif change == 'duplicate': rows.insert(0, copy.deepcopy(rows[0]))
-                elif change == 'compiler': rows[0]['Output'] = rows[0]['Output'].replace('go1.27.1', 'go1.25.0')
+                elif change == 'compiler': rows[0]['Output'] = rows[0]['Output'].replace(release.RECIPE['go_version'], worker.MINIMUM_COMPILER)
                 else: rows[0]['Output'] = rows[0]['Output'].replace('true', 'false')
                 self.events[1] = rows; self.save()
                 with self.assertRaises(ValueError): self.verify()

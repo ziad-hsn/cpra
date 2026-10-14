@@ -347,11 +347,13 @@ class QualificationTests(unittest.TestCase):
             qualification.inspect_component('storage_upgrade', fixture.manifest, entry, {}, qualification.Inputs())
 
     def test_dirty_unfrozen_or_stale_reader_source_is_rejected_before_components(self):
+        prefix, patch_version = self.manifest['recipe']['go_version'].rsplit('.', 1)
+        different_compiler = prefix + '.' + str(int(patch_version) + 1)
         cases = [lambda m: m.update(dirty=True), lambda m: m.update(candidate=True),
                  lambda m: m['source_files'].pop(qualification.READER_FILES[0]),
                  lambda m: m['source_files'][qualification.READER_FILES[0]].update(sha256='a' * 64),
                  lambda m: m['toolchain_archives'].update(linux_amd64='a' * 64),
-                 lambda m: m['recipe'].update(go_version='go1.27.2')]
+                 lambda m: m['recipe'].update(go_version=different_compiler)]
         for index, change in enumerate(cases):
             with self.subTest(index=index):
                 manifest = copy.deepcopy(self.manifest)

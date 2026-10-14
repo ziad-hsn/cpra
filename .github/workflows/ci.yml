@@ -22,7 +22,7 @@ jobs:
       GOTOOLCHAIN: local
     strategy:
       matrix:
-        go: ['1.25.0', '1.27.1']
+        go: ['1.25.0', '1.27.2']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -66,9 +66,9 @@ jobs:
           CPRA_RUN_CLI_INTEGRATION: '1'
         run: go test -race -count=1 -timeout=10m -tags=externaljobs -run '^TestMainManagement(RealCLI(Diff)?|Collection(ApplyCLI|ReselectionCLI|ReselectionCLILostReplies))$' .
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -tags='redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd teams twilio' ./...
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
   a2a:
     runs-on: ubuntu-latest
     env:
@@ -76,7 +76,7 @@ jobs:
       GOENV: 'off'
     strategy:
       matrix:
-        go: ['1.25.0', '1.27.1']
+        go: ['1.25.0', '1.27.2']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -99,7 +99,7 @@ jobs:
           "$RUNNER_TEMP/cpra-a2a-go/bin/go" build -mod=readonly -trimpath -buildvcs=false -o "$RUNNER_TEMP/cpra-a2a-agent" .
           git diff --exit-code -- go.mod go.sum
       - name: Check upstream fixture dependencies
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         working-directory: internal/jobs/testdata/a2aagent
         env:
           GOWORK: 'off'
@@ -155,8 +155,8 @@ jobs:
           python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work" --no-github-env
           GITHUB_PATH= python3 scripts/release/install_go.py --version go1.25.0 --out "$RUNNER_TEMP/cpra-browser-minimum-go"
           export GOWORK="$RUNNER_TEMP/cpra-sdk.work"
-          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --out "$RUNNER_TEMP/browser/go1.27.1-default.json"
-          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --tags externaljobs --out "$RUNNER_TEMP/browser/go1.27.1-externaljobs.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --out "$RUNNER_TEMP/browser/go1.27.2-default.json"
+          python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-parser-go/bin/go" --tags externaljobs --out "$RUNNER_TEMP/browser/go1.27.2-externaljobs.json"
           python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --out "$RUNNER_TEMP/browser/go1.25.0-default.json"
           python3 scripts/dashboard/browser_campaign.py --go "$RUNNER_TEMP/cpra-browser-minimum-go/bin/go" --no-race --tags externaljobs --out "$RUNNER_TEMP/browser/go1.25.0-externaljobs.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -179,7 +179,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.27.1'
+          go-version: '1.27.2'
       - name: Use the SDK candidate modules for native source verification
         shell: bash
         run: python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
@@ -221,7 +221,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.25.0', '1.27.1']
+        go: ['1.25.0', '1.27.2']
     env:
       GOTOOLCHAIN: local
       GOENV: off
@@ -265,7 +265,7 @@ jobs:
           GOWORK="$RUNNER_TEMP/cpra-sdk-examples.work" python3 scripts/sdk/verify_examples.py --race --out evidence/local/sdk-examples.json
           python3 scripts/sdk/workspace.py --output "$RUNNER_TEMP/cpra-sdk.work"
       - name: SDK vulnerability checks
-        if: matrix.go == '1.27.1'
+        if: matrix.go == '1.27.2'
         run: |
           cd sdk/go
           go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...

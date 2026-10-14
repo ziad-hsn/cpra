@@ -226,7 +226,7 @@ python3 scripts/release/sdk_evidence.py \
   --release /absolute/private-release/RELEASE.json \
   --dependencies /absolute/private-dependencies \
   --consumer /absolute/private-evidence/consumer-go1.25.0.json \
-  --consumer /absolute/private-evidence/consumer-go1.27.1.json \
+  --consumer /absolute/private-evidence/consumer-go1.27.2.json \
   --out /absolute/private-evidence/sdk-consumer-evidence.json
 ```
 

@@ -745,7 +745,7 @@ execution and real signature/readback qualification remain open.
 
 ## Source and build identity
 
-The canonical module is `github.com/ziad-hsn/cpra`. Its `go.mod` retains `go 1.25.0`; official binaries use **Go 1.27.1**. A separate minimum-compiler job tests Go 1.25.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
+The canonical module is `github.com/ziad-hsn/cpra`. Its `go.mod` retains `go 1.25.0`; official binaries use **Go 1.27.2**. A separate minimum-compiler job tests Go 1.25.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
 
 `scripts/release/recipe.json` is the build contract and `.goreleaser.yaml` matches it. The release recipe uses:
 
@@ -990,7 +990,7 @@ application release.
 The release builder needs Python 3.12+, the selected Go distribution, and the checksum-pinned GoReleaser OSS/nFPM tools. Node/pnpm are needed only to verify the committed dashboard, not to rebuild a shipped source archive.
 
 ```sh
-python3 scripts/release/install_go.py --version go1.27.1 --out /absolute/new/go
+python3 scripts/release/install_go.py --version go1.27.2 --out /absolute/new/go
 export PATH=/absolute/new/go/bin:$PATH
 python3 scripts/release/install_tools.py
 python3 scripts/release/dashboard_build.py --check

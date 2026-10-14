@@ -1,10 +1,10 @@
 {
-  "compiler": "go1.27.1",
+  "compiler": "go1.27.2",
   "externaljobs": false,
   "files": {
     "DEPENDENCIES.json": {
       "bytes": 1710,
-      "sha256": "95b2887558761eb979c880b078e072935bb357d5a309c2fc0120d18100d0fda5"
+      "sha256": "868201595c47bd4f0c7bce1d5a9e210e57f6caee25d487a50a26327a652219ae"
     },
     "GO-LICENSE.txt": {
       "bytes": 1453,
@@ -12,11 +12,11 @@
     },
     "LICENSES.txt": {
       "bytes": 20518,
-      "sha256": "244d43c5b9dcad05949ec414f6687d1db22210e6273cf289f3d022b7d2882076"
+      "sha256": "98965146c61325c7210de9e593502b5df8ccfefe3c08b1abcd61d7f91e755c4d"
     },
     "collection-parser.wasm": {
-      "bytes": 8231112,
-      "sha256": "b3e739c11ebbc2951ea825f2fe4068365fef48e357c29fe41fa9405779ca62d3"
+      "bytes": 8242869,
+      "sha256": "e7f7bd4874f965533ccf25bcd4dcf2b1615096ee6cd03cf288d410ca350d8636"
     },
     "wasm_exec.js": {
       "bytes": 16992,

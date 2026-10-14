@@ -322,6 +322,30 @@ class BuildEvidenceTests(unittest.TestCase):
         self.assertEqual(result['status'], 'consistent_pending_review')
         self.assertFalse(result['release_gate_passed'])
 
+    def test_security_rejection_stops_before_test_matrix(self):
+        output = self.root / 'security-failed.json'
+        args, observe, capture = self.recorder_fixture(release.RECIPE['go_version'], output)
+        args.security = True
+        commands = []
+
+        def record_capture(command, *arguments):
+            commands.append(command)
+            return capture(command, *arguments)
+
+        with patch.object(build, 'source_snapshot', return_value=build.source_inputs(self.manifest)), \
+                patch.object(build_campaign.dependencies, 'cache_environment', return_value={
+                    'GOMODCACHE': str(self.fixture.fixture.cache / 'modules'), 'GOPATH': str(self.fixture.fixture.cache / 'go-path')}), \
+                patch.object(build_campaign.subprocess, 'check_output', side_effect=observe), \
+                patch.object(build_campaign.worker_campaign, 'capture', side_effect=record_capture), \
+                patch.object(build_campaign, 'record_security', side_effect=ValueError('reachable vulnerabilities were found')):
+            result = build_campaign.campaign(args)
+        self.assertEqual(result['result'], 'failed')
+        self.assertEqual(result['error'], 'reachable vulnerabilities were found')
+        self.assertEqual(result['variants'], [])
+        self.assertEqual(len([command for command in commands if command[1:3] == ['mod', 'verify']]), 3)
+        self.assertFalse(any(command[1] in ('vet', 'test') for command in commands))
+        self.assertEqual(json.loads(output.read_bytes())['result'], 'failed')
+
     def test_recorder_preserves_failed_final_source_inspection(self):
         output = self.root / 'source-failed.json'
         args, observe, capture = self.recorder_fixture(build.MINIMUM_COMPILER, output)

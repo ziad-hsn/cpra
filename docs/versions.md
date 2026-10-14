@@ -6,7 +6,7 @@ cpra_scope: development
 
 # Versions and availability
 
-This source is under private release-repair qualification as of 13 October 2026.
+This source is under private release-repair qualification as of 14 October 2026.
 The intended first release is application/SDK/worker `v0.1.0-rc.1` and Helm chart
 `0.1.0-rc.1`. These are planned versions, not proof that installable public tags,
 assets or registry entries exist. Candidates remain access-controlled until the
@@ -31,6 +31,7 @@ to their actual source inventories. They are not a final frozen-release pass.
 | Drivers | 14 checks, six recovery roles and 15 notification roles across applicable build tags | Fixture contracts, provider acceptance and observed real effects are distinct evidence levels |
 | gRPC | TCP reachability when mode is omitted; explicit verified-TLS unary health mode | Only SERVING succeeds in health mode; it never falls back to TCP |
 | Distributions | Go-install contract, archive/package/image/Compose/Helm recipes and local administration | Native OS/architecture, service, filesystem and deployment matrices remain required |
+| Dependency security | Release compiler updated to Go 1.27.2 and gRPC to 1.83.2 | Five `x/net` HTTP/2 advisories remain; applying the upstream fix needs a decision on the Go 1.25 application minimum |
 | Artwork and code | MIT code; CPRa-authored artwork under CC BY 4.0 with attribution | Third-party notices and the separate project-name note remain applicable |
 
 The [quickstart](tutorials/quickstart.md) uses protected management initialization

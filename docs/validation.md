@@ -14,6 +14,10 @@ evidence classification and reproducible commands.
 Use the extracted source and private dependency cache from the approved release.
 The source directory excludes the generated `RELEASE.json`; pass the matching
 metadata separately. Select a new output name outside the source and cache.
+With `--security`, dependency verification and build exclusion run before the
+long correctness matrix; release-compiler vulnerability findings stop that
+matrix while preserving the original scanner output. JSON scanner exit zero
+alone is not a passing security result.
 
 ```sh
 python3 -B scripts/release/build_campaign.py \
@@ -22,19 +26,19 @@ python3 -B scripts/release/build_campaign.py \
   --dependencies /private/dependencies \
   --go /path/to/go1.25.0/bin/go \
   --security \
-  --a2a-reference-go /path/to/go1.27.1/bin/go \
+  --a2a-reference-go /path/to/go1.27.2/bin/go \
   --out /private/builds/build-minimum.json
 
 GOBIN=/private/security-tools GOWORK=off GOENV=off GOFLAGS= GOTOOLCHAIN=local \
-  /path/to/go1.27.1/bin/go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+  /path/to/go1.27.2/bin/go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
 python3 -B scripts/release/build_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.1/bin/go \
+  --go /path/to/go1.27.2/bin/go \
   --security --govulncheck /private/security-tools/govulncheck \
-  --a2a-reference-go /path/to/go1.27.1/bin/go \
+  --a2a-reference-go /path/to/go1.27.2/bin/go \
   --pnpm /path/to/pinned/pnpm \
   --out /private/builds/build-release.json
 
@@ -194,7 +198,7 @@ python3 -B scripts/release/worker_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.1/bin/go \
+  --go /path/to/go1.27.2/bin/go \
   --out /private/workers/worker-release.json
 
 python3 -B scripts/release/worker_evidence.py \
@@ -302,8 +306,8 @@ browser with `--browser`. The report records its actual version.
 ```sh
 python3 -B scripts/dashboard/asset_manifest.py
 python3 scripts/sdk/workspace.py --output /private/cpra-sdk.work --no-github-env
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.1/bin/go --node /path/to/pinned/node --out evidence/local/browser-release-default.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.1/bin/go --node /path/to/pinned/node --tags externaljobs --out evidence/local/browser-release-external.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --out evidence/local/browser-release-default.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --tags externaljobs --out evidence/local/browser-release-external.json
 GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.25.0/bin/go --node /path/to/pinned/node --no-race --out evidence/local/browser-minimum-default.json
 GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.25.0/bin/go --node /path/to/pinned/node --no-race --tags externaljobs --out evidence/local/browser-minimum-external.json
 ```
@@ -324,7 +328,7 @@ python3 -B scripts/release/browser_record.py \
   --release /private/release/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.1/bin/go \
+  --go /path/to/go1.27.2/bin/go \
   --node /path/to/pinned/node \
   --module /private/dependencies/source/scripts/dashboard/browser/node_modules/playwright \
   --browser /path/to/installed/chromium \
@@ -558,7 +562,7 @@ or another machine when the prerequisite fails.
 
 Build the baseline commit `a370969b041b399c0778318d8915ce059fd74294` and the candidate
 with identical Go version, build tags and optimized build flags. Preparation uses
-the recorded release recipe, currently Go 1.27.1, with symbols and DWARF retained,
+the recorded release recipe, currently Go 1.27.2, with symbols and DWARF retained,
 PGO disabled, `GOTOOLCHAIN=local` and `GOWORK=off`. Both builds come from committed
 source archives; ignored developer files and workspace settings are excluded.
 The physical-space check runs before archives, downloads or compilation.
@@ -572,7 +576,7 @@ or the wrong compiler. Keep the output and module cache outside the checkout and
 separate from each other.
 
 ```sh
-python3 scripts/benchmark/prepare.py --manifest /path/to/release/RELEASE.json --go /path/to/go1.27.1/bin/go --module-cache /path/to/qualified-module-cache --out /path/to/prepared-builds
+python3 scripts/benchmark/prepare.py --manifest /path/to/release/RELEASE.json --go /path/to/go1.27.2/bin/go --module-cache /path/to/qualified-module-cache --out /path/to/prepared-builds
 ```
 
 The default tag set is the release recipe's built-in drivers. An explicit `--tags`

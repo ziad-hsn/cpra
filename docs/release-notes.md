@@ -54,6 +54,13 @@ and exhausted its locally shortened persistence timeout. Corrected focused
 checks and a documented-budget persistence rerun remain separate evidence.
 These results do not establish a final frozen-source release matrix.
 
+The release recipe now uses Go 1.27.2 and gRPC 1.83.2 following a vulnerability
+scan. Five `x/net` HTTP/2 advisories remain; the upstream fix requires Go 1.26,
+while the approved application minimum is still Go 1.25. That compatibility
+decision and the security gate remain open. The
+[security checkpoint](implementation/dependency-security-2026-10-14.md) records
+the evidence and scope.
+
 Publication still requires final source review/freeze, complete compiler/tag
 and vulnerability checks, reproducible packaged artifacts, native platform and
 service lifecycle tests, both image architectures, Compose/Helm storage and

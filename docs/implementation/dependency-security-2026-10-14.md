@@ -1,0 +1,105 @@
+# Compiler and dependency security repair — 14 October 2026
+
+Scope: private development checks after source checkpoint
+`73d479794fb3112db0dd53c3920c6d8ade068fba`. This is not frozen release
+qualification, a reproduced exploit, or permission to publish.
+
+## Findings and selected updates
+
+A retained `govulncheck v1.7.0` source/symbol scan of the default application
+build found 14 distinct advisories with called-symbol traces. The scan used
+Go 1.27.1 and the database last-modified timestamp
+`2026-10-08T22:31:09Z`. Its JSON-mode exit code was zero; the original finding
+messages, rather than that exit code, establish the failed security gate.
+
+The repair updates the release recipe, six official compiler archive checksums,
+workflow compiler selections and developer image index to Go 1.27.2. The
+browser parser, embedded dashboard and dependency notices are regenerated with
+that compiler. Historical evidence remains labeled with its actual compiler.
+The application updates gRPC to `v1.83.2` and `x/text` to `v0.41.0`, with the
+versions selected by their dependency graph. The integration examples also
+update `x/text` to `v0.41.0`. Public module checksum verification remains enabled;
+no dependency replacement or vulnerability suppression is added.
+
+The direct gRPC receive-path finding reaches CPRa's production health RPC. The
+new patch contains the upstream fragmentation/OOM fix. Other scanner traces are
+conservative reachability evidence: server, client and reverse-proxy advisories
+have different prerequisites and are not five demonstrated attacks on CPRa's
+management listener. Sources: [Go 1.27.2 release history](https://go.dev/doc/devel/release#go1.27.2),
+[gRPC fragmentation advisory](https://github.com/grpc/grpc-go/security/advisories/GHSA-vp52-pcj8-j9qc),
+[gRPC 1.83.2](https://github.com/grpc/grpc-go/releases/tag/v1.83.2) and
+[`x/text` advisory](https://pkg.go.dev/vuln/GO-2026-6629).
+
+## Remaining compatibility decision
+
+The application still declares Go 1.25.0. The updated gRPC dependency selects
+`x/net v0.58.0`, which is the latest inspected upstream release supporting
+Go 1.25. A fresh Go 1.27.2 default-build scan removes the compiler/gRPC findings
+but still reports called-symbol findings for GO-2026-6603, GO-2026-6610,
+GO-2026-6611, GO-2026-6612 and GO-2026-6617 in `x/net`.
+
+The upstream fixes require `x/net v0.60.0`, whose module declares Go 1.26.0 and
+selects `x/text v0.42.0` and `x/sys v0.48.0`. An independent reviewer checked
+upstream tags and the Go proxy metadata and found no published patched
+Go 1.25-compatible release. Raising the application's and integration examples'
+minimum to Go 1.26 requires the user's decision because the approved plan
+explicitly preserves Go 1.25. The independent SDK and worker module currently
+retain their separate Go 1.25 source requirement.
+
+Sources: [HTTP/2 advisory](https://pkg.go.dev/vuln/GO-2026-6611),
+[`x/net v0.58.0` module](https://github.com/golang/net/blob/v0.58.0/go.mod),
+[`x/net v0.60.0` module](https://github.com/golang/net/blob/v0.60.0/go.mod) and
+[upstream tags](https://go.googlesource.com/net/+refs/tags).
+Source compatibility does not extend [Go's security support period](https://go.dev/doc/devel/release#policy).
+
+## Verification and retained failures
+
+- The complete jobs, authentication and HTTP-server package suites pass on
+  Go 1.27.2 and Go 1.25.0, including real local gRPC health and notification
+  receiver paths. The minimum-compiler run retains a metadata correction:
+  its wrapper initially labeled the PATH compiler instead of the explicit
+  Go 1.25.0 executable in the recorded command. That annotation is separate
+  from the original record and is not a second test run.
+- SDK base/tagged and worker tagged tests pass with race detection on
+  Go 1.27.2. Separate source/symbol scans of those three module selections
+  produce zero findings. These checks use `GOWORK=off` and the private prepared
+  SDK cache; they do not prove public module downloads.
+- The integration examples pass their base tests on Go 1.27.2 and their
+  external-worker tests on Go 1.27.2 with race detection and Go 1.25.0 without
+  race instrumentation. Their first dependency-update attempt fails at the
+  public proxy because the SDK is unpublished. The successful attempt uses the
+  existing private proxy, with checksum exceptions limited to the two private
+  modules. The reviewer confirms their recorded checksums and unchanged SDK
+  sources. These are local fixture tests; the examples still select an affected
+  `x/net` version and have no full security or live-provider qualification.
+- The full dashboard rebuild passes 541 tests, type checking and lint. A
+  second parser generation matches the first byte-for-byte; the embedded
+  asset freshness check passes.
+- The first 702-test release-tool run fails two negative fixtures because
+  their formerly different compiler value became the selected compiler.
+  Those fixtures now derive a different patch version. Their focused
+  regressions pass; the complete rerun passes all 703 tests after adding the
+  security-order regression. The original failure log is retained.
+- The security gate now executes after dependency verification and before
+  the long correctness matrix. A regression first fails against the old
+  order and passes after the change, confirming that a security rejection
+  retains a failed report without starting the matrix.
+- The 47 packaging-tool contract tests pass. They are separate from executing
+  packages, images or a Kubernetes deployment.
+
+An independent reviewer checked the compiler checksums against official Go
+metadata, the developer-image index against the official registry, updated
+public module checksums, all 188 dashboard inputs and 43 outputs, the parser
+and notice bytes, and the failure ordering. That finite review found no new
+actionable issue. It did not run tests or establish native/container execution,
+and it did not close the remaining HTTP/2 security gate.
+
+The earlier `73d4797` matrix remains incomplete. Its scratch supervisor treated
+a disappearing test directory as a failed disk-usage command and terminated
+the child. The supervisor now tolerates concurrent directory removal. The
+original report/logs retain 4,345 test-pass events, 14 skips and no observed
+test failure before termination; that prefix is not a complete matrix pass.
+
+Release/compiler, native, provider, deployment and comparative-capacity gates
+remain open. The 24-hour endurance run remains cancelled. No public promotion
+is performed by this repair.

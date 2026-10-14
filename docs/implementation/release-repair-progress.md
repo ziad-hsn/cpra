@@ -5,18 +5,26 @@ Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
 Updated: 2026-10-14. The candidate is not frozen or publicly qualified.
 
+The [compiler/dependency security checkpoint](dependency-security-2026-10-14.md)
+updates the release compiler to Go 1.27.2 and gRPC to 1.83.2. Five `x/net`
+HTTP/2 advisories remain: their upstream fix requires Go 1.26, and the approved
+Go 1.25 application minimum has not been changed without a user decision.
+The earlier `73d4797` qualification prefix is incomplete and does not qualify
+the changed recipe or dependency graph.
+
 All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
 independent review. Failed reproductions and intermediate failures are retained.
 
 The branch now includes published `main` at `b293f34`; merge `4516d1d` adds the
 missing merge history without a content change. Its clean private source archive
-and isolated dependency bootstrap pass, including the refreshed nested-module
-checksums. The first complete compiler matrix starts against that archive with
-`GOWORK=off`, race detection and an explicit scratch-budget governor. While it
-runs, independent review identified the documentation metadata gap recorded at
-the end of this file; that correction requires a new source freeze. Results for
-`4516d1d` must retain that identity and cannot qualify the corrected source.
+and isolated dependency bootstrap passed, including the refreshed nested-module
+checksums. The first complete compiler matrix was started against that archive
+with `GOWORK=off`, race detection and an explicit scratch-budget governor.
+Independent review then identified the documentation metadata gap recorded at
+the end of this file. That correction required a new source freeze. Results for
+`4516d1d` retain that identity and cannot qualify the corrected source or the
+subsequent compiler/dependency changes.
 
 | Ticket | Implemented in this repair branch | Still required |
 | --- | --- | --- |
@@ -31,8 +39,8 @@ the end of this file; that correction requires a new source freeze. Results for
 
 ## Recorded local checks
 
-The release compiler used for new checks is Go 1.27.1, checksum-pinned by the
-repository installer. Earlier Go 1.27.0 checks remain earlier development
+The release compiler used for new checks is Go 1.27.2, checksum-pinned by the
+repository installer. Earlier Go 1.27.0/1.27.1 checks remain earlier development
 evidence. Frontend qualification uses pinned Node v24.21.0 and pnpm 11.22.0.
 
 - API/SDK admission classification and original-handle tests passed.
@@ -118,7 +126,7 @@ The user confirmed on 2026-10-12 that no native runner fleet, private Kubernetes
 environment or designated external provider/agent accounts are configured.
 Those qualification gates remain open; fixture passing is not account evidence.
 
-The last physical C: measurement was 30,977,564,672 bytes, below the initial
+The 14 October campaign preflight measured 18,711,650,304 physical C: free bytes, below the initial
 35 GiB comparative-campaign prerequisite. The large campaign has not started.
 Task-owned scratch remains subject to the 6 GiB cap and 64 MiB reserve.
 

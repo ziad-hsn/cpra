@@ -44,12 +44,14 @@ class EvidenceIdentityTests(unittest.TestCase):
     def test_same_commit_cannot_reuse_evidence_after_any_release_input_changes(self):
         original = manifest_fixture()
         identity = release.evidence_identity(original)
+        prefix, patch_version = original['recipe']['go_version'].rsplit('.', 1)
+        different_compiler = prefix + '.' + str(int(patch_version) + 1)
         mutations = (
             ('SDK implementation', lambda m: m['source_files']['sdk/go/client.go'].update(sha256='1' * 64)),
             ('worker implementation', lambda m: m['source_files']['sdk/go/worker/worker.go'].update(sha256='2' * 64)),
             ('SDK dependency', lambda m: m['source_files']['sdk/go/go.mod'].update(sha256='3' * 64)),
             ('file mode', lambda m: m['source_files']['main.go'].update(mode='100755')),
-            ('compiler', lambda m: m['recipe'].update(go_version='go1.27.2')),
+            ('compiler', lambda m: m['recipe'].update(go_version=different_compiler)),
             ('build settings', lambda m: m['recipe']['build_flags'].append('-race')),
             ('compiler archives', lambda m: m['toolchain_archives'].update({'linux_amd64': '4' * 64})),
             ('dashboard', lambda m: m.update(dashboard_sha256='c' * 64)),

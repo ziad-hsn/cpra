@@ -442,7 +442,7 @@ dashboard-wasm/LICENSES.txt
 Licenses for the linked browser collection parser and matching Go runtime.
 
 ========================================================================
-Go/go1.27.1/LICENSE
+Go/go1.27.2/LICENSE
 ========================================================================
 Copyright 2009 The Go Authors.
 

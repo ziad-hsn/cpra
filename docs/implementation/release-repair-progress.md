@@ -586,3 +586,24 @@ the scope recorded in the [audit follow-up](alert-path-audit-2026-10-13.md).
 Independent source review identified two coverage gaps; corrected fanout
 scheduling and pending-code aggregate assertions now pass and the review is
 closed. The full compiler/tag/build matrix still awaits the final source.
+
+## Original collection continuation, 14 October
+
+Native CLI interruption tests exposed two defects: ordinary file profiles were
+rejected by the SDK, and a read-only original-input proof inherited upload-only
+append restrictions after validation started. Both are repaired without changing
+durable formats or mutation/claim guards. Interrupted compiler work remains
+terminal under the original operation; the CLI now explains that disposition.
+
+Five native CLI scenarios, focused Go 1.25/default/externaljobs checks and race
+regressions pass. Independent source review is closed. The real application
+owner restart in the CLI fixture is graceful; separate coordinator tests kill
+a real child process. See the [full scoped record](collection-continuation-2026-10-14.md)
+for failed baselines, exact evidence, conditional timing and remaining gates.
+
+The pinned dashboard rebuild passes all 541 tests, type checking and lint;
+parser, notices and embedded assets are regenerated. All eight required
+Go 1.27.1/default real-server browser tests pass with race detection, no skips
+and an unchanged campaign source inventory. Canonical documentation checks pass
+for 175 pages and 89 selected source references. These are local development
+checks, not the remaining frozen compiler/tag/platform release matrix.

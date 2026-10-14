@@ -82,3 +82,20 @@ func TestResumeFilesMismatchAndLostVerificationNeverActivate(t *testing.T) {
 		})
 	}
 }
+
+func TestResumeFilesPreservesClosedAndActivatedOperations(t *testing.T) {
+	for _, state := range []string{"interrupted", "rejected", "canceled", "expired", "invalidated", "applying", "completed"} {
+		t.Run(state, func(t *testing.T) {
+			f := &fileContinuationFixture{reselectionFixture: newReselectionFixture([]byte("original source")), fakeOperations: &fakeOperations{valid: true}}
+			f.reselectionFixture.operation.State = state
+			f.reselectionFixture.operation.Uploaded = api.Pointer(int64(3))
+			result, err := ResumeFiles(t.Context(), f, reselectOperationID, reselectionTestSources(f.raw), reselectionTestOptions(t))
+			if !errors.Is(err, ErrReselectionState) || result.OperationID != reselectOperationID || result.Operation.State != state || result.VerificationAttemptID != "" {
+				t.Fatal("original disposition lost", err, result.Operation.State)
+			}
+			if len(f.fakeOperations.calls) != 0 || !reflect.DeepEqual(f.reselectionFixture.calls, []string{"get"}) {
+				t.Fatal("closed or activated operation submitted new work", f.fakeOperations.calls, f.reselectionFixture.calls)
+			}
+		})
+	}
+}

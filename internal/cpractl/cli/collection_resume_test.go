@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"github.com/ziad-hsn/cpra/sdk/go/collection"
 	"github.com/ziad-hsn/cpra/sdk/go/collection/commitment"
 )
 
@@ -65,5 +67,20 @@ func TestResumeRequiresOriginalInputsBeforeRequests(t *testing.T) {
 	_, _, err := fixture.run(t, nil, "resume", "operation/"+sequencedOperationID)
 	if err == nil || requests != 0 {
 		t.Fatal("continuation without inputs made a request", err, requests)
+	}
+}
+
+func TestResumeInterruptedValidationReportsOriginalDisposition(t *testing.T) {
+	protocol := newUploadRecoveryCLIProtocol(t, "uploading")
+	protocol.operation.State = "interrupted"
+	protocol.operation.Uploaded = api.Pointer(int64(2))
+	fixture := newCLIManagementFixture(t, protocol.serve)
+	stdout, stderr, err := fixture.run(t, []byte("exact original source"), "resume", "operation/"+sequencedOperationID, "-f", "-", "-o", "json")
+	var operation api.Operation
+	if !errors.Is(err, collection.ErrReselectionState) || json.Unmarshal([]byte(stdout), &operation) != nil || operation.ID != sequencedOperationID || operation.State != "interrupted" {
+		t.Fatal("interruption lost original handle or classification", stdout, stderr, err)
+	}
+	if !strings.Contains(err.Error(), "validation was interrupted") || !strings.Contains(err.Error(), "retained evidence") || !strings.Contains(stderr, sequencedOperationID) || !reflect.DeepEqual(protocol.calls, []string{"get-original"}) {
+		t.Fatal("interruption was hidden or caused new work", protocol.calls, stderr, err)
 	}
 }

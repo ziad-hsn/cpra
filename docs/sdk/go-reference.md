@@ -640,6 +640,8 @@ func (s *OperationsService) Create(ctx context.Context, req api.OperationCreateR
 
 CreateReselection requests a disposable, caller-owned attempt under the
 original operation. It does not upload, verify, renew or activate that operation.
+NormalizationProfile must match the original, including empty for ordinary
+file input. The server verifies source bytes and resource identities.
 Discover server support before use; this candidate contract is additive.
 
 ```go
@@ -5167,6 +5169,9 @@ It fills missing uploads, reconciles the original phase, then requests whole
 input validation and conditional activation. No mutation is automatically
 retried. A stopped Wait or context never cancels the server operation. Sources
 and attempt spools retain Reselect's byte/count limits and ownership rules.
+A validation interrupted after losing its compiler owner cannot be restarted
+under the same operation. ErrReselectionState and Result.Operation preserve
+that disposition. Observe an already activated operation with Wait instead.
 
 ```go
 func ResumeFiles(ctx context.Context, operations ContinuationOperations, id string, sources []Source, options ReselectionOptions) (Result, error)

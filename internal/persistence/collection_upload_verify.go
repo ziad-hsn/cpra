@@ -59,5 +59,24 @@ func (v *CollectionUploadView) VerifyPrefix(ctx context.Context, at time.Time) e
 	if used != head.EncodedBytes || digest != head.ProgressDigest {
 		return ErrCollectionUnavailable
 	}
-	return v.verifyAppendCurrent(ctx, currentTime, head)
+	return v.verifyPrefixCurrent(ctx, currentTime, head)
+}
+
+// Verification is read-only and may follow validation progress when the view
+// was opened for input proof. Append verification still requires upload phase.
+// Sample time under the lock so contention cannot extend an expired proof.
+func (v *CollectionUploadView) verifyPrefixCurrent(ctx context.Context, now func() time.Time, original CollectionState) error {
+	f := v.view.store.fsm
+	if err := collectionReadLock(ctx, &f.mu); err != nil {
+		return err
+	}
+	defer f.mu.RUnlock()
+	head, err := v.view.current(original.ID, now())
+	if err != nil {
+		return err
+	}
+	if !collectionInputIdentity(original, head) || head.ActivityAt.Before(original.ActivityAt) || head.ExpiresAt.Before(original.ExpiresAt) {
+		return ErrCollectionConflict
+	}
+	return ctx.Err()
 }

@@ -23,7 +23,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `dashboard/src/components/OperationsList.tsx` | [Source](source/dashboard/src/components/OperationsList.tsx.txt) | `6894dd72aec2df2a95083ca4a9d41b13cad28d1cac1a5ed21f2de81253b17e79` |
 | `dashboard/src/import/README.md` | [Source](source/dashboard/src/import/README.md.txt) | `a44a3be9f0273cc2b8f1d497d788e14b9c5a35daa361d6d4e1cc6d240c98192e` |
 | `dashboard/src/pages/OperationDetail.tsx` | [Source](source/dashboard/src/pages/OperationDetail.tsx.txt) | `016ce61243e60c20678dd8278f101a4aa86ac77dde8222a7d81f7e589739caad` |
-| `internal/controller/controller.go` | [Source](source/internal/controller/controller.go.txt) | `5108d59794b3d538a6b15cdb2b0ddd223762afaa37957d8f3917d43881669f7e` |
+| `internal/controller/controller.go` | [Source](source/internal/controller/controller.go.txt) | `2ff1613d3b673b3f85e5873f30ea00da49765aed0a1366ef46020e3d62baecd1` |
 | `internal/controller/systems/catalog_runtime.go` | [Source](source/internal/controller/systems/catalog_runtime.go.txt) | `84bfebe2e466d2325774937a2d619b295c5f4cf46e8f4896bc251f391bea8d86` |
 | `internal/controller/systems/owner_wait.go` | [Source](source/internal/controller/systems/owner_wait.go.txt) | `a27e400d8cd77f24ecd49accfcc906f2c142a5c3601d6781fae5e3198a473acb` |
 | `internal/httpauth/worker_external.go` | [Source](source/internal/httpauth/worker_external.go.txt) | `c53ea0fac6cf98b30981c2caf0ba0584ba5592d91e799c8d30adfc18e49bd6e7` |

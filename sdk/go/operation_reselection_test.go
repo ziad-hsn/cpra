@@ -135,7 +135,7 @@ func TestReselectionInputBoundsBeforeHTTP(t *testing.T) {
 	var calls atomic.Int32
 	c := fixture(t, func(http.ResponseWriter, *http.Request) { calls.Add(1) }, nil)
 	for _, request := range []api.CollectionReselectionCreateRequest{
-		{}, {SourceCount: 1, NormalizationProfile: ""}, {SourceCount: 1001, NormalizationProfile: "cpra.file.base.v1"},
+		{}, {SourceCount: -1}, {SourceCount: 1001, NormalizationProfile: "cpra.file.base.v1"},
 		{SourceCount: 1, NormalizationProfile: "unknown"},
 	} {
 		if _, err := c.Operations.CreateReselection(t.Context(), reselectionTestOperation, request); err == nil {
@@ -337,6 +337,39 @@ func TestReselectionUploadResponseCoversSubmittedPart(t *testing.T) {
 			}
 			if calls.Load() != 1 {
 				t.Fatal("mutation retried")
+			}
+		})
+	}
+}
+
+func TestReselectionPreservesOrdinaryAndProfiledInputs(t *testing.T) {
+	for _, profile := range []string{"", "cpra.file.base.v1"} {
+		t.Run("profile="+profile, func(t *testing.T) {
+			want := reselectionTestObservation()
+			want.NormalizationProfile = profile
+			want.SourcesCompleted, want.RawBytes, want.NextSource = 0, 0, 1
+			calls := 0
+			c := fixture(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method == http.MethodPost {
+					var request map[string]any
+					if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+						t.Error(err)
+					}
+					if len(request) != 2 || request["normalizationProfile"] != profile || request["sourceCount"] != float64(3) {
+						t.Error("original profile was omitted or changed", request)
+					}
+					w.WriteHeader(http.StatusCreated)
+				}
+				_ = json.NewEncoder(w).Encode(want)
+			}, nil)
+			created, err := c.Operations.CreateReselection(t.Context(), reselectionTestOperation, api.CollectionReselectionCreateRequest{SourceCount: 3, NormalizationProfile: profile})
+			if err != nil || created == nil || created.Data.NormalizationProfile != profile {
+				t.Fatal("supported original profile was rejected or rewritten", err)
+			}
+			read, err := c.Operations.GetReselection(t.Context(), reselectionTestOperation, reselectionTestAttempt)
+			if err != nil || read == nil || read.Data.NormalizationProfile != profile || calls != 2 {
+				t.Fatal("supported original profile could not be read", err, calls)
 			}
 		})
 	}

@@ -103,7 +103,13 @@ func collectionUploadAppendShape(h CollectionState) bool {
 }
 
 func collectionUploadAppendIdentity(a, b CollectionState) bool {
-	if !collectionUploadAppendShape(a) || !collectionUploadAppendShape(b) || a.ID != b.ID || a.UploadID != b.UploadID ||
+	return collectionUploadAppendShape(a) && collectionUploadAppendShape(b) && collectionInputIdentity(a, b)
+}
+
+// collectionInputIdentity compares the immutable input, independent of
+// validation progress. Callers separately enforce phase and prefix permissions.
+func collectionInputIdentity(a, b CollectionState) bool {
+	if a.ID != b.ID || a.UploadID != b.UploadID ||
 		a.Actor != b.Actor || a.NormalizationProfile != b.NormalizationProfile || a.IdentityFormat != b.IdentityFormat ||
 		a.ContentDigest != b.ContentDigest || a.ItemCount != b.ItemCount || a.MaxEncodedBytes != b.MaxEncodedBytes || !a.CreatedAt.Equal(b.CreatedAt) ||
 		(a.Owner == nil) != (b.Owner == nil) || a.Owner != nil && *a.Owner != *b.Owner ||

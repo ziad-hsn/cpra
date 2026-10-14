@@ -547,6 +547,15 @@ handle and committed progress survive. A failed/lost response stops continuation
 and retains the original handle and any known attempt handle. No write is retried
 automatically, and no replacement operation is created.
 
+Continuation depends on the original phase. Losing a client reply does not stop
+the server's validation. A queued validation or a finalized original verdict can
+survive an owner restart. If the server loses a claimed, unfinished validation,
+it records `interrupted`; `resume` reports that disposition and sends no new
+work. Inspect the original operation and retained evidence before explicitly
+applying new intent. It cannot recompile against changed configuration under the
+old handle. An operation already in execution is observed with
+`cpractl wait operation/OPERATION_ID`, without another activation request.
+
 `--wait` observes the original execution after activation. Canceling the client
 wait never cancels that execution. `resume-upload` remains limited to missing
 uploads and never validates or activates. SDK callers use `collection.ResumeFiles`

@@ -42,6 +42,51 @@ func TestCollectionUploadVerifyPrefixBoundedPagesAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestCollectionInputVerifyPrefixDuringValidation(t *testing.T) {
+	for _, disk := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disk=%t", disk), func(t *testing.T) {
+			s := collectionReadStore(t, disk)
+			head, authority := validationApplyInput(t, s, 2)
+			captured, _, err := s.CollectionInputView(t.Context(), head.ID, head.ActivityAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			upload, _, err := s.CollectionUploadView(t.Context(), head.ID, head.ActivityAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			head = requestTestClaim(t, s, requestTestBegin(t, s, head, authority))
+			current, _, err := s.CollectionInputView(t.Context(), head.ID, head.ActivityAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := json.Marshal(s.fsm.image)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, view := range []*CollectionUploadView{captured, current} {
+				if err := view.VerifyPrefix(t.Context(), head.ActivityAt); err != nil {
+					t.Fatal("original input proof rejected during validation", err)
+				}
+			}
+			if err := upload.VerifyPrefix(t.Context(), head.ActivityAt); !errors.Is(err, ErrOperationExpired) {
+				t.Fatal("upload-only capability remained usable during validation", err)
+			}
+			after, err := json.Marshal(s.fsm.image)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("input proof changed committed state", err)
+			}
+			command := requestTestInterrupt(head, "coordinatorRestarted")
+			head = validationApplyAllowed(t, collectionCommand(t, s, command, command.ValidationInterruption.At))
+			for _, view := range []*CollectionUploadView{captured, current} {
+				if err := view.VerifyPrefix(t.Context(), head.ActivityAt); !errors.Is(err, ErrOperationExpired) {
+					t.Fatal("interrupted input remained readable", err)
+				}
+			}
+		})
+	}
+}
+
 func TestCollectionUploadVerifyPrefixRejectsEquivalentReencryption(t *testing.T) {
 	for _, disk := range []bool{false, true} {
 		t.Run(fmt.Sprintf("disk=%t", disk), func(t *testing.T) {

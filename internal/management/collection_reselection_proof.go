@@ -49,8 +49,8 @@ func (collectionReselectionProof) MarshalJSON() ([]byte, error) { return nil, er
 
 // The caller must authenticate the named actor before construction. Committed
 // authority, ownership, profile and prefix are checked before decrypting the
-// identity, and again after every external key operation. Only the explicit
-// base file profile is supported; unprofiled uploads remain on their old path.
+// identity, and again after every external key operation. Ordinary file input
+// retains its empty profile; the explicit base profile remains unchanged.
 func proveCollectionReselection(ctx context.Context, catalog *Catalog, id, actor string, sources *reselectionSources,
 	spool *reselectionSpool, canWrite func(persistence.CatalogKey) bool, now func() time.Time) (*collectionReselectionProof, error) {
 	if ctx == nil || catalog == nil || sources == nil || spool == nil || sources.spool != spool || canWrite == nil || now == nil {

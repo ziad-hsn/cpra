@@ -123,3 +123,11 @@ unused batch/alert removal are complete for this working implementation.
 Independent review and scoped default/tagged/minimum/race checks pass with the
 boundaries recorded in the [audit follow-up](alert-path-audit-2026-10-13.md).
 This closes the finite code repair, not the final frozen release matrix.
+
+F55 now has real CLI reply-loss/continuation coverage for upload, validation and
+activation. These checks found and repaired ordinary-profile and post-validation
+input-proof failures. Interrupted compiler attempts remain terminal with their
+original evidence and zero activation. Focused default/minimum/tagged/race checks
+and independent source review pass; see the
+[continuation record](collection-continuation-2026-10-14.md). Slow-storage contention
+and the complete frozen release matrices remain separate.

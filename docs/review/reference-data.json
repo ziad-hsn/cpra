@@ -1361,9 +1361,9 @@
     },
     {
       "asset": "review/source/internal/controller/controller.go.txt",
-      "bytes": 29288,
+      "bytes": 26011,
       "path": "internal/controller/controller.go",
-      "sha256": "5108d59794b3d538a6b15cdb2b0ddd223762afaa37957d8f3917d43881669f7e"
+      "sha256": "2ff1613d3b673b3f85e5873f30ea00da49765aed0a1366ef46020e3d62baecd1"
     },
     {
       "asset": "review/source/internal/controller/systems/catalog_runtime.go.txt",

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ziad-hsn/cpra/internal/alerts"
 	"github.com/ziad-hsn/cpra/internal/controller/systems"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/management"
@@ -64,7 +63,6 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 // Controller manages the ECS world and its systems using ark-tools.
 type Controller struct {
 	durableSystem        *systems.DurableSystem
-	stateLogger          *systems.StateLogger
 	pulseQueue           queue.Queue
 	codeQueue            queue.Queue
 	interventionQueue    queue.Queue
@@ -122,11 +120,6 @@ type Config struct {
 	// before Start when the entity count exceeds it. Zero disables selection.
 	// Set via the CPRA_ENTITY_THRESHOLD env var or config.
 	EntityCountThreshold int64
-	// SnapshotInterval is how often the dashboard stats snapshot is rebuilt.
-	// The snapshot is an O(N) scan of every monitor that runs inside the ECS
-	// tick loop, so a too-small interval stalls the pipeline on large fleets.
-	// Zero or negative falls back to 5s.
-	SnapshotInterval time.Duration
 	// TPS is the ark-tools tick rate (ticks/sec). Zero falls back to 10.
 	TPS int
 }
@@ -144,13 +137,17 @@ func DefaultConfig() Config {
 		SizingHeadroomPct: 0,
 		AlertCooldown:     5 * time.Minute,
 		RecoveryBypass:    true,
-		SnapshotInterval:  5 * time.Second,
 		TPS:               200,
 	}
 }
 
 // NewController creates a new controller with its queues, workers and ECS systems.
+// Store must be initialized even in memory mode. A nil Store is a caller error
+// and panics before queues or workers are allocated.
 func NewController(config Config) *Controller {
+	if config.Store == nil {
+		panic("controller requires an initialized store")
+	}
 	// Create ark-tools app with initial capacity
 	arkApp := app.New(1024)
 	tps := config.TPS
@@ -211,85 +208,24 @@ func NewController(config Config) *Controller {
 	interventionQueue = interventionPool.Queue()
 	codeQueue = codePool.Queue()
 
-	stateLogger := systems.NewStateLogger(config.Debug)
 	metricsAgg := NewMetricsAggregator()
 	snapshotHolder := fleetview.NewHolder()
 	logger := &LoggerAdapter{logger: SystemLogger.withCallerSkip(1), metrics: metricsAgg}
 
-	// Construct the alert manager once and share it across the systems that
-	// trigger, enqueue, and observe code alerts.
 	alertCooldown := config.AlertCooldown
 	if alertCooldown <= 0 {
 		alertCooldown = 5 * time.Minute
 	}
-	alertPolicy := alerts.NewDefaultPolicy(world, config.RecoveryBypass)
-	alertMgr := alerts.NewManager(world, alertPolicy, alertCooldown)
-
-	// Connect systems to their queues and worker pools.
 	pulseRouter := pulsePool.GetRouter()
 	interventionRouter := interventionPool.GetRouter()
 	codeRouter := codePool.GetRouter()
-
-	pulseSched := systems.NewPulseScheduler()
-	interventionReady := &systems.ReadyQueue{}
-	codeSched := systems.NewCodeScheduler()
-
-	pulseScheduleSystem := systems.NewBatchPulseScheduleSystem(world, pulseSched, logger, stateLogger)
-	pulseSystem := systems.NewBatchPulseSystem(world, pulseQueue, pulseSched, config.BatchSize, logger, stateLogger)
-	pulseResultSystem := systems.NewBatchPulseResultSystem(world, pulseRouter.PulseResultChan, pulseSched, interventionReady, codeSched, logger, stateLogger, alertMgr)
-
-	interventionSystem := systems.NewBatchInterventionSystem(world, interventionQueue, interventionReady, config.BatchSize, logger, stateLogger)
-	interventionResultSystem := systems.NewBatchInterventionResultSystem(world, interventionRouter.InterventionResultChan, codeSched, logger, stateLogger, alertMgr)
-
-	codeScheduleSystem := systems.NewBatchCodeScheduleSystem(world, codeSched, logger, stateLogger)
-	codeSystem := systems.NewBatchCodeSystem(world, codeQueue, codeSched, config.BatchSize, logger, stateLogger, alertMgr)
-	codeResultSystem := systems.NewBatchCodeResultSystem(world, codeRouter.CodeResultChan, codeSched, logger, stateLogger, alertMgr)
-
-	var durableSystem *systems.DurableSystem
 	wakeups := make(chan struct{}, 1)
-	if config.Store != nil {
-		durableSystem = systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
-		durableSystem.SetWakeup(wakeups)
-		for _, router := range []*queue.ResultRouter{pulseRouter, interventionRouter, codeRouter} {
-			router.SetWakeup(wakeups)
-		}
-		arkApp.AddSystem(durableSystem)
-	} else {
-		arkApp.AddSystem(pulseScheduleSystem)
-		arkApp.AddSystem(pulseSystem)
-		arkApp.AddSystem(interventionSystem)
-		arkApp.AddSystem(codeScheduleSystem)
-		arkApp.AddSystem(codeSystem)
-		arkApp.AddSystem(pulseResultSystem)
-		arkApp.AddSystem(interventionResultSystem)
-		arkApp.AddSystem(codeResultSystem)
+	durableSystem := systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
+	durableSystem.SetWakeup(wakeups)
+	for _, router := range []*queue.ResultRouter{pulseRouter, interventionRouter, codeRouter} {
+		router.SetWakeup(wakeups)
 	}
-
-	// Snapshot system publishes a read-only fleet projection for the web
-	// server. It reads the world only inside its tick, throttled to
-	// SnapshotInterval (default 5s) because the O(N) scan stalls the pipeline
-	// on large fleets.
-	snapshotInterval := config.SnapshotInterval
-	if snapshotInterval <= 0 {
-		snapshotInterval = 5 * time.Second
-	}
-	statsSnapshotSystem := systems.NewBatchStatsSnapshotSystem(world, logger, snapshotHolder, snapshotInterval, 1_000_000)
-	if durableSystem == nil {
-		arkApp.AddSystem(statsSnapshotSystem)
-	}
-
-	// Drain pulse results a second time at the END of the tick. The result
-	// system runs once per tick by default, so a result is applied on the NEXT
-	// tick (~1 tick of round-trip latency). Draining again here applies the
-	// results that arrived since the first drain in the SAME tick, shrinking
-	// the round-trip below one tick.
-	if durableSystem == nil {
-		arkApp.AddSystem(pulseResultSystem)
-	}
-	resultSystems := []app.System{pulseResultSystem, interventionResultSystem, codeResultSystem, statsSnapshotSystem}
-	if durableSystem != nil {
-		resultSystems = []app.System{durableSystem}
-	}
+	arkApp.AddSystem(durableSystem)
 
 	return &Controller{
 		durableSystem:        durableSystem,
@@ -304,10 +240,9 @@ func NewController(config Config) *Controller {
 		codePool:             codePool,
 		config:               config,
 		entityCountThreshold: config.EntityCountThreshold,
-		stateLogger:          stateLogger,
 		metricsAgg:           metricsAgg,
 		snapshotHolder:       snapshotHolder,
-		resultSystems:        resultSystems,
+		resultSystems:        []app.System{durableSystem},
 		wakeups:              wakeups,
 	}
 }

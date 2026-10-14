@@ -26,6 +26,9 @@ type ContinuationOperations interface {
 // input validation and conditional activation. No mutation is automatically
 // retried. A stopped Wait or context never cancels the server operation. Sources
 // and attempt spools retain Reselect's byte/count limits and ownership rules.
+// A validation interrupted after losing its compiler owner cannot be restarted
+// under the same operation. ErrReselectionState and Result.Operation preserve
+// that disposition. Observe an already activated operation with Wait instead.
 func ResumeFiles(ctx context.Context, operations ContinuationOperations, id string, sources []Source, options ReselectionOptions) (Result, error) {
 	result := Result{OperationID: id}
 	reselected, err := reselect(ctx, operations, id, sources, options, true)

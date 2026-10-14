@@ -324,6 +324,37 @@ Applying and terminal operations can still be observed without the count.
 `Reselect` requires an explicit uploaded count in every original-operation
 observation and returns `ErrReselectionObservation` when that count is absent.
 
+## Continue a file import through activation
+
+`ResumeFiles` uses the server's original private identity to verify the exact
+sources before continuing validation and activation. It supports ordinary
+`Freeze` file imports with an empty normalization profile, as well as
+`cpra.file.base.v1`; it never changes that profile. Preserve the original file
+order, boundaries, comments and whitespace.
+
+```go
+result, err := collection.ResumeFiles(ctx, client.Operations, operationID,
+    []collection.Source{
+        collection.File("shared/endpoints.yaml"),
+        collection.File("services/payments.yaml"),
+    }, collection.ReselectionOptions{})
+// Retain result.OperationID and result.VerificationAttemptID on failure.
+if err != nil {
+    return err
+}
+result, err = collection.Wait(ctx, client.Operations, result)
+```
+
+Complete uploads are verified too. The existing source and staging limits apply;
+verification does not grant permission to recreate validation or retry activation.
+If a server restart lost an unfinished compiler attempt, the original operation
+is `interrupted`. `ResumeFiles` returns `ErrReselectionState` with that state in
+`result.Operation` and submits no new work. Inspect its retained evidence before
+explicitly applying new intent. A finalized original verdict remains usable;
+the client does not compile a replacement against changed catalog state.
+For an operation already in execution, use `Wait` on its original result instead
+of `ResumeFiles`. Canceling that wait does not cancel the server operation.
+
 The server v2 management/operation contract remains a prerequisite. Package and
 HTTP fixture tests establish loader/client behavior, not production server CAS,
 encrypted server staging, real provider effects, or million-monitor qualification.

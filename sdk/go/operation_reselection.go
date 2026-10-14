@@ -68,12 +68,14 @@ func reselectionAttemptID(id string) bool {
 
 // CreateReselection requests a disposable, caller-owned attempt under the
 // original operation. It does not upload, verify, renew or activate that operation.
+// NormalizationProfile must match the original, including empty for ordinary
+// file input. The server verifies source bytes and resource identities.
 // Discover server support before use; this candidate contract is additive.
 func (s *OperationsService) CreateReselection(ctx context.Context, id string, req api.CollectionReselectionCreateRequest) (*Response[api.CollectionReselectionAttempt], error) {
 	if err := reselectionIDs(id, "", false); err != nil {
 		return nil, err
 	}
-	if req.SourceCount < 1 || req.SourceCount > 1000 || req.NormalizationProfile != "cpra.file.base.v1" {
+	if req.SourceCount < 1 || req.SourceCount > 1000 || req.NormalizationProfile != "" && req.NormalizationProfile != "cpra.file.base.v1" {
 		return nil, errReselectionRequest
 	}
 	raw, err := s.c.generated.CreateCollectionReselection(ctx, id, req)
@@ -201,7 +203,7 @@ func reselectionResponse(c *Client, raw *http.Response, requestErr error, id, at
 }
 
 func validateReselectionObservation(a api.CollectionReselectionAttempt) error {
-	if !reselectionAttemptID(a.ID) || a.NormalizationProfile != "cpra.file.base.v1" || a.ExpiresAt.IsZero() ||
+	if !reselectionAttemptID(a.ID) || a.NormalizationProfile != "" && a.NormalizationProfile != "cpra.file.base.v1" || a.ExpiresAt.IsZero() ||
 		a.SourceCount < 1 || a.SourceCount > 1000 || a.SourcesCompleted < 0 || a.SourcesCompleted > a.SourceCount ||
 		a.RawBytes < 0 || a.RawBytes > 64<<20 || a.NextOffset < 0 || a.NextOffset > a.RawBytes || a.OperationUploaded < 0 || a.OperationUploaded > 10_000 {
 		return errReselectionResponse

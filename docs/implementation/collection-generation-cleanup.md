@@ -44,6 +44,16 @@ administrative authentication operations do not invoke cleanup. Use a separate
 maintenance worker; neither the controller owner loop nor request handlers do
 directory scanning, unlinking or synchronous filesystem maintenance.
 
+Explicit authenticated restore has a separate, offline preparation step for an
+already-admitted retirement copied from a backup. While holding the copied
+store's ownership lock, it verifies the original intent, catalog and selector,
+then checks destination native identities before removing only the admitted
+obsolete generation. This finishes inside the unpublished private destination;
+it neither admits another retirement nor changes the original backup. Catalog
+publication precedes intent removal. A partially written or unverifiable intent
+fails preparation. Ordinary startup retains its exact native identity checks,
+and stopped backup validation remains read-only.
+
 Keep **the selected current generation and the previous completed selection**
 in the local durable generation catalog, plus every live/pinned generation.
 Completion-marker modification time remains a conservative native eligibility

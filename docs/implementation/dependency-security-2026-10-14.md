@@ -103,3 +103,24 @@ test failure before termination; that prefix is not a complete matrix pass.
 Release/compiler, native, provider, deployment and comparative-capacity gates
 remain open. The 24-hour endurance run remains cancelled. No public promotion
 is performed by this repair.
+
+## Isolated tools and reference fixture
+
+A subsequent scan at `ddc2210` covers the separately pinned build tools and
+A2A reference fixture, which are outside the application's module traversal.
+The scans use Go 1.27.2 and `govulncheck v1.7.0`; their evidence remains private.
+No module versions or suppressions change in this follow-up.
+
+| Selection | Scan | Result |
+| --- | --- | --- |
+| `internal/jobs/testdata/a2aagent` | Required modules | Zero findings; this is not agent interoperability or provider-effect evidence. |
+| Pinned `oapi-codegen` command in `tools/sdkgen` | Source/symbol | Five required-module advisories: GO-2026-6095, GO-2026-6112, GO-2026-6179, GO-2026-6180 and GO-2026-6629. No affected imported-package or called-symbol findings in this command. |
+| `tools/modulezip`, including tests | Source/symbol | Two required-module advisories: GO-2026-6179 and GO-2026-6180. No affected imported-package or called-symbol findings in this tool. |
+
+The generator's initial invocations failed because its module root contains no
+Go package and because module-only scanning does not accept package patterns.
+Those invocations are retained as unsuccessful attempts; the command-specific
+source scan above supplies the reachability assessment. JSON exit status alone
+does not establish an empty finding inventory. These finite tool results do not
+close the application's separate, reachable HTTP/2 findings or qualify a frozen
+release.

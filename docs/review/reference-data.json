@@ -1589,9 +1589,9 @@
     },
     {
       "asset": "review/source/internal/persistence/collection_ledger_gc_windows.go.txt",
-      "bytes": 8277,
+      "bytes": 8220,
       "path": "internal/persistence/collection_ledger_gc_windows.go",
-      "sha256": "b686416c735a2ce3d8b47f947c9252d051d0d0ec7cd660e5100a5184761606ae"
+      "sha256": "ade0f20797b14196058b665debe277e5c0237471d7d489fa44a811acce01b4e9"
     },
     {
       "asset": "review/source/internal/persistence/collection_operation_access.go.txt",
@@ -1643,9 +1643,9 @@
     },
     {
       "asset": "review/source/internal/persistence/restore_reset.go.txt",
-      "bytes": 13767,
+      "bytes": 14086,
       "path": "internal/persistence/restore_reset.go",
-      "sha256": "88722ce69bca5f6ab85b2f6aa45e74473ccb3b72498399759bf0ee3d9b7fbd86"
+      "sha256": "13ba30eed7a89e1c6a5a5a64eb28077f6ac17c1921bbf66a1f67be8f938a2b80"
     },
     {
       "asset": "review/source/internal/persistence/store.go.txt",

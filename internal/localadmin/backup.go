@@ -152,9 +152,12 @@ func Restore(backup, destination, authenticationKeyFile string) error {
 		return fmt.Errorf("backup changed while restoring")
 	}
 	if err = persistence.MarkRestored(copied, time.Now().UTC()); err != nil {
-		return err
+		return fmt.Errorf("prepare restored state: %w", err)
 	}
-	return replacePath(copied, destination)
+	if err := replacePath(copied, destination); err != nil {
+		return fmt.Errorf("publish restored state: %w", err)
+	}
+	return nil
 }
 
 func verifyBackup(root string, key []byte) (BackupManifest, error) {

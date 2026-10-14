@@ -12,6 +12,13 @@ Go 1.25 application minimum has not been changed without a user decision.
 The earlier `73d4797` qualification prefix is incomplete and does not qualify
 the changed recipe or dependency graph.
 
+The [collection backup/restore follow-up](collection-backup-restore-2026-10-14.md)
+repairs a reproduced pending-cleanup restore failure. The authenticated private
+restore copy now completes the original admitted retirement before publication;
+the original backup and ordinary runtime identity checks remain intact. Focused
+Linux regression/race checks and independent source review pass. Native checks
+and the remaining final-source matrices are recorded separately.
+
 All checks below are private development evidence for the inspected working
 source. They are not a replacement for the complete final-commit matrices or
 independent review. Failed reproductions and intermediate failures are retained.

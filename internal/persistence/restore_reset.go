@@ -97,6 +97,12 @@ func MarkRestored(directory string, at time.Time) error {
 	if err = m.validate(); err != nil {
 		return err
 	}
+	// A complete backup can contain a partially retired collection generation.
+	// Its native identities belong to the source filesystem, so finish only
+	// that authenticated copied intent before publishing the restored store.
+	if err := restoreCollectionRetirement(directory, lock.NodeID); err != nil {
+		return err
+	}
 	// Publish the incompatibility fence first. If the marker write fails, both
 	// old and current binaries reject the incomplete destination.
 	node := nodeIdentity{Version: restoredIdentityVersion, ID: lock.NodeID, Initialized: true, RestoreID: m.ID}

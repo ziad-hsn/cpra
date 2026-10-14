@@ -323,6 +323,15 @@ owner while stopped. Resume with matching configuration and explicit data path;
 check readiness, history and unknown outcomes. A backup may still contain a
 started action: recovery conservatively marks it unknown.
 
+A stopped backup can also contain an admitted, unfinished deletion of an old
+collection ledger generation. Explicit restore finishes that one deletion in
+its authenticated private copy before publishing the destination. It protects
+the current and previous generations, verifies the copied files, and updates
+the generation catalog before removing the cleanup record. The backup remains
+unchanged. Incomplete or unverifiable cleanup records fail restore; ordinary
+startup does not reinterpret copied filesystem identities or delete unknown
+files. Backup inspection itself performs no cleanup.
+
 Restore also starts a new authentication epoch. Keep the owner stopped, inspect
 the restored policy, and provision fresh operator access before starting it:
 

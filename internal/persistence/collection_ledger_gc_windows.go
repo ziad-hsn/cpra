@@ -10,8 +10,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const collectionGCIntentTemporary = "gc-retirement.tmp"
-
 // Local NTFS provides the 64-bit file ID used by this private intent format.
 // Network filesystems can return partial identities; ReFS needs a 128-bit ID.
 // Neither is permitted to authorize this implementation's removal protocol.

@@ -31,6 +31,23 @@ type collectionGenerationCatalog struct {
 	UnlinkedBytes int64    `json:"unlinkedBytes"`
 }
 
+func (c collectionGenerationCatalog) validate(nodeID string) error {
+	if c.Version != 1 || c.NodeID != nodeID || !collectionGCUUID(c.StoreID) || len(c.Completed) > maxCollectionGenerations || c.UnlinkedBytes < 0 {
+		return errCollectionLedgerCorrupt
+	}
+	seen := make(map[string]bool, len(c.Completed))
+	for _, name := range c.Completed {
+		if !collectionGCName(name) || seen[name] {
+			return errCollectionLedgerCorrupt
+		}
+		seen[name] = true
+	}
+	if c.Current != "" && !seen[c.Current] || c.Previous != "" && (!seen[c.Previous] || c.Previous == c.Current) {
+		return errCollectionLedgerCorrupt
+	}
+	return nil
+}
+
 // CollectionStorageAccounting is a sampled, path-free observation. Unlinked
 // bytes describe apparent file sizes; they do not promise physical reclamation.
 type CollectionStorageAccounting struct {
@@ -89,18 +106,8 @@ func newCollectionGenerations(directory, nodeID string) (*collectionGenerations,
 	defer root.Close()
 	var saved collectionGenerationCatalog
 	if err := readCollectionGenerationJSON(root, collectionGenerationCatalogName, &saved); err == nil {
-		if saved.Version != 1 || saved.NodeID != nodeID || !collectionGCUUID(saved.StoreID) || len(saved.Completed) > maxCollectionGenerations || saved.UnlinkedBytes < 0 {
-			return nil, errCollectionLedgerCorrupt
-		}
-		seen := make(map[string]bool, len(saved.Completed))
-		for _, name := range saved.Completed {
-			if !collectionGCName(name) || seen[name] {
-				return nil, errCollectionLedgerCorrupt
-			}
-			seen[name] = true
-		}
-		if saved.Current != "" && !seen[saved.Current] || saved.Previous != "" && (!seen[saved.Previous] || saved.Previous == saved.Current) {
-			return nil, errCollectionLedgerCorrupt
+		if err := saved.validate(nodeID); err != nil {
+			return nil, err
 		}
 		owner.catalog = saved
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -146,6 +153,10 @@ func readCollectionGenerationJSON(root *os.Root, name string, target any) error 
 	if err != nil {
 		return err
 	}
+	return decodeCollectionGenerationJSON(raw, target)
+}
+
+func decodeCollectionGenerationJSON(raw []byte, target any) error {
 	if len(raw) > 64<<10 || api.StrictDecode(raw, target) != nil {
 		return errCollectionLedgerCorrupt
 	}

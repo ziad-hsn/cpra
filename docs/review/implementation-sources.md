@@ -61,7 +61,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/collection_execution_snapshot.go` | [Source](source/internal/persistence/collection_execution_snapshot.go.txt) | `bea1c5f29a2996cb85c1d8959884259550d827dba746384f539c0e516f35eafe` |
 | `internal/persistence/collection_ledger_gc_darwin.go` | [Source](source/internal/persistence/collection_ledger_gc_darwin.go.txt) | `ee0c4bfbd2d05ced86c30ba30dea352f1fa6c277c90b2b5e08920c77ae592e4e` |
 | `internal/persistence/collection_ledger_gc_engine.go` | [Source](source/internal/persistence/collection_ledger_gc_engine.go.txt) | `8bbd966ef2b4cf0fee6d8e05fd2a2d8a3e8750e0d3893b4444acb0cfc76f6348` |
-| `internal/persistence/collection_ledger_gc_windows.go` | [Source](source/internal/persistence/collection_ledger_gc_windows.go.txt) | `b686416c735a2ce3d8b47f947c9252d051d0d0ec7cd660e5100a5184761606ae` |
+| `internal/persistence/collection_ledger_gc_windows.go` | [Source](source/internal/persistence/collection_ledger_gc_windows.go.txt) | `ade0f20797b14196058b665debe277e5c0237471d7d489fa44a811acce01b4e9` |
 | `internal/persistence/collection_operation_access.go` | [Source](source/internal/persistence/collection_operation_access.go.txt) | `3b0e5253f44037ef1f7633315b73ccae566c189f83c89f1c695bd9d859e7b202` |
 | `internal/persistence/collection_usage_native.go` | [Source](source/internal/persistence/collection_usage_native.go.txt) | `4a6ae94dd775334e19a8cf40dc2b5f3932d96589a14af58c7a2815e72f0b1477` |
 | `internal/persistence/command_digest_v1.go` | [Source](source/internal/persistence/command_digest_v1.go.txt) | `d8be70116f5a0766836418e9a67e536e372f98f3c642810a332997ebc0a13e66` |
@@ -70,7 +70,7 @@ These downloads contain the exact source bytes used to prepare this documentatio
 | `internal/persistence/management_operation_history.go` | [Source](source/internal/persistence/management_operation_history.go.txt) | `ddcf3d5c9a3e91a1498b3dcbf12cd8064f984bd041c094b1aca9a6b278550439` |
 | `internal/persistence/management_operation_view.go` | [Source](source/internal/persistence/management_operation_view.go.txt) | `b5f3bb3a55346bb7750c97e683b0fa4c3b4f9266877f1419d8519e6b2ada149c` |
 | `internal/persistence/model.go` | [Source](source/internal/persistence/model.go.txt) | `31b496ed020f96a1b4b44c135cff7e2fcdb018775bcf48fc1075022a51e7fca7` |
-| `internal/persistence/restore_reset.go` | [Source](source/internal/persistence/restore_reset.go.txt) | `88722ce69bca5f6ab85b2f6aa45e74473ccb3b72498399759bf0ee3d9b7fbd86` |
+| `internal/persistence/restore_reset.go` | [Source](source/internal/persistence/restore_reset.go.txt) | `13ba30eed7a89e1c6a5a5a64eb28077f6ac17c1921bbf66a1f67be8f938a2b80` |
 | `internal/persistence/store.go` | [Source](source/internal/persistence/store.go.txt) | `87dba08c451c7c1307f339ad35f808348652e2cb839f73bb592a0cd890a789cc` |
 | `internal/persistence/worker_authority_external.go` | [Source](source/internal/persistence/worker_authority_external.go.txt) | `890ab7ea9ea1389c586616223ed19ab8c8cf1f04dd32d43e52411728914b01f4` |
 | `internal/persistence/worker_policy_external.go` | [Source](source/internal/persistence/worker_policy_external.go.txt) | `75e6c5376ad97c56adb1ae73a3617df5fd060c45e491e4a4384fbf9f56060731` |

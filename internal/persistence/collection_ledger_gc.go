@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const collectionGCIntentTemporary = "gc-retirement.tmp"
+
 var (
 	errCollectionGCUnavailable = errors.New("collection generation cleanup unavailable")
 	errCollectionGCBlocked     = errors.New("collection generation cleanup requires attention")

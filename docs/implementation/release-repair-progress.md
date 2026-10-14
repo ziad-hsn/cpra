@@ -781,3 +781,38 @@ examples. Independent source review closed both finite findings without another
 concrete issue; the reviewer ran no tests or builds. Canonical and rendered-site
 checks are retained separately. Final frozen-source qualification and the
 dependency-security decision remain open.
+
+## Common compiler minimum and retained-receipt fixtures, 14 October
+
+All seven repository modules now require Go 1.26.0; the release compiler is
+Go 1.27.2. The [dependency repair record](dependency-security-2026-10-14.md)
+documents the shared minimum, regenerated inputs and scoped security results.
+
+Frozen checkpoint `507559b` passes 982 Python contract-test executions across
+release, SDK, documentation, benchmark, dashboard, provider-verification and
+Helm 4 tooling. The 48 packaging cases also pass under Helm 3. These are tooling
+contracts, not live deployment or provider results. Its strict site build
+checks 178 content pages, 16 redirects and 30,896 internal links/assets without
+errors. Independent reviews of those records are closed.
+
+The Go 1.27.2 full matrix stopped at the scratch limit and remains incomplete.
+A separate Go 1.26.0 correctness run completed the default application suite
+with two failed control tests: their fixed September 14 receipt timestamps had
+aged outside history's 30-day retention window. A focused rerun reproduced both
+failures. Superseded receipts correctly leave active state and are then subject
+to retained-history expiry; no production retention defect was found.
+
+The repair gives each affected test one current UTC base and preserves its
+event ordering, including the catalog deletion timestamp. Production code,
+the shared deterministic policy clock and retention behavior are unchanged.
+The focused controls, receipt-retention, reservation-clock and action-review
+selection passes with race detection in default and `externaljobs` builds on
+both Go 1.26.0 and Go 1.27.2. Independent source review is closed; formatting
+and whitespace checks pass. The original failed logs remain retained.
+
+These focused working-source checks do not complete the failed frozen matrix.
+The repaired source requires a new frozen identity and the outstanding
+compiler, browser, distribution, provider and comparative-performance gates.
+Physical C: free space was 14.88 GiB during this check, below the large campaign's
+initial 35 GiB requirement. Publication remains withheld and the 24-hour run
+remains cancelled.

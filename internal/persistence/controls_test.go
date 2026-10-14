@@ -57,13 +57,14 @@ func applyControlRequest(t *testing.T, s *Store, c Command) Result {
 
 func TestControlsExactIncidentTriageAndDismissal(t *testing.T) {
 	s := openCatalogMemory(t)
+	at := time.Now().UTC()
 	m, g := managedControlMonitor(t, s, "incident")
-	m = controlPulse(t, s, m, g, policyTime().Add(time.Second), "failure")
+	m = controlPulse(t, s, m, g, at.Add(time.Second), "failure")
 	if m.IncidentID == "" || m.IncidentRevision == "" {
 		t.Fatal("outage has no incident identity")
 	}
 	original := m.Clone()
-	ack := controlRequest(m, "acknowledge", "ack-one", policyTime().Add(2*time.Second))
+	ack := controlRequest(m, "acknowledge", "ack-one", at.Add(2*time.Second))
 	ar := applyControlRequest(t, s, ack)
 	m = *ar.Monitor
 	if m.ControlRevision != original.ControlRevision || m.Revision != original.Revision || m.AcknowledgedBy != ack.Control.Actor || !reflect.DeepEqual(m.Actions, original.Actions) {
@@ -80,12 +81,12 @@ func TestControlsExactIncidentTriageAndDismissal(t *testing.T) {
 			break
 		}
 	}
-	sr := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: started.ID, At: policyTime().Add(3 * time.Second), Guard: g})[0]
+	sr := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: started.ID, At: at.Add(3 * time.Second), Guard: g})[0]
 	if !sr.Allowed {
 		t.Fatal("start", sr.Err)
 	}
 	m = *sr.Monitor
-	dr := applyControlRequest(t, s, controlRequest(m, "dismiss", "dismiss-one", policyTime().Add(4*time.Second)))
+	dr := applyControlRequest(t, s, controlRequest(m, "dismiss", "dismiss-one", at.Add(4*time.Second)))
 	m = *dr.Monitor
 	for _, a := range m.Actions {
 		switch {
@@ -107,13 +108,13 @@ func TestControlsExactIncidentTriageAndDismissal(t *testing.T) {
 		t.Fatal("prior triage receipt not superseded", receipt, err)
 	}
 	// Definite rejection of the already-started delivery is recorded but cannot retry a dismissed incident.
-	rr := submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: started.ID, At: policyTime().Add(5 * time.Second), Outcome: "failure", Retryable: true})[0]
+	rr := submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: started.ID, At: at.Add(5 * time.Second), Outcome: "failure", Retryable: true})[0]
 	m = *rr.Monitor
 	if m.Actions[started.ID].State != Failed {
 		t.Fatal("actual rejection not retained")
 	}
 	before := m.Clone()
-	m = *applyControlRequest(t, s, controlRequest(m, "reopen", "reopen-one", policyTime().Add(6*time.Second))).Monitor
+	m = *applyControlRequest(t, s, controlRequest(m, "reopen", "reopen-one", at.Add(6*time.Second))).Monitor
 	if m.Dismissed || !reflect.DeepEqual(m.Actions, before.Actions) || m.InterventionAttempts != before.InterventionAttempts {
 		t.Fatal("reopen replayed prior actions or reset recovery budget")
 	}
@@ -420,10 +421,12 @@ func TestControlsIncidentClosureAndNewIncidentNeverReplaysDismissedWork(t *testi
 
 func TestControlsCatalogRemovalSupersedesPendingBeforeOwnerProjection(t *testing.T) {
 	s := openCatalogMemory(t)
+	at := time.Now().UTC()
 	m, _ := managedControlMonitor(t, s, "deleted")
-	m = *applyControlRequest(t, s, controlRequest(m, "snooze", "pending-removal", policyTime().Add(time.Second))).Monitor
+	m = *applyControlRequest(t, s, controlRequest(m, "snooze", "pending-removal", at.Add(time.Second))).Monitor
 	old := requireCatalog(t, s, CatalogKey{Kind: "Monitor", ID: m.ID})
 	mutation := deleteCatalogMutation(old, "removed-version")
+	mutation.Record.UpdatedAt = at.Add(2 * time.Second)
 	if r := catalogSubmit(t, s, mutation); r.Err != nil || !r.Allowed {
 		t.Fatal("remove", r.Err)
 	}

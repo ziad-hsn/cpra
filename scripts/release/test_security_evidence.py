@@ -307,7 +307,7 @@ class SecurityEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'duplicate'):
             security.scan_results(path, compiler, roots, modules)
 
-    def recorder(self, compiler, called=False):
+    def recorder(self, compiler, called=False, exclusion_error=None, exclusion_exit=0):
         output = self.root / ('recorded-' + compiler + '.json')
         artifacts = output.with_name(output.stem + '.artifacts')
         artifacts.mkdir()
@@ -320,14 +320,29 @@ class SecurityEvidenceTests(unittest.TestCase):
         args = Namespace(out=output, govulncheck=str(scanner))
         program = '/fixture/bin/go'
         report, progress = {}, []
+        shared_cache = self.root / 'shared-build-cache'
+        shared_cache.mkdir(exist_ok=True)
+        (shared_cache / 'retained').write_bytes(b'caller-owned cache')
+        environment = {'GOCACHE': str(shared_cache)}
+        cache_paths = []
 
         def capture(command, relative, name, environment, timeout):
             stdout, stderr = artifacts / (name + '-stdout.log'), artifacts / (name + '-stderr.log')
             stdout.write_bytes(b''); stderr.write_bytes(b'')
             if name == 'security-exclusion':
+                cache = Path(environment['GOCACHE'])
+                cache_paths.append(cache)
+                self.assertTrue(cache.is_relative_to(artifacts))
+                self.assertEqual(cache.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(list(cache.iterdir()), [])
+                (cache / 'exclusion-object').write_bytes(b'disposable build object')
                 (artifacts / 'worker-exclusion.json').write_bytes(release.encoded(
                     exclusion_report(self.manifest, compiler, program)))
+                if exclusion_error is not None:
+                    raise exclusion_error
             elif name == 'scanner-build-info':
+                self.assertEqual(environment['GOCACHE'], str(shared_cache))
+                self.assertFalse(cache_paths[0].exists())
                 info = (source / 'scanner-build-info-stdout.log').read_text().splitlines()
                 stdout.write_text(str(scanner) + ': ' + compiler + '\n' + '\n'.join(info[1:]) + '\n')
             elif name.endswith('-scan-packages'):
@@ -340,15 +355,21 @@ class SecurityEvidenceTests(unittest.TestCase):
                     messages.extend([{'osv': {'id': 'GO-2026-1234'}}, {'finding': {'osv': 'GO-2026-1234', 'trace': [
                         {'module': 'stdlib', 'version': 'v' + compiler.removeprefix('go'), 'package': 'net/http', 'function': 'Serve'}]}}])
                 stdout.write_text('\n'.join(json.dumps(value) for value in messages))
-            return {'exit_code': 0, 'stdout': build_campaign.fingerprint(stdout, self.root),
+            return {'exit_code': exclusion_exit if name == 'security-exclusion' else 0,
+                    'stdout': build_campaign.fingerprint(stdout, self.root),
                     'stderr': build_campaign.fingerprint(stderr, self.root)}
         with patch.object(build_campaign, 'executable', side_effect=lambda value: Path(value) if value != 'python3' else Path('/fixture/bin/python3')):
             security_error = None
             try:
                 build_campaign.record_security(args, self.manifest, self.root / 'source', artifacts,
-                    compiler, Path(program), {}, capture, report, lambda: progress.append(copy.deepcopy(report)))
-            except ValueError as error:
+                    compiler, Path(program), environment, capture, report, lambda: progress.append(copy.deepcopy(report)))
+            except (ValueError, TimeoutError, KeyboardInterrupt) as error:
                 security_error = error
+        self.assertEqual(environment, {'GOCACHE': str(shared_cache)})
+        self.assertEqual((shared_cache / 'retained').read_bytes(), b'caller-owned cache')
+        self.assertEqual(len(cache_paths), 1)
+        self.assertNotEqual(cache_paths[0], shared_cache)
+        self.assertFalse(cache_paths[0].exists())
         return report, progress, artifacts, security_error
 
     def test_recorder_retains_all_scanner_outputs_and_minimum_exclusion(self):
@@ -371,6 +392,24 @@ class SecurityEvidenceTests(unittest.TestCase):
         self.assertEqual(report['security']['scans'][0]['findings']['called'], ['GO-2026-1234'])
         self.assertTrue((artifacts / 'application-default-vulnerabilities-stdout.log').is_file())
         self.assertEqual(progress[-1]['security']['scans'][0]['findings']['called'], ['GO-2026-1234'])
+
+    def test_exclusion_cache_is_removed_after_timeout_or_interruption(self):
+        for compiler, error in ((build.MINIMUM_COMPILER, TimeoutError('fixture timeout')),
+                                (release.RECIPE['go_version'], KeyboardInterrupt())):
+            with self.subTest(error=type(error).__name__):
+                report, _, artifacts, caught = self.recorder(compiler, exclusion_error=error)
+                self.assertIs(caught, error)
+                self.assertEqual(report['security']['scans'], [])
+                self.assertTrue((artifacts / 'worker-exclusion.json').is_file())
+                self.assertTrue((artifacts / 'security-exclusion-stdout.log').is_file())
+
+    def test_exclusion_failure_keeps_logs_and_removes_only_its_cache(self):
+        report, _, artifacts, error = self.recorder(build.MINIMUM_COMPILER, exclusion_exit=1)
+        self.assertIn('worker build exclusion failed', str(error))
+        self.assertEqual(report['security']['exclusion']['exit_code'], 1)
+        self.assertEqual(report['security']['scans'], [])
+        self.assertTrue((artifacts / 'worker-exclusion.json').is_file())
+        self.assertTrue((artifacts / 'security-exclusion-stderr.log').is_file())
 
     def test_scanner_identity_and_repeated_database_records_are_explicit(self):
         original = (self.paths[1].with_name(self.paths[1].stem + '.artifacts') / 'scanner-build-info-stdout.log').read_text()

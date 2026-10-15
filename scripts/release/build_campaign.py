@@ -12,6 +12,7 @@ import platform
 import shutil
 import signal
 import subprocess
+import tempfile
 import time
 
 import build_evidence as build
@@ -54,7 +55,13 @@ def record_security(args, manifest, root, artifacts, compiler, go, environment, 
                '--go', str(go), '--workspace', 'off', '--out', str(output)]
     section['exclusion'] = {'command': command}
     progress()
-    section['exclusion'].update(capture(command, '.', 'security-exclusion', environment, 1800))
+    # Exclusion builds intentionally omit the matrix's trimpath/race settings.
+    # Retaining both object sets inflated the local matrix's scratch footprint.
+    # capture stops the child process group before this owned cache is removed;
+    # original logs and exclusion evidence remain outside the disposable cache.
+    with tempfile.TemporaryDirectory(prefix='exclusion-cache-', dir=artifacts) as cache:
+        isolated = dict(environment, GOCACHE=cache)
+        section['exclusion'].update(capture(command, '.', 'security-exclusion', isolated, 1800))
     if output.is_file():
         section['exclusion']['report'] = fingerprint(output, args.out.absolute().parent)
     progress()

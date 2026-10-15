@@ -886,3 +886,31 @@ Obscured-node and dialog contrast findings remain `needsReview`. No dashboard
 CSS was changed and no accessibility-conformance pass is claimed. Independent
 source and evidence review is closed; all fourteen required manual cases and
 the complete browser matrix against the next frozen source remain outstanding.
+
+## Build-exclusion cache isolation, 15 October
+
+Two private matrices at `5e20a31` completed the default application package,
+static-analysis and race-test selection, then reached the task scratch limit
+during all-built-in static analysis. Both original reports remain incomplete.
+The second run was sequential and began with a cold compiler cache. Its sampled
+peak was 6,243,680,256 bytes; its governor stopped below the 6 GiB hard allowance.
+The completed default selection contains 5,148 passing test/subtest events,
+30 passing packages, two no-test packages and fifteen classified skips. Browser
+companion cases remain separately required.
+
+After stopped compiler temporaries were removed, the original all-built-in
+static-analysis command passed from the surviving cache in 48.538 seconds.
+This is a separate command result, not completion of either interrupted matrix.
+An exact cache inventory found 1,109,217,280 allocated bytes in 1,019 export
+objects used by the exclusion helper's non-trimmed builds. Those settings differ
+from the main matrix and retain an additional object set in the shared cache.
+
+The security recorder now gives only that helper a private temporary build
+cache. It discards the cache after the captured child process group stops,
+before vulnerability scanning and the main matrix. Original output and
+exclusion evidence stay outside the disposable directory. The caller's cache,
+commands, driver selections, race settings, deadlines and evidence reader are
+unchanged. Regression coverage verifies private ownership, isolation, preserved
+output and cleanup on success, failure, timeout and interruption. This harness
+change requires a new source freeze; earlier completed checks keep their own
+source identity and do not qualify the changed candidate.

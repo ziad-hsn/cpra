@@ -374,11 +374,12 @@ Reinstalling an older package or using Helm rollback does not reverse committed
 state or external interventions. Native crash/restart tests establish the
 tested OS/filesystem boundary; they do not claim universal power-loss durability.
 
-The current candidate writes state format 38 for built-in check observations,
-and format 39 for observations from optional external workers. The recorded
-format determines replay behavior: earlier commands retain their original
-transition semantics. The candidate can read the preceding formats, but an
-older executable must reject a state format it does not understand. Restore
+New monitor configuration, check and action transitions use delivery format 40;
+combining this state with optional external-worker state uses format 41. The
+recorded format determines replay behavior: supported earlier commands retain
+their original transition semantics. The reader must support both the stored
+format and any optional worker state. An older executable must reject a state
+format it does not understand. Restore
 the previous stopped backup with a compatible administration tool before
 attempting such a rollback. Do not delete the newer store or silently replace
 it with an empty directory.

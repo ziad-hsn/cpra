@@ -948,3 +948,22 @@ The second private `e555a4a` compiler matrix was intentionally stopped for these
 repairs, with no assertion failure attributed to that interruption. Its completed
 checks retain their original source identity. A new freeze and the corresponding
 qualification are required; no release or publication gate is waived.
+
+## Native cleanup gates and storage guidance, 15 October
+
+The current native guides now describe the implemented Linux, local APFS and
+fixed local NTFS cleanup restrictions. Unsupported or unverifiable objects remain
+protected. Both native CI and private release jobs require filesystem identity
+evidence on Windows as well as Linux and macOS; an unavailable cleanup fixture
+can no longer skip the Windows qualification check.
+
+The native installation and release guides now identify delivery format 40 and
+its optional-worker combination, format 41. Earlier formats 38/39 remain
+documented as historical notification formats. Dated implementation records and
+their original qualification boundaries are preserved.
+
+Independent source review is closed. All fifteen release-policy contracts,
+workflow lint and canonical documentation checks pass. These changes affect
+workflow gates and current documentation, not production storage behavior. The
+running `7478256` Go campaign retains its frozen inputs and does not qualify this
+subsequent correction; final qualification still requires the final source.

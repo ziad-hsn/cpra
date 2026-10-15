@@ -1075,14 +1075,17 @@ Both Helm 3 and 4, including a 3-to-4 upgrade, are exercised. The release gate r
 
 Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
-Default builds support application storage formats **1–14, 31, 33, 35 and 38**. The
+Default builds support application storage formats **1–14, 31, 33, 35, 38 and 40**. The
 private `externaljobs` build additionally supports worker formats **15–30, 32,
-34, 36, 37 and 39**. [Agent actions](implementation/a2a-jobs.md) use common format
+34, 36, 37, 39 and 41**. [Agent actions](implementation/a2a-jobs.md) use common format
 31, recovery-failure notifications use 33, and retained agent connections use
 35. Combining those features with optional worker state requires formats 32,
 34 and 36 respectively; committed-order worker assignment uses 37. State-change
-notification admission uses common format 38 and combined worker format 39;
-historical envelopes retain their original notification semantics. The higher
+notification admission introduced common format 38 and combined worker format
+39. New monitor configuration, check and action transitions use delivery format
+40 for notification identity, diagnostics and deadlines; combining this state
+with optional worker state requires format 41. Supported historical envelopes
+retain their original notification semantics. The higher
 common formats do not make worker formats readable by default builds. The
 release metadata must record the
 reader/writer capability of the actual build. A default binary cannot open

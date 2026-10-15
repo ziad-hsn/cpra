@@ -265,7 +265,7 @@ jobs:
           retention-days: 14
       - name: Native storage and platform correctness
         env:
-          CPRA_REQUIRED_COLLECTION_GC: ${{ runner.os != 'Windows' && '1' || '0' }}
+          CPRA_REQUIRED_COLLECTION_GC: '1'
         run: go test -p=2 ./internal/installpath ./internal/secureconfig ./internal/localadmin ./internal/persistence
       - name: Versioned source installation outside a checkout
         shell: bash

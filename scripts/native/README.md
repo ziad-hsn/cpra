@@ -1,12 +1,17 @@
 # Native service lifecycle verification
 
-Collection-generation cleanup is also a native filesystem gate. On Linux and
-macOS, run the persistence tests with `CPRA_REQUIRED_COLLECTION_GC=1`; the native
-CI and private release jobs set this flag. Missing identity evidence then fails
-instead of skipping the cleanup fixture. macOS cleanup currently supports local
-APFS with no extended ACL on the collection objects. Windows cleanup still
-reports unavailable and preserves its generations; passing its other native
-tests does not close the unfinished Windows retirement gate.
+Collection-generation cleanup is also a native filesystem gate. Linux requires
+filesystem support for the checked `statx` mount and birth-time identity. macOS
+supports local APFS with private ownership/modes and no extended ACL on collection
+objects. Windows supports fixed local NTFS with verified native identities and
+restricted ownership/DACLs; network volumes, ReFS and reparse points cannot
+authorize retirement. Unsupported or unverifiable state is preserved.
+
+For qualifying native persistence runs, set `CPRA_REQUIRED_COLLECTION_GC=1` so
+missing identity evidence fails instead of skipping the cleanup fixture. Native
+CI and private release jobs require this on all three operating systems. Scoped
+native checks and cross-builds do not establish complete native-platform or
+frozen-release qualification.
 
 ```sh
 CPRA_REQUIRED_COLLECTION_GC=1 go test -timeout=45m ./internal/persistence
@@ -163,12 +168,13 @@ inventory. The previous server must refuse upgraded state without calling a
 provider. These controls distinguish an incompatible upgrade from a broken
 previous executable or restore command.
 
-New built-in observations use state format 38; observations from optional
-external workers use format 39. Historical log envelopes retain their original
-transition semantics. Opening old state is supported by the new reader;
-reopening state written by the new observer requires a compatible reader.
-Retain the previous stopped backup and matching administration tool if rollback
-may be necessary.
+New monitor configuration, check and action transitions use delivery format 40;
+combining this state with optional external-worker state uses format 41.
+Supported historical log envelopes retain their original replay semantics.
+Opening older state requires a reader that supports its stored format and
+optional state; after an upgrade, older binaries must refuse unsupported newer
+state. Retain the previous stopped backup and matching administration tool if
+rollback may be necessary.
 
 The schema-2 report records both executable hashes and version output, initial
 committed identities and history, the fixture source hash, each scenario's

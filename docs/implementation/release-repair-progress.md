@@ -914,3 +914,37 @@ unchanged. Regression coverage verifies private ownership, isolation, preserved
 output and cleanup on success, failure, timeout and interruption. This harness
 change requires a new source freeze; earlier completed checks keep their own
 source identity and do not qualify the changed candidate.
+
+## Mobile incident reflow and Compose outage evidence, 15 October
+
+Review of the retained mobile screenshots found a concrete reflow defect:
+the incident identifier occupied a 481-pixel cell inside a 264-pixel region.
+A real TLS/Raft server browser regression reproduced the failure against the
+previous embedded assets. Monitor, incident and operator identifiers now wrap
+within bounded spans while retaining their complete values and navigation.
+
+The regenerated dashboard passes its build, type checks, lint and all 541 tests.
+The normal-startup recovery/review browser case passes with Go 1.27.2 race
+detection, including restart and exactly one recovery request. The incident cell
+measures approximately 88 pixels and becomes fully visible after keyboard
+scrolling. At a 320-pixel viewport all seven cells fit individually within the
+194-pixel table region, with the original incident identity preserved. Ten
+accessibility scans and eleven screenshots are retained. The first rebuilt
+browser attempt exposed a test assumption that scrolling was always necessary;
+the harness now exercises an arrow key even when wrapping already makes the
+cell visible. Both failed attempts remain separate from the passing result.
+Manual accessibility and contrast review remain open.
+
+Independent review also found that the Compose campaign could accept old
+history as evidence of its deliberately induced outage. It now requires a
+completed healthy check, captures the existing event and incident identities,
+then requires a new incident-opening event after the target fails. Restart and
+volume-retention checks must preserve that exact event. The evidence reader
+rejects missing or contradictory baseline and incident fields. All 39 packaging
+evidence tests and 19 container/chart contract tests pass. These contract checks
+do not establish a live container run.
+
+The second private `e555a4a` compiler matrix was intentionally stopped for these
+repairs, with no assertion failure attributed to that interruption. Its completed
+checks retain their original source identity. A new freeze and the corresponding
+qualification are required; no release or publication gate is waived.

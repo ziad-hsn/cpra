@@ -42,10 +42,10 @@ export function IncidentsList() {
         <div className="table-scroll" role="region" aria-label="Latest incident page" tabIndex={0}><table className="data-table">
           <thead><tr><th>Monitor</th><th>Incident</th><th>State</th><th>Opened</th><th>Acknowledged by</th><th>Notifications</th><th>Closed</th></tr></thead>
           <tbody>{page.items.map(item => <tr key={item.id}>
-            <td className="mono">{session.can('GetMonitor') ? <Link to={`/monitors/by-id/${encodeURIComponent(item.monitorID)}`}>{item.monitorID}</Link> : item.monitorID}</td>
-            <td className="mono">{item.id}</td><td>{item.state === 'unrecognized' ? 'Unrecognized state' : item.state}</td>
+            <td className="mono"><span className="table-identifier">{session.can('GetMonitor') ? <Link to={`/monitors/by-id/${encodeURIComponent(item.monitorID)}`}>{item.monitorID}</Link> : item.monitorID}</span></td>
+            <td className="mono"><span className="table-identifier">{item.id}</span></td><td>{item.state === 'unrecognized' ? 'Unrecognized state' : item.state}</td>
             <td>{item.openedAt ? formatDateTime(item.openedAt) : 'Not reported'}</td>
-            <td>{item.acknowledgedBy || 'Not acknowledged'}{item.acknowledgedAt && <> · {formatDateTime(item.acknowledgedAt)}</>}</td>
+            <td><span className="table-identifier">{item.acknowledgedBy || 'Not acknowledged'}</span>{item.acknowledgedAt && <> · {formatDateTime(item.acknowledgedAt)}</>}</td>
             <td>{item.dismissed === true ? 'Dismissed for this incident' : item.dismissed === false ? 'Not dismissed' : 'Not reported'}</td>
             <td>{item.closedAt ? formatDateTime(item.closedAt) : 'Not reported'}</td>
           </tr>)}</tbody>

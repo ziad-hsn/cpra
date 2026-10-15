@@ -247,7 +247,10 @@ class PackagingEvidenceTests(unittest.TestCase):
                 'down_up_retains_named_volume',
             ])
             checks[0].update(binary_sha256=self.programs['linux_' + arch], image_id=image_id)
-            checks[1]['event_ids'] = ['11:0', '12:0']
+            checks[1].update(event_ids=['11:0'], baseline_event_ids=['10:0'],
+                baseline_incident_ids=['old-incident'], healthy_before_outage=True,
+                opened_incident={'id': '11:0', 'incident_id': 'new-incident',
+                                 'type': 'incident_opened', 'monitor_id': 'packaging-fixture'})
             checks[5].update(committed_revision='fixture-rotation-revision', old_token_status=401)
             self.reports['container-' + arch + '.json'] = dict(
                 self.base, checks=checks, platform='linux/' + arch, cleanup='pass',
@@ -540,6 +543,19 @@ class PackagingEvidenceTests(unittest.TestCase):
         self.reject(name, lambda report: report.update(cleanup='incomplete'))
         for change in ({'committed_revision': ''}, {'old_token_status': 200}, {'old_token_status': '401'}):
             self.reject(name, lambda report: scenario(report, 'versioned_token_file_rotation').update(change))
+
+    def test_compose_outage_requires_fresh_incident_evidence(self):
+        name = 'container-amd64.json'
+        case = 'real_http_outage_records_incident_without_liveness_failure'
+        for change in ({'baseline_event_ids': None}, {'baseline_event_ids': ['11:0']},
+                       {'baseline_incident_ids': None}, {'baseline_incident_ids': ['new-incident']},
+                       {'opened_incident': None}, {'healthy_before_outage': False}):
+            with self.subTest(change=change):
+                self.reject(name, lambda report: scenario(report, case).update(change))
+        for change in ({'id': 'missing'}, {'incident_id': ''}, {'type': 'action_succeeded'},
+                       {'monitor_id': 'another-monitor'}):
+            with self.subTest(change=change):
+                self.reject(name, lambda report: scenario(report, case)['opened_incident'].update(change))
 
     def test_helm_requires_observed_storage_probe_and_large_file_outcomes(self):
         name = 'chart-helm4.json'

@@ -40,24 +40,51 @@ def source_evidence(manifest, diagnostic=False):
             'release_gate_passed': False, 'release_identity': evidence_identity(manifest)}
 
 
-def read_history(port, token):
-    """Read this manifest-mode fixture directly; no CLI compatibility client."""
+def read_observation(port, token, path):
+    """Read a bounded response from the manifest-mode fixture directly."""
     connection = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
     try:
-        connection.request('GET', '/api/v1/history?monitor_id=packaging-fixture&limit=100',
-                           headers={'Authorization': 'Bearer ' + token})
+        connection.request('GET', path, headers={'Authorization': 'Bearer ' + token})
         response = connection.getresponse()
         body = response.read((2 << 20) + 1)
         if response.status != 200 or len(body) > 2 << 20:
-            raise RuntimeError('fixture history response was unavailable or oversized')
-        events = json.loads(body)['events']
-        if not isinstance(events, list) or any(event.get('monitor_id') != 'packaging-fixture' for event in events):
-            raise RuntimeError('fixture history contained an unexpected monitor')
-        return events
+            raise RuntimeError('fixture observation was unavailable or oversized')
+        return json.loads(body)
     except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, AttributeError):
-        raise RuntimeError('authenticated fixture history read failed') from None
+        raise RuntimeError('authenticated fixture observation read failed') from None
     finally:
         connection.close()
+
+
+def read_history(port, token):
+    page = read_observation(port, token, '/api/v1/history?monitor_id=packaging-fixture&limit=100')
+    events = page.get('events') if isinstance(page, dict) else None
+    if not isinstance(events, list) or any(not isinstance(event, dict)
+            or event.get('monitor_id') != 'packaging-fixture' for event in events):
+        raise RuntimeError('fixture history contained an unexpected monitor')
+    return events
+
+
+def healthy_monitor(monitor):
+    if not isinstance(monitor, dict) or monitor.get('monitor_id') != 'packaging-fixture' \
+            or monitor.get('status') != 'up' or monitor.get('incident') is not False:
+        return False
+    try:
+        success = datetime.fromisoformat(monitor.get('last_success', '').replace('Z', '+00:00'))
+        return success.year > 1 and success.utcoffset() is not None
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def new_incident(events, baseline):
+    """An earlier incident or unrelated action cannot prove the induced outage."""
+    event_ids = {event['id'] for event in baseline}
+    incident_ids = {event.get('incident_id') for event in baseline}
+    return next((event for event in events if event.get('monitor_id') == 'packaging-fixture'
+                 and event.get('type') == 'incident_opened'
+                 and isinstance(event.get('id'), str) and event['id'].strip()
+                 and isinstance(event.get('incident_id'), str) and event['incident_id'].strip()
+                 and event['id'] not in event_ids and event['incident_id'] not in incident_ids), None)
 
 
 def main():
@@ -158,6 +185,14 @@ def main():
             token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
             return read_history(api_port(), token)
 
+        def healthy():
+            token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
+            page = read_observation(api_port(), token, '/api/v1/monitors?size=1')
+            monitors = page.get('monitors') if isinstance(page, dict) else None
+            if not isinstance(monitors, list) or len(monitors) != 1 or page.get('total') != 1:
+                return False
+            return healthy_monitor(monitors[0])
+
         try:
             report['docker_server_version'] = run(['docker', 'version', '--format', '{{.Server.Version}}']).stdout.strip()
             report['compose_version'] = run(['docker', 'compose', 'version', '--short']).stdout.strip()
@@ -180,11 +215,16 @@ def main():
                 hashes[binary] = image_hash
             record('exact_release_binary_hashes_and_hardened_runtime', image_id=inspect['Image'], binary_sha256=hashes)
             target = compose('ps', '-q', 'target').stdout.strip()
+            until(healthy, 'a completed healthy check before the induced outage')
+            baseline = history()
             run(['docker', 'exec', target, 'rm', '/tmp/www/index.html'])
-            events = until(lambda: history(), 'incident events')
-            ids = {event['id'] for event in events}
+            opened = until(lambda: new_incident(history(), baseline), 'a new incident for the induced outage')
+            ids = {opened['id']}
             ctl('health')
-            record('real_http_outage_records_incident_without_liveness_failure', event_ids=sorted(ids))
+            record('real_http_outage_records_incident_without_liveness_failure', event_ids=sorted(ids),
+                   healthy_before_outage=True, baseline_event_ids=sorted(event['id'] for event in baseline),
+                   baseline_incident_ids=sorted({event['incident_id'] for event in baseline if event.get('incident_id')}),
+                   opened_incident={key: opened[key] for key in ('id', 'incident_id', 'monitor_id', 'type')})
             identity = run(['docker', 'exec', cid(), 'cat', '/var/lib/cpra/identity.json']).stdout
             duplicate = compose('run', '--name', name+'-duplicate', '--no-deps', '--rm', 'cpra', check=False, timeout=20)
             assert duplicate.returncode != 0 and any(x in (duplicate.stdout+duplicate.stderr).lower() for x in ('locked', 'lock', 'timeout'))

@@ -284,18 +284,33 @@ function check(value, message) { if (!value) throw new Error(message); }
         focused: region === document.activeElement };
     });
     const initialCell = await cellBounds();
+    check(initialCell.cellWidth <= initialCell.regionWidth, 'Incident identifier does not reflow within the mobile table region');
     let scrolledCell = initialCell;
-    for (let presses = 0; presses < 80 && scrolledCell.cellRight > scrolledCell.regionRight; presses++) {
+    // Reflow may already make the whole cell visible; still exercise scrolling.
+    for (let presses = 0; presses < 80 && (presses === 0 || scrolledCell.cellRight > scrolledCell.regionRight); presses++) {
       await page.keyboard.press('ArrowRight');
       await page.waitForTimeout(25);
       scrolledCell = await cellBounds();
     }
     check(scrolledCell.focused && scrolledCell.scrollLeft > initialCell.scrollLeft, 'Focused incident region did not scroll with the keyboard');
     check(scrolledCell.cellRight <= scrolledCell.regionRight + 1, 'Keyboard scrolling could not reach the incident cell');
+    check(scrolledCell.cellLeft >= scrolledCell.regionLeft - 1, 'Keyboard scrolling left part of the incident identifier clipped');
     keyboardSteps.push({ control: 'Incident cell horizontal scrolling', initial: initialCell, scrolled: scrolledCell,
       fullyVisible: scrolledCell.cellLeft >= scrolledCell.regionLeft - 1 && scrolledCell.cellRight <= scrolledCell.regionRight + 1 });
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'mobile-reader-incidents-scrolled.png'), fullPage: true });
     await auditAccessibility(page, 'mobile-reader-incidents-scrolled', accessibility);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await checkMobileOverflow('320-pixel incidents');
+    const narrowCells = await incidentRegion.locator('tbody tr').first().locator('td').evaluateAll(cells => cells.map(cell => ({
+      width: cell.getBoundingClientRect().width,
+      regionWidth: cell.closest('[role="region"]').getBoundingClientRect().width,
+      contentWidth: cell.scrollWidth, clientWidth: cell.clientWidth,
+    })));
+    check(narrowCells.every(cell => cell.width <= cell.regionWidth && cell.contentWidth <= cell.clientWidth + 1),
+      'An incident cell requires horizontal panning at 320 CSS pixels');
+    check(await incidentCell.textContent() === originalIncident.id, 'Incident reflow changed or truncated its identity');
+    keyboardSteps.push({ control: 'Incident cells at 320 CSS pixels', cells: narrowCells, identityPreserved: true });
+    await page.setViewportSize({ width: 390, height: 844 });
     await keyboardActivate(incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }), 'Stable monitor identity');
     await savedIdentity.waitFor();
     check(new URL(page.url()).pathname === '/monitors/by-id/browser-recovery', 'mobile keyboard incident navigation lost stable identity');
@@ -312,7 +327,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     await keyboardActivate(page.getByRole('button', { name: 'Hide metrics', exact: true }), 'Hide metrics');
     check(await metricOutput.count() === 0, 'mobile keyboard hide retained displayed metrics');
     check(metricsRequests.length === 3 && metricsRequests.every(request => request.method === 'GET' && request.readerBearer && request.queryEmpty), 'metrics did not use exactly three explicit authenticated reads');
-    checkpoints.push('390×844 keyboard reader navigation reaches Alerts, stable monitor, Settings and View/Hide metrics without body overflow; scoped qualification only');
+    checkpoints.push('390×844 keyboard reader navigation reaches Alerts, stable monitor, Settings and View/Hide metrics without body overflow; incident cells reflow at 320 CSS pixels with their identities intact; scoped qualification only');
     await keyboardActivate(page.getByRole('button', { name: 'View metrics', exact: true }), 'View metrics before sign-out');
     await metricOutput.waitFor();
     check(metricsRequests.length === 4 && metricsRequests.every(request => request.method === 'GET' && request.readerBearer && request.queryEmpty), 'final metrics view did not use exactly four explicit authenticated reads');

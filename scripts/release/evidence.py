@@ -126,8 +126,8 @@ def outcomes(report, field, required, name, repeated=()):
     return cases
 
 
-def event_ids(value, name):
-    require(isinstance(value, list) and 0 < len(value) <= 10000
+def event_ids(value, name, *, allow_empty=False):
+    require(isinstance(value, list) and (allow_empty or len(value) > 0) and len(value) <= 10000
             and all(text(item) for item in value) and len(set(value)) == len(value),
             name, 'missing or duplicate retained event identities')
 
@@ -371,7 +371,16 @@ def compose(report, name, programs):
     image = checks['exact_release_binary_hashes_and_hardened_runtime']
     require(image.get('binary_sha256') == programs['linux_' + arch] and text(image.get('image_id')),
             name, 'container executables differ from the native archive')
-    event_ids(checks['real_http_outage_records_incident_without_liveness_failure'].get('event_ids'), name)
+    outage = checks['real_http_outage_records_incident_without_liveness_failure']
+    event_ids(outage.get('event_ids'), name)
+    event_ids(outage.get('baseline_event_ids'), name, allow_empty=True)
+    event_ids(outage.get('baseline_incident_ids'), name, allow_empty=True)
+    opened = outage.get('opened_incident')
+    require(outage.get('healthy_before_outage') is True and isinstance(opened, dict)
+            and opened.get('type') == 'incident_opened' and opened.get('monitor_id') == 'packaging-fixture'
+            and text(opened.get('incident_id')) and opened['incident_id'] not in outage['baseline_incident_ids']
+            and opened.get('id') in outage['event_ids'] and opened['id'] not in outage['baseline_event_ids'],
+            name, 'induced outage lacks a new incident after a healthy baseline')
     rotation = checks['versioned_token_file_rotation']
     require(text(rotation.get('committed_revision')) and type(rotation.get('old_token_status')) is int
             and rotation['old_token_status'] == 401, name, 'committed token rotation or old-token rejection is missing')

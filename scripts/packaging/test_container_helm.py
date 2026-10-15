@@ -29,6 +29,31 @@ MANAGEMENT = {'enabled': True,
 
 
 class ComposeEvidenceContract(unittest.TestCase):
+    def test_outage_requires_a_new_incident_for_the_designated_monitor(self):
+        previous = {'id': '10:0', 'monitor_id': 'packaging-fixture',
+                    'type': 'incident_opened', 'incident_id': 'old-incident'}
+        current = {**previous, 'id': '20:0', 'incident_id': 'new-incident'}
+        baseline = [previous]
+        for events in ([previous], [{**current, 'type': 'action_succeeded'}],
+                       [{**current, 'incident_id': 'old-incident'}],
+                       [{**current, 'monitor_id': 'unrelated-monitor'}],
+                       [{**current, 'incident_id': ''}], [{**current, 'id': ''}]):
+            with self.subTest(events=events):
+                self.assertIsNone(live_compose.new_incident(events, baseline))
+        self.assertEqual(live_compose.new_incident([previous, current], baseline), current)
+        self.assertEqual(live_compose.new_incident([current], []), current)
+
+    def test_healthy_baseline_requires_a_completed_successful_check(self):
+        monitor = {'monitor_id': 'packaging-fixture', 'status': 'up', 'incident': False,
+                   'last_success': '2026-10-15T03:00:00Z'}
+        self.assertTrue(live_compose.healthy_monitor(monitor))
+        for change in ({'monitor_id': 'unrelated-monitor'}, {'status': 'unknown'},
+                       {'incident': True}, {'last_success': '0001-01-01T00:00:00Z'},
+                       {'last_success': ''}, {'last_success': 'not-a-time'},
+                       {'last_success': '2026-10-15T03:00:00'}):
+            with self.subTest(change=change):
+                self.assertFalse(live_compose.healthy_monitor({**monitor, **change}))
+
     def test_pre_freeze_execution_cannot_become_frozen_release_evidence(self):
         import release
         with tempfile.TemporaryDirectory(prefix='cpra-compose-source-') as tmp:

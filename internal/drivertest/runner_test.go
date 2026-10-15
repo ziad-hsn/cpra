@@ -234,7 +234,7 @@ func TestReportRecordsProvenRejectionWithoutRetrying(t *testing.T) {
 	}
 	for _, row := range r.Records {
 		if row.Kind == "code" && row.Name == "slack" {
-				if row.Status != "fail" || row.HTTPStatus != http.StatusForbidden || row.RejectionCode != http.StatusForbidden || row.Outcome != "rejected" || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
+			if row.Status != "fail" || row.HTTPStatus != http.StatusForbidden || row.RejectionCode != http.StatusForbidden || row.Outcome != "rejected" || !row.Invoked || row.Accepted || row.Observed || invoked.Load() != 1 {
 				t.Fatal("documented rejection was lost or repeated", row, invoked.Load())
 			}
 			return

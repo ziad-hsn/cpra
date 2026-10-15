@@ -5,6 +5,18 @@ Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
 Updated: 2026-10-15. The candidate is not frozen or publicly qualified.
 
+The [empty collection snapshot repair](collection-empty-snapshot-2026-10-15.md)
+fixes an additional ticket 4 regression reproduced at `16569a7`: a monitor's
+streamed snapshot created unnecessary collection ledgers on restart even when
+no collection existed. Empty namespace framing is now validated without disk
+allocation, while the first real collection remains durable. Focused Go 1.26.0
+and Go 1.27.2/default/tagged checks pass, including release-compiler race checks.
+Seven native Windows AMD64/NTFS cases and 29 subtests pass. Independent source,
+Linux and native Windows execution-record reviews are closed. This production
+change requires a new freeze. Completed `16569a7`
+browser/default-matrix checks retain that identity, and both interrupted full
+matrix attempts remain incomplete evidence.
+
 The [compiler/dependency security checkpoint](dependency-security-2026-10-14.md)
 updates the release compiler to Go 1.27.2 and gRPC to 1.83.2. Five `x/net`
 HTTP/2 findings are cleared from fresh working-source scans after updating

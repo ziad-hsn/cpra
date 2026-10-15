@@ -75,6 +75,9 @@ func recoverCollectionExecution(i image, ledger *collectionLedger) (*collectionE
 		return nil, nil
 	}
 	if ledger == nil {
+		if len(i.Collections) == 0 {
+			return nil, nil
+		}
 		return nil, ErrCollectionUnavailable
 	}
 	view, err := ledger.Freeze()

@@ -224,27 +224,9 @@ func (s *frozenSnapshot) persistCollections(sink raft.SnapshotSink) error {
 		_ = sink.Cancel()
 		return err
 	}
-	if _, err := s.collections.WriteTo(sink); err != nil {
+	if err := writeCollectionSnapshotRows(sink, s.image.Version, s.collections); err != nil {
 		_ = sink.Cancel()
 		return err
-	}
-	if collectionPlanStorageFormat(s.image.Version) {
-		if _, err := writeCollectionPlanLedger(sink, s.collections); err != nil {
-			_ = sink.Cancel()
-			return err
-		}
-	}
-	if collectionValidationStorageFormat(s.image.Version) {
-		if _, err := writeCollectionValidationLedger(sink, s.collections); err != nil {
-			_ = sink.Cancel()
-			return err
-		}
-	}
-	if collectionExecutionStorageFormat(s.image.Version) {
-		if _, err := writeCollectionExecutionLedger(sink, s.collections); err != nil {
-			_ = sink.Cancel()
-			return err
-		}
 	}
 	if err := sink.Close(); err != nil {
 		_ = sink.Cancel()
@@ -253,7 +235,29 @@ func (s *frozenSnapshot) persistCollections(sink raft.SnapshotSink) error {
 	return nil
 }
 
-// decodeSnapshot accepts legacy JSON or a self-contained streamed collection
+func writeCollectionSnapshotRows(w io.Writer, version int, view *collectionLedgerView) error {
+	if _, err := view.WriteTo(w); err != nil {
+		return err
+	}
+	if collectionPlanStorageFormat(version) {
+		if _, err := writeCollectionPlanLedger(w, view); err != nil {
+			return err
+		}
+	}
+	if collectionValidationStorageFormat(version) {
+		if _, err := writeCollectionValidationLedger(w, view); err != nil {
+			return err
+		}
+	}
+	if collectionExecutionStorageFormat(version) {
+		if _, err := writeCollectionExecutionLedger(w, view); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// decodeSnapshot accepts JSON or a self-contained streamed collection
 // image. It builds a fresh unpublished materialization; failure closes it and
 // leaves every previous generation and authoritative snapshot/log untouched.
 func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collectionLedger, resultErr error) {
@@ -327,6 +331,14 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	if delimiter, err := remainder.ReadByte(); err != nil || delimiter != '\n' {
 		return i, nil, ErrCollectionInvalid
 	}
+	if len(i.Collections) == 0 {
+		ledger, err := decodeEmptyCollectionSnapshot(remainder, i)
+		if ledger != nil && directory != "" {
+			err = errors.Join(err, ledger.Close())
+			ledger = nil
+		}
+		return i, ledger, err
+	}
 	if directory == "" {
 		ledger, err = newMemoryCollectionLedger(maxCollectionLedgerBytes)
 	} else {
@@ -376,6 +388,41 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	err = validateCollectionRows(i, view)
 	err = errors.Join(err, view.Close())
 	return i, ledger, err
+}
+
+// An empty collection image still requires every namespace and its exact empty
+// footer. Bound the read to that framing plus one byte so unexpected rows are
+// rejected without allocating storage or accepting trailing data.
+func decodeEmptyCollectionSnapshot(reader io.Reader, i image) (_ *collectionLedger, resultErr error) {
+	ledger, err := newMemoryCollectionLedger(maxCollectionLedgerBytes)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if resultErr != nil {
+			_ = ledger.Close()
+		}
+	}()
+	view, err := ledger.Freeze()
+	if err != nil {
+		return nil, err
+	}
+	var expected bytes.Buffer
+	err = validateCollectionRows(i, view)
+	if err == nil {
+		err = writeCollectionSnapshotRows(&expected, i.Version, view)
+	}
+	if err = errors.Join(err, view.Close()); err != nil {
+		return nil, err
+	}
+	actual, err := io.ReadAll(io.LimitReader(reader, int64(expected.Len())+1))
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(actual, expected.Bytes()) {
+		return nil, ErrCollectionInvalid
+	}
+	return ledger, nil
 }
 
 // An image without staging rows still needs every namespace in its format.

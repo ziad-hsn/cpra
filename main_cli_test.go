@@ -112,7 +112,7 @@ func TestMainManagementRealCLI(t *testing.T) {
 	cli.applied(t, client, enabled)
 	awaitMainCLI(t, func() bool {
 		got, err := client.Monitors.Get(t.Context(), "cli-managed")
-		return err == nil && got.Data.Status.IncidentID != "" && got.Data.Status.UnknownActions == 1 && effects.Load() == 1
+		return err == nil && got.Data.Status.IncidentID != "" && got.Data.Status.UnknownActions != nil && *got.Data.Status.UnknownActions == 1 && effects.Load() == 1
 	}, "real failed checks and ambiguous webhook did not produce one held action")
 	status, err := client.Monitors.Get(t.Context(), "cli-managed")
 	if err != nil {
@@ -258,7 +258,7 @@ func TestMainManagementRealCLI(t *testing.T) {
 	restarted, stopRestarted := startMainManagement(t, fixture)
 	cli.origin = "https://" + fixture.options.webAddr
 	restored := decodeMainCLI[api.Monitor](t, cli.success(t, nil, "get", "monitor/cli-managed", "-o", "json").stdout)
-	if restored.Metadata.UID != initialUID || restored.Metadata.Name == nil || *restored.Metadata.Name != "Committed despite a lost CLI reply" || restored.Spec.Enabled == nil || *restored.Spec.Enabled || restored.Status.UnknownActions != 1 || !restored.Status.SnoozedUntil.Equal(snoozedUntil) {
+	if restored.Metadata.UID != initialUID || restored.Metadata.Name == nil || *restored.Metadata.Name != "Committed despite a lost CLI reply" || restored.Spec.Enabled == nil || *restored.Spec.Enabled || restored.Status.UnknownActions == nil || *restored.Status.UnknownActions != 1 || !restored.Status.SnoozedUntil.Equal(snoozedUntil) {
 		t.Fatal("restart lost CLI configuration, unknown action hold or snooze")
 	}
 	restoredIncident := decodeMainCLI[api.Incident](t, cli.success(t, nil, "get", incidentAddress, "-o", "json").stdout)

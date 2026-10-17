@@ -204,6 +204,25 @@ fixture-setup failures remain recorded separately from the passing checks.
 This response change requires a new freeze and affected verification; the earlier
 combined and browser passes are evidence for `a8f2213`, not the new candidate.
 
+The next frozen browser run exposed two native-CLI integration assertions that
+still compared optional counts as plain integers. Both now require a present
+count of one. Independent source review closed the assertion update, and the
+explicitly enabled native CLI scenario passed with race instrumentation in
+`product-action-counts-cli-integration-2`: 98 checks, one ambiguous external
+effect, retained controls/configuration and unknown facts after restart. The
+preceding invocation omitted its opt-in and is explicitly recorded as unexercised.
+
+Independent verification review added authentication and worker-exclusion cases
+to the affected inventory. Default and combined builds run the full affected
+selection on each compiler. Builtins-only and externaljobs-only intermediate
+rows run explicit tag-interaction profiles, including controller/queue, driver,
+management, authorization and HTTP/CLI contracts. The worker profile retains
+maintenance, Ignore, requeue and snapshot boundaries. Required profile tests must
+compile and pass; all rows separately compile and vet every application package.
+Generic storage/backup repetition omitted from intermediate rows remains covered
+by each compiler's full default/combined rows. Intermediate profiles are not
+reported as equivalent execution of the full affected selection.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

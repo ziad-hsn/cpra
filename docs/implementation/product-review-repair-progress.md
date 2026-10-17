@@ -318,3 +318,32 @@ private runner's aggregate allowance is 45 minutes per invocation; the
 25-minute package test timeout, 35-minute command cap, output limit and scratch
 guard remain intact. Independent review accepted this scheduling boundary.
 These are scoped correctness checks, not performance or release qualification.
+
+At `0646c69`, all five Go 1.27.2 application rows passed with race checks and
+package-wide vet. The independent SDK/worker checks, browser campaigns, CLI
+process checks, generation and documentation checks also passed within their
+recorded scopes. Bounded mixed-target experiments showed continued healthy-check
+progress but exceeded the selected latency targets; they are not SLO or fleet
+qualification. Private vulnerability reporting remains disabled, and publication
+gates remain open.
+
+The Go 1.26.0 combined row then found two malformed-JSON diagnostic defects:
+custom decoder errors exposed a Go field spelling, and mixed Token/Decode calls
+reported a syntax offset relative to an incomplete scan count. The correction
+normalizes the affected safe field names and counts bytes delivered directly to
+the decoder. A bounded failure-only probe reports an exact position only when it
+reproduces the same syntax error with a positive offset; otherwise the location
+is explicitly parser context. No valid configuration bytes, storage format,
+dependency, API schema or accepted input spellings change. ICMP's existing JSON
+`privilege` type error remains attributed to its safe enclosing configuration
+field instead of inventing a new public field alias.
+
+The first offset correction passed Go 1.26.0 but failed Go 1.27.2 because its
+unread buffer retains separators differently. Both failed records remain retained.
+The revised full loader/manifest checks passed on Go 1.26.0 and Go 1.27.2 with
+race instrumentation on the latter. Regression cases include malformed scalars,
+repeated delimiters, whitespace, buffer refills, compressed input, truncation,
+bounded probes, cancellation and unchanged serialized configuration. The final
+minimum-version matrix and affected release-compiler checks must pass after this
+reviewed diagnostic correction is committed; earlier executions retain their
+original source identity.

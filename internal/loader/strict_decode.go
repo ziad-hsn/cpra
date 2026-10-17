@@ -1,10 +1,12 @@
 package loader
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -19,15 +21,15 @@ import (
 // Custom schema decoders resolve interface fields but bypass decoder-wide
 // unknown-field settings. Validate the original keys against the resolved
 // concrete values after decoding, including nested notification configs.
-func decodeJSONValue(decoder *json.Decoder, target any, strict bool) error {
+func decodeJSONValue(decoder *jsonDecoder, target any, strict bool) error {
 	_, err := decodeJSONResource(decoder, target, strict)
 	return err
 }
 
-func decodeJSONResource(decoder *json.Decoder, target any, strict bool) ([]byte, error) {
+func decodeJSONResource(decoder *jsonDecoder, target any, strict bool) ([]byte, error) {
 	var raw json.RawMessage
 	if err := decoder.Decode(&raw); err != nil {
-		return raw, jsonInputError(err, "")
+		return raw, jsonDecoderError(decoder, err, "")
 	}
 	if len(raw) > 1<<20 {
 		return raw, api.InvalidField("", "resourceTooLarge")
@@ -307,3 +309,74 @@ func jsonInputError(err error, field string) error {
 	}
 	return cause
 }
+
+// Count bytes delivered directly to the decoder, after any buffered reader.
+// Buffered and InputOffset can identify different positions after Token/More.
+type jsonDecoder struct {
+	*json.Decoder
+	input     io.Reader
+	bytesRead int64
+}
+
+func newJSONDecoder(input io.Reader) *jsonDecoder {
+	d := &jsonDecoder{input: input}
+	d.Decoder = json.NewDecoder(d)
+	return d
+}
+
+func (d *jsonDecoder) Read(p []byte) (int, error) {
+	n, err := d.input.Read(p)
+	d.bytesRead += int64(n)
+	return n, err
+}
+
+// Reproduce a syntax failure in the unread buffer to recover its source
+// position. Token calls affect syntax offsets differently across Go versions.
+// No additional input is read, and only a bounded failure buffer is examined.
+func jsonDecoderError(decoder *jsonDecoder, err error, field string) error {
+	var syntax *json.SyntaxError
+	if !errors.As(err, &syntax) {
+		cause := jsonInputError(err, field)
+		var detail *api.ValidationError
+		if !errors.As(cause, &detail) || detail.Reason != "invalidJSON" {
+			return cause
+		}
+	}
+	cause := api.InvalidField(field, "invalidJSON")
+	cause.Offset = decoder.InputOffset() + 1
+	const limit = 1 << 20
+	buffer, readErr := io.ReadAll(io.LimitReader(decoder.Buffered(), limit+1))
+	if readErr != nil || len(buffer) > limit || decoder.bytesRead < int64(len(buffer)) {
+		return &jsonCursorError{cause}
+	}
+	base := decoder.bytesRead - int64(len(buffer))
+	value := bytes.TrimLeft(buffer, " \t\r\n")
+	base += int64(len(buffer) - len(value))
+	// Some decoders retain the separator preceding a value. Never skip an
+	// unexpected separator: the original failure must be beyond that byte.
+	if len(value) > 0 && (value[0] == ':' || value[0] == ',') && (syntax == nil || syntax.Offset > base+1) {
+		trimmed := bytes.TrimLeft(value[1:], " \t\r\n")
+		base += int64(len(value) - len(trimmed))
+		value = trimmed
+	}
+	cause.Offset = base + 1
+	if syntax == nil {
+		return &jsonCursorError{cause}
+	}
+	probe := json.NewDecoder(bytes.NewReader(value))
+	var raw json.RawMessage
+	var local *json.SyntaxError
+	if errors.As(probe.Decode(&raw), &local) && local.Offset > 0 && syntax.Error() == local.Error() {
+		cause.Offset = base + local.Offset
+		return cause
+	}
+	// Contextual errors (for example a missing colon before a valid value) do
+	// not recur in a fresh decoder. Nor may a different error in that value
+	// replace the original. Report the cursor as context, not an exact byte.
+	return &jsonCursorError{cause}
+}
+
+type jsonCursorError struct{ cause *api.ValidationError }
+
+func (e *jsonCursorError) Error() string { return e.cause.Error() }
+func (e *jsonCursorError) Unwrap() error { return e.cause }

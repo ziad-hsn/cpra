@@ -19,7 +19,18 @@ func jsonFieldError(prefix string, cause error) error {
 	} else {
 		var wrong *json.UnmarshalTypeError
 		if errors.As(cause, &wrong) {
-			field = api.SafeValidationField(wrong.Field)
+			field = wrong.Field
+			// These original TCP/ICMP fields have no JSON tags. Older Go
+			// decoders report their Go name rather than the input spelling.
+			// Normalize only the diagnostic; changing their tags would also
+			// change serialized configuration and stored revision identities.
+			if wrong.Struct == "PulseTCPConfig" || wrong.Struct == "PulseICMPConfig" {
+				switch strings.ToLower(field) {
+				case "host", "port", "retries", "count", "privilege":
+					field = strings.ToLower(field)
+				}
+			}
+			field = api.SafeValidationField(field)
 		}
 	}
 	if field != "" && prefix != "" {

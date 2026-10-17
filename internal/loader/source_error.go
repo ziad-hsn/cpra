@@ -25,6 +25,7 @@ import (
 type MonitorSource struct {
 	Item, Line, Column int
 	Offset             int64
+	ParserContext      bool
 }
 
 // Error annotates local validation failures. JSON line counting is performed
@@ -39,7 +40,11 @@ func (s MonitorSource) Error(ctx context.Context, filename string, cause error) 
 		location += fmt.Sprintf(" monitor %d", s.Item)
 	}
 	if s.Line > 0 && s.Column > 0 {
-		location += fmt.Sprintf(" at line %d column %d", s.Line, s.Column)
+		if s.ParserContext {
+			location += fmt.Sprintf(" near line %d column %d (parser context)", s.Line, s.Column)
+		} else {
+			location += fmt.Sprintf(" at line %d column %d", s.Line, s.Column)
+		}
 	}
 	return fmt.Errorf("%s: %w", location, cause)
 }
@@ -289,5 +294,6 @@ func jsonFieldSourceError(ctx context.Context, filename string, item int, raw []
 			position = validation.Offset - 1
 		}
 	}
-	return (MonitorSource{Item: item, Offset: max(0, start+position)}).Error(ctx, filename, cause)
+	var cursor *jsonCursorError
+	return (MonitorSource{Item: item, Offset: max(0, start+position), ParserContext: errors.As(cause, &cursor)}).Error(ctx, filename, cause)
 }

@@ -66,7 +66,7 @@ func (p *StreamingJsonParser) parseFile(ctx context.Context, batchChan chan<- Mo
 
 // openDecoder opens the file (handling gzip) and returns a JSON decoder plus a
 // cleanup function.
-func (p *StreamingJsonParser) openDecoder(ctx context.Context) (*json.Decoder, func(), error) {
+func (p *StreamingJsonParser) openDecoder(ctx context.Context) (*jsonDecoder, func(), error) {
 	file, err := os.Open(p.filename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open file: %w", err)
@@ -84,7 +84,7 @@ func (p *StreamingJsonParser) openDecoder(ctx context.Context) (*json.Decoder, f
 		reader = gz
 	}
 	bufr := bufio.NewReaderSize(&boundedReader{ctx: ctx, reader: reader, remaining: p.config.MaxMemory}, 64*1024)
-	decoder := json.NewDecoder(bufr)
+	decoder := newJSONDecoder(bufr)
 	if p.config.StrictUnknownFields {
 		decoder.DisallowUnknownFields()
 	}
@@ -105,7 +105,7 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 
 	t, err := decoder.Token()
 	if err != nil {
-		return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, ""))
+		return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, ""))
 	}
 	if t != json.Delim('{') {
 		return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), api.InvalidField("", "objectRequired"))
@@ -123,7 +123,7 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 	for decoder.More() {
 		t, err := decoder.Token()
 		if err != nil {
-			return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, ""))
+			return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, ""))
 		}
 		key, ok := t.(string)
 		if !ok {
@@ -165,18 +165,18 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 		case "monitors":
 			token, err := decoder.Token()
 			if err != nil {
-				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, "monitors"))
+				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, "monitors"))
 			}
 			if token != json.Delim('[') {
 				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), api.InvalidField("monitors", "invalidType"))
 			}
 			for item := 1; decoder.More(); item++ {
-				if err := skipJSONValue(ctx, decoder); err != nil {
-					return nil, nil, jsonSourceError(ctx, p.filename, item, nil, decoder.InputOffset(), jsonInputError(err, ""))
+				if err := skipJSONValue(ctx, decoder.Decoder); err != nil {
+					return nil, nil, jsonSourceError(ctx, p.filename, item, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, ""))
 				}
 			}
 			if _, err := decoder.Token(); err != nil {
-				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, "monitors"))
+				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, "monitors"))
 			}
 		case "version":
 			var version int
@@ -186,8 +186,8 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 			}
 		default:
 			// Skip unknown keys (including "monitors" and "version").
-			if err := skipJSONValue(ctx, decoder); err != nil {
-				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, ""))
+			if err := skipJSONValue(ctx, decoder.Decoder); err != nil {
+				return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, ""))
 			}
 		}
 	}
@@ -195,7 +195,7 @@ func (p *StreamingJsonParser) readMetadata(ctx context.Context) (map[string]mani
 		return nil, nil, fmt.Errorf("manifest requires monitors")
 	}
 	if _, err := decoder.Token(); err != nil {
-		return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonInputError(err, ""))
+		return nil, nil, jsonSourceError(ctx, p.filename, 0, nil, decoder.InputOffset(), jsonDecoderError(decoder, err, ""))
 	}
 	if _, err := decoder.Token(); err != io.EOF {
 		return nil, nil, fmt.Errorf("unexpected trailing JSON data")
@@ -222,7 +222,7 @@ func (p *StreamingJsonParser) streamMonitors(ctx context.Context, batchChan chan
 
 	t, err := decoder.Token()
 	if err != nil {
-		return jsonInputError(err, "")
+		return jsonDecoderError(decoder, err, "")
 	}
 	if t != json.Delim('{') {
 		return api.InvalidField("", "objectRequired")
@@ -231,15 +231,15 @@ func (p *StreamingJsonParser) streamMonitors(ctx context.Context, batchChan chan
 	for decoder.More() {
 		t, err := decoder.Token()
 		if err != nil {
-			return jsonInputError(err, "")
+			return jsonDecoderError(decoder, err, "")
 		}
 		key, ok := t.(string)
 		if !ok {
 			return api.InvalidField("", "invalidType")
 		}
 		if key != "monitors" {
-			if err := skipJSONValue(ctx, decoder); err != nil {
-				return jsonInputError(err, "")
+			if err := skipJSONValue(ctx, decoder.Decoder); err != nil {
+				return jsonDecoderError(decoder, err, "")
 			}
 			continue
 		}
@@ -247,7 +247,7 @@ func (p *StreamingJsonParser) streamMonitors(ctx context.Context, batchChan chan
 		// Read the opening bracket of the array.
 		t, err = decoder.Token()
 		if err != nil {
-			return jsonInputError(err, "")
+			return jsonDecoderError(decoder, err, "")
 		}
 		if t != json.Delim('[') {
 			return api.InvalidField("monitors", "invalidType")
@@ -298,7 +298,7 @@ func (p *StreamingJsonParser) streamMonitors(ctx context.Context, batchChan chan
 		// Read the closing bracket of the array.
 		t, err = decoder.Token()
 		if err != nil && !errors.Is(err, io.EOF) {
-			return jsonInputError(err, "")
+			return jsonDecoderError(decoder, err, "")
 		}
 		if t != json.Delim(']') {
 			return api.InvalidField("monitors", "invalidJSON")

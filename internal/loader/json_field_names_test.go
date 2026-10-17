@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,9 +41,17 @@ func TestStrictJSONPreservesDecodedFieldNames(t *testing.T) {
 					if cfg.Host != "127.0.0.1" || cfg.Port != 80 {
 						t.Errorf("wrong TCP config: %+v", cfg)
 					}
+					encoded, err := json.Marshal(cfg)
+					if err != nil || string(encoded) != `{"Host":"127.0.0.1","Port":80,"Retries":0}` {
+						t.Errorf("TCP configuration bytes changed: %s, %v", encoded, err)
+					}
 				case *manifest.PulseICMPConfig:
 					if !cfg.Privilege {
 						t.Errorf("JSON privilege field was not decoded")
+					}
+					encoded, err := json.Marshal(cfg)
+					if err != nil || string(encoded) != `{"Host":"127.0.0.1","Privilege":true,"Count":0,"Retries":0}` {
+						t.Errorf("ICMP configuration bytes changed: %s, %v", encoded, err)
 					}
 				case *manifest.PulseHTTPConfig:
 					if cfg.Url != "http://127.0.0.1" || len(cfg.ExpectedStatus) != 1 || cfg.ExpectedStatus[0] != 418 {

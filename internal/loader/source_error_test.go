@@ -1,7 +1,10 @@
 package loader
 
 import (
+	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,6 +77,8 @@ func TestSemanticErrorOriginalFieldPositions(t *testing.T) {
 func TestCustomDecoderFieldLocations(t *testing.T) {
 	for _, test := range []struct{ name, input, field, reason, token string }{
 		{"check-type.json", "{\n\"monitors\":[{\"name\":\"private-marker\",\n\"pulse_check\":{\"type\":\"tcp\",\"interval\":\"1s\",\"timeout\":\"1s\",\n\"config\":{\"host\":\"localhost\",\n\"port\":\"private-marker\"}}}]}", "pulse_check.config.port", "invalidType", "\"port\":"},
+		{"check-case.json", "{\"monitors\":[{\"name\":\"demo\",\"pulse_check\":{\"type\":\"tcp\",\"interval\":\"1s\",\"timeout\":\"1s\",\"config\":{\"host\":\"localhost\",\n\"PORT\":\"private-marker\"}}}]}", "pulse_check.config.port", "invalidType", "\"PORT\":"},
+		{"icmp-count.json", "{\"monitors\":[{\"name\":\"demo\",\"pulse_check\":{\"type\":\"icmp\",\"interval\":\"1s\",\"timeout\":\"1s\",\"config\":{\"host\":\"localhost\",\n\"Count\":\"private-marker\"}}}]}", "pulse_check.config.count", "invalidType", "\"Count\":"},
 		{"action-type.json", "{\"monitors\":[{\"name\":\"private-marker\",\n\"pulse_check\":{\"type\":\"tcp\",\"interval\":\"1s\",\"timeout\":\"1s\",\"config\":{\"host\":\"localhost\",\"port\":80}},\n\"intervention\":{\"action\":\"docker\",\"target\":{\"container\":\"demo\",\n\"timeout\":\"private-marker\"}}}]}", "intervention.target.timeout", "positiveDuration", "\"timeout\":\"private-marker\""},
 		{"endpoint-type.json", "{\"monitors\":[],\n\"endpoints\":{\"private-marker\":{\"type\":\"log\",\"config\":{\n\"file\":false}}}}", "endpoints[0].config.file", "invalidType", "\"file\":"},
 		{"endpoint-selector.yaml", "endpoints:\n  private-marker:\n    type: private-marker\n    config: {}\nmonitors: []\n", "endpoints[0].type", "unsupportedDriver", "type: "},
@@ -109,6 +114,20 @@ func TestCustomDecoderFieldLocations(t *testing.T) {
 func TestSyntaxErrorOriginalSource(t *testing.T) {
 	for _, test := range []struct{ name, input, reason, point string }{
 		{"syntax.json", "{\"monitors\":[\n{},\n{\"name\": invalid}\n]}", "invalidJSON", "document 1 monitor 2 at line 3"},
+		{"metadata.json", "{\"monitors\":[],\n\"endpoints\":{\n\"private-marker\":invalid}}", "invalidJSON", "document 1 at line 3 column 18"},
+		{"syntax.json.gz", "{\"monitors\":[\n{},\n{\"name\": invalid}\n]}", "invalidJSON", "document 1 monitor 2 at line 3 column 10"},
+		{"escape.json", "{\"monitors\":[\n{},\n{\"name\": \"bad\\q\"}\n]}", "invalidJSON", "document 1 monitor 2 at line 3 column 15"},
+		{"number.json", "{\"monitors\":[\n{},\n{\"name\": 123e+bad}\n]}", "invalidJSON", "document 1 monitor 2 at line 3 column 15"},
+		{"refill.json", "{\"monitors\":[\n{\"name\":\"" + strings.Repeat("a", 70_000) + "\"},\n{\"name\": invalid}\n]}", "invalidJSON", "document 1 monitor 2 at line 3 column 10"},
+		{"comma.json", "{\"monitors\":[\n,invalid]}", "invalidJSON", "line 2 column 1"},
+		{"repeated-comma.json", "{\"monitors\":[\n{},\n,invalid]}", "invalidJSON", "line 3 column 1"},
+		{"unexpected-colon.json", "{\"monitors\":[\n{},\n:invalid]}", "invalidJSON", "line 3 column 1"},
+		{"repeated-colon.json", "{\"monitors\":[\n{},\n{\"name\": :invalid}]}", "invalidJSON", "line 3 column 10"},
+		{"whitespace.json", "{\"monitors\":[\n{},\n{\"name\": \n \tinvalid}]}", "invalidJSON", "document 1 monitor 2 at line 4 column 3"},
+		{"colon.json", "{\"monitors\":[\n{},\n{\"name\"\ntrue}\n]}", "invalidJSON", "document 1 monitor 2 near line 4 column 1 (parser context)"},
+		{"colon-escape.json", "{\"monitors\":[\n{},\n{\"name\"\n\"bad\\q\"}\n]}", "invalidJSON", "document 1 monitor 2 near line 4 column 1 (parser context)"},
+		{"truncated.json", "{\"monitors\":[\n{},\n{\"name\": \"unfinished", "invalidJSON", "document 1 monitor 2 near line 3 column 10 (parser context)"},
+		{"bounded-probe.json", "{\"monitors\":[\n{},\n{\"name\": \"" + strings.Repeat("a", 1<<20) + "\\q\"}\n]}", "invalidJSON", "document 1 monitor 2 near line 3"},
 		{"metadata.yaml", "monitors:\n  - name: demo\n    pulse_check: {type: tcp, interval: 1s, timeout: 1s, config: {host: localhost, port: 80}}\nendpoints: [}\n", "invalidYAML", "document 1: near line 4"},
 		{"syntax.yaml", "monitors:\n  - name: demo\n    pulse_check:\n      config: [}\n", "invalidYAML", "document 1 monitor 1: near line 3"},
 	} {
@@ -117,6 +136,12 @@ func TestSyntaxErrorOriginalSource(t *testing.T) {
 			detail, ok := api.ValidationFieldError(err)
 			if !ok || detail.Reason != test.reason || !strings.Contains(err.Error(), test.point) {
 				t.Fatalf("diagnostic=%v detail=%+v; want %s at %s", err, detail, test.reason, test.point)
+			}
+			if strings.Contains(err.Error(), "unfinished") || strings.Contains(err.Error(), "bad") {
+				t.Fatalf("diagnostic retained rejected data: %v", err)
+			}
+			if test.name == "bounded-probe.json" && !strings.Contains(err.Error(), "(parser context)") {
+				t.Fatalf("bounded probe claimed an exact location: %v", err)
 			}
 		})
 	}
@@ -128,17 +153,34 @@ func TestSyntaxErrorOriginalSource(t *testing.T) {
 	if detail, ok := api.ValidationFieldError(err); !ok || detail.Reason != "unknownField" || strings.Contains(detail.Field, "endpoints") || strings.Contains(err.Error(), "private-marker") {
 		t.Fatalf("missing endpoint map changed the original failure: %v", err)
 	}
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
+		if got := jsonDecoderError(newJSONDecoder(strings.NewReader("")), cause, ""); !errors.Is(got, cause) {
+			t.Fatalf("cancellation changed: %v", got)
+		}
+	}
 }
 
 func parseInvalidInput(t *testing.T, name, input string) error {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name)
-	if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+	data := []byte(input)
+	if strings.HasSuffix(name, ".gz") {
+		var compressed bytes.Buffer
+		writer := gzip.NewWriter(&compressed)
+		if _, err := writer.Write(data); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		data = compressed.Bytes()
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
 	}
 	var batches <-chan MonitorBatch
 	var failures <-chan error
-	if strings.HasSuffix(name, ".yaml") {
+	if strings.HasSuffix(strings.TrimSuffix(name, ".gz"), ".yaml") {
 		parser, _ := NewStreamingYamlParser(path, ParseConfig{BatchSize: 1})
 		batches, failures = parser.ParseBatches(t.Context(), nil)
 	} else {

@@ -290,3 +290,31 @@ Native OS/architecture execution, services/packages/CSI, designated provider and
 agent accounts, and comparative fleet qualification remain open where infrastructure
 is absent. Private vulnerability reporting remains disabled. Candidates, evidence
 and artifacts stay private, and the cancelled 24-hour run is not reinstated.
+
+At `4701900`, the combined race row reached the explicitly enabled large-input
+cases and found two invalid fixtures: the near-limit endpoint update and the
+large notification graph supplied protected webhook URL/header fields inline.
+The endpoint case failed during setup, before staged validation. The failed row
+remains retained. A separate diagnostic execution of its twelve unexecuted
+packages passed with 1,237 test/subtest events and six subprocess-helper skips;
+that diagnostic does not complete the failed row or its vet gate.
+
+The test-only correction uses credential references and JSON-object text for
+header credentials. Near-limit credential envelopes remain covered; the endpoint
+update now exercises a near-limit resolved configuration. The notification graph
+contains 83 resources, including 40 distinct header credentials with 36,864,000
+payload bytes (35.15625 MiB), plus resource-envelope overhead. It checks unique
+identities, all dependency edges, bounded released plaintext reservations, no
+committed writes, no sealing and zero target calls. Independent source review
+closed the proposal. `product-large-validation-fixtures-1` passed both complete
+large-input tests with Go 1.27.2 race instrumentation in 555.646 seconds, with
+six passing test/subtest events and no skips or race reports. Production
+validation and the credential policy did not change.
+
+The next freeze runs the standard combined selection and its three expensive
+collection/worker-process cases in separate, explicitly recorded invocations
+on each compiler. Their union must equal the full combined selection. The
+private runner's aggregate allowance is 45 minutes per invocation; the
+25-minute package test timeout, 35-minute command cap, output limit and scratch
+guard remain intact. Independent review accepted this scheduling boundary.
+These are scoped correctness checks, not performance or release qualification.

@@ -260,6 +260,9 @@ func TestStagedValidationIndependentMonitorsNeverInvokeTargets(t *testing.T) {
 }
 
 func TestStagedValidationLargeInventoryAndNearLimitUpdates(t *testing.T) {
+	var calls atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls.Add(1) }))
+	defer target.Close()
 	t.Run("aggregate exceeds 64 MiB", func(t *testing.T) {
 		const count, size = 72, 950 << 10
 		f := stagedSourceFixture(t, count, sourceCredentials(size), nil, nil)
@@ -277,20 +280,37 @@ func TestStagedValidationLargeInventoryAndNearLimitUpdates(t *testing.T) {
 			if mode == "omitted credential" {
 				input = resource("Credential", "large", api.CredentialSpec{})
 			}
+			var dependencies []api.Resource
 			if mode == "endpoint update" {
-				config, _ := json.Marshal(map[string]any{"url": "https://never-called.example/notify", "headers": map[string]string{"X-Fixture": large}})
-				old = resource("NotificationEndpoint", "large", api.DriverConfig{Type: "webhook", Config: config})
+				headers, _ := json.Marshal(map[string]string{"X-Fixture": large})
+				dependencies = []api.Resource{
+					resource("Credential", "hook", api.CredentialSpec{Value: api.Pointer(target.URL)}),
+					resource("Credential", "headers", api.CredentialSpec{Value: api.Pointer(string(headers))}),
+				}
+				old = resource("NotificationEndpoint", "large", api.DriverConfig{Type: "webhook", Config: json.RawMessage(`{}`), CredentialRefs: api.Pointer(map[string]string{"url": "hook", "headers": "headers"})})
 				input = old
 				input.Metadata.Name = api.Pointer("new name")
 			}
 			f := stagedValidationFixture(t, input)
-			createResource(t, f.catalog, old)
-			result, err, source := stagedValidationRun(t, &f, collectionReadAll)
-			if err != nil || !result.Valid || source.peakBytes > collectionSourcePlaintextBudget {
-				t.Fatal("near-limit supported resource rejected by redundant reservations", result, source.peakBytes, err)
+			for _, dependency := range dependencies {
+				createResource(t, f.catalog, dependency)
 			}
-			if mode == "omitted credential" && result.Items[0].Change != "unchanged" {
-				t.Fatal("omission changed value")
+			createResource(t, f.catalog, old)
+			index := f.store.Status().CommittedIndex
+			wrapper := collectionBlockSealing(t, f.catalog)
+			result, err, source := stagedValidationRun(t, &f, collectionReadAll)
+			if err != nil || !result.Valid || source.peakBytes > collectionSourcePlaintextBudget || source.peakBytes < len(large) {
+				t.Fatal("near-limit supported resource rejected or omitted from reservations", result, source.peakBytes, err)
+			}
+			wantChange := "update"
+			if mode == "omitted credential" {
+				wantChange = "unchanged"
+			}
+			if len(result.Items) != 1 || result.Items[0].Change != wantChange || len(result.Order) != 1 || result.Order[0] != (persistence.CatalogKey{Kind: input.Kind, ID: input.Metadata.ID}) {
+				t.Fatal("near-limit update lost its expected change or identity", result)
+			}
+			if f.store.Status().CommittedIndex != index || wrapper.wraps.Load() != 0 || calls.Load() != 0 {
+				t.Fatal("near-limit validation wrote state, sealed input or invoked a target")
 			}
 			t.Logf("peak accounted borrow/scratch %d bytes", source.peakBytes)
 		})
@@ -425,20 +445,29 @@ func TestStagedValidationMetadataAndWorkBoundsBeforeGrowth(t *testing.T) {
 
 func TestStagedValidationLargeNotificationClosureUsesLookups(t *testing.T) {
 	const endpoints, valueBytes = 40, 900 << 10
+	const resources = endpoints*2 + 3
+	var calls atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls.Add(1) }))
+	defer target.Close()
 	refs := make([]string, endpoints)
 	for i := range refs {
 		refs[i] = fmt.Sprintf("endpoint-%03d", i)
 	}
-	f := stagedSourceFixture(t, endpoints+2, func(i int) (persistence.CatalogKey, []byte) {
+	f := stagedSourceFixture(t, resources, func(i int) (persistence.CatalogKey, []byte) {
 		var r api.Resource
 		switch {
 		case i < endpoints:
-			config, _ := json.Marshal(map[string]any{"url": "https://never-called.example/notify", "headers": map[string]string{"X-Fixture": strings.Repeat("x", valueBytes)}})
-			r = resource("NotificationEndpoint", refs[i], api.DriverConfig{Type: "webhook", Config: config})
-		case i == endpoints:
+			headers, _ := json.Marshal(map[string]string{"X-Fixture": strings.Repeat("x", valueBytes)})
+			r = resource("Credential", fmt.Sprintf("headers-%03d", i), api.CredentialSpec{Value: api.Pointer(string(headers))})
+		case i < endpoints*2:
+			index := i - endpoints
+			r = resource("NotificationEndpoint", refs[index], api.DriverConfig{Type: "webhook", Config: json.RawMessage(`{}`), CredentialRefs: api.Pointer(map[string]string{"url": "hook", "headers": fmt.Sprintf("headers-%03d", index)})})
+		case i == endpoints*2:
+			r = resource("Credential", "hook", api.CredentialSpec{Value: api.Pointer(target.URL)})
+		case i == endpoints*2+1:
 			r = resource("NotificationGroup", "large-group", api.NotificationGroupSpec{EndpointRefs: refs})
 		default:
-			r = collectionMonitor("large-consumer", "https://example.test/health")
+			r = collectionMonitor("large-consumer", target.URL)
 			var spec api.MonitorSpec
 			_ = json.Unmarshal(r.Spec, &spec)
 			spec.Notifications = &map[string]api.AlertRule{"red": {GroupRef: api.Pointer("large-group"), NotifyType: api.Pointer("webhook")}}
@@ -448,9 +477,33 @@ func TestStagedValidationLargeNotificationClosureUsesLookups(t *testing.T) {
 		return persistence.CatalogKey{Kind: r.Kind, ID: r.Metadata.ID}, raw
 	}, nil, nil)
 	index := f.store.Status().CommittedIndex
+	wrapper := collectionBlockSealing(t, f.catalog)
 	result, err, source := stagedValidationRun(t, &f, collectionReadAll)
-	if err != nil || !result.Valid || len(result.Order) != endpoints+2 || source.peakBytes > collectionSourcePlaintextBudget || f.store.Status().CommittedIndex != index {
-		t.Fatal("large notification closure retained aggregate resources or wrote state", result.Valid, source.peakBytes, err)
+	if err != nil || !result.Valid || len(result.Order) != resources || source.peakBytes > collectionSourcePlaintextBudget || source.peakBytes < valueBytes || f.store.Status().CommittedIndex != index || wrapper.wraps.Load() != 0 || calls.Load() != 0 {
+		t.Fatal("large notification closure rejected, retained aggregate resources or caused effects", result.Items, source.peakBytes, err)
 	}
+	positions := make(map[persistence.CatalogKey]int, resources)
+	for i, key := range result.Order {
+		positions[key] = i
+	}
+	if len(positions) != resources {
+		t.Fatal("notification closure repeated a resource")
+	}
+	before := func(dependency, consumer persistence.CatalogKey) {
+		t.Helper()
+		first, foundFirst := positions[dependency]
+		last, foundLast := positions[consumer]
+		if !foundFirst || !foundLast || first >= last {
+			t.Fatal("notification closure lost dependency order", dependency, consumer)
+		}
+	}
+	group := persistence.CatalogKey{Kind: "NotificationGroup", ID: "large-group"}
+	for i, id := range refs {
+		endpoint := persistence.CatalogKey{Kind: "NotificationEndpoint", ID: id}
+		before(persistence.CatalogKey{Kind: "Credential", ID: "hook"}, endpoint)
+		before(persistence.CatalogKey{Kind: "Credential", ID: fmt.Sprintf("headers-%03d", i)}, endpoint)
+		before(endpoint, group)
+	}
+	before(group, persistence.CatalogKey{Kind: "Monitor", ID: "large-consumer"})
 	t.Logf("validated notification closure exceeding %d plaintext bytes; peak accounted borrow/scratch %d bytes (not RSS)", endpoints*valueBytes, source.peakBytes)
 }

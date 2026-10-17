@@ -13,7 +13,7 @@ The working branch implements and tests resource management, incident controls,
 action review, and observations through the normal server, SDK and dashboard.
 Collection staging/activation and the external-worker protocol still have
 outstanding server gates. The
-[implementation progress](../implementation/dashboard-implementation-progress.md)
+[current availability](../versions.md)
 records the implemented boundaries and execution evidence; generated code alone
 does not establish server coverage. The SDK uses the current management and observation contract.
 

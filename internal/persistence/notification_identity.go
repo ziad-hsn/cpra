@@ -15,7 +15,7 @@ const NotificationTimeout = 45 * time.Second
 var ErrNotificationIdentity = errors.New("invalid notification identity or deadline")
 
 func deliveryStorageFormat(version int) bool {
-	return version == DeliveryFormatVersion || version > DeliveryFormatVersion && externalStorageFormat(version)
+	return version == DeliveryFormatVersion || lifecycleStorageFormat(version) || version > DeliveryFormatVersion && externalStorageFormat(version)
 }
 
 func requiresDeliveryFormat(m Monitor) bool {
@@ -43,7 +43,7 @@ func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action))
 		}
 		for _, id := range sortedActions(m.Actions) {
 			a := m.Actions[id]
-			if a.Kind == "code" && a.State == Queued && a.CatalogUID == m.CatalogUID && a.QueuedAt.IsZero() {
+			if a.Kind == "code" && a.State == Queued && m.OwnsAction(a) && a.QueuedAt.IsZero() {
 				m.cancelNotification(a, "notification_identity_incomplete", at, emit)
 			}
 		}
@@ -54,7 +54,7 @@ func (m *Monitor) upgradeNotifications(at time.Time, emit func(string, *Action))
 	// erase a started/completed/unknown action while upgrading its monitor.
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if a.Kind == "code" && a.State == Queued && a.CatalogUID == m.CatalogUID {
+		if a.Kind == "code" && a.State == Queued && m.OwnsAction(a) {
 			m.cancelNotification(a, "notification_format_upgraded", at, emit)
 		}
 	}
@@ -75,7 +75,7 @@ func (m *Monitor) changeNotificationEpisode(episode string, at time.Time, emit f
 	m.Cooldowns = nil
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if a.CatalogUID == m.CatalogUID && a.Kind == "code" && a.State == Queued && a.NotificationEpisode != episode {
+		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) && a.NotificationEpisode != episode {
 			m.cancelNotification(a, "notification_superseded", at, emit)
 		}
 	}
@@ -94,13 +94,16 @@ func (m *Monitor) suppressMaintenanceNotifications(at time.Time, emit func(strin
 	m.NotificationMaintenance = true
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if a.CatalogUID == m.CatalogUID && a.Kind == "code" && a.State == Queued {
+		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) {
 			m.cancelNotification(a, "maintenance", at, emit)
 		}
 	}
 }
 
 func (m Monitor) notificationEligible(a Action) bool {
+	if m.ControlNotification(a) {
+		return true
+	}
 	if m.NotificationVersion != DeliveryFormatVersion || a.Kind != "code" {
 		return true
 	}
@@ -122,6 +125,9 @@ func (m Monitor) notificationEligible(a Action) bool {
 }
 
 func validateNotificationIdentity(m Monitor, version int) error {
+	if err := validateLifecycle(m, version); err != nil {
+		return err
+	}
 	if err := m.LastFailure.validate(version); err != nil {
 		return err
 	}
@@ -152,6 +158,14 @@ func validateNotificationIdentity(m Monitor, version int) error {
 		if !hasIdentity {
 			continue // Retained pre-migration outcomes keep their original evidence.
 		}
+		if a.Kind == "intervention" && lifecycleStorageFormat(version) {
+			if a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || a.NotificationCorrelation != "" ||
+				a.QueuedAt.IsZero() || a.QueuedAt.After(a.NotBefore) || a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 ||
+				!a.Deadline.After(a.NotBefore) || a.Deadline.Sub(a.NotBefore) > 24*time.Hour || a.Deadline.Year() > 9999 {
+				return ErrNotificationIdentity
+			}
+			continue
+		}
 		if !deliveryStorageFormat(version) || m.NotificationVersion != DeliveryFormatVersion || a.Kind != "code" ||
 			!catalogIdentifier(a.DeliveryID, 256) || !catalogIdentifier(a.NotificationEpisode, 256) || !catalogIdentifier(a.EndpointID, 256) ||
 			!a.QueuedAt.IsZero() && (a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 || a.QueuedAt.After(a.NotBefore)) ||
@@ -178,10 +192,10 @@ func (p Policy) MaintenanceBetween(from, through time.Time) bool {
 
 func notificationEndpointIdentity(m Monitor, color string, endpoint int) string {
 	if ids := m.Policy.NotificationEndpointIDs[color]; endpoint >= 0 && endpoint < len(ids) {
-		return identity(fmt.Sprintf("endpoint/%s/%s/%s", m.ID, m.CatalogUID, ids[endpoint]))
+		return identity(fmt.Sprintf("endpoint/%s/%s/%s", m.ID, m.incarnationIdentity(), ids[endpoint]))
 	}
 	// Revision pins the endpoint configuration; the ordinal belongs to its
 	// immutable color-specific destination list. No target or credential enters
 	// this identity or the Raft record.
-	return identity(fmt.Sprintf("endpoint/%s/%s/%s/%s/%d", m.ID, m.CatalogUID, m.Revision, color, endpoint))
+	return identity(fmt.Sprintf("endpoint/%s/%s/%s/%s/%d", m.ID, m.incarnationIdentity(), m.Revision, color, endpoint))
 }

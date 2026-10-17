@@ -525,4 +525,3 @@ Recorded availability: missing (missing). Contents remain private; this generato
 ## bin/verification/worker-status-2026-09-29/result.json {#record-d747aeae189b2c5d44d9fecf}
 
 Recorded availability: missing (missing). Contents remain private; this generator did not verify the result.
-

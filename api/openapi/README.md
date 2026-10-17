@@ -10,7 +10,7 @@ records the implemented boundaries and execution evidence; generated code alone
 does not establish server coverage. The SDK uses the current management and observation contract.
 
 - `models.base.json` defines the canonical public types, including concrete data
-  structures for all 33 built-in driver configurations. Optional mutable fields
+  structures for all 35 built-in driver configurations. Optional mutable fields
   retain presence. Duration configuration uses Go duration strings, not numeric
   nanoseconds or ISO-8601 durations. Driver envelopes preserve raw unknown data
   for observation; SDK mutation validation selects a concrete category/type.
@@ -32,8 +32,8 @@ shipped runtime is pinned to 1.6.0. Generator dependencies are isolated in the
 From the repository root:
 
 ```sh
-GO=/path/to/go1.27.1/bin/go python3 tools/sdkgen/generate.py
-GO=/path/to/go1.27.1/bin/go python3 tools/sdkgen/generate.py --check
+GO=/path/to/go1.27.2/bin/go python3 tools/sdkgen/generate.py
+GO=/path/to/go1.27.2/bin/go python3 tools/sdkgen/generate.py --check
 ```
 
 The second command generates only in temporary storage and fails on differences;
@@ -69,7 +69,7 @@ selects the actual driver key; `recipientRefs` and `groupRef` provide destinatio
 That typed mode excludes inline drivers and direct rule endpoint references.
 Local SDK validation checks shapes and duplicate references; matching destination
 methods, reverse dependencies and delivery deduplication require the authoritative
-server catalog. Legacy endpoint-only group fanout remains supported.
+server catalog. Endpoint-only group fanout remains supported.
 
 `GET /api/v2/self` returns `AccessInfo` with `principalId`, `role`, and an explicit
 `permissions` array. Permissions exactly match case-sensitive OpenAPI operation IDs

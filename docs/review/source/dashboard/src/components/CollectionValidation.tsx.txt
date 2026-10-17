@@ -1,3 +1,4 @@
+import { validationDiagnostic } from '../api/validation';
 import { useEffect, useRef, useState } from 'react';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { collectionValidationMessage, collectionValidationPendingDelay, readCollectionValidation, type CollectionIdentity, type CollectionValidationPage } from '../api/collectionOperations';
@@ -88,7 +89,7 @@ export function CollectionValidation({ id, identity }: { id: string; identity: C
         <p>{page.summary.summaryOnly ? `Summary only for ${formatNumber(identity.itemCount)} original resources. No per-resource results are retained.` : `${formatNumber(page.summary.count)} original resource results. Showing ${page.items.length ? `${formatNumber(page.items[0].ordinal)}–${formatNumber(page.items.at(-1)!.ordinal)}` : '0'} on this page.`}</p>
         {page.items.length > 0 && <div className="table-scroll" role="region" aria-label="Original validation resource results" tabIndex={0}><table className="data-table">
           <thead><tr><th>Ordinal</th><th>Kind</th><th>Resource ID</th><th>Change</th><th>Issue</th><th>Source token</th><th>Document</th><th>Item</th><th>Original UID</th><th>Original version</th></tr></thead>
-          <tbody>{page.items.map(item => <tr key={item.ordinal}><td>{formatNumber(item.ordinal)}</td><td>{item.kind}</td><td className="mono">{item.id}</td><td>{item.change ? changes[item.change] ?? 'Unrecognized change' : 'Not reported'}</td><td>{item.issue ? issues[item.issue] ?? 'Unrecognized issue' : 'None reported'}</td><td className="mono">{item.source}</td><td>{formatNumber(item.sourceDocument)}</td><td>{formatNumber(item.sourceItem)}</td><td className="mono">{item.uid ?? 'Not reported'}</td><td className="mono">{item.resourceVersion ?? 'Not reported'}</td></tr>)}</tbody>
+          <tbody>{page.items.map(item => <tr key={item.ordinal}><td>{formatNumber(item.ordinal)}</td><td>{item.kind}</td><td className="mono">{item.id}</td><td>{item.change ? changes[item.change] ?? 'Unrecognized change' : 'Not reported'}</td><td>{item.issue ? issues[item.issue] ?? 'Unrecognized issue' : 'None reported'}{item.reason && <div>{validationDiagnostic(item)}</div>}</td><td className="mono">{item.source}</td><td>{formatNumber(item.sourceDocument)}</td><td>{formatNumber(item.sourceItem)}</td><td className="mono">{item.uid ?? 'Not reported'}</td><td className="mono">{item.resourceVersion ?? 'Not reported'}</td></tr>)}</tbody>
         </table></div>}
         <p className="muted">Source tokens preserve the original input ordering. Local file names and resource contents are not part of this retained view.</p>
       </>}

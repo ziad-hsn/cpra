@@ -125,13 +125,25 @@ func TestCatalogManualRecoveryAndHistoricalReviewUseOwnerReceipts(t *testing.T) 
 	if newRecord.Resource.Metadata.UID == action.CatalogUID {
 		t.Fatal("replacement did not get a new incarnation")
 	}
-	reviewed = commitManagedAction(t, catalog, "review", action.ID, api.ControlRequest{Revision: action.ReviewRevision, Resolution: "accepted", Reason: "Operator confirmed provider acceptance", EvidenceRefs: []string{"provider-receipt-41"}})
 	c = managedController(t, settings, catalog, store)
+	waitCatalog(t, func() bool {
+		index := c.SnapshotHolder().Index()
+		if index == nil {
+			return false
+		}
+		row, ok := index.GetStable("manual-recovery")
+		return ok && row.ActionsNeedingReview == 1 && row.UnknownActions == 1 && !row.Enabled
+	})
+	reviewed = commitManagedAction(t, catalog, "review", action.ID, api.ControlRequest{Revision: action.ReviewRevision, Resolution: "accepted", Reason: "Operator confirmed provider acceptance", EvidenceRefs: []string{"provider-receipt-41"}})
 	waitCatalog(t, func() bool {
 		receipt, err := catalog.Operation(context.Background(), reviewed.Operation.ID)
 		return err == nil && (receipt.Applied != nil && *receipt.Applied == 1)
 	})
 	time.Sleep(300 * time.Millisecond) // More than the fixture's recovery cooldown.
+	row, exists := c.SnapshotHolder().Index().GetStable("manual-recovery")
+	if !exists || row.ActionsNeedingReview != 0 || row.UnknownActions != 1 {
+		t.Fatal("historical review left a stale live summary or erased provider uncertainty", row)
+	}
 	action, _, err = store.Action(action.ID)
 	if err != nil || action.State != persistence.Unknown || action.Held || action.Review == nil || action.Review.Actor != "oncall-alice" || action.Review.Resolution != "accepted" {
 		t.Fatal("historical review changed provider facts or failed to retain its assertion")

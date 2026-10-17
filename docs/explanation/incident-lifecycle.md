@@ -14,7 +14,18 @@ CPRa schedules checks, classifies their results, optionally admits a recovery ac
 
 ## From an unknown monitor to an incident
 
-A newly loaded monitor has no observed result yet. Successful checks establish health. Consecutive unsuccessful checks accumulate toward its unhealthy threshold. On the first failure, a configured yellow notification can be admitted. At the unhealthy threshold, an eligible recovery is attempted before opening a red incident. Without an available recovery, on a rejected recovery, or after a failed verification check, the incident opens and its configured red notification is admitted. A successful recovery emits configured cyan and starts healthy-check verification; verified recovery emits configured green. Notification rules and maintenance still govern actual delivery.
+A newly loaded monitor has no observed result yet. Successful checks establish
+health. Consecutive failures accumulate toward the unhealthy threshold. The first
+failure can admit configured yellow; reaching the threshold can admit an eligible
+intervention. Without available recovery, after rejected recovery, or after a
+failed verification check, the incident opens and configured red can be admitted.
+A successful intervention can admit cyan, meaning **health verification pending**.
+
+Normal green requires both the healthy-check threshold and an actual yellow,
+red or cyan notification start in that episode. An unsent, canceled intent does
+not qualify. Healthy startup alone does not send green. Ignore recovery has the
+explicit exception described below. Notification configuration and suppression
+controls still determine eligibility; admission does not prove delivery.
 
 | Displayed state | How to interpret it |
 | --- | --- |
@@ -36,7 +47,10 @@ checks must confirm health before restored-health wording is emitted.
 
 A lost response, interrupted start or deadline can leave the external outcome
 unknown. That hold survives restart. Check observations resume, while the
-interrupted action is not automatically repeated. Inspect provider evidence and
+interrupted action is not automatically repeated. An unknown intervention blocks
+conflicting interventions, but does not block healthy streaks, incident closure,
+later outage detection or eligible notifications. A successful health observation
+does not establish that the earlier intervention succeeded. Inspect provider evidence and
 use the audited review procedure. This does not provide provider-independent
 exactly-once execution.
 
@@ -44,16 +58,44 @@ exactly-once execution.
 
 TLS `warn_days` raises a yellow warning and degraded state without starting recovery. `critical_days` fails the check and follows the normal failure policy.
 
-Maintenance keeps checks running while suppressing new notifications and
+Maintenance keeps checks running while suppressing ordinary notifications and
 recovery admissions. Covered queued notifications are canceled, including work
 that waited through the entire window. Started, completed and unknown actions
 retain their evidence. Ending maintenance does not release accumulated alerts.
+Configured gray notices for actual enable/disable transitions remain eligible
+during maintenance and Ignore. They describe the control change, never recovery.
+
+## Ignore and repeated outages
+
+Ignore retains checks, actual health, incidents and history while suppressing
+ordinary notifications and new interventions. It can be entered explicitly with
+an audited [Ignore control](../cpractl-controls.md#ignore-and-unignore), or by the
+monitor's optional `auto_ignore` count/window policy. Automatic Ignore counts
+distinct outages that reach the unhealthy threshold, not individual failed
+checks. Ordinary recoveries before the limit is reached do not reset that rolling
+count. The triggering outage enters Ignore before its intervention or ordinary
+notifications can be admitted.
+
+Ignore cancels unsent interventions and ordinary notifications. Started and
+unknown work retain their original evidence. Configuration edits do not clear an
+active Ignore. Explicit Unignore permits future eligible handling without
+releasing suppressed work.
+
+Verified recovery clears Ignore and its counter and can admit one configured
+green notification, even though the ignored outage had no earlier alert start.
+Other controls still apply: disabled/snoozed checks cannot establish fresh
+recovery, and maintenance can suppress green. Clearing Ignore does not wait for
+green delivery to succeed. A failed or uncertain green cannot keep the monitor
+ignored or cause that delivery to replay automatically.
 
 ## Delivery and cooldown
 
 Red, yellow, green, cyan and gray rules are configuration keys. Endpoint outcomes
 are tracked independently with stable logical delivery identities. Confirmed
 delivery to one destination is not repeated because another was unfinished.
+An unknown delivery holds only its own identity, incarnation, episode and
+destination. It does not suppress a later incident's notification or an unrelated
+destination.
 
 Only proven retryable provider rejection can authorize another HTTP attempt,
 up to three within the original deadline. Generic server errors remain unknown.
@@ -66,7 +108,11 @@ distinct severity transition receives its first eligible notification promptly.
 
 Raft restores committed incidents, cooldowns, verification, attempt limits,
 controls and delivery outcomes. Replay performs no provider operations. Each
-data directory has one exclusively locked owner. Separate instances do not
+restored queued intervention requires a fresh check before dispatch. A healthy
+target cancels it; a failed check still must satisfy the original identity,
+policy and deadline. Removing and later re-adding a file monitor creates a new
+incarnation. Its old actions and history remain attached to the original target.
+Each data directory has one exclusively locked owner. Separate instances do not
 coordinate a shared monitor fleet; single-node Raft is persistence, not failover.
 Memory mode is explicit and disposable. Back up the complete stopped directory,
 including retained history and generation metadata.

@@ -118,7 +118,12 @@
       "protected": [
         "headers",
         "body"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name"
+      }
     },
     "tcp": {
       "schema": "PulseTCPConfig",
@@ -138,7 +143,12 @@
     },
     "grpc": {
       "schema": "PulseGRPCConfig",
-      "protected": []
+      "protected": [],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name"
+      }
     },
     "docker": {
       "schema": "PulseDockerConfig",
@@ -148,41 +158,82 @@
       "schema": "PulseRedisConfig",
       "protected": [
         "password"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "postgres": {
       "schema": "PulsePostgresConfig",
       "protected": [
         "dsn",
         "password"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "mysql": {
       "schema": "PulseMySQLConfig",
       "protected": [
         "dsn",
         "password"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "mongo": {
       "schema": "PulseMongoConfig",
       "protected": [
         "uri"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "rabbitmq": {
       "schema": "PulseRabbitMQConfig",
       "protected": [
         "url"
-      ]
+      ],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "kafka": {
       "schema": "PulseKafkaConfig",
-      "protected": []
+      "protected": [],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name",
+        "tls": "Use TLS"
+      }
     },
     "tls": {
       "schema": "PulseTLSConfig",
-      "protected": []
+      "protected": [],
+      "labels": {
+        "insecureSkipVerify": "Skip TLS certificate verification",
+        "caFile": "CA certificate file",
+        "serverName": "TLS server name"
+      }
     }
   },
   "recoveryDrivers": {
@@ -235,6 +286,7 @@
     "Duration",
     "MonitorStatus",
     "Measurement",
-    "FailureDiagnostic"
+    "FailureDiagnostic",
+    "AutoIgnore"
   ]
 }

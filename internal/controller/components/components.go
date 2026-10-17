@@ -16,6 +16,16 @@ import (
 // Using a tag allows filters to exclude disabled entities efficiently at the archetype level.
 type Disabled struct{}
 
+// Ignored excludes ordinary action admission while retaining health checks.
+// The committed store repeats the guard before external execution.
+type Ignored struct{}
+
+// AutoIgnore is present only on monitors with an explicit frequency policy.
+type AutoIgnore struct {
+	Incidents int
+	Window    time.Duration
+}
+
 // CheckPause exists only while the owner excludes a monitor from new checks
 // because it is disabled or snoozed. Driver retains the accounted membership
 // across a configuration replacement; it contains no provider configuration.
@@ -141,13 +151,16 @@ func (m *MonitorState) SetCodePending(pending bool) {
 
 // PulseConfig consolidates pulse configuration
 type PulseConfig struct {
-	Config             manifest.PulseConfig
-	Type               string
-	Timeout            time.Duration
-	Interval           time.Duration
-	Retries            int
-	UnhealthyThreshold int
-	HealthyThreshold   int
+	FlowKey                         uint64
+	TargetSummary                   string
+	CertificateVerificationDisabled bool
+	Config                          manifest.PulseConfig
+	Type                            string
+	Timeout                         time.Duration
+	Interval                        time.Duration
+	Retries                         int
+	UnhealthyThreshold              int
+	HealthyThreshold                int
 }
 
 func (c *PulseConfig) Copy() *PulseConfig {
@@ -155,12 +168,15 @@ func (c *PulseConfig) Copy() *PulseConfig {
 		return nil
 	}
 	cpy := &PulseConfig{
-		Type:               strings.Clone(c.Type),
-		Timeout:            c.Timeout,
-		Interval:           c.Interval,
-		Retries:            c.Retries,
-		UnhealthyThreshold: c.UnhealthyThreshold,
-		HealthyThreshold:   c.HealthyThreshold,
+		FlowKey:                         c.FlowKey,
+		TargetSummary:                   c.TargetSummary,
+		CertificateVerificationDisabled: c.CertificateVerificationDisabled,
+		Type:                            strings.Clone(c.Type),
+		Timeout:                         c.Timeout,
+		Interval:                        c.Interval,
+		Retries:                         c.Retries,
+		UnhealthyThreshold:              c.UnhealthyThreshold,
+		HealthyThreshold:                c.HealthyThreshold,
 	}
 
 	if c.Config != nil {

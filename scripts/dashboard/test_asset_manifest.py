@@ -12,7 +12,7 @@ class AssetManifestTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         for name in ("dashboard/src/App.tsx", "dashboard/pnpm-lock.yaml", "internal/httpserver/assets/index.html",
-                     "sdk/go/collection/parse.go", "LICENSES/dashboard.txt", "brand/palette.json", "brand/dist/palette.css",
+                     "sdk/go/collection/parse.go", "sdk/go/api/validation_messages.json", "LICENSES/dashboard.txt", "brand/palette.json", "brand/dist/palette.css",
                      "brand/LICENSE", "brand/ATTRIBUTION.md", "brand/dist/svg/cpra-mark-color.svg", "brand/fonts/LICENSE.txt"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -24,7 +24,7 @@ class AssetManifestTests(unittest.TestCase):
 
     def test_changes_additions_and_deletions_are_rejected(self):
         for name in ("dashboard/src/App.tsx", "dashboard/pnpm-lock.yaml", "internal/httpserver/assets/index.html",
-                     "sdk/go/collection/parse.go", "LICENSES/dashboard.txt", "dashboard/src/New.tsx"):
+                     "sdk/go/collection/parse.go", "sdk/go/api/validation_messages.json", "LICENSES/dashboard.txt", "dashboard/src/New.tsx"):
             with self.subTest(name=name):
                 path = self.root / name
                 old = path.read_bytes() if path.exists() else None

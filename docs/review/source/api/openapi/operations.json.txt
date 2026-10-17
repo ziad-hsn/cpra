@@ -1000,5 +1000,53 @@
     "buildTag": "",
     "sdkMethod": "Client.DiscoverAccess",
     "contractTest": "TestOperationInventory"
+  },
+  {
+    "operationID": "IgnoreMonitor",
+    "method": "POST",
+    "path": "/api/v2/monitors/{id}/ignore",
+    "schema": "Operation",
+    "request": "ControlRequest",
+    "cas": true,
+    "listing": false,
+    "buildTag": "",
+    "sdkMethod": "MonitorsService.Ignore",
+    "contractTest": "TestOperationInventory"
+  },
+  {
+    "operationID": "UnignoreMonitor",
+    "method": "POST",
+    "path": "/api/v2/monitors/{id}/unignore",
+    "schema": "Operation",
+    "request": "ControlRequest",
+    "cas": true,
+    "listing": false,
+    "buildTag": "",
+    "sdkMethod": "MonitorsService.Unignore",
+    "contractTest": "TestOperationInventory"
+  },
+  {
+    "operationID": "ListMonitorObservations",
+    "method": "GET",
+    "path": "/api/v2/observations/monitors",
+    "schema": "MonitorObservationList",
+    "request": "",
+    "cas": false,
+    "listing": true,
+    "buildTag": "",
+    "sdkMethod": "MonitorObservationsService.List",
+    "contractTest": "TestOperationInventory"
+  },
+  {
+    "operationID": "GetMonitorObservation",
+    "method": "GET",
+    "path": "/api/v2/observations/monitors/{id}",
+    "schema": "MonitorObservation",
+    "request": "",
+    "cas": false,
+    "listing": false,
+    "buildTag": "",
+    "sdkMethod": "MonitorObservationsService.Get",
+    "contractTest": "TestOperationInventory"
   }
 ]

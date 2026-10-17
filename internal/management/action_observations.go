@@ -10,12 +10,12 @@ import (
 )
 
 type ActionView struct {
-	view    persistence.ActionView
-	catalog *Catalog
+	view  persistence.ActionView
+	ready func(context.Context) error
 }
 
 func actionView(a persistence.ActionRecord) api.Action {
-	out := api.Action{ID: a.ID, MonitorID: a.MonitorID, IncarnationUID: a.CatalogUID, IncidentID: a.IncidentID, ExecutionID: a.ID, ExecutionRevision: a.Revision, State: string(a.State), Kind: a.Kind, Outcome: a.Outcome, ReviewRevision: a.ReviewRevision, Held: a.Held, ExecutorFenced: a.ExecutorFenced, ReceiptID: a.OperationID}
+	out := api.Action{ID: a.ID, MonitorID: a.MonitorID, IncarnationUID: a.IncarnationID(), IncidentID: a.IncidentID, ExecutionID: a.ID, ExecutionRevision: a.Revision, State: string(a.State), Kind: a.Kind, Outcome: a.Outcome, ReviewRevision: a.ReviewRevision, Held: a.Held, ExecutorFenced: a.ExecutorFenced, ReceiptID: a.OperationID}
 	out.Failure, out.Cause = failureView(a.Failure), failureView(a.Cause)
 	out.AgentReceipt = agentReceiptView(a.AgentReceipt)
 	out.RecoveryFailure = recoveryFailureView(a.RecoveryFailure)
@@ -100,16 +100,16 @@ func (c *Catalog) ActionSnapshotContext(ctx context.Context) (ActionView, error)
 		return ActionView{}, err
 	}
 	v, err := c.store.ActionSnapshotContext(ctx)
-	return ActionView{view: v, catalog: c}, err
+	return ActionView{view: v, ready: c.readyContext}, err
 }
 func (v ActionView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Action, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	if v.catalog == nil {
+	if v.ready == nil {
 		return nil, "", ErrUnavailable
 	}
-	if err := v.catalog.readyContext(ctx); err != nil {
+	if err := v.ready(ctx); err != nil {
 		return nil, "", err
 	}
 	if monitorID != "" && !validID(monitorID) {

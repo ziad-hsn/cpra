@@ -125,7 +125,7 @@ func (f *machine) applyAgentObservation(c Command) Result {
 	m.Actions[a.ID] = a
 	f.image.Version = joinStorageFormat(f.image.Version, AgentObservationFormatVersion)
 	eventReceipt := r
-	event := Event{MonitorID: m.ID, Revision: a.Revision, CatalogUID: a.CatalogUID, IncidentID: a.IncidentID,
+	event := Event{MonitorID: m.ID, Revision: a.Revision, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, IncidentID: a.IncidentID,
 		At: c.At, Type: "agent_task_observed", ActionID: a.ID, Kind: a.Kind, Color: a.Color,
 		Endpoint: a.Endpoint, AgentReceipt: &eventReceipt}
 	// Unknown state, operator review and incident policy remain unchanged. A

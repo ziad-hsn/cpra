@@ -185,7 +185,7 @@ func (v *stagedValidator) ingest(ctx context.Context, ref stagedItemRef, input *
 		return nil
 	})
 	if errors.Is(err, ErrValidation) {
-		v.result.Items[i].Issue = "invalidResource"
+		v.result.Items[i].invalid(err)
 		return nil
 	}
 	return err
@@ -223,6 +223,9 @@ func (v *stagedValidator) visit(ctx context.Context) error {
 func (v *stagedValidator) reject(i int, err error) (CollectionValidation, error) {
 	// Reuse the established public-safe item classifications without invoking
 	// the request-local validator or allocating its plaintext resource maps.
+	if i >= 0 && i < len(v.result.Items) {
+		v.result.Items[i].diagnostic(err)
+	}
 	classified := collectionValidator{result: v.result}
 	result, safe := classified.reject(i, stagedValidationError(err))
 	v.result = result
@@ -239,6 +242,9 @@ func stagedValidationError(err error) error {
 			}
 			return allowed
 		}
+	}
+	if field, ok := api.ValidationFieldError(err); ok {
+		return errors.Join(ErrValidation, api.InvalidField(field.Field, field.Reason))
 	}
 	return ErrValidation
 }
@@ -389,7 +395,7 @@ func (v *stagedValidator) normalized(ctx context.Context, key persistence.Catalo
 			clear(original)
 		}
 		if err != nil {
-			return ErrValidation
+			return stagedValidationError(err)
 		}
 		if _, err := collectionCandidateEncoding(r, old); err != nil {
 			return ErrValidation

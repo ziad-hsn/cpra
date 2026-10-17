@@ -69,7 +69,7 @@ func notificationEndpointCases() []endpointCase {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
-			if body.Title != "CPRA alert: fixture" || !strings.Contains(body.Text, "fixture") || len(body.Tags) != 1 || body.Tags[0] != "env:fixture" {
+			if body.Title != "CPRa CRITICAL ALERT: fixture" || !strings.Contains(body.Text, "fixture") || len(body.Tags) != 1 || body.Tags[0] != "env:fixture" {
 				t.Errorf("unexpected datadog body: %+v", body)
 			}
 		}},

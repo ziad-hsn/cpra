@@ -28,3 +28,8 @@ slo:
 manual_recovery:
   minimum_interval: 60s
   per_hour: 3
+
+# File notification names are relative to this separate, private output root.
+# Prefer cpractl local init to generate the platform-specific path.
+# notifications:
+#   log_directory: /var/log/cpra/notifications

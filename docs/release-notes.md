@@ -9,8 +9,8 @@ cpra_scope: development
 CPRa's first versioned release candidate remains private and unpublished. The
 target is `v0.1.0-rc.1` for the application, Go SDK and worker module, and
 `0.1.0-rc.1` for the Helm chart. [Versions and availability](versions.md) is the
-current support matrix. The [September runtime preview](review/runtime-preview-2026-09-13.md)
-is a dated record of earlier source and checks.
+current support matrix. Historical engineering records remain in the repository
+and are excluded from the public website.
 
 ## Implemented behavior
 
@@ -26,6 +26,9 @@ is a dated record of earlier source and checks.
   dashboard expose the same resource/version contracts. Acknowledge records
   attention; dismiss suppresses incident notifications; snooze pauses checks
   and notifications for its period; disable excludes the monitor until enabled.
+  Ignore continues health observations while suppressing ordinary notifications
+  and interventions. Verified recovery clears Ignore; gray notices describe
+  actual enable/disable transitions, including during Ignore and maintenance.
 - Startup imports configured management manifests once. Later file edits require
   explicit apply. Interrupted collection application retains its original
   operation and requires explicit continuation with the original inputs.
@@ -39,7 +42,10 @@ is a dated record of earlier source and checks.
   contractual SLA or an unconditional capacity claim.
 - The gRPC check supports explicit unary health mode with verified TLS by
   default. Only `SERVING` is healthy. Omitting the mode preserves TCP
-  reachability. Docker stop grace and overall operation budget are separate.
+  reachability. TLS-capable checks support explicit per-monitor certificate
+  verification bypass, off by default, with isolated transport settings. This
+  does not disable recovery health verification or CPRa API authentication.
+  Docker stop grace and overall operation budget are separate.
 
 See the [quickstart](tutorials/quickstart.md), [durability guide](durability.md),
 [management controls](cpractl-controls.md) and
@@ -59,9 +65,7 @@ vulnerability scans. All repository Go modules share a Go 1.26.0 minimum.
 Fresh scans across nine application, SDK, worker and example selections report
 no affected imported packages or called symbols. The all-built-in application
 selections retain one module-level advisory for OpenPGP packages they do not
-import. Complete final-source security qualification remains required. The
-[security checkpoint](implementation/dependency-security-2026-10-14.md) records
-the evidence and scope.
+import. Complete final-source security qualification remains required. Earlier scan records retain their own source identity; later repairs require new scans.
 
 Publication still requires final source review/freeze, complete compiler/tag
 and vulnerability checks, reproducible packaged artifacts, native platform and
@@ -73,6 +77,5 @@ delivery or provider certification. The comparative million-monitor campaign
 has not completed; its disk prerequisite still applies. The 24-hour endurance
 run remains cancelled.
 
-The [repair progress record](implementation/release-repair-progress.md) retains
-individual pass/fail scope and the open work. No public tag, module, artifact,
+The repository retains individual pass/fail records and open work. No public tag, module, artifact,
 image, chart or documentation promotion is implied by this page.

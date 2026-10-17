@@ -221,7 +221,7 @@ func TestCollectionValidationIndependentMonitorsAreBoundedAndDoNotRunProviders(t
 		t.Fatal("pure preflight performed I/O or committed")
 	}
 	logPath := filepath.Join(t.TempDir(), "must-not-exist.log")
-	result, err = validateCollection(t, c, collectionInputs(resource("NotificationEndpoint", "log", api.DriverConfig{Type: "log", Config: json.RawMessage(fmt.Sprintf(`{"file":%q}`, logPath))})))
+	result, err = validateCollection(t, c, collectionInputs(resource("NotificationEndpoint", "log", api.DriverConfig{Type: "log", Config: json.RawMessage(fmt.Sprintf(`{"file":%q}`, filepath.Base(logPath)))})))
 	if err != nil || !result.Valid {
 		t.Fatal(result, err)
 	}
@@ -376,7 +376,7 @@ func TestCollectionValidationRoutingWorkAndCancellationAreBounded(t *testing.T) 
 		r.Spec, _ = json.Marshal(spec)
 		resources[persistence.CatalogKey{Kind: r.Kind, ID: r.Metadata.ID}] = r
 	}
-	validator := collectionValidator{catalog: &Catalog{}}
+	validator := collectionValidator{catalog: &Catalog{options: CatalogOptions{NotificationLogEnabled: true}}}
 	_, err := validator.validateSet(context.Background(), resources)
 	if !errors.Is(err, ErrGraphLimit) || validator.visits != collectionValidationVisits+1 {
 		t.Fatal("expanded routing escaped the work bound", validator.visits, err)
@@ -420,7 +420,7 @@ func TestCollectionValidationFinalMonitorFailureDoesNotRepeatSharedValidation(t 
 		}
 		resources[persistence.CatalogKey{Kind: r.Kind, ID: r.Metadata.ID}] = r
 	}
-	validator := collectionValidator{catalog: &Catalog{}}
+	validator := collectionValidator{catalog: &Catalog{options: CatalogOptions{NotificationLogEnabled: true}}}
 	key, err := validator.validateSet(context.Background(), resources)
 	if !errors.Is(err, ErrValidation) || key.ID != "monitor-199" || validator.visits > 1000 {
 		t.Fatal("final invalid monitor repeated shared validation", key, validator.visits, err)

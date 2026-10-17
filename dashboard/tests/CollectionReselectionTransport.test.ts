@@ -14,6 +14,20 @@ const status: ReselectionStatus = { id: attempt, operationID: id, normalizationP
   rawBytes: 0, nextSource: 1, nextOffset: 0, expiresAt: '2026-09-30T12:00:00Z', operationUploaded: 1 };
 const finished = { ...status, sourcesCompleted: 1, nextSource: 0, nextOffset: 0, rawBytes: 5 };
 const response = (value: unknown = status, code = 200, headers?: HeadersInit) => new Response(code === 204 ? null : JSON.stringify(value), { status: code, headers });
+
+it('preserves an original v1 profile and rejects a switched continuation reply', async () => {
+  const profile = 'cpra.file.base.v1';
+  let switched = false;
+  const { session } = await fixture(async (_url, init) => {
+    if (init.method === 'POST') expect(JSON.parse(decoder.decode(init.body as Uint8Array)).normalizationProfile).toBe(profile);
+    return response({ ...status, normalizationProfile: switched ? fileNormalizationProfile : profile }, init.method === 'POST' ? 201 : 200);
+  });
+  const created = await createReselection(session, all, id, 1, undefined, profile);
+  expect(created.data.normalizationProfile).toBe(profile);
+  expect((await getReselection(session, all, id, attempt, undefined, profile)).data.normalizationProfile).toBe(profile);
+  switched = true;
+  await expect(getReselection(session, all, id, attempt, undefined, profile)).rejects.toMatchObject({ reason: 'invalid' });
+});
 async function fixture(handler: (url: string, init: RequestInit) => Promise<Response>, permissions = [...all], options: { maxResponseBytes?: number; timeoutMs?: number } = {}) {
   const sent = vi.fn(handler);
   const fetcher = vi.fn<typeof fetch>(async (url, init = {}) => String(url).endsWith('/self') ? response({ principalId: 'operator', role: 'operator', permissions }) : sent(String(url), init));

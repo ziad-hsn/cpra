@@ -3,8 +3,6 @@ package management
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -42,30 +40,30 @@ func validateProtectedDriver(category string, driver api.DriverConfig) error {
 		return err
 	}
 	if err := api.ValidateDriverSettings(category, driver); err != nil {
-		return errors.New("invalid or unsupported driver configuration")
+		return err
 	}
 	var config map[string]json.RawMessage
 	if err := json.Unmarshal(driver.Config, &config); err != nil || config == nil {
-		return errors.New("driver configuration must be an object")
+		return api.InvalidField("config", "objectRequired")
 	}
 	for _, field := range ProtectedDriverFields(category, driver.Type) {
 		if value, exists := config[field]; exists && !bytes.Equal(value, []byte("null")) {
-			return fmt.Errorf("config.%s must use a credentialRefs reference", field)
+			return api.InvalidField("config."+field, "credentialRequired")
 		}
 	}
 	if driver.CredentialRefs != nil {
 		for field, id := range *driver.CredentialRefs {
 			if !validID(id) || field == "" {
-				return errors.New("invalid credential reference")
+				return api.InvalidField("credentialRefs", "invalidReference")
 			}
 			if value, exists := config[field]; exists && !bytes.Equal(value, []byte("null")) {
-				return errors.New("credential reference conflicts with an inline configuration field")
+				return api.InvalidField("credentialRefs", "credentialConflict")
 			}
 			// Unknown slots must never be injected into an execution driver. Null
 			// preserves schema typing while checking the exact configured field.
 			probe, _ := json.Marshal(map[string]any{field: nil})
 			if err := api.ValidateDriver(category, api.DriverConfig{Type: driver.Type, Config: probe}); err != nil {
-				return errors.New("credential reference names an unsupported driver field")
+				return api.InvalidField("credentialRefs", "credentialField")
 			}
 		}
 	}
@@ -75,11 +73,11 @@ func validateProtectedDriver(category string, driver api.DriverConfig) error {
 		if raw := config["url"]; len(raw) != 0 && !bytes.Equal(raw, []byte("null")) {
 			var target string
 			if json.Unmarshal(raw, &target) != nil {
-				return errors.New("invalid HTTP check URL")
+				return api.InvalidField("config.url", "httpURL")
 			}
 			u, err := url.Parse(target)
 			if err != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-				return errors.New("HTTP URL with credentials, query, or fragment must use credentialRefs.url")
+				return api.InvalidField("config.url", "credentialRequired")
 			}
 		}
 	}
@@ -98,30 +96,30 @@ func visitDrivers(resource *api.Resource, visit func(string, *api.DriverConfig) 
 	case "NotificationEndpoint":
 		var driver api.DriverConfig
 		if err := api.StrictDecode(resource.Spec, &driver); err != nil {
-			return errors.New("invalid endpoint spec")
+			return api.PrefixValidationError("spec", err)
 		}
 		if err := visit("notification", &driver); err != nil {
-			return err
+			return api.PrefixValidationError("spec", err)
 		}
 		resource.Spec, _ = json.Marshal(driver)
 	case "Monitor":
 		var spec api.MonitorSpec
 		if err := api.StrictDecode(resource.Spec, &spec); err != nil {
-			return errors.New("invalid monitor spec")
+			return api.PrefixValidationError("spec", err)
 		}
 		if err := visit("check", &spec.Check.Driver); err != nil {
-			return err
+			return api.PrefixValidationError("spec.check.driver", err)
 		}
 		if spec.Recovery != nil {
 			if err := visit("recovery", &spec.Recovery.Driver); err != nil {
-				return err
+				return api.PrefixValidationError("spec.recovery.driver", err)
 			}
 		}
 		if spec.Notifications != nil {
 			for color, rule := range *spec.Notifications {
 				if rule.Driver != nil {
 					if err := visit("notification", rule.Driver); err != nil {
-						return err
+						return api.PrefixValidationError("spec.notifications."+color+".driver", err)
 					}
 					(*spec.Notifications)[color] = rule
 				}

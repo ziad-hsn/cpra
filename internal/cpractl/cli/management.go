@@ -12,7 +12,7 @@ import (
 
 func managementKind(name string) (string, error) {
 	switch strings.ToLower(name) {
-	case "monitor", "monitors", "monitor-configurations", "monitor-configuration", "configurations":
+	case "monitor", "monitors", "mon", "mons", "monitor-configurations", "monitor-configuration", "configurations":
 		return "Monitor", nil
 	case "notificationendpoint", "notificationendpoints", "notification-endpoint", "notification-endpoints", "endpoint", "endpoints":
 		return "NotificationEndpoint", nil
@@ -75,8 +75,8 @@ func addManagementGetCommands(get *cobra.Command, o *options) {
 	} {
 		kindName := definition.name
 		list := cpra.ListOptions{Limit: 100}
-		command := &cobra.Command{Use: kindName + " [stable-id]", Aliases: definition.aliases, Short: "Read a v2 configuration resource or one bounded page", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-			return runManagementGet(cmd, o, append([]string{kindName}, args...), false, list)
+		command := &cobra.Command{Use: kindName + " [stable-id]", Aliases: definition.aliases, Short: "Read configuration or file-monitor observations, one bounded page", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+			return runManagementGet(cmd, o, append([]string{cmd.CalledAs()}, args...), false, list)
 		}}
 		command.Flags().IntVar(&list.Limit, "limit", 100, "page size (1..500); never collects the fleet automatically")
 		command.Flags().StringVar(&list.Cursor, "cursor", "", "continue the server's original resource page")
@@ -107,6 +107,19 @@ func runManagementGet(cmd *cobra.Command, o *options, args []string, describe bo
 		return err
 	}
 	defer client.CloseIdleConnections()
+	if kind == "Monitor" {
+		access, err := client.DiscoverAccess(cmd.Context())
+		if err != nil {
+			return err
+		}
+		if access.Data.Mode == api.AccessDiscoveryModeObservation {
+			name := strings.ToLower(strings.SplitN(args[0], "/", 2)[0])
+			if strings.Contains(name, "configuration") {
+				return &managementCommandError{"file-configured monitors expose observations only; use get monitors or describe monitor/ID", cpra.ErrFeatureUnavailable}
+			}
+			return readMonitorObservations(cmd, o, client, id, describe, list)
+		}
+	}
 	service, err := managementServiceFor(client, kind)
 	if err != nil {
 		return err

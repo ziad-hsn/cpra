@@ -75,11 +75,11 @@ func TestFreezeProfileFixedCommitments(t *testing.T) {
 				return
 			}
 			defer f.Close()
-			if f.Len() != len(fixture.Items) || f.NormalizationProfile() != FileNormalizationProfile {
+			if f.Len() != len(fixture.Items) || f.NormalizationProfile() != fixtures.Profile {
 				t.Fatal("profile/count changed")
 			}
 			req, err := f.creationRequest()
-			if err != nil || req.NormalizationProfile != FileNormalizationProfile {
+			if err != nil || req.NormalizationProfile != fixtures.Profile {
 				t.Fatal("creation lost profile", err)
 			}
 			key, _ := hex.DecodeString(*req.IdentityKey)

@@ -34,6 +34,14 @@ export function QueueDiagnostics({ name, queue: q }: { name: string; queue: Queu
     <StatRow label="Oldest queued work" value={oldestPending(q)} />
     <StatRow label="Arrival variability (CV)" value={(q.arrival_samples ?? 0) >= 2 && valid(q.arrival_cv) ? q.arrival_cv.toFixed(3) : 'Unavailable'} />
     <StatRow label="Variability samples" value={number(q.arrival_samples)} /><StatRow label="Rate sample window" value={q.sample_window > 0 ? duration(q.sample_window) : 'Unavailable'} />
+    {q.drivers?.map(driver => <section key={driver.driver} aria-label={`${driver.driver} scheduling`}>
+      <h4>{driver.driver}</h4>
+      <StatRow label="Pending / active" value={`${number(driver.pending)} / ${number(driver.active)}`} />
+      <StatRow label="Concurrency allowance" value={number(driver.concurrency_limit)} />
+      <StatRow label="Oldest pending / active" value={`${driver.pending ? duration(driver.oldest_pending_age) : 'None'} / ${driver.active ? duration(driver.oldest_active_age) : 'None'}`} />
+      <StatRow label="Rejected / timed out" value={`${number(driver.rejections)} / ${number(driver.timeouts)}`} />
+      <StatRow label="Scheduling condition" value={driver.condition.replaceAll('_', ' ')} />
+    </section>)}
     <p className="muted">Saturation is the current depth divided by capacity. Observed waits describe dequeued work, not the age of work still waiting. Oldest queued work measures an admitted copy still waiting for dequeue; work already removed for execution is excluded. Depth and age are separate observations during concurrent activity.</p>
   </section>;
 }
@@ -43,6 +51,9 @@ export function PoolDiagnostics({ name, pool: p }: { name: string; pool: WorkerP
     <h3 className="card-title" style={{ textTransform: 'capitalize' }}>{name}</h3>
     <StatRow label="Running / capacity" value={`${number(p.running_workers)} / ${number(p.current_capacity)}`} />
     <StatRow label="Target workers" value={number(p.target_workers)} /><StatRow label="Worker bounds" value={`${number(p.min_workers)} – ${number(p.max_workers)}`} />
+    <StatRow label="Active checks / oldest age" value={`${number(p.active_executions)} / ${(p.active_executions ?? 0) > 0 ? duration(p.oldest_execution_age) : 'None'}`} />
+    <StatRow label="Removed from queue, awaiting execution" value={number(p.pending_submissions)} />
+    <StatRow label="Oldest awaiting execution" value={(p.pending_submissions ?? 0) > 0 ? duration(p.oldest_submission_age) : 'None'} />
     <StatRow label="Waiting tasks" value={number(p.waiting_tasks)} /><StatRow label="Pending results" value={number(p.pending_results)} />
     <StatRow label="Submitted / completed" value={`${number(p.tasks_submitted)} / ${number(p.tasks_completed)}`} /><StatRow label="Scaling events" value={number(p.scaling_events)} />
     <StatRow label="Observed service time" value={(p.service_samples ?? 0) > 0 ? duration(p.service_time) : 'Unavailable'} />

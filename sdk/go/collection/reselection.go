@@ -59,7 +59,7 @@ var ErrReselectionObservation = errors.New("original upload recovery observation
 // All required raw inputs are privately frozen before creating an attempt or
 // uploading a part. Explicit source order and lexical directory expansion match
 // Freeze; retain the original source boundaries and include empty sources.
-// The supported original profile is FileNormalizationProfile. Ordinary unprofiled
+// The supported original profiles are reported by SupportsFileNormalization. Ordinary unprofiled
 // Freeze/FreezeResources operations cannot be relabeled by this helper.
 //
 // A supplied AttemptID is read before continuing its observed phase. Its already

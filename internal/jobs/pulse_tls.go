@@ -25,6 +25,7 @@ type PulseTLSJob struct {
 	WarnDays           int
 	CriticalDays       int
 	InsecureSkipVerify bool
+	CAFile             string
 	Timeout            time.Duration
 	Retries            int
 	Entity             ecs.Entity
@@ -46,6 +47,7 @@ func newPulseTLSJob(cfg *manifest.PulseTLSConfig, timeout time.Duration, entity 
 		WarnDays:           cfg.WarnDays,
 		CriticalDays:       cfg.CriticalDays,
 		InsecureSkipVerify: cfg.InsecureSkipVerify,
+		CAFile:             cfg.CAFile,
 		Timeout:            timeout,
 		Retries:            cfg.Retries,
 		payload:            map[string]interface{}{"type": "pulse", "driver": "tls"},
@@ -62,7 +64,14 @@ func (p *PulseTLSJob) Execute() (result Result) {
 	defer attempts.complete(&result)
 	addr := net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
 	dialer := &net.Dialer{Timeout: p.Timeout}
-	tlsCfg := &tls.Config{ServerName: p.ServerName, InsecureSkipVerify: p.InsecureSkipVerify}
+	serverName := p.ServerName
+	if serverName == "" {
+		serverName = p.Host
+	}
+	tlsCfg, err := checkTLSConfiguration(p.CAFile, serverName, p.InsecureSkipVerify)
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+	}
 
 	var lastErr error
 	for {
@@ -89,7 +98,7 @@ func (p *PulseTLSJob) Execute() (result Result) {
 			"not_after": leaf.NotAfter,
 		}
 		if p.CriticalDays > 0 && daysLeft <= p.CriticalDays {
-			return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("tls certificate for %s expires in %d day(s) (critical threshold %d)", addr, daysLeft, p.CriticalDays), Payload: out}
+			return Result{ID: p.ID, Ent: p.Entity, Err: &CertificateExpiryError{NotAfter: leaf.NotAfter.UTC(), DaysRemaining: daysLeft}, Payload: out}
 		}
 		if p.WarnDays > 0 && daysLeft <= p.WarnDays {
 			return Result{ID: p.ID, Ent: p.Entity, Warning: fmt.Sprintf("tls certificate expires in %d day(s) (warning threshold %d)", daysLeft, p.WarnDays), Payload: out}

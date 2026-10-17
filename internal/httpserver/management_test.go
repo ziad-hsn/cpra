@@ -153,7 +153,7 @@ func TestManagementRealSDKAndSharedResources(t *testing.T) {
 	if bytes.Contains(encoded, []byte(secret)) || bytes.Contains(encoded, []byte(`"value"`)) {
 		t.Fatal("credential leaked")
 	}
-	f.create(t, managementResource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	f.create(t, managementResource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	f.create(t, managementResource("Recipient", "oncall", api.RecipientSpec{EndpointRefs: []string{"console"}}))
 	f.create(t, managementResource("NotificationGroup", "ops", api.NotificationGroupSpec{RecipientRefs: []string{"oncall"}}))
 	monitor := api.Monitor{APIVersion: api.APIVersion, Kind: "Monitor", Metadata: api.Metadata{ID: "service"}, Spec: api.MonitorSpec{Check: api.CheckSpec{Interval: "60s", Timeout: "5s", Driver: api.DriverConfig{Type: "http", Config: json.RawMessage(`{"url":"https://example.test/health"}`)}}, Enabled: api.Pointer(false), Notifications: api.Pointer(map[string]api.AlertRule{"red": {NotifyType: api.Pointer("log"), GroupRef: api.Pointer("ops")}})}}
@@ -189,7 +189,7 @@ func TestManagementRealSDKAndSharedResources(t *testing.T) {
 }
 func TestManagementStrictInputsAndReferencedDelete(t *testing.T) {
 	f := newManagementFixture(t, true)
-	endpoint := f.create(t, managementResource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	endpoint := f.create(t, managementResource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	f.create(t, managementResource("Recipient", "dependent", api.RecipientSpec{EndpointRefs: []string{"console"}}))
 	for _, tc := range []struct {
 		name, method, path, body, tag, none, media string
@@ -249,7 +249,7 @@ func TestManagementAuthenticationAndUnverifiedReadiness(t *testing.T) {
 	if response.StatusCode != 400 && response.StatusCode != 503 {
 		t.Fatal("unexpected strict decode outcome", response.StatusCode)
 	}
-	raw, _ := json.Marshal(managementResource("NotificationEndpoint", "blocked", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	raw, _ := json.Marshal(managementResource("NotificationEndpoint", "blocked", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	response, _ = f.request(t, "POST", "/api/v2/notification-endpoints", managementOperatorToken, raw, map[string]string{"If-None-Match": "*"})
 	if response.StatusCode != 503 {
 		t.Fatal("unverified catalog admitted write", response.StatusCode)
@@ -298,7 +298,7 @@ func TestManagementAuthenticationAndUnverifiedReadiness(t *testing.T) {
 func TestManagementFrozenPaginationAndAdmissionBounds(t *testing.T) {
 	f := newManagementFixture(t, true)
 	for _, id := range []string{"b", "c", "d"} {
-		f.create(t, managementResource("NotificationEndpoint", id, api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+		f.create(t, managementResource("NotificationEndpoint", id, api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	}
 	response, raw := f.request(t, "GET", "/api/v2/notification-endpoints?limit=1", managementOperatorToken, nil, nil)
 	if response.StatusCode != 200 {
@@ -311,7 +311,7 @@ func TestManagementFrozenPaginationAndAdmissionBounds(t *testing.T) {
 	if first.NextCursor == "" || first.Items[0].Metadata.ID != "b" {
 		t.Fatal(string(raw))
 	}
-	f.create(t, managementResource("NotificationEndpoint", "a", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	f.create(t, managementResource("NotificationEndpoint", "a", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	pagePath := "/api/v2/notification-endpoints?cursor=" + url.QueryEscape(first.NextCursor)
 	response, second := f.request(t, "GET", pagePath, managementOperatorToken, nil, nil)
 	if response.StatusCode != 200 {
@@ -460,7 +460,7 @@ func TestManagementRoutesRequireExplicitPairedConfiguration(t *testing.T) {
 
 func TestManagementPrepareDeleteHasNoEffectUntilCommit(t *testing.T) {
 	f := newManagementFixture(t, true)
-	resource := f.create(t, managementResource("NotificationEndpoint", "temporary", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	resource := f.create(t, managementResource("NotificationEndpoint", "temporary", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	prepared, err := f.server.managementHTTP.prepareChange(context.Background(), http.MethodDelete, resource.Kind, resource.Metadata.ID, resource.Metadata.ResourceVersion, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -478,7 +478,7 @@ func TestManagementPrepareDeleteHasNoEffectUntilCommit(t *testing.T) {
 
 func TestManagementMutationReceiptsRemainCommittedUntilOwnerApplies(t *testing.T) {
 	f := newManagementFixture(t, true)
-	endpoint := api.NotificationEndpoint{APIVersion: api.APIVersion, Kind: "NotificationEndpoint", Metadata: api.Metadata{ID: "temporary"}, Spec: api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}}
+	endpoint := api.NotificationEndpoint{APIVersion: api.APIVersion, Kind: "NotificationEndpoint", Metadata: api.Metadata{ID: "temporary"}, Spec: api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}}
 	created, err := f.sdk.NotificationEndpoints.Create(context.Background(), endpoint)
 	if err != nil {
 		t.Fatal(err)

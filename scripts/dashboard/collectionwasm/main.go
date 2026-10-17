@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"syscall/js"
 
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
@@ -47,14 +48,35 @@ func main() {
 		err := collection.NormalizeFile(context.Background(), bytes.NewReader(source), collection.FileNormalizationProfile,
 			collection.DecodeOptions{SourceName: "source"}, func(item collection.NormalizedItem) error {
 				defer clear(item.JSON)
-				if !args[1].Invoke(item.ID, item.Location.Document, item.Location.Item, string(item.JSON)).Bool() {
+				coordinates, err := json.Marshal(struct {
+					Line   int                                  `json:"line,omitempty"`
+					Column int                                  `json:"column,omitempty"`
+					Fields map[string]collection.SourcePosition `json:"fields,omitempty"`
+				}{item.Location.Line, item.Location.Column, item.FieldPositions})
+				if err != nil {
+					return errors.New("source coordinates unavailable")
+				}
+				if !args[1].Invoke(item.ID, item.Location.Document, item.Location.Item, string(item.JSON), string(coordinates)).Bool() {
 					return errors.New("browser capacity exceeded")
 				}
 				return nil
 			})
 		result = map[string]any{"valid": err == nil}
 		if err != nil {
-			// Only numeric attribution crosses this boundary. Do not expose err.
+			// Only coordinates and reviewed validation rules cross this boundary.
+			var source *collection.SourceError
+			if errors.As(err, &source) {
+				for key, value := range map[string]int{"document": source.Location.Document, "item": source.Location.Item, "line": source.Location.Line, "column": source.Location.Column} {
+					if value > 0 && value <= 100_000_000 {
+						result.(map[string]any)[key] = value
+					}
+				}
+			}
+			if field, ok := api.ValidationFieldError(err); ok {
+				result.(map[string]any)["field"] = field.Field
+				result.(map[string]any)["reason"] = field.Reason
+			}
+			// Older parser errors expose only numeric document/item coordinates.
 			if match := documentPosition.FindStringSubmatch(err.Error()); match != nil {
 				for i, field := range []string{"document", "item"} {
 					if n, e := strconv.Atoi(match[i+1]); e == nil && n > 0 && n <= 10_000_000 {

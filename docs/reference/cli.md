@@ -38,11 +38,12 @@ cpra_scope: main
 | `-capabilities` | false | Print compiled driver capabilities as JSON and exit. |
 | `-shutdown-timeout` | `45s` | Maximum shutdown time; Windows service caps it at `15s`. |
 
-For initial legacy authentication, a token file overrides a direct or environment token. An unreadable or empty token file fails startup. Once authentication authority is committed, stopped local authentication operations manage credentials; changing bootstrap files does not rotate them. See [management startup](../management-startup.md). `CPRA_ENTITY_THRESHOLD` optionally influences startup queue selection; there is no live queue migration.
+For initial observation authentication, a token file overrides a direct or environment token. An unreadable or empty token file fails startup. Once authentication authority is committed, stopped local authentication operations manage credentials; changing bootstrap files does not rotate them. See [management startup](../management-startup.md). `CPRA_ENTITY_THRESHOLD` optionally influences startup queue selection; there is no live queue migration.
 
 ## Client commands
 
 ~~~sh
+./bin/cpractl version
 ./bin/cpractl health
 ./bin/cpractl ready
 ./bin/cpractl get monitors --limit 100
@@ -55,7 +56,9 @@ For initial legacy authentication, a token file overrides a direct or environmen
 ./bin/cpractl metrics
 ~~~
 
-Replace `service-api` with a stable monitor resource ID returned by your instance. Current `cpractl` uses v2 management APIs and cursor pagination; configure a management server and named authentication before these queries. See [management commands](../cpractl-management.md) for resource writes, collections, transport setup, and local administration.
+Replace `service-api` with a stable monitor resource ID returned by your instance. Current `cpractl` uses access discovery and bounded v2 observations in either
+management or observation mode. Configuration writes require management and a
+permitted named identity; a failed write never falls back to observation mode. See [management commands](../cpractl-management.md) for resource writes, collections, transport setup, and local administration.
 
 | Global option | Default |
 | --- | --- |
@@ -69,3 +72,26 @@ Replace `service-api` with a stable monitor resource ID returned by your instanc
 The client also reads `CPRA_AUTH_TOKEN`. `health` checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.
 
 [API semantics](api-reference.md)
+
+## Signals and repeated connections
+
+On Unix, SIGINT/SIGTERM begin bounded graceful shutdown and log its start.
+SIGHUP records an unsupported-reload notice and does not reload files or stop
+CPRa. Apply configuration explicitly. A second termination signal allows the
+supervisor/operator to terminate a stuck process. Machine timestamps use UTC;
+the dashboard presents times in the browser's local zone.
+
+Use `CPRA_SERVER`, `CPRA_CA_FILE` and `CPRA_AUTH_TOKEN_FILE` for repeatable client
+connections. The initializer prints exact non-secret paths. Prefer the token
+file over `CPRA_AUTH_TOKEN`; the latter is read after flag parsing and never
+included in help/error defaults. Keep tokens out of URLs and shell arguments.
+Use `cpractl local --help` and `cpractl local service --help` for local operations;
+these are separate from API requests. Probe commands perform API reads only.
+
+## Process logs
+
+Ordinary foreground and service runs use JSON at info level with UTC timestamps.
+Set `CPRA_ENV=development` explicitly for verbose console diagnostics, or select
+`CPRA_LOG_LEVEL` and `CPRA_LOG_FORMAT` directly. The first single-node Raft election
+is informational; later election warnings remain visible. No output format adds
+terminal colour to JSON or file records.

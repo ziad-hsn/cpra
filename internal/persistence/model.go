@@ -33,6 +33,7 @@ const (
 // Policy is deliberately an allowlist of non-secret decision inputs.
 type Policy struct {
 	policyExtensions
+	AutoIgnore              *AutoIgnorePolicy   `json:"auto_ignore,omitempty"`
 	Interval                time.Duration       `json:"interval"`
 	Unhealthy               int                 `json:"unhealthy"`
 	Healthy                 int                 `json:"healthy"`
@@ -47,105 +48,126 @@ type Policy struct {
 	// Zero retains the legacy one-attempt policy; cooldown applies only to a
 	// subsequent attempt after a confirmed recovery failure.
 	RecoveryCooldown    time.Duration       `json:"recovery_cooldown,omitempty"`
+	RecoveryTimeout     time.Duration       `json:"recovery_timeout,omitempty"`
 	RecoveryMaxAttempts int                 `json:"recovery_max_attempts,omitempty"`
 	Maintenance         []MaintenanceWindow `json:"maintenance,omitempty"`
+	PeriodicMaintenance bool                `json:"periodic_maintenance,omitempty"`
 }
 
 type Action struct {
-	Cause                   FailureDiagnostic   `json:"cause,omitzero"`
-	Failure                 FailureDiagnostic   `json:"failure,omitzero"`
-	NotificationCorrelation string              `json:"notification_correlation,omitempty"`
-	DeliveryID              string              `json:"delivery_id,omitempty"`
-	NotificationEpisode     string              `json:"notification_episode,omitempty"`
-	EndpointID              string              `json:"endpoint_id,omitempty"`
-	QueuedAt                time.Time           `json:"queued_at,omitzero"`
-	Deadline                time.Time           `json:"deadline,omitzero"`
-	AgentConnection         *AgentConnection    `json:"agent_connection,omitempty"`
-	RecoveryFailure         *RecoveryFailure    `json:"recovery_failure,omitempty"`
-	AgentReceipt            *AgentReceipt       `json:"agent_receipt,omitempty"`
-	ConflictingEvidence     *LateActionEvidence `json:"conflicting_evidence,omitempty"`
-	OperationID             string              `json:"operation_id,omitempty"`
-	Manual                  bool                `json:"manual,omitempty"`
-	Review                  *ActionReview       `json:"review,omitempty"`
-	ExecutorKind            string              `json:"executor_kind,omitempty"`
-	ExecutorSession         string              `json:"executor_session,omitempty"`
-	ExecutorFinishedAt      time.Time           `json:"executor_finished_at,omitempty"`
-	IncidentID              string              `json:"incident_id,omitempty"`
-	LateEvidence            *LateActionEvidence `json:"late_evidence,omitempty"`
-	CatalogUID              string              `json:"catalog_uid,omitempty"`
-	ID                      string              `json:"id"`
-	Revision                string              `json:"revision"`
-	Kind                    string              `json:"kind"`
-	Color                   string              `json:"color,omitempty"`
-	Endpoint                int                 `json:"endpoint"`
-	Attempt                 int                 `json:"attempt"`
-	State                   ActionState         `json:"state"`
-	NotBefore               time.Time           `json:"not_before"`
-	StartedAt               time.Time           `json:"started_at,omitempty"`
-	FinishedAt              time.Time           `json:"finished_at,omitempty"`
-	Outcome                 string              `json:"outcome,omitempty"`
+	ProviderCorrelationVersion int                 `json:"provider_correlation_version,omitempty"`
+	Control                    *ControlNotice      `json:"control,omitempty"`
+	FileIncarnation            string              `json:"file_incarnation,omitempty"`
+	Cause                      FailureDiagnostic   `json:"cause,omitzero"`
+	Failure                    FailureDiagnostic   `json:"failure,omitzero"`
+	NotificationCorrelation    string              `json:"notification_correlation,omitempty"`
+	DeliveryID                 string              `json:"delivery_id,omitempty"`
+	NotificationEpisode        string              `json:"notification_episode,omitempty"`
+	EndpointID                 string              `json:"endpoint_id,omitempty"`
+	QueuedAt                   time.Time           `json:"queued_at,omitzero"`
+	Deadline                   time.Time           `json:"deadline,omitzero"`
+	AgentConnection            *AgentConnection    `json:"agent_connection,omitempty"`
+	RecoveryFailure            *RecoveryFailure    `json:"recovery_failure,omitempty"`
+	AgentReceipt               *AgentReceipt       `json:"agent_receipt,omitempty"`
+	ConflictingEvidence        *LateActionEvidence `json:"conflicting_evidence,omitempty"`
+	OperationID                string              `json:"operation_id,omitempty"`
+	Manual                     bool                `json:"manual,omitempty"`
+	Review                     *ActionReview       `json:"review,omitempty"`
+	ExecutorKind               string              `json:"executor_kind,omitempty"`
+	ExecutorSession            string              `json:"executor_session,omitempty"`
+	ExecutorFinishedAt         time.Time           `json:"executor_finished_at,omitempty"`
+	IncidentID                 string              `json:"incident_id,omitempty"`
+	LateEvidence               *LateActionEvidence `json:"late_evidence,omitempty"`
+	CatalogUID                 string              `json:"catalog_uid,omitempty"`
+	ID                         string              `json:"id"`
+	Revision                   string              `json:"revision"`
+	Kind                       string              `json:"kind"`
+	Color                      string              `json:"color,omitempty"`
+	Endpoint                   int                 `json:"endpoint"`
+	Attempt                    int                 `json:"attempt"`
+	State                      ActionState         `json:"state"`
+	NotBefore                  time.Time           `json:"not_before"`
+	StartedAt                  time.Time           `json:"started_at,omitempty"`
+	FinishedAt                 time.Time           `json:"finished_at,omitempty"`
+	Outcome                    string              `json:"outcome,omitempty"`
 }
 
 type Monitor struct {
-	LastFailure             FailureDiagnostic    `json:"last_failure,omitzero"`
-	NotificationCorrelation string               `json:"notification_correlation,omitempty"`
-	NotificationVersion     int                  `json:"notification_version,omitempty"`
-	NotificationEpisode     string               `json:"notification_episode,omitempty"`
-	NotificationMaintenance bool                 `json:"notification_maintenance,omitempty"`
-	ownerObserved           ownerObservation     // Process-local acknowledgement; never serialized.
-	DependencyRevision      string               `json:"dependency_revision,omitempty"`
-	ManualRequests          []time.Time          `json:"manual_requests,omitempty"`
-	unknownActions          int                  // Rebuilt after restoration; compact observation cache, never authoritative.
-	CatalogRevision         string               `json:"catalog_revision,omitempty"`
-	ControlRevision         string               `json:"control_revision,omitempty"`
-	SnoozedUntil            time.Time            `json:"snoozed_until,omitempty"`
-	SnoozedBy               string               `json:"snoozed_by,omitempty"`
-	SnoozeReason            string               `json:"snooze_reason,omitempty"`
-	IncidentID              string               `json:"incident_id,omitempty"`
-	IncidentRevision        string               `json:"incident_revision,omitempty"`
-	IncidentSequence        uint64               `json:"incident_sequence,omitempty"`
-	IncidentOpenedAt        time.Time            `json:"incident_opened_at,omitempty"`
-	IncidentClosedAt        time.Time            `json:"incident_closed_at,omitempty"`
-	AcknowledgedBy          string               `json:"acknowledged_by,omitempty"`
-	AcknowledgedAt          time.Time            `json:"acknowledged_at,omitempty"`
-	AcknowledgedNote        string               `json:"acknowledged_note,omitempty"`
-	Dismissed               bool                 `json:"dismissed,omitempty"`
-	DismissedBy             string               `json:"dismissed_by,omitempty"`
-	DismissedAt             time.Time            `json:"dismissed_at,omitempty"`
-	DismissedReason         string               `json:"dismissed_reason,omitempty"`
-	CatalogUID              string               `json:"catalog_uid,omitempty"`
-	Removed                 bool                 `json:"removed"`
-	TotalChecks             uint64               `json:"total_checks"`
-	SuccessfulChecks        uint64               `json:"successful_checks"`
-	ID                      string               `json:"monitor_id"`
-	Revision                string               `json:"revision"`
-	Name                    string               `json:"name"`
-	Policy                  Policy               `json:"policy"`
-	Sequence                uint64               `json:"sequence"`
-	Generation              uint64               `json:"generation"`
-	Incident                bool                 `json:"incident"`
-	Recovering              bool                 `json:"recovering"`
-	InterventionAttempted   bool                 `json:"intervention_attempted"`
-	InterventionAttempts    int                  `json:"intervention_attempts,omitempty"`
-	LastInterventionFailure time.Time            `json:"last_intervention_failure,omitempty"`
-	InterventionFailures    int                  `json:"intervention_failures"`
-	ConsecutiveFailures     int                  `json:"consecutive_failures"`
-	PulseFailures           int                  `json:"pulse_failures"`
-	RecoveryStreak          int                  `json:"recovery_streak"`
-	VerifyRemaining         int                  `json:"verify_remaining"`
-	VerificationAfter       uint64               `json:"verification_after"`
-	LastCheck               time.Time            `json:"last_check"`
-	LastSuccess             time.Time            `json:"last_success"`
-	NextCheck               time.Time            `json:"next_check"`
-	LastLatency             time.Duration        `json:"last_latency"`
-	LatencyAvailable        bool                 `json:"latency_available"`
-	Warning                 bool                 `json:"warning"`
-	LastOutcome             string               `json:"last_outcome,omitempty"`
-	Actions                 map[string]Action    `json:"actions,omitempty"`
-	Cooldowns               map[string]time.Time `json:"cooldowns,omitempty"`
+	ProviderCorrelationVersion int                  `json:"provider_correlation_version,omitempty"`
+	EnabledControl             string               `json:"enabled_control,omitempty"`
+	Ignored                    bool                 `json:"ignored,omitempty"`
+	IgnoredAt                  time.Time            `json:"ignored_at,omitzero"`
+	IgnoredBy                  string               `json:"ignored_by,omitempty"`
+	IgnoreReason               string               `json:"ignore_reason,omitempty"`
+	IgnoreCause                string               `json:"ignore_cause,omitempty"`
+	IgnoreHealthyChecks        int                  `json:"ignore_healthy_checks,omitempty"`
+	IgnoreIncidents            []time.Time          `json:"ignore_incidents,omitempty"`
+	IgnoreCountedIncident      string               `json:"ignore_counted_incident,omitempty"`
+	FileIncarnation            string               `json:"file_incarnation,omitempty"`
+	LifecycleVersion           int                  `json:"lifecycle_version,omitempty"`
+	NotificationAttempted      string               `json:"notification_attempted,omitempty"`
+	RecoveryCheckAfter         time.Time            `json:"recovery_check_after,omitzero"`
+	LastFailure                FailureDiagnostic    `json:"last_failure,omitzero"`
+	NotificationCorrelation    string               `json:"notification_correlation,omitempty"`
+	NotificationVersion        int                  `json:"notification_version,omitempty"`
+	NotificationEpisode        string               `json:"notification_episode,omitempty"`
+	NotificationMaintenance    bool                 `json:"notification_maintenance,omitempty"`
+	ownerObserved              ownerObservation     // Process-local acknowledgement; never serialized.
+	DependencyRevision         string               `json:"dependency_revision,omitempty"`
+	ManualRequests             []time.Time          `json:"manual_requests,omitempty"`
+	heldActions                int                  // Rebuilt observation count; never authoritative.
+	unknownActions             int                  // Rebuilt after restoration; compact observation cache, never authoritative.
+	CatalogRevision            string               `json:"catalog_revision,omitempty"`
+	ControlRevision            string               `json:"control_revision,omitempty"`
+	SnoozedUntil               time.Time            `json:"snoozed_until,omitempty"`
+	SnoozedBy                  string               `json:"snoozed_by,omitempty"`
+	SnoozeReason               string               `json:"snooze_reason,omitempty"`
+	IncidentID                 string               `json:"incident_id,omitempty"`
+	IncidentRevision           string               `json:"incident_revision,omitempty"`
+	IncidentSequence           uint64               `json:"incident_sequence,omitempty"`
+	IncidentOpenedAt           time.Time            `json:"incident_opened_at,omitempty"`
+	IncidentClosedAt           time.Time            `json:"incident_closed_at,omitempty"`
+	AcknowledgedBy             string               `json:"acknowledged_by,omitempty"`
+	AcknowledgedAt             time.Time            `json:"acknowledged_at,omitempty"`
+	AcknowledgedNote           string               `json:"acknowledged_note,omitempty"`
+	Dismissed                  bool                 `json:"dismissed,omitempty"`
+	DismissedBy                string               `json:"dismissed_by,omitempty"`
+	DismissedAt                time.Time            `json:"dismissed_at,omitempty"`
+	DismissedReason            string               `json:"dismissed_reason,omitempty"`
+	CatalogUID                 string               `json:"catalog_uid,omitempty"`
+	Removed                    bool                 `json:"removed"`
+	TotalChecks                uint64               `json:"total_checks"`
+	SuccessfulChecks           uint64               `json:"successful_checks"`
+	ID                         string               `json:"monitor_id"`
+	Revision                   string               `json:"revision"`
+	Name                       string               `json:"name"`
+	Policy                     Policy               `json:"policy"`
+	Sequence                   uint64               `json:"sequence"`
+	Generation                 uint64               `json:"generation"`
+	Incident                   bool                 `json:"incident"`
+	Recovering                 bool                 `json:"recovering"`
+	InterventionAttempted      bool                 `json:"intervention_attempted"`
+	InterventionAttempts       int                  `json:"intervention_attempts,omitempty"`
+	LastInterventionFailure    time.Time            `json:"last_intervention_failure,omitempty"`
+	InterventionFailures       int                  `json:"intervention_failures"`
+	ConsecutiveFailures        int                  `json:"consecutive_failures"`
+	PulseFailures              int                  `json:"pulse_failures"`
+	RecoveryStreak             int                  `json:"recovery_streak"`
+	VerifyRemaining            int                  `json:"verify_remaining"`
+	VerificationAfter          uint64               `json:"verification_after"`
+	LastCheck                  time.Time            `json:"last_check"`
+	LastSuccess                time.Time            `json:"last_success"`
+	NextCheck                  time.Time            `json:"next_check"`
+	LastLatency                time.Duration        `json:"last_latency"`
+	LatencyAvailable           bool                 `json:"latency_available"`
+	Warning                    bool                 `json:"warning"`
+	LastOutcome                string               `json:"last_outcome,omitempty"`
+	Actions                    map[string]Action    `json:"actions,omitempty"`
+	Cooldowns                  map[string]time.Time `json:"cooldowns,omitempty"`
 }
 
 func (m Monitor) Clone() Monitor {
+	m.IgnoreIncidents = append([]time.Time(nil), m.IgnoreIncidents...)
 	m.ManualRequests = append([]time.Time(nil), m.ManualRequests...)
 	m.Policy = m.Policy.Clone()
 	m.Actions = maps.Clone(m.Actions)
@@ -200,6 +222,8 @@ type Command struct {
 }
 
 type Event struct {
+	Control                    *ControlNotice               `json:"control,omitempty"`
+	FileIncarnation            string                       `json:"file_incarnation,omitempty"`
 	Cause                      FailureDiagnostic            `json:"cause,omitzero"`
 	Failure                    FailureDiagnostic            `json:"failure,omitzero"`
 	DeliveryID                 string                       `json:"delivery_id,omitempty"`
@@ -364,6 +388,13 @@ func validateCommand(c Command) error {
 	if c.Authentication != nil || c.Restore != nil {
 		return ErrAuthenticationInvalid
 	}
+	if c.Kind == "local_action_review" {
+		if !catalogIdentifier(c.ExecutorSession, 256) {
+			return ErrExecutorUnfenced
+		}
+		c.ExecutorSession = ""
+		return validateRecoveryReviewCommand(c)
+	}
 	if c.Kind == "manual_recovery" || c.Kind == "action_review" {
 		return validateRecoveryReviewCommand(c)
 	}
@@ -491,7 +522,13 @@ func validateCommand(c Command) error {
 		if err := c.Config.Policy.Validate(); err != nil {
 			return err
 		}
-		if err := validateNotificationIdentity(*c.Config, commandMinimumFormat(c)); err != nil {
+		// Configuration carries policy before an operational lifecycle exists.
+		// Validate it at the command's format; Apply assigns the stored version.
+		config := *c.Config
+		if config.LifecycleVersion == 0 && (config.Policy.AutoIgnore != nil || config.Policy.PeriodicMaintenance || config.Policy.RecoveryTimeout != 0) {
+			config.LifecycleVersion = LifecycleFormatVersion
+		}
+		if err := validateNotificationIdentity(config, commandMinimumFormat(c)); err != nil {
 			return err
 		}
 		if c.Config.CatalogUID != "" && (c.Guard == nil || c.Config.CatalogUID != c.Guard.monitorUID(c.MonitorID)) {

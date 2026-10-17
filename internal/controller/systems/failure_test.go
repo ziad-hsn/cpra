@@ -3,6 +3,7 @@ package systems
 import (
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/codes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
@@ -95,7 +97,7 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 		t.Fatal("check result did not commit", system.lastError)
 	}
 	m, ok := store.Get(state.MonitorID)
-	if !ok || m.LastFailure != persistence.NewFailureDiagnostic("unexpected_http_status") {
+	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() {
 		t.Fatal("committed state lost safe cause")
 	}
 	system.dispatchActions(time.Now().UTC())
@@ -132,7 +134,7 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 		t.Fatal("committed incident/action diagnostics missing", logger.records)
 	}
 	for _, record := range logger.records {
-		if record.fields["monitor_id"] != m.ID || record.fields["incident_id"] != m.IncidentID || strings.Contains(fmt.Sprint(record), "private-") {
+		if record.fields["monitor_id"] != m.ID || record.fields["monitor_name"] != m.Name || record.fields["incident_id"] != m.IncidentID || strings.Contains(fmt.Sprint(record), "private-") {
 			t.Fatal("lifecycle log lacks identity or exposes provider text", record)
 		}
 	}
@@ -204,7 +206,7 @@ func TestNotificationResponseFailureDoesNotDescribeAHealthEndpoint(t *testing.T)
 		t.Fatal("notification result did not commit", system.lastError)
 	}
 	m, ok := store.Get(state.MonitorID)
-	if !ok || m.LastFailure != persistence.NewFailureDiagnostic("unexpected_http_status") || len(m.Actions) != 1 {
+	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() || len(m.Actions) != 1 {
 		t.Fatal("notification result changed the health observation")
 	}
 	for _, action := range m.Actions {
@@ -215,5 +217,87 @@ func TestNotificationResponseFailureDoesNotDescribeAHealthEndpoint(t *testing.T)
 	system.dispatchActions(time.Now().UTC().Add(time.Minute))
 	if notifications.Load() != 1 || len(queue.admitted) != 1 {
 		t.Fatal("unknown notification response was replayed")
+	}
+}
+
+func TestControllerMalformedRemoteStatusCannotCloseAdmission(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(700) }))
+	defer server.Close()
+	for _, test := range []struct {
+		name    string
+		job     jobs.Job
+		failure error
+	}{
+		{name: "HTTP 700", job: &jobs.PulseHTTPJob{URL: server.URL}},
+		{name: "gRPC unknown code", failure: &jobs.GRPCHealthError{RPCCode: codes.Code(1000)}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := runtimeconfig.Default()
+			cfg.Storage.Directory = t.TempDir()
+			store, err := persistence.Open(t.Context(), cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			world := ecs.NewWorld()
+			ent := releaseMonitor(t, &world, 1, 1)
+			system := NewDurableSystem(&world, store, cfg, &fleetview.Holder{}, noopLogger{}, &admissionQueue{full: true}, nil, &admissionQueue{}, nil, time.Minute, false)
+			if err := system.Load(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			system.Initialize(&world)
+			state := *system.states.Get(ent)
+			result := jobs.Result{MonitorID: state.MonitorID, Revision: state.Revision, Ent: ent, Type: "pulse", Generation: 1, Err: test.failure, Scheduled: time.Now().UTC()}
+			if test.job != nil {
+				d := jobs.NewDispatch(test.job, ent, "pulse", "", 1, 0)
+				d.MonitorID, d.Revision, d.Scheduled = state.MonitorID, state.Revision, result.Scheduled
+				result = d.Execute()
+			}
+			if result.Err == nil || !system.commitResults([]jobs.Result{result}) || system.lastError != nil {
+				t.Fatal("remote enum closed admission", system.lastError)
+			}
+			m, _ := store.Get(state.MonitorID)
+			if m.LastFailure.HTTPStatus != 0 || m.LastFailure.GRPCCode != "" && m.LastFailure.GRPCCode != "Unknown" {
+				t.Fatal("unbounded protocol detail persisted", m.LastFailure)
+			}
+			result.Generation = 2
+			result.Err = nil
+			result.Scheduled = time.Now().UTC()
+			if !system.commitResults([]jobs.Result{result}) || system.lastError != nil {
+				t.Fatal("subsequent healthy check cannot commit", system.lastError)
+			}
+		})
+	}
+}
+
+func TestLifecycleLogNameUsesCommittedIdentity(t *testing.T) {
+	monitor := persistence.Monitor{ID: "monitor", Name: "API\nservice\x1b", Revision: "revision", CatalogUID: "incarnation"}
+	event := persistence.Event{Type: "incident_opened", MonitorID: monitor.ID, Revision: monitor.Revision, CatalogUID: monitor.CatalogUID}
+	for _, tc := range []struct {
+		name   string
+		change func(*persistence.Monitor)
+		want   string
+	}{
+		{"matching", func(*persistence.Monitor) {}, "API service "},
+		{"different monitor", func(m *persistence.Monitor) { m.ID = "other" }, ""},
+		{"different revision", func(m *persistence.Monitor) { m.Revision = "other" }, ""},
+		{"recreated catalog monitor", func(m *persistence.Monitor) { m.CatalogUID = "replacement" }, ""},
+		{"different file incarnation", func(m *persistence.Monitor) { m.FileIncarnation = "replacement" }, ""},
+		{"utf8 boundary", func(m *persistence.Monitor) { m.Name = strings.Repeat("a", 255) + "é" }, strings.Repeat("a", 255)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := monitor
+			tc.change(&m)
+			log := &lifecycleTestLogger{}
+			system := &DurableSystem{logger: log}
+			system.logLifecycleEvents([]persistence.Event{event}, &m)
+			if len(log.records) != 1 {
+				t.Fatal("missing lifecycle event")
+			}
+			name, exists := log.records[0].fields["monitor_name"].(string)
+			if exists != (tc.want != "") || name != tc.want || !utf8.ValidString(name) || len(name) > 256 {
+				t.Fatal("wrong committed name or unsafe diagnostic", log.records)
+			}
+		})
 	}
 }

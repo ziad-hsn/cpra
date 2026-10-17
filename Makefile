@@ -67,6 +67,13 @@ vet: | dev-workspace
 test: | dev-workspace
 	$(DEV_GO) test -race -timeout "$(GO_TEST_TIMEOUT)" ./...
 
+# A bounded edit/test loop. Full race, driver and process checks remain in test,
+# test-all-drivers and sdk-check; this target is not release qualification.
+.PHONY: test-fast
+test-fast: | dev-workspace
+	$(DEV_GO) test -short -timeout 5m ./internal/manifest ./internal/manifestcheck ./internal/runtimeconfig ./internal/fleetview ./internal/slo ./internal/installpath ./internal/version
+	cd sdk/go && $(DEV_GO) test -short -timeout 5m ./api ./collection
+
 check: fmt-check vet test
 
 test-all-drivers: | dev-workspace

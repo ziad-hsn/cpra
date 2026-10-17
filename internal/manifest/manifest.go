@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"gopkg.in/yaml.v3"
 )
 
@@ -50,6 +51,8 @@ type PulseConfig interface {
 }
 
 type PulseHTTPConfig struct {
+	CAFile             string            `yaml:"ca_file,omitempty" json:"ca_file,omitempty"`
+	ServerName         string            `yaml:"server_name,omitempty" json:"server_name,omitempty"`
 	Url                string            `yaml:"url" json:"url"`
 	Method             string            `yaml:"method" json:"method"`
 	Headers            map[string]string `yaml:"headers" json:"headers"`
@@ -139,14 +142,15 @@ func (*PulseUDPConfig) isPulseConfigs() {}
 // PulseGRPCConfig checks TCP reachability by default. Health mode calls the
 // standard unary health service over verified TLS unless cleartext is explicit.
 type PulseGRPCConfig struct {
-	Host          string `yaml:"host" json:"host"`
-	Port          int    `yaml:"port" json:"port"`
-	Service       string `yaml:"service" json:"service"`
-	Retries       int    `yaml:"retries" json:"retries"`
-	Mode          string `yaml:"mode" json:"mode,omitempty"`
-	AllowInsecure bool   `yaml:"allow_insecure" json:"allow_insecure"`
-	ServerName    string `yaml:"server_name" json:"server_name"`
-	CAFile        string `yaml:"ca_file" json:"ca_file"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify,omitempty" json:"insecure_skip_verify,omitempty"`
+	Host               string `yaml:"host" json:"host"`
+	Port               int    `yaml:"port" json:"port"`
+	Service            string `yaml:"service" json:"service"`
+	Retries            int    `yaml:"retries" json:"retries"`
+	Mode               string `yaml:"mode" json:"mode,omitempty"`
+	AllowInsecure      bool   `yaml:"allow_insecure" json:"allow_insecure"`
+	ServerName         string `yaml:"server_name" json:"server_name"`
+	CAFile             string `yaml:"ca_file" json:"ca_file"`
 }
 
 func (c *PulseGRPCConfig) Copy() PulseConfig {
@@ -261,6 +265,9 @@ type rawPulse struct {
 }
 
 func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
+	if err := checkYAMLDurations(value, "pulse_check", "interval", "timeout"); err != nil {
+		return err
+	}
 	var temp struct {
 		rawPulse `yaml:",inline"`
 		Config   yaml.Node `yaml:"config"`
@@ -368,7 +375,7 @@ func (p *Pulse) UnmarshalYAML(value *yaml.Node) error {
 		}
 		p.Config = c
 	default:
-		return fmt.Errorf("unknown pulse type: %q", temp.Type)
+		return api.InvalidField("pulse_check.type", "unsupportedDriver")
 	}
 	applyDefaultRetries(p.Config, temp.Retries)
 	return nil
@@ -389,18 +396,18 @@ func (p *Pulse) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
+		return jsonFieldError("pulse_check", err)
 	}
 
 	// Parse duration strings
 	interval, err := time.ParseDuration(temp.Interval)
 	if err != nil {
-		return fmt.Errorf("invalid interval duration %q: %w", temp.Interval, err)
+		return api.InvalidField("pulse_check.interval", "positiveDuration")
 	}
 
 	timeout, err := time.ParseDuration(temp.Timeout)
 	if err != nil {
-		return fmt.Errorf("invalid timeout duration %q: %w", temp.Timeout, err)
+		return api.InvalidField("pulse_check.timeout", "positiveDuration")
 	}
 
 	*p = Pulse{
@@ -421,89 +428,89 @@ func (p *Pulse) UnmarshalJSON(data []byte) error {
 	case "http":
 		var c = &PulseHTTPConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "tcp":
 		var c = &PulseTCPConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "icmp":
 		var c = &PulseICMPConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "dns":
 		var c = &PulseDNSConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "udp":
 		var c = &PulseUDPConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "grpc":
 		var c = &PulseGRPCConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "docker":
 		var c = &PulseDockerConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "redis":
 		var c = &PulseRedisConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "postgres":
 		var c = &PulsePostgresConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "mysql":
 		var c = &PulseMySQLConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "mongo":
 		var c = &PulseMongoConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "rabbitmq":
 		var c = &PulseRabbitMQConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "kafka":
 		var c = &PulseKafkaConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	case "tls":
 		var c = &PulseTLSConfig{}
 		if err := json.Unmarshal(temp.Config, c); err != nil {
-			return err
+			return jsonFieldError("pulse_check.config", err)
 		}
 		p.Config = c
 	default:
-		return fmt.Errorf("unknown pulse type: %q", temp.Type)
+		return api.InvalidField("pulse_check.type", "unsupportedDriver")
 	}
 	applyDefaultRetries(p.Config, temp.Retries)
 	return nil
@@ -531,6 +538,9 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 		Target          yaml.Node `yaml:"target"`
 	}
 	if err := value.Decode(&temp); err != nil {
+		return err
+	}
+	if err := checkYAMLDurations(&temp.Target, "intervention.target", "timeout", "operation_timeout", "request_timeout", "task_timeout", "poll_interval"); err != nil {
 		return err
 	}
 	*i = Intervention{
@@ -577,7 +587,7 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 		}
 		i.Target = t
 	default:
-		return fmt.Errorf("unknown intervention type: %q", temp.Action)
+		return api.InvalidField("intervention.action", "unsupportedDriver")
 	}
 	return nil
 }
@@ -593,7 +603,7 @@ func (i *Intervention) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
+		return jsonFieldError("intervention", err)
 	}
 
 	*i = Intervention{
@@ -607,41 +617,41 @@ func (i *Intervention) UnmarshalJSON(data []byte) error {
 	case "a2a":
 		t := &InterventionTargetA2A{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	case "docker":
 		var t = &InterventionTargetDocker{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	case "kubernetes":
 		var t = &InterventionTargetKubernetes{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	case "webhook":
 		var t = &InterventionTargetWebhook{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	case "systemd":
 		var t = &InterventionTargetSystemd{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	case "aws":
 		var t = &InterventionTargetAWS{}
 		if err := decodeDriverDurationsJSON(temp.Target, t); err != nil {
-			return err
+			return jsonFieldError("intervention.target", err)
 		}
 		i.Target = t
 	default:
-		return fmt.Errorf("unknown intervention type: %q", temp.Action)
+		return api.InvalidField("intervention.action", "unsupportedDriver")
 	}
 	return nil
 }
@@ -661,7 +671,7 @@ func decodeDriverDurationsJSON(data []byte, target any) error {
 			}
 			duration, err := time.ParseDuration(text)
 			if err != nil {
-				return fmt.Errorf("invalid duration field %s", field)
+				return api.InvalidField(field, "positiveDuration")
 			}
 			fields[field], err = json.Marshal(int64(duration))
 			if err != nil {
@@ -828,6 +838,9 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 		if err := config.Decode(&temp); err != nil {
 			return err
 		}
+		if temp.NotifyGroup != "" && (temp.Notify != "" || temp.Config.Kind != 0 && temp.Config.Tag != "!!null") {
+			return api.InvalidField("codes."+color, "notificationDestinationConflict")
+		}
 		// Default dispatch to true if omitted
 		dispatch := true
 		if temp.Dispatch != nil {
@@ -843,6 +856,9 @@ func (c *Codes) UnmarshalYAML(value *yaml.Node) error {
 		if temp.NotifyGroup == "" {
 			cfg, err := decodeCodeNotificationYAML(temp.Notify, temp.Config)
 			if err != nil {
+				if detail, ok := api.ValidationFieldError(err); ok {
+					return notificationDecodeError("codes."+color+".config", "notify", api.InvalidField(detail.Field, detail.Reason))
+				}
 				return err
 			}
 			cc.Config = cfg
@@ -864,11 +880,14 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 	}
 
 	if err := json.Unmarshal(data, &codes); err != nil {
-		return err
+		return jsonFieldError("codes", err)
 	}
 
 	colors := make(map[string]CodeConfig)
 	for color, config := range codes {
+		if config.NotifyGroup != "" && (config.Notify != "" || len(config.Config) != 0 && string(config.Config) != "null") {
+			return api.InvalidField("codes."+color, "notificationDestinationConflict")
+		}
 		// Default dispatch to true if omitted
 		dispatch := true
 		if config.Dispatch != nil {
@@ -884,7 +903,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 		if config.NotifyGroup == "" {
 			cfg, err := decodeCodeNotificationJSON(config.Notify, config.Config)
 			if err != nil {
-				return err
+				return notificationDecodeError("codes."+color+".config", "notify", err)
 			}
 			cc.Config = cfg
 		}
@@ -895,6 +914,7 @@ func (c *Codes) UnmarshalJSON(data []byte) error {
 }
 
 type Monitor struct {
+	AutoIgnore   *AutoIgnore         `yaml:"auto_ignore,omitempty" json:"auto_ignore,omitempty"`
 	ID           string              `yaml:"id,omitempty" json:"id,omitempty"`
 	Pulse        Pulse               `yaml:"pulse_check" json:"pulse_check"`
 	Codes        Codes               `yaml:"codes" json:"codes"`
@@ -909,6 +929,7 @@ type Monitor struct {
 func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	// Create a temporary struct with a pointer to a bool for 'Enabled'
 	type TmpMonitor struct {
+		AutoIgnore   *AutoIgnore         `yaml:"auto_ignore" json:"auto_ignore"`
 		ID           string              `yaml:"id" json:"id"`
 		Pulse        Pulse               `yaml:"pulse_check"`
 		Enabled      *bool               `yaml:"enabled"`
@@ -932,6 +953,7 @@ func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 	m.Codes = tmp.Codes
 	m.Tags = tmp.Tags
 	m.Maintenance = tmp.Maintenance
+	m.AutoIgnore = tmp.AutoIgnore
 
 	// Set 'Enabled' to true if it's not specified in the YAML
 	if tmp.Enabled == nil {
@@ -948,6 +970,7 @@ func (m *Monitor) UnmarshalYAML(value *yaml.Node) error {
 // monitor with no "enabled" key was silently disabled).
 func (m *Monitor) UnmarshalJSON(data []byte) error {
 	type TmpMonitor struct {
+		AutoIgnore   *AutoIgnore         `yaml:"auto_ignore" json:"auto_ignore"`
 		ID           string              `yaml:"id" json:"id"`
 		Pulse        Pulse               `json:"pulse_check"`
 		Enabled      *bool               `json:"enabled"`
@@ -970,6 +993,7 @@ func (m *Monitor) UnmarshalJSON(data []byte) error {
 	m.Codes = tmp.Codes
 	m.Tags = tmp.Tags
 	m.Maintenance = tmp.Maintenance
+	m.AutoIgnore = tmp.AutoIgnore
 
 	if tmp.Enabled == nil {
 		m.Enabled = true

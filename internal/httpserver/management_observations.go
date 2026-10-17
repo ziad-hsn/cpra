@@ -31,7 +31,7 @@ func (s *Server) registerManagementObservations(mux *http.ServeMux, m *managemen
 		mux.HandleFunc("GET "+route.path, func(w http.ResponseWriter, r *http.Request) {
 			managementHeaders(w)
 			var result any
-			err := m.auth.WithPolicyAdmission(r, route.operation, func(access api.AccessInfo, generation uint64) error {
+			err := m.withReadPolicy(r, route.operation, func(access api.AccessInfo, generation uint64) error {
 				if err := r.Context().Err(); err != nil {
 					return err
 				}
@@ -242,11 +242,22 @@ func queueObservation(name string, source queue.Queue) api.Queue {
 	if stats.Dequeued > 0 {
 		result.AverageWait, result.MaximumWait = durationMeasurement(stats.AvgQueueTime), durationMeasurement(stats.MaxQueueTime)
 	}
+	for _, driver := range stats.Drivers {
+		d := api.DriverQueue{Driver: driver.Driver, Pending: int64(driver.Pending), Active: int64(driver.Active), ConcurrencyLimit: int64(driver.ConcurrencyLimit), AdmissionLimit: int64(driver.AdmissionLimit), Rejections: driver.Rejections, Timeouts: driver.Timeouts, Condition: driver.Condition,
+			OldestPendingMS: unavailableMeasurement("queue_empty"), OldestActiveMS: unavailableMeasurement("no_active_work")}
+		if driver.Pending > 0 {
+			d.OldestPendingMS = durationMeasurement(driver.OldestPendingAge)
+		}
+		if driver.Active > 0 {
+			d.OldestActiveMS = durationMeasurement(driver.OldestActiveAge)
+		}
+		result.Drivers = append(result.Drivers, d)
+	}
 	return result
 }
 
 func poolObservation(name string, source *queue.DynamicWorkerPool) api.Pool {
-	result := api.Pool{Name: name, ServiceTime: unavailableMeasurement("no_service_samples")}
+	result := api.Pool{Name: name, ServiceTime: unavailableMeasurement("no_service_samples"), OldestExecutionMS: unavailableMeasurement("no_active_work"), OldestSubmissionMS: unavailableMeasurement("no_pending_submissions")}
 	if source == nil {
 		return result
 	}
@@ -254,6 +265,13 @@ func poolObservation(name string, source *queue.DynamicWorkerPool) api.Pool {
 	result.Available, result.Workers, result.Capacity, result.Target = true, int64(stats.RunningWorkers), int64(stats.CurrentCapacity), int64(stats.TargetWorkers)
 	result.Minimum, result.Maximum = int64(stats.MinWorkers), int64(stats.MaxWorkers)
 	result.WaitingTasks, result.PendingResults = int64(stats.WaitingTasks), int64(stats.PendingResults)
+	result.BusyAvailable, result.Busy = true, int64(stats.ActiveExecutions)
+	if stats.ActiveExecutions > 0 {
+		result.OldestExecutionMS = durationMeasurement(stats.OldestExecutionAge)
+	}
+	if stats.PendingSubmissions > 0 {
+		result.OldestSubmissionMS = durationMeasurement(stats.OldestSubmissionAge)
+	}
 	result.TasksSubmitted, result.TasksCompleted, result.ScalingEvents = stats.TasksSubmitted, stats.TasksCompleted, stats.ScalingEvents
 	result.SizingModel, result.SloCondition, result.ServiceSamples = stats.SizingModel, stats.SLOCondition, int64(stats.ServiceSamples)
 	if stats.ServiceSamples > 0 {

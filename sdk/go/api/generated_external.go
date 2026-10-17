@@ -122,28 +122,28 @@ func (e CollectionReselectionAttemptErrorCode) Valid() bool {
 
 // Defines values for CollectionReselectionAttemptPhase.
 const (
-	Completed    CollectionReselectionAttemptPhase = "completed"
-	Failed       CollectionReselectionAttemptPhase = "failed"
-	Transferring CollectionReselectionAttemptPhase = "transferring"
-	Uploading    CollectionReselectionAttemptPhase = "uploading"
-	Verified     CollectionReselectionAttemptPhase = "verified"
-	Verifying    CollectionReselectionAttemptPhase = "verifying"
+	CollectionReselectionAttemptPhaseCompleted    CollectionReselectionAttemptPhase = "completed"
+	CollectionReselectionAttemptPhaseFailed       CollectionReselectionAttemptPhase = "failed"
+	CollectionReselectionAttemptPhaseTransferring CollectionReselectionAttemptPhase = "transferring"
+	CollectionReselectionAttemptPhaseUploading    CollectionReselectionAttemptPhase = "uploading"
+	CollectionReselectionAttemptPhaseVerified     CollectionReselectionAttemptPhase = "verified"
+	CollectionReselectionAttemptPhaseVerifying    CollectionReselectionAttemptPhase = "verifying"
 )
 
 // Valid indicates whether the value is a known member of the CollectionReselectionAttemptPhase enum.
 func (e CollectionReselectionAttemptPhase) Valid() bool {
 	switch e {
-	case Completed:
+	case CollectionReselectionAttemptPhaseCompleted:
 		return true
-	case Failed:
+	case CollectionReselectionAttemptPhaseFailed:
 		return true
-	case Transferring:
+	case CollectionReselectionAttemptPhaseTransferring:
 		return true
-	case Uploading:
+	case CollectionReselectionAttemptPhaseUploading:
 		return true
-	case Verified:
+	case CollectionReselectionAttemptPhaseVerified:
 		return true
-	case Verifying:
+	case CollectionReselectionAttemptPhaseVerifying:
 		return true
 	default:
 		return false
@@ -168,6 +168,90 @@ func (e CollectionStorageAccountingUsageCoverage) Valid() bool {
 	case CollectionUsagePending:
 		return true
 	case CollectionUsageUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FailureDiagnosticGrpcStatus.
+const (
+	NOTSERVING     FailureDiagnosticGrpcStatus = "NOT_SERVING"
+	SERVICEUNKNOWN FailureDiagnosticGrpcStatus = "SERVICE_UNKNOWN"
+	UNKNOWN        FailureDiagnosticGrpcStatus = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the FailureDiagnosticGrpcStatus enum.
+func (e FailureDiagnosticGrpcStatus) Valid() bool {
+	switch e {
+	case NOTSERVING:
+		return true
+	case SERVICEUNKNOWN:
+		return true
+	case UNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitorObservationHealth.
+const (
+	Healthy   MonitorObservationHealth = "healthy"
+	Unhealthy MonitorObservationHealth = "unhealthy"
+	Unknown   MonitorObservationHealth = "unknown"
+	Warning   MonitorObservationHealth = "warning"
+)
+
+// Valid indicates whether the value is a known member of the MonitorObservationHealth enum.
+func (e MonitorObservationHealth) Valid() bool {
+	switch e {
+	case Healthy:
+		return true
+	case Unhealthy:
+		return true
+	case Unknown:
+		return true
+	case Warning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitorObservationPhase.
+const (
+	MonitorObservationPhaseIdle      MonitorObservationPhase = "idle"
+	MonitorObservationPhaseIncident  MonitorObservationPhase = "incident"
+	MonitorObservationPhaseVerifying MonitorObservationPhase = "verifying"
+)
+
+// Valid indicates whether the value is a known member of the MonitorObservationPhase enum.
+func (e MonitorObservationPhase) Valid() bool {
+	switch e {
+	case MonitorObservationPhaseIdle:
+		return true
+	case MonitorObservationPhaseIncident:
+		return true
+	case MonitorObservationPhaseVerifying:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MonitorObservationSource.
+const (
+	File       MonitorObservationSource = "file"
+	Management MonitorObservationSource = "management"
+)
+
+// Valid indicates whether the value is a known member of the MonitorObservationSource enum.
+func (e MonitorObservationSource) Valid() bool {
+	switch e {
+	case File:
+		return true
+	case Management:
 		return true
 	default:
 		return false
@@ -585,6 +669,14 @@ type Assignments struct {
 	WorkerUID        string       `json:"workerUID"`
 }
 
+// AutoIgnore Suppress ordinary actions after this many distinct threshold-reaching outages in the rolling window. Both values are required.
+type AutoIgnore struct {
+	Incidents int64 `json:"incidents"`
+
+	// Window Positive Go duration, at most 720h; no default.
+	Window string `json:"window"`
+}
+
 // Capabilities defines model for Capabilities.
 type Capabilities struct {
 	APIVersions []string            `json:"apiVersions"`
@@ -685,11 +777,14 @@ type CodeNotificationPushover struct {
 	AppToken *string `json:"appToken,omitempty"`
 	Expire   *int64  `json:"expire,omitempty"`
 	Priority *int64  `json:"priority,omitempty"`
-	Retry    *int64  `json:"retry,omitempty"`
-	Sound    *string `json:"sound,omitempty"`
-	Title    *string `json:"title,omitempty"`
-	URL      *string `json:"url,omitempty"`
-	UserKey  *string `json:"userKey,omitempty"`
+
+	// PriorityByColor Explicit per-color priority overrides (-2..2). Shared emergency priority is reduced to normal for green and gray unless that color explicitly selects 2.
+	PriorityByColor *map[string]int `json:"priorityByColor,omitempty"`
+	Retry           *int64          `json:"retry,omitempty"`
+	Sound           *string         `json:"sound,omitempty"`
+	Title           *string         `json:"title,omitempty"`
+	URL             *string         `json:"url,omitempty"`
+	UserKey         *string         `json:"userKey,omitempty"`
 }
 
 // CodeNotificationSlack defines model for CodeNotificationSlack.
@@ -882,6 +977,22 @@ type DriverConfig struct {
 	Config         json.RawMessage    `json:"config"`
 	CredentialRefs *map[string]string `json:"credentialRefs,omitempty"`
 	Type           string             `json:"type"`
+}
+
+// DriverQueue defines model for DriverQueue.
+type DriverQueue struct {
+	Active           int64 `json:"active"`
+	AdmissionLimit   int64 `json:"admissionLimit"`
+	ConcurrencyLimit int64 `json:"concurrencyLimit"`
+
+	// Condition Current scheduling constraint; not a health or SLA claim.
+	Condition       string      `json:"condition"`
+	Driver          string      `json:"driver"`
+	OldestActiveMS  Measurement `json:"oldestActiveMs,omitempty"`
+	OldestPendingMS Measurement `json:"oldestPendingMs,omitempty"`
+	Pending         int64       `json:"pending"`
+	Rejections      int64       `json:"rejections"`
+	Timeouts        int64       `json:"timeouts"`
 }
 
 // Duration Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
@@ -1092,9 +1203,17 @@ type ExternalConfig struct {
 
 // FailureDiagnostic Bounded safe failure explanation. No provider response body, address, path or credential is included.
 type FailureDiagnostic struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	CertificateDaysRemaining *int                         `json:"certificateDaysRemaining,omitempty"`
+	CertificateNotAfter      *time.Time                   `json:"certificateNotAfter,omitempty"`
+	Code                     string                       `json:"code"`
+	GRPCCode                 *string                      `json:"grpcCode,omitempty"`
+	GRPCStatus               *FailureDiagnosticGrpcStatus `json:"grpcStatus,omitempty"`
+	HTTPStatus               *int                         `json:"httpStatus,omitempty"`
+	Message                  string                       `json:"message"`
 }
+
+// FailureDiagnosticGrpcStatus defines model for FailureDiagnostic.GrpcStatus.
+type FailureDiagnosticGrpcStatus string
 
 // FieldError defines model for FieldError.
 type FieldError struct {
@@ -1334,8 +1453,77 @@ type MonitorList struct {
 	Snapshot    string    `json:"snapshot,omitempty"`
 }
 
+// MonitorObservation Read-only controller observation for a configured monitor. Has no writable configuration or resourceVersion. Health and controls are independent. Delivery counters cover retained actions in this incarnation; unknownActions includes retained unknown provider outcomes, even after review. actionsNeedingReview counts unresolved holds, including previous incarnations.
+type MonitorObservation struct {
+	ActionsNeedingReview int64 `json:"actionsNeedingReview"`
+
+	// CertificateVerificationDisabled Explicit per-monitor TLS certificate verification bypass. Does not affect API authentication or recovery verification.
+	CertificateVerificationDisabled bool   `json:"certificateVerificationDisabled"`
+	CheckAdmission                  string `json:"checkAdmission,omitempty"`
+	CheckType                       string `json:"checkType"`
+
+	// CompletedNotifications Succeeded deliveries retained for this monitor incarnation; not a lifetime total.
+	CompletedNotifications  int64                    `json:"completedNotifications"`
+	ConfiguredNotifications []string                 `json:"configuredNotifications"`
+	Enabled                 bool                     `json:"enabled"`
+	FailedNotifications     int64                    `json:"failedNotifications"`
+	Health                  MonitorObservationHealth `json:"health"`
+	Ignored                 bool                     `json:"ignored"`
+	IncarnationUID          string                   `json:"incarnationUID"`
+	IncidentID              string                   `json:"incidentID,omitempty"`
+	IntervalMS              int64                    `json:"intervalMs"`
+	LastCheckLatencyMS      Measurement              `json:"lastCheckLatencyMs"`
+
+	// LastCheckedAt Absent when unavailable.
+	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
+
+	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
+	LastFailure *FailureDiagnostic `json:"lastFailure,omitempty"`
+
+	// LastSuccessfulAt Absent when unavailable.
+	LastSuccessfulAt *time.Time `json:"lastSuccessfulAt,omitempty"`
+	MissedChecks     int64      `json:"missedChecks"`
+	MonitorID        string     `json:"monitorID"`
+	Name             string     `json:"name"`
+
+	// NextCheckAt Absent when unavailable.
+	NextCheckAt          *time.Time              `json:"nextCheckAt,omitempty"`
+	NumericID            int64                   `json:"numericID"`
+	PendingNotifications int64                   `json:"pendingNotifications"`
+	Phase                MonitorObservationPhase `json:"phase"`
+	QueueRejections      int64                   `json:"queueRejections"`
+
+	// SnoozedUntil Absent when unavailable.
+	SnoozedUntil *time.Time               `json:"snoozedUntil,omitempty"`
+	Source       MonitorObservationSource `json:"source"`
+
+	// Target Non-secret target summary captured before credential resolution.
+	Target               string `json:"target"`
+	UnknownActions       int64  `json:"unknownActions"`
+	UnknownNotifications int64  `json:"unknownNotifications"`
+}
+
+// MonitorObservationHealth defines model for MonitorObservation.Health.
+type MonitorObservationHealth string
+
+// MonitorObservationPhase defines model for MonitorObservation.Phase.
+type MonitorObservationPhase string
+
+// MonitorObservationSource defines model for MonitorObservation.Source.
+type MonitorObservationSource string
+
+// MonitorObservationList Bounded stable-ID ordered page. Cursor freezes membership and incarnation identity; health observations can advance between pages. Start a new list to see added/replaced monitors.
+type MonitorObservationList struct {
+	GeneratedAt time.Time            `json:"generatedAt"`
+	Items       []MonitorObservation `json:"items"`
+	NextCursor  string               `json:"nextCursor,omitempty"`
+	Snapshot    string               `json:"snapshot"`
+}
+
 // MonitorSpec defines model for MonitorSpec.
 type MonitorSpec struct {
+	// AutoIgnore Suppress ordinary actions after this many distinct threshold-reaching outages in the rolling window. Both values are required.
+	AutoIgnore            *AutoIgnore           `json:"autoIgnore,omitempty"`
 	Check                 CheckSpec             `json:"check"`
 	Enabled               *bool                 `json:"enabled,omitempty"`
 	Maintenance           *[]MaintenanceWindow  `json:"maintenance,omitempty"`
@@ -1347,12 +1535,20 @@ type MonitorSpec struct {
 
 // MonitorStatus defines model for MonitorStatus.
 type MonitorStatus struct {
-	ControlRevision    string      `json:"controlRevision,omitempty"`
-	ExecutionRevision  string      `json:"executionRevision,omitempty"`
-	Health             string      `json:"health,omitempty"`
-	IncidentID         string      `json:"incidentID,omitempty"`
-	LastCheckLatencyMS Measurement `json:"lastCheckLatencyMs,omitempty"`
-	LastCheckedAt      time.Time   `json:"lastCheckedAt,omitempty"`
+	// ActionsNeedingReview Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.
+	ActionsNeedingReview int64       `json:"actionsNeedingReview,omitempty"`
+	ControlRevision      string      `json:"controlRevision,omitempty"`
+	ExecutionRevision    string      `json:"executionRevision,omitempty"`
+	Health               string      `json:"health,omitempty"`
+	IgnoreCause          string      `json:"ignoreCause,omitempty"`
+	IgnoreIncidentCount  int64       `json:"ignoreIncidentCount,omitempty"`
+	IgnoreReason         string      `json:"ignoreReason,omitempty"`
+	Ignored              bool        `json:"ignored,omitempty"`
+	IgnoredAt            time.Time   `json:"ignoredAt,omitempty"`
+	IgnoredBy            string      `json:"ignoredBy,omitempty"`
+	IncidentID           string      `json:"incidentID,omitempty"`
+	LastCheckLatencyMS   Measurement `json:"lastCheckLatencyMs,omitempty"`
+	LastCheckedAt        time.Time   `json:"lastCheckedAt,omitempty"`
 
 	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	LastFailure        *FailureDiagnostic `json:"lastFailure,omitempty"`
@@ -1513,8 +1709,10 @@ type PollRequest struct {
 
 // Pool defines model for Pool.
 type Pool struct {
-	AdjustmentReason             string      `json:"adjustmentReason,omitempty"`
-	Available                    bool        `json:"available"`
+	AdjustmentReason string `json:"adjustmentReason,omitempty"`
+	Available        bool   `json:"available"`
+
+	// Busy Executions currently inside a job call; excludes idle worker goroutines and result publication.
 	Busy                         int64       `json:"busy,omitempty"`
 	BusyAvailable                bool        `json:"busyAvailable"`
 	Capacity                     int64       `json:"capacity"`
@@ -1524,6 +1722,8 @@ type Pool struct {
 	ModelRecommendation          int64       `json:"modelRecommendation,omitempty"`
 	ModelRecommendationAvailable bool        `json:"modelRecommendationAvailable"`
 	Name                         string      `json:"name"`
+	OldestExecutionMS            Measurement `json:"oldestExecutionMs,omitempty"`
+	OldestSubmissionMS           Measurement `json:"oldestSubmissionMs,omitempty"`
 	PendingResults               int64       `json:"pendingResults"`
 	ScalingEvents                int64       `json:"scalingEvents"`
 	ServiceSamples               int64       `json:"serviceSamples"`
@@ -1616,14 +1816,19 @@ type PulseGRPCConfig struct {
 	// AllowInsecure Permit cleartext for health mode explicitly; TLS is the default.
 	AllowInsecure *bool `json:"allowInsecure,omitempty"`
 
-	// CAFile Optional PEM trust roots read by the server at check execution.
-	CAFile     *string              `json:"caFile,omitempty"`
-	Host       *string              `json:"host,omitempty"`
-	Mode       *PulseGRPCConfigMode `json:"mode,omitempty"`
-	Port       *int64               `json:"port,omitempty"`
-	Retries    *int64               `json:"retries,omitempty"`
-	ServerName *string              `json:"serverName,omitempty"`
-	Service    *string              `json:"service,omitempty"`
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile *string `json:"caFile,omitempty"`
+	Host   *string `json:"host,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool                `json:"insecureSkipVerify,omitempty"`
+	Mode               *PulseGRPCConfigMode `json:"mode,omitempty"`
+	Port               *int64               `json:"port,omitempty"`
+	Retries            *int64               `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+	Service    *string `json:"service,omitempty"`
 }
 
 // PulseGRPCConfigMode defines model for PulseGRPCConfig.Mode.
@@ -1631,13 +1836,21 @@ type PulseGRPCConfigMode string
 
 // PulseHTTPConfig defines model for PulseHTTPConfig.
 type PulseHTTPConfig struct {
-	Body               *string            `json:"body,omitempty"`
-	ExpectedStatus     *[]int64           `json:"expectedStatus,omitempty"`
-	Headers            *map[string]string `json:"headers,omitempty"`
-	InsecureSkipVerify *bool              `json:"insecureSkipVerify,omitempty"`
-	Method             *string            `json:"method,omitempty"`
-	Retries            *int64             `json:"retries,omitempty"`
-	URL                *string            `json:"url,omitempty"`
+	Body *string `json:"body,omitempty"`
+
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile         *string            `json:"caFile,omitempty"`
+	ExpectedStatus *[]int64           `json:"expectedStatus,omitempty"`
+	Headers        *map[string]string `json:"headers,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
+	Method             *string `json:"method,omitempty"`
+	Retries            *int64  `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+	URL        *string `json:"url,omitempty"`
 }
 
 // PulseICMPConfig defines model for PulseICMPConfig.
@@ -1651,50 +1864,118 @@ type PulseICMPConfig struct {
 // PulseKafkaConfig defines model for PulseKafkaConfig.
 type PulseKafkaConfig struct {
 	Brokers *[]string `json:"brokers,omitempty"`
-	Retries *int64    `json:"retries,omitempty"`
+
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile *string `json:"caFile,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool  `json:"insecureSkipVerify,omitempty"`
+	Retries            *int64 `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS *bool `json:"tls,omitempty"`
 }
 
 // PulseMongoConfig defines model for PulseMongoConfig.
 type PulseMongoConfig struct {
-	Retries *int64  `json:"retries,omitempty"`
-	URI     *string `json:"uri,omitempty"`
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile *string `json:"caFile,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool  `json:"insecureSkipVerify,omitempty"`
+	Retries            *int64 `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS *bool   `json:"tls,omitempty"`
+	URI *string `json:"uri,omitempty"`
 }
 
 // PulseMySQLConfig defines model for PulseMySQLConfig.
 type PulseMySQLConfig struct {
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile   *string `json:"caFile,omitempty"`
 	Database *string `json:"database,omitempty"`
 	DSN      *string `json:"dsn,omitempty"`
 	Host     *string `json:"host,omitempty"`
-	Password *string `json:"password,omitempty"`
-	Port     *int64  `json:"port,omitempty"`
-	Retries  *int64  `json:"retries,omitempty"`
-	User     *string `json:"user,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
+	Password           *string `json:"password,omitempty"`
+	Port               *int64  `json:"port,omitempty"`
+	Retries            *int64  `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS  *bool   `json:"tls,omitempty"`
+	User *string `json:"user,omitempty"`
 }
 
 // PulsePostgresConfig defines model for PulsePostgresConfig.
 type PulsePostgresConfig struct {
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile   *string `json:"caFile,omitempty"`
 	Database *string `json:"database,omitempty"`
 	DSN      *string `json:"dsn,omitempty"`
 	Host     *string `json:"host,omitempty"`
-	Password *string `json:"password,omitempty"`
-	Port     *int64  `json:"port,omitempty"`
-	Retries  *int64  `json:"retries,omitempty"`
-	SSLMode  *string `json:"sslmode,omitempty"`
-	User     *string `json:"user,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
+	Password           *string `json:"password,omitempty"`
+	Port               *int64  `json:"port,omitempty"`
+	Retries            *int64  `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+	SSLMode    *string `json:"sslmode,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS  *bool   `json:"tls,omitempty"`
+	User *string `json:"user,omitempty"`
 }
 
 // PulseRabbitMQConfig defines model for PulseRabbitMQConfig.
 type PulseRabbitMQConfig struct {
-	Retries *int64  `json:"retries,omitempty"`
-	URL     *string `json:"url,omitempty"`
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile *string `json:"caFile,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool  `json:"insecureSkipVerify,omitempty"`
+	Retries            *int64 `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS *bool   `json:"tls,omitempty"`
+	URL *string `json:"url,omitempty"`
 }
 
 // PulseRedisConfig defines model for PulseRedisConfig.
 type PulseRedisConfig struct {
-	Addr     *string `json:"addr,omitempty"`
-	DB       *int64  `json:"db,omitempty"`
-	Password *string `json:"password,omitempty"`
-	Retries  *int64  `json:"retries,omitempty"`
+	Addr *string `json:"addr,omitempty"`
+
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile *string `json:"caFile,omitempty"`
+	DB     *int64  `json:"db,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
+	Password           *string `json:"password,omitempty"`
+	Retries            *int64  `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+
+	// TLS Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.
+	TLS      *bool   `json:"tls,omitempty"`
 	Username *string `json:"username,omitempty"`
 }
 
@@ -1707,13 +1988,19 @@ type PulseTCPConfig struct {
 
 // PulseTLSConfig defines model for PulseTLSConfig.
 type PulseTLSConfig struct {
-	CriticalDays       *int64  `json:"criticalDays,omitempty"`
-	Host               *string `json:"host,omitempty"`
-	InsecureSkipVerify *bool   `json:"insecureSkipVerify,omitempty"`
-	Port               *int64  `json:"port,omitempty"`
-	Retries            *int64  `json:"retries,omitempty"`
-	ServerName         *string `json:"serverName,omitempty"`
-	WarnDays           *int64  `json:"warnDays,omitempty"`
+	// CAFile Optional PEM trust roots, read by the server during execution; maximum 1 MiB.
+	CAFile       *string `json:"caFile,omitempty"`
+	CriticalDays *int64  `json:"criticalDays,omitempty"`
+	Host         *string `json:"host,omitempty"`
+
+	// InsecureSkipVerify Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.
+	InsecureSkipVerify *bool  `json:"insecureSkipVerify,omitempty"`
+	Port               *int64 `json:"port,omitempty"`
+	Retries            *int64 `json:"retries,omitempty"`
+
+	// ServerName TLS SNI and certificate hostname; defaults to the connection host.
+	ServerName *string `json:"serverName,omitempty"`
+	WarnDays   *int64  `json:"warnDays,omitempty"`
 }
 
 // PulseUDPConfig defines model for PulseUDPConfig.
@@ -1736,14 +2023,17 @@ type Queue struct {
 	Depth                  int64   `json:"depth"`
 
 	// DequeuedPerSecond Dequeued jobs per second; this is not a completed-execution rate.
-	DequeuedPerSecond float64     `json:"dequeuedPerSecond"`
-	Drops             int64       `json:"drops"`
-	EnqueuedPerSecond float64     `json:"enqueuedPerSecond"`
-	LimitReason       string      `json:"limitReason,omitempty"`
-	MaximumWait       Measurement `json:"maximumWait,omitempty"`
-	Name              string      `json:"name"`
-	OldestPendingMS   Measurement `json:"oldestPendingMs,omitempty"`
-	RatesAvailable    bool        `json:"ratesAvailable"`
+	DequeuedPerSecond float64 `json:"dequeuedPerSecond"`
+
+	// Drivers Bounded per-driver admission and execution measurements. No target or per-monitor flow identifiers are returned.
+	Drivers           []DriverQueue `json:"drivers,omitempty"`
+	Drops             int64         `json:"drops"`
+	EnqueuedPerSecond float64       `json:"enqueuedPerSecond"`
+	LimitReason       string        `json:"limitReason,omitempty"`
+	MaximumWait       Measurement   `json:"maximumWait,omitempty"`
+	Name              string        `json:"name"`
+	OldestPendingMS   Measurement   `json:"oldestPendingMs,omitempty"`
+	RatesAvailable    bool          `json:"ratesAvailable"`
 
 	// SampleWindow Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
 	SampleWindow Duration    `json:"sampleWindow,omitempty"`
@@ -2000,12 +2290,18 @@ type UploadRequest struct {
 type ValidationResultItem struct {
 	// Change Known changes: create, update, unchanged. Unknown values are read-only observations.
 	Change string `json:"change,omitempty"`
-	ID     string `json:"id"`
+
+	// Field Static validation property path. Empty when a specific field is unavailable.
+	Field string `json:"field,omitempty"`
+	ID    string `json:"id"`
 
 	// Issue Allowlisted issue code, never a provider diagnostic or source path. Unknown codes are read-only observations.
-	Issue           string `json:"issue,omitempty"`
-	Kind            string `json:"kind"`
-	Ordinal         int64  `json:"ordinal"`
+	Issue   string `json:"issue,omitempty"`
+	Kind    string `json:"kind"`
+	Ordinal int64  `json:"ordinal"`
+
+	// Reason Static validation rule code. Consumers preserve unknown codes as observations and render only known safe messages.
+	Reason          string `json:"reason,omitempty"`
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
 	// Source Opaque ordered source token; never a filename or URL.

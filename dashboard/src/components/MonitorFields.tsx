@@ -103,6 +103,14 @@ export function MonitorFields({ spec: raw, onChange, readOnly = false }: { spec:
       {!maintenance.length && <p className="muted">No maintenance windows configured.</p>}
       {!readOnly && <div className="row" style={{ gap: 8 }}><button className="btn" type="button" onClick={() => update('maintenance', [...maintenance, { start: '', end: '' }])}>Add scheduled maintenance</button><button className="btn" type="button" onClick={() => update('maintenance', [...maintenance, { cron: '', duration: '30m', timezone: 'UTC' }])}>Add recurring maintenance</button></div>}
     </fieldset>
+    <fieldset className="management-field"><legend>Automatic Ignore</legend>
+      <p className="muted">Count distinct outages that reach the unhealthy threshold within your rolling window. Ignore keeps checking health while suppressing ordinary notifications and interventions. Verified recovery clears Ignore and resets this count.</p>
+      {!readOnly && <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={spec.autoIgnore !== undefined} onChange={event => update('autoIgnore', event.target.checked ? {} : undefined)} />Configure automatic Ignore</label>}
+      {spec.autoIgnore !== undefined ? <div className="grid-2">
+        <ValueField label="Outages within window" type="number" required value={spec.autoIgnore.incidents} onChange={value => update('autoIgnore', setField(record(spec.autoIgnore), 'incidents', value))} readOnly={readOnly} hint="Required: 2 to 1,000 distinct outages. Repeated failed checks in one outage count once." />
+        <ValueField label="Rolling window" required value={spec.autoIgnore.window} onChange={value => update('autoIgnore', setField(record(spec.autoIgnore), 'window', value))} readOnly={readOnly} hint="Required: a positive Go duration up to 720h, for example 1h. No default is selected." />
+      </div> : <p className="muted">Automatic Ignore is not configured.</p>}
+    </fieldset>
   </>;
 }
 
@@ -138,6 +146,14 @@ function positiveDuration(value: unknown): boolean { return typeof value === 'st
 
 /** Local guidance complements the authoritative server validation; no provider I/O. */
 export function validateMonitorDraft(spec: Record<string, unknown>, capabilities?: Capabilities): string | undefined {
+	if (spec.autoIgnore !== undefined) {
+		const policy = record(spec.autoIgnore);
+		if (!Number.isInteger(policy.incidents) || Number(policy.incidents) < 2 || Number(policy.incidents) > 1000) return 'Automatic Ignore needs an explicit outage count from 2 to 1,000.';
+		if (!positiveDuration(policy.window)) return 'Automatic Ignore needs an explicit positive rolling window, at most 720h.';
+		const units: Record<string, number> = { ns: 1e-9, us: 1e-6, 'µs': 1e-6, 'μs': 1e-6, ms: 1e-3, s: 1, m: 60, h: 3600 };
+		const seconds = [...String(policy.window).matchAll(/(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)/g)].reduce((sum, match) => sum + Number(match[1]) * units[match[2]], 0);
+		if (seconds > 720 * 3600) return 'Automatic Ignore window must not exceed 720h.';
+	}
   const check = record(spec.check);
   if (!positiveDuration(check.interval) || !positiveDuration(check.timeout)) return 'Check interval and timeout must be positive Go duration strings, such as 60s and 5s.';
   const validateDriver = (category: DriverCategory, source: unknown): string | undefined => {
@@ -183,10 +199,11 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
     <p>Configured generation: {monitor.metadata.generation ?? 'Unavailable'} · Observed generation: {status?.observedGeneration ?? 'Unavailable'}</p>
     <p>{monitor.metadata.generation !== undefined && monitor.metadata.generation > 0 && status?.observedGeneration === monitor.metadata.generation ? 'The controller reports this configuration generation applied.' : 'Controller application of this saved configuration has not been confirmed.'}</p>
     <p>Observed health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
+    {status?.ignored && <p>Ignored by {status.ignoredBy || 'Unavailable'} since {formatDateTime(status.ignoredAt ?? '')}. {status.ignoreReason} Health observations continue.</p>}
     <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>
-    <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown actions: {status?.unknownActions ?? 'Unavailable'}</p>
+    <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown provider outcomes: {status?.unknownActions ?? 'Unavailable'} · Actions needing review: {status?.actionsNeedingReview ?? 'Unavailable'}</p>
     <LabelFields labels={monitor.metadata.labels} onChange={noop} readOnly />
   </section>;
 }

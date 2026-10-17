@@ -7,12 +7,12 @@ import (
 
 func (m *Monitor) ensureControlIdentity() {
 	if m.ControlRevision == "" {
-		m.ControlRevision = identity("control/" + m.ID + "/" + m.CatalogUID)
+		m.ControlRevision = identity("control/" + m.ID + "/" + m.incarnationIdentity())
 	}
 	if m.IncidentID == "" && (m.Incident || m.Recovering) {
 		m.beginIncident(time.Time{})
 		for id, a := range m.Actions {
-			if a.IncidentID != "" || a.CatalogUID != m.CatalogUID {
+			if a.IncidentID != "" || !m.OwnsAction(a) {
 				continue
 			}
 			if a.Kind == "intervention" || a.Color != "green" {
@@ -30,7 +30,7 @@ func (m *Monitor) beginIncident(at time.Time) {
 		return
 	}
 	m.IncidentSequence++
-	m.IncidentID = identity(fmt.Sprintf("incident/%s/%s/%d", m.ID, m.CatalogUID, m.IncidentSequence))
+	m.IncidentID = identity(fmt.Sprintf("incident/%s/%s/%d", m.ID, m.incarnationIdentity(), m.IncidentSequence))
 	m.IncidentRevision = identity("triage/" + m.IncidentID)
 	m.IncidentOpenedAt, m.IncidentClosedAt = at, time.Time{}
 	m.AcknowledgedBy, m.AcknowledgedNote, m.DismissedBy, m.DismissedReason = "", "", "", ""
@@ -82,8 +82,25 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 	if c.Action == "unsnooze" && m.SnoozedUntil.IsZero() {
 		return Result{Err: ErrControlConflict}
 	}
+	if c.Action == "ignore" && m.Ignored || c.Action == "unignore" && !m.Ignored {
+		return Result{Err: ErrControlConflict}
+	}
 	var events []Event
+	emit := func(kind string, a *Action) {
+		e := Event{MonitorID: id, CatalogUID: m.CatalogUID, FileIncarnation: m.FileIncarnation, Revision: m.Revision, IncidentID: m.IncidentID, At: at, Type: kind, Actor: c.Actor, Reason: c.Reason, ControlRevision: c.Revision}
+		if a != nil {
+			e.ActionID, e.Kind, e.Color, e.Endpoint, e.Outcome = a.ID, a.Kind, a.Color, a.Endpoint, a.Outcome
+			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
+		}
+		events = append(events, e)
+	}
 	switch c.Action {
+	case "ignore":
+		m.upgradeLifecycle()
+		m.enterIgnore(at, c.Actor, "operator", c.Reason, emit)
+	case "unignore":
+		m.upgradeLifecycle()
+		m.leaveIgnore(at, false, emit)
 	case "acknowledge":
 		m.AcknowledgedBy, m.AcknowledgedAt, m.AcknowledgedNote = c.Actor, at, c.Note
 	case "dismiss":
@@ -106,12 +123,12 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 	for _, actionID := range sortedActions(m.Actions) {
 		a := m.Actions[actionID]
 		cancel := c.Action == "snooze" || (c.Action == "dismiss" && a.Kind == "code" && a.IncidentID == c.IncidentID)
-		if a.CatalogUID != m.CatalogUID || a.State != Queued || !cancel {
+		if !m.OwnsAction(a) || a.State != Queued || !cancel {
 			continue
 		}
 		a.State, a.Outcome, a.FinishedAt = Cancelled, c.Action, at
 		m.Actions[actionID] = a
-		events = append(events, Event{MonitorID: id, CatalogUID: a.CatalogUID, Revision: a.Revision, IncidentID: a.IncidentID, At: at, Type: "action_cancelled", ActionID: a.ID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome, Actor: c.Actor, Reason: c.Reason})
+		events = append(events, Event{MonitorID: id, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, IncidentID: a.IncidentID, At: at, Type: "action_cancelled", ActionID: a.ID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome, Actor: c.Actor, Reason: c.Reason})
 	}
 	events = append(events, Event{MonitorID: id, CatalogUID: m.CatalogUID, Revision: m.Revision, IncidentID: c.IncidentID, At: at, Type: "control_" + c.Action, Actor: c.Actor, Reason: c.Reason, Note: c.Note, ControlRevision: c.Revision})
 	events = append(events, f.installMonitor(previous, m, at)...)
@@ -121,6 +138,9 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 	}
 	f.putOperation(receipt)
 	f.image.Version = max(f.image.Version, CatalogFormatVersion)
+	if c.Action == "ignore" || c.Action == "unignore" {
+		f.image.Version = joinStorageFormat(f.image.Version, LifecycleFormatVersion)
+	}
 	events = append(events, receiptEvent(receipt))
 	return Result{Allowed: true, Monitor: &m, Operation: &receipt, Events: events}
 }

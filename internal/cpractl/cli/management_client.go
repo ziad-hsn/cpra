@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
 func (o *options) mustClient() (*cpra.Client, error) {
@@ -153,6 +155,16 @@ func managementFailure(err error) error {
 	}
 	if errors.As(err, &problem) && operationID == "" {
 		operationID = problem.OperationID
+	}
+	if field, ok := api.ValidationFieldError(err); ok {
+		message += "; " + field.Message
+		if field.Field != "" {
+			message += " (" + field.Field + ")"
+		}
+	}
+	var source *collection.SourceError
+	if errors.As(err, &source) {
+		message += "; " + managementDisplay(source.Location.String())
 	}
 	if problem != nil {
 		message += managementProblemDetails(problem)

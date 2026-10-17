@@ -410,6 +410,8 @@ func TestControlsIncidentClosureAndNewIncidentNeverReplaysDismissedWork(t *testi
 	if m.IncidentID == incident || m.Dismissed || m.AcknowledgedBy != "" {
 		t.Fatal("new incident inherited prior triage")
 	}
+	red := notificationByColor(t, m, "red", Queued)
+	m = *submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: red.ID, Guard: g, At: policyTime().Add(5500 * time.Millisecond)})[0].Monitor
 	m = controlPulse(t, s, m, g, policyTime().Add(6*time.Second), "success")
 	for _, a := range m.Actions {
 		if a.Color == "green" && a.State == Queued && a.IncidentID == m.IncidentID {

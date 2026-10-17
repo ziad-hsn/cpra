@@ -45,7 +45,11 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 		return f.publishCollectionValidation(c, at)
 	}
 	if collectionValidationAction(c.Action) {
-		return f.applyCollectionValidation(c, at)
+		result := f.applyCollectionValidation(c, at)
+		if result.Err == nil && collectionFieldDiagnosticsCommand(Command{Collection: &c}) {
+			f.image.Version = joinStorageFormat(f.image.Version, format)
+		}
+		return result
 	}
 	if c.Action == "plan_begin" || c.Action == "plan_append" || c.Action == "plan_finalize" {
 		return f.applyCollectionPlan(c, at)
@@ -88,6 +92,11 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 			}
 			return collectionResult(existing)
 		}
+		if lifecycleStorageFormat(format) && c.Create.NormalizationProfile == "cpra.file.base.v1" {
+			// Existing consumed tickets above still reconcile. A v1 ticket
+			// that never allocated an operation cannot start a new import.
+			return Result{Err: ErrCollectionInvalid}
+		}
 		if len(f.image.Collections) >= maxCollectionOperations || f.image.OperationHighWater == math.MaxUint64 {
 			return Result{Err: ErrCollectionQuota}
 		}
@@ -113,6 +122,9 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 		f.image.Version = max(f.image.Version, CollectionFormatVersion)
 		if s.NormalizationProfile != "" {
 			f.image.Version = max(f.image.Version, CollectionReselectionFormatVersion)
+		}
+		if s.NormalizationProfile == "cpra.file.base.v2" {
+			f.image.Version = joinStorageFormat(f.image.Version, format)
 		}
 		return collectionResult(s)
 	}

@@ -17,7 +17,7 @@ steps for supplying your own configuration.
 v2 management, observations and complete collection application through public
 activation and retained results. Cross-process file reselection and
 external-worker server qualification remain separate unfinished gates; consult
-the [implementation progress record](../implementation/dashboard-implementation-progress.md)
+the [current availability](../versions.md)
 and server discovery before using a configured workflow. Local demos exercise
 SDK HTTP requests and worker behavior against fixtures; they do not establish
 production-server, cloud-account, cluster, or SMS delivery certification.

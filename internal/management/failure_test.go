@@ -1,7 +1,10 @@
 package management
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ziad-hsn/cpra/internal/persistence"
 )
@@ -15,5 +18,18 @@ func TestActionFailureObservationPreservesSafeCauseAndOutcome(t *testing.T) {
 	}
 	if failureView(persistence.FailureDiagnostic{}) != nil {
 		t.Fatal("unavailable diagnostic invented")
+	}
+}
+
+func TestFailureCertificateObservationPreservesKnownZero(t *testing.T) {
+	at := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+	d := (persistence.FailureDiagnostic{Code: "certificate_expiring", CertificateNotAfter: at}).WithDetails()
+	v := failureView(d)
+	if v.CertificateDaysRemaining == nil || *v.CertificateDaysRemaining != 0 || v.CertificateNotAfter == nil || !v.CertificateNotAfter.Equal(at) {
+		t.Fatal("certificate observation lost known zero or expiry time")
+	}
+	raw, err := json.Marshal(v)
+	if err != nil || !strings.Contains(string(raw), `"certificateDaysRemaining":0`) {
+		t.Fatal("certificate observation omitted known zero", err)
 	}
 }

@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,7 @@ func TestDefaultParserRejectsUnknownAndIncompleteConfiguration(t *testing.T) {
 		{"duplicate-field-alias", strings.Replace(valid, `"url":"https://example.com"`, `"url":"https://example.com","URL":"https://elsewhere.example.com"`, 1)},
 		{"wrong-type", strings.Replace(valid, `"interval":"1s"`, `"interval":false`, 1)},
 		{"missing-discord", strings.Replace(valid, `"name":"fixture"`, `"name":"fixture","codes":{"red":{"notify":"discord","config":{}}}`, 1)},
+		{"missing-group", strings.Replace(valid, `"name":"fixture"`, `"name":"fixture","codes":{"red":{"notify_group":"missing"}}`, 1)},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			for _, extension := range []string{"json", "yaml"} {
@@ -57,5 +59,68 @@ func TestDefaultParserRejectsUnknownAndIncompleteConfiguration(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestYAMLScalarTypesAnchorsAndOriginalPositions(t *testing.T) {
+	valid := "monitors:\n  - name: first\n    pulse_check: &check {type: tcp, interval: 1s, timeout: 1s, config: {host: localhost, port: 80}}\n  - name: second\n    pulse_check: {type: tcp, interval: 1s, timeout: 1s, config: {host: localhost, port: 80}}\n"
+	for _, test := range []struct{ name, input, position string }{
+		{"number-name", strings.Replace(valid, "name: second", "name: 123", 1), "line 4"},
+		{"number-host", strings.Replace(valid, "host: localhost", "host: 123", 1), "line 3"},
+		{"boolean-name", strings.Replace(valid, "name: second", "name: true", 1), "line 4"},
+		{"number-groups", strings.Replace(valid, "type: tcp", "groups: 123, type: tcp", 1), "line 3"},
+		{"boolean-groups", strings.Replace(valid, "type: tcp", "groups: true, type: tcp", 1), "line 3"},
+		{"cross-entry-anchor", strings.Replace(valid, "pulse_check: {type: tcp, interval: 1s, timeout: 1s, config: {host: localhost, port: 80}}", "pulse_check: *check", 1), "monitor 2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "monitors.yaml")
+			if err := os.WriteFile(path, []byte(test.input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			parser, _ := NewStreamingYamlParser(path, ParseConfig{BatchSize: 1})
+			batches, errs := parser.ParseBatches(t.Context(), nil)
+			for range batches {
+			}
+			err := <-errs
+			if err == nil || !strings.Contains(err.Error(), test.position) || !strings.Contains(err.Error(), path) {
+				t.Fatalf("missing original source position: %v", err)
+			}
+		})
+	}
+}
+
+func TestDefaultParserErrorsNeverEchoRejectedValues(t *testing.T) {
+	const marker = "PRIVATE_REJECTED_MARKER"
+	for _, input := range []struct{ extension, body string }{
+		{"json", `"PRIVATE_REJECTED_MARKER"`},
+		{"json", `{"monitors":"PRIVATE_REJECTED_MARKER"}`},
+		{"json", `{"PRIVATE_REJECTED_MARKER":{},"monitors":[]}`},
+		{"yaml", "monitors:\n  - name: sample\n    PRIVATE_REJECTED_MARKER: private\n    pulse_check: {type: http, interval: 1s, timeout: 1s, config: {url: 'https://example.test'}}\n"},
+		{"yaml", "monitors:\n  - name: sample\n    pulse_check: {type: http, interval: 1s, timeout: 1s, config: {url: 'https://example.test', headers: {PRIVATE_REJECTED_MARKER: [private]}}}\n"},
+	} {
+		path := filepath.Join(t.TempDir(), "input."+input.extension)
+		if err := os.WriteFile(path, []byte(input.body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		var batches <-chan MonitorBatch
+		var failures <-chan error
+		if input.extension == "json" {
+			parser, _ := NewStreamingJsonParser(path, ParseConfig{})
+			batches, failures = parser.ParseBatches(t.Context(), nil)
+		} else {
+			parser, _ := NewStreamingYamlParser(path, ParseConfig{})
+			batches, failures = parser.ParseBatches(t.Context(), nil)
+		}
+		for range batches {
+		}
+		err := <-failures
+		if err == nil {
+			t.Fatal("rejected input was accepted")
+		}
+		for current := err; current != nil; current = errors.Unwrap(current) {
+			if strings.Contains(current.Error(), marker) {
+				t.Fatal("error retained rejected data", current)
+			}
+		}
 	}
 }

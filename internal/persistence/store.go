@@ -333,13 +333,16 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 		return nil, nil
 	}
 	for _, c := range commands {
+		if c.Kind == "local_action_review" && !s.administrative {
+			return nil, ErrAuthenticationAdminRequired
+		}
 		if c.CollectionExecute != nil && len(commands) != 1 {
 			return nil, ErrCollectionInvalid
 		}
 		if administrativeCommandExtension(c) && !s.administrative {
 			return nil, ErrAuthenticationAdminRequired
 		}
-		if s.administrative && c.Kind != "authentication" && c.Kind != "restore_reset" && c.Kind != "barrier" && !administrativeCommandExtension(c) {
+		if s.administrative && c.Kind != "authentication" && c.Kind != "restore_reset" && c.Kind != "barrier" && c.Kind != "local_action_review" && !administrativeCommandExtension(c) {
 			return nil, ErrAuthenticationAdminRequired
 		}
 		if c.Kind == "authentication" && c.Authentication != nil && c.Authentication.Mode != "bootstrap" && !s.administrative {

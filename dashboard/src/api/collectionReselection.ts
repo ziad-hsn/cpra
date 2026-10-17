@@ -1,5 +1,5 @@
 import type { CollectionReselectionAttempt } from './generated';
-import { fileNormalizationProfile } from './collectionInventory';
+import { fileNormalizationProfile, supportedFileNormalizationProfile, type FileNormalizationProfile } from './collectionInventory';
 import { object } from './value';
 import { DashboardSession, ManagementError, type APIResponse, type ReselectionRequestOperation, type ReselectionRequestOptions } from './session';
 
@@ -24,8 +24,8 @@ const invalid = () => new ManagementError('invalid', 'The server returned an uns
 
 /** Copies only the bounded public status vocabulary. Input, filenames, keys,
  * diagnostics and unknown fields never enter component or query state. */
-export function reselectionStatus(value: unknown, id: string, attempt?: string): ReselectionStatus {
-  if (!object(value) || !attemptID(value.id) || value.operationID !== id || attempt !== undefined && value.id !== attempt || value.normalizationProfile !== fileNormalizationProfile ||
+export function reselectionStatus(value: unknown, id: string, attempt?: string, profile: FileNormalizationProfile = fileNormalizationProfile): ReselectionStatus {
+  if (!supportedFileNormalizationProfile(profile) || !object(value) || !attemptID(value.id) || value.operationID !== id || attempt !== undefined && value.id !== attempt || value.normalizationProfile !== profile ||
     typeof value.phase !== 'string' || !phases.has(value.phase) || !count(value.sourceCount, 1000) || value.sourceCount < 1 || !count(value.sourcesCompleted, value.sourceCount) ||
     !count(value.rawBytes, 64 << 20) || !count(value.nextOffset, value.rawBytes) || !count(value.nextSource, 1000) || !count(value.operationUploaded, 10_000) ||
     typeof value.expiresAt !== 'string' || value.expiresAt.length > 40 || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(value.expiresAt) || !Number.isFinite(Date.parse(value.expiresAt))) throw invalid();
@@ -34,7 +34,7 @@ export function reselectionStatus(value: unknown, id: string, attempt?: string):
   if (value.phase !== 'uploading' && value.phase !== 'failed' && !complete) throw invalid();
   if (value.phase === 'failed' ? typeof value.errorCode !== 'string' || !failures.has(value.errorCode) : value.errorCode !== undefined) throw invalid();
   return {
-    id: value.id, operationID: id, normalizationProfile: fileNormalizationProfile, phase: value.phase as ReselectionStatus['phase'],
+    id: value.id, operationID: id, normalizationProfile: profile, phase: value.phase as ReselectionStatus['phase'],
     sourceCount: value.sourceCount, sourcesCompleted: value.sourcesCompleted, rawBytes: value.rawBytes, nextSource: value.nextSource, nextOffset: value.nextOffset,
     expiresAt: value.expiresAt, operationUploaded: value.operationUploaded,
     ...(value.errorCode === undefined ? {} : { errorCode: value.errorCode as ReselectionStatus['errorCode'] }),
@@ -65,14 +65,15 @@ function safeError(error: unknown, id: string): ManagementError {
     error.response ? metadata(error.response, id) : undefined);
 }
 
-async function call(session: DashboardSession, allowed: ReadonlySet<string>, operation: ReselectionRequestOperation, options: ReselectionRequestOptions, expectedStatus: number,
+async function call(session: DashboardSession, allowed: ReadonlySet<string>, operation: ReselectionRequestOperation, options: ReselectionRequestOptions, expectedStatus: number, profile: FileNormalizationProfile,
   validate?: (status: ReselectionStatus) => boolean): Promise<APIResponse<ReselectionStatus>> {
   try {
+    if (!supportedFileNormalizationProfile(profile)) throw invalid();
     if (!allowed.has(operation)) throw new ManagementError('forbidden', 'This reselection operation is not enabled for your identity.');
     const response = await session.reselectionRequest<unknown>(operation, options);
     try {
       if (response.status !== expectedStatus || response.operationID !== '' && response.operationID !== options.id) throw invalid();
-      const status = reselectionStatus(response.data, options.id, options.attempt);
+      const status = reselectionStatus(response.data, options.id, options.attempt, profile);
       if (validate && !validate(status)) throw invalid();
       return { ...metadata(response, options.id), data: status };
     } catch {
@@ -84,31 +85,31 @@ async function call(session: DashboardSession, allowed: ReadonlySet<string>, ope
 
 /** Starts only an attempt for the original operation. It neither activates
  * resources nor uploads sources, and the profile cannot be caller-substituted. */
-export function createReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, sourceCount: number, signal?: AbortSignal): Promise<APIResponse<ReselectionStatus>> {
+export function createReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, sourceCount: number, signal?: AbortSignal, profile: FileNormalizationProfile = fileNormalizationProfile): Promise<APIResponse<ReselectionStatus>> {
   if (!count(sourceCount, 1000) || sourceCount < 1) return Promise.reject(new ManagementError('invalid', 'Select between one and one thousand original sources.'));
-  const body = new TextEncoder().encode(JSON.stringify({ sourceCount, normalizationProfile: fileNormalizationProfile }));
-  return call(session, allowed, 'CreateCollectionReselection', { id, body, signal }, 201,
+  const body = new TextEncoder().encode(JSON.stringify({ sourceCount, normalizationProfile: profile }));
+  return call(session, allowed, 'CreateCollectionReselection', { id, body, signal }, 201, profile,
     status => status.sourceCount === sourceCount && status.phase === 'uploading' && status.sourcesCompleted === 0 && status.rawBytes === 0 && status.nextSource === 1 && status.nextOffset === 0);
 }
 
-export function getReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal): Promise<APIResponse<ReselectionStatus>> {
-  return call(session, allowed, 'GetCollectionReselection', { id, attempt, signal }, 200);
+export function getReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal, profile: FileNormalizationProfile = fileNormalizationProfile): Promise<APIResponse<ReselectionStatus>> {
+  return call(session, allowed, 'GetCollectionReselection', { id, attempt, signal }, 200, profile);
 }
 
-export function uploadReselectionSource(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, part: ReselectionSourcePart, signal?: AbortSignal): Promise<APIResponse<ReselectionStatus>> {
+export function uploadReselectionSource(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, part: ReselectionSourcePart, signal?: AbortSignal, profile: FileNormalizationProfile = fileNormalizationProfile): Promise<APIResponse<ReselectionStatus>> {
   const { source, offset, end, data } = part;
   const through = offset + data.byteLength;
-  return call(session, allowed, 'UploadCollectionReselectionSource', { id, attempt, source, offset, end, body: data, signal }, 200,
+  return call(session, allowed, 'UploadCollectionReselectionSource', { id, attempt, source, offset, end, body: data, signal }, 200, profile,
     status => status.sourceCount >= source && status.rawBytes >= through &&
       (status.sourcesCompleted >= source || !end && status.nextSource === source && status.nextOffset >= through));
 }
 
-export function verifyReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal): Promise<APIResponse<ReselectionStatus>> {
-  return call(session, allowed, 'VerifyCollectionReselection', { id, attempt, signal }, 202, status => status.phase !== 'uploading');
+export function verifyReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal, profile: FileNormalizationProfile = fileNormalizationProfile): Promise<APIResponse<ReselectionStatus>> {
+  return call(session, allowed, 'VerifyCollectionReselection', { id, attempt, signal }, 202, profile, status => status.phase !== 'uploading');
 }
 
-export function resumeReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal): Promise<APIResponse<ReselectionStatus>> {
-  return call(session, allowed, 'ResumeCollectionReselection', { id, attempt, signal }, 202,
+export function resumeReselection(session: DashboardSession, allowed: ReadonlySet<string>, id: string, attempt: string, signal?: AbortSignal, profile: FileNormalizationProfile = fileNormalizationProfile): Promise<APIResponse<ReselectionStatus>> {
+  return call(session, allowed, 'ResumeCollectionReselection', { id, attempt, signal }, 202, profile,
     status => status.phase === 'transferring' || status.phase === 'completed' || status.phase === 'failed');
 }
 

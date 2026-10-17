@@ -2,9 +2,9 @@ package manifest
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,11 +42,11 @@ func (e *Endpoint) UnmarshalJSON(data []byte) error {
 		Config json.RawMessage `json:"config"`
 	}
 	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
+		return jsonFieldError("", err)
 	}
 	cfg, err := decodeCodeNotificationJSON(temp.Type, temp.Config)
 	if err != nil {
-		return err
+		return notificationDecodeError("config", "type", err)
 	}
 	e.Type = temp.Type
 	e.Config = cfg
@@ -203,7 +203,7 @@ func decodeCodeNotificationYAML(notifyType string, node yaml.Node) (CodeNotifica
 		}
 		return &t, nil
 	default:
-		return nil, fmt.Errorf("unknown notification type: %q", notifyType)
+		return nil, api.InvalidField("type", "unsupportedDriver")
 	}
 }
 
@@ -303,6 +303,6 @@ func decodeCodeNotificationJSON(notifyType string, raw json.RawMessage) (CodeNot
 		}
 		return &t, nil
 	default:
-		return nil, fmt.Errorf("unknown notification type: %q", notifyType)
+		return nil, api.InvalidField("type", "unsupportedDriver")
 	}
 }

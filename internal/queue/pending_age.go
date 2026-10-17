@@ -124,3 +124,21 @@ func (p *pendingAges) addTo(stats Stats) Stats {
 	stats.OldestPendingAge, stats.OldestPendingAvailable, stats.OldestPendingReason = p.observe()
 	return stats
 }
+
+// summary is sampled on the five-second control interval. Execution and
+// submitted-work lists are bounded by the worker/dispatch limits.
+func (p *pendingAges) summary() (count int, oldest, mean time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.first == nil {
+		return
+	}
+	now := time.Since(p.epoch)
+	for e := p.first; e != nil; e = e.next {
+		age := max(time.Duration(0), now-e.at)
+		count++
+		mean += (age - mean) / time.Duration(count)
+		oldest = max(oldest, age)
+	}
+	return
+}

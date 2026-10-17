@@ -14,12 +14,50 @@ require the externaljobs tag in both consumer and server builds.
 
 Start with an existing integration whose protocol and lifecycle are similar. The integration contract spans configuration, execution, and result handling.
 
-1. Add the concrete built-in driver fields and copy behavior in `internal/manifest`, with shared static checks in `internal/manifestcheck`.
-2. Register YAML and JSON decoding and semantic validation. Exercise strict unknown-field behavior for polymorphic configuration.
-3. Implement execution in `internal/jobs` and connect the dispatch path.
-4. For optional built-in dependencies, preserve the established driver-tag/capability contract. External-job types, implementation and routes are entirely excluded from normal builds; they must not receive untagged unavailable stubs.
-5. Verify result classification, deadline and cancellation behavior, and resource cleanup.
-6. Update the driver documentation and add a focused regression or protocol fixture.
+1. Define the wire settings in `api/openapi/models.base.json`, and implement pure
+   shape/semantic rules in `sdk/go/api`. These validators must not construct a
+   provider client, open storage, read a credential file or contact a target.
+   Keep provider SDK dependencies in the application module.
+2. Add file-manifest fields and copy behavior in `internal/manifest`. Update both
+   YAML and JSON decoders, file-to-resource normalization in `sdk/go/collection`,
+   and typed-resource-to-runtime mapping in `internal/management`. Preserve
+   omitted versus explicit false/zero values. Test the same valid and invalid
+   cases through file validation, collection preflight and the API.
+3. Register compiled/platform availability through the existing job capability
+   registration and `internal/manifestcheck`. An unavailable driver must fail
+   before opening storage. Optional built-in implementations keep their build
+   constraints; `externaljobs` remains a distinct opt-in extension, never part
+   of the all-built-in-driver tag list.
+4. Implement execution in `internal/jobs`, the appropriate check/recovery/
+   notification factory, and entity preparation in `internal/controller/entities`.
+   The controller owns scheduling, start admission, retry policy and result
+   commits. Do not add a second dispatch or side-effect replay path.
+5. Define effective connection identity, deadline and cancellation behavior,
+   bounded safe diagnostics and result classification. Include every TLS option
+   in connection-pool identity. Keep clients, credentials and executable jobs
+   out of Raft records, history, logs and public observations.
+6. Extend production-path contract fixtures and the verification registry in
+   `internal/drivertest`. Document real-provider effect evidence and configuration
+   prerequisites separately from local mocks. Add configuration examples and
+   field tables in the driver reference.
+7. Regenerate both base/tagged SDK contracts and the dashboard contract, then
+   rebuild the shared browser parser, embedded assets and notices. Add an
+   operation-inventory entry only when introducing a new public HTTP operation.
+   A driver setting alone does not need its own HTTP endpoint.
+
+~~~sh
+python3 tools/sdkgen/generate.py
+python3 tools/sdkgen/generate.py --check
+python3 scripts/dashboard/generate_api.py
+make dashboard-build dashboard-check
+make docs-references docs-check
+~~~
+
+Use the pinned compiler and frontend tools described in the development guide.
+Review generated changes alongside the handwritten configuration/execution code.
+When durable semantics change, update command validation, format handling,
+canonical digests, deterministic replay and snapshots together. New job execution
+never belongs in replay or snapshot restoration.
 
 ## Checks
 

@@ -6,7 +6,7 @@ cpra_scope: development
 
 # Versions and availability
 
-This source is under private release-repair qualification as of 14 October 2026.
+This source is under private release-repair qualification as of 17 October 2026.
 The intended first release is application/SDK/worker `v0.1.0-rc.1` and Helm chart
 `0.1.0-rc.1`. These are planned versions, not proof that installable public tags,
 assets or registry entries exist. Candidates remain access-controlled until the
@@ -31,28 +31,32 @@ to their actual source inventories. They are not a final frozen-release pass.
 | Drivers | 14 checks, six recovery roles and 15 notification roles across applicable build tags | Fixture contracts, provider acceptance and observed real effects are distinct evidence levels |
 | gRPC | TCP reachability when mode is omitted; explicit verified-TLS unary health mode | Only SERVING succeeds in health mode; it never falls back to TCP |
 | Distributions | Go-install contract, archive/package/image/Compose/Helm recipes and local administration | Native OS/architecture, service, filesystem and deployment matrices remain required |
-| Dependency security | Common Go 1.26.0 minimum; release compiler Go 1.27.2; gRPC 1.83.2 and `x/net` 0.60.0; nine working-source scans have no affected imported-package or called-symbol findings | One module-level OpenPGP advisory remains for packages not imported by the built-in-driver application; complete final-source security qualification remains required |
+| Build compatibility | Common Go 1.26.0 minimum; release compiler Go 1.27.2 | Final-source compiler, driver-tag, vulnerability and reproducibility checks remain required |
 | Artwork and code | MIT code; CPRa-authored artwork under CC BY 4.0 with attribution | Third-party notices and the separate project-name note remain applicable |
 
 The [quickstart](tutorials/quickstart.md) uses protected management initialization
 and localhost TLS. Management imports bootstrap manifests once; subsequent
 changes use explicit apply. Notification receivers are contacts, not login
 identities. [Operator controls](management-controls.md) distinguish acknowledge,
-dismiss, snooze and disable; there is no check-now command.
+dismiss, snooze, disable and Ignore; there is no check-now command.
 
-The [repair progress record](implementation/release-repair-progress.md) describes
-completed local checks and remaining implementation work. The
-[approved qualification plan](implementation/release-repair-plan.md) requires
-independent reviews, final-source matrices, native/provider/deployment evidence
-and the matched capacity campaign. No native runner fleet, private Kubernetes
-environment or designated provider/agent accounts are configured yet. Missing
-configuration is not a passing verification result.
+## Remaining release gates
 
-The 24-hour endurance test is cancelled. The local idle CPU comparison is a
-short diagnostic experiment, not the million-monitor performance gate.
+A repair candidate needs independent source review, a frozen source identity,
+complete application/SDK/worker compiler and build-tag checks, security scans,
+real-server browser checks and reproducible distribution payloads. Packaged
+binaries need native execution and service-lifecycle checks on each claimed
+OS and architecture. Container and Helm qualification includes storage ownership,
+backup/restore, upgrades and credential rotation on the tested storage stack.
 
-Dated [historical version review](review/version-review-2026-10-01.md) and
-[earlier candidate records](candidate/index.md) remain available for their exact
-past scope. They do not describe the current setup instructions or qualify this
-candidate. Current release documentation is rendered from the final release
-metadata after source freeze; it must not infer an identity from an older pass.
+No native runner fleet, private Kubernetes environment or designated
+provider/agent accounts are configured yet. Actual provider effects and the
+matched comparative capacity campaign remain unqualified. Missing configuration
+is not a passing verification result. Short local isolation experiments do not
+establish five-minute SLO attainment or million-monitor capacity.
+
+The 24-hour endurance test is cancelled. GitHub private vulnerability reporting
+still needs enabled/read-back verification before announcement. Historical
+engineering plans and evidence are preserved in the repository, outside the
+public site and search index. Release documentation must use the final release
+metadata; an earlier successful check does not qualify later source changes.

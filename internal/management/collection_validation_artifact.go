@@ -132,6 +132,7 @@ func prepareCollectionValidationArtifactBounded(ctx context.Context, source *col
 					return nil, ErrValidation
 				}
 				item.Change, item.Issue = observed.Change, observed.Issue
+				item.Field, item.Reason = observed.Field, observed.Reason
 				item.UID, item.ResourceVersion = observed.UID, observed.ResourceVersion
 			}
 			raw, err := persistence.CollectionValidationItemEncoding(item)

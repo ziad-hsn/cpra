@@ -11,13 +11,15 @@ import { MutationReceipt, OperationLink } from './OperationReceipt';
 import { formatDateTime } from '../lib/format';
 import { Dialog } from './Dialog';
 
-type Action = 'acknowledge' | 'dismiss' | 'reopen' | 'snooze' | 'unsnooze' | 'disable' | 'enable' | 'recover';
+type Action = 'acknowledge' | 'dismiss' | 'reopen' | 'snooze' | 'unsnooze' | 'ignore' | 'unignore' | 'disable' | 'enable' | 'recover';
 const actions = {
   acknowledge: { title: 'Acknowledge', permission: 'AcknowledgeIncident', description: 'Record that you are checking this incident. Checks, notifications and recovery continue.' },
   dismiss: { title: 'Dismiss', permission: 'DismissIncident', description: 'Stop future notifications for this incident. Checks and recovery continue. Unsent deliveries for this incident are cancelled.' },
   reopen: { title: 'Reopen notifications', permission: 'ReopenIncident', description: 'Allow future notifications for this active incident. Previously cancelled or completed deliveries are not repeated.' },
   snooze: { title: 'Snooze', permission: 'SnoozeMonitor', description: 'Pause checks, notifications and new recovery for a period. Work that already started keeps its recorded outcome.' },
   unsnooze: { title: 'End snooze', permission: 'UnsnoozeMonitor', description: 'End this pause early. A disabled monitor remains disabled.' },
+  ignore: { title: 'Ignore', permission: 'IgnoreMonitor', description: 'Continue health checks and history while suppressing ordinary notifications and interventions. Verified recovery clears Ignore automatically. Configured enabled/disabled notices remain eligible.' },
+  unignore: { title: 'Unignore', permission: 'UnignoreMonitor', description: 'Resume future eligible notifications and interventions. Suppressed work is not replayed, and unknown outcomes remain held.' },
   disable: { title: 'Disable', permission: 'PatchMonitor', description: 'Stop new checks, notifications and recovery until this monitor is enabled again. State and history remain available.' },
   enable: { title: 'Enable', permission: 'PatchMonitor', description: 'Enable this monitor. An active snooze or maintenance restriction still applies.' },
   recover: { title: 'Request recovery', permission: 'RecoverMonitor', description: 'Request the configured recovery for the current unhealthy target. CPRa checks maintenance, active or unresolved work, cooldowns and attempt limits before admitting it. This can change the monitored service.' },
@@ -102,14 +104,15 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
     {resource.isPending && <p role="status">Loading saved control state…</p>}
     {resource.isError && <p role="alert">Saved control state is unavailable. Reload it before making a change.</p>}
     {monitor && <>
-      <p>{monitor.spec.enabled === false ? 'Disabled' : 'Enabled'}{snoozed ? ` · Snoozed until ${formatDateTime(until!)}` : ''}</p>
+      <p>{monitor.spec.enabled === false ? 'Disabled' : 'Enabled'} · Observed health: {monitor.status?.health || 'Unavailable'}{snoozed ? ` · Snoozed until ${formatDateTime(until!)}` : ''}</p>
+      {monitor.status?.ignored && <p role="status">Ignored by {monitor.status.ignoredBy || 'Unavailable'} · {monitor.status.ignoreReason || 'No reason reported'}. Health checks continue.</p>}
       {currentIncident?.acknowledgedBy && <p role="status">Acknowledged by {currentIncident.acknowledgedBy}{currentIncident.acknowledgedAt ? ` at ${formatDateTime(currentIncident.acknowledgedAt)}` : ''}. Monitoring continues.</p>}
       {currentIncident?.dismissed && <p>Notifications dismissed for this incident. Checks and recovery continue.</p>}
       {incidentID && incident.isError && <p role="alert">Incident attention could not be loaded. No incident action will use an older version.</p>}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         {currentIncident && (['acknowledge', currentIncident.dismissed ? 'reopen' : 'dismiss'] as Action[]).map(action => session.can(actions[action].permission) && <button key={action} className="btn" disabled={writesUnavailable} onClick={() => begin(action)}>{actions[action].title}</button>)}
-        {(['snooze', ...(snoozed ? ['unsnooze'] : []), monitor.spec.enabled === false ? 'enable' : 'disable'] as Action[]).map(action => session.can(actions[action].permission) && <button key={action} className="btn" disabled={writesUnavailable || !monitor.metadata.uid || ((action === 'snooze' || action === 'unsnooze') && !monitor.status?.controlRevision)} onClick={() => begin(action)}>{actions[action].title}</button>)}
-        {session.can('RecoverMonitor') && monitor.spec.recovery && <button className="btn" disabled={writesUnavailable || !monitor.metadata.uid || !monitor.status?.controlRevision || monitor.spec.enabled === false || snoozed || monitor.status?.health !== 'unhealthy'} onClick={() => begin('recover')}>Request recovery</button>}
+        {(['snooze', ...(snoozed ? ['unsnooze'] : []), monitor.status?.ignored ? 'unignore' : 'ignore', monitor.spec.enabled === false ? 'enable' : 'disable'] as Action[]).map(action => session.can(actions[action].permission) && <button key={action} className="btn" disabled={writesUnavailable || !monitor.metadata.uid || ((action !== 'disable' && action !== 'enable') && !monitor.status?.controlRevision)} onClick={() => begin(action)}>{actions[action].title}</button>)}
+        {session.can('RecoverMonitor') && monitor.spec.recovery && <button className="btn" disabled={writesUnavailable || !monitor.metadata.uid || !monitor.status?.controlRevision || monitor.spec.enabled === false || monitor.status?.ignored || snoozed || monitor.status?.health !== 'unhealthy'} onClick={() => begin('recover')}>Request recovery</button>}
       </div>
       {!monitor.status?.controlRevision && <p className="muted">Snooze is unavailable until the controller publishes a control version.</p>}
     </>}
@@ -123,7 +126,7 @@ function ControlDialog({ draft, pending, unconfirmed, children, onCancel, onConf
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [duration, setDuration] = useState('30m');
-  const needsReason = draft.action === 'dismiss' || draft.action === 'snooze' || draft.action === 'recover';
+  const needsReason = draft.action === 'dismiss' || draft.action === 'snooze' || draft.action === 'recover' || draft.action === 'ignore' || draft.action === 'unignore';
   const durationValid = draft.action !== 'snooze' || validSnoozeDuration(duration);
   const textValid = [reason, note].every(text => new TextEncoder().encode(text).byteLength <= 4096 && !text.includes('\0') && !text.includes('\r'));
   return <Dialog labelledBy={heading} pending={pending} onCancel={onCancel}><form className="card" onSubmit={event => { event.preventDefault(); if (!pending && !unconfirmed && textValid && durationValid && (!needsReason || reason.trim())) void onConfirm({ reason, note, duration }); }}>

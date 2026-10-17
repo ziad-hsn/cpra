@@ -84,9 +84,10 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
       : 'The agent receives incident context for investigation. Delivery records agent acceptance; checks determine whether the monitored service has recovered. Use a notification credential with only the intended agent permissions.'}</p>}
     {!readOnly && capabilities.isError && <p role="alert">Compiled {category} drivers are unavailable. Restore server access before saving.</p>}
     {!readOnly && driver && capabilities.data && !drivers.includes(driver) && <p role="alert">This driver is not compiled into the current server. The server will reject activation.</p>}
+    {category === 'check' && config.insecureSkipVerify === true && <p role="status" className="alert warning">Certificate verification disabled. This monitor accepts untrusted certificates and hostnames. Health recovery still requires successful checks.</p>}
     {fields?.map(field => {
       const useSecret = field.protected || typeof refs[field.key] === 'string' || secretFields.includes(field.key);
-      const secretChoice = !field.protected && !readOnly ? <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={useSecret}
+      const secretChoice = !field.protected && !readOnly && (field.type === 'string' || field.type === 'string-map' || typeof refs[field.key] === 'string') ? <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={useSecret}
         onChange={event => {
           setURLWarning(false);
           if (event.target.checked) {
@@ -111,14 +112,14 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
       </div>;
       const present = Object.prototype.hasOwnProperty.call(config, field.key);
       const value = config[field.key];
-      if (readOnly) return <div key={field.key} className="management-field"><span>{field.label}</span><p className="mono">{!present ? 'Use default (not configured)' : field.type === 'boolean' ? value ? 'Yes' : 'No' : Array.isArray(value) ? value.join(', ') || 'Empty list' : String(value) || 'Empty value'}</p></div>;
+      if (readOnly) return <div key={field.key} className="management-field"><span>{field.label}</span><p className="mono">{!present ? 'Use default (not configured)' : field.type === 'boolean' ? value ? 'Yes' : 'No' : object(value) ? JSON.stringify(value) : Array.isArray(value) ? value.join(', ') || 'Empty list' : String(value) || 'Empty value'}</p></div>;
       return <div key={field.key} className="management-field">
         {secretChoice}
         <label className="management-field"><span>{field.label}</span>
           {field.type === 'boolean' ? <select className="input" aria-label={field.label} value={!present ? 'default' : value ? 'true' : 'false'} disabled={readOnly}
             onChange={event => updateConfig(field.key, event.target.value === 'true', event.target.value === 'default')}>
             <option value="default">Use default</option><option value="true">Yes</option><option value="false">No</option>
-          </select> : field.type === 'number-list' ? <NumberListInput value={value} readOnly={readOnly} onChange={next => updateConfig(field.key, next)} /> : field.type === 'string-list' ? <textarea className="input" rows={3} readOnly={readOnly}
+          </select> : field.type === 'number-map' || field.type === 'string-map' ? <MapInput numeric={field.type === 'number-map'} value={value} onChange={next => updateConfig(field.key, next)} /> : field.type === 'number-list' ? <NumberListInput value={value} readOnly={readOnly} onChange={next => updateConfig(field.key, next)} /> : field.type === 'string-list' ? <textarea className="input" rows={3} readOnly={readOnly}
             value={Array.isArray(value) ? value.join('\n') : ''} placeholder="One value per line"
             onChange={event => updateConfig(field.key, event.target.value ? event.target.value.split('\n') : [])} />
             : <input className="input" type={field.type === 'number' ? 'number' : 'text'} readOnly={readOnly}
@@ -135,6 +136,20 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
     {urlWarning && <p role="alert">That URL requires a secret reference. Create it in Secrets and select “Use a secret for url”; the protected value was not added to the draft.</p>}
     {!fields && driver && <p>This driver can be observed, but its configuration cannot be edited by this dashboard.</p>}
   </>;
+}
+
+function MapInput({ value, onChange, numeric }: { value: unknown; onChange: (value: Record<string, unknown>) => void; numeric: boolean }) {
+  const [text, setText] = useState(object(value) ? JSON.stringify(value, null, 2) : '');
+  useEffect(() => { setText(object(value) ? JSON.stringify(value, null, 2) : ''); }, [value]);
+  return <textarea className="input mono" rows={4} value={text} placeholder={numeric ? '{"red": 2, "green": 0}' : '{"Header-Name": "value"}'}
+    onChange={event => {
+      const next = event.target.value; setText(next);
+      try {
+        const parsed: unknown = next ? JSON.parse(next) : {};
+        if (!object(parsed) || Object.values(parsed).some(item => numeric ? !Number.isSafeInteger(item) : typeof item !== 'string')) throw new Error();
+        event.target.setCustomValidity(''); onChange(parsed);
+      } catch { event.target.setCustomValidity(numeric ? 'Enter a JSON object with integer values.' : 'Enter a JSON object with string values.'); }
+    }} />;
 }
 
 export function EndpointFields(props: { spec: Record<string, unknown>; onChange: (spec: Record<string, unknown>) => void; readOnly?: boolean }) {

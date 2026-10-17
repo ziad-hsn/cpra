@@ -76,7 +76,7 @@ func validateRecoveryNotificationAction(version int, a Action) error {
 func (m *Monitor) queueRecoveryFailure(action Action, at time.Time, emit func(string, *Action)) {
 	// Only the original committed intervention result can create this intent.
 	// Replayed results, notifications, operator reviews and late evidence cannot.
-	if action.Kind != "intervention" || action.State != Failed || action.CatalogUID != m.CatalogUID ||
+	if action.Kind != "intervention" || action.State != Failed || !m.OwnsAction(action) ||
 		action.Revision != m.Revision || action.IncidentID == "" || action.IncidentID != m.notificationIncident() {
 		return
 	}

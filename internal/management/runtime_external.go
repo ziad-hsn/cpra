@@ -9,7 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"slices"
+	"time"
 
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -17,6 +19,14 @@ import (
 
 type runtimePreparationExtensions struct {
 	ExternalBindings []manifest.ExternalRuntimeBinding
+}
+
+func (c *Catalog) interventionBudget(ctx context.Context, target manifest.InterventionTarget) (time.Duration, error) {
+	if external, ok := target.(*manifest.ExternalInterventionConfig); ok {
+		j := external.Key.JobType
+		return c.WorkerExecutionTimeout(ctx, persistence.JobTypeReference{JobTypeID: j.JobTypeID, JobTypeUID: j.JobTypeUID, Version: j.Version, Revision: j.Revision, Category: j.Category}, 24*time.Hour)
+	}
+	return jobs.InterventionBudget(target)
 }
 
 // resolveRuntimeExtension selects only authenticated inert input. It does not

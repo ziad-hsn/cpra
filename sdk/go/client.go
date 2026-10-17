@@ -49,6 +49,7 @@ type Client struct {
 	maxBytes              int64
 	base                  *url.URL
 	Monitors              *MonitorsService
+	MonitorObservations   *MonitorObservationsService
 	NotificationEndpoints *NotificationEndpointsService
 	NotificationGroups    *NotificationGroupsService
 	Recipients            *RecipientsService
@@ -125,6 +126,7 @@ func New(cfg Config) (*Client, error) {
 	}
 	c := &Client{generated: gen, http: hc, doer: d, maxBytes: cfg.MaxResponseBytes, base: base}
 	c.Monitors = &MonitorsService{c}
+	c.MonitorObservations = &MonitorObservationsService{c}
 	c.NotificationEndpoints = &NotificationEndpointsService{c}
 	c.NotificationGroups = &NotificationGroupsService{c}
 	c.Recipients = &RecipientsService{c}

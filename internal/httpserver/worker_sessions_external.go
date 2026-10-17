@@ -22,9 +22,9 @@ const maxConcurrentWorkerPolls = 32
 type workerSessionStore interface {
 	httpauth.WorkerPolicyReader
 	WaitWorkerPoll(context.Context, persistence.WorkerAuthority, persistence.WorkerPollRequest) error
-	CommitWorkerPoll(context.Context, persistence.WorkerAuthority, persistence.WorkerPollRequest) (persistence.WorkerPollResponse, error)
-	CommitWorkerStart(context.Context, persistence.WorkerAuthority, persistence.WorkerStartRequest) (persistence.WorkerStartResponse, error)
-	CommitWorkerHeartbeat(context.Context, persistence.WorkerAuthority, persistence.WorkerHeartbeatRequest) (persistence.WorkerHeartbeatResponse, error)
+	CommitWorkerPoll(context.Context, persistence.WorkerAuthority, persistence.WorkerPollRequest, ...persistence.WorkerMaintenanceEvaluator) (persistence.WorkerPollResponse, error)
+	CommitWorkerStart(context.Context, persistence.WorkerAuthority, persistence.WorkerStartRequest, ...persistence.WorkerMaintenanceEvaluator) (persistence.WorkerStartResponse, error)
+	CommitWorkerHeartbeat(context.Context, persistence.WorkerAuthority, persistence.WorkerHeartbeatRequest, ...persistence.WorkerMaintenanceEvaluator) (persistence.WorkerHeartbeatResponse, error)
 }
 
 // workerSessionHTTP adapts committed worker protocol operations. New work and
@@ -159,7 +159,7 @@ func (h *workerSessionHTTP) poll(w http.ResponseWriter, r *http.Request) {
 	var response persistence.WorkerPollResponse
 	err = h.admit(ctx, func() error {
 		var err error
-		response, err = h.store.CommitWorkerPoll(ctx, authority, command)
+		response, err = h.store.CommitWorkerPoll(ctx, authority, command, h.maintenanceEvaluator())
 		return err
 	})
 	if err != nil {
@@ -214,4 +214,11 @@ func writeWorkerSessionError(w http.ResponseWriter, err error) {
 		code, detail = "requestInterrupted", "Polling was interrupted. Retain the original session and frozen request."
 	}
 	writeManagementError(w, managementFailure(status, code, detail))
+}
+
+func (h *workerSessionHTTP) maintenanceEvaluator() persistence.WorkerMaintenanceEvaluator {
+	if h.catalog == nil {
+		return nil
+	}
+	return h.catalog.EvaluateWorkerMaintenance
 }

@@ -24,7 +24,7 @@ func validateCollectionHeaders(i image) error {
 	uploads := map[string]bool{}
 	var used int64
 	for id, state := range i.Collections {
-		if state.NormalizationProfile != "" && i.Version < CollectionReselectionFormatVersion {
+		if !collectionProfileSupportedAt(state.NormalizationProfile, i.Version) {
 			return ErrCollectionInvalid
 		}
 		if state.ExecutionRetirement != nil && i.Version != CollectionExecutionRetirementFormatVersion && i.Version != CollectionExecutionSourceRetirementFormatVersion && i.Version != CollectionReselectionFormatVersion && !agentActionStorageFormat(i.Version) && !externalStorageFormat(i.Version) {
@@ -183,6 +183,8 @@ func (s *frozenSnapshot) persistCollections(sink raft.SnapshotSink) error {
 	magic := collectionSnapshotMagic
 	if external := externalSnapshotMagic(s.image.Version); external != "" {
 		magic = external
+	} else if s.image.Version == LifecycleFormatVersion {
+		magic = lifecycleSnapshotMagic
 	} else if s.image.Version == DeliveryFormatVersion {
 		magic = deliverySnapshotMagic
 	} else if s.image.Version == NotificationFormatVersion {
@@ -268,6 +270,9 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	switch {
 	case version != 0:
 		magicLength = externalLength
+	case bytes.HasPrefix(prefix, []byte(lifecycleSnapshotMagic)):
+		version = LifecycleFormatVersion
+		magicLength = len(lifecycleSnapshotMagic)
 	case bytes.HasPrefix(prefix, []byte(deliverySnapshotMagic)):
 		version = DeliveryFormatVersion
 		magicLength = len(deliverySnapshotMagic)

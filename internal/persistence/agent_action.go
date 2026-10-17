@@ -184,7 +184,7 @@ func (f *machine) applyAgentReceipt(c Command) Result {
 	if r.MessageID != "" {
 		eventType = "agent_message_received"
 	}
-	event := Event{MonitorID: m.ID, Revision: a.Revision, CatalogUID: a.CatalogUID, IncidentID: a.IncidentID,
+	event := Event{MonitorID: m.ID, Revision: a.Revision, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, IncidentID: a.IncidentID,
 		At: c.At, Type: eventType, ActionID: a.ID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, AgentReceipt: &eventReceipt}
 	return Result{Allowed: true, Monitor: &m, Events: []Event{event}}
 }

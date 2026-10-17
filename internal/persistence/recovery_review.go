@@ -140,7 +140,7 @@ func (m Monitor) latestRecovery() (Action, bool) {
 	var latest Action
 	found := false
 	for _, a := range m.Actions {
-		if a.Kind != "intervention" || a.CatalogUID != m.CatalogUID || (a.IncidentID != "" && a.IncidentID != m.IncidentID) {
+		if a.Kind != "intervention" || !m.OwnsAction(a) || (a.IncidentID != "" && a.IncidentID != m.IncidentID) {
 			continue
 		}
 		if !found || a.Attempt > latest.Attempt || (a.Attempt == latest.Attempt && (a.NotBefore.After(latest.NotBefore) || (a.NotBefore.Equal(latest.NotBefore) && a.ID > latest.ID))) {
@@ -150,7 +150,7 @@ func (m Monitor) latestRecovery() (Action, bool) {
 	return latest, found
 }
 func (m Monitor) manualRecoveryEligible(at time.Time) bool {
-	if m.Removed || !m.Policy.Enabled || m.snoozed(at) || m.Policy.InMaintenance(at) || !m.Policy.Intervention || !m.observedUnhealthy() ||
+	if m.Removed || m.Ignored || m.pendingAutomaticIgnore(at) || !m.Policy.Enabled || m.snoozed(at) || m.Policy.InMaintenance(at) || !m.Policy.Intervention || !m.observedUnhealthy() ||
 		m.pendingIntervention() || m.VerifyRemaining > 0 || m.recoveryAttempts() >= m.Policy.recoveryLimit() {
 		return false
 	}
@@ -204,7 +204,7 @@ func (f *machine) applyManualRecovery(c Command, index uint64) Result {
 	var events []Event
 	m.queueAction("intervention", "", 0, c.At, func(kind string, a *Action) {
 		actionID = a.ID
-		events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, Revision: a.Revision, At: c.At, Type: kind, ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Actor: r.Actor, Reason: r.Reason})
+		events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, At: c.At, Type: kind, ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Actor: r.Actor, Reason: r.Reason})
 	})
 	if actionID == "" {
 		return Result{Err: ErrRecoveryIneligible}
@@ -229,7 +229,7 @@ func (f *machine) applyActionReview(c Command, index uint64) Result {
 	r := c.ActionReview
 	previous, ok := f.image.Monitors[c.MonitorID]
 	a, exists := previous.Actions[r.ActionID]
-	if !ok || !exists || a.CatalogUID != r.MonitorUID || a.State != Unknown || ActionReviewRevision(a) != r.ExpectedRevision {
+	if !ok || !exists || actionMonitorIdentity(c.MonitorID, a) != r.MonitorUID || a.State != Unknown || ActionReviewRevision(a) != r.ExpectedRevision {
 		return Result{Err: ErrActionReviewConflict}
 	}
 	if r.Resolution != "inconclusive" {
@@ -254,10 +254,10 @@ func (f *machine) applyActionReview(c Command, index uint64) Result {
 	a.Review = &ActionReview{Revision: r.Revision, Resolution: r.Resolution, Actor: r.Actor, At: c.At, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...)}
 	m.Actions[a.ID] = a
 	events := f.installMonitor(previous, m, c.At)
-	events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, Revision: a.Revision, At: c.At, Type: "action_reviewed", ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Actor: r.Actor, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...), Outcome: r.Resolution})
+	events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, At: c.At, Type: "action_reviewed", ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Actor: r.Actor, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...), Outcome: r.Resolution})
 	// Historical actions retain their original UID even after public ID reuse.
 	generation := f.image.Catalog[(CatalogKey{Kind: "Monitor", ID: m.ID}).indexKey()].Generation
-	receipt := OperationReceipt{Subject: "review", ActionID: a.ID, ID: r.OperationID, Key: CatalogKey{Kind: "Monitor", ID: m.ID}, UID: a.CatalogUID, OldVersion: r.ExpectedRevision, NewVersion: r.Revision, Generation: max(1, generation), CommittedIndex: index, Actor: r.Actor, At: c.At, UpdatedAt: c.At, State: "committed", Outcome: "committed"}
+	receipt := OperationReceipt{Subject: "review", ActionID: a.ID, ID: r.OperationID, Key: CatalogKey{Kind: "Monitor", ID: m.ID}, UID: actionMonitorIdentity(m.ID, a), OldVersion: r.ExpectedRevision, NewVersion: r.Revision, Generation: max(1, generation), CommittedIndex: index, Actor: r.Actor, At: c.At, UpdatedAt: c.At, State: "committed", Outcome: "committed"}
 	f.addActionReceipt(receipt)
 	events = append(events, receiptEvent(receipt))
 	return Result{Allowed: true, Monitor: &m, Operation: &receipt, Events: events}
@@ -271,7 +271,7 @@ func (f *machine) supersedeActionReceipts(previous Monitor, at time.Time) []Even
 		a := previous.Actions[actionID]
 		ids := []string{a.OperationID}
 		if a.Review != nil {
-			if receipt, ok := f.operationByVersion(CatalogKey{Kind: "Monitor", ID: previous.ID}, a.CatalogUID, "review", a.Review.Revision); ok {
+			if receipt, ok := f.operationByVersion(CatalogKey{Kind: "Monitor", ID: previous.ID}, actionMonitorIdentity(previous.ID, a), "review", a.Review.Revision); ok {
 				ids = append(ids, receipt.ID)
 			}
 		}
@@ -294,7 +294,7 @@ func (f *machine) supersedeActionReceipts(previous Monitor, at time.Time) []Even
 
 func (m Monitor) otherActiveRecovery(id string) bool {
 	for _, a := range m.Actions {
-		if a.ID != id && a.CatalogUID == m.CatalogUID && a.Kind == "intervention" && (a.State == Started || a.Held()) {
+		if a.ID != id && m.OwnsAction(a) && a.Kind == "intervention" && (a.State == Started || a.Held()) {
 			return true
 		}
 	}
@@ -307,7 +307,7 @@ func (m Monitor) otherActiveRecovery(id string) bool {
 func (m Monitor) manualRecoveryDue(at time.Time) time.Time {
 	due := m.recoveryDue(at)
 	for _, a := range m.Actions {
-		if a.Kind != "intervention" || a.CatalogUID != m.CatalogUID || a.IncidentID != m.IncidentID || a.State != Unknown || a.Held() || a.Review == nil || a.Review.Resolution != "rejected" {
+		if a.Kind != "intervention" || !m.OwnsAction(a) || a.IncidentID != m.IncidentID || a.State != Unknown || a.Held() || a.Review == nil || a.Review.Resolution != "rejected" {
 			continue
 		}
 		last := a.Review.At

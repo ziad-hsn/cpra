@@ -13,6 +13,7 @@ type managementReply struct {
 	data                            json.RawMessage
 	operationID, requestID, version string
 	incidents                       bool
+	monitorObservations             bool
 	actions                         bool
 	events                          bool
 	operations                      bool

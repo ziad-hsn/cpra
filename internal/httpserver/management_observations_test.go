@@ -69,7 +69,7 @@ func TestManagementObservationSDKContractsAndSourceUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, item := range pools.Data.Items {
-		if !item.Available || item.Capacity != 2 || item.Minimum != 2 || item.Maximum != 8 || item.Workers != 0 || item.BusyAvailable || item.ModelRecommendationAvailable || item.ServiceTime.Available || item.LastScaleAt != nil {
+		if !item.Available || item.Capacity != 2 || item.Minimum != 2 || item.Maximum != 8 || item.Workers != 0 || !item.BusyAvailable || item.Busy != 0 || item.ModelRecommendationAvailable || item.ServiceTime.Available || item.LastScaleAt != nil {
 			t.Fatal("pool source meaning lost", item)
 		}
 	}

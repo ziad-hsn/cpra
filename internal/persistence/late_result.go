@@ -80,7 +80,7 @@ func applyLateResult(previous Monitor, c Command) Result {
 		action.Review.Conflict = true
 	}
 	m.Actions[action.ID] = action
-	event := Event{MonitorID: previous.ID, CatalogUID: action.CatalogUID, Revision: action.Revision, At: c.At,
+	event := Event{MonitorID: previous.ID, CatalogUID: action.CatalogUID, FileIncarnation: action.FileIncarnation, Revision: action.Revision, At: c.At,
 		Type: "action_late_evidence", IncidentID: action.IncidentID, ActionID: action.ID, Kind: action.Kind, Color: action.Color, Endpoint: action.Endpoint, Outcome: outcome}
 	events := []Event{event}
 	if conflict {
@@ -93,12 +93,12 @@ func applyLateResult(previous Monitor, c Command) Result {
 		// contradictory evidence. Already-started invocations remain factual.
 		for _, id := range sortedActions(m.Actions) {
 			queued := m.Actions[id]
-			if queued.CatalogUID != action.CatalogUID || queued.Kind != "intervention" || queued.State != Queued {
+			if queued.CatalogUID != action.CatalogUID || queued.FileIncarnation != action.FileIncarnation || queued.Kind != "intervention" || queued.State != Queued {
 				continue
 			}
 			queued.State, queued.Outcome, queued.FinishedAt = Cancelled, "late_evidence_conflict", c.At
 			m.Actions[id] = queued
-			events = append(events, Event{MonitorID: m.ID, CatalogUID: queued.CatalogUID, Revision: queued.Revision, At: c.At, Type: "action_cancelled", ActionID: queued.ID, IncidentID: queued.IncidentID, Kind: queued.Kind, Outcome: queued.Outcome, Reason: "late_evidence_conflict"})
+			events = append(events, Event{MonitorID: m.ID, CatalogUID: queued.CatalogUID, FileIncarnation: queued.FileIncarnation, Revision: queued.Revision, At: c.At, Type: "action_cancelled", ActionID: queued.ID, IncidentID: queued.IncidentID, Kind: queued.Kind, Outcome: queued.Outcome, Reason: "late_evidence_conflict"})
 		}
 	}
 	return Result{Monitor: &m, Allowed: true, Events: events}

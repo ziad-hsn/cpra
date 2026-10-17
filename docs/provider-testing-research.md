@@ -18,10 +18,7 @@ observer confirms the actual designated effect. These are different evidence;
 neither a successful HTTP response nor a mock proves completed recovery or
 notification delivery.
 
-The [dated provider research](review/provider-research-2026-09-10.md) preserves
-the September investigation of test endpoints and the original 33 roles. Its
-source-specific limitations and proposed changes are historical, including the
-then TCP-only gRPC path and report fields. Current gRPC health mode, endpoint
-overrides and evidence classification are documented in the current guides.
-That research is not a current provider-account qualification matrix, and its
-passing-case counts are not new verification results.
+Historical provider research is retained under `docs/review/` in the repository,
+not in the public site. Use the current driver reference and verification guide
+for supported configuration and evidence boundaries. Endpoint availability,
+provider acceptance and independently observed effects are separate claims.

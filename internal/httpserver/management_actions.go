@@ -17,7 +17,7 @@ func (m *managementHTTP) registerActions(mux *http.ServeMux) {
 		var action api.Action
 		err := m.withObservationRead(r, "GetAction", func(ctx context.Context) error {
 			var err error
-			action, err = m.catalog.Action(ctx, r.PathValue("id"))
+			action, err = m.observations.Action(ctx, r.PathValue("id"))
 			return err
 		})
 		if err != nil {
@@ -27,6 +27,9 @@ func (m *managementHTTP) registerActions(mux *http.ServeMux) {
 		actionHeaders(w, action)
 		writeManagementJSON(w, http.StatusOK, action)
 	})
+	if m.catalog == nil {
+		return
+	}
 	mux.HandleFunc("POST /api/v2/actions/{id}/review", func(w http.ResponseWriter, r *http.Request) { m.handleActionControl(w, r, "review", "ReviewAction") })
 	mux.HandleFunc("POST /api/v2/monitors/{id}/recover", func(w http.ResponseWriter, r *http.Request) {
 		m.handleActionControl(w, r, "recover", "RecoverMonitor")
@@ -110,7 +113,7 @@ func (m *managementHTTP) handleActionControl(w http.ResponseWriter, r *http.Requ
 
 func (m *managementHTTP) handleActions(w http.ResponseWriter, r *http.Request) {
 	managementHeaders(w)
-	if _, err := m.auth.Authorize(r, "ListActions"); err != nil {
+	if _, err := m.authorizeRead(r, "ListActions"); err != nil {
 		writeManagementError(w, err)
 		return
 	}
@@ -123,7 +126,7 @@ func (m *managementHTTP) handleActions(w http.ResponseWriter, r *http.Request) {
 	err = m.withSnapshotRead(r, "ListActions", "Action", query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.ActionSnapshotContext(ctx)
+			view, err := m.observations.ActionSnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

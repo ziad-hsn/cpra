@@ -41,11 +41,18 @@ func readManagementResource(cmd *cobra.Command, path string) (api.Resource, erro
 	if err != nil {
 		return resource, err
 	}
+	label := path
+	if label == "-" {
+		label = "stdin"
+	}
+	if len(label) > 256 {
+		label = "resource input"
+	}
 	count := 0
-	err = collection.Decode(cmd.Context(), reader, collection.DecodeOptions{SourceName: "resource input", MaxBytes: api.MaxResourceBytes, MaxResourceBytes: api.MaxResourceBytes, MaxDocumentBytes: api.MaxResourceBytes, MaxResources: 1}, func(item collection.Item) error {
+	err = collection.Decode(cmd.Context(), reader, collection.DecodeOptions{SourceName: label, MaxBytes: api.MaxResourceBytes, MaxResourceBytes: api.MaxResourceBytes, MaxDocumentBytes: api.MaxResourceBytes, MaxResources: 1}, func(item collection.Item) error {
 		count++
 		resource = item.Resource
-		return nil
+		return item.ValidationError(api.ValidateResourceSettings(resource))
 	})
 	closeErr := reader.Close()
 	if contextErr := cmd.Context().Err(); contextErr != nil {
@@ -53,6 +60,10 @@ func readManagementResource(cmd *cobra.Command, path string) (api.Resource, erro
 		return api.Resource{}, managementFailure(contextErr)
 	}
 	if err != nil || closeErr != nil || count != 1 {
+		if _, ok := api.ValidationFieldError(err); ok {
+			clear(resource.Spec)
+			return api.Resource{}, managementFailure(errors.Join(cpra.ErrInvalid, err))
+		}
 		clear(resource.Spec)
 		return api.Resource{}, &managementCommandError{"input must contain exactly one valid resource no larger than 1 MiB; collection apply is a separate operation", cpra.ErrInvalid}
 	}

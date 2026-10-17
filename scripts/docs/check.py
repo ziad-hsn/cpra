@@ -39,6 +39,10 @@ def check_links(document: Path, docs: Path, errors: list, local_evidence: list):
         boundary = ROOT if implementation else docs
         if relative.is_absolute() or not path.is_relative_to(boundary) or not path.exists():
             errors.append(f"{document.relative_to(ROOT)}: missing or nonportable link {target}")
+        elif (not document.relative_to(docs).as_posix().startswith(sync.ARCHIVE_PREFIXES)
+              and path.is_relative_to(docs)
+              and path.relative_to(docs).as_posix().startswith(sync.ARCHIVE_PREFIXES)):
+            errors.append(f"{document.relative_to(ROOT)}: public page links to unpublished engineering record {target}")
 
 
 def driver_fields(source: Path, document: Path, errors: list, label: str):

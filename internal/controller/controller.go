@@ -94,6 +94,7 @@ type Controller struct {
 
 // Config holds all configuration for the controller.
 type Config struct {
+	NotificationLog *jobs.NotificationLog
 	Catalog         *management.Catalog
 	Encryption      *secureconfig.Sealer
 	Store           *persistence.Store
@@ -158,12 +159,14 @@ func NewController(config Config) *Controller {
 	world := &arkApp.World
 	mapper := entities.NewEntityManager(world)
 
-	// Default to Hybrid queues per queue class
+	// Pulse work has bounded driver/flow reservations; action queues retain
+	// their existing durable admission order.
 	pulseCfg := queue.DefaultQueueConfig()
 	pulseCfg.Name = "pulse"
 	pulseCfg.HybridConfig.Name = "pulse"
 	pulseCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
-	pulseQueue, err := queue.NewQueue(pulseCfg)
+	var pulseQueue queue.Queue
+	pulseQueue, err := queue.NewFairQueue(pulseCfg.HybridConfig.RingCapacity + pulseCfg.HybridConfig.OverflowCapacity)
 	if err != nil {
 		SystemLogger.Fatal("Failed to create pulse HybridQueue: %v", err)
 	}
@@ -185,7 +188,9 @@ func NewController(config Config) *Controller {
 	}
 
 	pulseLogger := WorkerPoolLogger.WithContext("pulse")
-	pulsePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(pulseQueue), config.WorkerConfig, pulseLogger)
+	pulseWorkerConfig := config.WorkerConfig
+	pulseWorkerConfig.FairDispatch = true
+	pulsePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(pulseQueue), pulseWorkerConfig, pulseLogger)
 	if err != nil {
 		SystemLogger.Fatal("Failed to create pulse worker pool: %v", err)
 	}
@@ -221,6 +226,7 @@ func NewController(config Config) *Controller {
 	codeRouter := codePool.GetRouter()
 	wakeups := make(chan struct{}, 1)
 	durableSystem := systems.NewDurableSystem(world, config.Store, config.Runtime, snapshotHolder, logger, pulseQueue, interventionQueue, codeQueue, []<-chan []jobs.Result{pulseRouter.PulseResultChan, interventionRouter.InterventionResultChan, codeRouter.CodeResultChan}, alertCooldown, config.RecoveryBypass)
+	durableSystem.SetNotificationLog(config.NotificationLog)
 	durableSystem.SetWakeup(wakeups)
 	for _, router := range []*queue.ResultRouter{pulseRouter, interventionRouter, codeRouter} {
 		router.SetWakeup(wakeups)
@@ -312,7 +318,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 		}
 	}
 	if tau <= 0 {
-		tau = defaultServiceTime
+		tau = initialPulseServiceTime(c.world)
 	}
 	wSLO := c.config.SizingSLO
 	if v := os.Getenv("CPRA_SIZING_SLO_MS"); v != "" {
@@ -354,7 +360,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 			if wSLO <= tau {
 				target = math.Min(target, math.Ceil(lambda*tau.Seconds()*(1+headroom)))
 			}
-			c.pulsePool.SetTargetWorkers(int(target))
+			c.pulsePool.SetModelWorkers(int(target))
 		}
 		return
 	}
@@ -373,7 +379,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 	// drives the initial worker count. Runtime adjustments add measured
 	// interarrival and execution-time variability.
 	if c.pulsePool != nil {
-		c.pulsePool.SetTargetWorkers(cSafe)
+		c.pulsePool.SetModelWorkers(cSafe)
 	}
 }
 
@@ -393,8 +399,33 @@ func computePulseLambda(world *ecs.World) float64 {
 	return sum
 }
 
+// initialPulseServiceTime budgets cold checks against their configured timeout.
+// Before the first observation, a four-millisecond assumption cannot distinguish
+// a fast target from one that never replies. No monitor overlaps its own checks,
+// so each contributes at most one occupied worker. Explicit sizing overrides
+// remain available; measured service times take over after startup.
+func initialPulseServiceTime(world *ecs.World) time.Duration {
+	query := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
+		Without(ecs.C[components.Disabled]()).Query()
+	var arrivals, occupied float64
+	for query.Next() {
+		_, check := query.Get()
+		if check.Interval <= 0 {
+			continue
+		}
+		rate := 1 / check.Interval.Seconds()
+		arrivals += rate
+		occupied += min(1, max(defaultServiceTime, check.Timeout).Seconds()*rate)
+	}
+	if arrivals == 0 {
+		return defaultServiceTime
+	}
+	return max(defaultServiceTime, time.Duration(occupied/arrivals*float64(time.Second)))
+}
+
 // sizingTau returns the configured (or env-overridden) per-job service time
-// used until execution samples are available, defaulting to 4ms.
+// used until execution samples are available, using timeout-weighted demand
+// when no explicit estimate was supplied.
 func (c *Controller) sizingTau() time.Duration {
 	tau := c.config.SizingServiceTime
 	if v := os.Getenv("CPRA_SIZING_TAU_MS"); v != "" {
@@ -403,7 +434,7 @@ func (c *Controller) sizingTau() time.Duration {
 		}
 	}
 	if tau <= 0 {
-		tau = defaultServiceTime
+		tau = initialPulseServiceTime(c.world)
 	}
 	return tau
 }
@@ -448,6 +479,7 @@ func (c *Controller) run() {
 	c.app.Initialize()
 	if c.durableSystem != nil {
 		c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
+		c.pulsePool.SetColdOccupancy(c.durableSystem.PulseColdOccupancy())
 	}
 	c.lastProgress.Store(time.Now().UnixNano())
 	c.initializedState.Store(true)
@@ -513,6 +545,7 @@ func (c *Controller) run() {
 		c.app.Update()
 		if c.durableSystem != nil {
 			c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
+			c.pulsePool.SetColdOccupancy(c.durableSystem.PulseColdOccupancy())
 		}
 		now = time.Now()
 		c.lastProgress.Store(now.UnixNano())
@@ -628,7 +661,7 @@ func (c *Controller) PrintShutdownMetrics() {
 		if t.IsZero() || t.Unix() == 0 {
 			return "never"
 		}
-		return t.Format(time.RFC3339)
+		return t.UTC().Format(time.RFC3339)
 	}
 	formatDur := func(d time.Duration) string {
 		if d <= 0 {
@@ -691,7 +724,7 @@ func (c *Controller) CheckEntityCountAndSwitchQueue() {
 		name string
 		q    queue.Queue
 	}{
-		{"pulse", c.pulseQueue}, {"intervention", c.interventionQueue}, {"code", c.codeQueue},
+		{"intervention", c.interventionQueue}, {"code", c.codeQueue},
 	} {
 		cfg := queue.DefaultQueueConfig()
 		cfg.Type = queue.QueueTypeAdaptive

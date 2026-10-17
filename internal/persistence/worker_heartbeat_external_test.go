@@ -43,11 +43,13 @@ func TestWorkerHeartbeatKeepsOriginalGrantAndDeadline(t *testing.T) {
 			session := s.fsm.image.WorkerSessions.Sessions[a.WorkerUID]
 			at := session.Response.SessionExpiresAt.Add(time.Second)
 			c := WorkerHeartbeatCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: request}
+			c.Maintenance, _ = s.prepareWorkerMaintenance(t.Context(), input.ExecutionID, "heartbeat", at, nil)
 			result := submit(t, s, Command{Kind: "worker_heartbeat", At: at, commandExtensions: commandExtensions{WorkerHeartbeat: &c}})[0]
 			if result.Err != nil || result.WorkerHeartbeat == nil || !result.WorkerHeartbeat.Accepted {
 				t.Fatal("idle poll session stopped active handler", result.Err)
 			}
 			at = before.Intent.Deadline
+			c.Maintenance, _ = s.prepareWorkerMaintenance(t.Context(), input.ExecutionID, "heartbeat", at, nil)
 			result = submit(t, s, Command{Kind: "worker_heartbeat", At: at, commandExtensions: commandExtensions{WorkerHeartbeat: &c}})[0]
 			if result.Err != nil || result.WorkerHeartbeat == nil || result.WorkerHeartbeat.Accepted {
 				t.Fatal("expired execution continued", result.Err)
@@ -167,8 +169,8 @@ func TestWorkerHeartbeatSnapshotAndCommandFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != DeliveryWorkerFormatVersion {
-		t.Fatalf("heartbeat snapshot format: got %d, want %d", i.Version, DeliveryWorkerFormatVersion)
+	if i.Version != LifecycleWorkerFormatVersion {
+		t.Fatalf("heartbeat snapshot format: got %d, want %d", i.Version, LifecycleWorkerFormatVersion)
 	}
 	if err := validateWorkerExecutionImage(i); err != nil {
 		t.Fatal("heartbeat snapshot invalid", err)
@@ -186,7 +188,7 @@ func TestWorkerHeartbeatSnapshotAndCommandFormat(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("heartbeat format", version, err)
 		}
 	}

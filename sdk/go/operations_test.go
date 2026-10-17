@@ -87,7 +87,7 @@ func TestOperationInventory(t *testing.T) {
 				}
 				_, _ = w.Write(inventoryResponse(t, op.Schema))
 			}, nil)
-			services := map[string]any{"Client": c, "MonitorsService": c.Monitors, "NotificationEndpointsService": c.NotificationEndpoints, "NotificationGroupsService": c.NotificationGroups, "RecipientsService": c.Recipients, "CredentialsService": c.Credentials, "IncidentsService": c.Incidents, "ActionsService": c.Actions, "OperationsService": c.Operations, "QueuesService": c.Queues, "PoolsService": c.Pools, "SystemsService": c.Systems, "SLOService": c.SLO}
+			services := map[string]any{"Client": c, "MonitorsService": c.Monitors, "MonitorObservationsService": c.MonitorObservations, "NotificationEndpointsService": c.NotificationEndpoints, "NotificationGroupsService": c.NotificationGroups, "RecipientsService": c.Recipients, "CredentialsService": c.Credentials, "IncidentsService": c.Incidents, "ActionsService": c.Actions, "OperationsService": c.Operations, "QueuesService": c.Queues, "PoolsService": c.Pools, "SystemsService": c.Systems, "SLOService": c.SLO}
 			split := strings.Split(op.SDKMethod, ".")
 			if len(split) != 2 || services[split[0]] == nil {
 				t.Fatal("missing SDK operation", op.SDKMethod)
@@ -109,6 +109,8 @@ func TestOperationInventory(t *testing.T) {
 					args = append(args, reflect.ValueOf(v))
 				} else if op.OperationID == "GetHistory" && typ == reflect.TypeOf(ListOptions{}) {
 					args = append(args, reflect.ValueOf(ListOptions{MonitorID: "m"}))
+				} else if (op.OperationID == "IgnoreMonitor" || op.OperationID == "UnignoreMonitor") && typ == reflect.TypeOf(api.ControlRequest{}) {
+					args = append(args, reflect.ValueOf(api.ControlRequest{Revision: "rv-1", Reason: "investigating"}))
 				} else {
 					args = append(args, requestValue(t, typ))
 				}

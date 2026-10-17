@@ -1,3 +1,5 @@
+import { sourceCoordinates, type SourceCoordinates } from './validation';
+
 /**
  * Bounded browser counterpart of collection/commitment in the Go SDK.
  *
@@ -8,7 +10,9 @@
  * streaming and persistent/cross-tab resume are not provided here.
  */
 export const collectionIdentityFormat = 'cpra.collection.hmac-sha256-json-bytes.v1' as const;
-export const fileNormalizationProfile = 'cpra.file.base.v1' as const;
+export const fileNormalizationProfile = 'cpra.file.base.v2' as const;
+export type FileNormalizationProfile = typeof fileNormalizationProfile | 'cpra.file.base.v1';
+export const supportedFileNormalizationProfile = (value: unknown): value is FileNormalizationProfile => value === fileNormalizationProfile || value === 'cpra.file.base.v1';
 export const browserCollectionLimits = Object.freeze({ sourceBytes: 4 << 20, requestBytes: 4 << 20, resourceBytes: 1 << 20, items: 10_000, sources: 10_000 });
 
 export interface CollectionInventoryPosition {
@@ -217,7 +221,7 @@ export class FrozenCollectionInventory {
 
 /** Separate worker import quotas. The normalized buffer bound is an explicit
  * implementation safety limit, not a promise that source bytes equal heap use. */
-export const workerCollectionLimits = Object.freeze({ sources: 1_000, sourceBytes: 64 << 20, normalizedBytes: 512 << 20, resourceBytes: 1 << 20, items: 10_000, pageItems: 100, uploadItems: 256, requestBytes: 4 << 20 });
+export const workerCollectionLimits = Object.freeze({ sources: 1_000, diagnosticBytes: 8 << 20, sourceBytes: 64 << 20, normalizedBytes: 512 << 20, resourceBytes: 1 << 20, items: 10_000, pageItems: 100, uploadItems: 256, requestBytes: 4 << 20 });
 export interface WorkerCollectionSummary {
   readonly identityFormat: typeof collectionIdentityFormat;
   readonly normalizationProfile?: typeof fileNormalizationProfile;
@@ -228,8 +232,8 @@ export interface WorkerCollectionSummary {
   readonly normalizedBytes: number;
   readonly preflightAvailable: boolean;
 }
-export interface WorkerCollectionItemSummary extends CollectionInventoryPosition { readonly bytes: number }
-type WorkerItem = { position: CollectionInventoryPosition; raw: Uint8Array; digest?: Uint8Array };
+export interface WorkerCollectionItemSummary extends CollectionInventoryPosition { readonly bytes: number; readonly coordinates?: SourceCoordinates }
+type WorkerItem = { position: CollectionInventoryPosition; raw: Uint8Array; digest?: Uint8Array; coordinates?: SourceCoordinates };
 const workerLimit = () => new Error('Collection preparation exceeds the configured browser import quota.');
 const concatenate = (parts: readonly Uint8Array[], maximum: number): Uint8Array<ArrayBuffer> => {
   const size = parts.reduce((sum, part) => sum + part.byteLength, 0);
@@ -254,6 +258,7 @@ export class WorkerCollectionInventory {
   #sources = 0;
   #sourceBytes = 0;
   #normalizedBytes = 0;
+  #diagnosticBytes = 0;
   #closed = false;
   #summary?: WorkerCollectionSummary;
   #preflightBytes = 0;
@@ -295,7 +300,7 @@ export class WorkerCollectionInventory {
     return token;
   }
   /** Takes ownership; the caller must never read or mutate raw after this call. */
-  addItem(raw: Uint8Array, id: string, document: number, item: number): void {
+  addItem(raw: Uint8Array, id: string, document: number, item: number, diagnostic?: unknown): void {
     this.#requireOpen();
     if (this.#summary || this.#sources === 0 || !validBytes(raw) || raw.byteLength < 1 || raw.byteLength > workerCollectionLimits.resourceBytes ||
         this.#items.length >= workerCollectionLimits.items || raw.byteLength > workerCollectionLimits.normalizedBytes - this.#normalizedBytes) throw workerLimit();
@@ -307,7 +312,13 @@ export class WorkerCollectionInventory {
       const resource = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(raw));
       if (!resource || Array.isArray(resource) || `${resource.kind}/${resource.metadata?.id}` !== id) throw invalid();
     } catch { throw invalid(); }
-    this.#items.push({ position, raw }); this.#identities.add(id); this.#normalizedBytes += raw.byteLength;
+    let coordinates = diagnostic === undefined ? undefined : sourceCoordinates(diagnostic);
+    if (coordinates) {
+      const size = encoder.encode(JSON.stringify(coordinates)).byteLength;
+      if (size > workerCollectionLimits.diagnosticBytes - this.#diagnosticBytes) coordinates = undefined;
+      else this.#diagnosticBytes += size;
+    }
+    this.#items.push({ position, raw, coordinates }); this.#identities.add(id); this.#normalizedBytes += raw.byteLength;
   }
   async #digest(item: WorkerItem): Promise<Uint8Array<ArrayBuffer>> {
     const position = item.position;
@@ -338,7 +349,7 @@ export class WorkerCollectionInventory {
   page(offset: number, limit: number = workerCollectionLimits.pageItems): WorkerCollectionItemSummary[] {
     this.#requireFrozen();
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > this.#items.length || !integer(limit, workerCollectionLimits.pageItems)) throw invalid();
-    return this.#items.slice(offset, offset + limit).map(({ position, raw }) => ({ ...position, source: { ...position.source }, bytes: raw.byteLength }));
+    return this.#items.slice(offset, offset + limit).map(({ position, raw, coordinates }) => ({ ...position, source: { ...position.source }, bytes: raw.byteLength, ...(coordinates ? { coordinates: sourceCoordinates(coordinates) } : {}) }));
   }
   /** Explicit write-only operation-creation JSON; contains the private key. */
   createBody(): Uint8Array<ArrayBuffer> {

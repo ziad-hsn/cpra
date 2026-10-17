@@ -223,7 +223,7 @@ func (s *Store) Operation(id string) (OperationReceipt, error) {
 func operationCurrent(i image, r OperationReceipt) bool {
 	if r.Subject == "review" {
 		a, ok := i.Monitors[r.Key.ID].Actions[r.ActionID]
-		return ok && a.CatalogUID == r.UID && a.Review != nil && a.Review.Revision == r.NewVersion && !a.Review.Conflict
+		return ok && actionMonitorIdentity(r.Key.ID, a) == r.UID && a.Review != nil && a.Review.Revision == r.NewVersion && !a.Review.Conflict
 	}
 	current, ok := i.Catalog[r.Key.indexKey()]
 	if !ok || current.UID != r.UID {

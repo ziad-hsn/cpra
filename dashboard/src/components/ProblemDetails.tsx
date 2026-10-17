@@ -1,5 +1,6 @@
 import type { ManagementError } from '../api/session';
 import { correlationID } from '../api/correlation';
+import { safeValidationField, validationMessage } from '../api/validation';
 
 const codes = new Set([
   'internalError', 'unauthorized', 'forbidden', 'admissionBusy', 'admissionUnavailable', 'outcomeUnconfirmed', 'operationAllocationUnconfirmed', 'requestInterrupted', 'unavailable',
@@ -7,7 +8,6 @@ const codes = new Set([
   'evidenceConflict', 'recoveryIneligible', 'recoveryRateLimited', 'executorUnfenced', 'invalidControl', 'resourceReferenced', 'dependencyConflict', 'validationGraphLimit', 'invalidResource', 'invalidGraph',
   'validationPending', 'validationInterrupted', 'validationCanceled', 'validationNotRequested', 'featureUnavailable', 'preconditionRequired', 'invalidPrecondition', 'invalidJSON', 'bodyTooLarge',
 ]);
-const fieldName = /^(metadata|spec|items|sources|revision|reason|note|duration|incidentID|resolution|evidenceRefs)(\.[A-Za-z][A-Za-z0-9_]*|\[[0-9]+\])*$/;
 const phases = new Set(['upload', 'validation', 'activation', 'cancellation', 'observation']);
 
 /** Correlation and reviewed codes are useful; raw provider detail and submitted
@@ -27,7 +27,7 @@ export function ProblemDetails({ error, phase }: { error?: ManagementError; phas
       {correlationID(operation) && <><dt>Operation ID</dt><dd className="mono">{operation}</dd></>}
     </dl>
     {!!fields.length && <ul aria-label="Field errors">{fields.slice(0, 10).map((field, index) => <li key={index}>
-      {field.field.length <= 160 && fieldName.test(field.field) ? field.field : 'Resource field'}: validation failed{field.reason && codes.has(field.reason) ? ` (${field.reason})` : ''}.
+      {safeValidationField(field.field) || 'Resource field'}: {validationMessage(field.reason) || 'validation failed'}{field.reason && codes.has(field.reason) ? ` (${field.reason})` : ''}.
     </li>)}</ul>}
     {fields.length > 10 && <p>Additional field errors omitted.</p>}
   </div>;

@@ -55,6 +55,11 @@ func workerStartFromOffer(response WorkerPollResponse) WorkerStartRequest {
 func workerStartAt(t *testing.T, s *Store, a WorkerAuthority, r WorkerStartRequest, at time.Time) Result {
 	t.Helper()
 	cmd := WorkerStartCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: r, ProposedGrantID: uuid.NewString()}
+	var err error
+	cmd.Maintenance, err = s.prepareWorkerMaintenance(t.Context(), r.ExecutionID, "start", at, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return submit(t, s, Command{Kind: "worker_start", At: at, commandExtensions: commandExtensions{WorkerStart: &cmd}})[0]
 }
 func TestWorkerOfferExactReplayAndOneStartAllCategories(t *testing.T) {
@@ -324,12 +329,12 @@ func TestWorkerOfferFormatsSnapshotsAndCancelledRequests(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("start format", version, err)
 		}
 	}
 	snap := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(snap, []byte(deliveryWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(snap, []byte(lifecycleWorkerSnapshotMagic)) {
 		t.Fatal("snapshot frame")
 	}
 	restored, ledger, err := decodeSnapshot(bytes.NewReader(snap), "")
@@ -394,6 +399,17 @@ func TestWorkerOfferNativeRestartFencesOffersAndHoldsStarts(t *testing.T) {
 				store, err = Open(t.Context(), config)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if started {
+					if _, err = store.CommitWorkerExecution(t.Context(), in); !errors.Is(err, ErrWorkerExecutionConflict) {
+						t.Fatal("restored recovery was offered without a fresh check", err)
+					}
+					m, _ := store.Get(in.MonitorID)
+					at := time.Now().UTC()
+					result := submit(t, store, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, Outcome: "failure", At: at, ExecutionStart: at, Guard: &in.Guard})[0]
+					if result.Err != nil || result.Monitor == nil || !result.Monitor.RecoveryCheckAfter.IsZero() {
+						t.Fatal("fresh check did not release recovery admission", result.Err)
+					}
 				}
 				if _, err = store.CommitWorkerExecution(t.Context(), in); err != nil {
 					t.Fatal(err)

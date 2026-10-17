@@ -2,7 +2,7 @@
 
 The dashboard's **Import files** page (`/import`) connects this private parsing,
 inventory and bounded serialization layer to the generated collection API
-contracts. Server-assisted reselection after a refresh remains unimplemented.
+contracts. Server-assisted reselection after a refresh preserves the original operation and its input commitments.
 The page requires an operator identity and intersects its permissions with the
 server's registered discovery operations. A server that only offers preflight
 can preview a collection, but cannot activate it through this page.
@@ -17,7 +17,7 @@ controls is not proof that the server supports those steps.
 
 `BrowserCollection.prepare(files, { signal, onProgress })` starts one dedicated
 module Worker. The Worker loads the pinned Go/WASM parser, validates all selected
-files with the public SDK's `collection.Decode`, and freezes a keyed inventory.
+files with the public SDK's versioned `collection.NormalizeFile`, and freezes a keyed inventory.
 A malformed final file discards the entire private preparation; earlier callbacks
 are staging only. Parsing and HMAC work run away from the main browser thread.
 
@@ -35,7 +35,11 @@ try {
 
 The shared parser supplies the existing Go behavior for multi-document YAML/JSON,
 resource arrays and Lists, legacy manifests and driver normalization, duplicate
-keys and identities, and source document/item positions. It rejects YAML aliases.
+keys and identities, and source document/item positions. The current `cpra.file.base.v2`
+profile supports aliases and merge keys within one parsed entry, with cycle, depth,
+expanded-node and expanded-byte limits. Cross-entry anchors are not supported.
+The original v1 normalization remains available only to verify and continue an
+existing operation; new browser imports use v2.
 JavaScript does not reconstruct numeric resource values. JSON numeric tokens
 retain their exact spelling. YAML decimal spellings normalize textually without
 rounding. Fractional or exponent notation for integer controls is rejected just
@@ -109,11 +113,13 @@ inside inventory tests, but JavaScript, Go and browser runtime copies are not
 cryptographic erasure guarantees. No localStorage, sessionStorage, IndexedDB,
 Cache Storage or plaintext filesystem spool is used.
 
-A new preparation currently creates a new key even when files are identical.
-The approved ability to reselect original inputs and resume the original server
-operation still needs a reviewed, authenticated server-assisted protocol. Do not
-persist the key or treat a new preparation as the original operation to bridge
-that gap.
+A new preparation creates a new key even when files are identical. To continue
+after a refresh, reselect the original files through the original operation's
+reselection flow. The server verifies their source and ordered-resource
+commitments using that operation's original normalization profile before
+accepting any missing suffix. A changed profile or changed input fails this
+verification. Do not persist the key or substitute a new preparation for the
+original operation.
 
 ## Build and verification
 

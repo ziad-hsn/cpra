@@ -44,7 +44,7 @@ func incidentOf(m Monitor) IncidentRecord {
 	return IncidentRecord{ID: m.IncidentID, MonitorID: m.ID, MonitorUID: m.CatalogUID, Revision: m.IncidentRevision, Active: !m.Removed && m.IncidentClosedAt.IsZero() && (m.Incident || m.Recovering), OpenedAt: m.IncidentOpenedAt, ClosedAt: m.IncidentClosedAt, AcknowledgedBy: m.AcknowledgedBy, AcknowledgedAt: m.AcknowledgedAt, AcknowledgedNote: m.AcknowledgedNote, Dismissed: m.Dismissed, DismissedBy: m.DismissedBy, DismissedAt: m.DismissedAt, DismissedReason: m.DismissedReason}
 }
 func statusOf(m Monitor) MonitorStatus {
-	return MonitorStatus{ObservedGeneration: m.ownerObserved.generation, ID: m.ID, CatalogUID: m.CatalogUID, CatalogRevision: m.CatalogRevision, Revision: m.Revision, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: m.NextCheck, Enabled: m.Policy.Enabled, Removed: m.Removed, Incident: m.Incident, Recovering: m.Recovering, Warning: m.Warning, LatencyAvailable: m.LatencyAvailable, Generation: m.Generation, TotalChecks: m.TotalChecks, SuccessfulChecks: m.SuccessfulChecks, LastOutcome: m.LastOutcome, LastFailure: m.LastFailure, LastLatency: m.LastLatency, UnknownActions: m.unknownActions}
+	return MonitorStatus{Ignored: m.Ignored, IgnoredAt: m.IgnoredAt, IgnoredBy: m.IgnoredBy, IgnoreCause: m.IgnoreCause, IgnoreReason: m.IgnoreReason, IgnoreIncidentCount: len(m.IgnoreIncidents), ObservedGeneration: m.ownerObserved.generation, ID: m.ID, CatalogUID: m.CatalogUID, CatalogRevision: m.CatalogRevision, Revision: m.Revision, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: m.NextCheck, Enabled: m.Policy.Enabled, Removed: m.Removed, Incident: m.Incident, Recovering: m.Recovering, Warning: m.Warning, LatencyAvailable: m.LatencyAvailable, Generation: m.Generation, TotalChecks: m.TotalChecks, SuccessfulChecks: m.SuccessfulChecks, LastOutcome: m.LastOutcome, LastFailure: m.LastFailure, LastLatency: m.LastLatency, UnknownActions: m.unknownActions, ActionsNeedingReview: m.heldActions}
 }
 func (f *machine) emptyControlIndexes() {
 	f.incidents = btree.NewG(32, func(a, b IncidentRecord) bool { return a.ID < b.ID })
@@ -57,7 +57,7 @@ func (f *machine) indexMonitor(m Monitor) {
 		f.incidents.ReplaceOrInsert(r)
 		f.incidentsByMonitor.ReplaceOrInsert(r)
 	}
-	if m.IncidentID != "" || !m.SnoozedUntil.IsZero() || m.ControlRevision != identity("control/"+m.ID+"/"+m.CatalogUID) || f.hasWorkerCheckState(m) {
+	if m.IncidentID != "" || !m.SnoozedUntil.IsZero() || m.ControlRevision != identity("control/"+m.ID+"/"+m.incarnationIdentity()) || f.hasWorkerCheckState(m) {
 		f.controls.ReplaceOrInsert(changeOf(m))
 	}
 }
@@ -77,10 +77,13 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 			return err
 		}
 		m.ensureControlIdentity()
-		m.unknownActions = 0
+		m.unknownActions, m.heldActions = 0, 0
 		for _, a := range m.Actions {
 			if err := ctx.Err(); err != nil {
 				return err
+			}
+			if a.Held() {
+				m.heldActions++
 			}
 			if a.State == Unknown {
 				m.unknownActions++
@@ -128,8 +131,11 @@ func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
 		}
 	}
 	// Cache the count at commit time so observation requests never scan actions.
-	m.unknownActions = 0
+	m.unknownActions, m.heldActions = 0, 0
 	for _, a := range m.Actions {
+		if a.Held() {
+			m.heldActions++
+		}
 		if a.State == Unknown {
 			m.unknownActions++
 		}

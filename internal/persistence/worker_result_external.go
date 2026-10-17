@@ -62,10 +62,11 @@ func (r WorkerResultRecord) Clone() WorkerResultRecord {
 }
 
 type WorkerResultCommand struct {
-	NodeID     string            `json:"node_id"`
-	OwnerEpoch string            `json:"owner_epoch"`
-	Authority  WorkerAuthority   `json:"authority"`
-	Input      WorkerResultInput `json:"input"`
+	Maintenance *WorkerMaintenanceDecision `json:"maintenance,omitempty"`
+	NodeID      string                     `json:"node_id"`
+	OwnerEpoch  string                     `json:"owner_epoch"`
+	Authority   WorkerAuthority            `json:"authority"`
+	Input       WorkerResultInput          `json:"input"`
 }
 
 func (in WorkerResultInput) validate() error {
@@ -96,6 +97,9 @@ func workerResultStatus(status, category string) bool {
 }
 
 func (c WorkerResultCommand) validate(at time.Time) error {
+	if c.Maintenance != nil && c.Maintenance.validate(at) != nil {
+		return ErrWorkerExecutionInvalid
+	}
 	if !catalogIdentifier(c.NodeID, 256) || !catalogIdentifier(c.OwnerEpoch, 256) || !c.Authority.sessionShapeValid() ||
 		c.Input.validate() != nil || c.Input.ServerID != workerProtocolServerID(c.NodeID, c.Authority.Epoch) ||
 		at.IsZero() || at.Year() < 1 || at.Year() > 9998 {
@@ -198,7 +202,7 @@ func (f *machine) applyWorkerResult(c WorkerResultCommand, at time.Time, index u
 	r := old.Clone()
 	receipt := WorkerReceipt{ServerID: c.Input.ServerID, WorkerUID: c.Authority.WorkerUID, ExecutionID: c.Input.ExecutionID,
 		ReceiptID: workerResultReceiptID(c.Input.ServerID, c.Input.GrantID, index), Disposition: "accepted"}
-	monitor, events, applied, noData, held := f.workerResultTransition(r, c.Input, at, version)
+	monitor, events, applied, noData, held := f.workerResultTransition(r, c.Input, at, version, c.Maintenance)
 	if noData {
 		receipt.Disposition = "finalized"
 	}
@@ -247,7 +251,7 @@ func (f *machine) applyWorkerResult(c WorkerResultCommand, at time.Time, index u
 	return Result{Allowed: true, Monitor: monitor, Events: events, resultExtensions: resultExtensions{WorkerResult: &receipt}}
 }
 
-func (s *Store) CommitWorkerResult(ctx context.Context, a WorkerAuthority, input WorkerResultInput) (WorkerReceipt, error) {
+func (s *Store) CommitWorkerResult(ctx context.Context, a WorkerAuthority, input WorkerResultInput, evaluators ...WorkerMaintenanceEvaluator) (WorkerReceipt, error) {
 	if ctx == nil {
 		return WorkerReceipt{}, ErrWorkerExecutionInvalid
 	}
@@ -263,6 +267,11 @@ func (s *Store) CommitWorkerResult(ctx context.Context, a WorkerAuthority, input
 	if err := c.validate(at); err != nil {
 		return WorkerReceipt{}, err
 	}
+	decision, err := s.prepareWorkerMaintenance(ctx, input.ExecutionID, "result", at, evaluators)
+	if err != nil {
+		return WorkerReceipt{}, err
+	}
+	c.Maintenance = decision
 	results, err := s.Submit(ctx, []Command{{Kind: "worker_result", At: at, commandExtensions: commandExtensions{WorkerResult: &c}}})
 	confirmedAt := time.Now().UTC()
 	if err != nil {

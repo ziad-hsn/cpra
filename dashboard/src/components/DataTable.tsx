@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { MonitorSummary } from '../api/types';
-import { StatusChip } from './StatusChip';
+import { MonitorStatusLabels } from './MonitorStatusLabels';
 import { formatMeasuredLatency, formatTime, formatUptime, uptimeColor } from '../lib/format';
 import { CodeBadge } from './CodeBadge';
 import type { CpraCode } from '../theme/tokens';
@@ -39,7 +39,7 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
     {
       header: 'Status',
       id: 'status',
-      cell: (info) => <StatusChip status={info.row.original.status} />,
+      cell: (info) => <MonitorStatusLabels monitor={info.row.original} compact />,
     },
     {
       header: 'Health samples',
@@ -64,16 +64,13 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
       cell: (info) => <span className='muted mono'>{formatTime(String(info.getValue()))}</span>,
     },
     {
-      header: 'Pending',
-      accessorKey: 'pending_code',
-      cell: (info) => {
-        const code = String(info.getValue() ?? '') as CpraCode;
-        if (!code) return <span className='muted'>—</span>;
-        return <CodeBadge code={code} />;
-      },
+      header: 'Pending notices',
+      id: 'pending_notifications',
+      cell: (info) => typeof info.row.original.pending_notifications === 'number'
+        ? <span>{info.row.original.pending_notifications}</span> : <span className='muted'>Unavailable</span>,
     },
     {
-      header: 'Active codes',
+      header: 'Configured notifications',
       id: 'active_codes',
       cell: (info) => {
         const codes = info.row.original.active_codes ?? [];

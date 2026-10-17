@@ -74,6 +74,14 @@ func TestWorkerResultProcessCrashHelper(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if category == "recovery" {
+		// Restarted queued recovery needs a new health observation before any
+		// worker may start the retained action.
+		m, _ := store.Get(in.MonitorID)
+		at := time.Now().UTC()
+		submit(t, store, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: &in.Guard,
+			Generation: m.Generation + 1, At: at, ExecutionStart: at, Outcome: "failure"})
+	}
 	if _, err := store.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)
 	}

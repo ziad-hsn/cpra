@@ -9,7 +9,7 @@ export const resourceKinds = {
   monitors: { kind: 'Monitor', singular: 'Monitor', title: 'Monitor configurations', path: '/api/v2/monitors', route: '/monitor-configurations', operations: 'Monitor', listOperation: 'ListMonitors', description: 'Manage saved check, recovery and notification settings. Saved configuration and controller observations have separate versions; a saved change may still be awaiting application.' },
   recipients: { kind: 'Recipient', singular: 'Recipient', title: 'Recipients', path: '/api/v2/recipients', route: '/recipients', operations: 'Recipient', listOperation: 'ListRecipients', description: 'Notification contacts collect a person’s delivery endpoints. Contacts are separate from dashboard access.' },
   endpoints: { kind: 'NotificationEndpoint', singular: 'Notification endpoint', title: 'Notification endpoints', path: '/api/v2/notification-endpoints', route: '/notification-endpoints', operations: 'NotificationEndpoint', listOperation: 'ListNotificationEndpoints', description: 'Configure destinations using built-in notification drivers. A monitor’s Code selects the delivery type; its recipients and groups supply matching destinations.' },
-  groups: { kind: 'NotificationGroup', singular: 'Notification group', title: 'Notification groups', path: '/api/v2/notification-groups', route: '/notification-groups', operations: 'NotificationGroup', listOperation: 'ListNotificationGroups', description: 'Groups contain recipients, direct endpoints, or both. Groups cannot contain other groups. Legacy direct-endpoint groups keep their existing delivery behavior.' },
+  groups: { kind: 'NotificationGroup', singular: 'Notification group', title: 'Notification groups', path: '/api/v2/notification-groups', route: '/notification-groups', operations: 'NotificationGroup', listOperation: 'ListNotificationGroups', description: 'Groups contain recipients, direct endpoints, or both. Groups cannot contain other groups. Direct endpoints and recipient references can be used together.' },
   credentials: { kind: 'Credential', singular: 'Secret', title: 'Secrets', path: '/api/v2/credentials', route: '/secrets', operations: 'Credential', listOperation: 'ListCredentials', description: 'Secret values are write-only. Protected values are encrypted before durable admission; provider credentials are separate from dashboard bearer tokens.' },
 } as const;
 
@@ -51,6 +51,8 @@ export function driverView(source: Record<string, unknown>, category: DriverCate
     }
     const valid = field.type === 'string-list' ? Array.isArray(value) && value.every(item => typeof item === 'string')
       : field.type === 'number-list' ? Array.isArray(value) && value.every(item => typeof item === 'number' && Number.isSafeInteger(item))
+        : field.type === 'number-map' ? object(value) && Object.values(value).every(Number.isSafeInteger)
+          : field.type === 'string-map' ? object(value) && Object.values(value).every(item => typeof item === 'string')
         : field.type === 'number' ? typeof value === 'number' && Number.isSafeInteger(value)
           : field.type === 'duration' ? typeof value === 'string'
             : typeof value === field.type;

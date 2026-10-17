@@ -9,7 +9,7 @@ import { CollectionValidation } from '../components/CollectionValidation';
 import { OperationsList } from '../components/OperationsList';
 import { CollectionExecution } from '../components/CollectionExecution';
 import { CollectionReselection } from '../components/CollectionReselection';
-import { fileNormalizationProfile } from '../api/collectionInventory';
+import { supportedFileNormalizationProfile } from '../api/collectionInventory';
 import { CollectionOperationControls } from '../components/CollectionOperationControls';
 
 const outcomes: Record<string, string> = { reserved: 'Reserved; no resource change committed', activation_rejected: 'Rejected before resource/action commit', reservation_expired: 'Reservation expired; no resource/action commit', committed: 'Committed; awaiting controller', applied: 'Applied by controller', projection_failed: 'Controller application failed', superseded: 'Superseded; application was not confirmed', unrecognized: 'Unrecognized outcome' };
@@ -58,7 +58,7 @@ export default function OperationDetail() {
         <p className="muted">These receipts describe durable admission and controller application. They do not establish notification delivery or completed recovery, and rollback cannot reverse external actions.</p>
       </section>}
       {operation?.executionResult && identity && <CollectionExecution key={`execution:${operation.id}:${identity.identityFormat}:${identity.contentDigest}:${identity.itemCount}`} id={operation.id} identity={identity} observation={operation.executionResult} />}
-      {operation?.state === 'uploading' && identity?.normalizationProfile === fileNormalizationProfile && operation.uploaded !== undefined && operation.uploaded < identity.itemCount && <CollectionReselection key={`reselection:${operation.id}`} id={operation.id} onProgress={() => { void query.refetch(); }} />}
+      {operation?.state === 'uploading' && identity && supportedFileNormalizationProfile(identity.normalizationProfile) && operation.uploaded !== undefined && operation.uploaded < identity.itemCount && <CollectionReselection key={`reselection:${operation.id}`} id={operation.id} profile={identity.normalizationProfile} onProgress={() => { void query.refetch(); }} />}
       {operation && identity && <CollectionOperationControls key={`controls:${operation.id}:${identity.identityFormat}:${identity.contentDigest}:${identity.itemCount}`} id={operation.id} identity={identity} operation={operation} onProgress={() => { void query.refetch(); }} />}
       {operation?.identityFormat !== undefined && (identity
         ? <CollectionValidation key={`${operation.id}:${identity.identityFormat}:${identity.contentDigest}:${identity.itemCount}`} id={operation.id} identity={identity} />

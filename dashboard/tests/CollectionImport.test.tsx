@@ -18,8 +18,8 @@ const identity = { identityFormat: collectionIdentityFormat, contentDigest: 'a'.
 const summary: WorkerCollectionSummary = { ...identity, sourceCount: 1, sourceBytes: 64, normalizedBytes: 64, preflightAvailable: true };
 const steps = ['PrepareCollection', 'CreateOperation', 'UploadOperation', 'ValidateOperation', 'GetOperationValidation', 'ActivateOperation', 'CancelOperation', 'GetOperation', 'PreflightCollection'];
 
-function frozen(count = 1) {
-  const all = Array.from({ length: count }, (_, index) => ({ ordinal: index + 1, id: `Monitor/monitor-${index + 1}`, source: { token: collectionSourceToken(1), document: index + 1, item: 1 }, bytes: 64 }));
+function frozen(count = 1, coordinates?: { line: number; column: number }) {
+  const all = Array.from({ length: count }, (_, index) => ({ ordinal: index + 1, id: `Monitor/monitor-${index + 1}`, source: { token: collectionSourceToken(1), document: index + 1, item: 1 }, bytes: 64, coordinates }));
   const value = { summary: { ...summary, itemCount: count }, close: vi.fn(), sourceName: vi.fn(() => 'service.yaml'),
     page: vi.fn(async (offset = 0) => all.slice(offset, offset + 100)),
     createBody: vi.fn(async () => makeBody({ ...identity, itemCount: count, identityKey: 'private-key', sourceFingerprint: 'private-fingerprint' })),
@@ -29,7 +29,7 @@ function frozen(count = 1) {
   vi.spyOn(BrowserCollection, 'prepare').mockResolvedValue(value as unknown as BrowserCollection);
   return value;
 }
-async function fixture(options: { operationID?: string; createErrorHandle?: string; supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; activationState?: string; operationRead?: (url: URL, operation: Operation) => unknown } = {}) {
+async function fixture(options: { monitorRead?: () => Promise<unknown>; operationID?: string; createErrorHandle?: string; supported?: string[]; reader?: boolean; lostCreate?: boolean; lostUpload?: boolean; count?: number; invalidValidation?: boolean; unknownState?: boolean; lostValidation?: boolean; validationPending?: number; validationError?: { status: number; code: string }; validationHeaders?: HeadersInit; validationExpiresAt?: string; progressError?: boolean; afterValidationState?: string; lostActivation?: boolean; activationHeader?: string; activationState?: string; operationRead?: (url: URL, operation: Operation) => unknown; validationMismatch?: boolean } = {}) {
   const supported = options.supported ?? steps, count = options.count ?? 1;
   const writes: { path: string; method: string; body?: Record<string, unknown>; match: string | null }[] = [];
   const operation: Operation = { ...identity, itemCount: count, id: options.operationID ?? 'original-1', state: 'uploading', uploaded: 0, committed: 0, applied: 0 };
@@ -39,6 +39,8 @@ async function fixture(options: { operationID?: string; createErrorHandle?: stri
     const url = new URL(String(input)), method = init.method ?? 'GET', headers = new Headers(init.headers);
     if (url.pathname === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
     if (url.pathname.endsWith('/self')) return headers.has('Authorization') ? response({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions: Object.keys(operationContracts) }) : response({}, 401);
+    if (url.pathname === '/api/v2/monitors/api' && options.monitorRead) return response(await options.monitorRead());
+    if (url.pathname === '/api/v2/monitors') return response({ items: [] });
     if (url.pathname.endsWith('/discovery')) return response({ resourceOperations: { Collection: supported, Operation: supported } });
     if (method === 'GET' && url.pathname.endsWith('/validation')) {
       validationReads++;
@@ -48,7 +50,7 @@ async function fixture(options: { operationID?: string; createErrorHandle?: stri
       operation.state = options.afterValidationState ?? (options.invalidValidation ? 'rejected' : 'validated');
       const offset = Number(url.searchParams.get('cursor')?.slice(1) ?? 0);
       return response({ ...identity, itemCount: count, operationID: operation.id, summary: { resultID: '11111111-1111-1111-1111-111111111111', valid: !options.invalidValidation, summaryOnly: false, count, digest: 'b'.repeat(64), capabilitiesDigest: 'c'.repeat(64), finalizedAt: '2026-09-20T00:00:00Z', expiresAt: options.validationExpiresAt ?? '2026-10-20T00:00:00Z', ...(options.invalidValidation ? { issue: 'invalidResource' } : { planID: '22222222-2222-2222-2222-222222222222', planDigest: 'd'.repeat(64) }) },
-        items: Array.from({ length: Math.min(100, count - offset) }, (_, index) => ({ ordinal: offset + index + 1, kind: 'Monitor', id: `monitor-${offset + index + 1}`, source: collectionSourceToken(1), sourceDocument: offset + index + 1, sourceItem: 1, ...(options.invalidValidation ? { issue: index === 0 ? 'invalidResource' : 'notEvaluated' } : { change: 'create' }), message: 'private-server-message', resource: 'private-resource-value' })), ...(offset + 100 < count ? { nextCursor: `v${offset + 100}` } : {}) });
+        items: Array.from({ length: Math.min(100, count - offset) }, (_, index) => ({ ordinal: offset + index + 1, kind: 'Monitor', id: `monitor-${offset + index + 1}`, source: collectionSourceToken(1), sourceDocument: offset + index + 1, sourceItem: options.validationMismatch ? 2 : 1, ...(options.invalidValidation ? { issue: index === 0 ? 'invalidResource' : 'notEvaluated' } : { change: 'create' }), message: 'private-server-message', resource: 'private-resource-value' })), ...(offset + 100 < count ? { nextCursor: `v${offset + 100}` } : {}) });
     }
     if (method === 'GET' && options.progressError && validationReads > 0) return response({ code: 'storageUnavailable' }, 503);
     if (method === 'GET') return response(options.operationRead?.(url, operation) ?? (options.unknownState ? { ...operation, state: 'future' } : operation));
@@ -528,4 +530,38 @@ it('keeps an expired sealed validation read-only and does not open activation co
   expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+});
+
+// Source coordinates are local hints only after the complete retained identity matches.
+it.each([false, true])('attributes retained source coordinates only to matching rows (mismatch=%s)', async mismatch => {
+  frozen(1, { line: 7, column: 3 }); await fixture({ validationMismatch: mismatch });
+  await reviewCollection();
+  const result = screen.getByRole('region', { name: 'Original validation result' });
+  if (mismatch) expect(result.textContent).not.toContain('line 7, column 3');
+  else expect(result).toHaveTextContent('1 / 1, line 7, column 3');
+});
+
+it('reserves shared preparation before reading notification setup inputs', async () => {
+  let finishRead!: (value: unknown) => void, finishFiles!: (value: BrowserCollection) => void;
+  const read = new Promise<unknown>(resolve => { finishRead = resolve; });
+  const filePreparation = new Promise<BrowserCollection>(resolve => { finishFiles = resolve; });
+  const collection = frozen();
+  vi.mocked(BrowserCollection.prepare).mockReturnValueOnce(filePreparation);
+  const { writes, fetcher } = await fixture({ monitorRead: () => read });
+  fireEvent.click(screen.getByText('Set up webhook notifications'));
+  fireEvent.change(screen.getByLabelText('Specific monitor ID'), { target: { value: 'api' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Use ID' }));
+  fireEvent.change(screen.getByLabelText('Recipient name'), { target: { value: 'On-call' } });
+  fireEvent.change(screen.getByLabelText('Webhook URL'), { target: { value: 'https://hooks.example/draft-marker' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare notification setup' }));
+  await waitFor(() => expect(fetcher.mock.calls.some(call => String(call[0]).endsWith('/monitors/api'))).toBe(true));
+  fireEvent.change(screen.getByLabelText('Configuration files'), { target: { files: [new File(['{}'], 'manual.json')] } });
+  expect(screen.getByLabelText('Configuration files')).toBeDisabled();
+  expect(BrowserCollection.prepare).not.toHaveBeenCalled();
+  await act(async () => { finishRead({ apiVersion: 'cpra.io/v2', kind: 'Monitor', metadata: { id: 'api', uid: 'instance', resourceVersion: 'version-1' }, spec: { check: { interval: '60s', timeout: '5s', driver: { type: 'http', config: { url: 'https://example.invalid' } } } } }); });
+  await waitFor(() => expect(BrowserCollection.prepare).toHaveBeenCalledOnce());
+  expect(vi.mocked(BrowserCollection.prepare).mock.calls[0][0][0].name).toBe('notification-setup.json');
+  expect(writes).toEqual([]);
+  await act(async () => { finishFiles(collection as unknown as BrowserCollection); });
+  await screen.findByRole('heading', { name: 'Source-attributed preview' });
 });

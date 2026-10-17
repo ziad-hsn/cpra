@@ -68,7 +68,7 @@ func runManagementIncidentGet(cmd *cobra.Command, o *options, args []string, des
 }
 
 func addManagementControlCommands(root *cobra.Command, o *options) {
-	for _, action := range []string{"acknowledge", "dismiss", "reopen", "snooze", "unsnooze", "disable", "enable"} {
+	for _, action := range []string{"acknowledge", "dismiss", "reopen", "snooze", "unsnooze", "ignore", "unignore", "disable", "enable"} {
 		var revision, noteFile, reasonFile, duration string
 		incident := action == "acknowledge" || action == "dismiss" || action == "reopen"
 		configuration := action == "disable" || action == "enable"
@@ -83,7 +83,7 @@ func addManagementControlCommands(root *cobra.Command, o *options) {
 		if action == "acknowledge" {
 			command.Flags().StringVar(&noteFile, "note-file", "", "optional UTF-8 operator note file; - reads stdin; retained in the audit history")
 		}
-		if action == "dismiss" || action == "snooze" {
+		if action == "dismiss" || action == "snooze" || action == "ignore" || action == "unignore" {
 			command.Flags().StringVar(&reasonFile, "reason-file", "", "required UTF-8 reason file; - reads stdin; retained in the audit history")
 		}
 		if action == "snooze" {
@@ -116,7 +116,7 @@ func addManagementControlCommands(root *cobra.Command, o *options) {
 			}
 			if action == "acknowledge" {
 				request.Note, err = readManagementControlText(cmd, noteFile, false)
-			} else if action == "dismiss" || action == "snooze" {
+			} else if action == "dismiss" || action == "snooze" || action == "ignore" || action == "unignore" {
 				request.Reason, err = readManagementControlText(cmd, reasonFile, true)
 			}
 			if err != nil {
@@ -139,6 +139,10 @@ func addManagementControlCommands(root *cobra.Command, o *options) {
 				reply, err = managementResponse(client.Monitors.Snooze(cmd.Context(), id, request))
 			case "unsnooze":
 				reply, err = managementResponse(client.Monitors.Unsnooze(cmd.Context(), id, request))
+			case "ignore":
+				reply, err = managementResponse(client.Monitors.Ignore(cmd.Context(), id, request))
+			case "unignore":
+				reply, err = managementResponse(client.Monitors.Unignore(cmd.Context(), id, request))
 			case "disable":
 				reply, err = managementResponse(client.Monitors.Patch(cmd.Context(), id, revision, api.MergePatch(`{"spec":{"enabled":false}}`)))
 			case "enable":
@@ -165,6 +169,10 @@ func managementControlDescription(action string) string {
 		return "Pause checks, notifications and new recovery for a bounded period"
 	case "unsnooze":
 		return "End snooze while respecting disabled state and maintenance"
+	case "ignore":
+		return "Suppress ordinary notifications and interventions while health checks continue"
+	case "unignore":
+		return "Resume future eligible handling without replaying suppressed work"
 	case "disable":
 		return "Save enabled=false, retaining monitor state and history"
 	default:

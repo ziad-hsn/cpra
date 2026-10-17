@@ -33,6 +33,9 @@ func reselectionCreate(t *testing.T, s *Store, profile string, count uint64) Col
 	if err != nil {
 		t.Fatal(err)
 	}
+	if profile == "cpra.file.base.v1" {
+		return validationApplyAllowed(t, applyCatalogFormat(t, s, CollectionReselectionFormatVersion, Command{Kind: "collection", At: c.Create.CreatedAt, Collection: &c})[0])
+	}
 	return validationApplyAllowed(t, collectionCommand(t, s, c, c.Create.CreatedAt))
 }
 
@@ -67,7 +70,7 @@ func TestCollectionReselectionProfileAdmissionBindingAndLegacyIdentity(t *testin
 	if _, err := catalogSealer(t).Open(t.Context(), legacy.Binding(s.nodeID), c.Create.Secret); err == nil {
 		t.Fatal("profile-bound ciphertext opened under legacy identity")
 	}
-	head := validationApplyAllowed(t, collectionCommand(t, s, c, c.Create.CreatedAt))
+	head := validationApplyAllowed(t, applyCatalogFormat(t, s, CollectionReselectionFormatVersion, Command{Kind: "collection", At: c.Create.CreatedAt, Collection: &c})[0])
 	if s.fsm.image.Version != CollectionReselectionFormatVersion || collectionAdmissionFor(head).NormalizationProfile != head.NormalizationProfile || collectionReceiptFor(head).NormalizationProfile != head.NormalizationProfile {
 		t.Fatal("profile not retained consistently")
 	}
@@ -96,13 +99,17 @@ func TestCollectionReselectionHistoricalFormatAndStrictFenceFields(t *testing.T)
 			at = c.Create.CreatedAt
 		}
 		command := Command{Kind: "collection", At: at, Collection: &c}
-		if commandWriteFormat(command) != CollectionReselectionFormatVersion {
+		wantFormat := CollectionReselectionFormatVersion
+		if c.Action == "create" {
+			wantFormat = LifecycleFormatVersion
+		}
+		if commandWriteFormat(command) != wantFormat {
 			t.Fatal("new contract selected an older writer")
 		}
 		for version := 1; version <= LatestFormatVersion+1; version++ {
 			raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 			_, err := decodeEnvelope(raw)
-			if (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || externalStorageFormat(version)) {
+			if (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || version == LifecycleFormatVersion || externalStorageFormat(version)) {
 				t.Fatal("new fields interpreted under historical/future format", version, err)
 			}
 		}
@@ -257,7 +264,7 @@ func TestCollectionReselectionProfileSnapshotAndRetainedReceipt(t *testing.T) {
 	for version := CollectionFormatVersion; version <= LatestFormatVersion; version++ {
 		image := s.fsm.image
 		image.Version = version
-		if err := validateCollectionHeaders(image); (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || externalStorageFormat(version)) {
+		if err := validateCollectionHeaders(image); (err == nil) != (version == CollectionReselectionFormatVersion || version == AgentActionFormatVersion || version == RecoveryNotificationFormatVersion || version == AgentObservationFormatVersion || version == NotificationFormatVersion || version == DeliveryFormatVersion || version == LifecycleFormatVersion || externalStorageFormat(version)) {
 			t.Fatal("profile snapshot version gate", version, err)
 		}
 	}

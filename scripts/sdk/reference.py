@@ -26,7 +26,7 @@ def generate(go):
     for op in ops:
         condition='inspected version' if op['cas'] else ('If-None-Match: *' if op['operationID'].startswith('Create') and op['operationID']!='CreateOperation' else '—')
         lines.append('| `'+op['sdkMethod']+'` | `'+op['method']+' '+op['path']+'` | '+(op['request'] or '—')+' | '+op['schema']+' | '+condition+' | '+(op['buildTag'] or 'default')+' |')
-    lines+=['','`Disable` and `Enable` are narrow conditional monitor patches. Acknowledge records who is investigating; dismiss pauses incident notifications; snooze pauses checks and notifications until its deadline. These controls have separate revision requirements. No check-now operation exists.','','## Operation parameters','']
+    lines+=['','`Disable` and `Enable` are narrow conditional monitor patches. Acknowledge records who is investigating; dismiss pauses incident notifications; snooze pauses checks and notifications until its deadline. Ignore continues observations while suppressing ordinary notifications and interventions until verified recovery or explicit Unignore; gray enabled/disabled notices remain eligible. These controls have separate revision requirements. No check-now operation exists.','','## Operation parameters','']
     for op in ops:
         wire=paths[op['path']][op['method'].lower()]
         lines+=['### '+op['operationID'],'','`'+op['sdkMethod']+'` → `'+op['method']+' '+op['path']+'`','']

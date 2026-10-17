@@ -18,8 +18,11 @@ func (v *collectionValidator) validateSet(ctx context.Context, resources map[per
 			return key, err
 		}
 		r := resources[key]
-		if validateMetadata(r.Metadata) != nil || v.catalog.options.validateDesired(&r) != nil {
+		if validateMetadata(r.Metadata) != nil {
 			return key, ErrValidation
+		}
+		if err := v.catalog.options.validateDesired(&r); err != nil {
+			return key, stagedValidationError(err)
 		}
 		refs, err := directReferences(r)
 		if err != nil {
@@ -33,8 +36,11 @@ func (v *collectionValidator) validateSet(ctx context.Context, resources map[per
 		switch r.Kind {
 		case "Monitor":
 			var spec api.MonitorSpec
-			if api.StrictDecode(r.Spec, &spec) != nil || ValidateMonitorSettings(spec) != nil {
-				return key, ErrValidation
+			if err := api.StrictDecode(r.Spec, &spec); err != nil {
+				return key, stagedValidationError(api.PrefixValidationError("spec", err))
+			}
+			if err := ValidateMonitorSettings(spec); err != nil {
+				return key, stagedValidationError(api.PrefixValidationError("spec", err))
 			}
 			monitors = append(monitors, api.Monitor{APIVersion: r.APIVersion, Kind: r.Kind, Metadata: r.Metadata, Spec: spec})
 		case "NotificationEndpoint":

@@ -40,6 +40,8 @@ type CollectionValidationItem struct {
 	Key             persistence.CatalogKey
 	Change          string // create, update, unchanged; empty when input is invalid
 	Issue           string // safe classification, never a provider/parser error
+	Field           string // schema property path, never a user-defined map key
+	Reason          string // fixed static-validation rule code
 	UID             string
 	ResourceVersion string
 	Dependencies    []persistence.CatalogKey
@@ -133,7 +135,7 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 		r, err := api.DecodeResource(raw)
 		clear(raw)
 		if err != nil || !supportedKind(r.Kind) || !validID(r.Metadata.ID) || validateMetadata(r.Metadata) != nil {
-			v.result.Items[i].Issue = "invalidResource"
+			v.result.Items[i].invalid(err)
 			continue
 		}
 		if r.Kind == "Monitor" {
@@ -174,8 +176,8 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 			v.result.Items[i].Change = "create"
 		}
 		r.Status = nil
-		if v.catalog.options.validateDesired(&r) != nil {
-			v.result.Items[i].Issue = "invalidResource"
+		if err := v.catalog.options.validateDesired(&r); err != nil {
+			v.result.Items[i].invalid(err)
 			continue
 		}
 		var original *api.Resource
@@ -323,6 +325,7 @@ func (v *collectionValidator) reject(i int, err error) (CollectionValidation, er
 	}
 	if i >= 0 && i < len(v.result.Items) {
 		v.result.Items[i].Issue = code
+		v.result.Items[i].diagnostic(err)
 	}
 	v.result.Valid = false
 	v.result.Order = nil
@@ -515,4 +518,15 @@ func (v *collectionValidator) order(ctx context.Context) ([]persistence.CatalogK
 		}
 	}
 	return order, nil
+}
+
+func (item *CollectionValidationItem) diagnostic(err error) {
+	if field, ok := api.ValidationFieldError(err); ok {
+		item.Field, item.Reason = field.Field, field.Reason
+	}
+}
+
+func (item *CollectionValidationItem) invalid(err error) {
+	item.Issue = "invalidResource"
+	item.diagnostic(err)
 }

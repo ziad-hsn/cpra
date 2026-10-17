@@ -18,6 +18,7 @@ type EntityManager struct {
 	MonitorState       *ecs.Map1[components.MonitorState]
 	PulseConfig        *ecs.Map1[components.PulseConfig]
 	InterventionConfig *ecs.Map1[components.InterventionConfig]
+	AutoIgnore         *ecs.Map1[components.AutoIgnore]
 	CodeConfig         *ecs.Map1[components.CodeConfig]
 	CodeStatus         *ecs.Map1[components.CodeStatus]
 	JobStorage         *ecs.Map1[components.JobStorage]
@@ -40,6 +41,7 @@ func NewEntityManager(world *ecs.World) *EntityManager {
 		MonitorState:       ecs.NewMap1[components.MonitorState](world),
 		PulseConfig:        ecs.NewMap1[components.PulseConfig](world),
 		InterventionConfig: ecs.NewMap1[components.InterventionConfig](world),
+		AutoIgnore:         ecs.NewMap1[components.AutoIgnore](world),
 		CodeConfig:         ecs.NewMap1[components.CodeConfig](world),
 		CodeStatus:         ecs.NewMap1[components.CodeStatus](world),
 		JobStorage:         ecs.NewMap1[components.JobStorage](world),
@@ -72,6 +74,9 @@ func (e *EntityManager) Install(p *PreparedMonitor, world *ecs.World) (ecs.Entit
 	state := &components.MonitorState{Name: b.name, MonitorID: p.id, Revision: p.revision, Maintenance: b.maintenance, NextCheckTime: now}
 	state.SetPulseFirstCheck(b.enabled)
 	entity := e.baseMapper.NewEntity(state, &b.pulse, &components.JobStorage{})
+	if b.autoIgnore != nil {
+		e.AutoIgnore.Add(entity, b.autoIgnore)
+	}
 	if b.intervention != nil {
 		e.InterventionConfig.Add(entity, b.intervention)
 	}
@@ -115,6 +120,15 @@ func (e *EntityManager) Replace(expected ecs.Entity, p *PreparedMonitor, world *
 	var status *components.CodeStatus
 	if b.codes != nil {
 		status = initialCodeStatus(b.codes, e.CodeStatus.Get(expected), time.Now())
+	}
+	if b.autoIgnore != nil {
+		if e.AutoIgnore.HasAll(expected) {
+			e.AutoIgnore.Set(expected, b.autoIgnore)
+		} else {
+			e.AutoIgnore.Add(expected, b.autoIgnore)
+		}
+	} else if e.AutoIgnore.HasAll(expected) {
+		e.AutoIgnore.Remove(expected)
 	}
 	if b.intervention != nil {
 		if e.InterventionConfig.HasAll(expected) {

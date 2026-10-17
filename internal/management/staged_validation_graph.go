@@ -319,8 +319,8 @@ func (v *stagedValidator) validateSet(ctx context.Context, selected map[persiste
 func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resource *api.Resource, lookup resourceLookup) error {
 	driver := func(category string, input api.DriverConfig) error {
 		defer clear(input.Config)
-		if v.source.catalog.options.validateDriver(category, input) != nil {
-			return ErrValidation
+		if err := v.source.catalog.options.validateDriver(category, input); err != nil {
+			return stagedValidationError(err)
 		}
 		release, err := resolveDriverWithLookup(ctx, &input, category, lookup, v.source.reserve)
 		if err != nil {
@@ -336,19 +336,22 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 	switch resource.Kind {
 	case "Credential":
 		copy := *resource
-		if v.source.catalog.options.validateDesired(&copy) != nil {
-			return ErrValidation
+		if err := v.source.catalog.options.validateDesired(&copy); err != nil {
+			return stagedValidationError(err)
 		}
 	case "NotificationEndpoint":
 		var spec api.DriverConfig
-		if api.StrictDecode(resource.Spec, &spec) != nil {
-			return ErrValidation
+		if err := api.StrictDecode(resource.Spec, &spec); err != nil {
+			return stagedValidationError(api.PrefixValidationError("spec", err))
 		}
-		return driver("notification", spec)
+		return api.PrefixValidationError("spec", driver("notification", spec))
 	case "Monitor":
 		var spec api.MonitorSpec
-		if api.StrictDecode(resource.Spec, &spec) != nil || ValidateMonitorSettings(spec) != nil {
-			return ErrValidation
+		if err := api.StrictDecode(resource.Spec, &spec); err != nil {
+			return stagedValidationError(api.PrefixValidationError("spec", err))
+		}
+		if err := ValidateMonitorSettings(spec); err != nil {
+			return stagedValidationError(api.PrefixValidationError("spec", err))
 		}
 		defer clear(spec.Check.Driver.Config)
 		if spec.Recovery != nil {
@@ -362,11 +365,11 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 			}
 		}
 		if err := driver("check", spec.Check.Driver); err != nil {
-			return err
+			return api.PrefixValidationError("spec.check.driver", err)
 		}
 		if spec.Recovery != nil {
 			if err := driver("recovery", spec.Recovery.Driver); err != nil {
-				return err
+				return api.PrefixValidationError("spec.recovery.driver", err)
 			}
 		}
 		if spec.Notifications != nil {
@@ -377,7 +380,7 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 					copy := *rule.Driver
 					copy.Config = slices.Clone(rule.Driver.Config)
 					if err := driver("notification", copy); err != nil {
-						return err
+						return api.PrefixValidationError("spec.notifications."+color+".driver", err)
 					}
 				}
 			}

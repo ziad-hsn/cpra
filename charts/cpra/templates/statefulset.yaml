@@ -59,9 +59,35 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.management.enabled }}
+      {{- if or .Values.management.enabled .Values.notificationLog.enabled }}
       initContainers:
+        {{- if .Values.management.enabled }}
         {{- include "cpra.managementInit" . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.notificationLog.enabled }}
+        - name: notification-log-directory
+          image: {{ include "cpra.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              umask 077
+              test ! -L /work/notifications
+              if test ! -e /work/notifications; then mkdir /work/notifications; fi
+              test -d /work/notifications
+              test "$(stat -c '%u:%a' /work/notifications)" = '1001:700'
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 32Mi}
+          volumeMounts:
+            - name: notification-log
+              mountPath: /work
+        {{- end }}
       {{- end }}
       containers:
         - name: cpra
@@ -127,6 +153,11 @@ spec:
           {{- end }}
           {{- end }}
           volumeMounts:
+            {{- if .Values.notificationLog.enabled }}
+            - name: notification-log
+              mountPath: /var/log/cpra-notifications
+              subPath: notifications
+            {{- end }}
             {{- if .Values.management.enabled }}
             - name: management-bootstrap
               mountPath: /etc/cpra/management
@@ -154,6 +185,16 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- if .Values.notificationLog.enabled }}
+        - name: notification-log
+          {{- if .Values.notificationLog.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.notificationLog.existingClaim }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.notificationLog.sizeLimit }}
+          {{- end }}
+        {{- end }}
         {{- if .Values.management.enabled }}
         {{- include "cpra.managementVolumes" . | nindent 8 }}
         {{- end }}

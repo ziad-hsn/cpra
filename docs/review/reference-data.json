@@ -1295,9 +1295,9 @@
   "sources": [
     {
       "asset": "review/source/Makefile.txt",
-      "bytes": 6844,
+      "bytes": 7297,
       "path": "Makefile",
-      "sha256": "545a94af08fbe8bd3663541d2d81ee9cdac40350ae2903af18c98d85335d311d"
+      "sha256": "2d1f88f16c9b2367ff2d4a84e2a0af0d677b77dc799867d680c1287eba2fa70f"
     },
     {
       "asset": "review/source/api/openapi/externaljobs.json.txt",
@@ -1307,21 +1307,21 @@
     },
     {
       "asset": "review/source/api/openapi/models.base.json.txt",
-      "bytes": 137355,
+      "bytes": 158307,
       "path": "api/openapi/models.base.json",
-      "sha256": "1e553c54717de9b7971e5d03f04a71c42f58a06aa5f3c61f58a95a1737d668c7"
+      "sha256": "cb9305ea8477f1e2db3932cc1c70147a1464a98ea406e4f67a3efcf4f7ab4e9c"
     },
     {
       "asset": "review/source/api/openapi/operations.json.txt",
-      "bytes": 26589,
+      "bytes": 27902,
       "path": "api/openapi/operations.json",
-      "sha256": "f676ba620526646b5a7cacf9c352cebff73c8caeaf76f1e22fce54834dcb34f3"
+      "sha256": "fc74b3a25e1d33f72793c54dab5d677e080b4b2f2e207b554c482b343bfa5833"
     },
     {
       "asset": "review/source/dashboard/src/api/collectionOperations.ts.txt",
-      "bytes": 21331,
+      "bytes": 22931,
       "path": "dashboard/src/api/collectionOperations.ts",
-      "sha256": "80a7d95cfee70c4f4bf09af1d18cc44d7100c32ac160dcb08346f3bcfea21b2d"
+      "sha256": "196c2ce14ddf2e7c826e4a672e247e85eb78bbd1cfb1c9d3be4c7820688bd9e7"
     },
     {
       "asset": "review/source/dashboard/src/api/executionResults.ts.txt",
@@ -1337,9 +1337,9 @@
     },
     {
       "asset": "review/source/dashboard/src/components/CollectionValidation.tsx.txt",
-      "bytes": 7713,
+      "bytes": 7827,
       "path": "dashboard/src/components/CollectionValidation.tsx",
-      "sha256": "492cdf57a20368a39791589d666860bb289a337b02e24e9560f340784ec16d9c"
+      "sha256": "47fca644468ceed6efec10473c3a6484bdda5fd58368b4ed46bf8b7d679754b8"
     },
     {
       "asset": "review/source/dashboard/src/components/OperationsList.tsx.txt",
@@ -1349,69 +1349,69 @@
     },
     {
       "asset": "review/source/dashboard/src/import/README.md.txt",
-      "bytes": 9578,
+      "bytes": 10077,
       "path": "dashboard/src/import/README.md",
-      "sha256": "a44a3be9f0273cc2b8f1d497d788e14b9c5a35daa361d6d4e1cc6d240c98192e"
+      "sha256": "b0fa229b46da3235c9fea61b7e6ab7401888a50848098c030c7f1c23eb2ee306"
     },
     {
       "asset": "review/source/dashboard/src/pages/OperationDetail.tsx.txt",
-      "bytes": 8583,
+      "bytes": 8649,
       "path": "dashboard/src/pages/OperationDetail.tsx",
-      "sha256": "016ce61243e60c20678dd8278f101a4aa86ac77dde8222a7d81f7e589739caad"
+      "sha256": "d269ea01dff5729f63a78903c851f7b5b0f25d54abdd4b17cb3cfd143e35546e"
     },
     {
-      "asset": "review/source/examples/cpractl/disable.json.txt",
+      "asset": "reference/source/examples/cpractl/disable.json.txt",
       "bytes": 27,
       "path": "examples/cpractl/disable.json",
       "sha256": "fe869dbc14f4d1669175c62d9bd7645289069b3d4da2df05eb4d0b76120acd4f"
     },
     {
-      "asset": "review/source/examples/cpractl/endpoint.yaml.txt",
+      "asset": "reference/source/examples/cpractl/endpoint.yaml.txt",
       "bytes": 186,
       "path": "examples/cpractl/endpoint.yaml",
       "sha256": "0d8b22d7ef78153c84788033efc36ee78bad5e4ff766d5f0437e2f4881a076b8"
     },
     {
-      "asset": "review/source/examples/cpractl/group.yaml.txt",
+      "asset": "reference/source/examples/cpractl/group.yaml.txt",
       "bytes": 141,
       "path": "examples/cpractl/group.yaml",
       "sha256": "298b5e4e49f23425dd6c94574c96db7ed3a65ed51f63108d614fc5b8e0b15352"
     },
     {
-      "asset": "review/source/examples/cpractl/monitor.yaml.txt",
+      "asset": "reference/source/examples/cpractl/monitor.yaml.txt",
       "bytes": 438,
       "path": "examples/cpractl/monitor.yaml",
       "sha256": "4c799054ffdd2366d9201b12644fee0a843ce3ecb5a50eed0f58400402f91ef7"
     },
     {
-      "asset": "review/source/examples/cpractl/recipient.yaml.txt",
+      "asset": "reference/source/examples/cpractl/recipient.yaml.txt",
       "bytes": 137,
       "path": "examples/cpractl/recipient.yaml",
       "sha256": "6a3c9241c4270c65052fae54e9d95ae4f0fb6b4c9fb89688ae4537de5776e4ae"
     },
     {
-      "asset": "review/source/examples/management/README.md.txt",
+      "asset": "reference/source/examples/management/README.md.txt",
       "bytes": 4393,
       "path": "examples/management/README.md",
       "sha256": "6c2e7ce00aea272b1e5c85fd49b373ad3eec08843e6b7ab28dc4f6b6b4d93c63"
     },
     {
-      "asset": "review/source/examples/verification/sandboxes.yaml.txt",
+      "asset": "reference/source/examples/verification/sandboxes.yaml.txt",
       "bytes": 4512,
       "path": "examples/verification/sandboxes.yaml",
       "sha256": "debfe0e1c25364d4e83196296d4018ced17176e5e73b63d087cf8235eac879fb"
     },
     {
       "asset": "review/source/internal/controller/controller.go.txt",
-      "bytes": 26011,
+      "bytes": 27543,
       "path": "internal/controller/controller.go",
-      "sha256": "2ff1613d3b673b3f85e5873f30ea00da49765aed0a1366ef46020e3d62baecd1"
+      "sha256": "9b77fea53edbd503ed813a61e5df9ba765950e9b1d853a498d17b92e3ae36db6"
     },
     {
       "asset": "review/source/internal/controller/systems/catalog_runtime.go.txt",
-      "bytes": 17366,
+      "bytes": 17826,
       "path": "internal/controller/systems/catalog_runtime.go",
-      "sha256": "84bfebe2e466d2325774937a2d619b295c5f4cf46e8f4896bc251f391bea8d86"
+      "sha256": "9aa1bcdc1bf6f35e82b3e3b9932ede0a229fd344d12eb5f9f73e6f92638864f3"
     },
     {
       "asset": "review/source/internal/controller/systems/owner_wait.go.txt",
@@ -1420,7 +1420,7 @@
       "sha256": "a27e400d8cd77f24ecd49accfcc906f2c142a5c3601d6781fae5e3198a473acb"
     },
     {
-      "asset": "review/source/internal/encryptionsetup/README.md.txt",
+      "asset": "reference/source/internal/encryptionsetup/README.md.txt",
       "bytes": 8870,
       "path": "internal/encryptionsetup/README.md",
       "sha256": "44119cb9e8c2f1a95d1f4a3f94c4c5ecd5ab0134403c19fd81a759dc3af3a54a"
@@ -1450,7 +1450,7 @@
       "sha256": "a6e5fa667cbef19387ca1cf2e380217017b6c1df9cc70370e7de5ab04c876a2b"
     },
     {
-      "asset": "review/source/internal/httpserver/types.go.txt",
+      "asset": "reference/source/internal/httpserver/types.go.txt",
       "bytes": 4674,
       "path": "internal/httpserver/types.go",
       "sha256": "30f95ffb36f70962cbd16e7596bf127c335f9a449a48dc6d8e75adbb1455485a"
@@ -1487,9 +1487,9 @@
     },
     {
       "asset": "review/source/internal/management/collection_admission.go.txt",
-      "bytes": 12239,
+      "bytes": 12340,
       "path": "internal/management/collection_admission.go",
-      "sha256": "1893ee1e9d241999641c6f91c9237768c77d1ed1f17dd769806b2d87ca0fbc53"
+      "sha256": "90682869ff201671abcdd7b373a22d9dd35d3d33e6a66ee8c1acfddd9819c18f"
     },
     {
       "asset": "review/source/internal/management/collection_execution_coordinator.go.txt",
@@ -1534,46 +1534,46 @@
       "sha256": "321aad8ed5a9390f58e8569b8f41cd41ade6a76e6e9da6f22849d2ea60293bd2"
     },
     {
-      "asset": "review/source/internal/manifest/groups.go.txt",
-      "bytes": 8058,
+      "asset": "reference/source/internal/manifest/groups.go.txt",
+      "bytes": 8133,
       "path": "internal/manifest/groups.go",
-      "sha256": "eb2102787c1645e0d2116bb7127c29c9ac272e04f37740bb45c799f5fcafa443"
+      "sha256": "ec8263d9532c59b05ad24aa9d94d37fe153519a5f2e5b4612a8e4cdf6dc2db7f"
     },
     {
-      "asset": "review/source/internal/manifest/intervention_types_new.go.txt",
+      "asset": "reference/source/internal/manifest/intervention_types_new.go.txt",
       "bytes": 3579,
       "path": "internal/manifest/intervention_types_new.go",
       "sha256": "5ce42eeed3399397f0a5ac2dcad44d59085ee17d2cf81f99b7a708635968775f"
     },
     {
-      "asset": "review/source/internal/manifest/manifest.go.txt",
-      "bytes": 26811,
+      "asset": "reference/source/internal/manifest/manifest.go.txt",
+      "bytes": 29278,
       "path": "internal/manifest/manifest.go",
-      "sha256": "8a8323e81de24cb99b690af646e3216ff040462b27fb8bbe0a83fdfeadf6d2cc"
+      "sha256": "aaf3945d2764a3a6ab1ac99556be18cadb565dd59e13c6fdb1ae3972304f63a8"
     },
     {
-      "asset": "review/source/internal/manifest/notification_types_new.go.txt",
-      "bytes": 4965,
+      "asset": "reference/source/internal/manifest/notification_types_new.go.txt",
+      "bytes": 5292,
       "path": "internal/manifest/notification_types_new.go",
-      "sha256": "48ad9759612fb1518b3b765c429b9d4a1f9b25c6835283b3a4e24d14b6d34e8d"
+      "sha256": "69878b4e40be445372639231485e63b946bbf86d05d92038ec1684ecaf04e351"
     },
     {
-      "asset": "review/source/internal/manifest/pulse_types_new.go.txt",
-      "bytes": 4533,
+      "asset": "reference/source/internal/manifest/pulse_types_new.go.txt",
+      "bytes": 7721,
       "path": "internal/manifest/pulse_types_new.go",
-      "sha256": "93075d8cdfaa31864209aad1d24f4656bdc0d84734d54d018e1995b17fc8aa11"
+      "sha256": "d6c7df99e3aea6a5a9759120f0c4e9ee36c08c292cf07b2b6a1c0f0733299f3b"
     },
     {
       "asset": "review/source/internal/persistence/agent_action.go.txt",
-      "bytes": 8031,
+      "bytes": 8067,
       "path": "internal/persistence/agent_action.go",
-      "sha256": "ce0eeefc007c325b16d30693d5f1fab8463e835cc90ab0a8879d0190303970d2"
+      "sha256": "693d06374ea662cf66e31195c2533cb57be6561fea12040165f82662a677243b"
     },
     {
       "asset": "review/source/internal/persistence/catalog_format.go.txt",
-      "bytes": 5589,
+      "bytes": 6639,
       "path": "internal/persistence/catalog_format.go",
-      "sha256": "aeed2f688e3b4cae3787aef8113c18bb7cf28db97133a7a0497cc3cba3b58b59"
+      "sha256": "a7ac80d50c4a80bd6acc1f736fbc269ab4d225182792794917e47169eb0e0726"
     },
     {
       "asset": "review/source/internal/persistence/collection_cancel.go.txt",
@@ -1697,9 +1697,9 @@
     },
     {
       "asset": "review/source/internal/persistence/job_type_external.go.txt",
-      "bytes": 40319,
+      "bytes": 41282,
       "path": "internal/persistence/job_type_external.go",
-      "sha256": "2b2ab001794f5bffdd55d75bc0736d1c2bf7d28c0d2309e4568b7d01d5e9cbe0"
+      "sha256": "9a19b40f92bda2d324e173d453558e05fb18fe646b6b8711cb62ccfce4b9bcf4"
     },
     {
       "asset": "review/source/internal/persistence/local_executor.go.txt",
@@ -1721,21 +1721,21 @@
     },
     {
       "asset": "review/source/internal/persistence/model.go.txt",
-      "bytes": 23514,
+      "bytes": 26371,
       "path": "internal/persistence/model.go",
-      "sha256": "31b496ed020f96a1b4b44c135cff7e2fcdb018775bcf48fc1075022a51e7fca7"
+      "sha256": "96abb0bfd3d6cfaeb237efa07dfd40199c0c47bfe60af0068f2efedd3bd550d0"
     },
     {
       "asset": "review/source/internal/persistence/restore_reset.go.txt",
-      "bytes": 14086,
+      "bytes": 14122,
       "path": "internal/persistence/restore_reset.go",
-      "sha256": "13ba30eed7a89e1c6a5a5a64eb28077f6ac17c1921bbf66a1f67be8f938a2b80"
+      "sha256": "42b1ceaaee5d420337341efe31b19a0a5b768292736474eec823915199d3c2de"
     },
     {
       "asset": "review/source/internal/persistence/store.go.txt",
-      "bytes": 23826,
+      "bytes": 23971,
       "path": "internal/persistence/store.go",
-      "sha256": "87dba08c451c7c1307f339ad35f808348652e2cb839f73bb592a0cd890a789cc"
+      "sha256": "149866b2ee651632db6482dc47f17c5d17f6502479502c7c283da070f38c41e5"
     },
     {
       "asset": "review/source/internal/persistence/worker_authority_external.go.txt",
@@ -1774,85 +1774,85 @@
       "sha256": "237e176af881a42f1d1a5b453f9aa087596dbe6afd724867f5caaf9974083eb5"
     },
     {
-      "asset": "review/source/scripts/release/chart.py.txt",
+      "asset": "reference/source/scripts/release/chart.py.txt",
       "bytes": 21575,
       "path": "scripts/release/chart.py",
       "sha256": "147c977c21deee9ddb5646adc48bce6d34fc6e762232b08149186d65b34f1dfe"
     },
     {
-      "asset": "review/source/scripts/release/image_sbom.py.txt",
+      "asset": "reference/source/scripts/release/image_sbom.py.txt",
       "bytes": 16727,
       "path": "scripts/release/image_sbom.py",
       "sha256": "189da198791480f72bd018664abc2af6335dbfb6ec43cc9e8fb629f2b9cf2005"
     },
     {
-      "asset": "review/source/scripts/release/image_signing.py.txt",
+      "asset": "reference/source/scripts/release/image_signing.py.txt",
       "bytes": 27516,
       "path": "scripts/release/image_signing.py",
       "sha256": "b24c10fe0c3b7799da6313ca201193d3f044bf0255d947a1c2b23d0b671d6ec5"
     },
     {
-      "asset": "review/source/scripts/release/module_publication.py.txt",
+      "asset": "reference/source/scripts/release/module_publication.py.txt",
       "bytes": 17313,
       "path": "scripts/release/module_publication.py",
       "sha256": "a43b80d09c847f4d84ada91af3a6430c71351393bb4e00bdea42c668706637c9"
     },
     {
-      "asset": "review/source/scripts/release/oci_assembly.py.txt",
+      "asset": "reference/source/scripts/release/oci_assembly.py.txt",
       "bytes": 11204,
       "path": "scripts/release/oci_assembly.py",
       "sha256": "5ea04ce52e1b379ab8fe2b3e687fd1492904a33b2ab9ec59282b68ced9b0caa9"
     },
     {
-      "asset": "review/source/scripts/release/publication_evidence.py.txt",
+      "asset": "reference/source/scripts/release/publication_evidence.py.txt",
       "bytes": 16704,
       "path": "scripts/release/publication_evidence.py",
       "sha256": "e5db341115547e0955a777374f73d9db60cfcef9b71d268ee396b47b1a8e1291"
     },
     {
-      "asset": "review/source/scripts/release/publish.py.txt",
+      "asset": "reference/source/scripts/release/publish.py.txt",
       "bytes": 47585,
       "path": "scripts/release/publish.py",
       "sha256": "78389ec3a12373d3a3b8a21e85b50be4d794f1b7f8a28af0caa72c42a95f0157"
     },
     {
-      "asset": "review/source/scripts/release/registry.py.txt",
+      "asset": "reference/source/scripts/release/registry.py.txt",
       "bytes": 25789,
       "path": "scripts/release/registry.py",
       "sha256": "bdcd58a2dc179ece74391911e61452cd87bf8eb9a3671861c9aed7f317d754e2"
     },
     {
-      "asset": "review/source/scripts/release/release_publication.py.txt",
+      "asset": "reference/source/scripts/release/release_publication.py.txt",
       "bytes": 50291,
       "path": "scripts/release/release_publication.py",
       "sha256": "3f280db0bbd8f3051241a0510c6cbf2e2ccb811f6d37f0064a47489ced6cd885"
     },
     {
-      "asset": "review/source/scripts/release/review_evidence.py.txt",
+      "asset": "reference/source/scripts/release/review_evidence.py.txt",
       "bytes": 12501,
       "path": "scripts/release/review_evidence.py",
       "sha256": "00474ef23bf3ffac010043e0f5075cb14a5429afc7af5c070f22be9ac706d026"
     },
     {
-      "asset": "review/source/scripts/release/test_chart_publication.py.txt",
+      "asset": "reference/source/scripts/release/test_chart_publication.py.txt",
       "bytes": 24926,
       "path": "scripts/release/test_chart_publication.py",
       "sha256": "045ea1db2ff1594383221cd34b7e46836c10fa834b8109644b900b357ecf01ce"
     },
     {
-      "asset": "review/source/scripts/release/test_publish.py.txt",
+      "asset": "reference/source/scripts/release/test_publish.py.txt",
       "bytes": 28346,
       "path": "scripts/release/test_publish.py",
       "sha256": "dda6e8cff32edb158dff7e59eba091ad3fb9c31200f71539f1621b3f82f33129"
     },
     {
-      "asset": "review/source/scripts/release/test_registry.py.txt",
+      "asset": "reference/source/scripts/release/test_registry.py.txt",
       "bytes": 38383,
       "path": "scripts/release/test_registry.py",
       "sha256": "535e7382910b712274a87cb9c1b4fbd1d7c2be33d9a4bbbc2de33eb9d7afdb42"
     },
     {
-      "asset": "review/source/scripts/release/test_release_publication.py.txt",
+      "asset": "reference/source/scripts/release/test_release_publication.py.txt",
       "bytes": 55481,
       "path": "scripts/release/test_release_publication.py",
       "sha256": "0c8811bb6d1e3c0b81df30348eb227eb6293785c2bae1400be0a9ddf6ee21208"

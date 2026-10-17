@@ -65,7 +65,7 @@ func TestCollectionValidationCoordinatorCommitsOneVerdictWithoutActivation(t *te
 				collectionMonitor("api", target.URL),
 				resource("NotificationGroup", "team", api.NotificationGroupSpec{RecipientRefs: []string{"oncall"}}),
 				resource("Recipient", "oncall", api.RecipientSpec{EndpointRefs: []string{"log"}}),
-				planLogEndpoint("log", log),
+				planLogEndpoint("log", filepath.Base(log)),
 				resource("Credential", "secret", api.CredentialSpec{Value: &secret}),
 			}
 			if invalid {

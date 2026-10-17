@@ -3,6 +3,7 @@ package systems
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -23,7 +24,7 @@ func releaseMonitor(t *testing.T, w *ecs.World, unhealthy, healthy int) ecs.Enti
 	mgr := entities.NewEntityManager(w)
 	m := manifest.Monitor{Name: "release", Enabled: true, Pulse: manifest.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: unhealthy, HealthyThreshold: healthy, Config: &manifest.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: map[string]manifest.CodeConfig{}}
 	for _, color := range []string{"yellow", "red", "green", "cyan"} {
-		m.Codes[color] = manifest.CodeConfig{Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: t.TempDir() + "/alerts.jsonl"}}
+		m.Codes[color] = manifest.CodeConfig{Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: "alerts.jsonl"}}
 	}
 	if err := mgr.CreateEntityFromMonitor(&m, w); err != nil {
 		t.Fatal(err)
@@ -49,7 +50,17 @@ func newIncidentSystem(t *testing.T, world *ecs.World, intervention, notificatio
 			t.Error(err)
 		}
 	})
+	log, err := jobs.OpenNotificationLog(filepath.Join(t.TempDir(), "notifications"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := log.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 	system := NewDurableSystem(world, store, cfg, fleetview.NewHolder(), noopLogger{}, &admissionQueue{full: true}, intervention, notification, nil, time.Minute, true)
+	system.SetNotificationLog(log)
 	if err := system.Load(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -84,26 +95,45 @@ func incidentActions(m persistence.Monitor, kind, color string) []persistence.Ac
 
 func TestRecoveryRequiresConsecutiveSuccesses(t *testing.T) {
 	for _, unhealthy := range []int{1, 5} {
-		t.Run(fmt.Sprint(unhealthy), func(t *testing.T) {
-			world := ecs.NewWorld()
-			ent := releaseMonitor(t, &world, unhealthy, 2)
-			system := newIncidentSystem(t, &world, nil, &admissionQueue{})
-			failure := jobs.Result{Err: errors.New("unhealthy")}
-			applyIncidentPulse(t, system, ent, failure)
-			applyIncidentPulse(t, system, ent, jobs.Result{})
-			applyIncidentPulse(t, system, ent, failure)
-			m := applyIncidentPulse(t, system, ent, jobs.Result{})
-			if len(incidentActions(m, "code", "green")) != 0 {
-				t.Fatal("recovered without consecutive successful checks")
-			}
-			m = applyIncidentPulse(t, system, ent, jobs.Result{})
-			if len(incidentActions(m, "code", "green")) != 1 || m.Recovering {
-				t.Fatal("consecutive successful checks did not recover")
-			}
-			if system.states.Get(ent).Recovering {
-				t.Fatal("controller projection did not apply recovery")
-			}
-		})
+		for _, attempted := range []bool{false, true} {
+			t.Run(fmt.Sprintf("threshold-%d/attempted-%t", unhealthy, attempted), func(t *testing.T) {
+				world := ecs.NewWorld()
+				ent := releaseMonitor(t, &world, unhealthy, 2)
+				notifications := &admissionQueue{}
+				system := newIncidentSystem(t, &world, nil, notifications)
+				failure := jobs.Result{Err: errors.New("unhealthy")}
+				applyIncidentPulse(t, system, ent, failure)
+				if attempted {
+					system.dispatchActions(time.Now().UTC())
+					if len(notifications.admitted) == 0 {
+						t.Fatal("initial notification not admitted")
+					}
+					for _, notification := range notifications.admitted {
+						result := notification.Execute()
+						if result.Err != nil || !system.commitResults([]jobs.Result{result}) {
+							t.Fatal("initial notification attempt did not complete", result.Err, system.lastError)
+						}
+					}
+				}
+				applyIncidentPulse(t, system, ent, jobs.Result{})
+				applyIncidentPulse(t, system, ent, failure)
+				m := applyIncidentPulse(t, system, ent, jobs.Result{})
+				if len(incidentActions(m, "code", "green")) != 0 {
+					t.Fatal("recovered without consecutive successful checks")
+				}
+				m = applyIncidentPulse(t, system, ent, jobs.Result{})
+				expected := 0
+				if attempted {
+					expected = 1
+				}
+				if len(incidentActions(m, "code", "green")) != expected || m.Recovering {
+					t.Fatal("healthy threshold or earlier-attempt eligibility was not applied", m.Recovering, m.Actions)
+				}
+				if system.states.Get(ent).Recovering {
+					t.Fatal("controller projection did not apply recovery")
+				}
+			})
+		}
 	}
 }
 
@@ -143,12 +173,12 @@ func TestAlertFanoutRetainsIndependentDelivery(t *testing.T) {
 	mgr := entities.NewEntityManager(&world)
 	mgr.Endpoints = map[string]manifest.Endpoint{}
 	for i := range 3 {
-		mgr.Endpoints[fmt.Sprintf("endpoint-%d", i)] = manifest.Endpoint{Type: "log", Config: &manifest.CodeNotificationLog{File: fmt.Sprintf("%s/endpoint-%d.jsonl", t.TempDir(), i)}}
+		mgr.Endpoints[fmt.Sprintf("endpoint-%d", i)] = manifest.Endpoint{Type: "log", Config: &manifest.CodeNotificationLog{File: fmt.Sprintf("endpoint-%d.jsonl", i)}}
 	}
 	mgr.NotificationGroups = manifest.NotificationGroups{"oncall": {"endpoint-0", "endpoint-1", "endpoint-2"}}
 	monitor := manifest.Monitor{Name: "fanout", Enabled: true, Pulse: manifest.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: 1, HealthyThreshold: 1, Config: &manifest.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: manifest.Codes{
 		"red":   {Dispatch: true, NotifyGroup: "oncall"},
-		"green": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: t.TempDir() + "/recovery.jsonl"}},
+		"green": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: "recovery.jsonl"}},
 	}}
 	if err := mgr.CreateEntityFromMonitor(&monitor, &world); err != nil {
 		t.Fatal(err)

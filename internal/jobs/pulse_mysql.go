@@ -4,10 +4,13 @@ package jobs
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 
@@ -25,6 +28,7 @@ type PulseMySQLJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func mysqlDSN(cfg *manifest.PulseMySQLConfig) string {
@@ -39,18 +43,42 @@ func mysqlDSN(cfg *manifest.PulseMySQLConfig) string {
 	if port == 0 {
 		port = 3306
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.User, cfg.Password, host, port, cfg.Database)
+	parsed := mysql.NewConfig()
+	parsed.User, parsed.Passwd, parsed.Net, parsed.Addr, parsed.DBName = cfg.User, cfg.Password, "tcp", net.JoinHostPort(host, strconv.Itoa(port)), cfg.Database
+	return parsed.FormatDSN()
 }
 
 func newPulseMySQLJob(cfg *manifest.PulseMySQLConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("mysql", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
+	dsn := mysqlDSN(cfg)
+	if _, err := mysqlCheckConfig(dsn); err != nil {
+		return nil, err
+	}
 	return &PulseMySQLJob{
+		tls:     transport,
 		ID:      uuid.New(),
 		Entity:  entity,
-		DSN:     mysqlDSN(cfg),
+		DSN:     dsn,
 		Timeout: timeout,
 		Retries: cfg.Retries,
 		payload: map[string]interface{}{"type": "pulse", "driver": "mysql"},
 	}, nil
+}
+
+// Parse using the same driver that will initialize the connection. In
+// particular, initialization queries must never enable arbitrary LOCAL INFILE.
+func mysqlCheckConfig(dsn string) (*mysql.Config, error) {
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, errors.New("invalid MySQL connection settings")
+	}
+	if cfg.AllowAllFiles {
+		return nil, errors.New("MySQL allowAllFiles must remain disabled")
+	}
+	return cfg, nil
 }
 
 func (p *PulseMySQLJob) Execute() (result Result) {
@@ -59,10 +87,27 @@ func (p *PulseMySQLJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	db, err := sql.Open("mysql", p.DSN)
+	parsed, err := mysqlCheckConfig(p.DSN)
 	if err != nil {
-		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("failed to open mysql connection: %w", err), Payload: payload}
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
 	}
+	if p.tls.configured {
+		if p.tls.enabled && parsed.Net != "tcp" && parsed.Net != "tcp4" && parsed.Net != "tcp6" {
+			return Result{ID: p.ID, Ent: p.Entity, Err: errors.New("MySQL TLS requires a TCP connection"), Payload: payload}
+		}
+		host, _, _ := net.SplitHostPort(parsed.Addr)
+		parsed.TLS, err = p.tls.configuration(host)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
+		parsed.TLSConfig = ""
+		parsed.AllowFallbackToPlaintext = false
+	}
+	connector, err := mysql.NewConnector(parsed)
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: errors.New("invalid MySQL connection settings"), Payload: payload}
+	}
+	db := sql.OpenDB(connector)
 	defer func() { _ = db.Close() }()
 
 	attempts := newPulseAttempts(ctx, p.Retries)

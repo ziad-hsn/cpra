@@ -2,13 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
-
-var managementField = regexp.MustCompile(`^(metadata|spec|items|sources|revision|reason|note|duration|incidentID|resolution|evidenceRefs)(\.[A-Za-z][A-Za-z0-9_]*|\[[0-9]+\])*$`)
 
 // Problem detail and field messages are server-controlled text. Show only
 // bounded correlation identities and reviewed codes, never raw detail/values.
@@ -33,10 +31,14 @@ func managementProblemDetails(problem *cpra.Error) string {
 			break
 		}
 		name := "resource field"
-		if len(field.Field) <= 160 && managementField.MatchString(field.Field) {
-			name = field.Field
+		if safe := api.SafeValidationField(field.Field); safe != "" {
+			name = safe
 		}
-		result.WriteString("; " + name + ": validation failed")
+		message := api.ValidationMessage(field.Reason)
+		if message == "" {
+			message = "validation failed"
+		}
+		result.WriteString("; " + name + ": " + message)
 		if managementProblemCode(field.Reason) {
 			result.WriteString(" (" + field.Reason + ")")
 		}

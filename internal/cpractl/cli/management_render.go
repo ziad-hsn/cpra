@@ -67,7 +67,9 @@ func writeManagementReply(cmd *cobra.Command, o *options, reply managementReply,
 			err = closeErr
 		}
 	default:
-		if reply.incidents {
+		if reply.monitorObservations {
+			err = writeMonitorObservations(cmd, o, reply.data, describe)
+		} else if reply.incidents {
 			err = writeManagementIncidents(cmd, o, reply.data, describe)
 		} else if reply.actions {
 			err = writeManagementActions(cmd, o, reply.data, describe)

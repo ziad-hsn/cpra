@@ -318,7 +318,7 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 	for _, item := range page.Items {
 		result.Items = append(result.Items, api.ValidationResultItem{Ordinal: int64(item.Ordinal), Kind: item.Key.Kind, ID: item.Key.ID,
 			Source: item.Source, SourceDocument: int64(item.Document), SourceItem: int64(item.Item), Change: item.Change, Issue: item.Issue,
-			UID: item.UID, ResourceVersion: item.ResourceVersion})
+			UID: item.UID, ResourceVersion: item.ResourceVersion, Field: item.Field, Reason: item.Reason})
 	}
 	if result.Summary.ExpiresAt.Before(read.entry.expires) {
 		read.entry.expires = result.Summary.ExpiresAt

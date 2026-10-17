@@ -26,7 +26,7 @@ func TestAgentStoragePreservesOptionalFormatBoundary(t *testing.T) {
 			}
 			m, a, h := agentActionFixture(t, s, "intervention")
 			if !workerFirst {
-				if s.fsm.image.Version != DeliveryFormatVersion {
+				if s.fsm.image.Version != LifecycleFormatVersion {
 					t.Fatal("agent alone enabled optional storage")
 				}
 				commitJobType(t, s, jobTypeFixture(t, s, "test-agent-order"))
@@ -42,7 +42,7 @@ func TestAgentStoragePreservesOptionalFormatBoundary(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer ledger.Close()
-			if i.Version != DeliveryWorkerFormatVersion || i.JobTypes == nil || i.Monitors[m.ID].Actions[a.ID].AgentReceipt == nil {
+			if i.Version != LifecycleWorkerFormatVersion || i.JobTypes == nil || i.Monitors[m.ID].Actions[a.ID].AgentReceipt == nil {
 				t.Fatal("mixed snapshot lost agent or worker state")
 			}
 			i.Version = 31
@@ -90,7 +90,7 @@ func TestRecoveryNotificationPreservesWorkerFormatBoundary(t *testing.T) {
 	for _, version := range []int{31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42} {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("wrong combined notification format accepted", version, err)
 		}
 	}
@@ -101,7 +101,7 @@ func TestRecoveryNotificationPreservesWorkerFormatBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != DeliveryWorkerFormatVersion || len(i.Monitors[m.ID].Policy.WorkerNotificationSources) != 2 || i.Monitors[m.ID].Policy.NotificationTriggers["red"] != NotifyRecoveryExhausted {
+	if i.Version != LifecycleWorkerFormatVersion || len(i.Monitors[m.ID].Policy.WorkerNotificationSources) != 2 || i.Monitors[m.ID].Policy.NotificationTriggers["red"] != NotifyRecoveryExhausted {
 		t.Fatal("combined snapshot lost notification or worker policy")
 	}
 	i.Version = RecoveryNotificationFormatVersion

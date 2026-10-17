@@ -62,7 +62,7 @@ func Init(l installpath.Layout, account string) error {
 	if err != nil {
 		return err
 	}
-	runtimeData, err := yaml.Marshal(map[string]any{"storage": map[string]any{"mode": "raft", "directory": l.StateDir}, "history": map[string]any{"retention_days": 30}})
+	runtimeData, err := yaml.Marshal(map[string]any{"storage": map[string]any{"mode": "raft", "directory": l.StateDir}, "history": map[string]any{"retention_days": 30}, "notifications": map[string]any{"log_directory": filepath.Join(l.LogDir, "notifications")}})
 	if err != nil {
 		return err
 	}

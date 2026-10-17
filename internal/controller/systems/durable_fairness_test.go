@@ -2,6 +2,7 @@ package systems
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -12,6 +13,38 @@ import (
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+func TestColdPulseDemandTracksNewChangedAndPausedChecks(t *testing.T) {
+	w := ecs.NewWorld()
+	ent := releaseMonitor(t, &w, 1, 1)
+	s := NewDurableSystem(&w, nil, runtimeconfig.Default(), &fleetview.Holder{}, noopLogger{}, nil, nil, nil, nil, time.Minute, false)
+	s.checks = make([]checkSchedule, int(ent.ID())+1)
+	cfg := s.configs.Get(ent)
+	cfg.Interval, cfg.Timeout = 10*time.Second, 5*time.Second
+	s.setPulseDemand(ent, cfg.Interval)
+	assertDemand := func(want float64) {
+		t.Helper()
+		if math.Abs(s.PulseColdOccupancy()-want) > 1e-9 {
+			t.Fatalf("cold occupancy=%g want=%g", s.PulseColdOccupancy(), want)
+		}
+	}
+	assertDemand(.5)
+	s.observePulseDemand(ent)
+	s.setPulseDemand(ent, cfg.Interval)
+	assertDemand(0)
+	// Replacement invalidates observations and releases the previous demand.
+	s.resetCheckSchedule(ent)
+	cfg.Timeout = 20 * time.Second
+	s.setPulseDemand(ent, cfg.Interval)
+	assertDemand(1)
+	s.resetCheckSchedule(ent) // Disable/snooze/removal releases demand.
+	assertDemand(0)
+	if s.PulseArrivalRate() != 0 {
+		t.Fatal("inactive check retains arrival demand")
+	}
+	s.setPulseDemand(ent, cfg.Interval) // Re-enable requires a fresh observation.
+	assertDemand(1)
+}
 
 func TestDurableResultDrainDoesNotStarveActionPipelines(t *testing.T) {
 	pulse := make(chan []jobs.Result, 3)

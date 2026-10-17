@@ -75,6 +75,14 @@ func (s *DurableSystem) isSnoozed(ent ecs.Entity) bool {
 // projectControls runs on the owner with no open Ark query. Reacquire every
 // component pointer after adding the always-present component.
 func (s *DurableSystem) projectControls(ent ecs.Entity, m persistence.Monitor) {
+	if s.ignored == nil {
+		s.ignored = ecs.NewMap1[components.Ignored](s.world)
+	}
+	if m.Ignored && s.ignored.Get(ent) == nil {
+		s.ignored.Add(ent, &components.Ignored{})
+	} else if !m.Ignored && s.ignored.Get(ent) != nil {
+		s.ignored.Remove(ent)
+	}
 	old := s.controls.Get(ent)
 	changed := old != nil && old.Revision != m.ControlRevision
 	if old == nil {
@@ -100,8 +108,10 @@ func (s *DurableSystem) projectControls(ent ecs.Entity, m persistence.Monitor) {
 	if !m.SnoozedUntil.IsZero() || !m.Policy.Enabled || m.Removed {
 		s.scheduler.Cancel(ent)
 		s.resetCheckSchedule(ent)
-		s.actions.Cancel(ent)
-		delete(s.actionDue, ent)
+		if m.Removed || !m.SnoozedUntil.IsZero() {
+			s.actions.Cancel(ent)
+			delete(s.actionDue, ent)
+		}
 	}
 	interval := time.Duration(0)
 	if m.Policy.Enabled && !m.Removed && m.SnoozedUntil.IsZero() {
@@ -315,15 +325,24 @@ func (s *DurableSystem) applyControlReceipt(ctx context.Context, receipt persist
 		if !ok || action.MonitorID != receipt.Key.ID || action.CatalogUID != receipt.UID || action.Review == nil || action.Review.Revision != receipt.NewVersion || action.Review.Conflict {
 			return persistence.ErrControlConflict
 		}
-		// Refresh the current entity only if this is still its incarnation.
-		// Old reviews can complete without a live replacement entity.
+		// Aggregate held/unknown counts include historical incarnations. Refresh
+		// the current summary even when the reviewed invocation belongs to an
+		// older target, without projecting old controls or scheduling any work.
 		current, ok, err := s.store.GetContext(ctx, receipt.Key.ID)
 		if err != nil {
 			return err
 		}
-		if ok && !current.Removed && current.CatalogUID == receipt.UID {
-			if err := s.projectControlChange(ctx, persistence.ControlChange{MonitorID: receipt.Key.ID, MonitorUID: receipt.UID}); err != nil {
-				return err
+		if ok && !current.Removed {
+			if ent, exists := s.entities[current.ID]; exists && s.world.Alive(ent) {
+				if s.states.Get(ent).Revision != current.Revision {
+					return persistence.ErrControlConflict
+				}
+				if managed, exists := s.managed[current.ID]; exists && managed.uid != current.CatalogUID {
+					return persistence.ErrControlConflict
+				}
+				if s.index != nil {
+					s.index.Put(s.summary(ent, current))
+				}
 			}
 		}
 		return nil

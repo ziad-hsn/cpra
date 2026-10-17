@@ -3426,6 +3426,216 @@
           }
         }
       }
+    },
+    "/api/v2/monitors/{id}/ignore": {
+      "post": {
+        "operationId": "IgnoreMonitor",
+        "summary": "IgnoreMonitor",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/ControlRequest"
+              }
+            }
+          }
+        },
+        "description": "Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained."
+      }
+    },
+    "/api/v2/monitors/{id}/unignore": {
+      "post": {
+        "operationId": "UnignoreMonitor",
+        "summary": "UnignoreMonitor",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.json#/components/schemas/ControlRequest"
+              }
+            }
+          }
+        },
+        "description": "Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained."
+      }
+    },
+    "/api/v2/observations/monitors": {
+      "get": {
+        "operationId": "ListMonitorObservations",
+        "summary": "Read controller monitor observations",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/MonitorObservationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitorID",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v2/observations/monitors/{id}": {
+      "get": {
+        "operationId": "GetMonitorObservation",
+        "summary": "Read one controller monitor observation",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/MonitorObservation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./models.json#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   }
 }

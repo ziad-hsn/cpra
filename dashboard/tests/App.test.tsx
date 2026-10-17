@@ -87,6 +87,7 @@ const emptyPool = {
 };
 
 const server = setupServer(
+  http.get('/api/v2/self', () => HttpResponse.json({ principalId: 'anonymous', role: 'reader', permissions: ['GetHistory', 'GetState', 'GetSLO', 'GetQueues', 'GetPools', 'GetSystems', 'GetConfig', 'GetReady', 'GetLive', 'GetMetrics', 'ListActions', 'GetAction', 'ListMonitorObservations', 'GetMonitorObservation', 'ListIncidents', 'GetIncident', 'GetCapabilities'] })),
   http.get('/api/v2/access', () => HttpResponse.json({ mode: 'observation', authenticationRequired: false })),
   http.get('/api/v1/overview', () => HttpResponse.json(overviewResponse)),
   http.get('/api/v1/monitors', () => HttpResponse.json(monitorsResponse)),
@@ -129,6 +130,14 @@ describe('App', () => {
     renderApp('/');
     expect(await screen.findByRole('heading', { level: 1, name: 'Fleet Overview' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
+  it('does not report zero queue wait when no work has been dequeued', async () => {
+    renderApp('/');
+    await screen.findByText('Health checks queue');
+    expect(screen.getAllByText('avg wait unavailable · 0 dropped')).toHaveLength(3);
+    expect(screen.queryByText('avg wait 0ms · 0 dropped')).not.toBeInTheDocument();
+    expect(screen.getByText('items / sec; not check completions')).toBeInTheDocument();
   });
 
   it('keeps one primary heading when the overview request fails', async () => {

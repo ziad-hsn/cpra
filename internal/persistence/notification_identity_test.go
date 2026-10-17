@@ -57,6 +57,7 @@ func TestNotificationProviderCorrelationSurvivesRecoveryAndRenewal(t *testing.T)
 	at := policyTime().Add(time.Second)
 	m := policyPulse(t, configuredPolicyMonitor(t, p), at, "failure")
 	red := notificationByColor(t, m, "red", Queued)
+	m = policyStart(t, m, red, at)
 	m = policyPulse(t, m, at.Add(time.Second), "success")
 	green := notificationByColor(t, m, "green", Queued)
 	if red.NotificationCorrelation == "" || red.NotificationCorrelation != green.NotificationCorrelation || red.EndpointID != green.EndpointID {
@@ -279,7 +280,7 @@ func TestNotificationIdentitySnapshotRejectsOldFormat(t *testing.T) {
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, Outcome: "failure", At: policyTime().Add(time.Second)})
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(deliverySnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(lifecycleSnapshotMagic)) {
 		t.Fatal("snapshot did not record its new storage boundary")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")

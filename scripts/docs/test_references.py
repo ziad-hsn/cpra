@@ -50,6 +50,17 @@ class PortableReferenceTests(unittest.TestCase):
         shutil.rmtree(self.root / "bin")
         self.assertEqual(references.prepare(self.root, check=True), result)
 
+    def test_public_source_downloads_do_not_publish_engineering_records(self):
+        self.record.write_text("[Server](../../internal/server.go)\n")
+        guide = self.docs / "guide.md"
+        guide.write_text("[Server](review/source/internal/server.go.txt)\n")
+        result = references.prepare(self.root)
+        self.assertEqual(result['source_references'], 2)
+        self.assertIn('reference/source/internal/server.go.txt', guide.read_text())
+        self.assertIn('../review/source/internal/server.go.txt', self.record.read_text())
+        self.assertEqual((self.docs / 'reference/source/internal/server.go.txt').read_bytes(), self.source.read_bytes())
+        self.assertEqual(references.prepare(self.root, check=True), result)
+
     def test_current_examples_are_exact_and_historical_revision_links_are_preserved(self):
         examples = {
             "examples/management/README.md": b"# Current management setup\n",
@@ -69,7 +80,7 @@ class PortableReferenceTests(unittest.TestCase):
 
         result = references.prepare(self.root)
         for name, content in examples.items():
-            self.assertEqual((self.docs / references.source_asset(name)).read_bytes(), content)
+            self.assertEqual((self.docs / references.source_asset(name, True)).read_bytes(), content)
         self.assertEqual(historical.read_text(), original)
         self.assertEqual(references.prepare(self.root, check=True), result)
         (self.root / "examples/management/README.md").write_text("# Updated setup\n")

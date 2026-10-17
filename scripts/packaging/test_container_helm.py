@@ -101,6 +101,58 @@ class ChartContract(unittest.TestCase):
         if not shutil.which(HELM):
             raise RuntimeError('Helm is required; chart checks cannot be reported as passing without it')
 
+    def test_notification_log_volume_is_separate_and_private(self):
+        for claim in ('', 'cpra-notification-output'):
+            objects = render({**BASE, 'notificationLog': {'enabled': True, 'existingClaim': claim}})
+            pod = kind(objects, 'StatefulSet')['spec']['template']['spec']
+            init = next(x for x in pod['initContainers'] if x['name'] == 'notification-log-directory')
+            owner = pod['containers'][0]
+            self.assertEqual(init['image'], owner['image'])
+            self.assertEqual([m['name'] for m in init['volumeMounts']], ['notification-log'])
+            self.assertTrue(init['securityContext']['readOnlyRootFilesystem'])
+            mount = next(m for m in owner['volumeMounts'] if m['name'] == 'notification-log')
+            self.assertEqual(mount['subPath'], 'notifications')
+            self.assertEqual(mount['mountPath'], '/var/log/cpra-notifications')
+            volume = next(v for v in pod['volumes'] if v['name'] == 'notification-log')
+            self.assertEqual(volume.get('persistentVolumeClaim') if claim else volume.get('emptyDir'),
+                             {'claimName': claim} if claim else {'sizeLimit': '64Mi'})
+            runtime = yaml.safe_load(kind(objects, 'ConfigMap')['data']['runtime.yaml'])
+            self.assertEqual(runtime['notifications']['log_directory'], mount['mountPath'])
+            self.assertNotIn('chmod', init['args'][0])
+        for claim, changes in (('state-contract-cpra-0', {}), ('state-existing', {'persistence': {'existingClaim': 'state-existing'}}),
+                               ('manifest-existing', {'manifest': {'existingConfigMap': '', 'existingClaim': 'manifest-existing'}})):
+            values = {**BASE, **changes, 'notificationLog': {'enabled': True, 'existingClaim': claim}}
+            self.assertIn('separate', render(values, succeeds=False))
+        disabled = kind(render(), 'StatefulSet')['spec']['template']['spec']
+        self.assertNotIn('notification-log', [v['name'] for v in disabled['volumes']])
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'Linux shell permission fixture; native container evidence is separate')
+    def test_notification_directory_initializer_refuses_existing_unsafe_entries(self):
+        pod = kind(render({**BASE, 'notificationLog': {'enabled': True}}), 'StatefulSet')['spec']['template']['spec']
+        script = next(x for x in pod['initContainers'] if x['name'] == 'notification-log-directory')['args'][0]
+        for existing in ('absent', 'private', 'broad', 'symlink', 'file'):
+            with self.subTest(existing=existing), tempfile.TemporaryDirectory(prefix='cpra-log-init-') as directory:
+                root = Path(directory)
+                child, target = root/'notifications', root/'canary'
+                target.mkdir(mode=0o700)
+                if existing in ('private', 'broad'):
+                    child.mkdir(mode=0o700)
+                    child.chmod(0o700 if existing == 'private' else 0o770)
+                elif existing == 'symlink':
+                    child.symlink_to(target, target_is_directory=True)
+                elif existing == 'file':
+                    child.write_text('unchanged')
+                # This verifies the real script at the test user's UID. It is
+                # explicitly not evidence of execution as container UID 1001.
+                source = script.replace('/work', shlex.quote(directory)).replace('1001:700', f'{os.getuid()}:700')
+                result = subprocess.run(['/bin/sh', '-ec', source], capture_output=True, timeout=5)
+                self.assertEqual(result.returncode == 0, existing in ('absent', 'private'))
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o700)
+                if existing == 'broad':
+                    self.assertEqual(stat.S_IMODE(child.stat().st_mode), 0o770)
+                if existing == 'file':
+                    self.assertEqual(child.read_text(), 'unchanged')
+
     def test_declared_api_versions_and_unsupported_versions(self):
         for version in ('1.32.0', '1.33.0', '1.34.0', '1.35.0', '1.36.0'):
             with self.subTest(version=version):

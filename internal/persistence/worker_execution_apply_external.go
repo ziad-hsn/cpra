@@ -195,7 +195,9 @@ func (f *machine) checkWorkerExecutionAuthority(in WorkerExecutionIntent, at tim
 		return err
 	}
 	m, ok := f.image.Monitors[in.MonitorID]
-	if !ok || m.Removed || m.CatalogUID != in.MonitorUID || m.Revision != in.MonitorRevision || m.ControlRevision != in.ControlRevision || m.DependencyRevision != in.Guard.revision() || !m.Policy.Enabled || m.snoozed(at) {
+	controlNotice := in.Category == "notification" && m.ControlNotification(m.Actions[in.ActionID])
+	if !ok || m.Removed || m.CatalogUID != in.MonitorUID || m.Revision != in.MonitorRevision || !controlNotice && m.ControlRevision != in.ControlRevision || m.DependencyRevision != in.Guard.revision() || m.snoozed(at) ||
+		!controlNotice && (!m.Policy.Enabled || in.Category != "check" && (m.Ignored || m.Policy.InMaintenance(at))) {
 		return ErrWorkerExecutionConflict
 	}
 	source, ok := f.image.Catalog[in.Source.indexKey()]

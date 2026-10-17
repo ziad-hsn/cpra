@@ -1,8 +1,9 @@
+import { safeValidationField, validationMessage } from '../api/validation';
 import type { SelectedCollectionSource } from './files';
 import type { WorkerCollectionItemSummary, WorkerCollectionSummary } from '../api/collectionInventory';
 
 export type ImportErrorCode = 'invalid' | 'quota' | 'duplicate' | 'unavailable' | 'closed' | 'cancelled';
-export interface ImportLocation { source?: number; document?: number; item?: number }
+export interface ImportLocation { source?: number; document?: number; item?: number; line?: number; column?: number; field?: string; reason?: string }
 export type WorkerRequest = { id: number; kind: 'prepare'; sources: SelectedCollectionSource[] } | { id: number; kind: 'page'; offset: number; limit: number }
   | { id: number; kind: 'create' | 'preflight' } | { id: number; kind: 'upload'; offset: number };
 export type WorkerReply = { kind: 'ready' } | { kind: 'progress'; phase: 'parsing' | 'parsed' | 'identity'; sources: number; items: number }
@@ -22,5 +23,13 @@ export const importErrorMessages: Record<ImportErrorCode, string> = {
 export class CollectionImportError extends Error {
   readonly code: ImportErrorCode;
   readonly location?: Readonly<ImportLocation>;
-  constructor(code: ImportErrorCode, location?: ImportLocation) { super(importErrorMessages[code]); this.name = 'CollectionImportError'; this.code = code; this.location = location ? Object.freeze({ ...location }) : undefined; }
+  constructor(code: ImportErrorCode, location?: ImportLocation) {
+    super(importErrorMessages[code]); this.name = 'CollectionImportError'; this.code = code;
+    if (location) {
+      const safe: ImportLocation = {};
+      for (const key of ['source', 'document', 'item', 'line', 'column'] as const) if (Number.isSafeInteger(location[key]) && location[key]! > 0 && location[key]! <= 100_000_000) safe[key] = location[key];
+      if (validationMessage(location.reason)) { safe.reason = location.reason; safe.field = safeValidationField(location.field); }
+      this.location = Object.freeze(safe);
+    }
+  }
 }

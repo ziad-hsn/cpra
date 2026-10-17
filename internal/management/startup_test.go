@@ -46,6 +46,9 @@ func TestStartupCatalogRaftRestartDoesNotReplaceAPIEdit(t *testing.T) {
 	if err != nil || result.Catalog == nil || !result.Bootstrap.CatalogActivated || result.Bootstrap.SeededRecords != 1 {
 		t.Fatalf("initial startup failed: %+v %v", result.Bootstrap, err)
 	}
+	if result.ReusedCatalog {
+		t.Fatal("first import reported an existing catalog")
+	}
 	original, err := result.Catalog.Get(ctx, "Monitor", "api")
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +76,7 @@ func TestStartupCatalogRaftRestartDoesNotReplaceAPIEdit(t *testing.T) {
 	defer reopened.Close()
 	before := reopened.Status().CommittedIndex
 	result, err = StartupCatalog(ctx, reopened, sealer, StartupOptions{OpenSource: noStartupSource(t), DataDirectory: "an obsolete relative directory", MaxResources: 10_000_001})
-	if err != nil || result.Catalog == nil || reopened.Status().CommittedIndex != before {
+	if err != nil || result.Catalog == nil || !result.ReusedCatalog || reopened.Status().CommittedIndex != before {
 		t.Fatal("restart required obsolete input options or rewrote state", err)
 	}
 	got, err := result.Catalog.Get(ctx, "Monitor", "api")

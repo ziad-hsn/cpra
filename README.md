@@ -15,230 +15,190 @@ Checks services, sends alerts, and runs the recovery actions you configure.</p>
   <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-8A5A00" alt="Documentation"></a>
 </p>
 
-CPRa is a self-hosted monitoring and recovery agent written in Go. It runs
-health checks against your services on a schedule, opens and closes incidents
-against configurable thresholds, sends notifications, and executes a recovery
-action — restart a container, call a webhook, restart or scale a Kubernetes
-workload, reboot an EC2 instance, restart a systemd unit — when a service
-fails. It ships as a single server binary with an embedded dashboard, an HTTP
-API, and the `cpractl` command-line client. Named management access enables
-monitor, destination, group and secret editing; observation mode remains
-read-only. Application code is MIT-licensed; [CPRa artwork](brand/ATTRIBUTION.md)
-uses CC BY 4.0.
+CPRa monitors services and runs the recovery actions you configure. One Go
+process schedules checks, tracks incidents, sends notifications and exposes a
+React dashboard, an HTTP API and the `cpractl` command-line client. Use files for
+read-only operation or named management access to edit monitors, notification
+receivers, groups and secrets through the dashboard, API or Go SDK.
 
-**Documentation:** [ziad-hsn.github.io/cpra](https://ziad-hsn.github.io/cpra/) —
-[quickstart](https://ziad-hsn.github.io/cpra/tutorials/quickstart/) ·
-[monitor configuration](https://ziad-hsn.github.io/cpra/reference/config-schema/) ·
-[drivers](https://ziad-hsn.github.io/cpra/reference/jobs-reference/) ·
-[HTTP API](https://ziad-hsn.github.io/cpra/reference/api-reference/) ·
-[deployment](https://ziad-hsn.github.io/cpra/how-to/deploy-to-production/) ·
-[FAQ](https://ziad-hsn.github.io/cpra/faq/)
+## Availability
 
-## Documentation and current development
+**CPRa is in development; the first qualified release is not published.** Build
+this checkout using the local workspace below. Public application, SDK and worker
+module tags, packages, images and the Helm chart remain subject to qualification.
+The intended first version is `v0.1.0-rc.1`; the chart uses `0.1.0-rc.1`. SDK and
+worker versions are independent modules with the same Go 1.26 minimum.
 
-The [documentation source](docs/index.md) includes current development references
-and explicitly dated guides for earlier revisions. The
-[published site](https://ziad-hsn.github.io/cpra/) is updated separately.
-[Versions and availability](docs/versions.md) identifies those boundaries:
+[Versions and availability](docs/versions.md) is the current support matrix.
+Linux amd64 development tests do not qualify all six planned Linux/macOS/Windows
+amd64/arm64 targets. Native service, filesystem, provider-account and comparative
+performance gates remain open where their environments or evidence are missing.
+The 24-hour test is cancelled.
 
-- This source includes Raft persistence, history/SLOs, encrypted management resources,
-  dashboard forms, and SDK/CLI collection workflows.
-- The [implementation progress](docs/implementation/dashboard-implementation-progress.md)
-  records completed checks and remaining external-worker integration and release gates.
-- The [Go SDK](docs/sdk/index.md) documents the current source contracts; public
-  module-version and downloaded-consumer qualification remain pending.
-- [Earlier candidate guides](docs/candidate/index.md) describe the pinned `410fbfb`
-  revision and are not a release qualification for this development branch.
+[Documentation](docs/index.md) · [Quickstart](docs/tutorials/quickstart.md) ·
+[Configuration](docs/reference/config-schema.md) · [Drivers](docs/reference/jobs-reference.md) ·
+[API](docs/reference/api-reference.md) · [Go SDK](sdk/go/README.md)
 
-The [shipping plan](docs/implementation/dashboard-shipping-plan.md) governs
-publication, together with the [approved review repairs](docs/implementation/release-repair-plan.md).
-Source availability does not establish provider-account, native-platform or
-comparative-performance qualification. The 24-hour run is cancelled.
+The [published website](https://ziad-hsn.github.io/cpra/) is updated separately;
+use documentation from the same checkout as your executable.
 
-## Quick start
+## What CPRa does
 
-Requires Go 1.26 or later, Make, and Python 3 for the source workspace below.
-The repository already contains the built dashboard assets.
+- Runs health checks at a configured cadence with unhealthy and healthy thresholds.
+  It retains incident and action events for 30 days, rather than every raw check.
+- Commits incident state and action intent to single-node Raft before dispatch.
+  Restarts retain confirmed outcomes and hold ambiguous interventions for review.
+  Health observations continue while a conflicting intervention is held.
+- Sends notifications to configured destinations and can restart containers,
+  call a webhook, operate designated Kubernetes workloads, reboot EC2 instances,
+  restart systemd units or ask an A2A agent to investigate.
+- Supports acknowledge, dismiss, snooze, disable and Ignore as distinct controls.
+  Ignore continues checks while suppressing ordinary alerts and interventions;
+  verified recovery clears it. Optional automatic Ignore uses an explicit outage
+  count and rolling window. Gray notices describe actual enable/disable changes.
+- Lets operators apply collections from files, directories or explicitly requested
+  URLs. Validation precedes activation; operation receipts preserve progress and
+  item failures. Interrupted application requires explicit continuation.
+- Reports observed health, action outcomes, queues, worker saturation and measured
+  SLO attainment. Worker sizing starts with Erlang C/Allen–Cunneen and adjusts
+  within configured bounds. Percentiles and targets are measurements, not an SLA.
 
-Make creates an ignored `bin/cpra-sdk.work` for the application and its local
-SDK modules, so the unpublished SDK candidate can be built from this checkout.
-The integrations example module remains opt-in. An explicit `GOWORK` path or
-`GOWORK=off` takes precedence; Make never changes the selected external workspace.
+![CPRa dashboard showing monitor state, notification queues and management navigation](docs/assets/dashboard-overview.png)
+
+Current development dashboard, captured from a local fixture with one disabled
+monitor. This illustration is not production capacity evidence.
+
+## Build and run locally
+
+Install Go 1.26 or newer, Make and Python 3. The checkout includes the embedded
+dashboard; Node and pnpm are needed only when its build inputs change.
 
 ```sh
 make
 export PATH="$PWD/bin:$PATH"
+cpra -version
+cpractl version
 cpractl local init --management
-# Use the exact start and client commands printed by initialization.
 ```
 
-Initialization creates an intentionally empty manifest, a named operator token,
-its hash policy, a wrapping key, and localhost TLS material in the platform's
-configuration directory. It prints paths and commands, never the bearer value.
-It refuses existing configuration or state and starts no service. System scope
-requires an explicit protected `--token-output` outside service configuration and
-state. [Management startup](docs/management-startup.md) explains the files and
-stopped rotation.
+Make generates an ignored `bin/cpra-sdk.work` containing the application, SDK and
+worker modules. It respects an explicitly selected `GOWORK`, including `off`.
+Do not publish module tags or edit dependency versions to work around development
+workspace setup. See [contributor setup](CONTRIBUTING.md) for direct Go commands
+and editors.
 
-Start CPRa using the printed command, then manually trust the generated local CA
-in your browser and open `https://localhost:8060`. Read the protected operator
-token file locally for browser sign-in. The initializer does not install trust
-roots. The CLI uses `--ca-file` and `--token-file`; credentials belong in neither
-URLs nor command arguments. Add monitors through the dashboard or explicit
-`cpractl apply -f FILE` after startup. Management imports bootstrap manifests once;
-subsequent file edits need an explicit apply.
+Initialization creates an empty manifest, a named operator token and hash policy,
+a wrapping key, localhost TLS certificates and runtime settings in
+platform-standard locations. It configures a notification-log directory, which
+the server creates with private permissions at startup. It prints exact start and client
+commands, never the bearer value. It refuses existing files and starts no service.
+System installation requires a protected operator-token output outside
+service-owned configuration and state.
 
-For direct Go commands, select the workspace explicitly after `make dev-workspace`:
+Use the printed server command. Trust the generated local CA explicitly in your
+browser, open `https://localhost:8060` and sign in with the token from its protected
+file. The CLI uses `--server`, `--ca-file` and `--token-file`; the corresponding
+`CPRA_SERVER`, `CPRA_CA_FILE` and `CPRA_AUTH_TOKEN_FILE` variables make connections
+repeatable. Keep token values out of URLs and command arguments.
 
-```sh
-GOWORK="$PWD/bin/cpra-sdk.work" go test ./internal/cpractl/cli
-```
+Follow the [quickstart](docs/tutorials/quickstart.md) to run a local HTTP target,
+validate and apply `examples/monitors.yaml`, inspect `monitor/example-service`,
+and restart against the same state. Management imports bootstrap configuration
+once; later edits require explicit `apply`. SIGHUP reports that reload is
+unsupported; SIGINT and SIGTERM begin graceful shutdown.
 
-Official release builds retain `GOWORK=off` and require separately qualified
-module dependencies. Local workspace builds do not establish public module
-availability or release readiness.
+## Drivers and configuration
 
-State is durable by default in the platform's user state directory (`cpractl local paths`); Linux system services explicitly use `/var/lib/cpra`. Keep that directory across restarts. An explicit `-data-dir` overrides runtime configuration and the platform default. A legacy `./cpra-data` requires an explicit path or a stopped migration. Use `-runtime-config examples/runtime-memory.yaml` for a disposable run. [Persistence and recovery](docs/durability.md) describes identities, unknown outcomes and complete backups.
-
-The [management setup](docs/management-startup.md) enables current SDK commands
-such as `cpractl get monitors`; those commands use stable resource IDs. Missing
-or malformed configuration stops startup. Empty configurations require
-`-allow-empty`, included in the initialized start command.
-
-The [sample manifest](examples/monitors.yaml) checks an HTTP endpoint and writes incident transitions to `alerts.jsonl`; replace its target before applying it. The initialized manifest is empty. Each monitor can specify a check interval, timeout, failure threshold, recovery threshold, notification destinations, and a recovery action. Maintenance windows suppress alerts and recovery while checks continue; they use five-field cron expressions, a duration, and an IANA timezone.
-
-## Drivers
-
-| Function | Default build | Optional build tags |
+| Function | Default build | Additional built-in tags |
 | --- | --- | --- |
 | Checks | HTTP, TCP, ICMP, DNS, UDP, TLS, Docker, gRPC | `redis postgres mysql mongo rabbitmq kafka` |
-| Recovery | Docker, HTTP webhook, A2A agent task | `kubernetes aws systemd` |
-| Alerts | Log, Slack, PagerDuty, email, webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, Datadog, A2A | `teams twilio` |
+| Recovery | Docker, HTTP webhook, A2A | `kubernetes aws systemd` |
+| Notifications | Log, Slack, PagerDuty, email, webhook, Telegram, Discord, Opsgenie, Mattermost, VictorOps, Pushover, Datadog, A2A | `teams twilio` |
 
 ```sh
 make BUILD_TAGS='redis postgres kubernetes'
+cpra -capabilities
+cpra -validate -yaml examples/monitors.yaml -runtime-config /absolute/path/from/init/runtime.yaml
 ```
 
-The `grpc` check preserves TCP reachability when `mode` is omitted. Explicit
-`mode: health` calls the unary gRPC health service and requires `SERVING`; it
-uses verified TLS unless cleartext is explicitly selected. UDP checks require
-a payload and a reply. PagerDuty requires an Events API v2 routing key. Email
-uses an SMTP relay with STARTTLS; SMTP username/password authentication is not
-implemented. See [driver configuration](docs/reference/jobs-reference.md) and
-[notification response contracts](docs/implementation/notification-response-contracts.md).
+Replace the runtime path with the one printed by initialization.
+Validation checks schemas, references and compiled capabilities without opening
+storage or contacting targets. File log notifications require a process-configured
+root directory; monitor files select paths inside it. An omitted filename writes
+to stdout. Pass the initialized runtime
+configuration when validating a manifest that uses log notifications.
 
-TLS `warn_days` produces a yellow alert and a degraded monitor status without starting recovery; `critical_days` fails the check and follows the normal recovery policy. Pushover emergency priority accepts `retry` and `expire` in seconds, defaulting to 60 and 1800. Docker recovery preserves the daemon's stop grace when its timeout is omitted.
+TLS checks verify certificates by default. The explicit per-monitor
+`insecure_skip_verify` option disables certificate-chain and hostname verification
+only for that monitor. It does not disable recovery health checks or API
+authentication. Configured certificate-expiry checks still run.
 
-MongoDB checks require a direct `mongodb://` URI. The selected driver cannot bound initial `mongodb+srv://` discovery by the check deadline, so CPRa rejects that mode. Kubernetes recovery supports token, certificate, and in-cluster credentials; kubeconfig exec credential plugins are rejected because they can outlive the recovery deadline.
+The gRPC check defaults to TCP reachability; `mode: health` calls the gRPC health
+service and requires `SERVING`. MongoDB SRV discovery, Kubernetes exec credential
+plugins and SMTP username/password authentication are currently unsupported.
+[Driver reference](docs/reference/jobs-reference.md) describes required settings,
+transport choices, deadlines and platform restrictions.
 
-## Access
+The separately tagged [external-worker library](sdk/go/worker/README.md) runs
+operator-owned Go handlers outside CPRa. It requires `externaljobs` on both sides,
+explicit server enablement and scoped credentials. It is not a sandbox for
+untrusted code.
 
-The server listens on loopback by default. The management quickstart uses native
-HTTPS and a named Bearer token. Enter the operator token in the dashboard; no
-username is required. Use the initializer's HTTPS address, `--ca-file` and
-`--token-file` arguments for CLI access. The operator bearer stays with the
-operator, outside service-owned configuration and state.
+## Persistence, operation and safety
 
-For remote management, configure a certificate for the intended hostname or an
-explicitly trusted HTTPS proxy using [management startup](docs/management-startup.md).
-The generated localhost certificate is only for local access. Do not pass a
-named management token through `-web.auth-file`; management loads its committed
-named authority after the initial policy import.
+User and system installations have different platform-standard paths. Linux
+system services explicitly store state in `/var/lib/cpra`; containers and Helm
+require retained storage. Use `cpractl local paths` to inspect local defaults.
+Explicit `-data-dir` wins over runtime configuration and user defaults. A legacy
+working-directory `cpra-data` requires an explicit path or stopped migration.
 
-File-configured observation-only deployments can instead use `-web.auth-file`
-for a shared read-only token. This mode accepts Bearer authentication or Basic
-authentication with username `cpra` and the token as the password; it does not
-enable management commands. A plaintext listener needs an HTTPS reverse proxy
-before remote use. The server and CLI also support `CPRA_AUTH_TOKEN` and
-`CPRA_AUTH_TOKEN_FILE`. Keep bearer values out of URLs and command arguments.
+Single-node Raft provides durable state, not cross-instance failover. Keep one
+owner per store. A complete stopped backup includes node identity, Raft data,
+snapshots, history and collection generations. Storage errors stop unsafe
+admission; restoring or repairing state is an explicit operator action.
 
-Manifests authorize checks, notification destinations, and recovery actions with the process account's permissions. Use trusted configuration. `-ssrf-protect` blocks non-public HTTP destinations at connection time; it does not restrict other protocols or local actions. Profiling is opt-in. Keep token files and manifests containing credentials outside version control.
+Recovery attempts are limited per incident by `intervention.max_attempts`
+(default one). Successful action completion means health verification is pending.
+Only the configured healthy threshold confirms recovery. An unknown delivery
+holds that delivery, without suppressing unrelated later incidents or destinations.
+Transport acceptance alone does not prove delivery to a person.
 
-## Behavior and limits
+Configuration authors can choose destinations and actions using the process
+account's permissions. Treat them as trusted operators. Management is not a
+multi-tenant security boundary. Use [management startup](docs/management-startup.md)
+for HTTPS, authority, credential storage and rotation.
 
-- Single-node Raft commits incident state and action intent before dispatch. Started external actions with interrupted results are held as unknown after restart; health checks resume. This is one-node persistence, without distributed failover.
-- Each incident admits one recovery operation. Successful recovery must be followed by the configured consecutive successful checks. Inspect provider records for unknown actions; restarting does not automatically repeat them.
-- Notification endpoint outcomes are separate. A successful endpoint is not repeated because another endpoint failed. Confirmed retryable rejections allow at most three attempts per endpoint. Transport acceptance does not confirm delivery to a person.
-- `/api/v2/healthz` reports liveness. `/api/v2/readyz` requires initialized admission, controller progress and available storage; explicitly empty configurations can be ready. Dashboard projection freshness is reported separately. Provider outages do not make the process dead.
-- Fleet views update incrementally, retain numeric routes and add stable `monitor_id` values. Pages are bounded. `/api/v1/history` retains incident and action events for 30 days; `/api/v1/state` exposes persistence and unknown actions; `/api/v1/slo` exposes measured latency distributions. All remain read-only and use the existing authentication.
-- Raw health-check history is not retained. Current counters and the aggregate SLO window survive restart; gaps in measurement coverage are explicit. See [measured SLO definitions](docs/slo.md).
-- JSON is decoded incrementally. YAML requires a block sequence for monitors and limits each entry and the metadata to 1 MiB. Both formats have a decompressed-input budget. Memory use grows with monitor count; capacity depends on check intervals, targets, and host resources.
-- Worker scaling uses Erlang C with an Allen-Cunneen variability adjustment and 15% default headroom. Arrival intervals and execution times use the latest 256 observations. The model estimates mean latency. Observed percentile feedback uses a 30-second control window, bounded growth and a healthy hold before reducing capacity. The five-minute health-check targets are p99 queue delay ≤250 ms and scheduled-to-committed-result ≤5 seconds. Worker limits remain; these are measured targets rather than an SLA guarantee.
-- Configuration is loaded before startup. Live reload and runtime queue migration are not supported.
+[Native installation](docs/native-installation.md) ·
+[Containers and Helm](docs/container-helm.md) ·
+[Backup and recovery](docs/durability.md) · [SLOs](docs/slo.md)
 
-## Check and package
+## Development and verification
 
 ```sh
+make dev-workspace
+make test-fast
 make check
 make test-all-drivers
+make sdk-check
 ```
 
-Rebuilding the dashboard requires Node.js 24.21.0, pnpm 11.22.0, and Python 3:
+`test-fast` is a short edit/test loop. Full race, process, browser, build-tag and
+release matrices remain separate. Root `go test ./...` excludes nested modules.
+The [contributor guide](CONTRIBUTING.md) covers tools, generation and verification.
 
-```sh
-make dashboard-build dashboard-check
-make release VERSION=v0.1.0-rc.1
-```
+The [provider verification guide](docs/provider-testing.md) separates local
+fixtures, provider acceptance and independently observed effects. Unconfigured
+accounts remain unverified. The [release guide](docs/release-engineering.md)
+describes reproducible artifacts and private qualification gates. Passing a
+source test does not authorize publication or establish a capacity claim.
 
-The [recorded release recipe](docs/release-engineering.md) uses a checksum-pinned
-Go 1.27.2 compiler and explicit source identity. It produces unstripped,
-optimized server/client archives for Linux, macOS and Windows on amd64/arm64,
-Linux packages, a source archive and evidence inventories. Go 1.26 compatibility
-is a separate test. Native execution gates qualify each platform; a successful
-cross-build alone does not establish support.
+## License and community
 
-Versioned installation needs only Go and the committed embedded assets:
+Code is [MIT-licensed](LICENSE). CPRa-authored artwork by Ziad Hassan uses
+[CC BY 4.0](brand/ATTRIBUTION.md), with a separate name and endorsement note.
+Third-party licenses remain in the [dashboard notices](LICENSES/dashboard.txt)
+and packaged dependency notices.
 
-```sh
-go install github.com/ziad-hsn/cpra@VERSION
-go install github.com/ziad-hsn/cpra/cmd/cpractl@VERSION
-cpractl local init --management
-cpra -capabilities
-```
-
-Replace `VERSION` with an actual published version. [Native installation](docs/native-installation.md)
-documents full-driver builds, standard paths, native supervisors, local ownership
-and stopped backup/restore. Initial configuration is deliberately empty.
-
-The production image consumes the same staged release executables; source builds
-use `docker/Dockerfile.dev`. Production Compose uses a stable named volume,
-read-only configuration, UID 1001, bounded logs and a loopback-published API.
-The Helm chart uses one StatefulSet owner and retained storage, supports large
-file-backed manifests, and distinguishes Helm 3 and 4 operations. Follow the
-[container and Helm guide](docs/container-helm.md) to prepare authentication and
-configuration before starting either route.
-
-## Release evidence
-
-The [Go SDK](sdk/go/README.md) and optional
-[external worker library](sdk/go/worker/README.md) are independent modules.
-`cpractl` uses the public SDK for management and observation requests, with stable
-resource IDs and cursor pagination. The worker protocol still requires its
-separate server qualification; neither module has been published by this work.
-The [four SDK integration lessons](examples/sdk/README.md) demonstrate queue
-registration, AWS deregistration, Kubernetes Service discovery, and a DAO/SMS
-worker. The [SDK guide and full API reference](docs/sdk/index.md) describe their
-methods, fields, and verification boundaries.
-
-[SDK status](docs/implementation/go-sdk-status.md) records the remaining gates,
-and [SDK verification](docs/implementation/go-sdk-verification.md) distinguishes
-executed tests from pending server and release evidence. Root `go test ./...`
-does not include the nested modules; use `make sdk-check` with the source
-workspace above. Official releases keep `GOWORK=off` and require the SDK versions
-to be published first.
-
-The implementation is still undergoing release qualification. Full-provider verification and comparative million-monitor performance require completed evidence before a full release-readiness claim. The 24-hour endurance test is outside the requested work and is not a mandatory completion gate. The current verification inventory contains 35 driver roles, including the local A2A additions. Configured A2A provider-evidence integration is still pending; missing configuration never passes. [Validation instructions](docs/validation.md) distinguish local operations, provider accounts, comparisons and endurance.
-
-[Provider test environments](docs/provider-testing.md) cover local services,
-notification contract mocks, the Moto EC2 emulator and optional provider sandboxes.
-Reports distinguish these results from real-account delivery and recovery.
-
-## License
-
-CPRa code is licensed under [MIT](LICENSE). [Dashboard dependency notices](LICENSES/dashboard.txt) accompany the embedded assets. Binary archives include notices for the dependencies in the selected build.
-
-CPRa-authored artwork by Ziad Hassan is licensed under [CC BY 4.0](brand/ATTRIBUTION.md), with a separate note about the name and endorsement. Third-party fonts retain their own licenses. Brand assets and usage guidance live in [`brand/`](brand/BRANDING.md).
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification guidance,
-[SECURITY.md](SECURITY.md) for private vulnerability reporting, and the
-[code of conduct](CODE_OF_CONDUCT.md) for participation.
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the
+[code of conduct](CODE_OF_CONDUCT.md). Support is through voluntary donations;
+there are no subscription-only features or promised response times.

@@ -16,6 +16,10 @@ data:
       snapshot_retain: 3
     history:
       retention_days: 30
+    {{- if .Values.notificationLog.enabled }}
+    notifications:
+      log_directory: /var/log/cpra-notifications
+    {{- end }}
     {{- if .Values.management.enabled }}
     management:
       enabled: true

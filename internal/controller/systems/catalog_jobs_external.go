@@ -13,7 +13,12 @@ import (
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
-func prepareCatalogMonitor(p management.RuntimePreparation, config runtimeconfig.Config) (*entities.PreparedMonitor, error) {
+func prepareCatalogMonitor(p management.RuntimePreparation, config runtimeconfig.Config) (prepared *entities.PreparedMonitor, err error) {
+	defer func() {
+		if err == nil {
+			prepared.SetTargetSummary(p.CheckTargetSummary)
+		}
+	}()
 	if len(p.ExternalBindings) == 0 {
 		return entities.PrepareMonitor(p.Monitor, p.Endpoints, p.NotificationGroups)
 	}

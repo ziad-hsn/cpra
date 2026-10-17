@@ -164,8 +164,8 @@ type lostWorkerStartReply struct {
 	lost bool
 }
 
-func (s *lostWorkerStartReply) CommitWorkerStart(ctx context.Context, a persistence.WorkerAuthority, r persistence.WorkerStartRequest) (persistence.WorkerStartResponse, error) {
-	v, err := s.Store.CommitWorkerStart(ctx, a, r)
+func (s *lostWorkerStartReply) CommitWorkerStart(ctx context.Context, a persistence.WorkerAuthority, r persistence.WorkerStartRequest, evaluators ...persistence.WorkerMaintenanceEvaluator) (persistence.WorkerStartResponse, error) {
+	v, err := s.Store.CommitWorkerStart(ctx, a, r, evaluators...)
 	if err == nil && !s.lost && r.Mode == "begin" {
 		s.lost = true
 		return persistence.WorkerStartResponse{}, persistence.ErrCommitUnconfirmed

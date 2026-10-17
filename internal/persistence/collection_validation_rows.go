@@ -19,6 +19,9 @@ func validateCollectionValidationRows(ctx context.Context, i image, view *collec
 	var current string
 	var expected map[uint64]CollectionValidationItem
 	err := view.WalkValidation(ctx, func(id string, item CollectionValidationItem) error {
+		if (item.Field != "" || item.Reason != "") && !lifecycleStorageFormat(i.Version) {
+			return ErrCollectionInvalid
+		}
 		s, exists := i.Collections[id]
 		if !exists || s.Validation == nil || !collectionValidationStorageFormat(i.Version) {
 			return ErrCollectionInvalid

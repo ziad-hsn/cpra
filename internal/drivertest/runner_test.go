@@ -439,3 +439,53 @@ func TestRetainedPacketCountersAreNumericOnly(t *testing.T) {
 		t.Fatal("non-numeric packet counters were retained", data)
 	}
 }
+
+func TestNotificationLogVerificationUsesConfiguredRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "notifications")
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{LogDirectory: root, Manifest: manifest.Manifest{Monitors: []manifest.Monitor{{ID: "log-fixture", Name: "log fixture", Codes: manifest.Codes{"red": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: "events.jsonl"}}}}}}, Cases: []Case{{Kind: "code", Driver: "log", MonitorID: "log-fixture", Color: "red", Configured: true, EvidenceType: EvidenceLocalIntegration, Observer: []string{executable, "-test.run=^TestNotificationLogObserverProcess$", "--", filepath.Join(root, "events.jsonl")}}}}
+	report, err := Run(t.Context(), cfg, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range report.Records {
+		if row.Kind == "code" && row.Name == "log" && (row.Status != "pass" || !row.Invoked || !row.Observed) {
+			t.Fatal("root not wired through production dispatch", row)
+		}
+	}
+	if report.Complete || !report.AllConfiguredPassed {
+		t.Fatal("local log evidence scope changed")
+	}
+	cfg.LogDirectory = ""
+	if _, err := Run(t.Context(), cfg, true); err == nil {
+		t.Fatal("missing root accepted")
+	}
+}
+
+func TestNotificationLogObserverProcess(t *testing.T) {
+	phase := os.Getenv("CPRA_VERIFY_PHASE")
+	if phase == "" {
+		return
+	}
+	path := os.Args[len(os.Args)-1]
+	content, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		os.Exit(2)
+	}
+	count := strings.Count(string(content), "\n")
+	observed := false
+	if phase == "after" {
+		var before struct {
+			Count int `json:"count"`
+		}
+		if json.NewDecoder(os.Stdin).Decode(&before) != nil {
+			os.Exit(2)
+		}
+		observed = count == before.Count+1 && strings.Contains(string(content), os.Getenv("CPRA_VERIFY_RUN_ID"))
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"count": count, "observed": observed})
+	os.Exit(0)
+}

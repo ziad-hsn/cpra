@@ -1,3 +1,6 @@
 storage:
   mode: raft
   directory: /var/lib/cpra
+
+notifications:
+  log_directory: /var/log/cpra/notifications

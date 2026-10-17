@@ -186,7 +186,7 @@ func TestWorkerRequeueSnapshotAndCommandBounds(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("format gate", version, err)
 		}
 	}
@@ -200,7 +200,7 @@ func TestWorkerRequeueSnapshotAndCommandBounds(t *testing.T) {
 		t.Fatal("requeue", result.Err)
 	}
 	snapshot := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(snapshot, []byte(deliveryWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(snapshot, []byte(lifecycleWorkerSnapshotMagic)) {
 		t.Fatal("snapshot format")
 	}
 	restored, _, err := decodeSnapshot(bytes.NewReader(snapshot), "")

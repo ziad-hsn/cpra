@@ -10,6 +10,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/management"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
 // handleCollectionAdmission keeps parsing, encryption and durable admission
@@ -137,7 +138,7 @@ func validCollectionAdmissionProfile(raw []byte) bool {
 		return true
 	}
 	var profile string
-	return json.Unmarshal(field.Profile, &profile) == nil && profile == "cpra.file.base.v1"
+	return json.Unmarshal(field.Profile, &profile) == nil && collection.SupportsFileNormalization(profile)
 }
 
 func collectionPermissionSet(access api.AccessInfo) map[string]bool {

@@ -41,7 +41,7 @@ WORKDIR /var/lib/cpra
 COPY --from=builder /out/cpra /out/cpractl /usr/local/bin/
 COPY LICENSE /usr/share/licenses/cpra/LICENSE
 COPY --from=builder /out/licenses/ /usr/share/licenses/cpra/
-RUN mkdir -p /var/lib/cpra && chown 1001:1001 /var/lib/cpra && chmod 0700 /var/lib/cpra
+RUN mkdir -p /var/lib/cpra /var/log/cpra && chown 1001:1001 /var/lib/cpra /var/log/cpra && chmod 0700 /var/lib/cpra /var/log/cpra
 COPY docker/runtime.yaml /etc/cpra/runtime.yaml
 USER 1001:1001
 EXPOSE 8060

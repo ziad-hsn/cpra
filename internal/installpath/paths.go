@@ -51,6 +51,7 @@ func resolveUnix(goos, scope, home string, getenv func(string) string) Layout {
 	}
 	if scope == "system" {
 		l.ConfigDir, l.StateDir, l.BinDir = "/etc/cpra", "/var/lib/cpra", "/usr/local/lib/cpra"
+		l.LogDir = "/var/log/cpra"
 		l.ServiceFile = "/etc/systemd/system/cpra.service"
 		return l
 	}
@@ -62,6 +63,7 @@ func resolveUnix(goos, scope, home string, getenv func(string) string) Layout {
 	}
 	l.ConfigDir = filepath.Join(xdg("XDG_CONFIG_HOME", ".config"), "cpra")
 	l.StateDir = filepath.Join(xdg("XDG_STATE_HOME", ".local/state"), "cpra")
+	l.LogDir = filepath.Join(xdg("XDG_STATE_HOME", ".local/state"), "cpra-logs")
 	l.BinDir = filepath.Join(home, ".local", "lib", "cpra")
 	l.ServiceFile = filepath.Join(xdg("XDG_CONFIG_HOME", ".config"), "systemd", "user", "cpra.service")
 	return l

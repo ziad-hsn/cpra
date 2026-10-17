@@ -117,7 +117,7 @@ func (d *workerDispatcher) prepare(request workerDispatchRequest) (persistence.W
 		return persistence.WorkerDispatchState{}, err
 	}
 	in.Deadline = in.Scheduled.Add(timeout)
-	if in.Category == "notification" {
+	if in.Category != "check" {
 		monitor, found, err := d.store.GetContext(ctx, in.MonitorID)
 		if err != nil {
 			return persistence.WorkerDispatchState{}, err

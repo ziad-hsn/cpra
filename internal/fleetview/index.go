@@ -1,6 +1,7 @@
 package fleetview
 
 import (
+	"context"
 	"maps"
 	"slices"
 	"strings"
@@ -19,6 +20,7 @@ import (
 type Index struct {
 	rows      map[uint32]*atomic.Pointer[MonitorSummary]
 	order     *btree.BTreeG[indexItem]
+	stable    *btree.BTreeG[stableItem]
 	mu        sync.RWMutex
 	aggregate StatsSnapshot
 }
@@ -29,6 +31,11 @@ type indexItem struct {
 	row  *atomic.Pointer[MonitorSummary]
 }
 
+type stableItem struct {
+	id  string
+	row *atomic.Pointer[MonitorSummary]
+}
+
 func NewIndex(monitors []MonitorSummary) *Index {
 	order := btree.NewG[indexItem](32, func(a, b indexItem) bool {
 		if c := strings.Compare(a.name, b.name); c != 0 {
@@ -37,6 +44,7 @@ func NewIndex(monitors []MonitorSummary) *Index {
 		return a.id < b.id
 	})
 	i := &Index{rows: make(map[uint32]*atomic.Pointer[MonitorSummary], len(monitors)), order: order, aggregate: StatsSnapshot{ByStatus: map[string]int{}, ByPulseType: map[string]int{}, ByCode: map[string]int{}}}
+	i.stable = btree.NewG[stableItem](32, func(a, b stableItem) bool { return a.id < b.id })
 	for _, m := range monitors {
 		i.Put(m)
 	}
@@ -48,21 +56,38 @@ func (i *Index) Put(m MonitorSummary) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	p, ok := i.rows[m.ID]
+	var old *MonitorSummary
+	if ok {
+		old = p.Load()
+	}
+	// A retained page must never acquire a replacement monitor's identity.
+	if old != nil && (old.IncarnationUID != m.IncarnationUID || old.MonitorID != m.MonitorID) {
+		p = &atomic.Pointer[MonitorSummary]{}
+		i.rows[m.ID] = p
+	}
 	if !ok {
 		p = &atomic.Pointer[MonitorSummary]{}
 		i.rows[m.ID] = p
 	}
-	old := p.Swap(&m)
+	p.Store(&m)
 	if old == nil {
 		i.aggregate.Total++
 	} else {
 		i.count(*old, -1)
 	}
-	if old == nil || old.Name != m.Name {
+	if old == nil || old.Name != m.Name || old.IncarnationUID != m.IncarnationUID || old.MonitorID != m.MonitorID {
 		if old != nil {
 			i.order.Delete(indexItem{name: old.Name, id: old.ID})
 		}
 		i.order.ReplaceOrInsert(indexItem{name: m.Name, id: m.ID, row: p})
+	}
+	if old == nil || old.MonitorID != m.MonitorID || old.IncarnationUID != m.IncarnationUID {
+		if old != nil && old.MonitorID != "" {
+			i.stable.Delete(stableItem{id: old.MonitorID})
+		}
+		if m.MonitorID != "" {
+			i.stable.ReplaceOrInsert(stableItem{id: m.MonitorID, row: p})
+		}
 	}
 	i.count(m, 1)
 	i.aggregate.Generated = time.Now()
@@ -80,10 +105,72 @@ func (i *Index) Remove(id uint32) bool {
 	m := p.Load()
 	delete(i.rows, id)
 	i.order.Delete(indexItem{name: m.Name, id: id})
+	if m.MonitorID != "" {
+		i.stable.Delete(stableItem{id: m.MonitorID})
+	}
 	i.count(*m, -1)
 	i.aggregate.Total--
 	i.aggregate.Generated = time.Now()
 	return true
+}
+
+// View freezes membership in O(1). Observations in that membership may advance;
+// replacing an incarnation installs a new pointer and leaves this view intact.
+type View struct{ order *btree.BTreeG[stableItem] }
+
+func (i *Index) Snapshot() View {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return View{order: i.stable.Clone()}
+}
+
+func (i *Index) GetStable(id string) (MonitorSummary, bool) {
+	i.mu.RLock()
+	item, ok := i.stable.Get(stableItem{id: id})
+	i.mu.RUnlock()
+	if !ok {
+		return MonitorSummary{}, false
+	}
+	m := *item.row.Load()
+	m.ActiveCodes = slices.Clone(m.ActiveCodes)
+	return m, true
+}
+
+// Page visits at most limit+1 indexed rows. Selection is an exact stable ID.
+func (v View) Page(ctx context.Context, selection, after string, limit int) ([]MonitorSummary, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	limit = min(500, max(1, limit))
+	rows := make([]MonitorSummary, 0, limit)
+	if v.order == nil {
+		return rows, "", nil
+	}
+	start := after
+	if selection != "" {
+		start = selection
+	}
+	next := ""
+	v.order.AscendGreaterOrEqual(stableItem{id: start}, func(item stableItem) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		if selection != "" && item.id != selection {
+			return false
+		}
+		if item.id <= after {
+			return true
+		}
+		if len(rows) == limit {
+			next = rows[len(rows)-1].MonitorID
+			return false
+		}
+		m := *item.row.Load()
+		m.ActiveCodes = slices.Clone(m.ActiveCodes)
+		rows = append(rows, m)
+		return selection == ""
+	})
+	return rows, next, ctx.Err()
 }
 func (i *Index) count(m MonitorSummary, delta int) {
 	i.aggregate.ByStatus[m.Status] += delta

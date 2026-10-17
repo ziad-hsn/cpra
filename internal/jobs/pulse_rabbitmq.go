@@ -5,6 +5,7 @@ package jobs
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,10 +27,16 @@ type PulseRabbitMQJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func newPulseRabbitMQJob(cfg *manifest.PulseRabbitMQConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("rabbitmq", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
 	return &PulseRabbitMQJob{
+		tls:     transport,
 		ID:      uuid.New(),
 		Entity:  entity,
 		URL:     cfg.URL,
@@ -45,6 +52,14 @@ func (p *PulseRabbitMQJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
+	address, err := url.Parse(p.URL)
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("invalid RabbitMQ URL"), Payload: payload}
+	}
+	tlsConfig, err := p.tls.configuration(address.Hostname())
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+	}
 	attempts := newPulseAttempts(ctx, p.Retries)
 	defer attempts.complete(&result)
 	var lastErr error
@@ -53,7 +68,7 @@ func (p *PulseRabbitMQJob) Execute() (result Result) {
 		if !ok {
 			break
 		}
-		conn, err := amqp.DialConfig(p.URL, amqp.Config{Dial: func(network, address string) (net.Conn, error) { return dialBounded(ctx, network, address) }})
+		conn, err := amqp.DialConfig(p.URL, amqp.Config{TLSClientConfig: tlsConfig, Dial: func(network, address string) (net.Conn, error) { return dialBounded(ctx, network, address) }})
 		if err == nil {
 			var ch *amqp.Channel
 			ch, err = conn.Channel()

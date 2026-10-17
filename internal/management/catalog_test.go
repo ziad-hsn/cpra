@@ -36,7 +36,7 @@ func testCatalog(t *testing.T) (*Catalog, *persistence.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := NewCatalog(store, sealer)
+	catalog, err := NewCatalog(store, sealer, CatalogOptions{NotificationLogEnabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestCatalogWriteOnlyCredentialAndEncryptedPreparation(t *testing.T) {
 
 func TestCatalogCASAndDeleteRecreate(t *testing.T) {
 	c, _ := testCatalog(t)
-	one := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	one := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	a, err := c.PreparePatch(context.Background(), one.Kind, one.Metadata.ID, one.Metadata.ResourceVersion, []byte(`{"metadata":{"name":"first editor"}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestCatalogCASAndDeleteRecreate(t *testing.T) {
 	if _, err := c.Get(context.Background(), one.Kind, one.Metadata.ID); !errors.Is(err, persistence.ErrCatalogNotFound) {
 		t.Fatal(err)
 	}
-	replacement := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	replacement := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	if replacement.Metadata.UID == one.Metadata.UID {
 		t.Fatal("incarnation reused")
 	}
@@ -251,7 +251,7 @@ func TestCatalogProtectedValuesAndPatchBoundaries(t *testing.T) {
 func TestCatalogConsistentPagesAndPreparedChangeOwnership(t *testing.T) {
 	c, _ := testCatalog(t)
 	for _, id := range []string{"a", "c", "e"} {
-		createResource(t, c, resource("NotificationEndpoint", id, api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+		createResource(t, c, resource("NotificationEndpoint", id, api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	}
 	view, err := c.Snapshot()
 	if err != nil {
@@ -261,7 +261,7 @@ func TestCatalogConsistentPagesAndPreparedChangeOwnership(t *testing.T) {
 	if err != nil || len(page) != 2 || next != "c" {
 		t.Fatalf("first page: %v %s %v", page, next, err)
 	}
-	createResource(t, c, resource("NotificationEndpoint", "b", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+	createResource(t, c, resource("NotificationEndpoint", "b", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 	rest, next, err := view.Page(context.Background(), "NotificationEndpoint", next, 2)
 	if err != nil || len(rest) != 1 || rest[0].Metadata.ID != "e" || next != "" {
 		t.Fatalf("unstable continuation: %v %s %v", rest, next, err)
@@ -286,7 +286,7 @@ func TestCatalogConsistentPagesAndPreparedChangeOwnership(t *testing.T) {
 func TestCatalogDetectsUnauthenticatedReferenceIndexAndUnknownKinds(t *testing.T) {
 	t.Run("changed edge", func(t *testing.T) {
 		c, store := testCatalog(t)
-		createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-not-opened-by-validation.log"}`)}))
+		createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-not-opened-by-validation.log"}`)}))
 		createResource(t, c, resource("Recipient", "person", api.RecipientSpec{EndpointRefs: []string{"console"}}))
 		record, _, _ := store.CatalogGet(persistence.CatalogKey{Kind: "Recipient", ID: "person"})
 		record.References = nil

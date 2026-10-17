@@ -1,3 +1,5 @@
+# Set a separate private absolute output directory before enabling the log case.
+# log_directory: /var/log/cpra/verification
 # User-owned configuration. Every case is disabled until its target and observer are configured.
 {
   "manifest": {
@@ -340,7 +342,7 @@
             "dispatch": true,
             "notify": "log",
             "config": {
-              "file": "/tmp/cpra-verification-alerts.jsonl"
+              "file": "cpra-verification-alerts.jsonl"
             }
           }
         }

@@ -360,11 +360,16 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(-time.Nanosecond)})[0]; result.Allowed {
 		t.Fatal("restart bypassed recovery cooldown")
 	}
-	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore})[0]; !result.Allowed {
+	fresh := current.RecoveryCheckAfter.Add(time.Second)
+	if fresh.Before(second.NotBefore) {
+		fresh = second.NotBefore
+	}
+	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 3, At: fresh, ExecutionStart: fresh, Outcome: "failure"})
+	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: fresh})[0]; !result.Allowed {
 		t.Fatal("safe queued attempt did not survive restart", result.Err)
 	}
-	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(time.Second), Outcome: "failure"})
-	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 3, At: second.NotBefore.Add(2 * time.Hour), Outcome: "failure"})
+	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: fresh.Add(time.Second), Outcome: "failure"})
+	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 4, At: fresh.Add(2 * time.Hour), Outcome: "failure"})
 	current, _ = s.Get(m.ID)
 	if last := interventionAction(t, current); last.ID != second.ID || last.State != Failed || current.InterventionAttempts != 2 {
 		t.Fatal("restart reset the per-incident attempt limit")

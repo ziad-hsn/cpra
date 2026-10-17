@@ -43,7 +43,7 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
-		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
 			return batch, errors.New("optional commands require their own storage format")
 		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
@@ -158,7 +158,7 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.At.After(at) {
 			at = c.At
 		}
-		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion {
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion {
 			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
 		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
@@ -282,6 +282,12 @@ func (f *machine) Apply(log *raft.Log) any {
 			events = append(events, r.Events...)
 			continue
 		}
+		if c.Kind == "local_action_review" {
+			r := f.applyLocalActionReview(c, log.Index)
+			results = append(results, r)
+			events = append(events, r.Events...)
+			continue
+		}
 		if c.Kind == "catalog" || c.Kind == "control" || c.Kind == "manual_recovery" || c.Kind == "action_review" {
 			r := f.applyOperationTarget(c, log.Index, batch.Version)
 			if f.err != nil {
@@ -309,7 +315,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			ids := make([]string, 0)
 			for id, m := range f.image.Monitors {
 				for _, a := range m.Actions {
-					if a.State == Started {
+					if a.State == Started || lifecycleStorageFormat(batch.Version) && a.Kind == "intervention" && a.State == Queued {
 						ids = append(ids, id)
 						break
 					}
@@ -320,6 +326,9 @@ func (f *machine) Apply(log *raft.Log) any {
 				r := transitionAtFormat(f.image.Monitors[id], c, batch.Version)
 				events = append(events, f.installMonitor(f.image.Monitors[id], *r.Monitor, c.At)...)
 				events = append(events, r.Events...)
+			}
+			if len(ids) != 0 && lifecycleStorageFormat(batch.Version) {
+				f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 			}
 			results = append(results, Result{Allowed: true})
 			continue

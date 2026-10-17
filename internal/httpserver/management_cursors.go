@@ -33,7 +33,7 @@ func (m *managementHTTP) withObservationRead(r *http.Request, operation string, 
 	r = r.WithContext(ctx)
 	var principal string
 	var generation uint64
-	if err := m.auth.WithPolicyAdmission(r, operation, func(access api.AccessInfo, current uint64) error {
+	if err := m.withReadPolicy(r, operation, func(access api.AccessInfo, current uint64) error {
 		principal, generation = access.PrincipalID, current
 		return ctx.Err()
 	}); err != nil {
@@ -46,7 +46,7 @@ func (m *managementHTTP) withObservationRead(r *http.Request, operation string, 
 		return managementFailure(429, "readBusy", "Snapshot read capacity is busy.")
 	}
 	err := read(ctx)
-	permissionErr := m.auth.WithPolicyAdmission(r, operation, func(access api.AccessInfo, current uint64) error {
+	permissionErr := m.withReadPolicy(r, operation, func(access api.AccessInfo, current uint64) error {
 		if access.PrincipalID != principal || current != generation {
 			return managementFailure(410, "cursorExpired", "Authorization changed. Read the resource again.")
 		}
@@ -67,7 +67,7 @@ func (m *managementHTTP) withSnapshotRead(r *http.Request, operation, kind strin
 	r = r.WithContext(ctx)
 	var principal string
 	var generation uint64
-	if err := m.auth.WithPolicyAdmission(r, operation, func(access api.AccessInfo, current uint64) error {
+	if err := m.withReadPolicy(r, operation, func(access api.AccessInfo, current uint64) error {
 		principal, generation = access.PrincipalID, current
 		return ctx.Err()
 	}); err != nil {
@@ -85,7 +85,7 @@ func (m *managementHTTP) withSnapshotRead(r *http.Request, operation, kind strin
 	}
 	defer m.releaseSnapshotRead(read)
 	err = page(ctx, read)
-	permissionErr := m.auth.WithPolicyAdmission(r, operation, func(access api.AccessInfo, current uint64) error {
+	permissionErr := m.withReadPolicy(r, operation, func(access api.AccessInfo, current uint64) error {
 		if access.PrincipalID != principal || current != generation {
 			return managementFailure(410, "cursorExpired", "Authorization changed. Start a new query.")
 		}

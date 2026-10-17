@@ -90,7 +90,7 @@ func Preflight(ctx context.Context, operations Operations, frozen *Frozen) (*api
 	encodedBytes := len(initial)
 	err = frozen.Range(ctx, func(item Item) error {
 		if err := api.ValidateResourceSettings(item.Resource); err != nil {
-			return fmt.Errorf("%s: %w", item.Location, err)
+			return item.ValidationError(err)
 		}
 		value := applyItem(item)
 		raw, err := json.Marshal(value)
@@ -164,7 +164,7 @@ func Apply(ctx context.Context, operations Operations, frozen *Frozen) (Result, 
 	}
 	if err := frozen.Range(ctx, func(item Item) error {
 		if err := api.ValidateResourceSettings(item.Resource); err != nil {
-			return fmt.Errorf("%s: %w", item.Location, err)
+			return item.ValidationError(err)
 		}
 		return nil
 	}); err != nil {

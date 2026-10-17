@@ -25,10 +25,16 @@ type PulseKafkaJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func newPulseKafkaJob(cfg *manifest.PulseKafkaConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("kafka", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
 	return &PulseKafkaJob{
+		tls:     transport,
 		ID:      uuid.New(),
 		Entity:  entity,
 		Brokers: append([]string(nil), cfg.Brokers...),
@@ -44,6 +50,10 @@ func (p *PulseKafkaJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
+	tlsConfig, err := p.tls.configuration("") // Kafka selects each broker's hostname.
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+	}
 	attempts := newPulseAttempts(ctx, p.Retries)
 	defer attempts.complete(&result)
 	var lastErr error
@@ -52,7 +62,11 @@ func (p *PulseKafkaJob) Execute() (result Result) {
 		if !ok {
 			break
 		}
-		client, err := kgo.NewClient(kgo.SeedBrokers(p.Brokers...), kgo.RequestRetries(0), kgo.DialTimeout(remaining(ctx)), kgo.RequestTimeoutOverhead(remaining(ctx)))
+		options := []kgo.Opt{kgo.SeedBrokers(p.Brokers...), kgo.RequestRetries(0), kgo.DialTimeout(remaining(ctx)), kgo.RequestTimeoutOverhead(remaining(ctx))}
+		if tlsConfig != nil {
+			options = append(options, kgo.DialTLSConfig(tlsConfig.Clone()))
+		}
+		client, err := kgo.NewClient(options...)
 		if err == nil {
 			err = client.Ping(ctx)
 			client.Close()

@@ -67,7 +67,7 @@ func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api
 			return nil, persistence.ErrCatalogNotFound
 		}
 		monitorID, control.MonitorUID, control.IncidentID = incident.MonitorID, incident.MonitorUID, id
-	case "snooze", "unsnooze":
+	case "snooze", "unsnooze", "ignore", "unignore":
 		if req.IncidentID != "" {
 			return nil, persistence.ErrControlInvalid
 		}
@@ -78,6 +78,9 @@ func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api
 			}
 			control.Until = at.Add(duration)
 		} else if req.Duration != "" {
+			return nil, persistence.ErrControlInvalid
+		}
+		if (action == "ignore" || action == "unignore") && strings.TrimSpace(req.Reason) == "" {
 			return nil, persistence.ErrControlInvalid
 		}
 		status, ok, err := c.store.MonitorStatusContext(ctx, id)

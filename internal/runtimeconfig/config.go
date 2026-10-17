@@ -27,6 +27,10 @@ type History struct {
 	RetentionDays int `yaml:"retention_days"`
 }
 
+type Notifications struct {
+	LogDirectory string `yaml:"log_directory,omitempty" json:"-"`
+}
+
 type SLO struct {
 	QueueTarget        time.Duration `yaml:"queue_target"`
 	ResultTarget       time.Duration `yaml:"result_target"`
@@ -44,6 +48,7 @@ type Config struct {
 	Storage           Storage        `yaml:"storage"`
 	History           History        `yaml:"history"`
 	SLO               SLO            `yaml:"slo"`
+	Notifications     Notifications  `yaml:"notifications,omitempty"`
 }
 
 func Default() Config {
@@ -86,6 +91,9 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.Notifications.LogDirectory != "" && !filepath.IsAbs(c.Notifications.LogDirectory) {
+		return fmt.Errorf("notifications.log_directory must be absolute")
+	}
 	if err := c.ManualRecovery.Validate(); err != nil {
 		return err
 	}
@@ -119,6 +127,16 @@ func (c Config) Validate() error {
 // platform user default. It does not create or open state. Services pass an
 // absolute configuration path and never infer their scope from an elevated UID.
 func (c *Config) ResolveStorageDirectory(override string) error {
+	return c.resolveStorageDirectory(override, true)
+}
+
+// ResolveValidationDirectory computes the key-exclusion boundary without
+// inspecting the old working-directory store or opening persistent state.
+func (c *Config) ResolveValidationDirectory(override string) error {
+	return c.resolveStorageDirectory(override, false)
+}
+
+func (c *Config) resolveStorageDirectory(override string, inspectLegacy bool) error {
 	if c.Storage.Mode != "raft" {
 		return nil
 	}
@@ -127,10 +145,12 @@ func (c *Config) ResolveStorageDirectory(override string) error {
 		dir = c.Storage.Directory
 	}
 	if dir == "" {
-		if _, err := os.Lstat("cpra-data"); err == nil {
-			return fmt.Errorf("legacy ./cpra-data exists: select it explicitly with -data-dir, or stop CPRa and migrate the complete store before using a new directory")
-		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("inspect legacy data directory: %w", err)
+		if inspectLegacy {
+			if _, err := os.Lstat("cpra-data"); err == nil {
+				return fmt.Errorf("legacy ./cpra-data exists: select it explicitly with -data-dir, or stop CPRa and migrate the complete store before using a new directory")
+			} else if !os.IsNotExist(err) {
+				return fmt.Errorf("inspect legacy data directory: %w", err)
+			}
 		}
 		layout, err := installpath.Resolve("user")
 		if err != nil {

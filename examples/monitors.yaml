@@ -1,6 +1,7 @@
 # Replace this local example address with your own service health endpoint.
 monitors:
-  - name: example-service
+  - id: example-service
+    name: example-service
     enabled: true
     pulse_check:
       type: http

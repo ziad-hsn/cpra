@@ -62,6 +62,10 @@ func (c ControlCommand) validate(at time.Time) error {
 		if c.IncidentID != "" || !c.Until.IsZero() {
 			return ErrControlInvalid
 		}
+	case "ignore", "unignore":
+		if c.IncidentID != "" || !c.Until.IsZero() || strings.TrimSpace(c.Reason) == "" {
+			return ErrControlInvalid
+		}
 	case "expire_snooze":
 		if c.IncidentID != "" || c.Actor != "system" || c.Until.IsZero() || at.Before(c.Until) {
 			return ErrControlInvalid
@@ -75,6 +79,10 @@ func (c ControlCommand) validate(at time.Time) error {
 // MonitorStatus is an observation projection with no action maps, provider
 // configuration, actor notes or other large per-monitor allocations.
 type MonitorStatus struct {
+	Ignored                                                           bool
+	IgnoredAt                                                         time.Time
+	IgnoredBy, IgnoreCause, IgnoreReason                              string
+	IgnoreIncidentCount                                               int
 	LastFailure                                                       FailureDiagnostic
 	ObservedGeneration                                                uint64
 	ID, CatalogUID, CatalogRevision, Revision                         string
@@ -85,7 +93,7 @@ type MonitorStatus struct {
 	TotalChecks, SuccessfulChecks                                     uint64
 	LastOutcome                                                       string
 	LastLatency                                                       time.Duration
-	UnknownActions                                                    int
+	UnknownActions, ActionsNeedingReview                              int
 }
 
 // IncidentRecord describes the active or latest closed incident for a monitor.

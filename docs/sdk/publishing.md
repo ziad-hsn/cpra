@@ -17,7 +17,7 @@ working branch has real TLS/Raft integration for v2 resource management,
 controls, action review, operation reads and observations. Resumable collection
 application and external-worker server integration are implemented and locally
 tested. Frozen module installation and complete release qualification remain
-open. See the [current implementation status](../implementation/STATUS.md)
+open. See the [current availability](../versions.md)
 for the exact executed scope. Earlier published servers are not qualified by
 working-branch tests. Candidates stay private until every agreed gate passes;
 improving a README or passing a fixture does not complete that gate.
@@ -288,7 +288,7 @@ The verifier defaults to `v0.1.0-rc.1` for each module. Set `--sdk-version` and
 `--worker-version` explicitly when qualifying other versions; the worker's
 dependency must match the selected SDK version. Select versions and consumer
 requirements before verification; substituting `@latest` could test a different
-candidate. The [current archive checkpoint](../implementation/go-sdk-status.md#module-archive-checkpoint)
+candidate. The [module qualification](publishing.md)
 records unexecuted Go-tool and consumer gates for the latest local implementation.
 
 After publication, a new consumer project can add the library as follows:

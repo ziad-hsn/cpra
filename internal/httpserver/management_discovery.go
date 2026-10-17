@@ -31,7 +31,7 @@ func (s *Server) registerAccessDiscovery(mux *http.ServeMux) {
 func (m *managementHTTP) registerDiscovery(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/version", func(w http.ResponseWriter, r *http.Request) {
 		managementHeaders(w)
-		if _, err := m.auth.Authorize(r, "GetVersion"); err != nil {
+		if _, err := m.authorizeRead(r, "GetVersion"); err != nil {
 			writeManagementError(w, err)
 			return
 		}
@@ -54,20 +54,27 @@ func (m *managementHTTP) registerDiscovery(mux *http.ServeMux) {
 		} `json:"components"`
 	}
 	schemaErr := json.Unmarshal(api.Schema(), &contract)
-	resources := map[string]bool{"Incident": true, "Action": true, "Operation": true, "Event": true}
-	for _, route := range managementResourceRoutes {
-		resources[route.kind] = true
+	resources := map[string]string{"MonitorObservation": "MonitorObservation", "Incident": "Incident", "Action": "Action", "Event": "Event", "Version": "Version", "Schema": "Explanation"}
+	for _, route := range observationRoutes {
+		resources[route.kind] = route.kind
 	}
-	extensions := api.Capabilities{ResourceOperations: map[string][]string{}}
-	m.discoverExtensions(&extensions)
-	for _, name := range extensions.Resources {
-		if _, exists := contract.Components.Schemas[name]; exists {
-			resources[name] = true
+	resources["SLO"], resources["Readiness"], resources["Liveness"] = "SLOView", "Health", "Health"
+	if m.catalog != nil {
+		resources["Operation"] = "Operation"
+		for _, route := range managementResourceRoutes {
+			resources[route.kind] = route.kind
+		}
+		extensions := api.Capabilities{ResourceOperations: map[string][]string{}}
+		m.discoverExtensions(&extensions)
+		for _, name := range extensions.Resources {
+			if _, exists := contract.Components.Schemas[name]; exists {
+				resources[name] = name
+			}
 		}
 	}
 	mux.HandleFunc("GET /api/v2/schemas/{id}", func(w http.ResponseWriter, r *http.Request) {
 		managementHeaders(w)
-		if _, err := m.auth.Authorize(r, "ExplainResource"); err != nil {
+		if _, err := m.authorizeRead(r, "ExplainResource"); err != nil {
 			writeManagementError(w, err)
 			return
 		}
@@ -87,7 +94,7 @@ func (m *managementHTTP) registerDiscovery(mux *http.ServeMux) {
 			writeManagementError(w, managementFailure(404, "schemaNotFound", "Select a registered resource kind from API discovery."))
 			return
 		}
-		schema, description, err := resourceExplanation(root, contract.Components.Schemas)
+		schema, description, err := resourceExplanation(resources[root], contract.Components.Schemas)
 		if err != nil {
 			writeManagementError(w, managementFailure(503, "schemaUnavailable", "The resource contract is unavailable."))
 			return

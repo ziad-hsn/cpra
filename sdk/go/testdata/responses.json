@@ -255,5 +255,67 @@
   "AccessDiscovery": {
     "mode": "management",
     "authenticationRequired": true
+  },
+  "MonitorObservation": {
+    "monitorID": "m",
+    "incarnationUID": "fixture-uid",
+    "numericID": 1,
+    "name": "Fixture",
+    "source": "file",
+    "checkType": "tcp",
+    "target": "127.0.0.1:443",
+    "intervalMs": 60000,
+    "health": "unknown",
+    "phase": "idle",
+    "enabled": true,
+    "ignored": false,
+    "configuredNotifications": [],
+    "pendingNotifications": 0,
+    "completedNotifications": 0,
+    "failedNotifications": 0,
+    "unknownNotifications": 0,
+    "unknownActions": 0,
+    "lastCheckLatencyMs": {
+      "available": false,
+      "reason": "notObserved"
+    },
+    "missedChecks": 0,
+    "queueRejections": 0,
+    "certificateVerificationDisabled": false,
+    "actionsNeedingReview": 0
+  },
+  "MonitorObservationList": {
+    "items": [
+      {
+        "monitorID": "m",
+        "incarnationUID": "fixture-uid",
+        "numericID": 1,
+        "name": "Fixture",
+        "source": "file",
+        "checkType": "tcp",
+        "target": "127.0.0.1:443",
+        "intervalMs": 60000,
+        "health": "unknown",
+        "phase": "idle",
+        "enabled": true,
+        "ignored": false,
+        "configuredNotifications": [],
+        "pendingNotifications": 0,
+        "completedNotifications": 0,
+        "failedNotifications": 0,
+        "unknownNotifications": 0,
+        "unknownActions": 0,
+        "lastCheckLatencyMs": {
+          "available": false,
+          "reason": "notObserved"
+        },
+        "missedChecks": 0,
+        "queueRejections": 0,
+        "certificateVerificationDisabled": false,
+        "actionsNeedingReview": 0
+      }
+    ],
+    "snapshot": "fixture-snapshot",
+    "generatedAt": "2026-10-17T12:00:00Z"
   }
 }

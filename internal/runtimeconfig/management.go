@@ -379,6 +379,32 @@ func (c Management) validateDataDirectory(directory, section string) error {
 	if err != nil {
 		return managementConfigError(section, 0, "cannot resolve data-directory boundary")
 	}
+	for _, source := range managementSourcePaths(c) {
+		if source == "" {
+			continue
+		}
+		rel, err := filepath.Rel(absolute, filepath.Clean(source))
+		if err == nil && (rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
+			return managementConfigError(section, 0, "policy, keys and bootstrap source files must remain outside the data directory")
+		}
+	}
+	return nil
+}
+
+// NotificationProtectedPaths supplies private process boundaries to the log
+// root opener. It must never be included in public configuration responses.
+func (c Config) NotificationProtectedPaths() []string {
+	paths := []string{c.Storage.Directory}
+	files := append(managementSourcePaths(c.Management), managementSourcePaths(Management{Encryption: c.Storage.Encryption})...)
+	for _, file := range files {
+		if file != "" {
+			paths = append(paths, filepath.Dir(file))
+		}
+	}
+	return paths
+}
+
+func managementSourcePaths(c Management) []string {
 	paths := []string{c.PolicyFile}
 	if c.TLS != nil {
 		paths = append(paths, c.TLS.KeyFile, c.TLS.CertFile)
@@ -396,16 +422,7 @@ func (c Management) validateDataDirectory(directory, section string) error {
 			paths = append(paths, source.SharedCredentialsFiles...)
 		}
 	}
-	for _, source := range paths {
-		if source == "" {
-			continue
-		}
-		rel, err := filepath.Rel(absolute, filepath.Clean(source))
-		if err == nil && (rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
-			return managementConfigError(section, 0, "policy, keys and bootstrap source files must remain outside the data directory")
-		}
-	}
-	return nil
+	return paths
 }
 
 func managementPath(path string) bool {

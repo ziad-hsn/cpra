@@ -119,6 +119,11 @@ func loadAuthenticationBootstrap(ctx context.Context, settings runtimeconfig.Con
 		policy.LegacyTokenSHA256 = hex.EncodeToString(digest[:])
 	}
 	if settings.Management.Enabled {
+		for _, entry := range policy.Principals {
+			if policy.LegacyTokenSHA256 != "" && strings.EqualFold(entry.TokenSHA256, policy.LegacyTokenSHA256) {
+				return persistence.AuthenticationCommand{}, fmt.Errorf("%w: a named management token cannot also be the observation bootstrap token; remove -web.auth, -web.auth-file, CPRA_AUTH_TOKEN and CPRA_AUTH_TOKEN_FILE from the server process; pass connection credentials only to cpractl", httpauth.ErrInvalidConfig)
+			}
+		}
 		if err := httpauth.ValidateConfig(policy); err != nil {
 			return persistence.AuthenticationCommand{}, err
 		}

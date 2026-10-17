@@ -34,6 +34,9 @@ func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inli
 	monitor.ID = uuid.NewString()
 	monitor.Revision = uuid.NewString()
 	monitor.Policy.Intervention = category == "recovery"
+	if monitor.Policy.Intervention {
+		monitor.Policy.RecoveryTimeout = time.Hour
+	}
 	monitor.Policy.Endpoints = nil
 	source := catalogJobTypeRecord(t, s, monitor.ID, job.Current)
 	keys := []CatalogKey{source.Key}

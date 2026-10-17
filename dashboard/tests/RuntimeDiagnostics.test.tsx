@@ -14,16 +14,16 @@ function stateWire() {
       commitLatency: { available: true, value: 0 }, snapshotDuration: { available: false, value: 0, reason: 'not_recorded' } } };
 }
 
-async function fixture(options: { permissions?: string[]; legacy?: boolean; readyStatus?: number; readyBody?: unknown; stateBody?: unknown; stateStatus?: number } = {}) {
+async function fixture(options: { permissions?: string[]; observation?: boolean; readyStatus?: number; readyBody?: unknown; stateBody?: unknown; stateStatus?: number } = {}) {
   const wire = { stateStatus: options.stateStatus ?? 200, stateBody: options.stateBody ?? stateWire(), readyStatus: options.readyStatus ?? 200, readyBody: options.readyBody ?? { available: true, generatedAt: '2026-09-19T12:00:00Z' } };
   const requests: { path: string; method: string; authorization: string | null }[] = [];
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
     const path = new URL(String(input)).pathname;
     requests.push({ path, method: init?.method ?? 'GET', authorization: new Headers(init?.headers).get('Authorization') });
-    if (path === '/api/v2/discovery') return options.legacy ? response({}, 404) : response({ apiVersions: ['cpra.io/v2'], resources: [], drivers: {}, patchTypes: [] });
-    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: options.legacy ? 'observation' : 'management', authenticationRequired: !options.legacy }));
-    if (path === '/api/v2/self') return options.legacy ? response({}, 404) : response({ principalId: 'alice', role: 'reader', permissions: options.permissions ?? ['GetState', 'GetReady'] });
+    if (path === '/api/v2/discovery') return options.observation ? response({}, 404) : response({ apiVersions: ['cpra.io/v2'], resources: [], drivers: {}, patchTypes: [] });
+    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: options.observation ? 'observation' : 'management', authenticationRequired: !options.observation }));
+    if (path === '/api/v2/self') return response({ principalId: options.observation ? 'anonymous' : 'alice', role: 'reader', permissions: options.permissions ?? ['GetState', 'GetReady'] });
     if (path === '/api/v2/state') return response(wire.stateBody, wire.stateStatus);
     if (path === '/api/v2/readyz') return response(wire.readyBody, wire.readyStatus);
     if (path === '/api/v1/state') return response({ storage: { ready: true, mode: 'memory', committed_index: 0, commit_latency_ms: 0, snapshot_duration_ms: 0 }, actions: [] });
@@ -31,7 +31,7 @@ async function fixture(options: { permissions?: string[]; legacy?: boolean; read
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover();
-  if (!options.legacy) await session.signIn('test-token-01234567890123456789012345678901');
+  if (!options.observation) await session.signIn('test-token-01234567890123456789012345678901');
   render(<SessionBoundary session={session}><RuntimeDiagnostics /></SessionBoundary>);
   return { wire, requests };
 }
@@ -145,16 +145,17 @@ it('honors separate state/readiness permissions without trying a legacy route', 
   expect(denied.requests.filter(request => !['/self', '/access', '/discovery'].some(suffix => request.path.endsWith(suffix)))).toHaveLength(0);
 });
 
-it('uses the limited legacy storage view only for an explicitly discovered legacy server', async () => {
-  const { requests } = await fixture({ legacy: true });
+it('uses current state and readiness in observation mode without writable management access', async () => {
+  const { requests } = await fixture({ observation: true, stateBody: { ...stateWire(), storage: { ...stateWire().storage, mode: 'memory' } } });
   await screen.findByText('Memory (not persistent)');
-  expect(screen.getByText(/^Observation mode:/)).toBeInTheDocument();
-  expect(valueFor('Admission readiness (state)')).toHaveTextContent(/^Unavailable$/);
-  expect(valueFor('Controller initialization and progress')).toHaveTextContent(/^Unavailable$/);
-  expect(valueFor('Dashboard projection')).toHaveTextContent(/^Unavailable$/);
-  expect(valueFor('Last recorded commit latency')).toHaveTextContent(/^Unavailable$/);
-  expect(valueFor('FSM-applied log position')).toHaveTextContent(/^0$/);
-  expect(requests.map(request => request.path)).toEqual(['/api/v2/access', '/api/v1/state']);
+  expect(screen.getByText(/Observation mode/)).toBeInTheDocument();
+  expect(valueFor('Admission readiness (state)')).toHaveTextContent(/^Ready for new work$/);
+  expect(valueFor('Controller initialization and progress')).toHaveTextContent(/^Ready$/);
+  expect(valueFor('Dashboard projection')).toHaveTextContent(/^Stale$/);
+  expect(valueFor('Last recorded commit latency')).toHaveTextContent(/^0 ms$/);
+  expect(valueFor('FSM-applied log position')).toHaveTextContent(/^12$/);
+  await screen.findByText(/^Readiness endpoint:/);
+  expect(requests.map(request => request.path)).toEqual(['/api/v2/access', '/api/v2/self', '/api/v2/state', '/api/v2/readyz']);
   expect(requests.every(request => request.authorization === null && request.method === 'GET')).toBe(true);
 });
 

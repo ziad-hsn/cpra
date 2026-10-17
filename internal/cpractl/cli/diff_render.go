@@ -23,10 +23,13 @@ type diffLocation struct {
 	File     string `json:"file" yaml:"file"`
 	Document int    `json:"document" yaml:"document"`
 	Item     int    `json:"item" yaml:"item"`
+	Line     int    `json:"line,omitempty" yaml:"line,omitempty"`
+	Column   int    `json:"column,omitempty" yaml:"column,omitempty"`
 }
 type diffIssue struct {
 	ID      string        `json:"id,omitempty" yaml:"id,omitempty"`
 	Source  *diffLocation `json:"source,omitempty" yaml:"source,omitempty"`
+	Field   string        `json:"field,omitempty" yaml:"field,omitempty"`
 	Reason  string        `json:"reason" yaml:"reason"`
 	Message string        `json:"message" yaml:"message"`
 }
@@ -65,18 +68,30 @@ func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, prefli
 		default:
 			return result, invalid
 		}
-		result.Items = append(result.Items, diffItem{ID: item.ID, Outcome: proposed.Outcome, OldVersion: proposed.OldVersion, Source: diffLocation{item.Location.Source, item.Location.Document, item.Location.Item}})
+		result.Items = append(result.Items, diffItem{ID: item.ID, Outcome: proposed.Outcome, OldVersion: proposed.OldVersion, Source: diffSource(item.Location)})
 	}
 	for _, problem := range preflight.Errors {
 		issue := diffIssue{Reason: "invalidGraph", Message: "The collection cannot be validated against the observed catalog."}
-		if strings.HasPrefix(problem.Field, "items[") && strings.HasSuffix(problem.Field, "].resource") {
-			number := strings.TrimSuffix(strings.TrimPrefix(problem.Field, "items["), "].resource")
+		if strings.HasPrefix(problem.Field, "items[") {
+			number, suffix, found := strings.Cut(strings.TrimPrefix(problem.Field, "items["), "].resource")
 			index, err := strconv.Atoi(number)
-			if err != nil || index < 0 || index >= len(result.Items) || strconv.Itoa(index) != number {
+			if !found || len(problem.Field) > 192 || err != nil || index < 0 || index >= len(result.Items) || strconv.Itoa(index) != number || suffix != "" && !strings.HasPrefix(suffix, ".") {
 				return result, invalid
 			}
 			item := result.Items[index]
 			issue.ID, issue.Source = item.ID, &item.Source
+			issue.Field = api.SafeValidationField(strings.TrimPrefix(suffix, "."))
+			original, err := frozen.Item(ctx, index)
+			if err != nil {
+				return result, managementFailure(err)
+			}
+			clear(original.Resource.Spec)
+			clear(original.Resource.Status)
+			var located *collection.SourceError
+			if errors.As(original.ValidationError(api.InvalidField(issue.Field, problem.Reason)), &located) {
+				source := diffSource(located.Location)
+				issue.Source = &source
+			}
 		}
 		// Error messages from a server are not input for terminal output. Render
 		// reviewed classifications while keeping payloads and private labels out.
@@ -91,6 +106,10 @@ func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, prefli
 			issue.Reason, issue.Message = "duplicateIdentity", "A resource identity occurs more than once."
 		case "invalidResource":
 			issue.Reason, issue.Message = "invalidResource", "The resource schema, compiled driver or configuration is invalid."
+		default:
+			if message := api.ValidationMessage(problem.Reason); message != "" {
+				issue.Reason, issue.Message = problem.Reason, message
+			}
 		}
 		result.Errors = append(result.Errors, issue)
 	}
@@ -104,7 +123,7 @@ func writeCollectionDiff(cmd *cobra.Command, o *options, result diffReport) erro
 	return newPrinter(cmd, o).render(result, func(w io.Writer) error {
 		rows := make([][]string, 0, len(result.Items))
 		for _, item := range result.Items {
-			location := fmt.Sprintf("%s document %d item %d", item.Source.File, item.Source.Document, item.Source.Item)
+			location := item.Source.String()
 			rows = append(rows, []string{managementDisplay(item.ID), item.Outcome, managementDisplay(strOrDash(item.OldVersion)), managementDisplay(location)})
 		}
 		if err := table(w, []string{"RESOURCE", "CHANGE", "OLD VERSION", "SOURCE"}, rows); err != nil {
@@ -113,7 +132,10 @@ func writeCollectionDiff(cmd *cobra.Command, o *options, result diffReport) erro
 		for _, issue := range result.Errors {
 			location := "collection"
 			if issue.Source != nil {
-				location = fmt.Sprintf("%s document %d item %d", issue.Source.File, issue.Source.Document, issue.Source.Item)
+				location = issue.Source.String()
+			}
+			if issue.Field != "" {
+				location += " " + issue.Field
 			}
 			if _, err := fmt.Fprintf(w, "%s: %s: %s\n", managementDisplay(location), issue.Reason, issue.Message); err != nil {
 				return err
@@ -121,4 +143,11 @@ func writeCollectionDiff(cmd *cobra.Command, o *options, result diffReport) erro
 		}
 		return nil
 	})
+}
+
+func diffSource(location collection.Location) diffLocation {
+	return diffLocation{File: location.Source, Document: location.Document, Item: location.Item, Line: location.Line, Column: location.Column}
+}
+func (location diffLocation) String() string {
+	return (collection.Location{Source: location.File, Document: location.Document, Item: location.Item, Line: location.Line, Column: location.Column}).String()
 }

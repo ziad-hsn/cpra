@@ -38,6 +38,11 @@ func NewZapLogger(cfg LoggerConfig) (*ZapLogger, error) {
 	} else {
 		zapConfig.Encoding = "json"
 	}
+	// Machine records use an explicit UTC offset, independent of the host's
+	// timezone. The dashboard formats observation timestamps for the viewer.
+	zapConfig.EncoderConfig.EncodeTime = func(at time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+		encoder.AppendString(at.UTC().Format(time.RFC3339Nano))
+	}
 
 	// Configure sampling
 	if cfg.EnableSampling {
@@ -96,6 +101,8 @@ func convertFields(fields []Field) []zap.Field {
 			zapFields[i] = zap.Bool(f.Key, v)
 		case time.Duration:
 			zapFields[i] = zap.Duration(f.Key, v)
+		case time.Time:
+			zapFields[i] = zap.Time(f.Key, v.UTC())
 		case error:
 			zapFields[i] = zap.Error(v)
 		default:

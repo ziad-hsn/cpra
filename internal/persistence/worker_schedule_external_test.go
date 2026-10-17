@@ -168,7 +168,7 @@ func TestWorkerScheduleCheckpointValidationAndSnapshot(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{*c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("format", version, err)
 		}
 	}
@@ -208,7 +208,7 @@ func TestWorkerScheduleCheckpointValidationAndSnapshot(t *testing.T) {
 	if err := snapshot.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(deliveryWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(lifecycleWorkerSnapshotMagic)) {
 		t.Fatal("snapshot does not preserve the delivery worker format")
 	}
 	if bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {

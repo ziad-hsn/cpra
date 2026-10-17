@@ -16,6 +16,7 @@ From the repository root:
 
 ```sh
 make dev-workspace
+make test-fast
 make fmt-check
 make vet
 make test
@@ -26,6 +27,37 @@ The development workspace composes the application, SDK and worker modules
 locally. Root `go test ./...` does not test nested modules. `make sdk-check`
 checks the SDK and the tagged worker module separately. Local workspace success
 does not establish that versioned modules have been published or downloaded.
+
+Make also needs Python 3. Release tools pin their own versions; use the exact
+Node/pnpm versions from `scripts/release/recipe.json` for frontend work. Race
+checks need a supported native C compiler, even though production binaries use
+`CGO_ENABLED=0`. Documentation dependencies are pinned in the separate site
+checkout's `_sources/requirements.txt`.
+
+For direct Go commands or an editor, select the generated workspace explicitly:
+
+```sh
+make dev-workspace
+export GOWORK="$PWD/bin/cpra-sdk.work"
+go test ./internal/loader
+# Launch your editor from this environment, or set its Go tools' GOWORK
+# environment to the absolute path printed by make dev-workspace.
+```
+
+Restart the editor's Go language server after changing its environment. Configure
+its build tags explicitly when working on `externaljobs` or optional built-in
+files. Keep local workspace/editor files uncommitted; do not add `replace`
+directives to distributed modules. Go's [workspace reference](https://go.dev/ref/mod#workspaces)
+and [gopls workspace guide](https://go.dev/gopls/workspace) explain these settings.
+To include integration lessons, generate a separate workspace with
+`python3 scripts/sdk/workspace.py --examples --output bin/cpra-examples.work`
+and select that absolute path only for those examples.
+
+`test-fast` covers pure settings, manifests, projections, SLO/path/version helpers
+and SDK collections without race instrumentation. It does not replace the full
+matrix above. Release and downloaded-consumer verification use `GOWORK=off` and
+qualified published dependencies; local workspace success does not satisfy that
+gate or justify publishing tags early.
 
 For frontend work:
 
@@ -44,7 +76,22 @@ Rebuild embedded assets with their sources and notices. Remove local dashboard
 dotenv files before a release build; credentials are runtime configuration, not
 frontend inputs. API changes also require regenerated base/tagged contracts and
 the operation inventory. Follow the existing generation commands rather than
-editing generated output by hand.
+editing generated output by hand:
+
+```sh
+python3 tools/sdkgen/generate.py
+python3 tools/sdkgen/generate.py --check
+python3 scripts/dashboard/generate_api.py
+make dashboard-build dashboard-check
+make docs-references docs-check
+```
+
+Set `GO` to the selected compiler for generation. The shared browser collection
+parser is rebuilt by `dashboard-build`; changing SDK validators requires that
+rebuild even when no TypeScript changed. Generated asset freshness prevents
+shipping an older dashboard with newer server source. See the [driver-authoring
+path](docs/how-to/adding-new-jobs.md) for schema, capability, execution and fixture
+changes needed for a new driver.
 
 ## Change and verification scope
 

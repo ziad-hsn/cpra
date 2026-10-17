@@ -27,9 +27,12 @@ func mutatesCatalog(c Command) bool {
 // format-2/3 replay contract.
 func commandWriteFormat(c Command) int {
 	version := joinStorageFormat(commandMinimumFormat(c), commandExtensionWriteFormat(c))
+	if c.Collection != nil && c.Collection.Action == "create" {
+		version = joinStorageFormat(version, LifecycleFormatVersion)
+	}
 	switch c.Kind {
 	case "configure", "pulse", "start", "result", "recover", "remove":
-		version = joinStorageFormat(version, DeliveryFormatVersion)
+		version = joinStorageFormat(version, LifecycleFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
@@ -50,6 +53,21 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if collectionProfileV2Command(c) || collectionFieldDiagnosticsCommand(c) {
+		return joinStorageFormat(LifecycleFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Failure.requiresLifecycleFormat() {
+		return joinStorageFormat(LifecycleFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Control != nil && (c.Control.Action == "ignore" || c.Control.Action == "unignore") {
+		return joinStorageFormat(LifecycleFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Kind == "local_action_review" {
+		return LifecycleFormatVersion
+	}
+	if c.Config != nil && requiresLifecycleFormat(*c.Config) {
+		return joinStorageFormat(LifecycleFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.RetryDelay != 0 || c.Failure != (FailureDiagnostic{}) || !c.ActionDeadline.IsZero() || c.Config != nil && requiresDeliveryFormat(*c.Config) {
 		return joinStorageFormat(DeliveryFormatVersion, commandExtensionMinimumFormat(c))
 	}
@@ -125,4 +143,15 @@ func (f *machine) nextCatalogMutationSequence(version int) (uint64, error) {
 		return 0, ErrCatalogSequenceExhausted
 	}
 	return previous + 1, nil
+}
+
+func collectionFieldDiagnosticsCommand(c Command) bool {
+	if c.Collection != nil {
+		for _, item := range c.Collection.ValidationItems {
+			if item.Field != "" || item.Reason != "" {
+				return true
+			}
+		}
+	}
+	return false
 }

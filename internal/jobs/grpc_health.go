@@ -2,18 +2,15 @@ package jobs
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io"
 	"net"
-	"os"
 	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	health "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 )
 
 func (p *PulseGRPCJob) healthCheck(ctx context.Context) (result Result) {
@@ -51,36 +48,27 @@ func (p *PulseGRPCJob) healthCheck(ctx context.Context) (result Result) {
 		}
 		if err != nil {
 			// Remote RPC messages are untrusted diagnostics, not retained state.
-			result.Err = fmt.Errorf("gRPC health RPC failed")
+			result.Err = &GRPCHealthError{RPCCode: status.Code(err)}
 		} else {
-			result.Err = fmt.Errorf("gRPC health service is not serving")
+			state := response.GetStatus().String()
+			if state != "NOT_SERVING" && state != "SERVICE_UNKNOWN" {
+				state = "UNKNOWN"
+			}
+			result.Err = &GRPCHealthError{Status: state}
 		}
 	}
 }
 
 func (p *PulseGRPCJob) healthCredentials() (credentials.TransportCredentials, error) {
 	if p.AllowInsecure {
-		if p.CAFile != "" || p.ServerName != "" {
+		if p.CAFile != "" || p.ServerName != "" || p.InsecureSkipVerify {
 			return nil, fmt.Errorf("gRPC cleartext cannot also configure TLS trust or server name")
 		}
 		return insecure.NewCredentials(), nil
 	}
-	configuration := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: p.ServerName}
-	if p.CAFile != "" {
-		file, err := os.Open(p.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("gRPC CA file is unavailable")
-		}
-		defer func() { _ = file.Close() }()
-		pem, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
-		if err != nil || len(pem) > 1<<20 {
-			return nil, fmt.Errorf("gRPC CA file cannot be read within its 1 MiB limit")
-		}
-		roots := x509.NewCertPool()
-		if !roots.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("gRPC CA file contains no supported certificates")
-		}
-		configuration.RootCAs = roots
+	configuration, err := checkTLSConfiguration(p.CAFile, p.ServerName, p.InsecureSkipVerify)
+	if err != nil {
+		return nil, err
 	}
 	return credentials.NewTLS(configuration), nil
 }

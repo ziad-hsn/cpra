@@ -59,7 +59,7 @@ func validateCollectionCreation(req api.OperationCreateRequest) error {
 }
 
 func validateCollectionPreparation(req api.CollectionPrepareRequest) error {
-	if !supportedCollectionProfile(req.NormalizationProfile) {
+	if req.NormalizationProfile != "" && req.NormalizationProfile != "cpra.file.base.v2" {
 		return errCollectionIdentity
 	}
 	key, _, _, err := collectionIdentity(string(req.IdentityFormat), req.IdentityKey, req.SourceFingerprint, req.ContentDigest, req.ItemCount, 1)
@@ -70,7 +70,7 @@ func validateCollectionPreparation(req api.CollectionPrepareRequest) error {
 func supportedCollectionProfile(profile string) bool {
 	// Keep the low-level client independent of the collection helper package,
 	// which imports this client. The wire contract owns the accepted profile.
-	return profile == "" || profile == "cpra.file.base.v1"
+	return profile == "" || profile == "cpra.file.base.v1" || profile == "cpra.file.base.v2"
 }
 
 func collectionItem(item api.ApplyItem) (commitment.Position, []byte, [commitment.MACBytes]byte, error) {

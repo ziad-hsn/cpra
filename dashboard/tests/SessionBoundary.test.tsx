@@ -55,8 +55,8 @@ it('uses an empty query cache for a replacement identity and drops late old data
   expect(clients[1].getDefaultOptions().mutations).toMatchObject({ retry: false, networkMode: 'always', gcTime: 0 });
 });
 
-it('preserves the observation view when the server has only v1', async () => {
-  const session = new DashboardSession({ origin: 'https://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })) });
+it('opens explicit observation mode using current read permissions', async () => {
+  const session = new DashboardSession({ origin: 'https://cpra.example', fetch: vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })).mockResolvedValueOnce(json({ principalId: 'anonymous', role: 'reader', permissions: ['GetHistory'] })) });
   render(<SessionBoundary session={session}><p>Monitor observations</p></SessionBoundary>);
   expect(await screen.findByText('Monitor observations')).toBeInTheDocument();
   expect(screen.getByText(/Observation mode/)).toBeInTheDocument();

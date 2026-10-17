@@ -87,7 +87,14 @@ func (f *machine) inspectWorkerSession(c WorkerSessionCommand, at time.Time) (wo
 	return previous, exists, false, nil
 }
 
-func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
+func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time, versions ...int) Result {
+	version := commandExtensionMinimumFormat(Command{commandExtensions: commandExtensions{WorkerSession: &c}})
+	if len(versions) > 0 {
+		version = versions[0]
+	}
+	if lifecycleStorageFormat(version) && c.SelectionVersion != 2 {
+		return Result{Err: ErrWorkerSessionInvalid}
+	}
 	previous, exists, replay, err := f.inspectWorkerSession(c, at)
 	if err != nil {
 		return Result{Err: err}
@@ -150,15 +157,30 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time) Result {
 	}
 	old.Sessions[record.WorkerUID] = record
 	old.EncodedBytes = used + cost
+	var events []Event
+	if lifecycleStorageFormat(version) && f.image.WorkerExecutions != nil {
+		for _, d := range c.Maintenance {
+			r := f.image.WorkerExecutions.Records[d.ExecutionID]
+			if monitor, cancelled := f.workerMaintenanceCancellation(&d, r.Intent, at, version); monitor != nil {
+				previous := f.image.Monitors[monitor.ID]
+				events = append(events, f.installMonitor(previous, *monitor, at)...)
+				f.publishWorkerMonitor(previous, *monitor)
+				events = append(events, cancelled...)
+			}
+		}
+	}
 	f.image.Version = max(f.image.Version, WorkerSessionFormatVersion)
 	if len(c.ProposedLeaseIDs) > 0 {
 		f.image.Version = max(f.image.Version, WorkerOfferFormatVersion)
+	}
+	if c.SelectionVersion == 2 {
+		f.image.Version = joinStorageFormat(f.image.Version, LifecycleWorkerFormatVersion)
 	}
 	if c.SelectionVersion == 1 {
 		f.image.Version = max(f.image.Version, WorkerQueueFormatVersion)
 	}
 	response = record.Response.clone()
-	return Result{Allowed: true, resultExtensions: resultExtensions{WorkerPoll: &response}}
+	return Result{Allowed: true, Events: events, resultExtensions: resultExtensions{WorkerPoll: &response}}
 }
 
 func validateWorkerSessionImage(i image) error {

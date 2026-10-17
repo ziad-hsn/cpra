@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -25,18 +24,18 @@ func StrictDecode(data []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.UseNumber()
 	if err := uniqueValue(d, 0); err != nil {
-		return err
+		return jsonValidationError(err)
 	}
 	if _, err := d.Token(); err != io.EOF {
-		return errors.New("trailing JSON value")
+		return InvalidField("", "invalidJSON")
 	}
 	d = json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
-	return d.Decode(out)
+	return jsonValidationError(d.Decode(out))
 }
 func uniqueValue(d *json.Decoder, depth int) error {
 	if depth > 128 {
-		return errors.New("JSON nesting exceeds 128")
+		return InvalidField("", "nodeLimit")
 	}
 	t, err := d.Token()
 	if err != nil {
@@ -55,7 +54,7 @@ func uniqueValue(d *json.Decoder, depth int) error {
 				return errors.New("invalid object key")
 			}
 			if seen[key] {
-				return fmt.Errorf("duplicate JSON field %q", key)
+				return InvalidField("", "duplicateField")
 			}
 			seen[key] = true
 			if err := uniqueValue(d, depth+1); err != nil {
@@ -80,7 +79,7 @@ func uniqueValue(d *json.Decoder, depth int) error {
 func DecodeResource(raw []byte) (Resource, error) {
 	var r Resource
 	if len(raw) > MaxResourceBytes {
-		return r, errors.New("resource exceeds 1 MiB")
+		return r, InvalidField("", "resourceTooLarge")
 	}
 	if err := StrictDecode(raw, &r); err != nil {
 		return r, err
@@ -105,29 +104,29 @@ func ValidateResourceValue(v any) error {
 // It performs no server authorization, live dependency check, or provider I/O.
 func ValidateResource(r Resource) error {
 	if r.APIVersion != APIVersion {
-		return errors.New("unsupported apiVersion")
+		return InvalidField("apiVersion", "unsupportedVersion")
 	}
 	if r.Metadata.ID == "" || r.Metadata.ID == "." || r.Metadata.ID == ".." || strings.ContainsAny(r.Metadata.ID, "/\\?#%\r\n") {
-		return errors.New("invalid resource identity")
+		return InvalidField("metadata.id", "invalidIdentity")
 	}
 	switch r.Kind {
 	case "Monitor":
 		var spec MonitorSpec
 		if err := StrictDecode(r.Spec, &spec); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
 		if err := ValidateDriver("check", spec.Check.Driver); err != nil {
-			return err
+			return PrefixValidationError("spec.check.driver", err)
 		}
-		for _, d := range []string{spec.Check.Interval, spec.Check.Timeout} {
-			v, e := time.ParseDuration(d)
+		for _, field := range []struct{ name, value string }{{"interval", spec.Check.Interval}, {"timeout", spec.Check.Timeout}} {
+			v, e := time.ParseDuration(field.value)
 			if e != nil || v <= 0 {
-				return errors.New("check interval and timeout must be positive Go duration strings")
+				return InvalidField("spec.check."+field.name, "positiveDuration")
 			}
 		}
 		if spec.Recovery != nil {
 			if err := ValidateDriver("recovery", spec.Recovery.Driver); err != nil {
-				return err
+				return PrefixValidationError("spec.recovery.driver", err)
 			}
 		}
 		if spec.Notifications != nil {
@@ -137,18 +136,18 @@ func ValidateResource(r Resource) error {
 					case "state_change":
 					case "recovery_failed", "recovery_exhausted":
 						if color != "red" || spec.Recovery == nil {
-							return errors.New("recovery notification triggers require Code red and recovery")
+							return InvalidField("spec.notifications", "notificationTrigger")
 						}
 					default:
-						return errors.New("unsupported notification trigger")
+						return InvalidField("spec.notifications", "notificationTrigger")
 					}
 				}
 				if err := validateAlertRule(rule); err != nil {
-					return fmt.Errorf("notifications.%s: %w", color, err)
+					return PrefixValidationError(notificationField(color), err)
 				}
 				if rule.Driver != nil {
 					if err := ValidateDriver("notification", *rule.Driver); err != nil {
-						return err
+						return PrefixValidationError(notificationField(color)+".driver", err)
 					}
 				}
 			}
@@ -156,34 +155,34 @@ func ValidateResource(r Resource) error {
 	case "NotificationEndpoint":
 		var spec DriverConfig
 		if err := StrictDecode(r.Spec, &spec); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
-		return ValidateDriver("notification", spec)
+		return PrefixValidationError("spec", ValidateDriver("notification", spec))
 	case "NotificationGroup":
 		var spec NotificationGroupSpec
 		if err := StrictDecode(r.Spec, &spec); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
 		if len(spec.EndpointRefs)+len(spec.RecipientRefs) == 0 {
-			return errors.New("notification group cannot be empty")
+			return InvalidField("spec", "nonemptyReferences")
 		}
 		if err := validateReferences("endpointRefs", spec.EndpointRefs); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
-		return validateReferences("recipientRefs", spec.RecipientRefs)
+		return PrefixValidationError("spec", validateReferences("recipientRefs", spec.RecipientRefs))
 	case "Recipient":
 		var spec RecipientSpec
 		if err := StrictDecode(r.Spec, &spec); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
 		if len(spec.EndpointRefs) == 0 {
-			return errors.New("recipient requires at least one endpoint reference")
+			return InvalidField("spec.endpointRefs", "nonemptyReferences")
 		}
-		return validateReferences("endpointRefs", spec.EndpointRefs)
+		return PrefixValidationError("spec", validateReferences("endpointRefs", spec.EndpointRefs))
 	case "Credential":
 		var spec CredentialSpec
 		if err := StrictDecode(r.Spec, &spec); err != nil {
-			return err
+			return PrefixValidationError("spec", err)
 		}
 	default:
 		return validateAdditionalResource(r)
@@ -195,7 +194,7 @@ func validateReferences(field string, refs []string) error {
 	seen := make(map[string]bool, len(refs))
 	for _, id := range refs {
 		if id == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\?#%\r\n") || seen[id] {
-			return fmt.Errorf("%s contains an invalid or duplicate reference", field)
+			return InvalidField(field, "invalidReference")
 		}
 		seen[id] = true
 	}
@@ -210,17 +209,17 @@ func validateAlertRule(rule AlertRule) error {
 			return err
 		}
 		if rule.NotifyType == nil {
-			return errors.New("recipientRefs requires a Code notifyType")
+			return InvalidField("notifyType", "notifyTypeRequired")
 		}
 	}
 	if rule.NotifyType == nil {
 		return nil // Direct endpoint and group routing permits mixed driver types.
 	}
 	if driverTarget("notification", *rule.NotifyType) == nil {
-		return fmt.Errorf("%w: Code notifyType", ErrUnsupportedDriver)
+		return errors.Join(ErrUnsupportedDriver, InvalidField("notifyType", "unsupportedDriver"))
 	}
 	if rule.Driver != nil || rule.EndpointRefs != nil {
-		return errors.New("notifyType cannot be combined with inline driver or endpointRefs")
+		return InvalidField("notifyType", "notificationDestination")
 	}
 	if rule.GroupRef != nil {
 		if err := validateReferences("groupRef", []string{*rule.GroupRef}); err != nil {
@@ -228,7 +227,7 @@ func validateAlertRule(rule AlertRule) error {
 		}
 	}
 	if rule.GroupRef == nil && (rule.RecipientRefs == nil || len(*rule.RecipientRefs) == 0) {
-		return errors.New("notifyType requires at least one recipient or a group")
+		return InvalidField("notifyType", "nonemptyReferences")
 	}
 	return nil
 }
@@ -248,12 +247,12 @@ func Driver(category, kind string, config any) (DriverConfig, error) {
 func ValidateDriver(category string, d DriverConfig) error {
 	target := driverTarget(category, d.Type)
 	if target == nil {
-		return fmt.Errorf("%w: %s/%s", ErrUnsupportedDriver, category, d.Type)
+		return errors.Join(ErrUnsupportedDriver, InvalidField("type", "unsupportedDriver"))
 	}
 	if len(d.Config) == 0 || bytes.Equal(bytes.TrimSpace(d.Config), []byte("null")) {
-		return errors.New("driver configuration must be an object")
+		return InvalidField("config", "objectRequired")
 	}
-	return StrictDecode(d.Config, target)
+	return PrefixValidationError("config", StrictDecode(d.Config, target))
 }
 
 // NormalizeManifestDriver maps manifest driver fields to their API names.
@@ -265,7 +264,7 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 	}
 	var fields map[string]json.RawMessage
 	if err := StrictDecode(raw, &fields); err != nil {
-		return nil, err
+		return nil, PrefixValidationError("config", err)
 	}
 	t := reflect.TypeOf(target).Elem()
 	names := map[string]string{}
@@ -281,15 +280,15 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 	for k, v := range fields {
 		n, ok := names[strings.ToLower(strings.ReplaceAll(k, "_", ""))]
 		if !ok {
-			return nil, fmt.Errorf("unknown manifest driver field %q", k)
+			return nil, InvalidField("config", "unknownField")
 		}
 		if _, exists := result[n]; exists {
-			return nil, errors.New("duplicate normalized driver field")
+			return nil, InvalidField("config", "duplicateField")
 		}
 		if (n == "timeout" || n == "operationTimeout" || n == "requestTimeout" || n == "taskTimeout" || n == "pollInterval") && len(v) > 0 && v[0] != '"' && string(v) != "null" {
 			var nanos int64
 			if err := json.Unmarshal(v, &nanos); err != nil {
-				return nil, err
+				return nil, PrefixValidationError("config."+n, jsonValidationError(err))
 			}
 			v, _ = json.Marshal(time.Duration(nanos).String())
 		}
@@ -305,3 +304,12 @@ func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.R
 // Pointer returns a pointer to a copy of value, preserving optional false and
 // zero values without losing presence.
 func Pointer[T any](value T) *T { return &value }
+
+// Do not include arbitrary notification-map keys in a diagnostic path.
+func notificationField(color string) string {
+	switch color {
+	case "red", "yellow", "green", "cyan", "gray":
+		return "spec.notifications." + color
+	}
+	return "spec.notifications"
+}

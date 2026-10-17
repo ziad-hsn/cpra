@@ -6,7 +6,36 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/ziad-hsn/cpra/internal/logger"
 )
+
+type raftLogRecorder struct {
+	logger.Logger
+	levels   []string
+	messages []string
+}
+
+func (r *raftLogRecorder) Info(message string, _ ...logger.Field) {
+	r.levels = append(r.levels, "info")
+	r.messages = append(r.messages, message)
+}
+func (r *raftLogRecorder) Warn(message string, _ ...logger.Field) {
+	r.levels = append(r.levels, "warn")
+	r.messages = append(r.messages, message)
+}
+
+func TestSingleNodeInitialElectionDiagnostic(t *testing.T) {
+	recorder := &raftLogRecorder{}
+	sink := &raftLogSink{logger: recorder}
+	sink.Accept("raft", hclog.Warn, "storage write delayed")
+	sink.Accept("raft", hclog.Warn, "heartbeat timeout reached, starting election")
+	sink.Accept("raft", hclog.Warn, "heartbeat timeout reached, starting election")
+	if len(recorder.levels) != 3 || recorder.levels[0] != "warn" || recorder.levels[1] != "info" || recorder.levels[2] != "warn" || recorder.messages[1] != "Starting single-node Raft election" {
+		t.Fatalf("unexpected diagnostic severity: %v %v", recorder.levels, recorder.messages)
+	}
+}
 
 func TestRaftDiagnosticsUseStructuredSinkWithoutPrivateText(t *testing.T) {
 	t.Setenv("CPRA_ENV", "production")

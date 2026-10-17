@@ -90,7 +90,7 @@ func (h *workerSessionHTTP) heartbeat(w http.ResponseWriter, r *http.Request) {
 	err = h.complete(ctx, func() error {
 		var err error
 		response, err = h.store.CommitWorkerHeartbeat(ctx, authority, persistence.WorkerHeartbeatRequest{
-			ServerID: input.ServerID, SessionID: input.SessionID, ExecutionID: input.ExecutionID, GrantID: input.GrantID})
+			ServerID: input.ServerID, SessionID: input.SessionID, ExecutionID: input.ExecutionID, GrantID: input.GrantID}, h.maintenanceEvaluator())
 		return err
 	})
 	if err != nil {

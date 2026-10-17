@@ -3,6 +3,7 @@ package entities
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,7 @@ type PreparedMonitor struct {
 }
 
 type preparedComponents struct {
+	autoIgnore   *components.AutoIgnore
 	name         string
 	enabled      bool
 	maintenance  []manifest.CompiledWindow
@@ -41,6 +43,16 @@ type preparedComponents struct {
 
 func (p *PreparedMonitor) MonitorID() string { return p.id }
 func (p *PreparedMonitor) Revision() string  { return p.revision }
+
+// SetTargetSummary supplies the catalog projection captured before credentials
+// were resolved. Even an empty projection replaces the file-mode default.
+func (p *PreparedMonitor) SetTargetSummary(target string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle != nil {
+		p.bundle.pulse.TargetSummary = target
+	}
+}
 
 // NotificationEndpointIDs returns copied opaque identities for prepared targets.
 func (p *PreparedMonitor) NotificationEndpointIDs(color string) []string {
@@ -153,14 +165,35 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 	if err != nil {
 		return nil, err
 	}
+	pulseJSON, err := json.Marshal(m.Pulse.Config)
+	if err != nil {
+		return nil, fmt.Errorf("check flow configuration cannot be encoded")
+	}
+	flowDigest := sha256.Sum256(pulseJSON)
+	var tlsPolicy struct {
+		Skip bool `json:"insecure_skip_verify"`
+	}
+	if err := json.Unmarshal(pulseJSON, &tlsPolicy); err != nil {
+		return nil, errors.New("check transport policy cannot be decoded")
+	}
 	b := &preparedComponents{
 		name: m.Name, enabled: m.Enabled, maintenance: windows,
 		pulse: components.PulseConfig{
-			Type: m.Pulse.Type, Config: m.Pulse.Config, Timeout: m.Pulse.Timeout,
+			FlowKey:                         binary.BigEndian.Uint64(flowDigest[:8]),
+			TargetSummary:                   m.Pulse.TargetSummary(),
+			CertificateVerificationDisabled: tlsPolicy.Skip,
+			Type:                            m.Pulse.Type, Config: m.Pulse.Config, Timeout: m.Pulse.Timeout,
 			Interval: m.Pulse.Interval, Retries: m.Pulse.Retries, UnhealthyThreshold: m.Pulse.UnhealthyThreshold,
 			HealthyThreshold: m.Pulse.HealthyThreshold,
 		},
 		jobs: components.JobStorage{CodeJobs: make(map[string][]jobs.Job, len(codes))},
+	}
+	if m.AutoIgnore != nil {
+		window, err := time.ParseDuration(m.AutoIgnore.Window)
+		if err != nil {
+			return nil, errors.New("automatic Ignore requires a valid rolling window")
+		}
+		b.autoIgnore = &components.AutoIgnore{Incidents: int(m.AutoIgnore.Incidents), Window: window}
 	}
 	b.jobs.PulseJob, err = preparer.pulse(m.Pulse)
 	if err != nil {
@@ -199,7 +232,12 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		}
 		if code.NotifyGroup != "" {
 			for _, name := range privateGroups[code.NotifyGroup] {
-				b.codes.Configs[color].EndpointIDs = append(b.codes.Configs[color].EndpointIDs, notificationTargetID("endpoint/"+name))
+				raw, err := json.Marshal(privateEndpoints[name])
+				if err != nil {
+					return nil, errors.New("notification identity cannot be encoded")
+				}
+				b.codes.Configs[color].EndpointIDs = append(b.codes.Configs[color].EndpointIDs, notificationTargetID("endpoint/"+name+"/"+string(raw)))
+				clear(raw)
 			}
 		} else if len(b.jobs.CodeJobs[color]) != 0 {
 			raw, err := json.Marshal(struct {

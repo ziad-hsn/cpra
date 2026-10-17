@@ -81,7 +81,7 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, node, filepath.Join(root, "scripts/dashboard/verify_collection_activation_browser.cjs"))
 	cmd.Env = append(os.Environ(), "CPRA_BROWSER_ORIGIN=https://"+f.options.webAddr,
@@ -92,11 +92,12 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 		t.Fatalf("public activation browser failed: %v\n%s", err, output)
 	}
 	var report struct {
-		OperationID string `json:"operationID"`
-		ResultID    string `json:"resultID"`
-		Activations int    `json:"activations"`
+		OperationID       string `json:"operationID"`
+		GuidedOperationID string `json:"guidedOperationID"`
+		ResultID          string `json:"resultID"`
+		Activations       int    `json:"activations"`
 	}
-	if len(output) > 64<<10 || json.Unmarshal(output, &report) != nil || report.OperationID == "" || report.ResultID == "" || report.Activations != 1 {
+	if len(output) > 64<<10 || json.Unmarshal(output, &report) != nil || report.OperationID == "" || report.GuidedOperationID == "" || report.ResultID == "" || report.Activations != 1 {
 		t.Fatal("browser did not report one original activation")
 	}
 	before, err := client.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
@@ -108,14 +109,29 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 	if err != nil || monitor.Data.Metadata.ID != "activated-monitor" {
 		t.Fatal("monitor was not created by original operation", err)
 	}
+	guided, err := client.Operations.ExecutionResult(ctx, report.GuidedOperationID, cpra.ExecutionResultPageOptions{})
+	if err != nil || guided.Data.State != "completed" || guided.Data.Committed == nil || *guided.Data.Committed != 5 || guided.Data.Applied == nil || *guided.Data.Applied != 5 {
+		t.Fatal("guided notification setup did not apply its five resources", err)
+	}
+	if monitor.Data.Spec.Notifications == nil {
+		t.Fatal("guided setup lost its notification rules")
+	}
+	red, green := (*monitor.Data.Spec.Notifications)["red"], (*monitor.Data.Spec.Notifications)["green"]
+	if red.GroupRef == nil || green.GroupRef == nil || *red.GroupRef == "" || *red.GroupRef != *green.GroupRef || monitor.Data.Spec.Enabled == nil || *monitor.Data.Spec.Enabled {
+		t.Fatal("guided setup changed monitor enablement or lost its shared notification group")
+	}
 	credential, err := client.Credentials.Get(ctx, "activated-secret")
 	if err != nil || credential.Data.Metadata.ID != "activated-secret" {
 		t.Fatal("cross-file credential dependency was not created", err)
 	}
 	stop()
 	restarted, stopRestarted := startMainManagement(t, f)
+	restoredMonitor, err := restarted.Monitors.Get(ctx, "activated-monitor")
+	if err != nil || !reflect.DeepEqual(restoredMonitor.Data.Spec, monitor.Data.Spec) {
+		t.Fatal("restart changed the guided notification configuration", err)
+	}
 	after, err := restarted.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
-	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v1" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
+	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v2" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
 		t.Fatal("restart changed the original public activation result", err)
 	}
 	repeated, err := restarted.Operations.Activate(ctx, report.OperationID)

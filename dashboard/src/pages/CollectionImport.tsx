@@ -1,3 +1,4 @@
+import { validationDiagnostic, validationSourcePosition } from '../api/validation';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -13,9 +14,10 @@ import { CollectionExecution } from '../components/CollectionExecution';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProblemDetails } from '../components/ProblemDetails';
 import { correlationID } from '../api/correlation';
+import { NotificationSetup } from '../components/NotificationSetup';
 
 type PreviewItem = WorkerCollectionItemSummary & { sourceName: string };
-type PrivateImport = { collection?: BrowserCollection; ticket?: string; expiresAt?: string; createAttempted: boolean; validationAttempted?: boolean; activationAttempted?: boolean; sourceNames?: readonly string[]; operation?: Operation; busy: boolean; active: boolean; generation: number; controller?: AbortController };
+type PrivateImport = { collection?: BrowserCollection; ticket?: string; expiresAt?: string; createAttempted: boolean; validationAttempted?: boolean; activationAttempted?: boolean; sourceNames?: readonly string[]; operation?: Operation; notificationPreparing?: boolean; busy: boolean; active: boolean; generation: number; controller?: AbortController };
 const durableSteps = ['PrepareCollection', 'CreateOperation', 'UploadOperation', 'ValidateOperation', 'GetOperationValidation', 'GetOperation'];
 const unavailable = 'This server or identity does not offer the complete staging and validation flow. You can prepare files locally and use server preview if available; no apply is submitted.';
 
@@ -24,6 +26,8 @@ export default function CollectionImport() {
   const access = useAccess();
   const lifetime = useRef<PrivateImport>({ active: true, generation: 0, busy: false, createAttempted: false });
   const [summary, setSummary] = useState<WorkerCollectionSummary>();
+  const [notificationDraft, setNotificationDraft] = useState(false);
+  const [notificationPreparing, setNotificationPreparing] = useState(false);
   const [preview, setPreview] = useState<readonly PreviewItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [progress, setProgress] = useState<ImportProgress>();
@@ -34,6 +38,7 @@ export default function CollectionImport() {
   const [uncertain, setUncertain] = useState(false);
   const [preflight, setPreflight] = useState<Preflight>();
   const [validation, setValidation] = useState<CollectionValidationPage>();
+  const [validationLocations, setValidationLocations] = useState<Record<number, string>>({});
   const [validationStatus, setValidationStatus] = useState('Not requested');
   const [waitKind, setWaitKind] = useState<'progress' | 'validation'>('progress');
   const waitDelay = useRef(5000);
@@ -105,8 +110,8 @@ export default function CollectionImport() {
     setPreview(rows.map(row => ({ ...row, sourceName: collection.sourceName(Number(row.source.token.slice(7))) })));
     setOffset(start);
   }
-  async function select(files: File[]) {
-    if (!files.length || summary || lifetime.current.busy || !operator) return;
+  async function select(files: File[], notification = false) {
+    if (!files.length || summary || lifetime.current.busy || lifetime.current.notificationPreparing && !notification || !operator) return false;
     await run('Preparing files', async signal => {
       try {
         const collection = await BrowserCollection.prepare(files, { signal, onProgress: value => { if (current(signal)) setProgress(value); } });
@@ -120,11 +125,12 @@ export default function CollectionImport() {
           // Names are local display data only. Never attach them to errors or requests.
           const ordered = collectionFileSources(files);
           const name = ordered[error.location.source - 1]?.name;
-          if (name) { setFeedback(`${error.message} Source: ${name}; document ${error.location.document ?? 'unavailable'}, item ${error.location.item ?? 'unavailable'}.`); return; }
+          if (name) { setFeedback(`${error.message} Source: ${name}; document ${error.location.document ?? 'unavailable'}, item ${error.location.item ?? 'unavailable'}${error.location.line ? `, line ${error.location.line}, column ${error.location.column ?? 'unavailable'}` : ''}. ${validationDiagnostic(error.location)}`); return; }
         }
         throw error;
       }
     });
+    return !!lifetime.current.collection;
   }
   function discard() {
     if (lifetime.current.busy) return;
@@ -175,6 +181,19 @@ export default function CollectionImport() {
     });
   }
   async function retainValidation(value: CollectionValidationPage, signal: AbortSignal) {
+    const locations: Record<number, string> = {};
+    const collection = lifetime.current.collection;
+    if (collection && value.items.length && value.items.length <= 100) {
+      try {
+        const originals = await collection.page(value.items[0].ordinal - 1, value.items.length);
+        for (const item of value.items) {
+          const original = originals.find(candidate => candidate.ordinal === item.ordinal && candidate.id === `${item.kind}/${item.id}` && candidate.source.token === item.source && candidate.source.document === item.sourceDocument && candidate.source.item === item.sourceItem);
+          if (original) locations[item.ordinal] = validationSourcePosition(original.coordinates, item.field);
+        }
+      } catch { /* The sealed result remains readable when local source coordinates are unavailable. */ }
+    }
+    if (!current(signal)) return;
+    setValidationLocations(locations);
     setProblem(undefined); setFailedPhase('');
     setValidation(value); setValidationStatus(!value.supported ? 'Unsupported result vocabulary — read only' : value.summary.valid ? 'Passed — original sealed result' : 'Rejected — original sealed result');
     setFeedback(!value.supported ? 'This retained result uses unsupported vocabulary. It is read only and cannot authorize activation.' : value.summary.valid ? 'The original validation passed. No activation was requested.' : 'The original validation was rejected. Review its source-attributed results; changed intent requires a new operation.');
@@ -286,17 +305,23 @@ export default function CollectionImport() {
     collectionProgressPending(operation);
   const pendingDraft = !!summary && !collectionTerminal(operation);
   return <main className="page">
-    <DirtyDraftGuard dirty={pendingDraft || !!busy} />
-    <h1>Import configuration files</h1>
+    <DirtyDraftGuard dirty={pendingDraft || !!busy || notificationDraft} />
+    <h1>Apply configuration</h1>
     <p>Choose YAML or JSON files for monitors, recipients, notification endpoints, groups and secrets. Files are parsed in a private worker; the preview shows identities and outcomes, never secret values.</p>
     <p className="muted">Up to 1,000 files, 64 MiB of source data, 10,000 resources and 1 MiB per resource. Upload chunks contain at most 256 resources or 4 MiB. File names remain local to this tab.</p>
-    <p className="muted">Refreshing or leaving discards this tab’s files and identity key. Server-assisted file reselection is not available yet. Leaving or stopping waiting does not cancel an accepted server operation.</p>
+    <p className="muted">Leaving discards local inputs. Save the operation ID to inspect or continue accepted work. Stopping waiting does not cancel the server operation.</p>
     {!operator && <p role="status">Import requires an operator identity. Existing resources and operation observations remain available to authorized readers.</p>}
     {operator && !durable && <p role="status">{unavailable}</p>}
     {capabilities.isError && <p role="alert">Server capabilities could not be read. Server import steps remain disabled.</p>}
+    {operator && !summary && <NotificationSetup disabled={!durable || !!busy} onPrepare={files => select(files, true)} onDirty={setNotificationDraft}
+      onStart={() => {
+        const owned = lifetime.current;
+        if (!owned.active || owned.busy || owned.notificationPreparing || owned.collection) return false;
+        owned.notificationPreparing = true; setNotificationPreparing(true); return true;
+      }} onFinish={() => { lifetime.current.notificationPreparing = false; if (lifetime.current.active) setNotificationPreparing(false); }} />}
     <section className="card" aria-label="Local file preparation">
       <label htmlFor="collection-files">Configuration files</label>{' '}
-      <input id="collection-files" type="file" accept=".yaml,.yml,.json,application/json,application/yaml,text/yaml" multiple disabled={!operator || !!busy || !!summary} onChange={event => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ''; void select(files); }} />
+      <input id="collection-files" type="file" accept=".yaml,.yml,.json,application/json,application/yaml,text/yaml" multiple disabled={!operator || !!busy || notificationPreparing || !!summary} onChange={event => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ''; void select(files); }} />
       {busy && <p role="status">{busy}…{busy === 'Preparing files' && progress ? ` ${progress.sources} sources, ${progress.items} resources (${progress.phase}).` : ''}</p>}
       {busy === 'Preparing files' && <button className="btn" onClick={() => lifetime.current.controller?.abort()}>Cancel preparation</button>}
       {summary && <>
@@ -310,6 +335,12 @@ export default function CollectionImport() {
     <ProblemDetails error={problem} phase={failedPhase} />
     {!!summary && <section className="card" aria-label="Collection preview">
       <h2>Source-attributed preview</h2><p>Resource contents are hidden. Create, update and unchanged outcomes appear after server validation; no resources are implicitly deleted.</p>
+      {!!preflight?.errors?.length && <ul aria-label="Preview validation errors">{preflight.errors.slice(0, 10).map((issue, index) => <li key={index}>{(() => {
+        const ordinal = /^items\[(\d+)\]/.exec(issue.field ?? '');
+        const row = ordinal ? preview[Number(ordinal[1]) - offset] : undefined;
+        return row ? `${row.sourceName}, document ${row.source.document}, item ${row.source.item}${validationSourcePosition(row.coordinates, issue.field)}: ` : '';
+      })()}{validationDiagnostic(issue)}</li>)}</ul>}
+      {(preflight?.errors?.length ?? 0) > 10 && <p>Additional validation errors omitted. Correct these resources and preview again.</p>}
       <table><caption>Resources {preview.length ? offset + 1 : 0}–{offset + preview.length} of {summary.itemCount}</caption><thead><tr><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Outcome</th><th scope="col">Observed version</th></tr></thead><tbody>{preview.map(item => <tr key={item.id}><td>{item.id}</td><td>{item.sourceName}</td><td>{item.source.document} / {item.source.item}</td><td>{results.get(item.id)?.outcome ?? 'Not evaluated'}</td><td>{results.get(item.id)?.oldVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>
       <div className="row" style={{ gap: 12 }}><button className="btn" disabled={!!busy || offset === 0 || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, Math.max(0, offset - 100), signal)); }}>Previous resources</button><button className="btn" disabled={!!busy || offset + preview.length >= summary.itemCount || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, offset + 100, signal)); }}>Next resources</button></div>
     </section>}
@@ -334,7 +365,7 @@ export default function CollectionImport() {
         {validation && <section aria-label="Original validation result"><h3>Original sealed validation result</h3><p>{validation.summary.valid ? 'Passed' : 'Rejected'}; {validation.itemCount} original resources. Result: <span className="mono">{validation.summary.resultID}</span></p>
           {validation.summary.summaryOnly && <p>This result contains a bounded summary only. No per-resource verdict is available.</p>}
           {validation.summary.issue && <p>Summary issue: {validation.summary.issue}</p>}
-          {!!validation.items.length && <table><caption>Original validation outcomes</caption><thead><tr><th scope="col">Ordinal</th><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Change</th><th scope="col">Issue</th><th scope="col">Observed version</th></tr></thead><tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{lifetime.current.sourceNames?.[Number(item.source.slice(7)) - 1] ?? 'Local filename unavailable'}</td><td>{item.sourceDocument} / {item.sourceItem}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}</td><td>{item.resourceVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>}
+          {!!validation.items.length && <table><caption>Original validation outcomes</caption><thead><tr><th scope="col">Ordinal</th><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Change</th><th scope="col">Issue</th><th scope="col">Observed version</th></tr></thead><tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{lifetime.current.sourceNames?.[Number(item.source.slice(7)) - 1] ?? 'Local filename unavailable'}</td><td>{item.sourceDocument} / {item.sourceItem}{validationLocations[item.ordinal]}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}{item.reason && <div>{validationDiagnostic(item)}</div>}</td><td>{item.resourceVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>}
           {validation.nextCursor && <button className="btn" disabled={!!busy || !allowed.has('GetOperationValidation')} onClick={() => { void refreshValidation(validation.nextCursor); }}>Next validation page</button>}
         </section>}
         {!!resultPage.length && <><h3>Original operation results</h3><ul>{resultPage.map(item => <li key={item.id}>{item.id}: {item.outcome}; committed {item.committed === undefined ? 'unavailable' : String(item.committed)}, applied {item.applied === undefined ? 'unavailable' : String(item.applied)}</li>)}</ul></>}

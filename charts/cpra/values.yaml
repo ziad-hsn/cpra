@@ -44,6 +44,10 @@ providerFiles:
   existingSecret: ""
 # Secret references only, e.g. [{name: AWS_PROFILE, secret: cpra-provider-v1, key: profile}].
 providerEnv: []
+notificationLog:
+  enabled: false # Omitted/empty log filenames use stdout without this volume.
+  existingClaim: "" # A dedicated claim, never the state or manifest claim.
+  sizeLimit: 64Mi # Bounded ephemeral output when existingClaim is empty.
 storage:
   mode: raft # memory is an explicit disposable mode and requires persistence.enabled=false.
 persistence:

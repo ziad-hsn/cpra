@@ -53,6 +53,9 @@ type StartupOptions struct {
 type StartupResult struct {
 	Catalog   *Catalog
 	Bootstrap BootstrapProgress
+	// ReusedCatalog means startup input was deliberately not opened. The
+	// committed catalog, including an empty one, remains authoritative.
+	ReusedCatalog bool
 }
 
 // StartupValidation counts fully validated resources, including extracted private
@@ -85,6 +88,7 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 		return result, ErrUnavailable
 	}
 	if (hasBootstrap && state.Phase == "active") || (!hasBootstrap && hasCatalog) {
+		result.ReusedCatalog = true
 		if hasBootstrap {
 			result.Bootstrap = observeBootstrap(store, state.Manifest)
 		} else {
@@ -356,6 +360,11 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 }
 
 func (o CatalogOptions) startupCapabilities(resource api.Resource) error {
+	if err := visitDrivers(&resource, func(category string, driver *api.DriverConfig) error {
+		return o.validateNotificationLog(category, *driver)
+	}); err != nil {
+		return err
+	}
 	check := func(kind, driver string) error {
 		if o.validateDriverType(kind, driver) != nil {
 			return ErrStartupDriver

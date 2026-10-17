@@ -16,30 +16,57 @@ import (
 // committed state and never mutates it after publication,
 // so it is safe to read concurrently from HTTP handler goroutines.
 type MonitorSummary struct {
-	CheckAdmission      string    `json:"check_admission,omitempty"`
-	MissedChecks        uint64    `json:"missed_checks"`
-	QueueRejections     uint64    `json:"queue_rejections"`
-	MonitorID           string    `json:"monitor_id" yaml:"monitor_id"`
-	LatencyAvailable    bool      `json:"latency_available"`
-	UnknownActions      int       `json:"unknown_actions"`
-	Warning             string    `json:"warning,omitempty"`
-	ID                  uint32    `json:"id" yaml:"id"`
-	Name                string    `json:"name" yaml:"name"`
-	PulseType           string    `json:"pulse_type" yaml:"pulse_type"`
-	Status              string    `json:"status" yaml:"status"` // up | down | verifying | incident | disabled
-	Incident            bool      `json:"incident" yaml:"incident"`
-	PendingCode         string    `json:"pending_code" yaml:"pending_code"`
-	ConsecutiveFailures int       `json:"consecutive_failures" yaml:"consecutive_failures"`
-	LastCheck           time.Time `json:"last_check" yaml:"last_check"`
-	LastSuccess         time.Time `json:"last_success" yaml:"last_success"`
-	NextCheck           time.Time `json:"next_check" yaml:"next_check"`
-	ActiveCodes         []string  `json:"active_codes" yaml:"active_codes"`
+	IncarnationUID                  string            `json:"incarnation_uid"`
+	Source                          string            `json:"source"`
+	Health                          string            `json:"health"`
+	Phase                           string            `json:"phase"`
+	Enabled                         bool              `json:"enabled"`
+	Ignored                         bool              `json:"ignored"`
+	SnoozedUntil                    time.Time         `json:"snoozed_until,omitzero"`
+	IncidentID                      string            `json:"incident_id,omitempty"`
+	PendingNotifications            int               `json:"pending_notifications"`
+	CompletedNotifications          int               `json:"completed_notifications"`
+	FailedNotifications             int               `json:"failed_notifications"`
+	UnknownNotifications            int               `json:"unknown_notifications"`
+	CertificateVerificationDisabled bool              `json:"certificate_verification_disabled"`
+	LastFailure                     FailureDiagnostic `json:"last_failure,omitzero"`
+	CheckAdmission                  string            `json:"check_admission,omitempty"`
+	MissedChecks                    uint64            `json:"missed_checks"`
+	QueueRejections                 uint64            `json:"queue_rejections"`
+	MonitorID                       string            `json:"monitor_id" yaml:"monitor_id"`
+	LatencyAvailable                bool              `json:"latency_available"`
+	ActionsNeedingReview            int               `json:"actions_needing_review"`
+	UnknownActions                  int               `json:"unknown_actions"`
+	Warning                         string            `json:"warning,omitempty"`
+	ID                              uint32            `json:"id" yaml:"id"`
+	Name                            string            `json:"name" yaml:"name"`
+	PulseType                       string            `json:"pulse_type" yaml:"pulse_type"`
+	Status                          string            `json:"status" yaml:"status"` // up | down | verifying | incident | disabled
+	Incident                        bool              `json:"incident" yaml:"incident"`
+	PendingCode                     string            `json:"pending_code" yaml:"pending_code"`
+	ConsecutiveFailures             int               `json:"consecutive_failures" yaml:"consecutive_failures"`
+	LastCheck                       time.Time         `json:"last_check" yaml:"last_check"`
+	LastSuccess                     time.Time         `json:"last_success" yaml:"last_success"`
+	NextCheck                       time.Time         `json:"next_check" yaml:"next_check"`
+	ActiveCodes                     []string          `json:"active_codes" yaml:"active_codes"`
 	// Target is a human-readable endpoint for display (URL for http, host:port for
 	// tcp/udp/grpc, host for icmp/dns/docker). Empty when not derivable.
 	Target     string  `json:"target"`      // endpoint host/url for display
 	IntervalMs int64   `json:"interval_ms"` // pulse interval in ms
 	Uptime     float64 `json:"uptime"`      // rolling success ratio 0..1 over observed checks
 	LatencyMs  float64 `json:"latency_ms"`  // last observed latency ms (0 if unknown)
+}
+
+// FailureDiagnostic contains only bounded classified observations, never raw
+// provider responses. Value fields keep published rows immutable.
+type FailureDiagnostic struct {
+	Code                     string    `json:"code,omitempty"`
+	Message                  string    `json:"message,omitempty"`
+	HTTPStatus               int       `json:"httpStatus,omitempty"`
+	GRPCStatus               string    `json:"grpcStatus,omitempty"`
+	GRPCCode                 string    `json:"grpcCode,omitempty"`
+	CertificateNotAfter      time.Time `json:"certificateNotAfter,omitzero"`
+	CertificateDaysRemaining int       `json:"certificateDaysRemaining,omitempty"`
 }
 
 // StatsSnapshot is an immutable point-in-time projection of fleet state.

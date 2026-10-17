@@ -51,10 +51,25 @@ type cliManagementFixture struct {
 
 func newCLIManagementFixture(t *testing.T, handler http.HandlerFunc) cliManagementFixture {
 	t.Helper()
+	return newCLIAPIFixture(t, api.AccessDiscoveryModeManagement, handler)
+}
+
+func newCLIAPIFixture(t *testing.T, mode api.AccessDiscoveryMode, handler http.HandlerFunc) cliManagementFixture {
+	t.Helper()
 	t.Setenv("CPRA_AUTH_TOKEN", "")
 	t.Setenv("CPRA_AUTH_TOKEN_FILE", "")
 	t.Setenv("CPRA_CA_FILE", "")
-	server := httptest.NewTLSServer(handler)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v2/access" {
+			if r.Method != http.MethodGet {
+				t.Error("access discovery must be read-only")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(api.AccessDiscovery{Mode: mode, AuthenticationRequired: true})
+			return
+		}
+		handler(w, r)
+	}))
 	t.Cleanup(server.Close)
 	dir := t.TempDir()
 	ca := filepath.Join(dir, "ca.pem")

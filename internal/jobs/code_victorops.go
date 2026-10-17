@@ -23,6 +23,7 @@ type CodeVictorOpsJob struct {
 	RoutingKey      string
 	MessageType     string
 	EntityID        string
+	CorrelationKey  string
 	Entity          ecs.Entity
 	ID              uuid.UUID
 }
@@ -35,16 +36,38 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 	payload := map[string]interface{}{"type": "code", "driver": "victorops", "color": c.Color}
 	messageType := c.MessageType
 	if messageType == "" {
-		messageType = "CRITICAL"
+		switch c.Color {
+		case "red":
+			messageType = "CRITICAL"
+		case "yellow":
+			messageType = "WARNING"
+		case "green":
+			messageType = "RECOVERY"
+		default:
+			messageType = "INFO"
+		}
+	}
+	// A shared endpoint's trigger override must never turn verified recovery or
+	// a control notice into a new incident. Cyan is completion, not recovery.
+	if c.Color == "green" {
+		messageType = "RECOVERY"
+	}
+	if c.Color == "cyan" || c.Color == "gray" {
+		messageType = "INFO"
+	}
+	identity := c.CorrelationKey
+	if identity == "" {
+		identity = c.EntityID
 	}
 	target, err := victorOpsURL(c.URL, c.RestEndpointKey, c.RoutingKey)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	body, err := json.Marshal(map[string]string{
-		"message_type":  messageType,
-		"entity_id":     c.EntityID,
-		"state_message": c.notificationMessage(c.Message),
+		"message_type":        messageType,
+		"entity_id":           identity,
+		"entity_display_name": c.Monitor,
+		"state_message":       c.notificationMessage(c.Message),
 	})
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}

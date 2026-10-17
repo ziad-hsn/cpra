@@ -10,7 +10,33 @@ const CollectionReselectionFormatVersion = 14
 const collectionReselectionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-14\n"
 
 func validCollectionNormalizationProfile(profile string) bool {
-	return profile == "" || profile == "cpra.file.base.v1"
+	return profile == "" || profile == "cpra.file.base.v1" || profile == "cpra.file.base.v2"
+}
+
+func collectionProfileSupportedAt(profile string, version int) bool {
+	return validCollectionNormalizationProfile(profile) && (profile == "" || version >= CollectionReselectionFormatVersion) &&
+		(profile != "cpra.file.base.v2" || lifecycleStorageFormat(version))
+}
+
+// Retirement fences can embed an older retained receipt. Inspect both levels
+// before selecting a write/replay format, without changing their digest bytes.
+func collectionProfileV2Command(c Command) bool {
+	if v := c.Collection; v != nil && v.Create != nil && v.Create.NormalizationProfile == "cpra.file.base.v2" {
+		return true
+	}
+	v := c.CollectionExecute
+	if v == nil {
+		return false
+	}
+	if collectionRetirementProfileV2(v.Retirement) {
+		return true
+	}
+	return v.SourceRetirement != nil && collectionRetirementProfileV2(v.SourceRetirement.Retirement)
+}
+
+func collectionRetirementProfileV2(p *CollectionExecutionRetirementFence) bool {
+	return p != nil && (p.Result.Summary.NormalizationProfile == "cpra.file.base.v2" ||
+		p.Retirement != nil && p.Retirement.Result.Summary.NormalizationProfile == "cpra.file.base.v2")
 }
 
 // CollectionUploadFence identifies the exact committed prefix observed before

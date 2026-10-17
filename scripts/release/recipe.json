@@ -54,7 +54,7 @@
     "node_version": "v24.21.0",
     "pnpm_version": "11.22.0"
   },
-  "storage_format_version": 40,
+  "storage_format_version": 42,
   "package_revision": "1",
   "embedded_inputs": [
     "internal/httpserver/assets",

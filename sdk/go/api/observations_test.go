@@ -24,6 +24,22 @@ func TestFailureDiagnosticObservationRoundTrips(t *testing.T) {
 	}
 }
 
+func TestFailureCertificateDetailsRoundTrip(t *testing.T) {
+	raw := []byte(`{"lastFailure":{"code":"certificate_expiring","message":"The certificate expires within the configured threshold.","certificateNotAfter":"2026-10-16T12:00:00Z","certificateDaysRemaining":0}}`)
+	var status MonitorStatus
+	if err := DecodeResponse(raw, &status); err != nil {
+		t.Fatal(err)
+	}
+	d := status.LastFailure
+	if d == nil || d.CertificateDaysRemaining == nil || *d.CertificateDaysRemaining != 0 || d.CertificateNotAfter == nil {
+		t.Fatal("certificate detail unavailable after decoding")
+	}
+	encoded, err := json.Marshal(status)
+	if err != nil || !bytes.Contains(encoded, []byte(`"certificateDaysRemaining":0`)) || !bytes.Contains(encoded, []byte(`"certificateNotAfter":"2026-10-16T12:00:00Z"`)) {
+		t.Fatal("certificate detail did not round trip", err)
+	}
+}
+
 func TestObservationKnownZeroAndOlderOptionalFields(t *testing.T) {
 	for _, value := range []any{Measurement{Available: true}, Percentiles{Available: true}, Operation{ID: "op", State: "committed", Committed: Pointer(int64(0)), Applied: Pointer(int64(0))}} {
 		raw, err := json.Marshal(value)

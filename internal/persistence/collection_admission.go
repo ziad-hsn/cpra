@@ -130,7 +130,7 @@ func validateCollectionAdmissions(i image) error {
 			id != entry.UploadID || !validOperationEpoch(id) || !catalogIdentifier(entry.Actor, 128) ||
 			!bootstrapHash(entry.RequestDigest) || !bootstrapHash(entry.ContentDigest) ||
 			entry.IdentityFormat != commitment.Format || !validCollectionNormalizationProfile(entry.NormalizationProfile) ||
-			entry.NormalizationProfile != "" && i.Version < CollectionReselectionFormatVersion ||
+			!collectionProfileSupportedAt(entry.NormalizationProfile, i.Version) ||
 			entry.ItemCount == 0 || entry.ItemCount > maxCollectionItems || entry.CreatedAt.IsZero() ||
 			!entry.ExpiresAt.After(entry.CreatedAt) || entry.ExpiresAt.After(entry.CreatedAt.Add(CollectionTicketLifetime)) ||
 			entry.CreatedAt.After(i.CollectionAdmissionWatermark) || !entry.ExpiresAt.After(i.CollectionAdmissionWatermark) || operations[entry.OperationID] {

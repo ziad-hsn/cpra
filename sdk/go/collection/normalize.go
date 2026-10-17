@@ -15,7 +15,17 @@ import (
 // by browser imports and server-assisted reselection. It is independent of the
 // inventory HMAC format, compiler version and source-build hash. External job
 // resources and drivers are excluded even when this package has externaljobs.
-const FileNormalizationProfile = "cpra.file.base.v1"
+const FileNormalizationProfile = "cpra.file.base.v2"
+
+const fileNormalizationV1 = "cpra.file.base.v1"
+
+// SupportsFileNormalization reports whether this client can reproduce a file
+// profile. V1 remains available for continuing an existing operation; new
+// operations use FileNormalizationProfile. An empty profile is a distinct,
+// unprofiled contract and is not accepted here.
+func SupportsFileNormalization(profile string) bool {
+	return profile == FileNormalizationProfile || profile == fileNormalizationV1
+}
 
 // ErrUnsupportedNormalization identifies an unavailable normalization profile.
 // An absent profile is not silently interpreted as the current profile.
@@ -27,9 +37,10 @@ var errFileUTF8 = errors.New("collection source is not valid UTF-8")
 // file profile. JSON belongs to the callback; callers must not serialize the
 // resource again before computing its inventory commitment. It may hold secrets.
 type NormalizedItem struct {
-	ID       string
-	Location Location
-	JSON     []byte
+	ID             string
+	Location       Location
+	JSON           []byte
+	FieldPositions map[string]SourcePosition
 }
 
 func (NormalizedItem) String() string               { return "private normalized collection item (input omitted)" }
@@ -56,7 +67,7 @@ func (NormalizedItem) MarshalJSON() ([]byte, error) {
 // SourceName is local diagnostic metadata and is not part of normalized JSON.
 // Ordinary Decode and Freeze retain their separate, configurable contracts.
 func NormalizeFile(ctx context.Context, r io.Reader, profile string, options DecodeOptions, visit func(NormalizedItem) error) error {
-	if profile != FileNormalizationProfile {
+	if !SupportsFileNormalization(profile) {
 		return ErrUnsupportedNormalization
 	}
 	if r == nil || visit == nil {
@@ -77,6 +88,7 @@ func NormalizeFile(ctx context.Context, r io.Reader, profile string, options Dec
 	if options.MaxBytes > 64<<20 || options.MaxDocumentBytes > 16<<20 || options.MaxResourceBytes > 1<<20 || options.MaxResources > 10_000 {
 		return errors.New("file normalization profile limits exceeded")
 	}
+	options.normalizationProfile = profile
 	return Decode(ctx, &fileUTF8Reader{r: io.LimitReader(r, options.MaxBytes+1)}, options, func(item Item) error {
 		if err := ValidateFileProfileResource(profile, item.Resource); err != nil {
 			return fmt.Errorf("%s: %w", item.Location, err)
@@ -85,7 +97,7 @@ func NormalizeFile(ctx context.Context, r io.Reader, profile string, options Dec
 		if err != nil {
 			return errors.New("normalized resource encoding failed")
 		}
-		return visit(NormalizedItem{ID: item.ID, Location: item.Location, JSON: raw})
+		return visit(NormalizedItem{ID: item.ID, Location: item.Location, JSON: raw, FieldPositions: item.FieldPositions})
 	})
 }
 
@@ -96,38 +108,62 @@ func NormalizeFile(ctx context.Context, r io.Reader, profile string, options Dec
 // unknown profiles return ErrUnsupportedNormalization; callers preserving an
 // unprofiled input contract must explicitly omit this check for that contract.
 func ValidateFileProfileResource(profile string, resource api.Resource) error {
-	if profile != FileNormalizationProfile {
+	if !SupportsFileNormalization(profile) {
 		return ErrUnsupportedNormalization
 	}
-	return fileBaseResource(resource)
+	return fileBaseResource(resource, profile)
+}
+
+// DecodeOperationSource reproduces input for an existing operation's identity
+// verification. It is not a preflight validator for new imports. Callers must
+// verify the original source and ordered-item commitments before continuation.
+// An empty original profile stays unprofiled, including its original treatment
+// of a group combined with an ignored inline notification. New imports reject
+// that conflict. Alias support only expands previously rejected input; accepted
+// unprofiled resource bytes remain unchanged.
+func DecodeOperationSource(ctx context.Context, r io.Reader, profile string, options DecodeOptions, visit func(NormalizedItem) error) error {
+	if profile != "" {
+		return NormalizeFile(ctx, r, profile, options, visit)
+	}
+	if visit == nil {
+		return errors.New("staging callback is required")
+	}
+	options.allowDestinationConflict = true
+	return Decode(ctx, r, options, func(item Item) error {
+		raw, err := json.Marshal(item.Resource)
+		if err != nil {
+			return errors.New("normalized resource encoding failed")
+		}
+		return visit(NormalizedItem{ID: item.ID, Location: item.Location, JSON: raw, FieldPositions: item.FieldPositions})
+	})
 }
 
 // Keep this projection explicit: linked tagged API validators also accept
 // external drivers, including notifyType selectors without an inline driver.
-func fileBaseResource(r api.Resource) error {
+func fileBaseResource(r api.Resource, profile string) error {
 	unsupported := errors.New("resource is outside the base file normalization profile")
 	switch r.Kind {
 	case "Credential", "Recipient", "NotificationGroup":
 		return nil
 	case "NotificationEndpoint":
 		var driver api.DriverConfig
-		if json.Unmarshal(r.Spec, &driver) != nil || !fileBaseDriver("notification", driver.Type) {
+		if json.Unmarshal(r.Spec, &driver) != nil || !fileBaseDriver("notification", driver.Type, profile) {
 			return unsupported
 		}
 	case "Monitor":
 		var spec api.MonitorSpec
-		if json.Unmarshal(r.Spec, &spec) != nil || !fileBaseDriver("check", spec.Check.Driver.Type) {
+		if json.Unmarshal(r.Spec, &spec) != nil || !fileBaseDriver("check", spec.Check.Driver.Type, profile) {
 			return unsupported
 		}
-		if spec.Recovery != nil && !fileBaseDriver("recovery", spec.Recovery.Driver.Type) {
+		if spec.Recovery != nil && !fileBaseDriver("recovery", spec.Recovery.Driver.Type, profile) {
 			return unsupported
 		}
 		if spec.Notifications != nil {
 			for _, rule := range *spec.Notifications {
-				if rule.Driver != nil && !fileBaseDriver("notification", rule.Driver.Type) {
+				if rule.Driver != nil && !fileBaseDriver("notification", rule.Driver.Type, profile) {
 					return unsupported
 				}
-				if rule.NotifyType != nil && !fileBaseDriver("notification", *rule.NotifyType) {
+				if rule.NotifyType != nil && !fileBaseDriver("notification", *rule.NotifyType, profile) {
 					return unsupported
 				}
 			}
@@ -138,7 +174,10 @@ func fileBaseResource(r api.Resource) error {
 	return nil
 }
 
-func fileBaseDriver(category, kind string) bool {
+func fileBaseDriver(category, kind, profile string) bool {
+	if kind == "a2a" && (category == "recovery" || category == "notification") {
+		return profile == FileNormalizationProfile
+	}
 	switch category + "/" + kind {
 	case "check/http", "check/tcp", "check/icmp", "check/dns", "check/udp", "check/grpc", "check/docker",
 		"check/redis", "check/postgres", "check/mysql", "check/mongo", "check/rabbitmq", "check/kafka", "check/tls",

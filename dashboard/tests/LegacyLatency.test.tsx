@@ -23,7 +23,8 @@ it.each([
   [true, -1, 'Unavailable'], [false, 0, 'Unavailable'], [false, 12, 'Unavailable'], [undefined, 12, 'Unavailable'],
 ] as const)('fleet reports availability=%s, latency=%s as %s', async (available, latency, expected) => {
   render(<DataTable data={[{ ...base, latency_available: available, latency_ms: latency }]} onRowClick={() => undefined} />);
-  expect(await screen.findByRole('cell', { name: expected })).toBeVisible();
+  const row = (await screen.findByRole('cell', { name: 'Payments' })).closest('[role="row"]')!;
+  expect(within(row as HTMLElement).getAllByRole('cell')[3]).toHaveTextContent(expected);
 });
 
 it('exposes the virtual table structure and supports activating a visible row with Enter', async () => {

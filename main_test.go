@@ -24,6 +24,25 @@ func TestValidateDoesNotCreateState(t *testing.T) {
 	}
 }
 
+func TestValidateIgnoresLegacyWorkingDirectoryState(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.Mkdir("cpra-data", 0700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(dir, "monitors.yaml")
+	if err := os.WriteFile(manifest, []byte("monitors: []\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := runCPRa(t.Context(), runOptions{manifest: manifest, allowEmpty: true, validate: true, shutdownTimeout: time.Second}, func() { t.Fatal("validation started runtime") }); err != nil {
+		t.Fatal("validation inspected legacy storage", err)
+	}
+	entries, err := os.ReadDir("cpra-data")
+	if err != nil || len(entries) != 0 {
+		t.Fatal("validation opened storage", err)
+	}
+}
+
 func TestInvalidManifestDoesNotCreateState(t *testing.T) {
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "monitors.yaml")

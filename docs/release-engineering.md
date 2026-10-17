@@ -1,6 +1,6 @@
 # Release engineering
 
-The [dashboard finalization and shipping plan](implementation/dashboard-shipping-plan.md)
+The [release gates](versions.md)
 adds the integrated management, SDK/worker, provider and performance gates and the
 decision to keep candidates private until those gates pass. Publication is now
 locked while that combined gate is unfinished. Release qualification requires
@@ -178,7 +178,7 @@ independent review, and no endurance run is started.
 
 ## Publication procedure and independent review
 
-[publication_evidence.py](review/source/scripts/release/publication_evidence.py.txt) checks a
+[publication_evidence.py](reference/source/scripts/release/publication_evidence.py.txt) checks a
 plan against the complete checksummed distribution and the original SDK/worker
 `.zip`, `.mod` and `.info` payloads. Module versions must agree with the dependency
 graph and executed SDK consumer reports. SDK and worker tags use their nested
@@ -204,7 +204,7 @@ complete the graph before a plan can pass inspection. The retained publisher als
 module steps and interruption handling. Preparing or reading a plan does not
 qualify these executions. Missing final OCI/chart bytes are an error.
 
-The offline [image assembler](review/source/scripts/release/oci_assembly.py.txt)
+The offline [image assembler](reference/source/scripts/release/oci_assembly.py.txt)
 uses both retained build transports and the saved runtime image reference for
 each Linux architecture. It rechecks their actual blobs and uncompressed layer
 digests, preserves the platform manifests and creates one deterministic index.
@@ -232,7 +232,7 @@ assembly record. Copy these artifacts and the original transports together when
 moving private evidence. Verification re-reads their bytes rather than accepting
 the record's status field.
 
-[Chart packaging](review/source/scripts/release/chart.py.txt) checks the source
+[Chart packaging](reference/source/scripts/release/chart.py.txt) checks the source
 inventory and packages against this already calculated index. Its optional
 `--report` retains source hashes and the final package digest. It refuses an
 existing package and bounds both compressed input and physical archive expansion.
@@ -244,7 +244,7 @@ For offline `helm template`, select an intended supported Kubernetes version
 explicitly, such as `--kube-version 1.35.8`. Helm's built-in default can be newer
 than the chart's declared support range; it does not establish a tested cluster.
 
-The [image inventory tool](review/source/scripts/release/image_sbom.py.txt) reads
+The [image inventory tool](reference/source/scripts/release/image_sbom.py.txt) reads
 the verified OCI layout directly using checksum-pinned Syft 1.51.1. It selects
 `linux/amd64` and `linux/arm64` explicitly, avoiding the scanner's default platform.
 This uses Syft's documented [local OCI scan target](https://oss.anchore.com/docs/guides/sbom/scan-targets/).
@@ -321,9 +321,9 @@ and [GitHub offline attestation procedure](https://docs.github.com/en/actions/ho
 
 ### OCI transfer and restart
 
-The implementation is in [registry.py](review/source/scripts/release/registry.py.txt),
-[publish.py](review/source/scripts/release/publish.py.txt) and the
-[transfer tests](review/source/scripts/release/test_registry.py.txt).
+The implementation is in [registry.py](reference/source/scripts/release/registry.py.txt),
+[publish.py](reference/source/scripts/release/publish.py.txt) and the
+[transfer tests](reference/source/scripts/release/test_registry.py.txt).
 
 The publisher's transfer helper uses checksum-pinned ORAS 1.3.4 to upload the
 preserved configs and layers, each platform manifest, and the original index,
@@ -380,7 +380,7 @@ of the complete protected workflow remain open.
 
 ### Chart publication and restart
 
-The chart helper in [chart.py](review/source/scripts/release/chart.py.txt) preserves
+The chart helper in [chart.py](reference/source/scripts/release/chart.py.txt) preserves
 the tested `.tgz` package. It reads bounded chart metadata and checks its chart
 name/version, application version, source commit and immutable image binding.
 Duplicate YAML keys, aliases, oversized metadata, archive links, traversal and
@@ -405,7 +405,7 @@ ORAS transport rather than running another Helm push. The chart journal is
 retained with the other original progress records and revalidated on import.
 All mutating phases remain locked pending the full private qualification gate.
 
-The [chart publication contracts](review/source/scripts/release/test_chart_publication.py.txt)
+The [chart publication contracts](reference/source/scripts/release/test_chart_publication.py.txt)
 cover lost replies, source changes, version conflicts, missing objects, journal
 ordering, quotas and concurrent owners. The explicit local registry suite kills
 separate processes after configuration and version acceptance, then verifies
@@ -427,7 +427,7 @@ every publisher phase. The private-assessment dependency and all existing
 publication locks remain enforced.
 
 The image-version helper in
-[publish.py](review/source/scripts/release/publish.py.txt) binds one explicit
+[publish.py](reference/source/scripts/release/publish.py.txt) binds one explicit
 application version to the exact original index. It rechecks the complete remote
 image graph and records intent before the tag write. Existing matching tags
 require original progress; conflicting bytes and missing completed tags cannot
@@ -445,8 +445,8 @@ only progress journals are retained. Credentials are provided to login operation
 through standard input and removed during cleanup.
 
 Release drafts and assets use the bounded HTTP transport in
-[release_publication.py](review/source/scripts/release/release_publication.py.txt).
-Its [recovery tests](review/source/scripts/release/test_release_publication.py.txt)
+[release_publication.py](reference/source/scripts/release/release_publication.py.txt).
+Its [recovery tests](reference/source/scripts/release/test_release_publication.py.txt)
 exercise real loopback HTTP and forced process termination. Intent precedes each
 remote mutation. Verified receipts retain the original release or asset ID;
 resumption rechecks that identity, metadata, size and downloaded digest. Changed
@@ -512,7 +512,7 @@ complete real-account publication, the entire signing workflow, frozen
 qualification or independent review. The executable CLI blocks every mutating phase. Its local
 `prepare` phase only validates and imports progress; it has no credentials or
 network operations. The
-[publisher tests](review/source/scripts/release/test_publish.py.txt) cover the
+[publisher tests](reference/source/scripts/release/test_publish.py.txt) cover the
 source/run boundaries, lock behavior and workflow payload selection. Real local
 ORAS/Distribution crash tests exercise exact index tagging; they do not qualify
 GitHub, GHCR, signatures or runnable CPRa images.
@@ -552,7 +552,7 @@ inclusion, production trust roots or final CPRa artifacts.
 
 ### Original image signatures and provenance
 
-[image_signing.py](review/source/scripts/release/image_signing.py.txt) keeps three
+[image_signing.py](reference/source/scripts/release/image_signing.py.txt) keeps three
 image signatures and the multiarchitecture provenance bundle in the private
 progress directory before uploading their OCI envelopes. Each generation has a
 synchronously committed started marker. Verified original bytes receive a sealed
@@ -603,7 +603,7 @@ open, and publication remains locked.
 
 ### Module publication and restart
 
-[module_publication.py](review/source/scripts/release/module_publication.py.txt) reads the frozen
+[module_publication.py](reference/source/scripts/release/module_publication.py.txt) reads the frozen
 SDK/worker dependency graph and uses create-only Git references. The SDK tag is
 followed by a fresh public download; the worker tag and its download follow; only
 then is the application tag created. Nested tag names follow the
@@ -652,7 +652,7 @@ the strict transport policy. Those observations do not verify CPRa's own public
 module versions, GitHub write credentials, official release binaries or the full
 release workflow. The final qualification and independent review remain open.
 
-[review_evidence.py](review/source/scripts/release/review_evidence.py.txt) verifies detached
+[review_evidence.py](reference/source/scripts/release/review_evidence.py.txt) verifies detached
 OpenSSH review signatures over the exact original assessment. The signing
 namespace is `cpra-release-review@ziad-hsn.github.io`. Supply the trust policy
 outside candidate source and downloaded review artifacts. Its authors and
@@ -894,7 +894,7 @@ SDK and worker dependency graphs. See the
 The archive helper compiles and passes its filesystem/command tests on both
 supported compilers. Actual versioned candidate installations remain pending.
 Private archive qualification and public-proxy retrieval are
-separate gates. See the [SDK checkpoint](implementation/go-sdk-status.md#module-archive-checkpoint).
+separate gates. See the [module qualification](sdk/publishing.md).
 
 SDK consumer reports now retain the source-derived and downloaded `.zip`, `.mod`
 and `.info` payloads. `scripts/release/sdk_evidence.py` inspects both compiler
@@ -986,7 +986,7 @@ module-file changes are retained privately even when preparation fails.
 
 The current implementation has Python orchestration and workflow-policy tests.
 Actual Go preparation, source installation, native builds and public retrieval
-remain unexecuted for this change. The [SDK status](implementation/go-sdk-status.md#private-dependency-cache-checkpoint)
+remain unexecuted for this change. The [module qualification](sdk/publishing.md)
 records that boundary. Preparing a cache does not publish an SDK or qualify the
 application release.
 
@@ -1071,20 +1071,22 @@ Read [container and Helm operations](container-helm.md). Production images use t
 
 Helm creates one StatefulSet owner with retained storage; maintenance selects zero owners. Large manifests come from a pre-populated read-only configuration volume, not Helm values or oversized Kubernetes objects. API token rotation requires stopped local administration of the committed verifier before selecting a new immutable Secret and resuming one owner. Both deployment reports require the committed revision and HTTP 401 for the old token; a rollout alone is insufficient. The chart has no automatic backup hooks, live-copy guarantee, HPA, fake reload operation or multi-node failover claim.
 
-Both Helm 3 and 4, including a 3-to-4 upgrade, are exercised. The release gate requires real RWOP contention evidence on the selected CSI fixture, in addition to chart rendering. An RWO local-path test remains useful but cannot pass the default RWOP gate. A test CSI hostpath driver is not production storage certification; record and retest the actual filesystem/storage class/CSI stack before claiming it.
+Qualification must exercise both Helm 3 and 4, including a 3-to-4 upgrade. The release gate requires real RWOP contention evidence on the selected CSI fixture, in addition to chart rendering. An RWO local-path test remains useful but cannot pass the default RWOP gate. A test CSI hostpath driver is not production storage certification; record and retest the actual filesystem/storage class/CSI stack before claiming it.
 
 Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
-Default builds support application storage formats **1–14, 31, 33, 35, 38 and 40**. The
+Default builds support application storage formats **1–14, 31, 33, 35, 38, 40 and 42**. The
 private `externaljobs` build additionally supports worker formats **15–30, 32,
-34, 36, 37, 39 and 41**. [Agent actions](implementation/a2a-jobs.md) use common format
+34, 36, 37, 39, 41 and 43**. [A2A driver settings](reference/jobs-reference.md) use common format
 31, recovery-failure notifications use 33, and retained agent connections use
 35. Combining those features with optional worker state requires formats 32,
 34 and 36 respectively; committed-order worker assignment uses 37. State-change
 notification admission introduced common format 38 and combined worker format
 39. New monitor configuration, check and action transitions use delivery format
 40 for notification identity, diagnostics and deadlines; combining this state
-with optional worker state requires format 41. Supported historical envelopes
+with optional worker state requires format 41. Episode starts, Ignore state,
+control-transition notices and TLS policy use common format 42 and combined
+worker format 43. Supported historical envelopes
 retain their original notification semantics. The higher
 common formats do not make worker formats readable by default builds. The
 release metadata must record the

@@ -86,7 +86,7 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
     await page.goto(`${origin}/import`);
     await page.getByLabel('Bearer token').fill(operator);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await page.getByRole('heading', { name: 'Import configuration files', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Apply configuration', exact: true }).waitFor();
     const chooser = page.waitForEvent('filechooser');
     await page.getByLabel('Configuration files', { exact: true }).click();
     await (await chooser).setFiles(files);
@@ -117,25 +117,86 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
     check(cells.length === 3 && cells[1].includes('Monitor/activated-monitor') && cells[2].includes('Credential/activated-secret'), 'Results lost original input order');
     check(cells.slice(1).every(row => row.includes('Change committed') && row.includes('Applied')), 'Configuration decisions and controller results missing');
     check(cells[1].includes(names[0]) && cells[2].includes(names[1]), 'Result source attribution missing');
-    let captureTimer;
-    try { await Promise.race([Promise.all(pending), new Promise((_, reject) => { captureTimer = setTimeout(() => reject(new Error('Read capture did not finish')), 10_000); })]); }
-    finally { clearTimeout(captureTimer); }
-    check(!captureFailure, captureFailure);
+    const drainCaptures = async () => {
+      let timer;
+      try {
+        await Promise.race([(async () => {
+          let count;
+          do { count = pending.length; await Promise.all(pending.slice(0, count)); }
+          while (pending.length !== count);
+        })(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Read capture did not finish')), 10_000); })]);
+      } finally { clearTimeout(timer); }
+      check(!captureFailure, captureFailure);
+    };
+    await drainCaptures();
     const original = reads.findLast(read => read.id === operationID && read.executionResult?.state === 'ready');
     check(original?.state === 'completed' && original.committed === 2 && original.applied === 2, 'Original operation did not complete both resources');
-    check(original.normalizationProfile === 'cpra.file.base.v1', 'Original file normalization profile was lost');
+    check(original.normalizationProfile === 'cpra.file.base.v2', 'Original file normalization profile was lost');
     const activations = writes.filter(write => write.path.endsWith('/activate'));
     check(activations.length === 1 && activations[0].path === `/api/v2/operations/${operationID}/activate` && activations[0].empty, 'Activation was duplicated, redirected or included a body');
+
+    stage = 'guided notification setup';
+    await page.getByRole('button', { name: 'Close this import', exact: true }).click();
+    await page.getByText('Set up webhook notifications', { exact: true }).click();
+    await page.getByRole('combobox', { name: /^Choose monitor/ }).selectOption('activated-monitor');
+    await page.getByLabel('Recipient name', { exact: true }).fill('Example on-call');
+    await page.getByLabel('Webhook URL', { exact: true }).fill(`https://example.invalid/${marker}`);
+    const beforeSetupWrites = writes.length;
+    await page.getByRole('button', { name: 'Prepare notification setup', exact: true }).click();
+    const setupPreview = page.getByRole('region', { name: 'Collection preview', exact: true });
+    await setupPreview.getByRole('row').nth(5).waitFor();
+    check(await setupPreview.getByRole('row').count() === 6, 'Guided setup did not compose five resources');
+    check(writes.length === beforeSetupWrites, 'Local guided preparation performed an HTTP mutation');
+    check(!((await page.content()).includes(marker)), 'Guided preparation retained a secret in the DOM');
+    await page.getByRole('button', { name: 'Preview on server', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'Server preview passed.' }).waitFor();
+    check(writes.slice(beforeSetupWrites).every(write => write.path.endsWith('/collections/preflight')), 'Guided preview activated configuration');
+    await page.getByRole('button', { name: 'Create inactive operation', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'Inactive operation created.' }).waitFor();
+    await page.getByRole('button', { name: 'Upload remaining resources', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'All resources are staged.' }).waitFor();
+    await page.getByRole('button', { name: 'Validate whole collection', exact: true }).click();
+    await page.getByRole('heading', { name: 'Original sealed validation result', exact: true }).waitFor();
+    const guidedOperationID = (await page.getByRole('region', { name: 'Apply collection' }).getByRole('link').innerText()).trim();
+    check(guidedOperationID !== operationID && guidedOperationID.startsWith('op.'), 'Guided setup lost its distinct operation identity');
+    await page.getByRole('button', { name: 'Review activation', exact: true }).click();
+    check((await page.getByRole('alertdialog').innerText()).includes(guidedOperationID), 'Guided confirmation omitted its operation');
+    await page.getByRole('button', { name: 'Confirm activation', exact: true }).click();
+    await page.getByText('Resource results are retained and ready to read.', { exact: true }).waitFor({ timeout: 45_000 });
+    await page.getByRole('button', { name: 'Read resource results', exact: true }).click();
+    const guidedRows = page.getByRole('region', { name: 'Application resource results' }).getByRole('row');
+    await guidedRows.nth(5).waitFor();
+    check(await guidedRows.count() === 6 && (await guidedRows.allTextContents()).slice(1).every(row => row.includes('Change committed') && row.includes('Applied')), 'Guided resources were not all applied');
+    check(writes.filter(write => write.path === `/api/v2/operations/${guidedOperationID}/activate`).length === 1, 'Guided activation was repeated');
+    check(writes.slice(beforeSetupWrites).every(write => write.path === '/api/v2/operations' || write.path.startsWith('/api/v2/operations/') || ['/api/v2/collections/preflight', '/api/v2/collections/prepare'].includes(write.path)), 'Guided setup bypassed collection admission');
     const dom = await page.locator('body').innerText();
     check(!dom.includes(marker) && !dom.includes(operator), 'Secret or token in DOM');
     const storage = await page.evaluate(async () => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookies: document.cookie, databases: await indexedDB.databases(), caches: await caches.keys() }));
     check([marker, operator, ...names].every(value => !storage.includes(value)), 'Private input persisted in browser storage');
+    await drainCaptures();
+    stage = 'sign out with retained results';
+    check(await results.count() === 1, 'Sign-out fixture has no populated results');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByLabel('Bearer token').waitFor();
+    check(await results.count() === 0 && !((await page.locator('body').innerText()).includes(guidedOperationID)), 'Sign-out retained operation results');
+    await drainCaptures();
+    stage = 'new session overview';
+    await page.getByLabel('Bearer token').fill(operator);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('link', { name: 'Overview', exact: true }).click();
+    await page.getByRole('heading', { name: 'Fleet Overview', exact: true }).waitFor();
+    await page.getByRole('status', { name: 'Global fleet status' }).waitFor();
+    if (process.env.CPRA_BROWSER_EVIDENCE_DIR) {
+      check(path.isAbsolute(process.env.CPRA_BROWSER_EVIDENCE_DIR), 'Screenshot directory must be absolute');
+      await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'dashboard-overview.png'), fullPage: true });
+    }
     stage = 'sign out';
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-    check(await results.count() === 0, 'Sign-out retained operation results');
+    await page.getByLabel('Bearer token').waitFor();
+    await drainCaptures();
     check(errors.length === 0, 'Browser reported an uncaught error');
-    process.stdout.write(JSON.stringify({ operationID, resultID: original.executionResult.summary.resultID, activations: activations.length, interruptedReads,
-      checks: ['real-file-import', 'file-normalization-profile', 'whole-collection-validation', 'explicit-confirmation', 'one-bodyless-activation', 'dependency-ordered-application', 'separate-decision-and-controller', 'source-attribution', 'secret-redaction', 'ephemeral-session', 'sign-out-clear'] }));
+    process.stdout.write(JSON.stringify({ operationID, guidedOperationID, resultID: original.executionResult.summary.resultID, activations: activations.length, interruptedReads,
+      checks: ['real-file-import', 'file-normalization-profile', 'whole-collection-validation', 'explicit-confirmation', 'one-bodyless-activation', 'dependency-ordered-application', 'separate-decision-and-controller', 'source-attribution', 'guided-notification-collection', 'guided-explicit-activation', 'secret-redaction', 'ephemeral-session', 'sign-out-clear'] }));
   } catch (error) { throw new Error(`${stage}: ${error.message}`); }
   finally { await browser.close(); }
 })().catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });

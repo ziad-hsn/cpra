@@ -60,7 +60,7 @@ func TestCollectionExecutionCoordinatorDependencyOrderAndPartialConflict(t *test
 				collectionMonitor("service", "http://original.example/health"),
 				resource("NotificationGroup", "team", api.NotificationGroupSpec{RecipientRefs: []string{"oncall"}}),
 				resource("Recipient", "oncall", api.RecipientSpec{EndpointRefs: []string{"log"}}),
-				planLogEndpoint("log", logPath),
+				planLogEndpoint("log", filepath.Base(logPath)),
 				resource("Credential", "secret", api.CredentialSpec{Value: &secret}),
 			}
 			f := coordinatorFixture(t, input...)

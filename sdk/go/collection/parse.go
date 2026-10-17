@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -21,6 +22,13 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 	scan.Buffer(make([]byte, 64<<10), b.o.MaxResourceBytes+1)
 	var metadata, entry bytes.Buffer
 	document, item := 1, 0
+	lineNumber, entryLine := 0, 0
+	firstColumn := 1
+	if source, ok := input.(*sourceReader); ok {
+		lineNumber, firstColumn = source.point.Line-1, source.point.Column
+	}
+	firstLine := lineNumber + 1
+	var metadataLines []int
 	sequence := ""
 	indent := -1
 	documentHasContent := false
@@ -28,34 +36,49 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		if entry.Len() == 0 {
 			return nil
 		}
-		value, err := decodeYAML(entry.Bytes())
+		value, root, err := b.decodeYAMLDocument(entry.Bytes())
+		positions := yamlPositions(root, func(line int) int { return entryLine + line - 1 })
+		adjustFirstColumn(positions, firstLine, firstColumn)
 		entry.Reset()
 		if err != nil {
-			return fmt.Errorf("document %d item %d: %w", document, item+1, err)
+			return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1, Line: entryLine}, func(line int) int { return entryLine + line - 1 })
 		}
 		array, ok := value.([]any)
 		if !ok || len(array) != 1 {
 			return fmt.Errorf("document %d: expected one block entry", document)
 		}
 		item++
-		return b.emit(array[0], Location{Source: source, Document: document, Item: item}, sequence == "monitors")
+		return b.emit(array[0], Location{Source: source, Document: document, Item: item}, sequence == "monitors", subsetPositions(positions, "/0"))
 	}
 	finish := func() error {
 		if err := emitEntry(); err != nil {
 			return err
 		}
 		if metadata.Len() > 0 {
-			value, err := decodeYAML(metadata.Bytes())
+			value, root, err := b.decodeYAMLDocument(metadata.Bytes())
+			positions := yamlPositions(root, func(line int) int {
+				if line > 0 && line <= len(metadataLines) {
+					return metadataLines[line-1]
+				}
+				return 0
+			})
+			adjustFirstColumn(positions, firstLine, firstColumn)
 			if err != nil {
-				return fmt.Errorf("document %d: %w", document, err)
+				return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1}, func(line int) int {
+					if line > 0 && line <= len(metadataLines) {
+						return metadataLines[line-1]
+					}
+					return 0
+				})
 			}
 			if value != nil {
-				if err := b.document(value, Location{Source: source, Document: document, Item: item}); err != nil {
+				if err := b.document(ctx, value, Location{Source: source, Document: document, Item: item}, positions); err != nil {
 					return err
 				}
 			}
 		}
 		metadata.Reset()
+		metadataLines = nil
 		entry.Reset()
 		sequence = ""
 		indent = -1
@@ -64,6 +87,7 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		return nil
 	}
 	for scan.Scan() {
+		lineNumber++
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -99,6 +123,7 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 					return fmt.Errorf("document metadata exceeds limit")
 				}
 				metadata.WriteString(key + ": []\n")
+				metadataLines = append(metadataLines, lineNumber)
 				continue
 			}
 		}
@@ -123,6 +148,9 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 				return fmt.Errorf("document %d item %d exceeds resource limit", document, item+1)
 			}
 			if !blank || entry.Len() > 0 {
+				if entry.Len() == 0 {
+					entryLine = lineNumber
+				}
 				entry.WriteString(line)
 				entry.WriteByte('\n')
 			}
@@ -130,6 +158,7 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 			if metadata.Len()+len(line)+1 > b.o.MaxDocumentBytes {
 				return fmt.Errorf("document %d metadata exceeds limit", document)
 			}
+			metadataLines = append(metadataLines, lineNumber)
 			metadata.WriteString(line)
 			metadata.WriteByte('\n')
 		}
@@ -157,14 +186,28 @@ func blockHeader(line string) (string, bool) {
 }
 
 func decodeYAML(data []byte) (any, error) {
+	return (&builder{}).decodeYAML(data)
+}
+
+func (b *builder) decodeYAML(data []byte) (any, error) {
+	value, _, err := b.decodeYAMLDocument(data)
+	return value, err
+}
+func (b *builder) decodeYAMLDocument(data []byte) (any, *yaml.Node, error) {
 	var document yaml.Node
 	if err := yaml.Unmarshal(data, &document); err != nil {
-		return nil, fmt.Errorf("invalid YAML")
+		return nil, &document, yamlSyntaxError(err)
 	}
 	if len(document.Content) == 0 {
-		return nil, nil
+		return nil, &document, nil
 	}
-	return nodeValue(document.Content[0], 0)
+	if b.normalizationProfile == fileNormalizationV1 || !yamlExpansion(document.Content[0], 0) {
+		value, err := nodeValue(document.Content[0], 0)
+		return value, &document, err
+	}
+	decoder := yamlValues{nodes: 65_536, bytes: 1 << 20, active: make(map[*yaml.Node]bool)}
+	value, err := decoder.value(document.Content[0], 0)
+	return value, &document, err
 }
 
 func nodeValue(node *yaml.Node, depth int) (any, error) {
@@ -180,7 +223,7 @@ func nodeValue(node *yaml.Node, depth int) (any, error) {
 				return nil, fmt.Errorf("mapping keys must be strings")
 			}
 			if _, exists := result[key.Value]; exists {
-				return nil, fmt.Errorf("duplicate key at line %d", key.Line)
+				return nil, &SourceError{Location: Location{Line: key.Line, Column: key.Column}, Cause: api.InvalidField("", "duplicateField")}
 			}
 			value, err := nodeValue(node.Content[i+1], depth+1)
 			if err != nil {
@@ -257,7 +300,7 @@ func yamlNumber(value string) (json.Number, error) {
 // readJSONValue is a bounded lexical reader: a giant single string cannot cause
 // the unbounded allocation that decoding a RawMessage before checking its size
 // would allow. JSON syntax and duplicate keys are checked afterward.
-func readJSONValue(r *bufio.Reader, limit int) ([]byte, error) {
+func readJSONValue(r byteReader, limit int) ([]byte, error) {
 	if _, err := peekNonspace(r); err != nil {
 		return nil, err
 	}
@@ -318,7 +361,7 @@ func readJSONValue(r *bufio.Reader, limit int) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func peekNonspace(r *bufio.Reader) (byte, error) {
+func peekNonspace(r byteReader) (byte, error) {
 	for {
 		p, err := r.Peek(1)
 		if err != nil {
@@ -332,7 +375,7 @@ func peekNonspace(r *bufio.Reader) (byte, error) {
 		}
 	}
 }
-func punctuation(r *bufio.Reader, want byte) error {
+func punctuation(r byteReader, want byte) error {
 	c, err := peekNonspace(r)
 	if err != nil {
 		return err
@@ -344,7 +387,7 @@ func punctuation(r *bufio.Reader, want byte) error {
 	return nil
 }
 
-func (b *builder) parseJSON(ctx context.Context, r *bufio.Reader, source string) error {
+func (b *builder) parseJSON(ctx context.Context, r byteReader, source string) error {
 	for document := 1; ; document++ {
 		first, err := peekNonspace(r)
 		if err == io.EOF {
@@ -354,20 +397,26 @@ func (b *builder) parseJSON(ctx context.Context, r *bufio.Reader, source string)
 			return err
 		}
 		if first != '{' && first != '[' {
-			return fmt.Errorf("document %d must be a JSON object or array", document)
+			return &SourceError{Location: locationAt(Location{Source: source, Document: document}, readerPosition(r)), Cause: api.InvalidField("", "invalidJSON")}
 		}
 		if err := b.parseJSONDocument(ctx, r, source, document); err != nil {
-			return fmt.Errorf("document %d: %w", document, err)
+			var positioned *SourceError
+			if errors.As(err, &positioned) {
+				return err
+			}
+			return &SourceError{Location: locationAt(Location{Source: source, Document: document}, readerPosition(r)), Cause: err}
 		}
 	}
 }
 
-func (b *builder) parseJSONDocument(ctx context.Context, r *bufio.Reader, source string, document int) error {
+func (b *builder) parseJSONDocument(ctx context.Context, r byteReader, source string, document int) error {
 	first, err := peekNonspace(r)
 	if err != nil {
 		return err
 	}
 	location := Location{Source: source, Document: document}
+	start := readerPosition(r)
+	positions := map[string]SourcePosition{"": start}
 	if first == '[' {
 		if err = b.jsonArray(ctx, r, location, false); err != nil {
 			return err
@@ -412,6 +461,10 @@ func (b *builder) parseJSONDocument(ctx context.Context, r *bufio.Reader, source
 				}
 				fields[key] = []any{}
 			} else {
+				if _, e = peekNonspace(r); e != nil {
+					return e
+				}
+				fieldStart := readerPosition(r)
 				raw, e = readJSONValue(r, b.o.MaxDocumentBytes-metadataBytes)
 				if e != nil {
 					return e
@@ -419,7 +472,13 @@ func (b *builder) parseJSONDocument(ctx context.Context, r *bufio.Reader, source
 				metadataBytes += len(raw)
 				value, e := decodeJSON(raw)
 				if e != nil {
-					return e
+					return jsonSourceError(raw, e, locationAt(location, fieldStart))
+				}
+				for field, point := range jsonPositions(raw, fieldStart) {
+					name := sourcePathChild("", key) + field
+					if len(positions) < 65536 {
+						positions[name] = point
+					}
 				}
 				fields[key] = value
 			}
@@ -442,14 +501,14 @@ func (b *builder) parseJSONDocument(ctx context.Context, r *bufio.Reader, source
 				return fmt.Errorf("trailing JSON comma")
 			}
 		}
-		if err = b.document(fields, location); err != nil {
+		if err = b.document(ctx, fields, location, positions); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (b *builder) jsonArray(ctx context.Context, r *bufio.Reader, location Location, manifest bool) error {
+func (b *builder) jsonArray(ctx context.Context, r byteReader, location Location, manifest bool) error {
 	if err := punctuation(r, '['); err != nil {
 		return err
 	}
@@ -465,16 +524,18 @@ func (b *builder) jsonArray(ctx context.Context, r *bufio.Reader, location Locat
 			_, _ = r.ReadByte()
 			return nil
 		}
+		start := readerPosition(r)
 		raw, err := readJSONValue(r, b.o.MaxResourceBytes)
+		location.Item++
+		location = locationAt(location, start)
 		if err != nil {
-			return err
+			return &SourceError{Location: locationAt(location, readerPosition(r)), Cause: api.InvalidField("", "invalidJSON")}
 		}
 		value, err := decodeJSON(raw)
 		if err != nil {
-			return err
+			return jsonSourceError(raw, err, location)
 		}
-		location.Item++
-		if err = b.emit(value, location, manifest); err != nil {
+		if err = b.emit(value, location, manifest, jsonPositions(raw, start)); err != nil {
 			return err
 		}
 		c, err = peekNonspace(r)
@@ -568,14 +629,21 @@ func jsonValue(d *json.Decoder, depth int) (any, error) {
 	}
 }
 
-func (b *builder) document(value any, location Location) error {
+func (b *builder) document(ctx context.Context, value any, location Location, positions map[string]SourcePosition) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	coordinates := indexPositions(positions)
 	if value == nil {
 		return nil
 	}
 	if list, ok := value.([]any); ok {
-		for _, item := range list {
+		for index, item := range list {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			location.Item++
-			if err := b.emit(item, location, false); err != nil {
+			if err := b.emit(item, location, false, coordinates.subset(fmt.Sprintf("/%d", index))); err != nil {
 				return err
 			}
 		}
@@ -599,16 +667,19 @@ func (b *builder) document(value any, location Location) error {
 			if !ok {
 				return fmt.Errorf("List.items must be an array")
 			}
-			for _, item := range items {
+			for index, item := range items {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 				location.Item++
-				if err := b.emit(item, location, false); err != nil {
+				if err := b.emit(item, location, false, coordinates.subset(fmt.Sprintf("/items/%d", index))); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 		location.Item++
-		return b.emit(m, location, false)
+		return b.emit(m, location, false, positions)
 	}
 	for key := range m {
 		if key != "version" && key != "monitors" && key != "endpoints" && key != "notification_groups" {
@@ -633,7 +704,21 @@ func (b *builder) document(value any, location Location) error {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			location.Item++
+			sourceFields := coordinates.subset(sourcePathChild("/"+entry.field, key))
+			fields := make(map[string]SourcePosition)
+			for field, point := range sourceFields {
+				name := "/spec"
+				if entry.kind == "NotificationGroup" {
+					name += "/endpointRefs"
+				}
+				name += field
+				fields[name] = point
+			}
+			location = locationAt(location, sourceFields[""])
 			var spec any
 			if entry.kind == "NotificationGroup" {
 				spec = map[string]any{"endpointRefs": definitions[key]}
@@ -649,7 +734,7 @@ func (b *builder) document(value any, location Location) error {
 				}
 				driver, err := driverFromManifest("notification", endpoint["type"], endpoint["config"])
 				if err != nil {
-					return err
+					return (Item{Location: location, FieldPositions: resourceFieldPositions(fields, false)}).ValidationError(api.PrefixValidationError("spec", err))
 				}
 				spec = driver
 			}
@@ -657,7 +742,8 @@ func (b *builder) document(value any, location Location) error {
 			if err != nil {
 				return err
 			}
-			if err = b.add(resource, location); err != nil {
+
+			if err = b.add(resource, location, resourceFieldPositions(fields, false)); err != nil {
 				return err
 			}
 		}
@@ -667,9 +753,12 @@ func (b *builder) document(value any, location Location) error {
 		if !ok {
 			return fmt.Errorf("manifest monitors must be an array")
 		}
-		for _, item := range list {
+		for index, item := range list {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			location.Item++
-			if err := b.emit(item, location, true); err != nil {
+			if err := b.emit(item, location, true, coordinates.subset(fmt.Sprintf("/monitors/%d", index))); err != nil {
 				return err
 			}
 		}
@@ -677,7 +766,9 @@ func (b *builder) document(value any, location Location) error {
 	return nil
 }
 
-func (b *builder) emit(value any, location Location, manifest bool) error {
+func (b *builder) emit(value any, location Location, manifest bool, positions map[string]SourcePosition) error {
+	location = locationAt(location, positions[""])
+	fields := resourceFieldPositions(positions, manifest)
 	m, ok := value.(map[string]any)
 	if !ok {
 		return fmt.Errorf("%s: resource must be an object", location)
@@ -685,13 +776,13 @@ func (b *builder) emit(value any, location Location, manifest bool) error {
 	var resource api.Resource
 	var err error
 	if manifest {
-		resource, err = monitorFromManifest(m)
+		resource, err = monitorFromManifestProfile(m, b.normalizationProfile == fileNormalizationV1 || b.allowDestinationConflict)
 	} else {
 		for key := range m {
 			switch key {
 			case "apiVersion", "kind", "metadata", "spec", "status":
 			default:
-				return fmt.Errorf("%s: unknown resource envelope field", location)
+				return (Item{Location: location, FieldPositions: fields}).ValidationError(api.InvalidField("", "unknownField"))
 			}
 		}
 		encoded, e := json.Marshal(m)
@@ -701,9 +792,9 @@ func (b *builder) emit(value any, location Location, manifest bool) error {
 		resource, err = api.DecodeResource(encoded)
 	}
 	if err != nil {
-		return fmt.Errorf("%s: %w", location, err)
+		return (Item{Location: location, FieldPositions: fields}).ValidationError(err)
 	}
-	return b.add(resource, location)
+	return b.add(resource, location, fields)
 }
 
 func envelope(kind, id, name string, spec any) (api.Resource, error) {
@@ -715,9 +806,13 @@ func envelope(kind, id, name string, spec any) (api.Resource, error) {
 }
 
 func monitorFromManifest(m map[string]any) (api.Resource, error) {
+	return monitorFromManifestProfile(m, false)
+}
+
+func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool) (api.Resource, error) {
 	for key := range m {
 		switch key {
-		case "id", "name", "pulse_check", "codes", "intervention", "enabled", "tags", "maintenance":
+		case "id", "name", "pulse_check", "codes", "intervention", "enabled", "tags", "maintenance", "auto_ignore":
 		default:
 			return api.Resource{}, fmt.Errorf("unknown manifest monitor field")
 		}
@@ -742,6 +837,9 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 		id = "name:" + hex.EncodeToString(sum[:])
 	}
 	spec := make(map[string]any)
+	if value, ok := m["auto_ignore"]; ok {
+		spec["autoIgnore"] = value
+	}
 	for _, key := range []string{"enabled", "tags", "maintenance"} {
 		if value, ok := m[key]; ok {
 			spec[key] = value
@@ -777,7 +875,7 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 	}
 	driver, err := driverFromManifest("check", pulse["type"], pulse["config"])
 	if err != nil {
-		return api.Resource{}, err
+		return api.Resource{}, api.PrefixValidationError("spec.check.driver", err)
 	}
 	// Manifest per-driver zero inherits positive pulse retries. Typed resource
 	// configuration preserves explicit zero, so resolve manifest defaults here.
@@ -815,7 +913,7 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 		}
 		driver, err := driverFromManifest("recovery", object["action"], object["target"])
 		if err != nil {
-			return api.Resource{}, err
+			return api.Resource{}, api.PrefixValidationError("spec.recovery.driver", err)
 		}
 		recovery["driver"] = driver
 		spec["recovery"] = recovery
@@ -838,6 +936,11 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 					return api.Resource{}, fmt.Errorf("unknown manifest code field")
 				}
 			}
+			if value, exists := code["notify_group"]; !allowDestinationConflict && exists && value != nil {
+				if _, ok := value.(string); !ok {
+					return api.Resource{}, fmt.Errorf("notification group must be a string")
+				}
+			}
 			rule := make(map[string]any)
 			if trigger, exists := code["trigger"]; exists {
 				rule["trigger"] = trigger
@@ -846,11 +949,17 @@ func monitorFromManifest(m map[string]any) (api.Resource, error) {
 				rule["dispatch"] = dispatch
 			}
 			if group, ok := code["notify_group"].(string); ok && group != "" {
+				if !allowDestinationConflict {
+					notify, supplied := code["notify"]
+					if supplied && notify != nil && notify != "" || code["config"] != nil {
+						return api.Resource{}, fmt.Errorf("notification group conflicts with inline destination")
+					}
+				}
 				rule["groupRef"] = group
 			} else {
 				driver, err := driverFromManifest("notification", code["notify"], code["config"])
 				if err != nil {
-					return api.Resource{}, err
+					return api.Resource{}, api.PrefixValidationError(api.SafeValidationField("spec.notifications."+color+".driver"), err)
 				}
 				rule["driver"] = driver
 			}

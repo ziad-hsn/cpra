@@ -5,6 +5,7 @@ import { collectionPermissions } from '../api/collectionOperations';
 import { createReselection, discardReselection, getReselection, reselectionOperations, resumeReselection, uploadReselectionSource, verifyReselection, type ReselectionStatus } from '../api/collectionReselection';
 import { ManagementError, type APIResponse } from '../api/session';
 import { collectionFileSources, type SelectedCollectionSource } from '../import/files';
+import type { FileNormalizationProfile } from '../api/collectionInventory';
 import { DirtyDraftGuard } from './DirtyDraftGuard';
 
 type Lifetime = { active: boolean; generation: number; busy: boolean; uncertain: boolean; createAttempted: boolean; files?: SelectedCollectionSource[]; attempt?: ReselectionStatus; abort?: AbortController };
@@ -19,7 +20,7 @@ const failures: Record<string, string> = {
   transfer_failed: 'The remaining upload could not be confirmed. Read the original operation before continuing.',
 };
 
-export function CollectionReselection({ id, onProgress }: { id: string; onProgress: () => void }) {
+export function CollectionReselection({ id, profile, onProgress }: { id: string; profile: FileNormalizationProfile; onProgress: () => void }) {
   const session = useDashboardSession();
   const owned = useRef<Lifetime>({ active: true, generation: 0, busy: false, uncertain: false, createAttempted: false });
   const [selected, setSelected] = useState(0);
@@ -77,7 +78,7 @@ export function CollectionReselection({ id, onProgress }: { id: string; onProgre
     const saved = owned.current.attempt;
     if (!saved) return;
     try {
-      const response = await getReselection(session, allowed, id, saved.id, signal);
+      const response = await getReselection(session, allowed, id, saved.id, signal, profile);
       if (!current()) return;
       observe(response); owned.current.uncertain = false; setUncertain(false);
     } catch (error) {
@@ -106,7 +107,7 @@ export function CollectionReselection({ id, onProgress }: { id: string; onProgre
     if (!progress) {
       if (state.createAttempted) return;
       state.createAttempted = true;
-      const response = await createReselection(session, allowed, id, files.length, signal);
+      const response = await createReselection(session, allowed, id, files.length, signal, profile);
       if (!current()) return;
       progress = observe(response);
     }
@@ -117,19 +118,19 @@ export function CollectionReselection({ id, onProgress }: { id: string; onProgre
       const bytes = new Uint8Array(await source.file.slice(progress.nextOffset, end).arrayBuffer());
       try {
         if (!current()) return;
-        const response = await uploadReselectionSource(session, allowed, id, progress.id, { source: progress.nextSource, offset: progress.nextOffset, end: end === source.file.size, data: bytes }, signal);
+        const response = await uploadReselectionSource(session, allowed, id, progress.id, { source: progress.nextSource, offset: progress.nextOffset, end: end === source.file.size, data: bytes }, signal, profile);
         if (!current()) return;
         progress = observe(response);
       } finally { bytes.fill(0); }
     }
     if (progress.phase !== 'uploading' || progress.sourcesCompleted !== files.length) return;
-    const response = await verifyReselection(session, allowed, id, progress.id, signal);
+    const response = await verifyReselection(session, allowed, id, progress.id, signal, profile);
     if (current()) { state.files = undefined; setSelected(0); observe(response); }
   });
   const resume = () => run(async (signal, current) => {
     const state = owned.current;
     if (state.uncertain || state.attempt?.phase !== 'verified') return;
-    const response = await resumeReselection(session, allowed, id, state.attempt.id, signal);
+    const response = await resumeReselection(session, allowed, id, state.attempt.id, signal, profile);
     if (current()) observe(response);
   });
   const discard = () => run(async (signal, current) => {

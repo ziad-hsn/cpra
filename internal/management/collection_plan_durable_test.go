@@ -42,7 +42,7 @@ func TestCollectionPlanCompilerThroughDurableFinalization(t *testing.T) {
 		monitor,
 		resource("NotificationGroup", "team", api.NotificationGroupSpec{RecipientRefs: []string{"oncall"}}),
 		resource("Recipient", "oncall", api.RecipientSpec{EndpointRefs: []string{"chat"}}),
-		planLogEndpoint("chat", logPath),
+		planLogEndpoint("chat", filepath.Base(logPath)),
 		resource("Credential", "secret", api.CredentialSpec{Value: api.Pointer(canary)}),
 	}
 	store, _ := bootstrapTestStore(t, "raft", 1000)

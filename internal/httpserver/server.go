@@ -369,10 +369,10 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			defer cancel()
 			r = r.WithContext(ctx)
 		}
-		if s.anonymousLoopbackConfigured() && !strings.HasPrefix(r.URL.Path, "/api/v2/") {
+		if s.anonymousLoopbackConfigured() {
 			if loopbackRequest(r) {
 				w.Header().Set("Cache-Control", "no-store")
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(w, observationRequest(r, "anonymous"))
 				return
 			}
 		}
@@ -411,7 +411,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		}
 		w.Header().Set("Cache-Control", "no-store")
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, observationRequest(r, "shared-observer"))
 	})
 }
 
@@ -435,7 +435,6 @@ func subtleTimeCompare(a, b string) bool {
 func (s *Server) registerAPI(mux *http.ServeMux) {
 	s.registerAccessDiscovery(mux)
 	s.registerManagement(mux)
-	s.registerProbes(mux)
 	mux.HandleFunc("GET /api/v1/history", s.handleHistory)
 	mux.HandleFunc("GET /api/v1/slo", s.handleSLO)
 	mux.HandleFunc("GET /api/v1/state", s.handleState)

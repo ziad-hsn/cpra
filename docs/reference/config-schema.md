@@ -20,7 +20,8 @@ automatically. File-only operation reconciles its manifest at startup.
 
 ~~~yaml
 monitors:
-  - name: example-service
+  - id: example-service
+    name: example-service
     enabled: true
     pulse_check:
       type: http
@@ -50,19 +51,54 @@ monitors:
 | `enabled` | Whether the monitor runs; defaults to true when omitted. |
 | `tags` | Optional list of labels attached to the monitor. |
 | `pulse_check.type` | Check implementation, such as `http` or `tls`. |
-| `pulse_check.interval` | Positive duration between scheduled checks, such as `30s`. |
+| `pulse_check.interval` | Duration between scheduled checks, at least `5ms`, such as `30s`. |
 | `pulse_check.timeout` | Check deadline, such as `5s`. |
 | `pulse_check.unhealthy_threshold` | Consecutive unsuccessful checks needed for failure. |
 | `pulse_check.healthy_threshold` | Consecutive successful checks needed to verify recovery. |
 | `pulse_check.config` | Fields specific to the check type. |
 | `codes` | Notification rules for incident colors. |
 | `intervention` | Optional recovery action and target. |
+| `intervention.max_attempts` | Maximum recovery attempts per incident; defaults to one. An unknown outcome still blocks conflicting intervention. |
+| `auto_ignore` | Optional explicit incident count and rolling window; omission disables automatic Ignore. |
 | `maintenance` | Optional scheduled suppression windows. |
+
+Omitted or zero healthy/unhealthy thresholds normalize to one. For file input,
+a positive `max_failures` supplies the unhealthy threshold when its explicit value
+is zero; a positive explicit unhealthy threshold wins. These are consecutive
+check thresholds, separate from `intervention.max_attempts` and check retries.
+
+For the TLS certificate-expiry check, omitted/zero `warn_days` and `critical_days`
+disable those optional age thresholds. Certificate-chain and hostname verification
+remain enabled unless explicitly skipped. Skipping them does not disable configured
+expiry thresholds.
 
 Use the threshold fields above for new configurations. Accepted `max_failures`
 and per-driver `retries` inputs do not grant permission to repeat ambiguous
 external actions. Consult the [incident lifecycle](../explanation/incident-lifecycle.md)
 for attempt limits, provider rejection and verification behavior.
+The timeout bounds the whole check, including configured check retries. A timeout
+longer than the cadence does not create overlapping executions for the monitor;
+missed scheduled slots remain visible. A `5ms` accepted cadence is a scheduling
+resolution, not a throughput or latency guarantee.
+
+## Automatic Ignore
+
+For example, this monitor policy enters Ignore on the fourth distinct outage
+reaching its unhealthy threshold in two hours:
+
+~~~yaml
+auto_ignore:
+  incidents: 4
+  window: 2h
+~~~
+
+Both fields are required. `incidents` must be 2–1,000; `window` must be a positive
+Go duration at most `720h` (30 days). Management resources use `spec.autoIgnore`
+with the same `incidents` and `window` fields. Ordinary recoveries before Ignore
+do not reset the rolling count. Ignore continues checks and health/history
+updates while suppressing ordinary alerts and interventions. Verified recovery
+clears Ignore and its count and admits eligible configured green without waiting
+for successful delivery. See [Ignore behavior](../explanation/incident-lifecycle.md#ignore-and-repeated-outages).
 
 ## Alert destinations and groups
 
@@ -107,7 +143,11 @@ maintenance:
     timezone: UTC
 ~~~
 
-Cron expressions have five fields. Duration must be positive and at most 366 days; timezone is an IANA name and defaults to UTC. During a window, checks continue while notifications and new recovery admissions are suppressed.
+Cron expressions have five fields. Duration must be positive and at most 366 days;
+timezone is an IANA name and defaults to UTC. During a window, checks continue
+while ordinary notifications and new recovery admissions are suppressed.
+Configured gray enable/disable notices remain eligible during maintenance and
+Ignore. Suppressed ordinary work is not released when the window ends.
 
 ## Recovery
 
@@ -115,6 +155,7 @@ Add an `intervention` field to a monitor only when the intended action is approp
 
 ~~~yaml
 intervention:
+  max_attempts: 1
   action: webhook
   target:
     url: https://recovery.example.com/restart

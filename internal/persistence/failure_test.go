@@ -55,7 +55,7 @@ func TestFailureDiagnosticsSurviveSnapshotAndHistory(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 	configure(t, store)
 	now := time.Now().UTC()
-	d := NewFailureDiagnostic("dns_failed")
+	d := (FailureDiagnostic{Code: "certificate_expiring", CertificateNotAfter: now.Add(time.Hour), CertificateDaysRemaining: 0}).WithDetails()
 	result := submit(t, store, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", At: now, Generation: 1, Outcome: "failure", Failure: d})[0]
 	if result.Err != nil || result.Monitor == nil || result.Monitor.LastFailure != d {
 		t.Fatal("diagnostic observation not committed", result.Err)
@@ -107,5 +107,42 @@ func TestFailureDiagnosticsSurviveSnapshotAndHistory(t *testing.T) {
 	raw, err := json.Marshal(result.Monitor)
 	if err != nil || strings.Contains(string(raw), "private-provider-response") {
 		t.Fatal("unsafe serialized diagnostic", err)
+	}
+}
+
+func TestFailureProtocolDetailsAreBoundedAndFormatGated(t *testing.T) {
+	for _, d := range []FailureDiagnostic{
+		{Code: "unexpected_http_status", HTTPStatus: 503},
+		{Code: "grpc_health_failed", GRPCStatus: "NOT_SERVING"},
+		{Code: "grpc_health_failed", GRPCCode: "PermissionDenied"},
+		{Code: "certificate_expiring", CertificateNotAfter: time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC), CertificateDaysRemaining: -1},
+	} {
+		d = d.WithDetails()
+		if err := d.validate(LifecycleFormatVersion); err != nil {
+			t.Fatal(err, d)
+		}
+		if d.validate(DeliveryFormatVersion) == nil {
+			t.Fatal("old format accepted protocol detail")
+		}
+		c := Command{Kind: "pulse", MonitorID: "monitor", Revision: "r1", At: policyTime(), Generation: 1, Outcome: "failure", Failure: d}
+		if commandMinimumFormat(c) != LifecycleFormatVersion || validateCommand(c) != nil {
+			t.Fatal("detail format not selected")
+		}
+		raw, err := json.Marshal(d)
+		var restored FailureDiagnostic
+		if err != nil || json.Unmarshal(raw, &restored) != nil || restored != d {
+			t.Fatal("detail round trip failed")
+		}
+	}
+	for _, d := range []FailureDiagnostic{
+		{Code: "unexpected_http_status", HTTPStatus: 600},
+		{Code: "dns_failed", HTTPStatus: 404},
+		{Code: "grpc_health_failed", GRPCStatus: "private-provider-body"},
+		{Code: "grpc_health_failed", GRPCCode: "OK"},
+		{Code: "certificate_expiring", CertificateDaysRemaining: 2},
+	} {
+		if d.WithDetails().validate(LifecycleFormatVersion) == nil {
+			t.Fatal("unbounded or contradictory detail accepted", d)
+		}
 	}
 }

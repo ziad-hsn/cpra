@@ -2,7 +2,6 @@ import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
 
 export interface RuntimeObservation {
-  legacy: boolean;
   generatedAt?: string;
   ready?: boolean;
   live?: boolean;
@@ -39,20 +38,12 @@ function invalid(): never { throw new ManagementError('invalid', 'The runtime ob
 
 /** Decode only operational observations; raw storage errors, action arrays and
  * future payload fields never enter the dashboard query cache. */
-export function runtimeView(value: unknown, legacy = false): RuntimeObservation {
+export function runtimeView(value: unknown): RuntimeObservation {
   if (!object(value) || !object(value.storage)) return invalid();
   const store = value.storage;
-  const available = boolean(legacy ? store.ready : store.available);
+  const available = boolean(store.available);
   if (available === undefined || typeof store.mode !== 'string') return invalid();
   const storage: RuntimeObservation['storage'] = { available, mode: storageMode(store.mode), error: typeof store.error === 'string' && store.error.length > 0 };
-  if (legacy) {
-    storage.appliedIndex = count(store.committed_index);
-    // The legacy contract has no measurement availability bit; zero includes
-    // "never measured", so it cannot be presented as a successful timing sample.
-    storage.commitLatencyMs = (nonnegative(store.commit_latency_ms) ?? 0) > 0 ? store.commit_latency_ms as number : undefined;
-    storage.snapshotDurationMs = (nonnegative(store.snapshot_duration_ms) ?? 0) > 0 ? store.snapshot_duration_ms as number : undefined;
-    return { legacy: true, storage };
-  }
   const generatedAt = timestamp(value.generatedAt);
   if (!generatedAt || typeof value.ready !== 'boolean' || typeof value.live !== 'boolean') return invalid();
   storage.appliedIndex = count(store.appliedIndex);
@@ -66,7 +57,7 @@ export function runtimeView(value: unknown, legacy = false): RuntimeObservation 
       usageCoverage: reason(generations.usageCoverage, usageCoverage), usageGenerations: count(generations.usageGenerations), usageExpected: count(generations.usageExpected),
       usageOldestAt: timestamp(generations.usageOldestAt), knownApparentBytes: count(generations.knownApparentBytes), knownAllocatedBytes: count(generations.knownAllocatedBytes) };
   }
-  return { legacy: false, generatedAt, ready: value.ready, live: value.live, storage,
+  return { generatedAt, ready: value.ready, live: value.live, storage,
     readinessReason: reason(value.readinessReason, readinessReasons),
     controllerReady: value.controllerAvailable === true ? boolean(value.controllerReady) : undefined,
     controllerReason: reason(value.controllerReason, controllerReasons),
@@ -76,7 +67,6 @@ export function runtimeView(value: unknown, legacy = false): RuntimeObservation 
 }
 
 export async function loadRuntime(session: DashboardSession, signal?: AbortSignal): Promise<RuntimeObservation> {
-  if (session.getSnapshot().phase === 'observation') return runtimeView(await session.legacy<unknown>('/api/v1/state', { signal }), true);
   if (!session.can('GetState')) throw new ManagementError('forbidden', 'This identity cannot read runtime state.');
   return runtimeView((await session.get<unknown>('/api/v2/state', { signal })).data);
 }

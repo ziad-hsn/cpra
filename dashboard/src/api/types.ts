@@ -3,9 +3,26 @@
  * Durations are Go time.Duration nanoseconds; time fields are RFC3339 strings.
  */
 
+import type { FailureDiagnostic } from './generated';
+
 export type MonitorStatus = 'up' | 'down' | 'degraded' | 'verifying' | 'incident' | 'disabled' | 'unknown';
 
 export interface MonitorSummary {
+  health?: 'healthy' | 'unhealthy' | 'warning' | 'unknown';
+  phase?: 'idle' | 'incident' | 'verifying';
+  enabled?: boolean;
+  ignored?: boolean;
+  snoozed_until?: string;
+  incarnation_uid?: string;
+  source?: 'file' | 'management';
+  incident_id?: string;
+  pending_notifications?: number;
+  completed_notifications?: number;
+  failed_notifications?: number;
+  unknown_notifications?: number;
+  actions_needing_review?: number;
+  certificate_verification_disabled?: boolean;
+  last_failure?: FailureDiagnostic;
 	warning?: string;
   monitor_id?: string;
   latency_available?: boolean;
@@ -97,7 +114,21 @@ export interface SystemsResponse {
   aggregate: AggregateMetrics;
 }
 
+export interface DriverQueueStats {
+  driver: string;
+  pending: number;
+  active: number;
+  concurrency_limit: number;
+  admission_limit: number;
+  oldest_pending_age: number; // ns
+  oldest_active_age: number; // ns
+  rejections: number;
+  timeouts: number;
+  condition: string;
+}
+
 export interface QueueStats {
+  drivers?: DriverQueueStats[];
 	/** Nanoseconds for a currently pending admission; consult availability. */
 	oldest_pending_age?: number;
 	oldest_pending_available?: boolean;
@@ -121,6 +152,10 @@ export interface QueueStats {
 }
 
 export interface WorkerPoolStats {
+  active_executions?: number;
+  oldest_execution_age?: number;
+  pending_submissions?: number;
+  oldest_submission_age?: number;
   slo_condition?: string;
   sizing_model?: string;
   service_time?: number; // ns

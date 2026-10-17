@@ -342,3 +342,19 @@ func TestDiffNativeStdinCancellationDoesNotRetainCallerBuffer(t *testing.T) {
 		t.Fatal("abandoned read modified returned caller memory")
 	}
 }
+
+func TestDiffKeepsNestedValidationCauseAndLocalSource(t *testing.T) {
+	spool := diffSpool(t)
+	file := diffFile(t, t.TempDir(), "service.json", cliResource("Monitor", "service"))
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		result := diffResponse(t, r)
+		result.Valid, result.Items[0].Outcome = false, "invalid"
+		result.Errors = []api.FieldError{{Field: "items[0].resource.spec.check.driver.config.url", Reason: "required", Message: "PRIVATE_PROVIDER_BODY"}}
+		_ = json.NewEncoder(w).Encode(result)
+	})
+	stdout, _, err := fixture.run(t, nil, "diff", "-f", file)
+	if err == nil || !strings.Contains(stdout, file) || !strings.Contains(stdout, "spec.check.driver.config.url") || !strings.Contains(stdout, api.ValidationMessage("required")) || strings.Contains(stdout, "PRIVATE_PROVIDER_BODY") {
+		t.Fatal("diff lost attribution or exposed remote text", stdout, err)
+	}
+	assertDiffSpoolRemoved(t, spool)
+}

@@ -170,7 +170,7 @@ func TestRuntimeExternalPreparationSelectsOnlyRoutedEndpoints(t *testing.T) {
 	createReferenceJobType(t, c, "notification")
 	commitRuntimeReference(t, c, resource("NotificationEndpoint", "remote", runtimeExternalDriver("notification")))
 	logPath := filepath.Join(t.TempDir(), "must-not-exist.log")
-	logConfig, _ := json.Marshal(map[string]string{"file": logPath})
+	logConfig, _ := json.Marshal(map[string]string{"file": filepath.Base(logPath)})
 	commitRuntimeReference(t, c, resource("NotificationEndpoint", "local", api.DriverConfig{Type: "log", Config: logConfig}))
 	commitRuntimeReference(t, c, resource("NotificationGroup", "destinations", api.NotificationGroupSpec{EndpointRefs: []string{"remote", "local"}}))
 	rules := map[string]api.AlertRule{"red": {NotifyType: api.Pointer("log"), GroupRef: api.Pointer("destinations")}}

@@ -32,7 +32,7 @@ func TestCommittedProjectionAggregates(t *testing.T) {
 	}{{"up-api", "http", true}, {"down-db", "tcp", true}, {"off-maint", "http", false}} {
 		monitor := manifest.Monitor{Name: spec.name, Enabled: spec.enabled, Pulse: manifest.Pulse{Type: spec.driver, Interval: time.Second, Timeout: time.Second, UnhealthyThreshold: 1, HealthyThreshold: 1}}
 		if spec.name == "down-db" {
-			monitor.Codes = manifest.Codes{"red": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: t.TempDir() + "/notification.jsonl"}}}
+			monitor.Codes = manifest.Codes{"red": {Dispatch: true, Notify: "log", Config: &manifest.CodeNotificationLog{File: "notification.jsonl"}}}
 		}
 		if spec.driver == "http" {
 			monitor.Pulse.Config = &manifest.PulseHTTPConfig{Url: "http://example.com/health"}

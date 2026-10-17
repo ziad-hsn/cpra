@@ -1,6 +1,9 @@
 package manifest
 
-import "strings"
+import (
+	"maps"
+	"strings"
+)
 
 // New code notification (alert delivery) types added on top of the general
 // SDK. Config structs always compile (no SDK dependency); only the job
@@ -39,26 +42,28 @@ func (c *CodeNotificationMattermost) IsCodeNotification() {}
 // CodeNotificationPushover delivers alerts to a Pushover user/group via the
 // push notification API.
 type CodeNotificationPushover struct {
-	URL      string `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
-	AppToken string `yaml:"app_token" json:"app_token"`
-	UserKey  string `yaml:"user_key" json:"user_key"`
-	Title    string `yaml:"title" json:"title"`
-	Priority int    `yaml:"priority" json:"priority"`                 // -2..2; 2 = emergency
-	Retry    int    `yaml:"retry,omitempty" json:"retry,omitempty"`   // Emergency repeat interval in seconds.
-	Expire   int    `yaml:"expire,omitempty" json:"expire,omitempty"` // Emergency repeat duration in seconds.
-	Sound    string `yaml:"sound" json:"sound"`
+	URL             string         `yaml:"url,omitempty" json:"url,omitempty"` // Optional complete operation URL.
+	AppToken        string         `yaml:"app_token" json:"app_token"`
+	UserKey         string         `yaml:"user_key" json:"user_key"`
+	Title           string         `yaml:"title" json:"title"`
+	Priority        int            `yaml:"priority" json:"priority"` // -2..2; 2 = emergency
+	PriorityByColor map[string]int `yaml:"priority_by_color,omitempty" json:"priority_by_color,omitempty"`
+	Retry           int            `yaml:"retry,omitempty" json:"retry,omitempty"`   // Emergency repeat interval in seconds.
+	Expire          int            `yaml:"expire,omitempty" json:"expire,omitempty"` // Emergency repeat duration in seconds.
+	Sound           string         `yaml:"sound" json:"sound"`
 }
 
 func (c *CodeNotificationPushover) Copy() CodeNotification {
 	return &CodeNotificationPushover{
-		URL:      strings.Clone(c.URL),
-		AppToken: strings.Clone(c.AppToken),
-		UserKey:  strings.Clone(c.UserKey),
-		Title:    strings.Clone(c.Title),
-		Priority: c.Priority,
-		Retry:    c.Retry,
-		Expire:   c.Expire,
-		Sound:    strings.Clone(c.Sound),
+		URL:             strings.Clone(c.URL),
+		AppToken:        strings.Clone(c.AppToken),
+		UserKey:         strings.Clone(c.UserKey),
+		Title:           strings.Clone(c.Title),
+		Priority:        c.Priority,
+		PriorityByColor: maps.Clone(c.PriorityByColor),
+		Retry:           c.Retry,
+		Expire:          c.Expire,
+		Sound:           strings.Clone(c.Sound),
 	}
 }
 

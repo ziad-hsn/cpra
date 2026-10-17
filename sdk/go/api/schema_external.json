@@ -657,6 +657,27 @@
         ],
         "type": "object"
       },
+      "AutoIgnore": {
+        "additionalProperties": false,
+        "description": "Suppress ordinary actions after this many distinct threshold-reaching outages in the rolling window. Both values are required.",
+        "properties": {
+          "incidents": {
+            "format": "int64",
+            "maximum": 1000,
+            "minimum": 2,
+            "type": "integer"
+          },
+          "window": {
+            "description": "Positive Go duration, at most 720h; no default.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incidents",
+          "window"
+        ],
+        "type": "object"
+      },
       "Capabilities": {
         "additionalProperties": false,
         "properties": {
@@ -934,6 +955,17 @@
             "format": "int64",
             "type": "integer",
             "x-go-name": "Priority"
+          },
+          "priorityByColor": {
+            "additionalProperties": {
+              "maximum": 2,
+              "minimum": -2,
+              "type": "integer"
+            },
+            "description": "Explicit per-color priority overrides (-2..2). Shared emergency priority is reduced to normal for green and gray unless that color explicitly selects 2.",
+            "maxProperties": 5,
+            "type": "object",
+            "x-go-name": "PriorityByColor"
           },
           "retry": {
             "format": "int64",
@@ -1523,6 +1555,75 @@
         ],
         "type": "object"
       },
+      "DriverQueue": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "admissionLimit": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "concurrencyLimit": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "condition": {
+            "description": "Current scheduling constraint; not a health or SLA claim.",
+            "type": "string"
+          },
+          "driver": {
+            "type": "string"
+          },
+          "oldestActiveMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-name": "OldestActiveMS",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "oldestPendingMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-name": "OldestPendingMS",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "pending": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "rejections": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "timeouts": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          }
+        },
+        "required": [
+          "driver",
+          "pending",
+          "active",
+          "concurrencyLimit",
+          "admissionLimit",
+          "rejections",
+          "timeouts",
+          "condition"
+        ],
+        "type": "object"
+      },
       "Duration": {
         "description": "Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.",
         "type": "string",
@@ -2015,9 +2116,38 @@
         "additionalProperties": false,
         "description": "Bounded safe failure explanation. No provider response body, address, path or credential is included.",
         "properties": {
+          "certificateDaysRemaining": {
+            "maximum": 4000000,
+            "minimum": -4000000,
+            "type": "integer"
+          },
+          "certificateNotAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
           "code": {
             "maxLength": 64,
             "type": "string"
+          },
+          "grpcCode": {
+            "maxLength": 32,
+            "type": "string",
+            "x-go-name": "GRPCCode"
+          },
+          "grpcStatus": {
+            "enum": [
+              "UNKNOWN",
+              "NOT_SERVING",
+              "SERVICE_UNKNOWN"
+            ],
+            "type": "string",
+            "x-go-name": "GRPCStatus"
+          },
+          "httpStatus": {
+            "maximum": 599,
+            "minimum": 100,
+            "type": "integer",
+            "x-go-name": "HTTPStatus"
           },
           "message": {
             "maxLength": 256,
@@ -2759,9 +2889,220 @@
         ],
         "type": "object"
       },
+      "MonitorObservation": {
+        "additionalProperties": false,
+        "description": "Read-only controller observation for a configured monitor. Has no writable configuration or resourceVersion. Health and controls are independent. Delivery counters cover retained actions in this incarnation; unknownActions includes retained unknown provider outcomes, even after review. actionsNeedingReview counts unresolved holds, including previous incarnations.",
+        "properties": {
+          "actionsNeedingReview": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "certificateVerificationDisabled": {
+            "description": "Explicit per-monitor TLS certificate verification bypass. Does not affect API authentication or recovery verification.",
+            "type": "boolean"
+          },
+          "checkAdmission": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "checkType": {
+            "type": "string"
+          },
+          "completedNotifications": {
+            "description": "Succeeded deliveries retained for this monitor incarnation; not a lifetime total.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "configuredNotifications": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "failedNotifications": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "unhealthy",
+              "warning",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "ignored": {
+            "type": "boolean"
+          },
+          "incarnationUID": {
+            "type": "string",
+            "x-go-name": "IncarnationUID"
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-name": "IncidentID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "intervalMs": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer",
+            "x-go-name": "IntervalMS"
+          },
+          "lastCheckLatencyMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-name": "LastCheckLatencyMS"
+          },
+          "lastCheckedAt": {
+            "description": "Absent when unavailable.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastFailure": {
+            "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "lastSuccessfulAt": {
+            "description": "Absent when unavailable.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "missedChecks": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "monitorID": {
+            "type": "string",
+            "x-go-name": "MonitorID"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nextCheckAt": {
+            "description": "Absent when unavailable.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "numericID": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer",
+            "x-go-name": "NumericID"
+          },
+          "pendingNotifications": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "phase": {
+            "enum": [
+              "idle",
+              "incident",
+              "verifying"
+            ],
+            "type": "string"
+          },
+          "queueRejections": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "snoozedUntil": {
+            "description": "Absent when unavailable.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "file",
+              "management"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "description": "Non-secret target summary captured before credential resolution.",
+            "type": "string"
+          },
+          "unknownActions": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unknownNotifications": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "monitorID",
+          "incarnationUID",
+          "numericID",
+          "name",
+          "source",
+          "checkType",
+          "target",
+          "intervalMs",
+          "health",
+          "phase",
+          "enabled",
+          "ignored",
+          "configuredNotifications",
+          "pendingNotifications",
+          "completedNotifications",
+          "failedNotifications",
+          "unknownNotifications",
+          "unknownActions",
+          "lastCheckLatencyMs",
+          "missedChecks",
+          "queueRejections",
+          "certificateVerificationDisabled",
+          "actionsNeedingReview"
+        ],
+        "type": "object"
+      },
+      "MonitorObservationList": {
+        "additionalProperties": false,
+        "description": "Bounded stable-ID ordered page. Cursor freezes membership and incarnation identity; health observations can advance between pages. Start a new list to see added/replaced monitors.",
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MonitorObservation"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "snapshot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "snapshot",
+          "generatedAt"
+        ],
+        "type": "object"
+      },
       "MonitorSpec": {
         "additionalProperties": false,
         "properties": {
+          "autoIgnore": {
+            "$ref": "#/components/schemas/AutoIgnore"
+          },
           "check": {
             "$ref": "#/components/schemas/CheckSpec"
           },
@@ -2804,6 +3145,12 @@
       "MonitorStatus": {
         "additionalProperties": false,
         "properties": {
+          "actionsNeedingReview": {
+            "description": "Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.",
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true
+          },
           "controlRevision": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
@@ -2813,6 +3160,32 @@
             "x-go-type-skip-optional-pointer": true
           },
           "health": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignoreCause": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignoreIncidentCount": {
+            "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignoreReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignored": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignoredAt": {
+            "format": "date-time",
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "ignoredBy": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
           },
@@ -3363,6 +3736,7 @@
             "x-omitempty": false
           },
           "busy": {
+            "description": "Executions currently inside a job call; excludes idle worker goroutines and result publication.",
             "format": "int64",
             "type": "integer",
             "x-go-type-skip-optional-pointer": true
@@ -3406,6 +3780,16 @@
           },
           "name": {
             "type": "string"
+          },
+          "oldestExecutionMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-name": "OldestExecutionMS",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "oldestSubmissionMs": {
+            "$ref": "#/components/schemas/Measurement",
+            "x-go-name": "OldestSubmissionMS",
+            "x-go-type-skip-optional-pointer": true
           },
           "pendingResults": {
             "format": "int64",
@@ -3706,13 +4090,18 @@
             "x-go-name": "AllowInsecure"
           },
           "caFile": {
-            "description": "Optional PEM trust roots read by the server at check execution.",
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
             "type": "string",
             "x-go-name": "CAFile"
           },
           "host": {
             "type": "string",
             "x-go-name": "Host"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
           },
           "mode": {
             "enum": [
@@ -3733,6 +4122,7 @@
             "x-go-name": "Retries"
           },
           "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
             "type": "string",
             "x-go-name": "ServerName"
           },
@@ -3751,6 +4141,11 @@
             "type": "string",
             "x-go-name": "Body"
           },
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "expectedStatus": {
             "items": {
               "format": "int64",
@@ -3767,6 +4162,7 @@
             "x-go-name": "Headers"
           },
           "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
             "type": "boolean",
             "x-go-name": "InsecureSkipVerify"
           },
@@ -3778,6 +4174,11 @@
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
           },
           "url": {
             "type": "string",
@@ -3822,10 +4223,30 @@
             "type": "array",
             "x-go-name": "Brokers"
           },
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
+          },
           "retries": {
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           }
         },
         "required": [],
@@ -3834,10 +4255,30 @@
       "PulseMongoConfig": {
         "additionalProperties": false,
         "properties": {
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
+          },
           "retries": {
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           },
           "uri": {
             "type": "string",
@@ -3850,6 +4291,11 @@
       "PulseMySQLConfig": {
         "additionalProperties": false,
         "properties": {
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "database": {
             "type": "string",
             "x-go-name": "Database"
@@ -3861,6 +4307,11 @@
           "host": {
             "type": "string",
             "x-go-name": "Host"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
           },
           "password": {
             "type": "string",
@@ -3875,6 +4326,16 @@
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           },
           "user": {
             "type": "string",
@@ -3887,6 +4348,11 @@
       "PulsePostgresConfig": {
         "additionalProperties": false,
         "properties": {
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "database": {
             "type": "string",
             "x-go-name": "Database"
@@ -3898,6 +4364,11 @@
           "host": {
             "type": "string",
             "x-go-name": "Host"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
           },
           "password": {
             "type": "string",
@@ -3913,9 +4384,19 @@
             "type": "integer",
             "x-go-name": "Retries"
           },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
           "sslmode": {
             "type": "string",
             "x-go-name": "SSLMode"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           },
           "user": {
             "type": "string",
@@ -3928,10 +4409,30 @@
       "PulseRabbitMQConfig": {
         "additionalProperties": false,
         "properties": {
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
+          },
           "retries": {
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           },
           "url": {
             "type": "string",
@@ -3948,10 +4449,20 @@
             "type": "string",
             "x-go-name": "Addr"
           },
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "db": {
             "format": "int64",
             "type": "integer",
             "x-go-name": "DB"
+          },
+          "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
+            "type": "boolean",
+            "x-go-name": "InsecureSkipVerify"
           },
           "password": {
             "type": "string",
@@ -3961,6 +4472,16 @@
             "format": "int64",
             "type": "integer",
             "x-go-name": "Retries"
+          },
+          "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
+            "type": "string",
+            "x-go-name": "ServerName"
+          },
+          "tls": {
+            "description": "Explicit transport selection. True requires TLS without cleartext fallback and verifies certificates by default. Omission preserves the connection-string or driver transport selection. TLS options require an explicit value.",
+            "type": "boolean",
+            "x-go-name": "TLS"
           },
           "username": {
             "type": "string",
@@ -3994,6 +4515,11 @@
       "PulseTLSConfig": {
         "additionalProperties": false,
         "properties": {
+          "caFile": {
+            "description": "Optional PEM trust roots, read by the server during execution; maximum 1 MiB.",
+            "type": "string",
+            "x-go-name": "CAFile"
+          },
           "criticalDays": {
             "format": "int64",
             "type": "integer",
@@ -4004,6 +4530,7 @@
             "x-go-name": "Host"
           },
           "insecureSkipVerify": {
+            "description": "Disable certificate chain and hostname verification for this monitor only. Default false; recovery health verification and API authentication are unchanged.",
             "type": "boolean",
             "x-go-name": "InsecureSkipVerify"
           },
@@ -4018,6 +4545,7 @@
             "x-go-name": "Retries"
           },
           "serverName": {
+            "description": "TLS SNI and certificate hostname; defaults to the connection host.",
             "type": "string",
             "x-go-name": "ServerName"
           },
@@ -4092,6 +4620,15 @@
             "type": "number",
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
+          },
+          "drivers": {
+            "description": "Bounded per-driver admission and execution measurements. No target or per-monitor flow identifiers are returned.",
+            "items": {
+              "$ref": "#/components/schemas/DriverQueue"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "x-go-type-skip-optional-pointer": true
           },
           "drops": {
             "format": "int64",
@@ -5005,6 +5542,12 @@
             "type": "string",
             "x-go-type-skip-optional-pointer": true
           },
+          "field": {
+            "description": "Static validation property path. Empty when a specific field is unavailable.",
+            "maxLength": 160,
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
           "id": {
             "maxLength": 256,
             "minLength": 1,
@@ -5027,6 +5570,12 @@
             "maximum": 10000000,
             "minimum": 1,
             "type": "integer"
+          },
+          "reason": {
+            "description": "Static validation rule code. Consumers preserve unknown codes as observations and render only known safe messages.",
+            "maxLength": 64,
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
           },
           "resourceVersion": {
             "maxLength": 256,
@@ -7139,6 +7688,63 @@
         "summary": "ReplaceMonitor"
       }
     },
+    "/api/v2/monitors/{id}/ignore": {
+      "post": {
+        "description": "Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.",
+        "operationId": "IgnoreMonitor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful operation"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details"
+          }
+        },
+        "summary": "IgnoreMonitor"
+      }
+    },
     "/api/v2/monitors/{id}/recover": {
       "post": {
         "operationId": "RecoverMonitor",
@@ -7249,6 +7855,63 @@
           }
         },
         "summary": "SnoozeMonitor"
+      }
+    },
+    "/api/v2/monitors/{id}/unignore": {
+      "post": {
+        "description": "Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.",
+        "operationId": "UnignoreMonitor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful operation"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details"
+          }
+        },
+        "summary": "UnignoreMonitor"
       }
     },
     "/api/v2/monitors/{id}/unsnooze": {
@@ -7899,6 +8562,102 @@
           }
         },
         "summary": "ReplaceNotificationGroup"
+      }
+    },
+    "/api/v2/observations/monitors": {
+      "get": {
+        "operationId": "ListMonitorObservations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selector",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "monitorID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorObservationList"
+                }
+              }
+            },
+            "description": "Successful operation"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details"
+          }
+        },
+        "summary": "Read controller monitor observations"
+      }
+    },
+    "/api/v2/observations/monitors/{id}": {
+      "get": {
+        "operationId": "GetMonitorObservation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorObservation"
+                }
+              }
+            },
+            "description": "Successful operation"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Problem details"
+          }
+        },
+        "summary": "Read one controller monitor observation"
       }
     },
     "/api/v2/operations": {

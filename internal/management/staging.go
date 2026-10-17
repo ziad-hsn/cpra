@@ -100,6 +100,9 @@ func (s *Stage) validateResolvedDriver(ctx context.Context, category string, dri
 	if handled, err := s.validateResolvedDriverExtension(ctx, category, driver); handled {
 		return err
 	}
+	if err := s.options.validateNotificationLog(category, driver); err != nil {
+		return err
+	}
 	return ValidateResolvedDriver(category, driver)
 }
 

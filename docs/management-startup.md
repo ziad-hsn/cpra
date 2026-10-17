@@ -28,7 +28,9 @@ a non-sensitive warning; obsolete bootstrap files are not needed for restart.
 
 `GET /api/v2/access` reports only management/observation mode and whether
 authentication is required. It grants no access. Authentication failure remains
-401, including a bounded authentication hold with `Retry-After`; it never
+401 for ordinary failures, or 429 with bounded `Retry-After` when failed
+authentication is throttled. Valid current credentials bypass failure throttling.
+Access discovery never
 changes a write into an observation request. Local anonymous observations and
 profiling require approved loopback Host/origin identities. Profiling does not
 serve process command-line arguments.
@@ -42,7 +44,7 @@ The remaining manual configuration sections also cover existing installations.
 
 Optional external-job configuration requires a server and consumer built with
 `externaljobs`, explicit runtime enablement, retained JobTypes and separately
-provisioned worker grants. The [configuration procedure](implementation/external-configuration.md)
+provisioned worker grants. The [worker configuration](sdk/worker-library.md)
 covers API and file/URL collections, startup recovery and offline validation's
 unverified-contract count. A successful offline shape check does not establish
 that a stored JobType exists or authorize a worker to execute it.
@@ -86,7 +88,7 @@ has been removed from the file. Missing or wrong keys stop admission.
 The original connection is encrypted before an A2A action starts. After restart,
 CPRa may read that original task; it never resends an ambiguous action or uses a
 new target from an edited manifest. An observed terminal task does not automatically
-resolve a held unknown action. See [A2A recovery](implementation/a2a-jobs.md#reading-retained-tasks-after-restart).
+resolve a held unknown action. See [A2A driver settings](reference/jobs-reference.md).
 
 ## Enabling management
 
@@ -96,7 +98,7 @@ exposes the authenticated management API used by the dashboard and SDK. Existing
 read-only startup remains available for stores that have never acquired a managed
 catalog.
 
-For a fresh Linux user instance, the [empty dashboard example](review/source/examples/management/README.md.txt)
+For a fresh Linux user instance, the [empty dashboard example](reference/source/examples/management/README.md.txt)
 generates private local sources and a test certificate, demonstrates verifier
 derivation, and starts without an existing state directory. Its templates include
 the runtime file and a verifier-only policy schema.
@@ -219,7 +221,7 @@ manifest from silently overriding committed changes. An explicit disposable
 `storage.mode: memory` configuration may omit encryption and use an ephemeral
 wrapping key; neither its catalog nor that key survives process restart. A
 configured backend still fails on missing keys or unavailable services even in
-memory mode. See the [encryption setup contract](review/source/internal/encryptionsetup/README.md.txt)
+memory mode. See the [encryption setup contract](reference/source/internal/encryptionsetup/README.md.txt)
 for previous local keys, OpenBao/Vault Transit and AWS KMS.
 
 `-validate` shares collection, graph and compiled-driver validation. It uses a
@@ -243,8 +245,8 @@ single-node Raft, SDK writes, controller operation application, restart without
 the original source file, write-only secret recovery, and disabled-monitor
 non-dispatch. This evidence is for the tested Linux process boundary. Native
 service identities, additional platforms, provider accounts, packaging, and the
-million-monitor endurance campaign retain their separate release gates.
+comparative capacity campaign retain their separate release gates.
 The local macOS protected-file adapter now inspects native ACLs and uses exclusive
 file publication. Its native permission, crash and administration checks remain
-unqualified; see the [macOS checkpoint](implementation/macos-protected-files.md).
+unqualified; see the [platform qualification](versions.md).
 The Linux example does not establish macOS support or production KMS certification.

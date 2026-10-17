@@ -3,7 +3,21 @@
 Plan: [approved release repairs](release-repair-plan.md).
 Baseline: `2ba7b73f0c9d398bfee2fbcf3896f70ccc1fb37c`.
 Branch: `codex/release-repairs`.
-Updated: 2026-10-15. The candidate is not frozen or publicly qualified.
+Updated: 2026-10-16. Private checks use source checkpoint `34ef88a`;
+the candidate is not publicly qualified or published.
+
+The [current merge preparation record](merge-preparation-2026-10-16.md) collects
+the latest compiler, browser, SDK, worker and packaged Linux results. All eight
+application combinations pass and have independent review: Go 1.26.0 and
+Go 1.27.2, each with default, all-built-in, `externaljobs` and combined tags.
+Each completes all 32 packages with race-enabled tests. Earlier
+scratch-guard interruptions remain recorded separately from the completed runs.
+Independent review of the combined branch against published `main` found two
+open defects:
+failed-authentication throttling can deny valid callers sharing a peer address,
+and recurring maintenance is missing at external-worker start/result boundaries.
+These findings remain merge blockers. The dated checkpoints below retain their
+original scope and are not a complete final-source qualification result.
 
 The [empty collection snapshot repair](collection-empty-snapshot-2026-10-15.md)
 fixes an additional ticket 4 regression reproduced at `16569a7`: a monitor's
@@ -13,7 +27,7 @@ allocation, while the first real collection remains durable. Focused Go 1.26.0
 and Go 1.27.2/default/tagged checks pass, including release-compiler race checks.
 Seven native Windows AMD64/NTFS cases and 29 subtests pass. Independent source,
 Linux and native Windows execution-record reviews are closed. This production
-change requires a new freeze. Completed `16569a7`
+change was frozen for private checks at `34ef88a`. Completed `16569a7`
 browser/default-matrix checks retain that identity, and both interrupted full
 matrix attempts remain incomplete evidence.
 

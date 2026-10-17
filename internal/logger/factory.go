@@ -27,8 +27,9 @@ func NewLoggerWithComponent(component string) (Logger, error) {
 func configFromEnv() LoggerConfig {
 	cfg := DefaultConfig()
 
-	// Check if we're in development based on environment
-	isDev := strings.ToLower(os.Getenv("CPRA_ENV")) != "production"
+	// Normal foreground and service runs share the quiet structured default.
+	// Verbose developer output is an explicit choice.
+	isDev := strings.EqualFold(os.Getenv("CPRA_ENV"), "development")
 	if isDev {
 		cfg = DevelopmentConfig()
 	}

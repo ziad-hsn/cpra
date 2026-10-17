@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ziad-hsn/cpra/internal/jobs"
@@ -13,10 +14,23 @@ func (o CatalogOptions) validateDriver(category string, driver api.DriverConfig)
 		return err
 	}
 	if err := o.validateDriverType(category, driver.Type); err != nil {
-		return fmt.Errorf("%w: selected driver is not compiled into this server", ErrValidation)
+		return fmt.Errorf("%w: %w", ErrValidation, api.InvalidField("type", "unsupportedDriver"))
 	}
 	if err := validateProtectedDriver(category, driver); err != nil {
 		return fmt.Errorf("%w: %w", ErrValidation, err)
+	}
+	return o.validateNotificationLog(category, driver)
+}
+
+func (o CatalogOptions) validateNotificationLog(category string, driver api.DriverConfig) error {
+	if o.NotificationLogEnabled || category != "notification" || driver.Type != "log" {
+		return nil
+	}
+	var config struct {
+		File string `json:"file"`
+	}
+	if json.Unmarshal(driver.Config, &config) != nil || config.File != "" || driver.CredentialRefs != nil && (*driver.CredentialRefs)["file"] != "" {
+		return fmt.Errorf("%w: %w", ErrValidation, api.InvalidField("config.file", "logDirectoryRequired"))
 	}
 	return nil
 }
@@ -36,6 +50,9 @@ func (c *Catalog) validateResolvedDriver(ctx context.Context, category string, d
 		return err
 	}
 	if handled, err := c.validateResolvedDriverExtension(ctx, category, driver); handled {
+		return err
+	}
+	if err := c.options.validateNotificationLog(category, driver); err != nil {
 		return err
 	}
 	return ValidateResolvedDriver(category, driver)

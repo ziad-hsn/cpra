@@ -301,7 +301,7 @@ describe('management transport', () => {
   });
 
   it('uses explicit observation discovery without making any write request', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })).mockResolvedValueOnce(json({ total: 1 }));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json({ mode: 'observation', authenticationRequired: false })).mockResolvedValueOnce(json({ principalId: 'anonymous', role: 'reader', permissions: ['GetHistory'] })).mockResolvedValueOnce(json({ total: 1 }));
     const session = new DashboardSession({ origin: 'http://cpra.example', fetch: fetcher });
     await session.discover();
     expect(session.getSnapshot().phase).toBe('observation');
@@ -315,7 +315,7 @@ describe('management transport', () => {
   it('preserves browser Basic authentication for explicitly discovered observation access', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url, init) =>
       String(url).endsWith('/access') ? json({ mode: 'observation', authenticationRequired: true })
-        : json({}, { status: init?.credentials === 'same-origin' ? 200 : 401 }));
+        : json({ principalId: 'shared-observer', role: 'reader', permissions: ['GetHistory'] }, { status: init?.credentials === 'same-origin' ? 200 : 401 }));
     const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
     await session.discover();
     expect(session.getSnapshot().phase).toBe('observation');
@@ -343,4 +343,25 @@ describe('management transport', () => {
     expect(next.getSnapshot().phase).toBe('signed-out');
     expect(next.can('CreateMonitor')).toBe(false);
   });
+});
+
+it('observation access admits registered reads but never configuration reads or writes', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith('/access')) return json({ mode: 'observation', authenticationRequired: true });
+    if (path.endsWith('/self')) return new Headers(init?.headers).has('Authorization')
+      ? json({ principalId: 'shared-observer', role: 'operator', permissions: ['GetHistory', 'GetMonitorObservation', 'GetMonitor', 'CreateMonitor'] })
+      : json({}, { status: 401 });
+    return json({ items: [] });
+  });
+  const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
+  await session.discover(); expect(session.getSnapshot().phase).toBe('signed-out');
+  await session.signIn('observation-fixture-012345678901234567890123456789');
+  expect(session.can('GetMonitorObservation')).toBe(true); expect(session.can('GetMonitor')).toBe(false);
+  expect(session.getSnapshot().access?.role).toBe('reader');
+  await session.get('/api/v2/history?monitorID=test');
+  const count = fetcher.mock.calls.length;
+  await expect(session.get('/api/v2/monitors/test')).rejects.toMatchObject({ reason: 'forbidden' });
+  await expect(session.mutate('/api/v2/monitors', { method: 'POST', operation: 'CreateMonitor', body: {} })).rejects.toMatchObject({ reason: 'forbidden' });
+  expect(fetcher).toHaveBeenCalledTimes(count);
 });

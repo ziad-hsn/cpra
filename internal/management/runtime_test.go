@@ -29,7 +29,7 @@ func TestRuntimeAll35DriverFieldMappings(t *testing.T) {
 		{"check", "icmp", `{"host":"host","ignorePrivilege":true,"count":3,"retries":2}`, &manifest.PulseICMPConfig{Host: "host", Privilege: true, Count: 3, Retries: 2}},
 		{"check", "dns", `{"host":"host","server":"[::1]:5353","retries":2}`, &manifest.PulseDNSConfig{Host: "host", Server: "[::1]:5353", Retries: 2}},
 		{"check", "udp", `{"host":"host","port":53,"payload":"request","retries":2}`, &manifest.PulseUDPConfig{Host: "host", Port: 53, Payload: "request", Retries: 2}},
-		{"check", "grpc", `{"host":"host","port":50051,"service":"ready","retries":2}`, &manifest.PulseGRPCConfig{Host: "host", Port: 50051, Service: "ready", Retries: 2}},
+		{"check", "grpc", `{"host":"host","port":50051,"mode":"health","service":"ready","retries":2}`, &manifest.PulseGRPCConfig{Host: "host", Port: 50051, Mode: "health", Service: "ready", Retries: 2}},
 		{"check", "docker", `{"container":"container","retries":2}`, &manifest.PulseDockerConfig{Container: "container", Retries: 2}},
 		{"check", "redis", `{"addr":"host:6379","password":"secret","username":"user","db":4,"retries":2}`, &manifest.PulseRedisConfig{Addr: "host:6379", Password: "secret", Username: "user", DB: 4, Retries: 2}},
 		{"check", "postgres", `{"dsn":"host=host","host":"host","port":5432,"user":"user","password":"secret","database":"db","sslmode":"require","retries":2}`, &manifest.PulsePostgresConfig{DSN: "host=host", Host: "host", Port: 5432, User: "user", Password: "secret", Database: "db", SSLMode: "require", Retries: 2}},
@@ -45,7 +45,7 @@ func TestRuntimeAll35DriverFieldMappings(t *testing.T) {
 		{"recovery", "webhook", `{"type":"webhook","url":"https://example.test/recover","method":"PATCH","headers":{"X-Custom_Header":"untouched"},"body":"body","timeout":"7s"}`, &manifest.InterventionTargetWebhook{Type: "webhook", URL: "https://example.test/recover", Method: "PATCH", Headers: map[string]string{"X-Custom_Header": "untouched"}, Body: "body", Timeout: 7 * time.Second}},
 		{"recovery", "systemd", `{"type":"systemd","unit":"cpra-test.service","mode":"fail","timeout":"20s"}`, &manifest.InterventionTargetSystemd{Type: "systemd", Unit: "cpra-test.service", Mode: "fail", Timeout: 20 * time.Second}},
 		{"recovery", "aws", `{"type":"aws","region":"eu-west-1","operation":"reboot-instance","instanceId":"i-test","timeout":"30s"}`, &manifest.InterventionTargetAWS{Type: "aws", Region: "eu-west-1", Operation: "reboot-instance", InstanceID: "i-test", Timeout: 30 * time.Second}},
-		{"notification", "log", `{"file":"/not/written"}`, &manifest.CodeNotificationLog{File: "/not/written"}},
+		{"notification", "log", `{"file":"not-written.log"}`, &manifest.CodeNotificationLog{File: "not-written.log"}},
 		{"notification", "email", `{"allowInsecure":true,"to":"ops@example.test","from":"cpra@example.test","server":"smtp.example.test:25","subject":"Alert"}`, &manifest.CodeNotificationEmail{AllowInsecure: true, To: "ops@example.test", From: "cpra@example.test", Server: "smtp.example.test:25", Subject: "Alert"}},
 		{"notification", "webhook", `{"url":"https://example.test/notify","method":"PUT","headers":{"X-Custom_Header":"untouched"}}`, &manifest.CodeNotificationWebhook{URL: "https://example.test/notify", Method: "PUT", Headers: map[string]string{"X-Custom_Header": "untouched"}}},
 		{"notification", "slack", `{"hook":"https://example.test/slack"}`, &manifest.CodeNotificationSlack{WebHook: "https://example.test/slack"}},
@@ -96,7 +96,7 @@ func TestRuntimeDriverSemanticRejectionsAndOmittedDefaults(t *testing.T) {
 		{"recovery", "kubernetes", `{"namespace":"ns","kind":"deployment","name":"workload","replicas":2147483648}`},
 		{"recovery", "systemd", `{"unit":"cpra-test.service","mode":"reload-or-restart"}`},
 		{"recovery", "aws", `{"operation":"terminate-instance","instanceId":"i-test"}`},
-		{"notification", "log", `{}`}, {"notification", "slack", `{"hook":"private-secret"}`},
+		{"notification", "slack", `{"hook":"private-secret"}`},
 		{"notification", "email", `{"from":"not an address","to":"ops@example.test","server":"host:25"}`},
 		{"notification", "telegram", `{"botToken":"private-secret","chatId":"room","testMode":true,"url":"https://example.test"}`},
 		{"notification", "pushover", `{"appToken":"private-secret","userKey":"user","priority":2,"retry":1}`},
@@ -110,7 +110,7 @@ func TestRuntimeDriverSemanticRejectionsAndOmittedDefaults(t *testing.T) {
 	for _, test := range []struct{ category, kind, config string }{
 		{"check", "http", `{"url":"https://example.test"}`}, {"check", "postgres", `{}`}, {"check", "mysql", `{}`}, {"check", "redis", `{}`}, {"check", "kafka", `{"brokers":["host"]}`}, {"check", "rabbitmq", `{"url":"amqp://"}`},
 		{"recovery", "docker", `{"container":"c"}`}, {"recovery", "systemd", `{"unit":"test.service"}`},
-		{"notification", "pagerduty", `{"routingKey":"key"}`}, {"notification", "opsgenie", `{"apiKey":"key"}`},
+		{"notification", "log", `{}`}, {"notification", "pagerduty", `{"routingKey":"key"}`}, {"notification", "opsgenie", `{"apiKey":"key"}`},
 		{"notification", "datadog", `{"apiKey":"key"}`}, {"notification", "pushover", `{"appToken":"key","userKey":"user","priority":2}`},
 	} {
 		if err := ValidateResolvedDriver(test.category, api.DriverConfig{Type: test.kind, Config: json.RawMessage(test.config)}); err != nil {
@@ -127,7 +127,7 @@ func TestRuntimePreparationTypedRoutingAndOwnedCredentials(t *testing.T) {
 	createResource(t, c, resource("Credential", "headers", api.CredentialSpec{Value: &headers}))
 	createResource(t, c, resource("NotificationEndpoint", "slack", api.DriverConfig{Type: "slack", Config: json.RawMessage(`{}`), CredentialRefs: api.Pointer(map[string]string{"hook": "hook"})}))
 	logFile := filepath.Join(t.TempDir(), "must-not-exist.log")
-	logConfig, _ := json.Marshal(api.CodeNotificationLog{File: &logFile})
+	logConfig, _ := json.Marshal(api.CodeNotificationLog{File: api.Pointer(filepath.Base(logFile))})
 	createResource(t, c, resource("NotificationEndpoint", "log", api.DriverConfig{Type: "log", Config: logConfig}))
 	createResource(t, c, resource("Recipient", "oncall", api.RecipientSpec{EndpointRefs: []string{"log", "slack"}}))
 	createResource(t, c, resource("NotificationGroup", "ops", api.NotificationGroupSpec{RecipientRefs: []string{"oncall"}}))
@@ -202,7 +202,7 @@ func TestRuntimePreparationTypedRoutingAndOwnedCredentials(t *testing.T) {
 
 func TestRuntimeLegacyFingerprintAndSharedGroupOrder(t *testing.T) {
 	c, _ := testCatalog(t)
-	file := filepath.Join(t.TempDir(), "events.log")
+	file := "events.log"
 	config, _ := json.Marshal(api.CodeNotificationLog{File: &file})
 	createResource(t, c, resource("NotificationEndpoint", "log", api.DriverConfig{Type: "log", Config: config}))
 	createResource(t, c, resource("NotificationGroup", "old-group", api.NotificationGroupSpec{EndpointRefs: []string{"log"}}))
@@ -290,5 +290,27 @@ func TestRuntimeAbsoluteMaintenanceRejectsZeroEndpoints(t *testing.T) {
 		if !errors.Is(ValidateMonitorSettings(spec), ErrValidation) {
 			t.Fatal("zero absolute maintenance endpoint passed admission but cannot become durable policy")
 		}
+	}
+}
+
+func TestRuntimeTargetSummaryDoesNotResolveCredentials(t *testing.T) {
+	c, _ := testCatalog(t)
+	secret := "https://private-host.example/ping/PRIVATE-PATH?token=PRIVATE-QUERY"
+	createResource(t, c, resource("Credential", "target", api.CredentialSpec{Value: &secret}))
+	spec := api.MonitorSpec{Check: api.CheckSpec{Interval: "60s", Timeout: "5s", Driver: api.DriverConfig{Type: "http", Config: json.RawMessage(`{}`), CredentialRefs: api.Pointer(map[string]string{"url": "target"})}}}
+	createResource(t, c, resource("Monitor", "private-target", spec))
+	view, err := c.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := c.PrepareRuntime(t.Context(), view, "private-target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Monitor.Pulse.Config.(*manifest.PulseHTTPConfig).Url != secret {
+		t.Fatal("job did not receive configured target")
+	}
+	if prepared.CheckTargetSummary != "" {
+		t.Fatal("public summary contained credential-derived target")
 	}
 }

@@ -40,7 +40,7 @@ func (c *Catalog) CommitWorkerOutcome(ctx context.Context, authority persistence
 	}
 	return c.store.CommitWorkerResult(ctx, authority, persistence.WorkerResultInput{ServerID: record.Lifecycle.ServerID,
 		ExecutionID: record.Intent.ID, ExecutionRevision: record.Intent.Revision, GrantID: record.Lifecycle.GrantID,
-		Status: prepared.disposition.Status, Retryable: prepared.disposition.Retryable, Digest: prepared.digest, Payload: prepared.payload})
+		Status: prepared.disposition.Status, Retryable: prepared.disposition.Retryable, Digest: prepared.digest, Payload: prepared.payload}, c.EvaluateWorkerMaintenance)
 }
 
 // verifyWorkerOutcome authenticates retained ciphertext even when its source or

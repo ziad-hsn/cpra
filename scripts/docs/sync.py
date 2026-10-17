@@ -57,6 +57,8 @@ def navigation(source: Path) -> tuple[list, list[str]]:
             paths.append(value)
 
     visit(entries)
+    if any(name.startswith(ARCHIVE_PREFIXES) for name in paths):
+        raise ValueError("engineering records cannot appear in public navigation")
     pages = {p.relative_to(source).as_posix() for p in source.rglob("*.md")}
     archived = {name for name in pages if name.startswith(ARCHIVE_PREFIXES)}
     if set(paths) - pages or pages - set(paths) - archived:
@@ -74,14 +76,14 @@ def navigation_config(config: str, entries: list) -> str:
     if len(matches) != 1:
         raise ValueError("site configuration must contain one top-level nav section")
     config = pattern.sub(lambda _: block, config, count=1)
-    # MkDocs keeps these pages buildable and linkable without treating their
-    # intentional navigation omission as a strict-build warning. Other pages
-    # still require explicit navigation coverage above.
-    archives = "not_in_nav: |\n" + "".join("  /" + prefix + "**\n" for prefix in ARCHIVE_PREFIXES)
-    omitted = re.compile(r"(?m)^not_in_nav:[^\n]*(?:\n|$)(?:[ \t].*(?:\n|$)|\n)*")
+    # not_in_nav only hides a page from navigation: MkDocs still renders and
+    # indexes it. Public source selection below and exclude_docs both enforce
+    # the publication boundary, including non-Markdown source/evidence copies.
+    archives = "exclude_docs: |\n" + "".join("  /" + prefix + "**\n" for prefix in ARCHIVE_PREFIXES)
+    omitted = re.compile(r"(?m)^exclude_docs:[^\n]*(?:\n|$)(?:[ \t].*(?:\n|$)|\n)*")
     matches = list(omitted.finditer(config))
     if len(matches) > 1:
-        raise ValueError("site configuration must contain at most one not_in_nav section")
+        raise ValueError("site configuration must contain at most one exclude_docs section")
     if matches:
         return omitted.sub(lambda _: archives, config, count=1)
     return config + "\n" + archives
@@ -158,6 +160,11 @@ def sync(site: Path, check: bool = False, release_path: Path | None = None) -> d
     if release_path is not None:
         metadata = frozen_metadata(metadata, release_path, files)
         metadata_bytes = release.encoded(metadata)
+    # Validate the complete frozen input first, then select public output. The
+    # repository retains all engineering records; the separate site's canonical
+    # source subtree contains only public material.
+    excluded_files = sum(name.startswith(ARCHIVE_PREFIXES) for name in files)
+    files = {name: path for name, path in files.items() if not name.startswith(ARCHIVE_PREFIXES)}
     for field in ("source_commit", "release_candidate_commit"):
         if not re.fullmatch(r"[a-f0-9]{40}", metadata.get(field, "")):
             raise ValueError(f"source metadata requires a full commit: {field}")
@@ -205,6 +212,7 @@ def sync(site: Path, check: bool = False, release_path: Path | None = None) -> d
     for name, path in files.items():
         digest.update(name.encode() + b"\0" + hashlib.sha256(content(name, path)).digest())
     result = {"files": len(files), "markdown_pages": sum(n.endswith(".md") for n in files),
+            "excluded_engineering_files": excluded_files,
             "content_sha256": digest.hexdigest(), "copies_match": True,
             "navigation_pages": len(pages), "navigation_matches": True,
             "navigation_sha256": hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest(),

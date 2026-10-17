@@ -15,3 +15,6 @@ slo:
   evaluation_interval: 5s
   minimum_samples: 1000
   healthy_hold: 60s
+
+notifications:
+  log_directory: /var/log/cpra/notifications

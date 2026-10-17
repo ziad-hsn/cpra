@@ -46,3 +46,29 @@ func (h *Handle) DequeueBatch(n int) ([]jobs.Job, error) {
 }
 func (h *Handle) Stats() Stats { h.mu.RLock(); defer h.mu.RUnlock(); return h.queue.Stats() }
 func (h *Handle) Close()       { h.mu.Lock(); defer h.mu.Unlock(); h.queue.Close() }
+
+func (h *Handle) acquire(capacity int) (jobs.Job, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if q, ok := h.queue.(*FairQueue); ok {
+		return q.acquire(capacity)
+	}
+	return h.queue.Dequeue()
+}
+func (h *Handle) notifyChannel() <-chan struct{} {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if q, ok := h.queue.(*FairQueue); ok {
+		return q.notifyChannel()
+	}
+	return nil
+}
+
+func (h *Handle) partitions() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if q, ok := h.queue.(*FairQueue); ok {
+		return q.partitions()
+	}
+	return 1
+}

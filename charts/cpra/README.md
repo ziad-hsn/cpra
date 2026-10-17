@@ -8,6 +8,20 @@ Management also requires immutable Secret references for `management.policy`, `m
 
 See [the complete installation, lifecycle, backup, permissions and verification guide](https://github.com/ziad-hsn/cpra/blob/main/docs/container-helm.md). The repository copy is `docs/container-helm.md`.
 
+Log notifications with an omitted or empty `file` write JSON to stdout. For
+relative file destinations, set `notificationLog.enabled=true`. A separate,
+bounded `emptyDir` is used by default; its files disappear when the Pod is
+replaced. For retained notification files, supply `notificationLog.existingClaim`
+with a dedicated claim. State and configuration claims cannot be reused.
+The non-root initializer creates a private `notifications` directory when absent
+and refuses existing symlinks, unexpected owners or permissions other than 0700.
+It never recursively changes retained files. A CSI driver that broadens retained
+directory/file permissions must be corrected or replaced; CPRa refuses that
+storage. Qualify the actual driver and filesystem, including remount behavior.
+File output has no automatic rotation: configure external retention or prefer
+stdout with the container runtime's log limits. Exhaustion causes notification
+failure, never deletion of retained history or state.
+
 ```sh
 helm lint charts/cpra -f charts/cpra/ci/lint-values.yaml --strict
 helm template cpra charts/cpra -f charts/cpra/ci/lint-values.yaml

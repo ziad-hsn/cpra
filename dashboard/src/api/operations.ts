@@ -1,5 +1,5 @@
 import type { ApplyResult, Operation, OperationList } from './generated';
-import { collectionIdentityFormat, fileNormalizationProfile } from './collectionInventory';
+import { collectionIdentityFormat, supportedFileNormalizationProfile } from './collectionInventory';
 import type { CollectionIdentity } from './collectionOperations';
 import { object } from './value';
 import { executionObservation } from './executionResults';
@@ -12,7 +12,7 @@ export type OperationListObservation = Omit<OperationList, 'items'> & { items: O
 
 export function supportedCollectionIdentity(operation: OperationObservation): CollectionIdentity | undefined {
   return operation.identityFormat === collectionIdentityFormat && operation.itemCount !== undefined &&
-    (operation.normalizationProfile === undefined || operation.normalizationProfile === fileNormalizationProfile)
+    (operation.normalizationProfile === undefined || supportedFileNormalizationProfile(operation.normalizationProfile))
     ? { identityFormat: collectionIdentityFormat, contentDigest: operation.contentDigest, itemCount: operation.itemCount,
       ...(operation.normalizationProfile ? { normalizationProfile: operation.normalizationProfile } : {}) } : undefined;
 }

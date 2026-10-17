@@ -15,7 +15,7 @@ func (m *managementHTTP) registerHistory(mux *http.ServeMux) {
 
 func (m *managementHTTP) handleHistoryV2(w http.ResponseWriter, r *http.Request) {
 	managementHeaders(w)
-	if _, err := m.auth.Authorize(r, "GetHistory"); err != nil {
+	if _, err := m.authorizeRead(r, "GetHistory"); err != nil {
 		writeManagementError(w, err)
 		return
 	}
@@ -31,7 +31,7 @@ func (m *managementHTTP) handleHistoryV2(w http.ResponseWriter, r *http.Request)
 	err = m.withSnapshotRead(r, "GetHistory", "History", query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.HistorySnapshotContext(ctx)
+			view, err := m.observations.HistorySnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

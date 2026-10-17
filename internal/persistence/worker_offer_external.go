@@ -92,7 +92,7 @@ func (f *machine) workerOfferOrder(c WorkerSessionCommand) []workerOfferCandidat
 			})
 		}
 	}
-	if c.SelectionVersion == 1 {
+	if c.SelectionVersion >= 1 {
 		slices.SortFunc(candidates, func(a, b workerOfferCandidate) int {
 			if order := cmp.Compare(a.index, b.index); order != 0 {
 				return order
@@ -139,6 +139,18 @@ func (f *machine) prepareWorkerOffers(c WorkerSessionCommand, response WorkerPol
 		}
 		id := candidate.id
 		old := state.Records[id]
+		if c.SelectionVersion == 2 {
+			var decision *WorkerMaintenanceDecision
+			for i := range c.Maintenance {
+				if c.Maintenance[i].ExecutionID == id {
+					decision = &c.Maintenance[i]
+					break
+				}
+			}
+			if !f.workerMaintenanceAllowed(decision, old.Intent, at) {
+				continue
+			}
+		}
 		if !f.workerAssignmentEligible(old, c.Authority, c.OwnerEpoch, at) {
 			continue
 		}
@@ -155,6 +167,14 @@ func (f *machine) prepareWorkerOffers(c WorkerSessionCommand, response WorkerPol
 		deadline := at.Add(WorkerOfferLifetime)
 		if r.Intent.Deadline.Before(deadline) {
 			deadline = r.Intent.Deadline
+		}
+		if c.SelectionVersion == 2 && r.Intent.Category != "check" && !f.image.Monitors[r.Intent.MonitorID].ControlNotification(f.image.Monitors[r.Intent.MonitorID].Actions[r.Intent.ActionID]) {
+			for _, d := range c.Maintenance {
+				if d.ExecutionID == id && !d.Until.IsZero() && d.Until.Before(deadline) {
+					deadline = d.Until
+					break
+				}
+			}
 		}
 		r.Lifecycle = &WorkerExecutionLifecycle{Phase: "offered", ServerID: response.ServerID, WorkerID: c.Authority.WorkerID, WorkerUID: c.Authority.WorkerUID, SessionID: response.SessionID, LeaseID: lease, OwnerEpoch: c.OwnerEpoch, OfferedAt: at, OfferDeadline: deadline, UpdatedAt: at}
 		oldCost, err := workerExecutionRecordCost(id, old)

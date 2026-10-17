@@ -22,13 +22,30 @@ type ActionExecution struct {
 type Execution struct {
 	parent                      context.Context
 	failureCode, failureMessage string
+	controlNotice               string
+	notification                notificationIdentity
+}
+
+func (e *Execution) SetControlNotification(enabled bool, at time.Time) {
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	e.controlNotice = fmt.Sprintf("Monitor %s at %s. This is a configuration change; observed service health is unchanged.", state, at.UTC().Format(time.RFC3339))
 }
 
 func (e *Execution) SetFailureDiagnostic(code, message string) {
 	e.failureCode, e.failureMessage = code, message
 }
 
+func (e *Execution) SetNotificationIdentity(identity notificationIdentity) {
+	e.notification = identity
+}
+
 func (e *Execution) notificationMessage(message string) string {
+	if e.controlNotice != "" {
+		return e.controlNotice
+	}
 	if e.failureCode != "" && e.failureMessage != "" {
 		return message + "\nCause: " + e.failureCode + " — " + e.failureMessage
 	}
@@ -53,13 +70,21 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
+	ProviderCorrelationVersion                      int
+	NotificationLog                                 *NotificationLog
+	ControlChanged                                  bool
+	ControlEnabled                                  bool
+	ControlAt                                       time.Time
 	FailureCode, FailureMessage                     string
 	RecoveryFailure                                 *RecoveryFailure
 	ProjectionVersion                               string
 	CheckControlRevision                            string
 	Scheduled                                       time.Time
+	NotificationAt                                  time.Time
 	MonitorID, Revision, ActionID, Driver           string
 	IncidentID, CatalogUID                          string
+	FileIncarnation                                 string
+	FlowKey                                         uint64
 	DeliveryID, EndpointID, NotificationCorrelation string
 	Attempt                                         int
 	Before                                          func(context.Context) error
@@ -76,6 +101,9 @@ type Dispatch struct {
 	ID          uuid.UUID
 }
 
+// QueueIdentity supplies an internal grouping key, never a public target label.
+func (d *Dispatch) QueueIdentity() (string, uint64) { return d.Driver, d.FlowKey }
+
 // NotificationBudget is the overall controller-owned delivery budget. Each
 // built-in HTTP call still has its shorter transport timeout. Agent jobs retain
 // the operator's task budget instead of inheriting the ordinary HTTP limit.
@@ -87,7 +115,7 @@ func NotificationBudget(job Job) time.Duration {
 }
 
 func NewDispatch(job Job, ent ecs.Entity, kind, color string, generation uint64, endpoint int) *Dispatch {
-	d := &Dispatch{Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
+	d := &Dispatch{ProviderCorrelationVersion: 1, Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
 	if agentJob(d.Job) != nil {
 		d.Driver = "a2a"
 	}

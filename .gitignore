@@ -18,6 +18,11 @@ Thumbs.db
 *:Zone.Identifier
 .idea/
 .vscode/
+/.claude/
+/.codex/
+/.agents/
+/go.work
+/go.work.sum
 .gocache/
 .gomodcache*/
 .gotmp/

@@ -37,8 +37,16 @@ func TestControlMethodsUseStrongETagAndOpaqueBodyRevision(t *testing.T) {
 		"reopen":      func() error { _, err := client.Incidents.Reopen(ctx, "incident", request); return err },
 		"snooze":      func() error { _, err := client.Monitors.Snooze(ctx, "monitor", request); return err },
 		"unsnooze":    func() error { _, err := client.Monitors.Unsnooze(ctx, "monitor", request); return err },
-		"recover":     func() error { _, err := client.Monitors.Recover(ctx, "monitor", request); return err },
-		"review":      func() error { _, err := client.Actions.Review(ctx, "action", request); return err },
+		"ignore": func() error {
+			_, err := client.Monitors.Ignore(ctx, "monitor", api.ControlRequest{Revision: request.Revision, Reason: "Investigating"})
+			return err
+		},
+		"unignore": func() error {
+			_, err := client.Monitors.Unignore(ctx, "monitor", api.ControlRequest{Revision: request.Revision, Reason: "Verified"})
+			return err
+		},
+		"recover": func() error { _, err := client.Monitors.Recover(ctx, "monitor", request); return err },
+		"review":  func() error { _, err := client.Actions.Review(ctx, "action", request); return err },
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := invoke(); err != nil {

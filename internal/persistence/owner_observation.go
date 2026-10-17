@@ -109,7 +109,7 @@ func preserveOwnerObservation(previous Monitor, m *Monitor) {
 	// dependency closure and executable revision; no duplicate strings/guard are
 	// retained for each of a million monitors. Caller-supplied markers are ignored.
 	m.ownerObserved = previous.ownerObserved
-	if m.Removed || previous.ID != m.ID || previous.CatalogUID != m.CatalogUID || previous.CatalogRevision != m.CatalogRevision || previous.DependencyRevision != m.DependencyRevision || previous.Revision != m.Revision {
+	if m.Removed || previous.ID != m.ID || previous.CatalogUID != m.CatalogUID || previous.FileIncarnation != m.FileIncarnation || previous.CatalogRevision != m.CatalogRevision || previous.DependencyRevision != m.DependencyRevision || previous.Revision != m.Revision {
 		m.ownerObserved = ownerObservation{}
 	}
 }

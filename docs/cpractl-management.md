@@ -50,7 +50,7 @@ operator action; displaying an error or rereading progress submits no write.
 ## Connection and authorization
 
 Start an explicitly enabled management server with named identities and TLS.
-The [local management example](review/source/examples/management/README.md.txt) creates a
+The [local management example](reference/source/examples/management/README.md.txt) creates a
 private example installation. Connect to it without putting a bearer token in
 the command line:
 
@@ -65,6 +65,12 @@ The equivalent flags are `--server`, `--token-file`, and `--ca-file`. The token
 file is reread for each request. `--ca-file` adds trust roots to the API
 HTTPS client; it does not alter operating-system trust. Each request defaults to a ten-second timeout; change it with
 `--request-timeout`.
+
+Keep bearer environment variables scoped to this CLI terminal or use explicit
+connection flags. `cpra` also reads `CPRA_AUTH_TOKEN` and `CPRA_AUTH_TOKEN_FILE`
+for observation bootstrap; a named operator token must not be passed to those
+server inputs. The [quickstart](tutorials/quickstart.md) explains validation from
+a shared terminal.
 
 Authenticated v2 HTTP is rejected by default. `--allow-insecure-http` explicitly
 permits it only for the configured origin and does not grant server permissions.
@@ -93,10 +99,10 @@ needed by old records and backups.
 
 ## Create contacts, destinations, and a monitor
 
-The [endpoint](review/source/examples/cpractl/endpoint.yaml.txt),
-[recipient](review/source/examples/cpractl/recipient.yaml.txt),
-[group](review/source/examples/cpractl/group.yaml.txt), and
-[monitor](review/source/examples/cpractl/monitor.yaml.txt) examples contain one resource per
+The [endpoint](reference/source/examples/cpractl/endpoint.yaml.txt),
+[recipient](reference/source/examples/cpractl/recipient.yaml.txt),
+[group](reference/source/examples/cpractl/group.yaml.txt), and
+[monitor](reference/source/examples/cpractl/monitor.yaml.txt) examples contain one resource per
 file. Apply the dependencies in this order: credential, endpoint, recipient,
 group, monitor.
 These commands use the connection environment above.
@@ -170,7 +176,7 @@ resources across display-name changes; delete/recreate produces a new
 incarnation and version.
 
 Use a JSON merge-patch file for a targeted edit. The
-[patch example](review/source/examples/cpractl/disable.json.txt) disables the monitor by
+[patch example](reference/source/examples/cpractl/disable.json.txt) disables the monitor by
 explicitly setting `spec.enabled` to `false`:
 
 ```bash
@@ -289,7 +295,7 @@ mutation. A malformed final document or second resource causes no request.
 Directory/URL import and resumable collection apply belong to the separate
 collection workflow and are not implemented by these CRUD commands. Use the
 [CLI control guide](cpractl-controls.md) to acknowledge, dismiss, reopen, snooze,
-unsnooze, disable or enable an exact target. The corresponding server behavior
+unsnooze, Ignore, Unignore, disable or enable an exact target. The corresponding server behavior
 is documented in [management controls](management-controls.md).
 
 ## Preview a complete collection
@@ -525,7 +531,7 @@ not cancel an admitted server transfer.
 The SDK's `collection.Reselect` supplies this upload-only workflow. Its separate
 `collection.Resume` method still requires the original open `Frozen` and can
 continue through activation. Freezing identical files again does not recreate
-the original private identity. See the [upload recovery contract](implementation/collection-reselection-runtime.md)
+the original private identity. See the [collection continuation](cpractl-management.md)
 for server ownership, storage limits and qualification boundaries.
 
 ## Continue the original collection through activation

@@ -14,6 +14,7 @@ import (
 // MonitorBatch represents a batch of monitors read from a file.
 type MonitorBatch struct {
 	Monitors           []manifest.Monitor
+	Sources            []MonitorSource
 	BatchID            int
 	Offset             int64
 	Endpoints          map[string]manifest.Endpoint

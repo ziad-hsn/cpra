@@ -4,7 +4,8 @@ import { MonitorActions } from '../components/MonitorActions';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { useMonitor } from '../hooks/queries';
-import { StatusChip } from '../components/StatusChip';
+import { MonitorStatusLabels } from '../components/MonitorStatusLabels';
+import { FailureDetails } from '../components/FailureDetails';
 import { CodeBadge } from '../components/CodeBadge';
 import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
@@ -51,8 +52,7 @@ export default function MonitorDetail() {
             </div>
           </div>
           <div className='row' style={{ gap: 10 }}>
-            <StatusChip status={m.status} />
-            {m.incident && <CodeBadge code='red' label='INCIDENT' />}
+            <MonitorStatusLabels monitor={m} />
           </div>
         </div>
 
@@ -68,6 +68,9 @@ export default function MonitorDetail() {
           The event timeline retains incidents and actions for 30 days; raw check history is not retained. This percentage is not an uptime guarantee.
         </p>
 	    {m.warning && <p role='status' style={{ color: 'var(--status-degraded)' }}>{m.warning}</p>}
+        <FailureDetails diagnostic={m.last_failure} />
+        {m.certificate_verification_disabled && <p role='status'>TLS certificate verification disabled for this monitor.</p>}
+        <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Delivered (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
       </div>
 
       {m.monitor_id && <MonitorControls key={`controls/${m.monitor_id}`} monitorID={m.monitor_id} />}
@@ -76,18 +79,18 @@ export default function MonitorDetail() {
 
       <div className='grid-2'>
         <div className='card'>
-          <div className='card-head'><span className='card-title'>Timing</span></div>
+          <div className='card-head'><h2 className='card-title'>Timing (local time)</h2></div>
           <div className='stack-12'>
             <Row k='Last check' v={formatDateTime(m.last_check)} />
             <Row k='Last success' v={formatDateTime(m.last_success)} />
             <Row k='Next check' v={formatDateTime(m.next_check)} />
-            <Row k='Pulse type' v={m.pulse_type.toUpperCase()} />
+            <Row k='Check type' v={m.pulse_type.toUpperCase()} />
           </div>
         </div>
         <div className='card'>
-          <div className='card-head'><span className='card-title'>Alert codes</span><span className='card-sub'>{activeCodes.length}</span></div>
+          <div className='card-head'><h2 className='card-title'>Configured notifications</h2><span className='card-sub'>{activeCodes.length}</span></div>
           {activeCodes.length === 0 ? (
-            <div className='empty-state'><Icon name='check' size={20} style={{ color: 'var(--status-operational)' }} /><div>No alert codes configured</div></div>
+            <div className='empty-state'><Icon name='check' size={20} style={{ color: 'var(--status-operational)' }} /><div>No notifications configured</div></div>
           ) : (
             <div className='stack-12'>
               {activeCodes.map((c) => (
@@ -96,7 +99,7 @@ export default function MonitorDetail() {
                   {m.pending_code === c ? (
                     <span className='muted' style={{ fontSize: 12 }}>pending delivery</span>
                   ) : (
-                    <span className='muted' style={{ fontSize: 12 }}>armed</span>
+                    <span className='muted' style={{ fontSize: 12 }}>configured</span>
                   )}
                 </div>
               ))}

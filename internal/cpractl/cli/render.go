@@ -79,6 +79,22 @@ func writeQueues(p *printer, page api.QueueList) error {
 		if err := table(w, headers, rows); err != nil {
 			return err
 		}
+		if p.wide() && page.Available {
+			var drivers [][]string
+			for _, q := range page.Items {
+				if !q.Available {
+					continue
+				}
+				for _, d := range q.Drivers {
+					drivers = append(drivers, []string{managementDisplay(q.Name), managementDisplay(d.Driver), fmt.Sprint(d.Pending), fmt.Sprint(d.Active), fmt.Sprint(d.ConcurrencyLimit), measurement(d.OldestPendingMS), measurement(d.OldestActiveMS), fmt.Sprint(d.Rejections), fmt.Sprint(d.Timeouts), managementDisplay(d.Condition)})
+				}
+			}
+			if len(drivers) > 0 {
+				if err := table(w, []string{"QUEUE", "DRIVER", "PENDING", "ACTIVE", "CONCURRENCY", "OLDEST PENDING MS", "OLDEST ACTIVE MS", "REJECTED", "TIMEOUTS", "CONDITION"}, drivers); err != nil {
+					return err
+				}
+			}
+		}
 		return observationPage(w, page.Available, page.NextCursor)
 	})
 }

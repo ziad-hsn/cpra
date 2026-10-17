@@ -6,6 +6,7 @@ import { collectionCall, collectionOperation, collectionPermissions, collectionP
 import { collectionIdentityFormat, fileNormalizationProfile, WorkerCollectionInventory } from '../src/api/collectionInventory';
 import { operationView, supportedCollectionIdentity } from '../src/api/operations';
 import { PrivateCollectionBody } from '../src/import/collection';
+import { validationDiagnostic } from '../src/api/validation';
 import { operationContracts } from '../src/api/generated';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -263,4 +264,21 @@ it('rejects malformed per-request response ceilings before sending', async () =>
   const { session, sent } = await fixture(async () => response(sealed()));
   for (const maxResponseBytes of [0, -1, NaN, Infinity, 1.5, (64 << 20) + 1]) await expect(session.get('/api/v2/operations/original-1/validation', { maxResponseBytes })).rejects.toMatchObject({ reason: 'invalid' });
   expect(sent).not.toHaveBeenCalled();
+});
+
+it('keeps safe preview field diagnostics without retaining remote text or arbitrary keys', () => {
+  const secret = 'PRIVATE_REJECTED_VALUE';
+  const result = collectionPreflight({ ...identity, valid: false, errors: [{ field: 'items[0].resource.spec.check.driver.config.url', reason: 'required', message: secret, detail: secret }] }, identity);
+  expect(result.errors).toHaveLength(1);
+  expect(validationDiagnostic(result.errors![0])).toContain('spec.check.driver.config.url');
+  expect(validationDiagnostic(result.errors![0])).toContain('required');
+  expect(JSON.stringify(result)).not.toContain(secret);
+  const hostile = collectionPreflight({ ...identity, valid: false, errors: [{ field: `items[0].resource.spec.${secret}`, reason: secret, message: secret }] }, identity);
+  expect(JSON.stringify(hostile)).not.toContain(secret);
+  expect(() => collectionPreflight({ ...identity, valid: false, errors: [{ field: 'items[1].resource', reason: 'required' }] }, identity)).toThrow();
+  expect(() => collectionPreflight({ ...identity, valid: true, errors: result.errors }, identity)).toThrow();
+  const graph = collectionPreflight({ ...identity, valid: false, errors: [{ field: 'items', reason: 'invalidGraph', message: secret }] }, identity);
+  expect(graph.errors?.[0].field).toBe('items');
+  expect(validationDiagnostic(graph.errors![0])).toContain('cannot be validated');
+  expect(validationDiagnostic({ field: 'items[0].resource', reason: 'unsafePrefix' })).toContain('existing consumer');
 });

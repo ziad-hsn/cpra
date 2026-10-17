@@ -210,6 +210,28 @@ func TestLoggerConfig_Development(t *testing.T) {
 	}
 }
 
+func TestEnvironmentLoggingDefaults(t *testing.T) {
+	for _, key := range []string{"CPRA_LOG_LEVEL", "CPRA_LOG_FORMAT", "CPRA_LOG_DEVELOPMENT", "CPRA_LOG_SAMPLING"} {
+		t.Setenv(key, "")
+	}
+	for _, value := range []string{"", "production", "unexpected"} {
+		t.Setenv("CPRA_ENV", value)
+		cfg := configFromEnv()
+		if cfg.Level != "info" || cfg.Format != "json" || cfg.Development {
+			t.Fatalf("ordinary execution enabled developer logging: %+v", cfg)
+		}
+	}
+	t.Setenv("CPRA_ENV", "development")
+	if cfg := configFromEnv(); cfg.Level != "debug" || cfg.Format != "console" || !cfg.Development {
+		t.Fatalf("explicit developer logging ignored: %+v", cfg)
+	}
+	t.Setenv("CPRA_LOG_LEVEL", "warn")
+	t.Setenv("CPRA_LOG_FORMAT", "json")
+	if cfg := configFromEnv(); cfg.Level != "warn" || cfg.Format != "json" {
+		t.Fatalf("explicit logging overrides ignored: %+v", cfg)
+	}
+}
+
 func TestConvertFields_AllTypes(t *testing.T) {
 	fields := []Field{
 		{Key: "string", Value: "test"},

@@ -27,7 +27,7 @@ func TestPrepareCancellationBeforeUnavailableCatalog(t *testing.T) {
 
 func TestMutationCancellationDoesNotAllocateOperations(t *testing.T) {
 	c, store := testCatalog(t)
-	endpoint := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"/tmp/cpra-validation-only.log"}`)}))
+	endpoint := createResource(t, c, resource("NotificationEndpoint", "console", api.DriverConfig{Type: "log", Config: json.RawMessage(`{"file":"cpra-validation-only.log"}`)}))
 	index := store.Status().CommittedIndex
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()

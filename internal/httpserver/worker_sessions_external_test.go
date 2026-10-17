@@ -370,14 +370,14 @@ type sessionBlockingStore struct {
 	entered, release chan struct{}
 }
 
-func (s *sessionBlockingStore) CommitWorkerPoll(ctx context.Context, a persistence.WorkerAuthority, r persistence.WorkerPollRequest) (persistence.WorkerPollResponse, error) {
+func (s *sessionBlockingStore) CommitWorkerPoll(ctx context.Context, a persistence.WorkerAuthority, r persistence.WorkerPollRequest, evaluators ...persistence.WorkerMaintenanceEvaluator) (persistence.WorkerPollResponse, error) {
 	close(s.entered)
 	select {
 	case <-s.release:
 	case <-ctx.Done():
 		return persistence.WorkerPollResponse{}, ctx.Err()
 	}
-	return s.Store.CommitWorkerPoll(ctx, a, r)
+	return s.Store.CommitWorkerPoll(ctx, a, r, evaluators...)
 }
 
 func TestWorkerSessionHTTPConcurrentPollAndCancellation(t *testing.T) {

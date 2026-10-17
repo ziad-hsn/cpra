@@ -34,6 +34,9 @@ func ValidateValidationResultPage(p ValidationResultPage) error {
 		if item.Ordinal < 1 || item.Ordinal > s.Count || i > 0 && item.Ordinal != prior+1 || item.Kind == "" || len(item.Kind) > 64 || item.ID == "" || len(item.ID) > 256 || len(item.Change) > 32 || len(item.Issue) > 64 || item.Change == "" && item.Issue == "" || (item.UID == "") != (item.ResourceVersion == "") || len(item.UID) > 256 || len(item.ResourceVersion) > 256 || item.Change == "create" && item.UID != "" || item.SourceDocument < 1 || item.SourceDocument > 10_000_000 || item.SourceItem < 1 || item.SourceItem > 10_000_000 {
 			return invalid
 		}
+		if len(item.Field) > 160 || len(item.Reason) > 64 || item.Field != "" && item.Reason == "" || item.Reason != "" && item.Issue == "" {
+			return invalid
+		}
 		if len(item.Source) != 27 || !strings.HasPrefix(item.Source, "source.") {
 			return invalid
 		}

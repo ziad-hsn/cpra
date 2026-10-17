@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/internal/transport"
-	"net/http"
-	"time"
 )
 
 type MonitorsService struct{ c *Client }
@@ -572,6 +574,35 @@ func (s *MonitorsService) Unsnooze(ctx context.Context, id string, req api.Contr
 	}
 	resp, err := s.c.generated.UnsnoozeMonitor(ctx, id, &transport.UnsnoozeMonitorParams{IfMatch: strongETag(req.Revision)}, req)
 	return response[api.Operation](s.c, resp, err, true)
+}
+
+// Ignore suppresses ordinary notifications and interventions while checks
+// continue. The exact observed control revision and an audit reason are required.
+func (s *MonitorsService) Ignore(ctx context.Context, id string, req api.ControlRequest) (*Response[api.Operation], error) {
+	if err := validIgnoreControl(id, req); err != nil {
+		return nil, err
+	}
+	resp, err := s.c.generated.IgnoreMonitor(ctx, id, &transport.IgnoreMonitorParams{IfMatch: strongETag(req.Revision)}, req)
+	return response[api.Operation](s.c, resp, err, true)
+}
+
+// Unignore resumes future eligible handling without replaying suppressed work.
+func (s *MonitorsService) Unignore(ctx context.Context, id string, req api.ControlRequest) (*Response[api.Operation], error) {
+	if err := validIgnoreControl(id, req); err != nil {
+		return nil, err
+	}
+	resp, err := s.c.generated.UnignoreMonitor(ctx, id, &transport.UnignoreMonitorParams{IfMatch: strongETag(req.Revision)}, req)
+	return response[api.Operation](s.c, resp, err, true)
+}
+
+func validIgnoreControl(id string, req api.ControlRequest) error {
+	if err := validID(id); err != nil {
+		return err
+	}
+	if strings.TrimSpace(req.Reason) == "" || req.Duration != "" || req.IncidentID != "" {
+		return errors.New("Ignore controls require a reason and no duration or incident ID")
+	}
+	return control(req)
 }
 
 // Recover calls POST /api/v2/monitors/{id}/recover.

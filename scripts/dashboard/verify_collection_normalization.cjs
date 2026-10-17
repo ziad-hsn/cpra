@@ -8,7 +8,7 @@ const { isDeepStrictEqual } = require('node:util');
 const [runtime, wasm, ...natives] = process.argv.slice(2);
 if (!runtime || !wasm || natives.length === 0) throw new Error('Expected runtime, Wasm and native parser artifacts');
 require(path.resolve(runtime));
-const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, '../../sdk/go/collection/testdata/file-base-v1.json'), 'utf8'));
+const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, '../../sdk/go/collection/testdata/file-base-v2.json'), 'utf8'));
 const check = (condition, description) => { if (!condition) throw new Error(description); };
 (async () => {
   const go = new Go();

@@ -43,7 +43,14 @@ func sessionApply(t *testing.T, s *Store, a WorkerAuthority, r WorkerPollRequest
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: r, ProposedSessionID: uuid.NewString()}
+	c := WorkerSessionCommand{SelectionVersion: 2, NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: r, ProposedSessionID: uuid.NewString()}
+	for range r.Limit {
+		c.ProposedLeaseIDs = append(c.ProposedLeaseIDs, uuid.NewString())
+	}
+	c.Maintenance, err = s.prepareWorkerPollMaintenance(t.Context(), c, at, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := s.Submit(t.Context(), []Command{{Kind: "worker_poll", At: at, commandExtensions: commandExtensions{WorkerSession: &c}}})
 	if err != nil || len(results) != 1 {
 		t.Fatal(err, results)
@@ -132,7 +139,10 @@ func TestWorkerSessionExpiryOwnerAndIdentityFences(t *testing.T) {
 	if result := sessionApply(t, s, a, fresh, first.SessionExpiresAt.Add(time.Second)); !errors.Is(result.Err, ErrWorkerSessionExpired) {
 		t.Fatal("old owner initial replay survived restart", result.Err)
 	}
-	stale := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: oldOwner, Authority: a, Request: fresh, ProposedSessionID: uuid.NewString()}
+	stale := WorkerSessionCommand{SelectionVersion: 2, NodeID: s.nodeID, OwnerEpoch: oldOwner, Authority: a, Request: fresh, ProposedSessionID: uuid.NewString()}
+	for range fresh.Limit {
+		stale.ProposedLeaseIDs = append(stale.ProposedLeaseIDs, uuid.NewString())
+	}
 	result := submit(t, s, Command{Kind: "worker_poll", At: first.SessionExpiresAt.Add(time.Second), commandExtensions: commandExtensions{WorkerSession: &stale}})[0]
 	if !errors.Is(result.Err, ErrWorkerSessionExpired) {
 		t.Fatal("old queued command survived owner fence", result.Err)
@@ -215,7 +225,7 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("format gate", version, err)
 		}
 	}
@@ -229,7 +239,7 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != WorkerQueueFormatVersion {
+	if s.fsm.image.Version != LifecycleWorkerFormatVersion {
 		t.Fatal("format not advanced")
 	}
 	clone := cloneImageExtensions(s.fsm.image)

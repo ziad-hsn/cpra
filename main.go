@@ -53,8 +53,8 @@ func main() {
 	flag.BoolVar(&o.web, "web", true, "Enable dashboard, API and metrics; management writes require runtime configuration")
 	flag.StringVar(&o.webAddr, "web.addr", "localhost:8060", "Web server listen address")
 	flag.StringVar(&o.webCors, "web.cors", "", "Web API CORS allowlist")
-	flag.StringVar(&o.webAuth, "web.auth", os.Getenv("CPRA_AUTH_TOKEN"), "API bearer token (prefer -web.auth-file)")
-	flag.StringVar(&o.webAuthFile, "web.auth-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "File containing API authentication token")
+	flag.StringVar(&o.webAuth, "web.auth", "", "API bearer token (prefer -web.auth-file; defaults to CPRA_AUTH_TOKEN)")
+	flag.StringVar(&o.webAuthFile, "web.auth-file", "", "File containing API authentication token (defaults to CPRA_AUTH_TOKEN_FILE)")
 	flag.BoolVar(&o.ssrfProtect, "ssrf-protect", false, "Reject HTTP targets resolving to private addresses")
 	flag.BoolVar(&o.allowEmpty, "allow-empty", false, "Allow an intentionally empty manifest")
 	flag.BoolVar(&o.validate, "validate", false, "Validate configuration and compiled drivers without opening storage or providers")
@@ -62,6 +62,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	capabilitiesFlag := flag.Bool("capabilities", false, "Print compiled driver capabilities as JSON and exit")
 	flag.Parse()
+	resolveAuthEnvironment(&o, flag.CommandLine, os.Getenv)
 	if *versionFlag {
 		fmt.Println(version.Info())
 		return
@@ -79,6 +80,23 @@ func main() {
 	if err := runPlatform(func(ctx context.Context, ready func()) error { return runCPRa(ctx, o, ready) }); err != nil {
 		fmt.Fprintln(os.Stderr, "CPRa:", err)
 		os.Exit(1)
+	}
+}
+
+// Secrets must never be flag defaults: flag usage prints those values even on
+// an unrelated parse error. An explicitly supplied flag, including an empty
+// value, takes precedence over its corresponding environment variable.
+func resolveAuthEnvironment(o *runOptions, flags *flag.FlagSet, getenv func(string) string) {
+	var tokenSet, fileSet bool
+	flags.Visit(func(f *flag.Flag) {
+		tokenSet = tokenSet || f.Name == "web.auth"
+		fileSet = fileSet || f.Name == "web.auth-file"
+	})
+	if !tokenSet {
+		o.webAuth = getenv("CPRA_AUTH_TOKEN")
+	}
+	if !fileSet {
+		o.webAuthFile = getenv("CPRA_AUTH_TOKEN_FILE")
 	}
 }
 
@@ -100,7 +118,12 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if err != nil {
 		return err
 	}
-	if err = settings.ResolveStorageDirectory(o.dataDir); err != nil {
+	if o.validate {
+		err = settings.ResolveValidationDirectory(o.dataDir)
+	} else {
+		err = settings.ResolveStorageDirectory(o.dataDir)
+	}
+	if err != nil {
 		return err
 	}
 	if settings.Management.Enabled || settings.EncryptionSource() != nil {
@@ -131,7 +154,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		return errors.New("pprof.addr must be a loopback address")
 	}
 	if !settings.Management.Enabled {
-		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil); err != nil {
+		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil, settings.Notifications.LogDirectory != ""); err != nil {
 			return fmt.Errorf("manifest validation: %w", err)
 		}
 	}
@@ -183,6 +206,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	var profiling *http.Server
 	var profileDone chan struct{}
 	defer func() {
+		controller.SystemLogger.Info("Shutdown started; stopping admission and draining accepted work (budget %s)", o.shutdownTimeout)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), o.shutdownTimeout)
 		defer cancel()
 		// Cancel every owned collection worker before waiting for HTTP admission.
@@ -257,7 +281,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 				_ = profiling.Close()
 				<-profileDone
 			}
-			closeErr = errors.Join(closeErr, store.Close())
+			closeErr = errors.Join(closeErr, config.NotificationLog.Close(), store.Close())
 			finished <- shutdownResult{err: errors.Join(closeErr, encryption.Close()), closed: true}
 		}()
 		select {
@@ -273,6 +297,18 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			resultErr = errors.Join(resultErr, fmt.Errorf("shutdown deadline exceeded; interrupted actions will be held unknown on restart: %w", shutdownCtx.Err()))
 		}
 	}()
+	if directory := settings.Notifications.LogDirectory; directory != "" {
+		protected := settings.NotificationProtectedPaths()
+		for _, file := range []string{o.runtimeFile, o.manifest, o.webAuthFile} {
+			if file != "" {
+				protected = append(protected, filepath.Dir(file))
+			}
+		}
+		config.NotificationLog, err = jobs.OpenNotificationLog(directory, protected...)
+		if err != nil {
+			return err
+		}
+	}
 	authority, auth, err := initializeRuntimeAuthentication(ctx, store, settings, o)
 	if err != nil {
 		return err
@@ -286,6 +322,9 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			return fmt.Errorf("management startup: %w", err)
 		}
 		config.Catalog = startup.Catalog
+		if startup.ReusedCatalog {
+			controller.SystemLogger.Info("Using committed management configuration; bootstrap file changes are not imported on restart. Use cpractl apply to change monitors.")
+		}
 		validation, err := config.Catalog.StartCollectionValidationCoordinator(ctx, time.Now)
 		if err != nil {
 			return fmt.Errorf("collection validation coordinator startup: %w", err)
@@ -626,6 +665,7 @@ func validateManagementTLS(ctx context.Context, source runtimeconfig.ManagementT
 func managementStartupOptions(settings runtimeconfig.Config, o runOptions) management.StartupOptions {
 	options := management.StartupOptions{DataDirectory: settings.Storage.Directory, AllowEmpty: o.allowEmpty,
 		Decode: collection.DecodeOptions{SourceName: "startup manifest"}}
+	options.Catalog.NotificationLogEnabled = settings.Notifications.LogDirectory != ""
 	configureCatalogOptions(&options.Catalog, settings)
 	if o.manifest != "" {
 		options.OpenSource = func(ctx context.Context) (io.ReadCloser, error) {

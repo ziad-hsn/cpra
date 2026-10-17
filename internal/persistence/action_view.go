@@ -11,6 +11,10 @@ import (
 )
 
 func (a Action) Clone() Action {
+	if a.Control != nil {
+		v := *a.Control
+		a.Control = &v
+	}
 	if a.AgentConnection != nil {
 		v := a.AgentConnection.Clone()
 		a.AgentConnection = &v
@@ -49,6 +53,10 @@ func ActionReviewRevision(a Action) string {
 	return identity("action-observation/" + string(data))
 }
 func (e Event) Clone() Event {
+	if e.Control != nil {
+		v := *e.Control
+		e.Control = &v
+	}
 	if e.RecoveryFailure != nil {
 		v := *e.RecoveryFailure
 		e.RecoveryFailure = &v
@@ -152,6 +160,10 @@ func (s *Store) ActionSnapshotContext(ctx context.Context) (ActionView, error) {
 		return ActionView{}, err
 	}
 	defer unlock()
+	return s.actionSnapshotLocked(ctx)
+}
+
+func (s *Store) actionSnapshotLocked(ctx context.Context) (ActionView, error) {
 	f := s.fsm
 	if f.err != nil {
 		return ActionView{}, f.err

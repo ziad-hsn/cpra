@@ -3,7 +3,10 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
+	"strings"
 
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
@@ -23,33 +26,48 @@ func Validate(m *Manifest) error {
 // ValidateMonitor checks a single monitor for semantic errors (required
 // fields and per-type pulse config requirements).
 func ValidateMonitor(m *Monitor) error {
+	settings := api.MonitorSpec{Check: api.CheckSpec{Interval: m.Pulse.Interval.String(), Timeout: m.Pulse.Timeout.String(), Retries: api.Pointer(int64(m.Pulse.Retries)), MaxFailures: api.Pointer(int64(m.Pulse.MaxFailures)), HealthyThreshold: api.Pointer(int64(m.Pulse.HealthyThreshold)), UnhealthyThreshold: api.Pointer(int64(m.Pulse.UnhealthyThreshold))}, AutoIgnore: m.AutoIgnore}
+	if m.Intervention.Action != "" {
+		settings.Recovery = &api.RecoverySpec{Retries: api.Pointer(int64(m.Intervention.Retries)), MaxFailures: api.Pointer(int64(m.Intervention.MaxFailures)), MaxAttempts: api.Pointer(int64(m.Intervention.MaxAttempts))}
+	}
+	colors := make(map[string]api.AlertRule, len(m.Codes))
+	for color := range m.Codes {
+		colors[color] = api.AlertRule{}
+	}
+	settings.Notifications = &colors
+	if err := api.ValidateMonitorSettings(settings); err != nil {
+		return manifestSettingsError(err)
+	}
+	if err := api.ValidateAutoIgnore(m.AutoIgnore); err != nil {
+		return fmt.Errorf("auto_ignore: %w", err)
+	}
 	if _, err := CompileMaintenance(m.Maintenance); err != nil {
-		return fmt.Errorf("monitor %q: %w", m.Name, err)
+		return err
 	}
 	if m.Name == "" {
-		return fmt.Errorf("monitor name is required")
+		return api.InvalidField("name", "required")
 	}
 	if m.Pulse.Type == "" {
-		return fmt.Errorf("monitor %q: pulse_check.type is required", m.Name)
+		return api.InvalidField("pulse_check.type", "required")
 	}
 	if m.Pulse.Interval <= 0 {
-		return fmt.Errorf("monitor %q: pulse_check.interval is required", m.Name)
+		return api.InvalidField("pulse_check.interval", "required")
 	}
 	if m.Pulse.Timeout <= 0 {
-		return fmt.Errorf("monitor %q: pulse_check.timeout is required", m.Name)
+		return api.InvalidField("pulse_check.timeout", "required")
 	}
 	if m.Pulse.Config == nil {
-		return fmt.Errorf("monitor %q: pulse_check.config is required", m.Name)
+		return api.InvalidField("pulse_check.config", "required")
 	}
 	if err := validateDriverSettings("check", m.Pulse.Type, m.Pulse.Config); err != nil {
-		return fmt.Errorf("monitor %q pulse_check: %w", m.Name, err)
+		return api.PrefixValidationError("pulse_check", err)
 	}
 	if m.Intervention.Action != "" {
 		if m.Intervention.Target == nil {
-			return fmt.Errorf("monitor %q intervention.target is required", m.Name)
+			return api.InvalidField("intervention.target", "required")
 		}
 		if err := validateDriverSettings("recovery", m.Intervention.Action, m.Intervention.Target); err != nil {
-			return fmt.Errorf("monitor %q intervention: %w", m.Name, err)
+			return api.PrefixValidationError("intervention", err)
 		}
 	}
 	if m.Intervention.Action == "a2a" {
@@ -64,20 +82,21 @@ func ValidateMonitor(m *Monitor) error {
 	if m.Intervention.MaxAttempts < 0 || m.Intervention.MaxAttempts > math.MaxInt32 {
 		return fmt.Errorf("intervention max_attempts is outside the supported range")
 	}
-	for color, notification := range m.Codes {
+	for _, color := range slices.Sorted(maps.Keys(m.Codes)) {
+		notification := m.Codes[color]
 		if notification.Notify != "" && notification.NotifyGroup == "" {
 			if err := validateDriverSettings("notification", notification.Notify, notification.Config); err != nil {
-				return fmt.Errorf("monitor %q codes.%s: %w", m.Name, color, err)
+				return api.PrefixValidationError("codes."+color, err)
 			}
 		}
 		switch notification.Trigger {
 		case "", "state_change":
 		case "recovery_failed", "recovery_exhausted":
 			if color != "red" || m.Intervention.Action == "" {
-				return fmt.Errorf("recovery notification triggers require Code red and an intervention")
+				return api.InvalidField("codes."+color+".trigger", "notificationTrigger")
 			}
 		default:
-			return fmt.Errorf("unsupported notification trigger")
+			return api.InvalidField("codes."+color+".trigger", "notificationTrigger")
 		}
 		if notification.Notify == "a2a" {
 			cfg, ok := notification.Config.(*CodeNotificationA2A)
@@ -93,34 +112,34 @@ func ValidateMonitor(m *Monitor) error {
 	switch cfg := m.Pulse.Config.(type) {
 	case *PulseHTTPConfig:
 		if cfg.Url == "" {
-			return fmt.Errorf("monitor %q: pulse_check.config.url is required for http", m.Name)
+			return api.InvalidField("pulse_check.config.url", "required")
 		}
 	case *PulseTCPConfig:
 		if cfg.Host == "" {
-			return fmt.Errorf("monitor %q: pulse_check.config.host is required for tcp", m.Name)
+			return api.InvalidField("pulse_check.config.host", "required")
 		}
 		if cfg.Port == 0 {
-			return fmt.Errorf("monitor %q: pulse_check.config.port is required for tcp", m.Name)
+			return api.InvalidField("pulse_check.config.port", "required")
 		}
 	case *PulseICMPConfig:
 		if cfg.Host == "" {
-			return fmt.Errorf("monitor %q: pulse_check.config.host is required for icmp", m.Name)
+			return api.InvalidField("pulse_check.config.host", "required")
 		}
 	case *PulseDNSConfig:
 		if cfg.Host == "" {
-			return fmt.Errorf("monitor %q: pulse_check.config.host is required for dns", m.Name)
+			return api.InvalidField("pulse_check.config.host", "required")
 		}
 	case *PulseUDPConfig:
 		if cfg.Host == "" || cfg.Port == 0 {
-			return fmt.Errorf("monitor %q: pulse_check.config.host/port required for udp", m.Name)
+			return api.InvalidField("pulse_check.config", "required")
 		}
 	case *PulseGRPCConfig:
 		if cfg.Host == "" || cfg.Port == 0 {
-			return fmt.Errorf("monitor %q: pulse_check.config.host/port required for grpc", m.Name)
+			return api.InvalidField("pulse_check.config", "required")
 		}
 	case *PulseDockerConfig:
 		if cfg.Container == "" {
-			return fmt.Errorf("monitor %q: pulse_check.config.container is required for docker", m.Name)
+			return api.InvalidField("pulse_check.config.container", "required")
 		}
 	}
 	return nil
@@ -129,9 +148,10 @@ func ValidateMonitor(m *Monitor) error {
 // validateGroups checks that every notify_group reference resolves to a
 // defined group whose endpoints all exist.
 func validateGroups(m *Manifest) error {
-	for _, endpoint := range m.Endpoints {
+	for index, name := range slices.Sorted(maps.Keys(m.Endpoints)) {
+		endpoint := m.Endpoints[name]
 		if err := validateDriverSettings("notification", endpoint.Type, endpoint.Config); err != nil {
-			return fmt.Errorf("notification endpoint: %w", err)
+			return api.PrefixValidationError(fmt.Sprintf("endpoints[%d]", index), err)
 		}
 		if endpoint.Type == "a2a" {
 			cfg, ok := endpoint.Config.(*CodeNotificationA2A)
@@ -143,27 +163,45 @@ func validateGroups(m *Manifest) error {
 			}
 		}
 	}
-	for _, endpoints := range m.NotificationGroups {
-		for _, name := range endpoints {
+	for index, group := range slices.Sorted(maps.Keys(m.NotificationGroups)) {
+		endpoints := m.NotificationGroups[group]
+		if len(endpoints) == 0 {
+			return api.InvalidField(fmt.Sprintf("notification_groups[%d]", index), "nonemptyReferences")
+		}
+		seen := make(map[string]bool, len(endpoints))
+		for ordinal, name := range endpoints {
+			if seen[name] {
+				return api.InvalidField(fmt.Sprintf("notification_groups[%d][%d]", index, ordinal), "duplicateIdentity")
+			}
+			seen[name] = true
 			if _, ok := m.Endpoints[name]; !ok {
-				return fmt.Errorf("notification group references an undefined endpoint")
+				return api.InvalidField(fmt.Sprintf("notification_groups[%d][%d]", index, ordinal), "referenceNotFound")
 			}
 		}
 	}
 	for i := range m.Monitors {
-		mon := &m.Monitors[i]
-		for color, cfg := range mon.Codes {
-			if cfg.NotifyGroup == "" {
-				continue
-			}
-			names, ok := m.NotificationGroups[cfg.NotifyGroup]
-			if !ok {
-				return fmt.Errorf("monitor %q color %q: notification group %q not found", mon.Name, color, cfg.NotifyGroup)
-			}
-			for _, name := range names {
-				if _, ok := m.Endpoints[name]; !ok {
-					return fmt.Errorf("monitor %q color %q: endpoint %q not found for group %q", mon.Name, color, name, cfg.NotifyGroup)
-				}
+		if err := ValidateMonitorReferences(&m.Monitors[i], m.Endpoints, m.NotificationGroups); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ValidateMonitorReferences checks one entry against previously validated
+// manifest metadata. Streaming callers must apply this to every emitted entry.
+func ValidateMonitorReferences(mon *Monitor, endpoints map[string]Endpoint, groups NotificationGroups) error {
+	for _, color := range slices.Sorted(maps.Keys(mon.Codes)) {
+		cfg := mon.Codes[color]
+		if cfg.NotifyGroup == "" {
+			continue
+		}
+		names, ok := groups[cfg.NotifyGroup]
+		if !ok || len(names) == 0 {
+			return api.InvalidField("codes."+color+".notify_group", "referenceNotFound")
+		}
+		for _, name := range names {
+			if _, ok := endpoints[name]; !ok {
+				return api.InvalidField("codes."+color+".notify_group", "referenceNotFound")
 			}
 		}
 	}
@@ -185,7 +223,27 @@ func validateDriverSettings(category, kind string, config any) error {
 	}
 	normalized, err := api.NormalizeManifestDriver(category, kind, raw)
 	if err != nil {
-		return fmt.Errorf("driver configuration has unsupported fields or types")
+		return err
 	}
 	return api.ValidateDriverSettings(category, api.DriverConfig{Type: kind, Config: normalized})
+}
+
+// Translate only diagnostic schema names; values and validation rules are shared
+// with management resources. File users see the spelling they can edit.
+func manifestSettingsError(err error) error {
+	detail, ok := api.ValidationFieldError(err)
+	if !ok {
+		return err
+	}
+	field := detail.Field
+	for _, pair := range [][2]string{{"check", "pulse_check"}, {"recovery", "intervention"}, {"notifications", "codes"}, {"autoIgnore", "auto_ignore"}} {
+		if field == pair[0] || strings.HasPrefix(field, pair[0]+".") {
+			field = pair[1] + strings.TrimPrefix(field, pair[0])
+			break
+		}
+	}
+	for _, pair := range [][2]string{{"maxFailures", "max_failures"}, {"maxAttempts", "max_attempts"}, {"unhealthyThreshold", "unhealthy_threshold"}, {"healthyThreshold", "healthy_threshold"}} {
+		field = strings.ReplaceAll(field, pair[0], pair[1])
+	}
+	return api.InvalidField(field, detail.Reason)
 }

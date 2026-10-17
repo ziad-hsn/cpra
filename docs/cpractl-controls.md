@@ -13,6 +13,8 @@ client `--actor` option.
 | Resume future notifications for the same incident | `reopen incident/ID` | Incident `revision` with `--revision` |
 | Pause checks, notifications and new recovery temporarily | `snooze monitor/ID` | Monitor `status.controlRevision` with `--control-revision` |
 | End that pause early | `unsnooze monitor/ID` | Monitor `status.controlRevision` with `--control-revision` |
+| Keep checks while suppressing ordinary alerts and interventions | `ignore monitor/ID` | Monitor `status.controlRevision` with `--control-revision` |
+| End Ignore without replaying suppressed work | `unignore monitor/ID` | Monitor `status.controlRevision` with `--control-revision` |
 | Disable indefinitely or enable again | `disable monitor/ID`, `enable monitor/ID` | Monitor `metadata.resourceVersion` with `--resource-version` |
 
 An incident revision, control revision, configuration resource version, and
@@ -95,6 +97,29 @@ cpractl unsnooze monitor/service-api --control-revision NEW_CONTROL_REVISION -o 
 
 Neither unsnooze nor expiry enables a disabled monitor or bypasses maintenance.
 
+## Ignore and Unignore
+
+Ignore continues health checks, incident transitions and history. It suppresses
+ordinary notifications and interventions; it does not label the target healthy.
+Both commands require the current control revision and a retained reason:
+
+```bash
+cpractl get monitor/service-api -o json
+cpractl ignore monitor/service-api --control-revision CONTROL_REVISION \
+  --reason-file known-issue.txt -o json
+cpractl get monitor/service-api -o json
+cpractl unignore monitor/service-api --control-revision NEW_CONTROL_REVISION \
+  --reason-file resume-handling.txt -o json
+```
+
+Queued suppressed work is canceled; started and unknown outcomes remain visible.
+Unignore resumes future eligible handling without a notification backlog.
+Verified recovery also clears Ignore and its rolling outage counter. It may
+admit one configured green even without an earlier alert attempt in that outage;
+other suppression controls still apply. Normal handling resumes independently
+of whether that green is delivered. Optional `autoIgnore` configuration uses
+the same durable state and recovery rules.
+
 ## Disable and enable
 
 These commands conditionally patch only `spec.enabled`, using the exact
@@ -107,7 +132,10 @@ cpractl enable monitor/service-api --resource-version NEW_CONFIGURATION_VERSION 
 ```
 
 Disable retains monitor state and event history while stopping new checks,
-notifications and recovery. Enable continues to respect snooze and maintenance.
+ordinary notifications and recovery. A real enable/disable transition can emit
+its configured gray control notice, including during Ignore and maintenance;
+unchanged configuration, restart and replay do not emit another gray. Enable
+continues to respect snooze, Ignore and maintenance for ordinary work.
 The current configuration patch receipt records the authenticated actor; it
 does not support an additional reason field for enable/disable.
 

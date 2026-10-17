@@ -201,7 +201,7 @@ it.each(Object.keys(notificationFields))('round-trips the generated %s endpoint 
   const credentialRefs: Record<string, string> = {};
   for (const field of fieldsFor(driver) ?? []) {
     if (field.protected) credentialRefs[field.key] = `secret-${field.key}`;
-    else config[field.key] = field.type === 'boolean' ? false : field.type === 'number' ? 0 : field.type === 'string-list' ? [] : '';
+    else config[field.key] = field.type === 'boolean' ? false : field.type === 'number' ? 0 : field.type === 'string-list' || field.type === 'number-list' ? [] : field.type === 'number-map' || field.type === 'string-map' ? {} : '';
   }
   const original = resource('endpoints', `endpoint-${driver}`, { type: driver, config, credentialRefs });
   const { writes } = await fixture('endpoints', original.metadata.id, { initial: [original] });
@@ -212,4 +212,21 @@ it.each(Object.keys(notificationFields))('round-trips the generated %s endpoint 
   await waitFor(() => expect(writes).toHaveLength(1));
   expect(writes[0]).toMatchObject({ method: 'PUT', match: '"rv-1"' });
   expect(writes[0].body?.spec).toEqual(original.spec);
+});
+
+it('preserves explicit Pushover per-color priority overrides while editing metadata', async () => {
+  const original = resource('endpoints', 'color-priority', { type: 'pushover', config: { priority: 2, priorityByColor: { red: 2, green: 0, gray: -1 } }, credentialRefs: { appToken: 'app', userKey: 'user' } });
+  const { writes } = await fixture('endpoints', original.metadata.id, { initial: [original] });
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit notification endpoint' }));
+  await waitFor(() => expect(screen.getByLabelText('Notification driver')).not.toBeDisabled());
+  expect(screen.getByLabelText('Priority by color')).toHaveValue(JSON.stringify(original.spec.config && (original.spec.config as Record<string, unknown>).priorityByColor, null, 2));
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pager' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].body?.spec).toEqual(original.spec);
+});
+
+it.each([{ red: '2' }, { red: 1.5 }, [], null])('keeps malformed Pushover priority maps read-only: %j', priorityByColor => {
+  const view = resourceView(resource('endpoints', 'malformed-priority', { type: 'pushover', config: { priorityByColor } }), 'endpoints');
+  expect(view.unsupported).toContain('unsupported format');
 });

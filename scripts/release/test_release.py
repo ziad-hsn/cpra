@@ -39,7 +39,7 @@ class ReleaseTests(unittest.TestCase):
     def test_storage_recipe_matches_current_reader(self):
         self.assertEqual(release.storage_format(release.RECIPE['build_tags']), release.RECIPE['storage_format_version'])
         self.assertNotIn('externaljobs', release.RECIPE['build_tags'])
-        self.assertEqual(release.storage_format(['externaljobs']), 41)
+        self.assertEqual(release.storage_format(['externaljobs']), 43)
 
     def test_manifest_rejects_previous_storage_format_even_with_matching_recipe(self):
         manifest = manifest_fixture()
@@ -320,22 +320,24 @@ esac''',
         # Keep real installation/mode changes, translating only privileged
         # ownership to the test runner. No command can create host identities.
         install = self.tools / 'install'
-        install.write_text('#!/usr/bin/python3\nimport subprocess,sys\n'
+        install.write_text('#!/usr/bin/python3\nimport os,pathlib,subprocess,sys\n'
                            'args=[]; source=iter(sys.argv[1:])\n'
                            'for arg in source:\n'
                            '    if arg in ("-o","-g"): next(source)\n'
                            '    else: args.append(arg)\n'
+                           'root=pathlib.Path(os.environ["CPRA_TEST_ROOT"])\n'
+                           'assert all(not arg.startswith("/") or pathlib.Path(arg).is_relative_to(root) for arg in args), "non-fixture install path"\n'
                            'raise SystemExit(subprocess.call(["/usr/bin/install",*args]))\n')
         install.chmod(0o700)
         chown = self.tools / 'chown'
-        chown.write_text('#!/bin/sh\nset -eu\nshift\nexec /usr/bin/chown ' + str(os.geteuid()) + ':' + str(os.getegid()) + ' "$@"\n')
+        chown.write_text('#!/bin/sh\nset -eu\nshift\nfor path do case "$path" in "$CPRA_TEST_ROOT"/*) ;; *) exit 99 ;; esac; done\nexec /usr/bin/chown ' + str(os.geteuid()) + ':' + str(os.getegid()) + ' "$@"\n')
         chown.chmod(0o700)
         self.env = {'PATH': str(self.tools) + ':/usr/bin:/bin', 'LANG': 'C',
-                    'CPRA_TEST_CALLS': str(self.calls), 'CPRA_TEST_STATE': str(self.state)}
+                    'CPRA_TEST_CALLS': str(self.calls), 'CPRA_TEST_STATE': str(self.state), 'CPRA_TEST_ROOT': str(self.root)}
 
     def hook(self, name, argument, *, expected=0, **environment):
         text = (release.ROOT / 'packaging/linux' / name).read_text()
-        for prefix in ('/etc/cpra', '/var/lib/cpra', '/run/cpra-package', '/run/systemd/system', '/var/backups/cpra'):
+        for prefix in ('/etc/cpra', '/var/lib/cpra', '/var/log/cpra', '/run/cpra-package', '/run/systemd/system', '/var/backups/cpra'):
             text = text.replace(prefix, str(self.root / prefix.lstrip('/')))
         result = subprocess.run(['sh', '-s', '--', argument], input=text, text=True,
                                 env=dict(self.env, **environment), capture_output=True, timeout=5)
@@ -430,6 +432,7 @@ esac''',
                 before = {name: (self.config / name).read_bytes() for name in ('auth.token', 'monitors.yaml', 'runtime.yaml')}
                 for name in before: (self.config / name).chmod(0o666)
                 self.hook(format + '-postinstall.sh', 'configure' if format == 'deb' else '1')
+                self.assertEqual((self.root / 'var/log/cpra').stat().st_mode & 0o777, 0o700)
                 for name, contents in before.items():
                     self.assertEqual((self.config / name).stat().st_mode & 0o777, 0o640)
                     self.assertEqual((self.config / name).read_bytes(), contents)

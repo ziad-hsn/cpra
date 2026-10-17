@@ -7,16 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
-	"net"
-	"net/http"
-	"net/mail"
-	"net/netip"
-	"net/url"
 	"reflect"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +29,7 @@ type RuntimePreparation struct {
 	// PreparationBytes bounds retained inputs, including detached worker bindings.
 	PreparationBytes      int
 	Monitor               manifest.Monitor
+	CheckTargetSummary    string
 	Endpoints             map[string]manifest.Endpoint
 	NotificationGroups    manifest.NotificationGroups
 	NotificationTargets   map[string][]NotificationTarget
@@ -48,6 +42,7 @@ type RuntimePreparation struct {
 	ProjectionVersion     string
 	RecoveryCooldown      *time.Duration
 	RecoveryMaxAttempts   *int
+	RecoveryTimeout       time.Duration
 	AbsoluteMaintenance   []AbsoluteMaintenanceWindow
 	NotificationGroupRefs []string
 }
@@ -170,246 +165,24 @@ func decodeRuntimeDriver(category string, driver api.DriverConfig) (any, error) 
 // runtime/preflight evidence and never become side effects of API validation.
 func ValidateResolvedDriver(category string, driver api.DriverConfig) error {
 	if err := api.ValidateDriverSettings(category, driver); err != nil {
-		return runtimeInvalid("driver target, required field, or range is invalid")
+		return fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 	config, err := decodeRuntimeDriver(category, driver)
 	if err != nil {
 		return err
 	}
-	value := reflect.ValueOf(config).Elem()
-	for _, field := range []string{"Retries", "Count", "DB", "WarnDays", "CriticalDays"} {
-		if v := value.FieldByName(field); v.IsValid() && (v.Int() < 0 || v.Int() > math.MaxInt32) {
-			return runtimeInvalid("driver counter must be between zero and 2147483647")
-		}
-	}
-	if typ := value.FieldByName("Type"); typ.IsValid() && typ.String() != "" && typ.String() != driver.Type {
-		return runtimeInvalid("recovery target type conflicts with its selected driver")
-	}
-	valid := true
-	switch cfg := config.(type) {
-	case *manifest.InterventionTargetA2A:
-		valid = cfg.Validate() == nil
-	case *manifest.CodeNotificationA2A:
-		valid = cfg.Validate() == nil
-	case *manifest.PulseHTTPConfig:
-		valid = httpTarget(cfg.Url, cfg.Method, cfg.Headers)
-		for _, status := range cfg.ExpectedStatus {
-			valid = valid && status >= 100 && status <= 599
-		}
-	case *manifest.PulseTCPConfig:
-		valid = hostPort(cfg.Host, cfg.Port)
-	case *manifest.PulseICMPConfig:
-		valid = networkHost(cfg.Host) && (!cfg.Privilege || runtime.GOOS == "linux" || runtime.GOOS == "darwin")
-	case *manifest.PulseDNSConfig:
-		valid = networkHost(cfg.Host) && (cfg.Server == "" || dnsAddress(cfg.Server))
-	case *manifest.PulseUDPConfig:
-		valid = hostPort(cfg.Host, cfg.Port)
-	case *manifest.PulseGRPCConfig:
-		valid = hostPort(cfg.Host, cfg.Port)
-	case *manifest.PulseDockerConfig:
-		valid = namedTarget(cfg.Container)
-	case *manifest.PulseRedisConfig:
-		// The production Redis client defaults an empty address to localhost.
-		valid = cfg.Addr == "" || numericAddress(cfg.Addr)
-	case *manifest.PulsePostgresConfig:
-		valid = cfg.Port >= 0 && cfg.Port <= 65535 && (cfg.DSN == "" || connectionURL(cfg.DSN, "postgres", "postgresql") || (strings.Contains(cfg.DSN, "=") && !strings.ContainsRune(cfg.DSN, '\x00'))) &&
-			(cfg.SSLMode == "" || slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, cfg.SSLMode))
-	case *manifest.PulseMySQLConfig:
-		valid = cfg.Port >= 0 && cfg.Port <= 65535 && (cfg.DSN == "" || (strings.Contains(cfg.DSN, "/") && !strings.ContainsRune(cfg.DSN, '\x00')))
-	case *manifest.PulseMongoConfig:
-		valid = mongoURI(cfg.URI)
-	case *manifest.PulseRabbitMQConfig:
-		u, err := url.Parse(cfg.URL)
-		valid = err == nil && (u.Scheme == "amqp" || u.Scheme == "amqps") && !strings.ContainsAny(cfg.URL, " \t\r\n\x00")
-		if valid && u.Port() != "" {
-			port, err := strconv.Atoi(u.Port())
-			valid = err == nil && port >= 1 && port <= 65535
-		}
-	case *manifest.PulseKafkaConfig:
-		// CPRa always calls SeedBrokers, so an empty list overrides the client's
-		// default and is rejected. A supplied seed may omit the port (9092).
-		valid = len(cfg.Brokers) != 0
-		for _, broker := range cfg.Brokers {
-			valid = valid && dnsAddress(broker)
-		}
-	case *manifest.PulseTLSConfig:
-		valid = hostPort(cfg.Host, cfg.Port) && (cfg.WarnDays == 0 || cfg.CriticalDays == 0 || cfg.WarnDays >= cfg.CriticalDays)
-	case *manifest.InterventionTargetDocker:
-		valid = namedTarget(cfg.Container)
-	case *manifest.InterventionTargetKubernetes:
-		valid = cfg.Kind == "deployment" && namedTarget(cfg.Name) && namedTarget(cfg.Namespace) &&
-			(cfg.Replicas == nil || (*cfg.Replicas >= 0 && *cfg.Replicas <= math.MaxInt32))
-	case *manifest.InterventionTargetWebhook:
-		valid = httpTarget(cfg.URL, cfg.Method, cfg.Headers)
-	case *manifest.InterventionTargetSystemd:
-		valid = namedTarget(cfg.Unit) && !strings.ContainsAny(cfg.Unit, "/\\") &&
-			(cfg.Mode == "" || slices.Contains([]string{"replace", "fail", "isolate", "flush", "ignore-dependencies", "ignore-requirements", "replace-irreversibly"}, cfg.Mode))
-	case *manifest.InterventionTargetAWS:
-		valid = cfg.Operation == "reboot-instance" && namedTarget(cfg.InstanceID)
-	case *manifest.CodeNotificationLog:
-		valid = namedTarget(cfg.File)
-	case *manifest.CodeNotificationEmail:
-		_, fromErr := mail.ParseAddress(cfg.From)
-		to, toErr := mail.ParseAddressList(cfg.To)
-		valid = fromErr == nil && toErr == nil && len(to) != 0 && numericAddress(cfg.Server) && !strings.ContainsAny(cfg.Subject, "\r\n")
-	case *manifest.CodeNotificationWebhook:
-		valid = httpTarget(cfg.URL, cfg.Method, cfg.Headers)
-	case *manifest.CodeNotificationSlack:
-		valid = httpTarget(cfg.WebHook, "", nil)
-	case *manifest.CodeNotificationPagerDuty:
-		valid = cfg.RoutingKey != "" && optionalHTTP(cfg.URL)
-	case *manifest.CodeNotificationTelegram:
-		valid = cfg.BotToken != "" && cfg.ChatID != "" && optionalHTTP(cfg.URL) && !(cfg.TestMode && cfg.URL != "")
-	case *manifest.CodeNotificationDiscord:
-		valid = httpTarget(cfg.WebhookURL, "", nil)
-	case *manifest.CodeNotificationOpsgenie:
-		valid = cfg.APIKey != "" && optionalHTTP(cfg.URL)
-	case *manifest.CodeNotificationTeams:
-		valid = httpTarget(cfg.WebhookURL, "", nil)
-	case *manifest.CodeNotificationMattermost:
-		valid = httpTarget(cfg.WebhookURL, "", nil)
-	case *manifest.CodeNotificationPushover:
-		valid = cfg.AppToken != "" && cfg.UserKey != "" && optionalHTTP(cfg.URL) && cfg.Priority >= -2 && cfg.Priority <= 2 && cfg.Retry >= 0 && cfg.Expire >= 0
-		if cfg.Priority == 2 {
-			valid = valid && (cfg.Retry == 0 || cfg.Retry >= 30) && (cfg.Expire == 0 || cfg.Expire <= 10800)
-		}
-	case *manifest.CodeNotificationTwilio:
-		valid = cfg.AccountSID != "" && cfg.AuthToken != "" && cfg.From != "" && cfg.To != "" && optionalHTTP(cfg.URL)
-	case *manifest.CodeNotificationDatadog:
-		valid = cfg.APIKey != "" && optionalHTTP(cfg.URL) && (cfg.Site == "" || networkHost(cfg.Site))
-	case *manifest.CodeNotificationVictorOps:
-		valid = optionalHTTP(cfg.URL) && (cfg.URL != "" || (cfg.RestEndpointKey != "" && cfg.RoutingKey != "")) &&
-			(cfg.MessageType == "" || slices.Contains([]string{"CRITICAL", "WARNING", "ACKNOWLEDGEMENT", "INFO", "RECOVERY"}, cfg.MessageType))
-	default:
-		return ErrUnavailable
-	}
-	if !valid {
-		return runtimeInvalid("driver target, required field, or range is invalid")
+	// Platform capabilities belong to the executing server, not the SDK caller.
+	if cfg, ok := config.(*manifest.PulseICMPConfig); ok && cfg.Privilege && runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return fmt.Errorf("%w: %w", ErrValidation, api.InvalidField("config.ignorePrivilege", "unsupportedDriver"))
 	}
 	return nil
-}
-
-func namedTarget(text string) bool { return text != "" && !strings.ContainsAny(text, "\x00\r\n") }
-func networkHost(host string) bool {
-	return namedTarget(host) && !strings.ContainsAny(host, " /\\\t?#@")
-}
-func hostPort(host string, port int) bool { return networkHost(host) && port >= 1 && port <= 65535 }
-func numericAddress(address string) bool {
-	host, port, err := net.SplitHostPort(address)
-	n, e := strconv.Atoi(port)
-	return err == nil && e == nil && hostPort(host, n)
-}
-func dnsAddress(address string) bool {
-	if _, err := netip.ParseAddr(address); err == nil {
-		return true
-	}
-	if strings.HasPrefix(address, "[") && strings.HasSuffix(address, "]") {
-		ip, err := netip.ParseAddr(address[1 : len(address)-1])
-		return err == nil && ip.Is6()
-	}
-	return numericAddress(address) || (networkHost(address) && !strings.ContainsAny(address, ":[]"))
-}
-func connectionURL(target string, schemes ...string) bool {
-	u, err := url.Parse(target)
-	if err != nil || !slices.Contains(schemes, u.Scheme) || u.Hostname() == "" || u.Fragment != "" {
-		return false
-	}
-	return true
-}
-
-// Mongo's authority permits multiple seed hosts, unlike net/url's host:port
-// grammar. Check each seed without SRV lookup or importing Mongo execution code.
-func mongoURI(target string) bool {
-	rest, ok := strings.CutPrefix(target, "mongodb://")
-	if !ok || strings.ContainsAny(rest, "\x00\r\n#") {
-		return false
-	}
-	authority, _, _ := strings.Cut(rest, "/")
-	if i := strings.LastIndex(authority, "@"); i >= 0 {
-		authority = authority[i+1:]
-	}
-	if authority == "" {
-		return false
-	}
-	for _, host := range strings.Split(authority, ",") {
-		if !dnsAddress(host) {
-			return false
-		}
-	}
-	return true
-}
-func optionalHTTP(target string) bool { return target == "" || httpTarget(target, "", nil) }
-func httpTarget(target, method string, headers map[string]string) bool {
-	if !connectionURL(target, "http", "https") {
-		return false
-	}
-	u, _ := url.Parse(target)
-	if u.Port() != "" {
-		n, err := strconv.Atoi(u.Port())
-		if err != nil || n < 1 || n > 65535 {
-			return false
-		}
-	}
-	if _, err := http.NewRequest(method, target, nil); err != nil {
-		return false
-	}
-	for key, value := range headers {
-		if !httpToken(key) {
-			return false
-		}
-		for i := range len(value) {
-			if (value[i] < 32 && value[i] != '\t') || value[i] == 127 {
-				return false
-			}
-		}
-	}
-	return true
-}
-func httpToken(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, char := range value {
-		if char <= 32 || char >= 127 || strings.ContainsRune("()<>@,;:\\\"/[]?={}", char) {
-			return false
-		}
-	}
-	return true
 }
 
 // ValidateMonitorSettings checks runtime control values independently of driver
 // secrets. Schema validation of the resource envelope remains the caller's job.
 func ValidateMonitorSettings(spec api.MonitorSpec) error {
-	for _, text := range []string{spec.Check.Interval, spec.Check.Timeout} {
-		duration, err := time.ParseDuration(text)
-		if err != nil || duration <= 0 {
-			return runtimeInvalid("check interval and timeout must be positive")
-		}
-	}
-	for _, value := range []*int64{spec.Check.Retries, spec.Check.MaxFailures, spec.Check.UnhealthyThreshold, spec.Check.HealthyThreshold} {
-		if value != nil && (*value < 0 || *value > math.MaxInt32) {
-			return runtimeInvalid("check counters are out of range")
-		}
-	}
-	if spec.Recovery != nil {
-		for _, value := range []*int64{spec.Recovery.Retries, spec.Recovery.MaxFailures, spec.Recovery.MaxAttempts} {
-			if value != nil && (*value < 0 || *value > math.MaxInt32) {
-				return runtimeInvalid("recovery counters are out of range")
-			}
-		}
-		if spec.Recovery.Cooldown != nil {
-			d, err := time.ParseDuration(*spec.Recovery.Cooldown)
-			if err != nil || d < 0 {
-				return runtimeInvalid("recovery cooldown is invalid")
-			}
-		}
-	}
-	if spec.Notifications != nil {
-		for color := range *spec.Notifications {
-			if !slices.Contains([]string{"red", "yellow", "green", "cyan", "gray"}, color) {
-				return runtimeInvalid("unsupported notification Code color")
-			}
-		}
+	if err := api.ValidateMonitorSettings(spec); err != nil {
+		return fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 	_, _, err := runtimeMaintenance(spec.Maintenance)
 	return err
@@ -511,6 +284,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 	if err := ValidateMonitorSettings(spec); err != nil {
 		return out, err
 	}
+	out.CheckTargetSummary = api.CheckTargetSummary(spec.Check.Driver)
 	out.PreparationBytes = bytes
 	type runtimeSlot struct {
 		source persistence.CatalogKey
@@ -541,6 +315,9 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		if err := resolveDriver(&driver, category, resources); err != nil {
 			return nil, err
 		}
+		if err := c.options.validateNotificationLog(category, driver); err != nil {
+			return nil, err
+		}
 		if err := ValidateResolvedDriver(category, driver); err != nil {
 			return nil, err
 		}
@@ -551,6 +328,10 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		return out, err
 	}
 	monitor := manifest.Monitor{ID: monitorID, Name: monitorID, Enabled: true}
+	if spec.AutoIgnore != nil {
+		v := *spec.AutoIgnore
+		monitor.AutoIgnore = &v
+	}
 	if resource.Metadata.Name != nil && *resource.Metadata.Name != "" {
 		monitor.Name = *resource.Metadata.Name
 	}
@@ -599,6 +380,10 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 			return out, err
 		}
 		monitor.Intervention = manifest.Intervention{Action: spec.Recovery.Driver.Type, Target: target.(manifest.InterventionTarget)}
+		out.RecoveryTimeout, err = c.interventionBudget(ctx, monitor.Intervention.Target)
+		if err != nil {
+			return out, err
+		}
 		assign(&monitor.Intervention.Retries, spec.Recovery.Retries)
 		assign(&monitor.Intervention.MaxFailures, spec.Recovery.MaxFailures)
 		if spec.Recovery.Cooldown != nil {

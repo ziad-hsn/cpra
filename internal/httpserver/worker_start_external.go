@@ -106,7 +106,7 @@ func (h *workerSessionHTTP) start(w http.ResponseWriter, r *http.Request) {
 	var response persistence.WorkerStartResponse
 	err = admit(ctx, func() error {
 		var err error
-		response, err = h.store.CommitWorkerStart(ctx, authority, command)
+		response, err = h.store.CommitWorkerStart(ctx, authority, command, h.maintenanceEvaluator())
 		return err
 	})
 	if err != nil {

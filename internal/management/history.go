@@ -8,8 +8,8 @@ import (
 )
 
 type HistoryView struct {
-	view    persistence.HistoryView
-	catalog *Catalog
+	view  persistence.HistoryView
+	ready func(context.Context) error
 }
 
 func (c *Catalog) HistorySnapshot() (HistoryView, error) {
@@ -21,16 +21,16 @@ func (c *Catalog) HistorySnapshotContext(ctx context.Context) (HistoryView, erro
 		return HistoryView{}, err
 	}
 	view, err := c.store.History().SnapshotContext(ctx)
-	return HistoryView{view: view, catalog: c}, err
+	return HistoryView{view: view, ready: c.readyContext}, err
 }
 
 // Page projects only public audit fields. Operation internals, provider outcome
 // payloads and configuration records are not serialized into the v2 timeline.
 func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Event, string, error) {
-	if v.catalog == nil {
+	if v.ready == nil {
 		return nil, "", ErrUnavailable
 	}
-	if err := v.catalog.readyContext(ctx); err != nil {
+	if err := v.ready(ctx); err != nil {
 		return nil, "", err
 	}
 	if !validID(monitorID) {

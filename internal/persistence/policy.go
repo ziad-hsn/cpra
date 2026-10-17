@@ -18,6 +18,10 @@ type MaintenanceWindow struct {
 }
 
 func (p Policy) Clone() Policy {
+	if p.AutoIgnore != nil {
+		v := *p.AutoIgnore
+		p.AutoIgnore = &v
+	}
 	p.policyExtensions = clonePolicyExtensions(p)
 	p.Endpoints = maps.Clone(p.Endpoints)
 	p.NotificationEndpointIDs = maps.Clone(p.NotificationEndpointIDs)
@@ -32,6 +36,9 @@ func (p Policy) Clone() Policy {
 // Validate accepts absent optional fields in older records. Zero recovery
 // attempts means the existing single-attempt behavior, not unlimited attempts.
 func (p Policy) Validate() error {
+	if err := p.AutoIgnore.validate(); err != nil {
+		return err
+	}
 	if err := validateRecoveryNotificationPolicy(p); err != nil {
 		return err
 	}
@@ -39,7 +46,7 @@ func (p Policy) Validate() error {
 		return err
 	}
 	if p.Interval <= 0 || p.Unhealthy < 0 || p.Healthy < 0 || p.Cooldown < 0 || p.RecoveryCooldown < 0 ||
-		p.RecoveryMaxAttempts < 0 || p.RecoveryMaxAttempts > math.MaxInt32 {
+		p.RecoveryMaxAttempts < 0 || p.RecoveryMaxAttempts > math.MaxInt32 || p.RecoveryTimeout < 0 || p.RecoveryTimeout > 24*time.Hour {
 		return errors.New("invalid durable monitor policy")
 	}
 	for _, count := range p.Endpoints {
@@ -88,7 +95,7 @@ func (m Monitor) recoveryAttempts() int {
 func (m Monitor) lastRecoveryFailure() time.Time {
 	last := m.LastInterventionFailure
 	for _, action := range m.Actions {
-		if action.CatalogUID == m.CatalogUID && action.Kind == "intervention" && action.State == Failed && action.FinishedAt.After(last) {
+		if m.OwnsAction(action) && action.Kind == "intervention" && action.State == Failed && action.FinishedAt.After(last) {
 			last = action.FinishedAt
 		}
 	}
@@ -96,7 +103,7 @@ func (m Monitor) lastRecoveryFailure() time.Time {
 }
 
 func (m Monitor) mayRetryRecovery() bool {
-	if !m.Policy.Intervention || m.recoveryAttempts() >= m.Policy.recoveryLimit() || m.pendingIntervention() || m.VerifyRemaining > 0 {
+	if m.Ignored || !m.Policy.Intervention || m.recoveryAttempts() >= m.Policy.recoveryLimit() || m.pendingIntervention() || m.VerifyRemaining > 0 {
 		return false
 	}
 	if m.recoveryAttempts() == 0 {

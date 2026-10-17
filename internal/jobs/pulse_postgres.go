@@ -4,6 +4,7 @@ package jobs
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ type PulsePostgresJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func postgresConnString(cfg *manifest.PulsePostgresConfig) string {
@@ -50,7 +52,12 @@ func postgresConnString(cfg *manifest.PulsePostgresConfig) string {
 }
 
 func newPulsePostgresJob(cfg *manifest.PulsePostgresConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("postgres", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
 	return &PulsePostgresJob{
+		tls:        transport,
 		ID:         uuid.New(),
 		Entity:     entity,
 		ConnString: postgresConnString(cfg),
@@ -66,9 +73,48 @@ func (p *PulsePostgresJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	config, err := pgx.ParseConfig(p.ConnString)
+	connection := p.ConnString
+	if p.tls.configured {
+		// Parse host/authentication without ambient or DSN TLS fallbacks. The
+		// validated explicit policy is installed for every host below.
+		if strings.HasPrefix(connection, "postgres://") || strings.HasPrefix(connection, "postgresql://") {
+			u, err := url.Parse(connection)
+			if err != nil {
+				return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("invalid PostgreSQL connection settings"), Payload: payload}
+			}
+			query := u.Query()
+			query.Set("sslmode", "disable")
+			u.RawQuery = query.Encode()
+			connection = u.String()
+		} else {
+			connection += " sslmode=disable"
+		}
+	}
+	config, err := pgx.ParseConfig(connection)
 	if err != nil {
 		return Result{ID: p.ID, Ent: p.Entity, Err: safeError{err, "invalid postgres connection configuration"}, Payload: payload}
+	}
+	if p.tls.configured {
+		if p.tls.enabled && strings.HasPrefix(config.Host, "/") {
+			return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("PostgreSQL TLS requires TCP hosts"), Payload: payload}
+		}
+		config.TLSConfig, err = p.tls.configuration(config.Host)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
+		for _, fallback := range config.Fallbacks {
+			if p.tls.enabled && strings.HasPrefix(fallback.Host, "/") {
+				return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("PostgreSQL TLS requires TCP hosts"), Payload: payload}
+			}
+			if config.TLSConfig == nil {
+				fallback.TLSConfig = nil
+				continue
+			}
+			fallback.TLSConfig = config.TLSConfig.Clone()
+			if p.tls.serverName == "" {
+				fallback.TLSConfig.ServerName = fallback.Host
+			}
+		}
 	}
 	attempts := newPulseAttempts(ctx, p.Retries)
 	defer attempts.complete(&result)

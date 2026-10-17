@@ -52,27 +52,31 @@ type ResultRouter struct {
 
 // WorkerPoolStats exposes runtime metrics for the dynamic worker pool.
 type WorkerPoolStats struct {
-	Attempts        int64         `json:"attempts"`
-	AttemptTimeouts int64         `json:"attempt_timeouts"`
-	AttemptDuration time.Duration `json:"attempt_duration"`
-	RetryDelay      time.Duration `json:"retry_delay"`
-	SLOCondition    string        `json:"slo_condition"`
-	ServiceTime     time.Duration `json:"service_time"`
-	ServiceCV       float64       `json:"service_cv"`
-	ServiceSamples  int           `json:"service_samples"`
-	ArrivalRate     float64       `json:"arrival_rate"`
-	SizingModel     string        `json:"sizing_model"`
-	LastScaleTime   time.Time     `json:"last_scale_time"`
-	MinWorkers      int           `json:"min_workers"`
-	MaxWorkers      int           `json:"max_workers"`
-	CurrentCapacity int           `json:"current_capacity"`
-	RunningWorkers  int           `json:"running_workers"`
-	WaitingTasks    int           `json:"waiting_tasks"`
-	TargetWorkers   int           `json:"target_workers"`
-	TasksSubmitted  int64         `json:"tasks_submitted"`
-	TasksCompleted  int64         `json:"tasks_completed"`
-	ScalingEvents   int64         `json:"scaling_events"`
-	PendingResults  int           `json:"pending_results"`
+	ActiveExecutions    int           `json:"active_executions"`
+	OldestExecutionAge  time.Duration `json:"oldest_execution_age"`
+	PendingSubmissions  int           `json:"pending_submissions"`
+	OldestSubmissionAge time.Duration `json:"oldest_submission_age"`
+	Attempts            int64         `json:"attempts"`
+	AttemptTimeouts     int64         `json:"attempt_timeouts"`
+	AttemptDuration     time.Duration `json:"attempt_duration"`
+	RetryDelay          time.Duration `json:"retry_delay"`
+	SLOCondition        string        `json:"slo_condition"`
+	ServiceTime         time.Duration `json:"service_time"`
+	ServiceCV           float64       `json:"service_cv"`
+	ServiceSamples      int           `json:"service_samples"`
+	ArrivalRate         float64       `json:"arrival_rate"`
+	SizingModel         string        `json:"sizing_model"`
+	LastScaleTime       time.Time     `json:"last_scale_time"`
+	MinWorkers          int           `json:"min_workers"`
+	MaxWorkers          int           `json:"max_workers"`
+	CurrentCapacity     int           `json:"current_capacity"`
+	RunningWorkers      int           `json:"running_workers"`
+	WaitingTasks        int           `json:"waiting_tasks"`
+	TargetWorkers       int           `json:"target_workers"`
+	TasksSubmitted      int64         `json:"tasks_submitted"`
+	TasksCompleted      int64         `json:"tasks_completed"`
+	ScalingEvents       int64         `json:"scaling_events"`
+	PendingResults      int           `json:"pending_results"`
 }
 
 // NewResultRouter creates a new result router with buffered channels.
@@ -179,36 +183,38 @@ func (r *ResultRouter) Close() {
 // DynamicWorkerPool manages a pool of workers that execute jobs from a queue.
 // It can dynamically adjust the number of workers based on load.
 type DynamicWorkerPool struct {
-	feedback        *feedback
-	serviceMetrics  durationMetrics
-	sizingPolicy    atomic.Pointer[sizingPolicy]
-	sizingModel     atomic.Uint32
-	queueMu         sync.RWMutex
-	queue           Queue
-	ctx             context.Context
-	cancel          context.CancelFunc
-	antsPool        *ants.PoolWithFunc
-	logger          Logger
-	resultQueues    []*xsync.MPMCQueue[jobs.Result]
-	notifyChans     []chan struct{}
-	numShards       int
-	pendingResults  atomic.Int64
-	router          *ResultRouter
-	config          WorkerPoolConfig
-	wg              sync.WaitGroup
-	workerWG        sync.WaitGroup
-	dispatcherDone  chan struct{}
-	stopped         chan struct{}
-	workCtx         context.Context
-	workCancel      context.CancelFunc
-	tasksSubmitted  atomic.Int64
-	tasksCompleted  atomic.Int64
-	scalingEvents   atomic.Int64
-	lastTarget      atomic.Int64
-	lastScaleTime   atomic.Int64
-	stopping        atomic.Int32
-	started         atomic.Bool
-	resultBatchPool sync.Pool
+	activeExecutions   pendingAges
+	pendingSubmissions pendingAges
+	feedback           *feedback
+	serviceMetrics     durationMetrics
+	sizingPolicy       atomic.Pointer[sizingPolicy]
+	sizingModel        atomic.Uint32
+	queueMu            sync.RWMutex
+	queue              Queue
+	ctx                context.Context
+	cancel             context.CancelFunc
+	antsPool           *ants.PoolWithFunc
+	logger             Logger
+	resultQueues       []*xsync.MPMCQueue[jobs.Result]
+	notifyChans        []chan struct{}
+	numShards          int
+	pendingResults     atomic.Int64
+	router             *ResultRouter
+	config             WorkerPoolConfig
+	wg                 sync.WaitGroup
+	workerWG           sync.WaitGroup
+	dispatcherDone     chan struct{}
+	stopped            chan struct{}
+	workCtx            context.Context
+	workCancel         context.CancelFunc
+	tasksSubmitted     atomic.Int64
+	tasksCompleted     atomic.Int64
+	scalingEvents      atomic.Int64
+	lastTarget         atomic.Int64
+	lastScaleTime      atomic.Int64
+	stopping           atomic.Int32
+	started            atomic.Bool
+	resultBatchPool    sync.Pool
 
 	// arrivalRate is the externally-provided job arrival rate (lambda), stored
 	// as float64 bits. When set (>0), the autoscaler sizes the pool from it
@@ -223,11 +229,14 @@ type DynamicWorkerPool struct {
 
 	// serviceTime is the externally-provided per-job service time (tau, seconds),
 	// stored as float64 bits. Used until completed jobs provide observations.
-	serviceTime atomic.Uint64
+	serviceTime   atomic.Uint64
+	coldOccupancy atomic.Uint64
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
 type WorkerPoolConfig struct {
+	// FairDispatch reserves driver/flow concurrency before removing pulse work.
+	FairDispatch       bool
 	MinWorkers         int
 	MaxWorkers         int
 	AdjustmentInterval time.Duration
@@ -343,6 +352,9 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*Dyn
 
 	workerFunc := func(job interface{}) {
 		defer pool.workerWG.Done()
+		if task, ok := job.(*poolTask); ok {
+			job = pool.pendingSubmissions.take(task.pending)
+		}
 		j, ok := job.(jobs.Job)
 		if !ok {
 			if pool.logger != nil {
@@ -354,7 +366,20 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*Dyn
 			cj.SetContext(pool.workCtx)
 		}
 		started := time.Now()
-		result := j.Execute()
+		entry := pool.activeExecutions.begin(j)
+		pool.activeExecutions.finish(entry, true)
+		defer func() {
+			if entry != nil {
+				pool.activeExecutions.take(entry)
+			}
+		}()
+		var result jobs.Result
+		if lease, ok := j.(*fairLease); ok {
+			defer func() { lease.complete(result) }()
+		}
+		result = j.Execute()
+		pool.activeExecutions.take(entry)
+		entry = nil
 		pool.serviceMetrics.observe(time.Since(started))
 		pool.attempts.Add(int64(result.Attempts))
 		pool.attemptTimeouts.Add(int64(result.AttemptTimeouts))
@@ -412,8 +437,9 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*Dyn
 		return nil, err
 	}
 	pool.antsPool = antsPool
-	pool.antsPool.Tune(config.MinWorkers)
-	pool.lastTarget.Store(int64(config.MinWorkers))
+	initial := pool.minimumCapacity()
+	pool.antsPool.Tune(initial)
+	pool.lastTarget.Store(int64(initial))
 	pool.lastScaleTime.Store(time.Now().UnixNano())
 
 	return pool, nil
@@ -492,6 +518,10 @@ func (p *DynamicWorkerPool) Queue() Queue {
 func (p *DynamicWorkerPool) dispatcher() {
 	defer close(p.dispatcherDone)
 	defer p.wg.Done()
+	if p.config.FairDispatch {
+		p.dispatchFair()
+		return
+	}
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -531,8 +561,14 @@ func (p *DynamicWorkerPool) dispatcher() {
 			}
 
 			p.tasksSubmitted.Add(int64(len(batch)))
-
+			tasks := make([]*poolTask, 0, len(batch))
 			for _, job := range batch {
+				entry := p.pendingSubmissions.begin(job)
+				p.pendingSubmissions.finish(entry, true)
+				tasks = append(tasks, &poolTask{pending: entry})
+			}
+
+			for _, job := range tasks {
 				p.workerWG.Add(1)
 				for {
 					if err := p.antsPool.Invoke(job); err == nil {
@@ -671,9 +707,11 @@ func (p *DynamicWorkerPool) autoScale() {
 			desired := p.desiredCapacity(stats)
 			current := p.antsPool.Cap()
 			if p.feedback != nil {
-				adjusted := p.feedback.adjust(current, desired, p.config.MaxWorkers, stats.QueueDepth, time.Now())
+				pending, _, _ := p.pendingSubmissions.summary()
+				queued := stats.QueueDepth + pending
+				adjusted := p.feedback.adjust(current, desired, p.config.MaxWorkers, queued, time.Now())
 				// Historical SLO breaches cannot require capacity for an empty workload.
-				if !p.arrivalRateSet.Load() || p.getArrivalRate() != 0 || stats.QueueDepth != 0 {
+				if !p.arrivalRateSet.Load() || p.getArrivalRate() != 0 || queued != 0 {
 					desired = adjusted
 				}
 			}
@@ -725,12 +763,27 @@ func (p *DynamicWorkerPool) GetVariabilityCoefficients() (ca, cs float64) {
 
 func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 	current := p.antsPool.Cap()
-	minimum, maximum := p.config.MinWorkers, p.config.MaxWorkers
+	minimum, maximum := p.minimumCapacity(), p.config.MaxWorkers
 	if current < minimum {
 		current = minimum
 	}
 	lambda := p.getArrivalRate()
-	if p.arrivalRateSet.Load() && lambda == 0 && stats.QueueDepth == 0 {
+	active, _, activeMean := p.activeExecutions.summary()
+	pending, oldest, _ := p.pendingSubmissions.summary()
+	stats.QueueDepth += pending
+	stats.OldestPendingAge = max(stats.OldestPendingAge, oldest)
+	relief := func(model float64) int {
+		headroom := 0.15
+		if policy := p.sizingPolicy.Load(); policy != nil {
+			headroom = policy.headroom
+		}
+		model = max(model, math.Float64frombits(p.coldOccupancy.Load())*(1+headroom)*float64(p.driverPartitions()))
+		if stats.QueueDepth > 0 && stats.OldestPendingAge > p.config.TargetQueueLatency {
+			model = max(model, float64(current)*1.25)
+		}
+		return int(math.Ceil(min(float64(maximum), min(float64(current)*2, max(float64(minimum), model)))))
+	}
+	if p.arrivalRateSet.Load() && lambda == 0 && stats.QueueDepth == 0 && active == 0 {
 		p.sizingModel.Store(sizingWaiting)
 		return minimum
 	}
@@ -742,18 +795,23 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 	}
 	if !finitePositive(lambda) {
 		p.sizingModel.Store(sizingWaiting)
-		return current
+		return relief(float64(current))
 	}
 	tau, _, samples := p.serviceMetrics.snapshot()
 	if samples == 0 {
 		tau = p.getServiceTime()
+	}
+	// Running checks are censored observations: their elapsed age is a lower
+	// bound on occupancy. Do not wait for a hanging batch to finish to scale.
+	if active > 0 {
+		tau = max(tau, activeMean.Seconds())
 	}
 	if !finitePositive(tau) && finitePositive(stats.DequeueRate) {
 		tau = float64(current) / stats.DequeueRate
 	}
 	if !finitePositive(tau) {
 		p.sizingModel.Store(sizingWaiting)
-		return current
+		return relief(float64(current))
 	}
 	target := tau + p.config.TargetQueueLatency.Seconds()
 	headroom := 0.15
@@ -782,21 +840,26 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 		desired = lambda * tau * (1 + headroom)
 		p.sizingModel.Store(sizingFallback)
 	}
-	// Preserve backlog relief for pools without an external demand estimate.
-	// A lifetime average arrival rate can hide a burst after a quiet period.
+	// Configured demand does not erase accumulated backlog after an outage.
 	// This can raise the model's target; it never removes its headroom.
-	if !finitePositive(p.getArrivalRate()) {
+	{
 		budget := p.config.TargetQueueLatency.Seconds()
 		targetDepth := math.Max(float64(minimum), lambda*budget)
 		if depth := float64(stats.QueueDepth); depth > targetDepth && targetDepth > 0 {
 			desired *= depth / targetDepth
 		}
 	}
+	// Fixed driver reservations need a global budget large enough to supply
+	// the model recommendation to the busiest driver. Unused seats do not
+	// allocate worker goroutines; the configured global maximum still applies.
+	if p.config.FairDispatch {
+		if q, ok := p.Queue().(interface{ partitions() int }); ok {
+			desired *= float64(q.partitions())
+		}
+	}
 	// Apply bounds before conversion, then limit growth to 2x per adjustment.
 	// These constrain actuation; they do not replace the queueing model.
-	desired = math.Max(float64(minimum), math.Min(float64(maximum), desired))
-	desired = math.Min(desired, float64(current)*2)
-	return int(math.Ceil(desired))
+	return relief(desired)
 }
 
 // Stats returns runtime statistics for the worker pool.
@@ -804,7 +867,10 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 	mean, cv, samples := p.serviceMetrics.snapshot()
 	models := [...]string{"awaiting_observations", "erlang_c_allen_cunneen", "little_law_fallback", "slo_unattainable"}
 	pending := int(p.pendingResults.Load())
+	active, activeAge, _ := p.activeExecutions.summary()
+	submissions, submissionAge, _ := p.pendingSubmissions.summary()
 	return WorkerPoolStats{
+		ActiveExecutions: active, OldestExecutionAge: activeAge, PendingSubmissions: submissions, OldestSubmissionAge: submissionAge,
 		Attempts: p.attempts.Load(), AttemptTimeouts: p.attemptTimeouts.Load(),
 		AttemptDuration: time.Duration(p.attemptDuration.Load()), RetryDelay: time.Duration(p.retryDelay.Load()),
 		SLOCondition: p.sloCondition(),
@@ -814,7 +880,7 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 		MaxWorkers:      p.config.MaxWorkers,
 		CurrentCapacity: p.antsPool.Cap(),
 		RunningWorkers:  p.antsPool.Running(),
-		WaitingTasks:    p.antsPool.Waiting(),
+		WaitingTasks:    submissions,
 		TargetWorkers:   int(p.lastTarget.Load()),
 		TasksSubmitted:  p.tasksSubmitted.Load(),
 		TasksCompleted:  p.tasksCompleted.Load(),
@@ -866,15 +932,49 @@ func (p *DynamicWorkerPool) SetServiceTime(tau float64) {
 	p.serviceTime.Store(math.Float64bits(tau))
 }
 
+// SetColdOccupancy supplies bounded, owner-computed demand from new or changed
+// checks. Old fast samples cannot erase this floor. The normal five-second
+// evaluation and twofold growth limit still govern capacity changes.
+func (p *DynamicWorkerPool) SetColdOccupancy(occupied float64) {
+	if occupied < 0 || math.IsNaN(occupied) || math.IsInf(occupied, 0) {
+		return
+	}
+	p.coldOccupancy.Store(math.Float64bits(occupied))
+}
+
 func (p *DynamicWorkerPool) getServiceTime() float64 {
 	return math.Float64frombits(p.serviceTime.Load())
+}
+
+func (p *DynamicWorkerPool) driverPartitions() int {
+	if p.config.FairDispatch {
+		if q, ok := p.Queue().(interface{ partitions() int }); ok {
+			return q.partitions()
+		}
+	}
+	return 1
+}
+func (p *DynamicWorkerPool) minimumCapacity() int {
+	return max(p.config.MinWorkers, min(p.config.MaxWorkers, p.driverPartitions()))
+}
+
+// SetModelWorkers expands a per-driver model recommendation into the global
+// reservation budget. Explicit SetTargetWorkers calls already use that budget.
+func (p *DynamicWorkerPool) SetModelWorkers(n int) {
+	partitions := p.driverPartitions()
+	if n > p.config.MaxWorkers/partitions {
+		n = p.config.MaxWorkers
+	} else {
+		n *= partitions
+	}
+	p.SetTargetWorkers(n)
 }
 
 // SetTargetWorkers explicitly sets the worker pool capacity to n (clamped to
 // the configured min/max) and records the target. It is used to apply the
 // M/M/c-derived initial sizing computed at startup.
 func (p *DynamicWorkerPool) SetTargetWorkers(n int) {
-	minW, maxW := p.config.MinWorkers, p.config.MaxWorkers
+	minW, maxW := p.minimumCapacity(), p.config.MaxWorkers
 	if maxW < minW {
 		maxW = minW
 	}

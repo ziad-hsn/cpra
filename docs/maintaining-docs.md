@@ -7,7 +7,7 @@ cpra_scope: docs
 # Maintain these docs
 
 Edit documentation in **`docs/` on `main`**. The `gh-pages` branch holds the exact
-copy in `_sources/docs/`, the MkDocs configuration and templates, and the generated
+public subset in `_sources/docs/`, the MkDocs configuration and templates, and the generated
 website. The application and documentation branches use separate Git worktrees.
 `scripts/docs/navigation.json` on main owns the page navigation; synchronization
 updates that section of the site configuration while preserving its other settings.
@@ -71,10 +71,12 @@ python _sources/verify_site.py .
 Add each user-facing Markdown page to `scripts/docs/navigation.json`. The source
 check requires every non-archived page exactly once, and rejects duplicates,
 missing pages and paths outside the docs. Dated `candidate/`, `implementation/`
-and `review/` pages remain built and linkable outside the main navigation.
-Synchronization supplies MkDocs' bounded
-[`not_in_nav` patterns](https://www.mkdocs.org/user-guide/configuration/#not_in_nav)
-for those three directories without lowering missing-link or anchor validation.
+and `review/` records remain in the repository but are not copied to the public
+site. Synchronization also supplies MkDocs'
+[`exclude_docs` patterns](https://www.mkdocs.org/user-guide/configuration/#exclude_docs)
+for all three directories. `not_in_nav` alone still renders and indexes pages,
+so it is insufficient. Public guides cannot link to those excluded records.
+Missing-link and anchor validation remain enabled.
 Redirects, theme configuration and build validation live
 under `_sources/` on gh-pages. The strict build checks links and anchors, titles,
 descriptions, one primary heading per page, project-prefixed URLs and search.
@@ -90,13 +92,16 @@ artifact without replacing the tracked site; the output path must be absent.
 
 Run `scripts/docs/references.py` after editing repository files referenced by
 implementation records. It copies selected UTF-8 source files byte for byte into
-`review/source/` with `.txt` suffixes, rewrites repository links to those downloads,
-and records their hashes in `review/reference-data.json`. The
-[source index](review/implementation-sources.md) explains their scope. These
-selected files are not a complete or reviewed source release.
+`review/source/` for internal records and `reference/source/` for explicitly
+linked public examples/API sources, with `.txt` suffixes. It rewrites repository
+links and records their hashes in the repository-only
+`review/reference-data.json`. Internal source copies and the index are excluded
+from the public site. These selected downloads are not a complete source release
+or verification evidence; public copies are included only when a public guide
+references them.
 
-Links to ignored `bin/verification/` artifacts lead to the
-[private-record index](review/local-evidence.md). That index records each path,
+Links from internal records to ignored `bin/verification/` artifacts lead to
+the repository-only `review/local-evidence.md` index. That index records each path,
 availability at preparation, and a file hash when available. It never copies the
 artifact contents and never verifies a result. Missing records remain explicit.
 `--check` verifies the prepared index without requiring private artifacts on CI;
@@ -141,7 +146,7 @@ Keep candidate sources, logs and rendered artifacts private while release gates
 are open. After the required private qualification and source review, follow the
 approved publication sequence for main and gh-pages. The Pages workflow rebuilds from
 locked dependencies and deploys the site. Check its exact commit, then inspect
-the published homepage, main quickstart, candidate guide, SDK reference and a
+the published homepage, main quickstart, SDK reference and a
 retained redirect. Exercise search, deep links, mobile layout, both themes,
 saved choices and System mode. Compare published `site-version.json` and selected
 assets with reviewed files. Documentation publication does not merge candidate

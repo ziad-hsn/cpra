@@ -1,9 +1,10 @@
+import { validationDiagnostic } from '../api/validation';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccess, useDashboardSession } from '../auth/SessionBoundary';
 import { collectionCall, collectionMutable, collectionPermissions, collectionValidationMessage, collectionValidationPendingDelay, readCollection, readCollectionValidation, type CollectionIdentity, type CollectionValidationPage } from '../api/collectionOperations';
 import { supportedCollectionIdentity, type OperationObservation } from '../api/operations';
-import { fileNormalizationProfile } from '../api/collectionInventory';
+import { supportedFileNormalizationProfile } from '../api/collectionInventory';
 import { ManagementError } from '../api/session';
 import type { Operation } from '../api/generated';
 import { formatNumber } from '../lib/format';
@@ -47,7 +48,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
   useEffect(() => { setObserved(operation); }, [operation]);
 
   const can = (action: string) => operator && supported && allowed.has('GetOperation') && allowed.has(action) &&
-    (!['ValidateOperation', 'ActivateOperation'].includes(action) || identity.normalizationProfile === fileNormalizationProfile);
+    (!['ValidateOperation', 'ActivateOperation'].includes(action) || supportedFileNormalizationProfile(identity.normalizationProfile));
   const fullUpload = (value: OperationObservation) => value.uploaded === identity.itemCount && !value.executionResult;
   const inactive = (value: OperationObservation) => !value.executionResult && collectionMutable(value as Operation);
   const validationReady = (value: OperationObservation) => value.state === 'uploading' && fullUpload(value);
@@ -143,7 +144,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
   return <section className="card" aria-label="Original collection controls">
     <h2>Original collection controls</h2>
     <p>Continue operation <span className="mono">{id}</span> with its {formatNumber(identity.itemCount)} original resources. These controls never create a replacement collection.</p>
-    {identity.normalizationProfile !== fileNormalizationProfile && <p>Unprofiled collections can be read or canceled while inactive. Use the compatible SDK or CLI to validate and activate them.</p>}
+    {!supportedFileNormalizationProfile(identity.normalizationProfile) && <p>Unprofiled collections can be read or canceled while inactive. Use the compatible SDK or CLI to validate and activate them.</p>}
     <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
       <button className="btn" disabled={busy || uncertain || !can('ValidateOperation') || owned.current.validationAttempted || !validationReady(observed)} onClick={() => void submit('ValidateOperation')}>Validate original collection</button>
       <button className="btn" disabled={busy || uncertain || !can('ActivateOperation') || !allowed.has('GetOperationValidation') || observed.state !== 'validated' || !fullUpload(observed)} onClick={() => void review()}>Review activation</button>
@@ -159,7 +160,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
       <p>Original verdict: {validation.summary.valid ? 'Passed' : 'Rejected'}. The sealed summary covers {formatNumber(validation.summary.count)} resources. Result: <span className="mono">{validation.summary.resultID}</span>.</p>
       {!validation.supported && <p role="status">This result contains unsupported vocabulary and cannot authorize activation.</p>}
       <div className="table-scroll" role="region" aria-label="Activation review resource results" tabIndex={0}><table className="data-table"><caption>Current validation review page</caption><thead><tr><th scope="col">Ordinal</th><th scope="col">Resource</th><th scope="col">Source / document / item</th><th scope="col">Change</th><th scope="col">Issue</th></tr></thead>
-        <tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{Number(item.source.slice(7))} / {item.sourceDocument} / {item.sourceItem}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}</td></tr>)}</tbody></table></div>
+        <tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{Number(item.source.slice(7))} / {item.sourceDocument} / {item.sourceItem}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}{item.reason && <div>{validationDiagnostic(item)}</div>}</td></tr>)}</tbody></table></div>
       {validation.nextCursor && <button className="btn" disabled={busy || uncertain} onClick={() => void review(validation.nextCursor)}>Next activation review page</button>}
     </section>}
     {confirm && <ConfirmDialog title={confirm === 'activate' ? 'Activate this original collection?' : 'Cancel this inactive operation?'} pending={busy}

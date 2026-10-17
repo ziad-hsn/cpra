@@ -62,6 +62,23 @@ export interface ReselectionRequestOptions {
   signal?: AbortSignal;
 }
 
+// Observation mode exposes only registered read operations, even if a malformed
+// server advertises an operator role or mutation permissions.
+const observationOperations = new Set(['GetAccess', 'GetCapabilities', 'GetVersion', 'ExplainResource',
+  'GetState', 'GetSLO', 'GetMetrics', 'GetConfig', 'GetReady', 'GetLive',
+  'GetQueues', 'GetPools', 'GetSystems', 'ListIncidents', 'GetIncident', 'ListActions', 'GetAction',
+  'GetHistory', 'ListMonitorObservations', 'GetMonitorObservation']);
+function observationAccess(value: unknown): AccessInfo {
+  const access = accessInfo(value);
+  return { ...access, role: 'reader', permissions: access.permissions.filter(operation => observationOperations.has(operation)) };
+}
+function operationMatches(operation: string, pathname: string): boolean {
+  const contract = (operationContracts as Record<string, { method: string; path: string }>)[operation];
+  if (!contract || contract.method !== 'GET') return false;
+  const actual = pathname.split('/'), expected = contract.path.split('/');
+  return actual.length === expected.length && expected.every((part, i) => part.startsWith('{') ? !!actual[i] : actual[i] === part);
+}
+
 const MAX_RESPONSE = 64 * 1024 * 1024;
 const MAX_ERROR = 64 * 1024;
 const REQUEST_TIMEOUT = 10_000;
@@ -193,7 +210,7 @@ export class DashboardSession {
   getSnapshot = (): SessionState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   onReset = (listener: () => void): (() => void) => { this.resets.add(listener); return () => this.resets.delete(listener); };
-  can = (operation: string): boolean => this.state.phase === 'authenticated' && this.state.access?.permissions.includes(operation) === true;
+  can = (operation: string): boolean => (this.state.phase === 'authenticated' || this.state.phase === 'observation' && observationOperations.has(operation)) && this.state.access?.permissions.includes(operation) === true;
 
   private publish(state: SessionState) {
     this.state = state;
@@ -229,12 +246,11 @@ export class DashboardSession {
       if (this.state.epoch !== epoch) return;
       this.mode = mode.mode;
       if (mode.mode === 'observation') {
-        // Preserve browser-provided Basic authentication on read-only servers.
-        // A 401 only requests sign-in; it never grants an observation downgrade.
-        if (mode.authenticationRequired) {
-          await this.request('/api/v1/healthz', { legacy: true, discovery: true, expireOn401: false });
-        }
-        if (this.state.epoch === epoch) this.publish({ phase: 'observation', epoch });
+        // Current authority is checked by /self for anonymous loopback, browser
+        // Basic, and named/shared tokens. Discovery never grants permissions.
+        const response = await this.request<unknown>('/api/v2/self', { discovery: true, expireOn401: false });
+        const access = observationAccess(response.data);
+        if (this.state.epoch === epoch) this.publish({ phase: 'observation', epoch, access });
       } else this.publish({ phase: 'signed-out', epoch });
     } catch (error) {
       if (this.state.epoch !== epoch) return;
@@ -256,10 +272,11 @@ export class DashboardSession {
       if (token.length < 32 || token.length > 8192 || /[^\x21-\x7e]/.test(token)) throw new ManagementError('invalid', 'Enter a bearer token with at least 32 printable characters and no whitespace.');
       if (new URL(this.origin).protocol !== 'https:') throw new ManagementError('invalid', 'Bearer sign-in requires HTTPS. Use the configured TLS endpoint.');
       if (this.mode === 'observation') {
-        await this.request('/api/v1/healthz', { token, legacy: true, expireOn401: false });
+        const response = await this.request<unknown>('/api/v2/self', { token, expireOn401: false });
+        const access = observationAccess(response.data);
         if (this.state.epoch !== epoch) return;
         this.#token = token;
-        this.publish({ phase: 'observation', epoch });
+        this.publish({ phase: 'observation', epoch, access });
         return;
       }
       const response = await this.request<unknown>('/api/v2/self', { token, expireOn401: false });
@@ -277,16 +294,22 @@ export class DashboardSession {
   }
 
   async get<T>(path: string, options: ReadOptions = {}): Promise<APIResponse<T>> {
-    if (!this.#token || this.state.phase !== 'authenticated') throw new ManagementError('forbidden', 'Sign in to access management data.');
-    return this.request<T>(path, { ...options, token: this.#token });
+    const observation = this.state.phase === 'observation';
+    if (observation) {
+      const url = new URL(path, this.origin);
+      if (url.origin !== this.origin || !this.state.access?.permissions.some(operation => this.can(operation) && operationMatches(operation, url.pathname))) {
+        throw new ManagementError('forbidden', 'This read is unavailable in observation mode.');
+      }
+    } else if (!this.#token || this.state.phase !== 'authenticated') throw new ManagementError('forbidden', 'Sign in to access management data.');
+    return this.request<T>(path, { ...options, token: this.#token, discovery: observation });
   }
 
   /** Fixed same-origin read; it cannot carry a caller-selected URL or bearer query. */
   async prometheus(options: ReadOptions = {}): Promise<string> {
-    const legacy = this.state.phase === 'observation';
+    const observation = this.state.phase === 'observation';
     // The server maps /metrics to GetMetrics in AuthorizeObservation.
-    if (!legacy && (!this.#token || !this.can('GetMetrics'))) throw new ManagementError('forbidden', 'Your identity cannot read metrics.');
-    return (await this.request<string>('/metrics', { ...options, metrics: true, legacy, token: this.#token })).data;
+    if (!this.can('GetMetrics') || !observation && !this.#token) throw new ManagementError('forbidden', 'Your identity cannot read metrics.');
+    return (await this.request<string>('/metrics', { ...options, metrics: true, legacy: observation, token: this.#token })).data;
   }
 
   async mutate<T>(path: string, options: MutationOptions): Promise<APIResponse<T>> {

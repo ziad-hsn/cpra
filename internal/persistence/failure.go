@@ -1,12 +1,22 @@
 package persistence
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+)
 
 // FailureDiagnostic contains only reviewed descriptions. Provider response
 // bodies, addresses, paths and error strings are never diagnostic inputs.
 type FailureDiagnostic struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code                     string    `json:"code"`
+	Message                  string    `json:"message"`
+	HTTPStatus               int       `json:"http_status,omitempty"`
+	GRPCStatus               string    `json:"grpc_status,omitempty"`
+	GRPCCode                 string    `json:"grpc_code,omitempty"`
+	CertificateNotAfter      time.Time `json:"certificate_not_after,omitzero"`
+	CertificateDaysRemaining int       `json:"certificate_days_remaining,omitempty"`
 }
 
 var ErrFailureDiagnostic = errors.New("invalid failure diagnostic")
@@ -28,6 +38,10 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 		message = "The connection could not be established or completed."
 	case "unexpected_http_status":
 		message = "The health endpoint returned an unexpected HTTP status."
+	case "grpc_health_failed":
+		message = "The gRPC health endpoint did not report SERVING."
+	case "certificate_expiring":
+		message = "The TLS certificate has reached its configured expiry threshold."
 	case "permission_denied":
 		message = "The operation was denied by local access permissions."
 	case "rejected":
@@ -42,12 +56,58 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 	return FailureDiagnostic{Code: code, Message: message}
 }
 
+// WithDetails renders protocol fields without accepting message text from a
+// caller. Persistent validation checks the fields and recomputes this message.
+func (d FailureDiagnostic) WithDetails() FailureDiagnostic {
+	d.Message = NewFailureDiagnostic(d.Code).Message
+	if d.HTTPStatus >= 100 && d.HTTPStatus <= 599 {
+		d.Message += fmt.Sprintf(" HTTP status: %d.", d.HTTPStatus)
+	}
+	if d.GRPCStatus != "" {
+		d.Message += " Health status: " + d.GRPCStatus + "."
+	}
+	if d.GRPCCode != "" {
+		d.Message += " RPC code: " + d.GRPCCode + "."
+	}
+	if !d.CertificateNotAfter.IsZero() {
+		d.Message += fmt.Sprintf(" Expires at %s (%d days remaining).", d.CertificateNotAfter.UTC().Format(time.RFC3339), d.CertificateDaysRemaining)
+	}
+	return d
+}
+
+func (d FailureDiagnostic) requiresLifecycleFormat() bool {
+	return d.HTTPStatus != 0 || d.GRPCStatus != "" || d.GRPCCode != "" || !d.CertificateNotAfter.IsZero() || d.CertificateDaysRemaining != 0 || d.Code == "grpc_health_failed" || d.Code == "certificate_expiring"
+}
+
 func (d FailureDiagnostic) validate(version int) error {
 	if d == (FailureDiagnostic{}) {
 		return nil
 	}
-	if !deliveryStorageFormat(version) || d != NewFailureDiagnostic(d.Code) || d.Code == "" {
+	if !deliveryStorageFormat(version) || d.Code == "" || NewFailureDiagnostic(d.Code).Code == "" {
 		return ErrFailureDiagnostic
+	}
+	if !d.requiresLifecycleFormat() {
+		if d != NewFailureDiagnostic(d.Code) {
+			return ErrFailureDiagnostic
+		}
+		return nil
+	}
+	if !lifecycleStorageFormat(version) || d != d.WithDetails() || len(d.Message) > 256 {
+		return ErrFailureDiagnostic
+	}
+	if d.HTTPStatus != 0 && (d.Code != "unexpected_http_status" || d.HTTPStatus < 100 || d.HTTPStatus > 599) {
+		return ErrFailureDiagnostic
+	}
+	if d.GRPCStatus != "" && (d.Code != "grpc_health_failed" || d.GRPCCode != "" || !slices.Contains([]string{"UNKNOWN", "NOT_SERVING", "SERVICE_UNKNOWN"}, d.GRPCStatus)) {
+		return ErrFailureDiagnostic
+	}
+	if d.GRPCCode != "" && (d.Code != "grpc_health_failed" || !slices.Contains([]string{"Canceled", "Unknown", "InvalidArgument", "DeadlineExceeded", "NotFound", "AlreadyExists", "PermissionDenied", "ResourceExhausted", "FailedPrecondition", "Aborted", "OutOfRange", "Unimplemented", "Internal", "Unavailable", "DataLoss", "Unauthenticated"}, d.GRPCCode)) {
+		return ErrFailureDiagnostic
+	}
+	if !d.CertificateNotAfter.IsZero() || d.CertificateDaysRemaining != 0 {
+		if d.Code != "certificate_expiring" || d.CertificateNotAfter.IsZero() || d.CertificateNotAfter.Year() < 1 || d.CertificateNotAfter.Year() > 9999 || d.CertificateDaysRemaining < -4000000 || d.CertificateDaysRemaining > 4000000 {
+			return ErrFailureDiagnostic
+		}
 	}
 	return nil
 }

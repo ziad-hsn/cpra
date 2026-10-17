@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/loader"
+	"github.com/ziad-hsn/cpra/internal/manifest"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"strings"
 )
 
-func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable bool) error {
+func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable, notificationLogEnabled bool) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	config := loader.ParseConfig{BatchSize: 1000, MaxMemory: 1 << 30}
@@ -38,35 +40,56 @@ func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable 
 		}
 	}()
 	ids := map[string]bool{}
+	checkLog := func(config manifest.CodeNotification) error {
+		if log, ok := config.(*manifest.CodeNotificationLog); ok && log.File != "" && !notificationLogEnabled {
+			return fmt.Errorf("file notifications require notifications.log_directory in the runtime configuration")
+		}
+		return nil
+	}
 	for batch := range batches {
 		for i := range batch.Monitors {
-			m := &batch.Monitors[i]
-			id, err := m.EffectiveID()
-			if err != nil {
-				return err
-			}
-			if ids[id] {
-				return fmt.Errorf("duplicate effective monitor id %q", id)
-			}
-			ids[id] = true
-			if err := jobs.ValidateCapabilities(m); err != nil {
-				return fmt.Errorf("monitor %q: %w", m.Name, err)
-			}
-			if m.Intervention.Action == "a2a" && !encryptionAvailable {
-				return fmt.Errorf("A2A file configuration requires storage.encryption")
-			}
-			for _, code := range m.Codes {
-				if code.Notify == "a2a" && !encryptionAvailable {
+			err := func() error {
+				m := &batch.Monitors[i]
+				id, err := m.EffectiveID()
+				if err != nil {
+					return err
+				}
+				if ids[id] {
+					return api.InvalidField("id", "duplicateIdentity")
+				}
+				ids[id] = true
+				if err := jobs.ValidateCapabilities(m); err != nil {
+					return err
+				}
+				if m.Intervention.Action == "a2a" && !encryptionAvailable {
 					return fmt.Errorf("A2A file configuration requires storage.encryption")
 				}
-				for _, name := range batch.NotificationGroups[code.NotifyGroup] {
-					if batch.Endpoints[name].Type == "a2a" && !encryptionAvailable {
+				for _, code := range m.Codes {
+					if err := checkLog(code.Config); err != nil {
+						return err
+					}
+					if code.Notify == "a2a" && !encryptionAvailable {
 						return fmt.Errorf("A2A file configuration requires storage.encryption")
 					}
-					if err := jobs.ValidateDriver("notification", batch.Endpoints[name].Type); err != nil {
-						return fmt.Errorf("monitor %q: %w", m.Name, err)
+					for _, name := range batch.NotificationGroups[code.NotifyGroup] {
+						if err := checkLog(batch.Endpoints[name].Config); err != nil {
+							return err
+						}
+						if batch.Endpoints[name].Type == "a2a" && !encryptionAvailable {
+							return fmt.Errorf("A2A file configuration requires storage.encryption")
+						}
+						if err := jobs.ValidateDriver("notification", batch.Endpoints[name].Type); err != nil {
+							return err
+						}
 					}
 				}
+				return nil
+			}()
+			if err != nil {
+				if i < len(batch.Sources) {
+					return batch.Sources[i].Error(ctx, path, err)
+				}
+				return err
 			}
 		}
 	}

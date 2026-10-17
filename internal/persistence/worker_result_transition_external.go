@@ -4,8 +4,13 @@ package persistence
 
 import "time"
 
-func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerResultInput, at time.Time, version int) (*Monitor, []Event, bool, bool, bool) {
+func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerResultInput, at time.Time, version int, decisions ...*WorkerMaintenanceDecision) (*Monitor, []Event, bool, bool, bool) {
 	in, l := r.Intent, r.Lifecycle
+	var decision *WorkerMaintenanceDecision
+	if len(decisions) > 0 {
+		decision = decisions[0]
+	}
+	maintenance := lifecycleStorageFormat(version) && (!decision.matches(in, at) || decision.Active || f.checkCatalogGuard(in.MonitorID, &in.Guard) != nil)
 	previous, exists := f.image.Monitors[in.MonitorID]
 	current := exists && !previous.Removed && previous.CatalogUID == in.MonitorUID && previous.Revision == in.MonitorRevision
 	inTime := l.OwnerEpoch == f.image.LocalExecutorSession && l.Phase == "started" && at.Before(in.Deadline)
@@ -25,7 +30,7 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 			return &m, nil, false, true, false
 		}
 		command := Command{Kind: "pulse", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
-			Generation: in.Generation, CheckControlRevision: in.ControlRevision, Outcome: input.Status, At: at}
+			Generation: in.Generation, CheckControlRevision: in.ControlRevision, Outcome: input.Status, At: at, Maintenance: maintenance}
 		if deliveryStorageFormat(version) && input.Status != "success" {
 			command.Failure = NewFailureDiagnostic("operation_failed")
 		}
@@ -62,7 +67,7 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		outcome = "failure"
 	}
 	command := Command{Kind: "result", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
-		ActionID: in.ActionID, At: at, Outcome: outcome, Retryable: input.Retryable, Ambiguous: input.Status == "unknown"}
+		ActionID: in.ActionID, At: at, Outcome: outcome, Retryable: input.Retryable, Ambiguous: input.Status == "unknown", Maintenance: maintenance}
 	if deliveryStorageFormat(version) && outcome != "success" {
 		code := "operation_failed"
 		if input.Status == "rejected" {

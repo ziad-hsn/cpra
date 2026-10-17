@@ -126,3 +126,27 @@ The receipt goes to stderr while JSON or YAML stdout remains a standalone API
 response. Read the operation to distinguish durable admission from controller
 application. Single explicit targets are supported; selectors, `--all` and
 multiple targets are rejected. No check-now operation is provided.
+
+
+## Review an action in file mode
+
+Stop CPRa and its service supervisor before opening the data directory. Local
+review acquires exclusive storage ownership; it fails while another owner holds
+the directory. It starts no controller, scheduler or provider client.
+
+```bash
+cpractl local actions --data-dir /var/lib/cpra --monitor-id service-api --limit 100
+cpractl local review action/ACTION_ID --data-dir /var/lib/cpra \
+  --revision OBSERVED_REVIEW_REVISION --actor administrator-name \
+  --resolution inconclusive --reason 'Provider outcome is still being investigated'
+```
+
+Use the exact local `revision` from the preceding action observation. The local
+actor is an administrator assertion recorded in history, not an API identity.
+`accepted`, `rejected` and `inconclusive` have the same meanings and evidence/fencing
+requirements as online review. Provider facts remain unchanged. Review does not
+replay an action, declare a service healthy or bypass conflicting evidence.
+
+For additional pages, repeat the original monitor filter and limit with
+`--cursor RETURNED_CURSOR`. Keep audit reasons and evidence references free of
+credentials. After review, restart the same store and inspect its retained state.

@@ -136,7 +136,7 @@ func safeUploadAttemptID(id string) bool { return len(id) == 36 && safeManagemen
 
 func safeUploadAttempt(id, requested string, value *api.CollectionReselectionAttempt) *api.CollectionReselectionAttempt {
 	if value == nil || value.OperationID != id || !safeUploadAttemptID(value.ID) || requested != "" && value.ID != requested ||
-		value.NormalizationProfile != collection.FileNormalizationProfile || !value.Phase.Valid() || value.ExpiresAt.IsZero() ||
+		value.NormalizationProfile != "" && !collection.SupportsFileNormalization(value.NormalizationProfile) || !value.Phase.Valid() || value.ExpiresAt.IsZero() ||
 		value.SourceCount < 1 || value.SourceCount > 1000 || value.SourcesCompleted < 0 || value.SourcesCompleted > value.SourceCount ||
 		value.RawBytes < 0 || value.RawBytes > 64<<20 || value.NextOffset < 0 || value.NextOffset > value.RawBytes ||
 		value.NextSource < 0 || value.NextSource > value.SourceCount || value.OperationUploaded < 0 || value.OperationUploaded > 10_000 ||

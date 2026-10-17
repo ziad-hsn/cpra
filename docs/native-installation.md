@@ -293,7 +293,7 @@ Windows. The unreleased macOS adapter retains the Unix owner/mode policy, permit
 deny-only ACLs, and rejects grants or unavailable extended-permission metadata.
 Its native compilation, permission, crash and backup/restore checks remain pending;
 macOS protected backup support is not yet qualified. See the
-[macOS implementation checkpoint](implementation/macos-protected-files.md).
+[platform qualification](versions.md).
 Other Unix platforms still reject protected key access.
 
 Restore requires that independently trusted key before reading or publishing state.

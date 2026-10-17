@@ -79,3 +79,13 @@ func TestAgentNotificationCarriesOnlySafeDiagnosticFields(t *testing.T) {
 		t.Fatal("agent notification lost safe diagnostic", err)
 	}
 }
+
+func TestFailureDetailsExcludeRemoteText(t *testing.T) {
+	err := fmt.Errorf("secret-provider-body: %w", &HTTPStatusError{Status: 502})
+	if detail := FailureDetails(SanitizeError(err)); detail.HTTPStatus != 502 || detail.GRPCCode != "" {
+		t.Fatal(detail)
+	}
+	if detail := FailureDetails(errors.New("HTTP 502 with credential-marker")); detail != (FailureDetail{}) {
+		t.Fatal("text parsed into trusted detail")
+	}
+}

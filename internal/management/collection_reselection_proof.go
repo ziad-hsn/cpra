@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -83,7 +82,7 @@ func proveCollectionReselection(ctx context.Context, catalog *Catalog, id, actor
 	if head.Actor != actor || head.Owner == nil || head.Owner.Actor != actor || head.Owner.Epoch != authority.Epoch {
 		return nil, persistence.ErrOperationNotFound
 	}
-	if head.NormalizationProfile != "" && head.NormalizationProfile != collection.FileNormalizationProfile {
+	if head.NormalizationProfile != "" && !collection.SupportsFileNormalization(head.NormalizationProfile) {
 		return nil, collection.ErrUnsupportedNormalization
 	}
 	if head.ItemCount > 10_000 {
@@ -299,21 +298,11 @@ func (p *collectionReselectionProof) verifyInventory(ctx context.Context, source
 	return nil
 }
 
-// Unprofiled sources use the ordinary SDK parser. They are never relabeled as
-// a versioned file profile: both raw-source and exact ordered-resource HMACs
-// must match the encrypted original identity before any continuation proceeds.
+// Reproduce the original profile, including prior accepted unprofiled inputs.
+// Both raw-source and ordered-resource commitments must match before transfer.
 func decodeReselectionSource(ctx context.Context, r io.Reader, profile, token string, visit func(collection.NormalizedItem) error) error {
 	options := collection.DecodeOptions{SourceName: token, MaxBytes: 64 << 20, MaxResources: 10_000, MaxResourceBytes: 1 << 20}
-	if profile != "" {
-		return collection.NormalizeFile(ctx, r, profile, options, visit)
-	}
-	return collection.Decode(ctx, r, options, func(item collection.Item) error {
-		raw, err := json.Marshal(item.Resource)
-		if err != nil {
-			return errReselectionInput
-		}
-		return visit(collection.NormalizedItem{ID: item.ID, Location: item.Location, JSON: raw})
-	})
+	return collection.DecodeOperationSource(ctx, r, profile, options, visit)
 }
 
 func (p *collectionReselectionProof) verifyPrefix(ctx context.Context, ref stagedItemRef, digest string, raw []byte) error {

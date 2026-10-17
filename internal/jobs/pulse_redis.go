@@ -3,7 +3,9 @@
 package jobs
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,10 +29,16 @@ type PulseRedisJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func newPulseRedisJob(cfg *manifest.PulseRedisConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("redis", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
 	return &PulseRedisJob{
+		tls:      transport,
 		ID:       uuid.New(),
 		Entity:   entity,
 		Addr:     cfg.Addr,
@@ -49,15 +57,11 @@ func (p *PulseRedisJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := p.payload
-	client := redis.NewClient(&redis.Options{
-		Dialer:     dialBounded,
-		Addr:       p.Addr,
-		MaxRetries: -1, ContextTimeoutEnabled: true,
-		DialTimeout: remaining(ctx), ReadTimeout: remaining(ctx), WriteTimeout: remaining(ctx),
-		Password: p.Password,
-		Username: p.Username,
-		DB:       p.DB,
-	})
+	options, err := p.clientOptions(ctx)
+	if err != nil {
+		return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+	}
+	client := redis.NewClient(options)
 	defer func() { _ = client.Close() }()
 
 	attempts := newPulseAttempts(ctx, p.Retries)
@@ -70,11 +74,41 @@ func (p *PulseRedisJob) Execute() (result Result) {
 		}
 		err := client.Ping(ctx).Err()
 		if err == nil {
-			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
+			return Result{ID: p.ID, Ent: p.Entity, Payload: payload}
 		}
 		lastErr = err
 	}
-	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("redis check failed for %s after %d attempt(s): %w", p.Addr, attempts.count, lastErr), Payload: payload}
+	return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("redis check failed after %d attempt(s): %w", attempts.count, lastErr), Payload: payload}
+}
+
+func (p *PulseRedisJob) clientOptions(ctx context.Context) (*redis.Options, error) {
+	host := ""
+	if p.tls.enabled {
+		address := p.Addr
+		if address == "" {
+			address = "localhost:6379"
+		}
+		var err error
+		host, _, err = net.SplitHostPort(address)
+		if err != nil {
+			return nil, fmt.Errorf("Redis TLS requires a TCP address")
+		}
+	}
+	tlsConfig, err := p.tls.configuration(host)
+	if err != nil {
+		return nil, err
+	}
+	return &redis.Options{
+		Dialer: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return dialCheckTLS(ctx, network, address, tlsConfig)
+		},
+		Addr:       p.Addr,
+		MaxRetries: -1, ContextTimeoutEnabled: true,
+		DialTimeout: remaining(ctx), ReadTimeout: remaining(ctx), WriteTimeout: remaining(ctx),
+		Password: p.Password,
+		Username: p.Username,
+		DB:       p.DB,
+	}, nil
 }
 
 func (p *PulseRedisJob) Copy() Job                  { job := *p; return &job }

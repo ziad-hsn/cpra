@@ -143,6 +143,39 @@ func TestManagementSnoozeVersionAndOperationContract(t *testing.T) {
 	}
 }
 
+func TestManagementIgnoreRealSDKContract(t *testing.T) {
+	f := newManagementFixture(t, true)
+	_, monitor, guard := configureControlMonitor(t, f, "service-ignore")
+	monitor = controlPulse(t, f, monitor, guard, "failure")
+	request := api.ControlRequest{Revision: monitor.ControlRevision, Reason: "Known upstream outage"}
+	raw, _ := json.Marshal(request)
+	denied, _ := f.request(t, http.MethodPost, "/api/v2/monitors/service-ignore/ignore", managementReaderToken, raw, map[string]string{"If-Match": `"` + request.Revision + `"`})
+	if denied.StatusCode != http.StatusForbidden {
+		t.Fatal("read-only principal obtained Ignore permission")
+	}
+	reply, err := f.sdk.Monitors.Ignore(t.Context(), monitor.ID, request)
+	if err != nil || reply.OperationID == "" || reply.Data.State != "committed" {
+		t.Fatal("Ignore failed", err)
+	}
+	got, err := f.sdk.Monitors.Get(t.Context(), monitor.ID)
+	if err != nil || !got.Data.Status.Ignored || got.Data.Status.Health != "unhealthy" || got.Data.Status.IgnoredBy != "operator" {
+		t.Fatal("Ignore concealed health or lost its actor", err)
+	}
+	if _, err := f.sdk.Monitors.Unignore(t.Context(), monitor.ID, request); err == nil {
+		t.Fatal("stale control revision was accepted")
+	}
+	_, err = f.sdk.Monitors.Unignore(t.Context(), monitor.ID, api.ControlRequest{Revision: got.Data.Status.ControlRevision, Reason: "Investigation complete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	monitor, _ = f.server.cfg.Store.Get(monitor.ID)
+	for _, action := range monitor.Actions {
+		if action.State == persistence.Queued {
+			t.Fatal("Unignore replayed a suppressed notification")
+		}
+	}
+}
+
 func TestManagementControlsRejectInvalidAndUnauthorizedRequests(t *testing.T) {
 	f := newManagementFixture(t, true)
 	_, monitor, _ := configureControlMonitor(t, f, "service")

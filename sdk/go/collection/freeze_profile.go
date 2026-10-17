@@ -13,8 +13,9 @@ import (
 )
 
 // FreezeProfile freezes explicitly selected files, directories, readers or URLs
-// using the named file-normalization contract. Only FileNormalizationProfile is
-// supported. Unsupported profiles fail before reading any source. This function
+// using the named file-normalization contract. Earlier supported profiles are
+// retained for continuing existing operations. Unsupported profiles fail before
+// reading any source. This function
 // does not contact CPRa; Apply must be invoked separately after all input freezes.
 //
 // Source order follows the explicit list and lexical directory traversal, with
@@ -27,7 +28,7 @@ import (
 // and 512 MiB plaintext staging. Options may tighten but never expand these
 // limits. Ordinary Freeze and FreezeResources keep their separate contracts.
 func FreezeProfile(ctx context.Context, sources []Source, profile string, options Options) (_ *Frozen, err error) {
-	if profile != FileNormalizationProfile {
+	if !SupportsFileNormalization(profile) {
 		return nil, ErrUnsupportedNormalization
 	}
 	if ctx == nil {
@@ -174,5 +175,5 @@ func (b *builder) addNormalized(normalized NormalizedItem) error {
 	if err != nil || !bytes.Equal(roundtrip, normalized.JSON) {
 		return errors.New("normalized resource encoding differs")
 	}
-	return b.stage(Item{ID: normalized.ID, Location: normalized.Location, Resource: resource}, normalized.JSON)
+	return b.stage(Item{ID: normalized.ID, Location: normalized.Location, Resource: resource, FieldPositions: normalized.FieldPositions}, normalized.JSON)
 }

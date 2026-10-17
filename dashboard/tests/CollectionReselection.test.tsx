@@ -37,7 +37,7 @@ async function fixture(handler: (url: URL, init: RequestInit) => Promise<Respons
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover(); await session.signIn('PRIVATE-COMPONENT-BEARER-01234567890123456789012345678901');
-  const rendered = render(<SessionBoundary session={session}><CollectionReselection id={id} onProgress={onProgress} /></SessionBoundary>);
+  const rendered = render(<SessionBoundary session={session}><CollectionReselection id={id} profile={fileNormalizationProfile} onProgress={onProgress} /></SessionBoundary>);
   await screen.findByLabelText('Original collection files');
   return { session, requests, onProgress, ...rendered };
 }

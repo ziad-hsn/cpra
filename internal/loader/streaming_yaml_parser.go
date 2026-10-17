@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -65,10 +66,31 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 	defer func() { _ = spool.Close(); _ = os.Remove(spool.Name()) }()
 	scan := bufio.NewScanner(input)
 	scan.Buffer(make([]byte, 64<<10), 1<<20)
-	var metadata bytes.Buffer
+	var metadata, entryBuffer bytes.Buffer
+	var metadataLines []int
+	lineNumber, entryLine := 0, 0
+	flushEntry := func() error {
+		if entryBuffer.Len() == 0 {
+			return nil
+		}
+		var header [16]byte
+		binary.BigEndian.PutUint64(header[:8], uint64(entryLine))
+		binary.BigEndian.PutUint64(header[8:], uint64(entryBuffer.Len()))
+		if _, err := spool.Write(header[:]); err != nil {
+			return err
+		}
+		_, err := spool.Write(entryBuffer.Bytes())
+		entryBuffer.Reset()
+		return err
+	}
+	writeMetadata := func(line string) {
+		metadata.WriteString(line + "\n")
+		metadataLines = append(metadataLines, lineNumber)
+	}
 	inMonitors, found, entry := false, false, false
 	indent, entryBytes := -1, 0
 	for scan.Scan() {
+		lineNumber++
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -80,14 +102,14 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 				if entryBytes > 1<<20 {
 					return fmt.Errorf("one monitor exceeds 1 MiB")
 				}
-				if _, err := io.WriteString(spool, line+"\n"); err != nil {
+				if _, err := entryBuffer.WriteString(line + "\n"); err != nil {
 					return err
 				}
 			} else {
 				if metadata.Len()+len(line) > 1<<20 {
 					return fmt.Errorf("manifest metadata exceeds 1 MiB")
 				}
-				metadata.WriteString(line + "\n")
+				writeMetadata(line)
 			}
 			continue
 		}
@@ -110,7 +132,7 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 			if metadata.Len()+len(line) > 1<<20 {
 				return fmt.Errorf("manifest metadata exceeds 1 MiB")
 			}
-			metadata.WriteString(line + "\n")
+			writeMetadata(line)
 			continue
 		}
 		isItem := strings.HasPrefix(trim, "- ") || trim == "-"
@@ -124,11 +146,12 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 			return fmt.Errorf("invalid monitor indentation")
 		}
 		if isItem && leading == indent {
-			if _, err := io.WriteString(spool, "---\n"); err != nil {
+			if err := flushEntry(); err != nil {
 				return err
 			}
 			entry = true
 			entryBytes = 0
+			entryLine = lineNumber
 		}
 		if !entry {
 			return fmt.Errorf("invalid monitor entry")
@@ -137,16 +160,20 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		if entryBytes > 1<<20 {
 			return fmt.Errorf("one monitor exceeds 1 MiB")
 		}
-		if _, err := io.WriteString(spool, line+"\n"); err != nil {
+		if _, err := entryBuffer.WriteString(line + "\n"); err != nil {
 			return err
 		}
 	}
 	if err := scan.Err(); err != nil {
 		return err
 	}
+	if err := flushEntry(); err != nil {
+		return err
+	}
 	if !found {
 		return fmt.Errorf("manifest requires a monitors block sequence")
 	}
+	var metaNode yaml.Node
 	var meta struct {
 		Version   int                          `yaml:"version"`
 		Endpoints map[string]manifest.Endpoint `yaml:"endpoints"`
@@ -155,16 +182,26 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 	if metadata.Len() > 0 {
 		d := yaml.NewDecoder(&metadata)
 		d.KnownFields(p.config.StrictUnknownFields)
-		var metaNode yaml.Node
 		decodeErr := d.Decode(&metaNode)
 		if decodeErr != nil && decodeErr != io.EOF {
-			return fmt.Errorf("invalid manifest metadata: %w", decodeErr)
+			return yamlSyntaxError(ctx, p.filename, 0, decodeErr, func(line int) int {
+				if line > 0 && line <= len(metadataLines) {
+					return metadataLines[line-1]
+				}
+				return 0
+			})
 		}
 		// Leading/trailing comments and blank lines are collected separately
 		// from monitors. A comments-only buffer has no YAML document to decode.
 		if decodeErr == nil {
+			adjustYAMLLines(&metaNode, func(line int) int {
+				if line > 0 && line <= len(metadataLines) {
+					return metadataLines[line-1]
+				}
+				return line
+			})
 			if err := decodeYAMLValue(&metaNode, &meta, p.config.StrictUnknownFields); err != nil {
-				return fmt.Errorf("invalid manifest metadata: %w", err)
+				return yamlSourceError(ctx, p.filename, 0, &metaNode, yamlMetadataError(&metaNode, err))
 			}
 		}
 		var extra interface{}
@@ -173,22 +210,23 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		}
 	}
 	if err := manifest.Validate(&manifest.Manifest{Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}); err != nil {
-		return fmt.Errorf("invalid manifest metadata: %w", err)
+		return yamlSourceError(ctx, p.filename, 0, &metaNode, err)
 	}
 	if _, err := spool.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	decoder := yaml.NewDecoder(spool)
-	decoder.KnownFields(p.config.StrictUnknownFields)
+	entryIndex := 0
 	batch := make([]manifest.Monitor, 0, p.config.BatchSize)
 	batchID := 0
+	sources := make([]MonitorSource, 0, p.config.BatchSize)
 	send := func() error {
 		if len(batch) == 0 {
 			return nil
 		}
 		select {
-		case out <- MonitorBatch{Monitors: batch, BatchID: batchID, Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}:
+		case out <- MonitorBatch{Monitors: batch, Sources: sources, BatchID: batchID, Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}:
 			batch = make([]manifest.Monitor, 0, p.config.BatchSize)
+			sources = make([]MonitorSource, 0, p.config.BatchSize)
 			batchID++
 			return nil
 		case <-ctx.Done():
@@ -201,20 +239,47 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		}
 		var monitors []manifest.Monitor
 		var monitorNode yaml.Node
-		if err := decoder.Decode(&monitorNode); err == io.EOF {
+		var header [16]byte
+		if _, err := io.ReadFull(spool, header[:]); err == io.EOF {
 			break
 		} else if err != nil {
-			return fmt.Errorf("invalid monitor (aliases must stay within an entry): %w", err)
+			return err
 		}
+		start, size := binary.BigEndian.Uint64(header[:8]), binary.BigEndian.Uint64(header[8:])
+		if size == 0 || size > 1<<20 || start == 0 || start > uint64(lineNumber) {
+			return fmt.Errorf("invalid monitor spool record")
+		}
+		raw := make([]byte, int(size))
+		if _, err := io.ReadFull(spool, raw); err != nil {
+			return err
+		}
+		entryIndex++
+		// A new parser bounds anchors to this entry and releases previous trees.
+		if err := yaml.Unmarshal(raw, &monitorNode); err != nil {
+			return yamlSyntaxError(ctx, p.filename, entryIndex, err, func(line int) int { return line + int(start) - 1 })
+		}
+		adjustYAMLLines(&monitorNode, func(line int) int { return line + int(start) - 1 })
 		if err := decodeYAMLValue(&monitorNode, &monitors, p.config.StrictUnknownFields); err != nil {
-			return fmt.Errorf("invalid monitor: %w", err)
+			node := &monitorNode
+			if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+				node = node.Content[0]
+			}
+			if node.Kind == yaml.SequenceNode && len(node.Content) > 0 {
+				node = node.Content[0]
+			}
+			return yamlSourceError(ctx, p.filename, entryIndex, node, err)
 		}
 		if len(monitors) != 1 {
 			return fmt.Errorf("expected one monitor per block entry")
 		}
 		if err := manifest.ValidateMonitor(&monitors[0]); err != nil {
-			return err
+			return yamlSourceError(ctx, p.filename, entryIndex, monitorNode.Content[0].Content[0], err)
 		}
+		if err := manifest.ValidateMonitorReferences(&monitors[0], meta.Endpoints, meta.Groups); err != nil {
+			return yamlSourceError(ctx, p.filename, entryIndex, monitorNode.Content[0].Content[0], err)
+		}
+		point := monitorNode.Content[0].Content[0]
+		sources = append(sources, MonitorSource{Item: entryIndex, Line: point.Line, Column: point.Column, Offset: -1})
 		batch = append(batch, monitors[0])
 		if len(batch) >= p.config.BatchSize {
 			if err := send(); err != nil {
@@ -223,4 +288,15 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		}
 	}
 	return send()
+}
+
+// Content owns the syntax tree; alias pointers refer back into it and must not
+// be traversed again (or an alias cycle could recurse indefinitely).
+func adjustYAMLLines(node *yaml.Node, line func(int) int) {
+	if node.Line > 0 {
+		node.Line = line(node.Line)
+	}
+	for _, child := range node.Content {
+		adjustYAMLLines(child, line)
+	}
 }

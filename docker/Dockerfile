@@ -23,11 +23,11 @@ RUN case "$SOURCE_DATE_EPOCH" in ''|*[!0-9]*) exit 1 ;; esac && \
     test -s /etc/ssl/certs/ca-certificates.crt && \
     printf 'cpra:x:1001:1001:CPRa:/nonexistent:/sbin/nologin\n' >> /payload/etc/passwd && \
     printf 'cpra:x:1001:\n' >> /payload/etc/group && \
-    mkdir -p /payload/var/lib/cpra && \
+    mkdir -p /payload/var/lib/cpra /payload/var/log/cpra && \
     find /payload -type d -exec chmod 0755 {} + && \
     find /payload -type f -exec chmod 0644 {} + && \
     chmod 0755 /payload/usr/local/bin/cpra /payload/usr/local/bin/cpractl && \
-    chown 1001:1001 /payload/var/lib/cpra && chmod 0700 /payload/var/lib/cpra && \
+    chown 1001:1001 /payload/var/lib/cpra /payload/var/log/cpra && chmod 0700 /payload/var/lib/cpra /payload/var/log/cpra && \
     find /payload -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
 
 FROM runtime-base

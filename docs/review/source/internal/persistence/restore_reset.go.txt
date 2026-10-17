@@ -267,7 +267,7 @@ func (f *machine) restoreActions(state *RestoreState) Result {
 		m.Actions[item.key] = a
 		changed[item.monitorID] = m
 		events = append(events, Event{MonitorID: m.ID, Revision: a.Revision, At: a.FinishedAt, Type: typ,
-			ActionID: a.ID, IncidentID: a.IncidentID, CatalogUID: a.CatalogUID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint,
+			ActionID: a.ID, IncidentID: a.IncidentID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint,
 			Outcome: a.Outcome, Reason: "explicit_restore", Actor: "local-administrator"})
 	}
 	ids := make([]string, 0, len(changed))

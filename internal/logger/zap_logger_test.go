@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ziad-hsn/cpra/internal/logger"
 )
@@ -97,6 +98,33 @@ func TestErrorLogIsWellFormedJSON(t *testing.T) {
 	}
 	if m["monitor"] != "x" {
 		t.Fatalf("structured field not encoded: %v", m["monitor"])
+	}
+}
+
+func TestMachineTimestampsAreUTC(t *testing.T) {
+	at := time.Date(2026, 10, 17, 4, 5, 6, 0, time.FixedZone("fixture", 3*60*60))
+	out := captureStderr(t, func() {
+		l, err := logger.NewZapLogger(defaultProdConfig())
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Info("time", logger.Field{Key: "observed_at", Value: at})
+	})
+	var record map[string]any
+	if err := json.Unmarshal([]byte(out), &record); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"ts", "observed_at"} {
+		value, ok := record[key].(string)
+		if !ok || !strings.HasSuffix(value, "Z") {
+			t.Fatal("timestamp is not explicit UTC", key, record[key])
+		}
+		if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if record["observed_at"] != "2026-10-17T01:05:06Z" {
+		t.Fatal("timestamp changed instant", record)
 	}
 }
 

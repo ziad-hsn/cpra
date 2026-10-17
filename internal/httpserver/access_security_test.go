@@ -73,10 +73,10 @@ func TestFailedAuthThrottlingIsBoundedAndExpires(t *testing.T) {
 			throttle.failed(fmt.Sprint(n), at)
 		}
 	}
-	if len(throttle.sources) != maxAuthSources || !throttle.blocked("0", at) || !throttle.blocked("additional", at) {
+	if len(throttle.sources) != maxAuthSources || throttle.failed("additional", at) {
 		t.Fatal("failed authentication state exceeded its bound")
 	}
-	if throttle.blocked("additional", at.Add(authFailureWindow+time.Second)) {
+	if throttle.failed("additional", at.Add(authFailureWindow+time.Second)) {
 		t.Fatal("expired authentication failures did not release capacity")
 	}
 	called := 0
@@ -84,12 +84,59 @@ func TestFailedAuthThrottlingIsBoundedAndExpires(t *testing.T) {
 	for n := 0; n <= maxAuthFailures; n++ {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "https://localhost/api/v2/self", nil))
-		if n == maxAuthFailures && (w.Code != 401 || w.Header().Get("Retry-After") != "10") {
+		if n == maxAuthFailures && (w.Code != 429 || w.Header().Get("Retry-After") != "10") {
 			t.Fatal("throttle hold unavailable")
 		}
 	}
-	if called != maxAuthFailures {
-		t.Fatal("blocked authentication reached the expensive handler", called)
+	if called != maxAuthFailures+1 {
+		t.Fatal("throttling bypassed the current authority check", called)
+	}
+}
+
+func TestFailedAuthenticationCannotDenyValidCredentials(t *testing.T) {
+	s := newTestServer(t)
+	token := strings.Repeat("valid-disposable-token-", 2)
+	s.cfg.AuthToken = token
+	h := failedAuthenticationLimit(s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })))
+	request := func(peer, bearer string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
+		r.RemoteAddr = peer
+		r.Header.Set("Authorization", "Bearer "+bearer)
+		r.Header.Set("X-Forwarded-For", "198.51.100.42")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	peer := "127.0.0.1:1234"
+	for range maxAuthFailures + 1 {
+		request(peer, "invalid")
+	}
+	if r := request(peer, token); r.Code != http.StatusNoContent {
+		t.Fatalf("valid same-peer request denied: %d", r.Code)
+	}
+	for n := 0; n < maxAuthSources+100; n++ {
+		request(fmt.Sprintf("192.0.%d.%d:1", n/256, n%256), "invalid")
+	}
+	if r := request("127.0.0.2:1234", token); r.Code != http.StatusNoContent {
+		t.Fatalf("full failure table denied valid caller: %d", r.Code)
+	}
+	if r := request("127.0.0.3:1234", "invalid"); r.Code != http.StatusUnauthorized {
+		t.Fatalf("unrelated source globally throttled: %d", r.Code)
+	}
+}
+
+func TestThrottledFailureHasConsistentProblemStatus(t *testing.T) {
+	h := failedAuthenticationLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(401)
+		_, _ = w.Write([]byte(`{"status":401,"detail":"must not leak the original response"}`))
+	}))
+	for n := 0; n < maxAuthFailures+1; n++ {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v2/self", nil))
+		if n == maxAuthFailures && (w.Code != 429 || strings.Contains(w.Body.String(), "401") || strings.Contains(w.Body.String(), "must not leak") || !strings.Contains(w.Body.String(), `"status":429`)) {
+			t.Fatal("throttled response mixed incompatible error bodies", w.Code, w.Body.String())
+		}
 	}
 }
 

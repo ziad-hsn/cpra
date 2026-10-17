@@ -30,6 +30,7 @@ def snapshot(root):
               "scripts/release/recipe.json", "scripts/release/dashboard_build.py", "scripts/release/stage_dashboard.py",
               "scripts/dashboard/build_collection_parser.py", "scripts/dashboard/generate_api.py",
               "scripts/dashboard/inspect_collection_parser.cjs", "scripts/dashboard/asset_manifest.py")]
+    paths += list((root / "sdk/go/api").glob("*.json"))
     paths += list((root / "scripts/dashboard/collectionwasm").glob("*.go"))
     paths += [root / "brand/palette.json", root / "brand/dist/palette.css",
               root / "brand/LICENSE", root / "brand/ATTRIBUTION.md"]

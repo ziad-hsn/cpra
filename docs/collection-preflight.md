@@ -9,7 +9,7 @@ inactive staging and restart boundary already implemented beneath those future
 workflows.
 The helper uses an explicitly captured catalog view and a bounded slice of
 desired resources with opaque source/item tokens. See the
-[identity contract](implementation/collection-identity-contract.md) for request
+[collection identities and continuation](cpractl-management.md) for request
 commitments and the [CLI guide](cpractl-management.md#preview-a-complete-collection) for inputs.
 
 The caller must authorize submitted writes and provide a required identity-only

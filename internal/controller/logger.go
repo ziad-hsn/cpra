@@ -108,18 +108,9 @@ func (l *Logger) withCallerSkip(skip int) *Logger {
 	return &derived
 }
 
-// getTimezone returns the timezone to use for logging
+// Machine logs always use UTC. Presentation-local time belongs in the dashboard.
 func getTimezone() *time.Location {
-	// Check environment variable first
-	if tz := os.Getenv("CPRA_TIMEZONE"); tz != "" {
-		if loc, err := time.LoadLocation(tz); err == nil {
-			return loc
-		}
-		log.Printf("Warning: Invalid timezone '%s', using local timezone", tz)
-	}
-
-	// Use local timezone as default
-	return time.Local
+	return time.UTC
 }
 
 // isTerminal checks if we're running in a terminal

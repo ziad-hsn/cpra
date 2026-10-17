@@ -18,7 +18,7 @@ import (
 
 func interventionMonitor(t *testing.T, w *ecs.World, target string) ecs.Entity {
 	ent := releaseMonitor(t, w, 1, 2)
-	ecs.NewMap1[components.InterventionConfig](w).Add(ent, &components.InterventionConfig{Action: "webhook", MaxFailures: 1})
+	ecs.NewMap1[components.InterventionConfig](w).Add(ent, &components.InterventionConfig{Action: "webhook", MaxFailures: 1, Target: &manifest.InterventionTargetWebhook{URL: target, Method: http.MethodPost, Timeout: time.Second}})
 	storage := ecs.NewMap1[components.JobStorage](w).Get(ent)
 	storage.InterventionJob = &jobs.InterventionWebhookJob{URL: target, Method: http.MethodPost, Timeout: time.Second, Entity: ent}
 	return ent
@@ -54,11 +54,45 @@ func TestRecoveryCancelsUnadmittedIntervention(t *testing.T) {
 	}
 }
 
+func TestRestartGatedInterventionWaitsOutsideScheduler(t *testing.T) {
+	world := ecs.NewWorld()
+	ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
+	queue := &admissionQueue{}
+	system := newIncidentSystem(t, &world, queue, &admissionQueue{})
+	m := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("target down")})
+	original := incidentActions(m, "intervention", "")[0]
+	restarted := time.Now().UTC()
+	results, err := system.store.Submit(t.Context(), []persistence.Command{{Kind: "recover", At: restarted}})
+	if err != nil || len(results) == 0 || results[0].Err != nil {
+		t.Fatal("restart recovery failed", err, results)
+	}
+	for n := 0; n < 10; n++ {
+		system.dispatchActions(time.Now().Add(time.Second))
+		if system.actions.Len() != 0 || len(queue.admitted) != 0 {
+			t.Fatal("restart-gated intervention repeatedly scheduled or dispatched")
+		}
+	}
+	m = applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("still down"), ExecutionStart: restarted.Add(time.Millisecond)})
+	if !m.RecoveryCheckAfter.IsZero() || m.Actions[original.ID].State != persistence.Queued {
+		t.Fatal("fresh observation did not retain and release the original intent")
+	}
+	system.dispatchActions(time.Now().Add(2 * time.Second))
+	if len(queue.admitted) != 1 {
+		t.Fatal("fresh failed observation did not schedule the original intervention")
+	}
+	if dispatch, ok := queue.admitted[0].(*jobs.Dispatch); !ok || dispatch.ActionID != original.ID {
+		t.Fatal("fresh observation created a replacement intervention")
+	}
+}
+
 func TestMaintenanceSuppressesDelayedIntervention(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		time.Sleep(11 * time.Second)
 		world := ecs.NewWorld()
 		ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
+		// This test crosses a minute boundary to exercise maintenance, within
+		// an explicitly longer original intervention budget.
+		ecs.NewMap1[components.InterventionConfig](&world).Get(ent).Target.(*manifest.InterventionTargetWebhook).Timeout = 2 * time.Minute
 		state := ecs.NewMap1[components.MonitorState](&world).Get(ent)
 		windows, err := manifest.CompileMaintenance([]manifest.MaintenanceWindow{{Cron: "* * * * *", Duration: "10s", Timezone: "UTC"}})
 		if err != nil {
@@ -128,4 +162,32 @@ func TestProjectionReportsConsecutivePulseFailures(t *testing.T) {
 	if m.ConsecutiveFailures != 1 {
 		t.Fatal("new failure did not start a fresh consecutive count")
 	}
+}
+
+func TestExpiredInterventionNeverInvokesProvider(t *testing.T) {
+	var calls atomic.Int32
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(200) }))
+	defer receiver.Close()
+	synctest.Test(t, func(t *testing.T) {
+		world := ecs.NewWorld()
+		ent := interventionMonitor(t, &world, receiver.URL)
+		queue := &admissionQueue{rejected: true}
+		system := newIncidentSystem(t, &world, queue, &admissionQueue{})
+		monitor := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("down")})
+		original := incidentActions(monitor, "intervention", "")[0]
+		system.dispatchActions(time.Now())
+		time.Sleep(time.Until(original.Deadline) + time.Second)
+		queue.rejected = false
+		system.dispatchActions(time.Now())
+		for _, job := range queue.admitted {
+			result := job.Execute()
+			if !system.commitResults([]jobs.Result{result}) {
+				t.Fatal("expired result did not reconcile", system.lastError)
+			}
+		}
+		current, _ := system.store.Get(monitor.ID)
+		if calls.Load() != 0 || current.Actions[original.ID].State != persistence.Cancelled {
+			t.Fatal("expired queue did not cancel without a provider invocation")
+		}
+	})
 }

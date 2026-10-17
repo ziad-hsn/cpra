@@ -70,11 +70,13 @@ The dashboard offers runtime observations and, when management is enabled, confi
 
 The healthy-sample percentage uses committed cumulative check counters. It is not an external SLA measurement. Incident, recovery, and notification history is retained according to runtime history configuration; raw check records are not retained. Pool and queue histories are separate, bounded, in-memory series. Unavailable durable state, history, or SLO data returns HTTP 503.
 
-[CLI reference](cli.md) · [Response types in source](../review/source/internal/httpserver/types.go.txt)
+[CLI reference](cli.md) · [Response types in source](source/internal/httpserver/types.go.txt)
 
 ## Management contracts
 
-The [SDK API reference](../sdk/api-reference.md) describes v2 resource and operation contracts. Server availability depends on runtime management configuration and compiled capabilities. The [historical candidate API](../candidate/reference/api-reference.md) remains pinned to its documented revision.
+The [SDK API reference](../sdk/api-reference.md) describes v2 resource and operation contracts. Server availability depends on runtime management configuration and compiled capabilities. Observation-mode servers also expose supported v2 read operations; writable
+catalog resources are available only in management mode. Use access discovery
+and the advertised operations rather than downgrading failed writes.
 
 ## Appearance
 

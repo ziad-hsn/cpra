@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection/commitment"
 )
 
@@ -32,6 +33,8 @@ type CollectionValidationItem struct {
 	Issue           string     `json:"issue,omitempty"`
 	UID             string     `json:"uid,omitempty"`
 	ResourceVersion string     `json:"resource_version,omitempty"`
+	Field           string     `json:"field,omitempty"`
+	Reason          string     `json:"reason,omitempty"`
 }
 
 // CollectionValidationDescriptor commits to the entire ordered result inventory.
@@ -68,6 +71,9 @@ func CollectionValidationItemEncoding(item CollectionValidationItem) ([]byte, er
 	}
 	if !CollectionValidationIssue(item.Issue) || item.Change == "" && item.Issue == "" ||
 		item.Change == "create" && item.UID != "" {
+		return nil, ErrCollectionInvalid
+	}
+	if item.Field != "" && item.Reason == "" || item.Reason != "" && (item.Issue == "" || api.ValidationMessage(item.Reason) == "" || api.SafeValidationField(item.Field) != item.Field) {
 		return nil, ErrCollectionInvalid
 	}
 	raw, err := json.Marshal(item)

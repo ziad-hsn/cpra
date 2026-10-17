@@ -1,7 +1,6 @@
 package collection
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -23,22 +22,32 @@ type Location struct {
 	Source   string `json:"source"`
 	Document int    `json:"document"`
 	Item     int    `json:"item"`
+	Line     int    `json:"line,omitempty"`
+	Column   int    `json:"column,omitempty"`
 }
 
 // String formats a source location without including its resource payload.
 func (l Location) String() string {
-	return fmt.Sprintf("%s document %d item %d", l.Source, l.Document, l.Item)
+	result := fmt.Sprintf("%s document %d item %d", l.Source, l.Document, l.Item)
+	if l.Line > 0 {
+		result += fmt.Sprintf(" line %d", l.Line)
+		if l.Column > 0 {
+			result += fmt.Sprintf(" column %d", l.Column)
+		}
+	}
+	return result
 }
 
 // Item is a desired resource. Frozen items carry a keyed ContentDigest and exact
 // inventory position; parser-only Decode items retain a local SHA-256 digest.
 // ID is the immutable identity within an apply operation, distinct from resource ID.
 type Item struct {
-	ID            string              `json:"id"`
-	ContentDigest string              `json:"contentDigest"`
-	Location      Location            `json:"location"`
-	Resource      api.Resource        `json:"resource"`
-	Position      commitment.Position `json:"position"`
+	ID             string                    `json:"id"`
+	ContentDigest  string                    `json:"contentDigest"`
+	Location       Location                  `json:"location"`
+	Resource       api.Resource              `json:"resource"`
+	Position       commitment.Position       `json:"position"`
+	FieldPositions map[string]SourcePosition `json:"fieldPositions,omitempty"`
 }
 
 func (Item) String() string               { return "private collection item (input omitted)" }
@@ -181,14 +190,16 @@ func (f *Frozen) Range(ctx context.Context, visit func(Item) error) error {
 }
 
 type builder struct {
-	f           *Frozen
-	o           Options
-	seen        map[string]Location
-	sources     *commitment.SourceAccumulator
-	sourceToken string
-	bytes       int64
-	stream      func(Item) error
-	emitted     int
+	f                        *Frozen
+	o                        Options
+	seen                     map[string]Location
+	sources                  *commitment.SourceAccumulator
+	sourceToken              string
+	bytes                    int64
+	stream                   func(Item) error
+	emitted                  int
+	normalizationProfile     string
+	allowDestinationConflict bool
 }
 
 func newBuilder(o Options, sourceCount uint64) (*builder, error) {
@@ -384,7 +395,7 @@ func FreezeResources(ctx context.Context, source ResourceSource, options Options
 		if err != nil {
 			return nil, err
 		}
-		if err = b.add(resource, Location{Source: "resources", Document: 1, Item: index}); err != nil {
+		if err = b.add(resource, Location{Source: "resources", Document: 1, Item: index}, nil); err != nil {
 			return nil, err
 		}
 		raw, marshalErr := json.Marshal(resource)
@@ -460,7 +471,7 @@ func (b *builder) source(ctx context.Context, source Source) error {
 	if _, err = input.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	reader := bufio.NewReader(input)
+	reader := newSourceReader(input)
 	first, err := peekNonspace(reader)
 	if err == io.EOF {
 		b.bytes -= n
@@ -494,7 +505,7 @@ func (r *contextReader) Read(p []byte) (int, error) {
 	return r.r.Read(p)
 }
 
-func (b *builder) add(resource api.Resource, location Location) error {
+func (b *builder) add(resource api.Resource, location Location, positions map[string]SourcePosition) error {
 	count := b.emitted
 	if b.f != nil {
 		count = len(b.f.records)
@@ -503,7 +514,7 @@ func (b *builder) add(resource api.Resource, location Location) error {
 		return fmt.Errorf("%s: resource-count limit exceeded", location)
 	}
 	if err := api.ValidateResource(resource); err != nil {
-		return fmt.Errorf("%s: %w", location, err)
+		return (Item{Location: location, FieldPositions: positions}).ValidationError(err)
 	}
 	key := resource.Kind + "/" + resource.Metadata.ID
 	if previous, ok := b.seen[key]; ok {
@@ -516,7 +527,7 @@ func (b *builder) add(resource api.Resource, location Location) error {
 	if len(raw) > b.o.MaxResourceBytes {
 		return fmt.Errorf("%s: resource exceeds %d bytes", location, b.o.MaxResourceBytes)
 	}
-	item := Item{ID: key, Location: location, Resource: resource}
+	item := Item{ID: key, Location: location, Resource: resource, FieldPositions: positions}
 	if b.stream != nil {
 		digest := sha256.Sum256(raw)
 		item.ContentDigest = hex.EncodeToString(digest[:])

@@ -4,7 +4,7 @@ description: Current CPRa driver availability and YAML configuration fields for 
 cpra_scope: main
 ---
 
-> **Current development checkout:** this reference follows the merged runtime source. See [version and availability](../versions.md) for the distinction between current development and historical candidate guides.
+> **Current development checkout:** this reference describes the current source. See [version and availability](../versions.md) for its verification and publication status.
 
 
 # Checks, recovery and notifications
@@ -42,9 +42,32 @@ The `grpc` check preserves TCP reachability when `mode` is omitted. With `mode: 
 
 TLS `warn_days` produces a yellow warning and degraded state without recovery. `critical_days` fails the check and follows the configured incident policy. Leave certificate verification enabled for normal use.
 
+**TLS policy.**
+
+TLS-capable checks support a monitor-specific `ca_file`, `server_name`, and
+`insecure_skip_verify`. The CA file must be a readable regular PEM file of at most
+1 MiB; it supplies that monitor's trust roots. Static validation does not read the
+file. The service identity must be able to read it when executing the check.
+
+Certificate verification is enabled by default. Explicit
+`insecure_skip_verify: true` disables certificate-chain and hostname verification
+for that monitor; it does not select cleartext transport, disable configured TLS
+expiry thresholds, skip recovery health verification, or change CPRa API
+authentication. Check summaries identify disabled certificate verification.
+
+For Redis, PostgreSQL, MySQL, MongoDB, RabbitMQ and Kafka, using these typed TLS
+settings requires an explicit `tls: true`. `tls: false` selects cleartext and
+cannot be combined with trust, server-name or skip-verification settings. Existing
+DSN/URI transport choices remain supported, but contradictory typed and DSN/URI
+settings are rejected. For example, PostgreSQL `tls: true` with verification
+requires `sslmode: verify-full`; `sslmode: disable` contradicts it. HTTPS is
+required for HTTP TLS settings. gRPC TLS settings require `mode: health` and
+cannot be combined with `allow_insecure: true`. Checks without TLS semantics
+reject these settings.
+
 ### http
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -53,6 +76,8 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 | `headers` | string map |
 | `body` | string |
 | `expected_status` | list of integers |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
 | `insecure_skip_verify` | boolean |
 | `retries` | integer |
 
@@ -66,7 +91,7 @@ proxy environment variables such as `HTTP_PROXY` or `HTTPS_PROXY`.
 
 ### tcp
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -76,7 +101,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### icmp
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -94,7 +119,7 @@ change host settings. See the [pro-bing platform requirements](https://github.co
 
 ### dns
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -104,7 +129,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### udp
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -115,7 +140,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### grpc
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -127,6 +152,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 | `allow_insecure` | boolean; health mode only |
 | `server_name` | optional TLS server name; health mode only |
 | `ca_file` | optional PEM trust roots, at most 1 MiB; health mode only |
+| `insecure_skip_verify` | boolean; health mode only |
 
 ```yaml
 monitors:
@@ -148,7 +174,7 @@ execution. The check timeout bounds the whole RPC and its configured attempts.
 
 ### docker
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -157,7 +183,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### tls
 
-Build: default. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -166,12 +192,13 @@ Build: default. [Schema](../review/source/internal/manifest/pulse_types_new.go.t
 | `server_name` | string |
 | `warn_days` | integer |
 | `critical_days` | integer |
+| `ca_file` | optional PEM trust-root file |
 | `insecure_skip_verify` | boolean |
 | `retries` | integer |
 
 ### redis
 
-Build: `redis`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `redis`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -179,11 +206,15 @@ Build: `redis`. [Schema](../review/source/internal/manifest/pulse_types_new.go.t
 | `password` | string |
 | `username` | string |
 | `db` | integer |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ### postgres
 
-Build: `postgres`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `postgres`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -194,11 +225,15 @@ Build: `postgres`. [Schema](../review/source/internal/manifest/pulse_types_new.g
 | `password` | string |
 | `database` | string |
 | `sslmode` | string |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ### mysql
 
-Build: `mysql`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `mysql`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -208,33 +243,49 @@ Build: `mysql`. [Schema](../review/source/internal/manifest/pulse_types_new.go.t
 | `user` | string |
 | `password` | string |
 | `database` | string |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ### mongo
 
-Build: `mongo`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `mongo`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
 | `uri` | string |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ### rabbitmq
 
-Build: `rabbitmq`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `rabbitmq`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
 | `url` | string |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ### kafka
 
-Build: `kafka`. [Schema](../review/source/internal/manifest/pulse_types_new.go.txt)
+Build: `kafka`. [Schema](source/internal/manifest/pulse_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
 | `brokers` | list of strings |
+| `tls` | optional boolean; explicit transport choice |
+| `ca_file` | optional PEM trust-root file |
+| `server_name` | optional TLS server name |
+| `insecure_skip_verify` | boolean; requires TLS |
 | `retries` | integer |
 
 ## Recovery actions
@@ -245,7 +296,7 @@ Set `intervention.action` and put fields under `intervention.target`.
 | --- | --- | --- |
 | `docker` | Restart a container | default |
 | `webhook` | HTTP request to an external recovery system | default |
-| `kubernetes` | Restart or scale a Deployment, StatefulSet, or ReplicaSet | `kubernetes` |
+| `kubernetes` | Restart or scale a Deployment | `kubernetes` |
 | `aws` | EC2 instance reboot | `aws` |
 | `systemd` | Restart a local systemd unit | `systemd` |
 | `a2a` | Request and observe an agent intervention | default; local candidate |
@@ -254,11 +305,14 @@ Docker recovery always restarts the container; the schema's `type` field does no
 
 AWS supports `operation: reboot-instance`. Use the process's configured AWS credential chain. Systemd needs access to the host's system bus and permission for the unit operation.
 
-The controller admits one recovery operation per incident. A response timeout can leave the external outcome uncertain; see the [incident lifecycle](../explanation/incident-lifecycle.md).
+`intervention.max_attempts` limits recovery attempts per incident and defaults to
+one. A response timeout can leave the external outcome uncertain and block
+conflicting interventions regardless of the remaining attempt limit; see the
+[incident lifecycle](../explanation/incident-lifecycle.md).
 
 ### docker
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -269,7 +323,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### webhook
 
-Build: default. [Schema](../review/source/internal/manifest/intervention_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/intervention_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -282,7 +336,7 @@ Build: default. [Schema](../review/source/internal/manifest/intervention_types_n
 
 ### kubernetes
 
-Build: `kubernetes`. [Schema](../review/source/internal/manifest/intervention_types_new.go.txt)
+Build: `kubernetes`. [Schema](source/internal/manifest/intervention_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -296,7 +350,7 @@ Build: `kubernetes`. [Schema](../review/source/internal/manifest/intervention_ty
 
 ### aws
 
-Build: `aws`. [Schema](../review/source/internal/manifest/intervention_types_new.go.txt)
+Build: `aws`. [Schema](source/internal/manifest/intervention_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -308,7 +362,7 @@ Build: `aws`. [Schema](../review/source/internal/manifest/intervention_types_new
 
 ### systemd
 
-Build: `systemd`. [Schema](../review/source/internal/manifest/intervention_types_new.go.txt)
+Build: `systemd`. [Schema](source/internal/manifest/intervention_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -319,7 +373,7 @@ Build: `systemd`. [Schema](../review/source/internal/manifest/intervention_types
 
 ### a2a
 
-Build: default in the local, unreleased candidate. Uses an explicitly configured A2A 1.0 HTTP+JSON interface. This addition has not been published to main. See [A2A implementation and evidence](../implementation/a2a-jobs.md).
+Build: default in the local, unreleased candidate. Uses an explicitly configured A2A 1.0 HTTP+JSON interface. This addition has not been published to main. See [A2A driver settings](jobs-reference.md).
 
 | Field | Meaning |
 | --- | --- |
@@ -363,7 +417,7 @@ Provider processing success does not prove a human received the notification.
 
 ### log
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -371,7 +425,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### slack
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -379,7 +433,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### pagerduty
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -388,7 +442,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### email
 
-Build: default. [Schema](../review/source/internal/manifest/groups.go.txt)
+Build: default. [Schema](source/internal/manifest/groups.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -400,7 +454,7 @@ Build: default. [Schema](../review/source/internal/manifest/groups.go.txt)
 
 ### webhook
 
-Build: default. [Schema](../review/source/internal/manifest/groups.go.txt)
+Build: default. [Schema](source/internal/manifest/groups.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -410,7 +464,7 @@ Build: default. [Schema](../review/source/internal/manifest/groups.go.txt)
 
 ### telegram
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -421,7 +475,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### discord
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -429,7 +483,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### opsgenie
 
-Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
+Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -438,7 +492,7 @@ Build: default. [Schema](../review/source/internal/manifest/manifest.go.txt)
 
 ### mattermost
 
-Build: default. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -448,7 +502,7 @@ Build: default. [Schema](../review/source/internal/manifest/notification_types_n
 
 ### victorops
 
-Build: default. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -460,7 +514,7 @@ Build: default. [Schema](../review/source/internal/manifest/notification_types_n
 
 ### pushover
 
-Build: default. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -469,13 +523,20 @@ Build: default. [Schema](../review/source/internal/manifest/notification_types_n
 | `user_key` | string |
 | `title` | string |
 | `priority` | integer |
+| `priority_by_color` | map of notification color to integer priority, -2 through 2 |
 | `retry` | integer |
 | `expire` | integer |
 | `sound` | string |
 
+A shared emergency `priority: 2` applies to yellow/red/cyan notifications. Green
+and gray use normal priority unless explicitly overridden by `priority_by_color`.
+For example, `priority_by_color: {green: 2}` deliberately makes recovery notices
+emergency pages. Emergency retry defaults to 60 seconds (minimum 30); expiry
+defaults to 1,800 seconds and must be between 1 and 10,800 seconds.
+
 ### datadog
 
-Build: default. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: default. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -487,7 +548,7 @@ Build: default. [Schema](../review/source/internal/manifest/notification_types_n
 
 ### teams
 
-Build: `teams`. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: `teams`. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |
@@ -495,7 +556,7 @@ Build: `teams`. [Schema](../review/source/internal/manifest/notification_types_n
 
 ### twilio
 
-Build: `twilio`. [Schema](../review/source/internal/manifest/notification_types_new.go.txt)
+Build: `twilio`. [Schema](source/internal/manifest/notification_types_new.go.txt)
 
 | YAML field | Value type |
 | --- | --- |

@@ -3,6 +3,7 @@ package manifestcheck
 import (
 	"context"
 	"fmt"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,11 +23,32 @@ func TestManifestValidationDoesNotContactTarget(t *testing.T) {
 	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Manifest(context.Background(), path, false, false); err != nil {
+	if err := Manifest(context.Background(), path, false, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if calls.Load() != 0 {
 		t.Fatal("validation invoked provider")
+	}
+}
+
+func TestFileNotificationRequiresProcessDirectory(t *testing.T) {
+	for _, group := range []bool{false, true} {
+		input := "monitors:\n  - name: fixture\n    pulse_check: {type: tcp, interval: 1m, timeout: 1s, config: {host: localhost, port: 80}}\n"
+		if group {
+			input += "    codes: {red: {notify_group: team}}\nendpoints: {log: {type: log, config: {file: alerts.jsonl}}}\nnotification_groups: {team: [log]}\n"
+		} else {
+			input += "    codes: {red: {notify: log, config: {file: alerts.jsonl}}}\n"
+		}
+		path := filepath.Join(t.TempDir(), "monitors.yaml")
+		if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := Manifest(t.Context(), path, false, false, false); err == nil || !strings.Contains(err.Error(), "notifications.log_directory") {
+			t.Fatal("unconfigured file output admitted", err)
+		}
+		if err := Manifest(t.Context(), path, false, false, true); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -41,7 +63,9 @@ func TestDuplicateIdentityAcrossParserBatches(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := Manifest(ctx, path, false, false); err == nil || !strings.Contains(err.Error(), "duplicate effective monitor id") {
+	err := Manifest(ctx, path, false, false, false)
+	field, ok := api.ValidationFieldError(err)
+	if !ok || field.Reason != "duplicateIdentity" || field.Field != "id" || !strings.Contains(err.Error(), "monitor 1001 at line 1 column") {
 		t.Fatalf("duplicate result: %v", err)
 	}
 }
@@ -51,10 +75,10 @@ func TestEmptyManifestRequiresOptIn(t *testing.T) {
 	if err := os.WriteFile(path, []byte("monitors: []\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := Manifest(context.Background(), path, false, false); err == nil {
+	if err := Manifest(context.Background(), path, false, false, false); err == nil {
 		t.Fatal("empty accepted")
 	}
-	if err := Manifest(context.Background(), path, true, false); err != nil {
+	if err := Manifest(context.Background(), path, true, false, false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -79,10 +103,10 @@ func TestA2AFileRequiresEncryptionWithoutProviderRequests(t *testing.T) {
 			if err := os.WriteFile(path, []byte(input), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := Manifest(t.Context(), path, false, false); err == nil || !strings.Contains(err.Error(), "storage.encryption") {
+			if err := Manifest(t.Context(), path, false, false, false); err == nil || !strings.Contains(err.Error(), "storage.encryption") {
 				t.Fatal("missing key selection accepted", err)
 			}
-			if err := Manifest(t.Context(), path, false, true); err != nil {
+			if err := Manifest(t.Context(), path, false, true, false); err != nil {
 				t.Fatal("explicit key selection rejected", err)
 			}
 			if calls.Load() != 0 {

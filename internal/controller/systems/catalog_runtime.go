@@ -377,6 +377,12 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 	id := update.prepared.MonitorID()
 	guard := persistence.CatalogGuard{Conditions: slices.Clone(p.Conditions)}
 	policy := persistence.Policy{Interval: p.Monitor.Pulse.Interval, Unhealthy: p.Monitor.Pulse.UnhealthyThreshold, Healthy: max(1, p.Monitor.Pulse.HealthyThreshold), Intervention: p.Monitor.Intervention.Action != "", Enabled: p.Monitor.Enabled, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
+	if p.Monitor.AutoIgnore != nil {
+		window, _ := time.ParseDuration(p.Monitor.AutoIgnore.Window) // Static validation preceded preparation.
+		policy.AutoIgnore = &persistence.AutoIgnorePolicy{Incidents: int(p.Monitor.AutoIgnore.Incidents), Window: window}
+	}
+	policy.PeriodicMaintenance = len(p.Monitor.Maintenance) > 0
+	policy.RecoveryTimeout = p.RecoveryTimeout
 	if p.RecoveryCooldown != nil {
 		policy.RecoveryCooldown = *p.RecoveryCooldown
 	}
@@ -395,9 +401,10 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 			if len(p.NotificationTargets[color]) == 1 && strings.HasPrefix(p.NotificationTargets[color][0].EndpointID, "$inline/") {
 				policy.NotificationEndpointIDs[color] = update.prepared.NotificationEndpointIDs(color)
 			}
-			for _, target := range p.NotificationTargets[color] {
+			preparedIDs := update.prepared.NotificationEndpointIDs(color)
+			for ordinal, target := range p.NotificationTargets[color] {
 				if !strings.HasPrefix(target.EndpointID, "$inline/") {
-					policy.NotificationEndpointIDs[color] = append(policy.NotificationEndpointIDs[color], target.EndpointUID)
+					policy.NotificationEndpointIDs[color] = append(policy.NotificationEndpointIDs[color], target.EndpointUID+"/"+preparedIDs[ordinal])
 				}
 			}
 			setRecoveryNotification(&policy, color, c.Trigger, p.Monitor.Intervention.Action)

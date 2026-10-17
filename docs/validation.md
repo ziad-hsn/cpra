@@ -470,7 +470,7 @@ GOWORK="$CPRA_SDK_WORKSPACE" GOTOOLCHAIN=local CPRA_RUN_CLI_INTEGRATION=1 \
 
 Ordinary application tests skip these cases unless the explicit invocation flag
 is set. CI runs all five on both compilers and both server builds. The
-[implementation record](implementation/STATUS.md#release-checkpoint-2026-09-30)
+[current availability](versions.md)
 passes all 20 cases, with no skips or changed captured inputs. Frozen release
 qualification still requires `GOWORK=off`, the matching dependency cache and
 final installed artifacts; this development workspace cannot satisfy that gate.
@@ -678,10 +678,10 @@ artifacts. The aggregate publication gate remains separate and locked. These
 reader tests use synthetic report fixtures and do not establish actual scale or
 endurance results.
 
-The current [harness verification record](implementation/07-scale-evidence.md#current-harness-verification)
+The current [comparative verification procedure](validation.md)
 uses local HTTP, Git and controlled compiler/process fixtures. Actual preparation
-of the frozen candidate, comparative runs and the full-duration campaign remain
-unqualified.
+of the frozen candidate and comparative runs remain unqualified. No 24-hour
+run is required or authorized by this guide.
 
 ## Additional local and account scenarios
 

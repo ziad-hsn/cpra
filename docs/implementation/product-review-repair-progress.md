@@ -1,0 +1,131 @@
+# Product-review repair progress
+
+Updated 17 October 2026. Work started from
+`34ef88aa3dd5ff840285d9f59ac8a95ce7ea6865` on `codex/release-repairs`.
+The [approved plan](product-review-repair-plan.md) governs this repair candidate.
+Current package names, existing housekeeping, retained evidence and the separate
+documentation checkout are preserved. Every module requires Go 1.26; the release
+compiler is Go 1.27.2. The 24-hour run remains cancelled.
+
+## Implementation status
+
+The eight implementation areas have independent source review. The reviewer found
+no remaining actionable finding in the changed paths after the documented repairs.
+This is source review, not native-platform, provider, performance or release approval.
+The final affected compiler/tag matrix and late-catalog measurement are still pending
+at this checkpoint. No push, merge, module tag, image or documentation publication
+has been performed by this work.
+
+| Ticket | Implemented and reviewed | Verification boundary |
+| --- | --- | --- |
+| 1. Incident/delivery/restart | Format 42/43 transitions; episode/destination-specific holds; observed health progresses around unknown interventions; green requires actual prior notification start; new file incarnations; fresh-check restart barrier; original intervention deadlines; stopped action inspection/review | Focused lifecycle, real child-process store/receiver, historical action and actual CLI tests passed. Final compatibility/failure selection remains; unknown provider outcomes are never inferred from healthy checks. |
+| 2. Ignore/gray/maintenance | Explicit rolling count/window policy; audited Ignore/Unignore across API/SDK/CLI/dashboard; retained counters/recovery; gray control-transition intents; ECS suppression with durable start guards; captured worker maintenance at offers/starts/heartbeats/results | Focused base/tagged transition tests and real-server browser controls passed. Native time-zone/service environments remain distinct from deterministic DST fixtures. |
+| 3. Authentication/secrets/files | Authentication precedes bounded failed-auth throttling; safe environment-token parsing; parsed MySQL local-file denial; rooted notification output with process-level capability; non-secret target projections | Scoped attacks, token markers, rooted-log and target fixtures passed. The executable walkthrough also checked help/flag-error token output. Native filesystem/service identity qualification remains open. |
+| 4. Validation/errors | Shared pure driver/monitor validators; reference graph checks; source coordinates through file/SDK/browser spools; bounded aliases; original normalization-v1 continuation and stricter v2 imports; safe typed causes | Full loader/manifest/capability suites and a 49-case SDK/file/management parity corpus passed at their recorded checkpoints. Final variants and retained collection-format checks remain. |
+| 5. TLS/provider content | Per-monitor TLS adapters for nine checks, trust/server-name/skip policy and pool isolation; bounded diagnostics; notification identity/content; provider correlation/severity and deliberate Pushover color overrides | Local production-path transport/provider fixtures passed. Local database handshakes and acceptance fixtures do not establish account-backed delivery/effect qualification. |
+| 6. Slow-target isolation | Bounded driver/flow dispatch under one global budget; pending/active ages; arrival-based initial sizing and incremental cold-demand floor; runtime queue diagnostics | Both startup outage scenarios passed after a retained failure. The first late-growth run timed out during activation; its corrected bounded harness requires a fresh run. No fleet or five-minute SLO pass is claimed. |
+| 7. Operator interfaces | Common v2 observation reads with stable IDs/incarnations; mode-aware SDK/CLI reads; Ignore/TLS/diagnostic/queue fields; guided five-resource webhook setup; status, errors, layout and permission repairs | Full frontend build/type/lint and 565 tests passed; all eight required real-server browser campaigns passed. Final generated contract and compiler/tag checks remain. |
+| 8. First run/docs/contributors | Readable quickstart IDs; one-time import guidance and restart reminder; SIGHUP notice/graceful shutdown; UTC machine output; workspace/editor/fast-test guidance; README/image; public source filtering and exclude_docs; repository ignores | Executable first-run/restart walkthrough and earlier strict rendered-site checks passed. Updated references need a final render. Private vulnerability reporting is still disabled and requires repository-admin configuration. |
+
+## Finding disposition
+
+The original review and checked assessment are retained unchanged. A repair below
+means implementation and scoped review/coverage, not completion of release gates.
+
+| Finding | Disposition |
+| --- | --- |
+| Blocker 1: held delivery suppresses later episodes | Confirmed and repaired: original delivery identity, incarnation, episode and destination scope the hold. Later incidents/destinations remain eligible. |
+| Blocker 2: unknown intervention prevents health progress | Confirmed and repaired: health/incident progression is independent of intervention authority; conflicting interventions remain held. |
+| Blocker 3: public installation unavailable | Confirmed publication gap. Development uses the documented generated workspace. Public tags remain intentionally withheld until qualification. |
+| Blocker 4: failed-auth lockout | Confirmed and repaired; current valid credentials are checked before failure throttling. Same-peer/proxy/table-saturation regressions are present. |
+| Blocker 5: private reporting disabled | Confirmed by fresh GitHub readback. No administrative writer credential/tool is configured here; this announcement prerequisite remains open. |
+| Blocker 6: quickstart identities and CLI causes | Repaired with readable IDs, typed safe errors, explicit connection instructions and an executed initialization/validate/start/describe/apply/restart walkthrough. |
+| M1: worker periodic-maintenance boundaries | Repaired with committed decisions/configuration guards across offer/start/heartbeat/result paths; started outcomes remain accepted without suppressed follow-ups. |
+| M2: normal green without prior notification | Repaired using actual notification starts; canceled queued work does not qualify. Ignore recovery has the explicitly selected exception. |
+| M3: slow-target starvation | Repaired dispatch/sizing implementation; two startup measurements pass. Revised late-growth measurement and final matrix remain pending. |
+| M4: validation parity | Shared validators and the reviewed 49-case corpus replace competing target rules. PostgreSQL duplicate URI-host precedence matches pinned pgx; SDK has no provider execution dependencies. |
+| M5: source locations and generic errors | Safe field/rule causes and original coordinates survive file/collection/browser paths. Missing positions are unavailable, not fabricated. |
+| M6: observation-mode CLI | Supported bounded v2 reads work without fabricated writable catalog resources; access discovery never downgrades failed writes. |
+| M7: notification content/provider mappings | Repaired colors, correlation/severity, identity envelopes, diagnostic content and Pushover overrides. Real account/effect qualification remains open. |
+| M8: repeated outages | Existing per-incident max_attempts remains intentional. Explicit count/window automatic Ignore and audited manual controls implement the approved addition. |
+| M9: bootstrap edits and SIGHUP | One-time import remains intentional, now explained/logged. SIGHUP logs unsupported reload and leaves monitoring running; SIGINT/SIGTERM drain. |
+| M10: MySQL/log/target disclosure | Repaired parsed MySQL policy, rooted log destinations and credential-free target projection. The MySQL reproduction requires its documented initialization-query precondition. |
+| M11: UI state/language | Repaired distinct health/control/delivery/review displays, field labels, unavailable timestamps, guided setup and layout. Real-server browser coverage passes. |
+| M12: public documentation/front door | README and guides rewritten; internal implementation/review/candidate records are excluded from source sync, generated output and search, while retained in the repository. |
+| M13: contributor setup | Generated workspace/editor, tool prerequisites, fast tests, regeneration and driver-authoring guidance are present. The fast target passed as a development check. |
+| Environment token disclosure | Confirmed and repaired; parsing and executable marker checks passed. |
+| Removed/re-added monitors and restart admission | Repaired durable incarnation, fresh-observation, original deadline and local-review boundaries; history and unknown facts remain retained. |
+| SDK alias / YAML syntax / VictorOps documentation claims | Assessment corrections retained: SDK aliasing is optional, flow-style YAML is valid, and VictorOps fields were already documented. No workaround added for incorrect claims. |
+| Native/DST/service behavior | Deterministic DST and Linux local fixtures are scoped evidence; native platform/service/CSI qualification remains separate. |
+
+## Recorded development evidence
+
+Records are private, under the task's evidence directory, and contain the command,
+compiler, source fingerprint, exit status, elapsed time, bounded scratch usage and
+log digest. These checks use Linux amd64. Application checks use the generated
+workspace; they do not prove public module installation. Earlier failed runs and
+the previous progress checkpoint remain retained.
+
+| Record | Result and scope |
+| --- | --- |
+| product-restart-process-1; product-intervention-deadline-2; product-ignore-interface-1 | Focused lifecycle/restart/deadline/Ignore checks passed. The process case exercises a child store and receiver, not the entire installed application. |
+| product-worker-maintenance-3 | Selected tagged worker/maintenance/Ignore/gray checks passed after retained failing runs. |
+| product-security-boundaries-3; product-security-tagged-3; product-tls-drivers-1 | Scoped authentication/log/MySQL/TLS/notification checks passed. Earlier failures remain recorded. |
+| product-file-field-locations-7 | Full loader, manifest and capability suites passed at source `2a74eb4a8f39360bee2965227a1d392a49e5ca5dd037017b269a8e10025d7696`. |
+| product-validation-parity-3 | Final 49-case target/settings corpus and typed management cause checks passed at `ff4adef630edd76468d7d54d23be336163fc9e8e5e999a0ae9ceacd33abbee84`. |
+| product-sdk-validation-1; product-sdk-validation-tagged-1 | SDK api/collection packages passed at their earlier recorded checkpoints; the final duplicate-host correction still needs the full tagged rerun. |
+| product-monitor-observation-app-3; product-monitor-observation-sdk-1; product-historical-review-summary-3 | Focused HTTP/SDK/CLI reads and historical review summaries passed. |
+| product-dashboard-rebuild-6 | Go 1.27.2 / Node 24.21.0 / pnpm 11.22.0 parser, assets, type, lint and 565 tests in 36 files passed. React act warnings remain visible in the log. |
+| product-browser-default-3 | All eight required real-server browser tests and both package completions passed without skips in 311 seconds at source `47533bafeb69864d7badce38df788db16a25cac51413cd685e04305dfbef8250`. This run has no race instrumentation and precedes the frozen repair commit. |
+| product-local-action-cli-1 | Actual command/store test passed at that same source: exclusive ownership, actor/reason, revision conflict, persisted assertion, preserved unknown facts and zero remote API requests. |
+| product-newcomer-3 | Eighteen executable walkthrough steps passed: protected init, validation, local TLS, writes/reads, real health receiver, SIGHUP, bounded shutdown, same-state restart and token-output canaries. Not package/service qualification. |
+| product-doc-publication-tests-2; product-doc-render-1; product-doc-boundary-1 | Forty-five publication tests, strict build of 73 HTML pages and 18,008 local links/assets, and zero excluded source/search entries passed at earlier documentation checkpoints. New documentation requires a rerender. |
+| product-fast-target-1 | Named fast development target passed. It does not replace the affected race/integration matrix. |
+
+### Outage evidence and retained failures
+
+`product-outage-isolation-3` passed the two startup cases with a real local target,
+Raft, snapshots, bounded target-side accounting and GOMAXPROCS=2:
+
+- 200 hanging HTTP checks plus one healthy TCP check: the healthy check completed
+  18 observations in 90 seconds; maximum cadence gap 5.017 seconds. All 200 slow
+  targets had a timeout-length hang and later recovered.
+- 300 hanging and 700 healthy HTTP checks: every healthy target completed 9–10
+  observations; maximum cadence gap 10.059 seconds. All 300 slow targets had a
+  timeout-length hang and later recovered.
+
+These cadence gaps are not queue-latency percentiles. Ninety-second regressions do
+not establish the agreed five-minute SLO or million-monitor capacity.
+The earlier `product-outage-isolation-1` failure (34.918-second healthy gap) remains
+retained. Run 3 was an overall failure: late growth reached 647 activated monitors
+before the harness's 150-second CLI deadline, with storage still ready. Its original
+operation handle and receipt remain in the evidence. The harness now records a
+bounded 600-second activation allowance separately from the 90-second measurement;
+that change is not a measured pass. Missing latency measurements stay null rather
+than becoming zero, with explicit rolling-window coverage.
+
+`product-browser-default-1` failed the guided setup fixture, and run 2 was explicitly
+interrupted before completion. Both remain failed/partial, independent of run 3.
+`product-historical-fence-1` reproduced an old test's writer-format expectation;
+only the new-write expectation was updated to format 42, retaining historical
+control-fence decoding assertions. `product-historical-fence-2` passed the corrected
+check plus historical digest/catalog, target-guard and restore selections.
+
+## Final verification and release boundary
+
+Before merge handoff, freeze the reviewed repair source and complete the affected
+application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
+combined variants, appropriate race checks, full SDK/worker suites, generation,
+vulnerability, browser, documentation and revised growth checks. Independent review
+expanded the selection to historical command/digest formats, controller ownership,
+original collection bindings/retained diagnostics and server-worker composition.
+Large pure graph cases run once per compiler, rather than repeating identical
+untagged work in every tag combination. Actual selected tests/skips must be recorded.
+This affected repair matrix is separate from complete release qualification.
+
+GitHub main readback on 17 October was
+`b293f34dd57ee61c78371643de6d0ebaa75c626e`, an ancestor of the local baseline.
+Native OS/architecture execution, services/packages/CSI, designated provider and
+agent accounts, and comparative fleet qualification remain open where infrastructure
+is absent. Private vulnerability reporting remains disabled. Candidates, evidence
+and artifacts stay private, and the cancelled 24-hour run is not reinstated.

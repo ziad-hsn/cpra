@@ -49,3 +49,17 @@ func TestSlowTargetsDoNotTriggerWorkerFeedbackGrowth(t *testing.T) {
 		t.Fatal(c)
 	}
 }
+
+func TestDownstreamDriverDoesNotSuppressOtherDriverQueueRelief(t *testing.T) {
+	now := time.Unix(1700000400, 0)
+	cfg := runtimeconfig.Default().SLO
+	r := slo.New(now.Add(-time.Hour), cfg.QueueTarget, cfg.ResultTarget)
+	for range 1000 {
+		r.Observe("http", now, now.Add(time.Second), now.Add(10*time.Second), now.Add(10*time.Second), true, 0)
+		r.Observe("tcp", now, now.Add(time.Second), now.Add(1100*time.Millisecond), now.Add(1200*time.Millisecond), false, 0)
+	}
+	f := feedback{recorder: r, config: cfg}
+	if got := f.adjust(100, 80, 200, 100, now.Add(11*time.Second)); got != 125 {
+		t.Fatalf("unrelated queue relief was suppressed: %d", got)
+	}
+}

@@ -124,19 +124,19 @@
         "Guide maintenance": "sdk/writing-guide.md"
       },
       {
-        "SDK candidate · Configuration collections": "sdk/collections.md"
+        "Configuration collections": "sdk/collections.md"
       },
       {
-        "SDK candidate · CPRa SDK examples": "sdk/examples.md"
+        "CPRa SDK examples": "sdk/examples.md"
       },
       {
-        "SDK candidate · CPRa Go SDK": "sdk/module-overview.md"
+        "CPRa Go SDK": "sdk/module-overview.md"
       },
       {
-        "SDK candidate · CPRa SDK contract sources": "sdk/openapi.md"
+        "CPRa SDK contract sources": "sdk/openapi.md"
       },
       {
-        "SDK candidate · CPRa external worker library": "sdk/worker-library.md"
+        "CPRa external worker library": "sdk/worker-library.md"
       }
     ]
   },
@@ -188,15 +188,6 @@
       },
       {
         "Provider test endpoints, sandboxes and local verification": "provider-testing-research.md"
-      },
-      {
-        "Referenced implementation sources": "review/implementation-sources.md"
-      },
-      {
-        "Historical documentation review": "review/latest-changes.md"
-      },
-      {
-        "Private verification references": "review/local-evidence.md"
       }
     ]
   }

@@ -202,6 +202,11 @@ type ReplaceMonitorParams struct {
 	IfMatch string `json:"If-Match"`
 }
 
+// IgnoreMonitorParams defines parameters for IgnoreMonitor.
+type IgnoreMonitorParams struct {
+	IfMatch string `json:"If-Match"`
+}
+
 // RecoverMonitorParams defines parameters for RecoverMonitor.
 type RecoverMonitorParams struct {
 	IfMatch string `json:"If-Match"`
@@ -209,6 +214,11 @@ type RecoverMonitorParams struct {
 
 // SnoozeMonitorParams defines parameters for SnoozeMonitor.
 type SnoozeMonitorParams struct {
+	IfMatch string `json:"If-Match"`
+}
+
+// UnignoreMonitorParams defines parameters for UnignoreMonitor.
+type UnignoreMonitorParams struct {
 	IfMatch string `json:"If-Match"`
 }
 
@@ -277,6 +287,14 @@ type PatchNotificationGroupParams struct {
 // ReplaceNotificationGroupParams defines parameters for ReplaceNotificationGroup.
 type ReplaceNotificationGroupParams struct {
 	IfMatch string `json:"If-Match"`
+}
+
+// ListMonitorObservationsParams defines parameters for ListMonitorObservations.
+type ListMonitorObservationsParams struct {
+	Cursor    *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Selector  *string `form:"selector,omitempty" json:"selector,omitempty"`
+	MonitorID *string `form:"monitorID,omitempty" json:"monitorID,omitempty"`
 }
 
 // ListOperationsParams defines parameters for ListOperations.
@@ -396,11 +414,17 @@ type PatchMonitorApplicationMergePatchPlusJSONRequestBody = externalRef0.MergePa
 // ReplaceMonitorJSONRequestBody defines body for ReplaceMonitor for application/json ContentType.
 type ReplaceMonitorJSONRequestBody = externalRef0.Monitor
 
+// IgnoreMonitorJSONRequestBody defines body for IgnoreMonitor for application/json ContentType.
+type IgnoreMonitorJSONRequestBody = externalRef0.ControlRequest
+
 // RecoverMonitorJSONRequestBody defines body for RecoverMonitor for application/json ContentType.
 type RecoverMonitorJSONRequestBody = externalRef0.ControlRequest
 
 // SnoozeMonitorJSONRequestBody defines body for SnoozeMonitor for application/json ContentType.
 type SnoozeMonitorJSONRequestBody = externalRef0.ControlRequest
+
+// UnignoreMonitorJSONRequestBody defines body for UnignoreMonitor for application/json ContentType.
+type UnignoreMonitorJSONRequestBody = externalRef0.ControlRequest
 
 // UnsnoozeMonitorJSONRequestBody defines body for UnsnoozeMonitor for application/json ContentType.
 type UnsnoozeMonitorJSONRequestBody = externalRef0.ControlRequest
@@ -763,6 +787,24 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v2/monitors/{id} (the `ReplaceMonitor` operationId).
 	ReplaceMonitor(ctx context.Context, id string, params *ReplaceMonitorParams, body ReplaceMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// IgnoreMonitorWithBody IgnoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+	IgnoreMonitorWithBody(ctx context.Context, id string, params *IgnoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// IgnoreMonitor IgnoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+	IgnoreMonitor(ctx context.Context, id string, params *IgnoreMonitorParams, body IgnoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RecoverMonitorWithBody RecoverMonitor
 	//
 	// Takes any type of body and a specified content type.
@@ -790,6 +832,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v2/monitors/{id}/snooze (the `SnoozeMonitor` operationId).
 	SnoozeMonitor(ctx context.Context, id string, params *SnoozeMonitorParams, body SnoozeMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnignoreMonitorWithBody UnignoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+	UnignoreMonitorWithBody(ctx context.Context, id string, params *UnignoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnignoreMonitor UnignoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+	UnignoreMonitor(ctx context.Context, id string, params *UnignoreMonitorParams, body UnignoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnsnoozeMonitorWithBody UnsnoozeMonitor
 	//
@@ -918,6 +978,16 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v2/notification-groups/{id} (the `ReplaceNotificationGroup` operationId).
 	ReplaceNotificationGroup(ctx context.Context, id string, params *ReplaceNotificationGroupParams, body ReplaceNotificationGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMonitorObservations Read controller monitor observations
+	//
+	// Corresponds with GET /api/v2/observations/monitors (the `ListMonitorObservations` operationId).
+	ListMonitorObservations(ctx context.Context, params *ListMonitorObservationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMonitorObservation Read one controller monitor observation
+	//
+	// Corresponds with GET /api/v2/observations/monitors/{id} (the `GetMonitorObservation` operationId).
+	GetMonitorObservation(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOperations ListOperations
 	//
@@ -1785,6 +1855,44 @@ func (c *Client) ReplaceMonitor(ctx context.Context, id string, params *ReplaceM
 	return c.Client.Do(req)
 }
 
+// IgnoreMonitorWithBody IgnoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+func (c *Client) IgnoreMonitorWithBody(ctx context.Context, id string, params *IgnoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIgnoreMonitorRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// IgnoreMonitor IgnoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+func (c *Client) IgnoreMonitor(ctx context.Context, id string, params *IgnoreMonitorParams, body IgnoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIgnoreMonitorRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RecoverMonitorWithBody RecoverMonitor
 //
 // Takes any type of body and a specified content type.
@@ -1843,6 +1951,44 @@ func (c *Client) SnoozeMonitorWithBody(ctx context.Context, id string, params *S
 // Corresponds with POST /api/v2/monitors/{id}/snooze (the `SnoozeMonitor` operationId).
 func (c *Client) SnoozeMonitor(ctx context.Context, id string, params *SnoozeMonitorParams, body SnoozeMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSnoozeMonitorRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnignoreMonitorWithBody UnignoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+func (c *Client) UnignoreMonitorWithBody(ctx context.Context, id string, params *UnignoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnignoreMonitorRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnignoreMonitor UnignoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+func (c *Client) UnignoreMonitor(ctx context.Context, id string, params *UnignoreMonitorParams, body UnignoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnignoreMonitorRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2171,6 +2317,36 @@ func (c *Client) ReplaceNotificationGroupWithBody(ctx context.Context, id string
 // Corresponds with PUT /api/v2/notification-groups/{id} (the `ReplaceNotificationGroup` operationId).
 func (c *Client) ReplaceNotificationGroup(ctx context.Context, id string, params *ReplaceNotificationGroupParams, body ReplaceNotificationGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaceNotificationGroupRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMonitorObservations Read controller monitor observations
+//
+// Corresponds with GET /api/v2/observations/monitors (the `ListMonitorObservations` operationId).
+func (c *Client) ListMonitorObservations(ctx context.Context, params *ListMonitorObservationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMonitorObservationsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMonitorObservation Read one controller monitor observation
+//
+// Corresponds with GET /api/v2/observations/monitors/{id} (the `GetMonitorObservation` operationId).
+func (c *Client) GetMonitorObservation(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMonitorObservationRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -4225,6 +4401,66 @@ func NewReplaceMonitorRequestWithBody(server string, id string, params *ReplaceM
 	return req, nil
 }
 
+// NewIgnoreMonitorRequest calls the generic IgnoreMonitor builder with application/json body
+func NewIgnoreMonitorRequest(server string, id string, params *IgnoreMonitorParams, body IgnoreMonitorJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewIgnoreMonitorRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewIgnoreMonitorRequestWithBody constructs an http.Request for the IgnoreMonitor method, with any body, and a specified content type
+func NewIgnoreMonitorRequestWithBody(server string, id string, params *IgnoreMonitorParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/monitors/%s/ignore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewRecoverMonitorRequest calls the generic RecoverMonitor builder with application/json body
 func NewRecoverMonitorRequest(server string, id string, params *RecoverMonitorParams, body RecoverMonitorJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -4313,6 +4549,66 @@ func NewSnoozeMonitorRequestWithBody(server string, id string, params *SnoozeMon
 	}
 
 	operationPath := fmt.Sprintf("/api/v2/monitors/%s/snooze", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("If-Match", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUnignoreMonitorRequest calls the generic UnignoreMonitor builder with application/json body
+func NewUnignoreMonitorRequest(server string, id string, params *UnignoreMonitorParams, body UnignoreMonitorJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUnignoreMonitorRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewUnignoreMonitorRequestWithBody constructs an http.Request for the UnignoreMonitor method, with any body, and a specified content type
+func NewUnignoreMonitorRequestWithBody(server string, id string, params *UnignoreMonitorParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/monitors/%s/unignore", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -5088,6 +5384,130 @@ func NewReplaceNotificationGroupRequestWithBody(server string, id string, params
 
 		req.Header.Set("If-Match", headerParam0)
 
+	}
+
+	return req, nil
+}
+
+// NewListMonitorObservationsRequest constructs an http.Request for the ListMonitorObservations method
+func NewListMonitorObservationsRequest(server string, params *ListMonitorObservationsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/observations/monitors")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Selector != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "selector", *params.Selector, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.MonitorID != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "monitorID", *params.MonitorID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMonitorObservationRequest constructs an http.Request for the GetMonitorObservation method
+func NewGetMonitorObservationRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/observations/monitors/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -6917,6 +7337,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v2/monitors/{id} (the `ReplaceMonitor` operationId).
 	ReplaceMonitorWithResponse(ctx context.Context, id string, params *ReplaceMonitorParams, body ReplaceMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceMonitorResponse, error)
 
+	// IgnoreMonitorWithBodyWithResponse IgnoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+	IgnoreMonitorWithBodyWithResponse(ctx context.Context, id string, params *IgnoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IgnoreMonitorResponse, error)
+
+	// IgnoreMonitorWithResponse IgnoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+	IgnoreMonitorWithResponse(ctx context.Context, id string, params *IgnoreMonitorParams, body IgnoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*IgnoreMonitorResponse, error)
+
 	// RecoverMonitorWithBodyWithResponse RecoverMonitor
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -6944,6 +7382,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v2/monitors/{id}/snooze (the `SnoozeMonitor` operationId).
 	SnoozeMonitorWithResponse(ctx context.Context, id string, params *SnoozeMonitorParams, body SnoozeMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*SnoozeMonitorResponse, error)
+
+	// UnignoreMonitorWithBodyWithResponse UnignoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+	UnignoreMonitorWithBodyWithResponse(ctx context.Context, id string, params *UnignoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnignoreMonitorResponse, error)
+
+	// UnignoreMonitorWithResponse UnignoreMonitor
+	//
+	// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+	UnignoreMonitorWithResponse(ctx context.Context, id string, params *UnignoreMonitorParams, body UnignoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*UnignoreMonitorResponse, error)
 
 	// UnsnoozeMonitorWithBodyWithResponse UnsnoozeMonitor
 	//
@@ -7084,6 +7540,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v2/notification-groups/{id} (the `ReplaceNotificationGroup` operationId).
 	ReplaceNotificationGroupWithResponse(ctx context.Context, id string, params *ReplaceNotificationGroupParams, body ReplaceNotificationGroupJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceNotificationGroupResponse, error)
+
+	// ListMonitorObservationsWithResponse Read controller monitor observations
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/observations/monitors (the `ListMonitorObservations` operationId).
+	ListMonitorObservationsWithResponse(ctx context.Context, params *ListMonitorObservationsParams, reqEditors ...RequestEditorFn) (*ListMonitorObservationsResponse, error)
+
+	// GetMonitorObservationWithResponse Read one controller monitor observation
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/observations/monitors/{id} (the `GetMonitorObservation` operationId).
+	GetMonitorObservationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetMonitorObservationResponse, error)
 
 	// ListOperationsWithResponse ListOperations
 	//
@@ -8691,6 +9161,54 @@ func (r ReplaceMonitorResponse) ContentType() string {
 	return ""
 }
 
+type IgnoreMonitorResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *externalRef0.Operation
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *externalRef0.Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r IgnoreMonitorResponse) GetJSON200() *externalRef0.Operation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r IgnoreMonitorResponse) GetApplicationproblemJSONDefault() *externalRef0.Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r IgnoreMonitorResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r IgnoreMonitorResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r IgnoreMonitorResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r IgnoreMonitorResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RecoverMonitorResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8781,6 +9299,54 @@ func (r SnoozeMonitorResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SnoozeMonitorResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UnignoreMonitorResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *externalRef0.Operation
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *externalRef0.Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UnignoreMonitorResponse) GetJSON200() *externalRef0.Operation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UnignoreMonitorResponse) GetApplicationproblemJSONDefault() *externalRef0.Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnignoreMonitorResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnignoreMonitorResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnignoreMonitorResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnignoreMonitorResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9405,6 +9971,102 @@ func (r ReplaceNotificationGroupResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ReplaceNotificationGroupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListMonitorObservationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *externalRef0.MonitorObservationList
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *externalRef0.Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMonitorObservationsResponse) GetJSON200() *externalRef0.MonitorObservationList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListMonitorObservationsResponse) GetApplicationproblemJSONDefault() *externalRef0.Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMonitorObservationsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMonitorObservationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMonitorObservationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMonitorObservationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMonitorObservationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *externalRef0.MonitorObservation
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *externalRef0.Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMonitorObservationResponse) GetJSON200() *externalRef0.MonitorObservation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetMonitorObservationResponse) GetApplicationproblemJSONDefault() *externalRef0.Problem {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMonitorObservationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMonitorObservationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMonitorObservationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMonitorObservationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -11316,6 +11978,36 @@ func (c *ClientWithResponses) ReplaceMonitorWithResponse(ctx context.Context, id
 	return ParseReplaceMonitorResponse(rsp)
 }
 
+// IgnoreMonitorWithBodyWithResponse IgnoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+func (c *ClientWithResponses) IgnoreMonitorWithBodyWithResponse(ctx context.Context, id string, params *IgnoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IgnoreMonitorResponse, error) {
+	rsp, err := c.IgnoreMonitorWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseIgnoreMonitorResponse(rsp)
+}
+
+// IgnoreMonitorWithResponse IgnoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/monitors/{id}/ignore (the `IgnoreMonitor` operationId).
+func (c *ClientWithResponses) IgnoreMonitorWithResponse(ctx context.Context, id string, params *IgnoreMonitorParams, body IgnoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*IgnoreMonitorResponse, error) {
+	rsp, err := c.IgnoreMonitor(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseIgnoreMonitorResponse(rsp)
+}
+
 // RecoverMonitorWithBodyWithResponse RecoverMonitor
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -11366,6 +12058,36 @@ func (c *ClientWithResponses) SnoozeMonitorWithResponse(ctx context.Context, id 
 		return nil, err
 	}
 	return ParseSnoozeMonitorResponse(rsp)
+}
+
+// UnignoreMonitorWithBodyWithResponse UnignoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+func (c *ClientWithResponses) UnignoreMonitorWithBodyWithResponse(ctx context.Context, id string, params *UnignoreMonitorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnignoreMonitorResponse, error) {
+	rsp, err := c.UnignoreMonitorWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnignoreMonitorResponse(rsp)
+}
+
+// UnignoreMonitorWithResponse UnignoreMonitor
+//
+// Conditional, audited monitor control. A reason and exact control revision are required. Health checks continue; existing external outcomes are retained.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/monitors/{id}/unignore (the `UnignoreMonitor` operationId).
+func (c *ClientWithResponses) UnignoreMonitorWithResponse(ctx context.Context, id string, params *UnignoreMonitorParams, body UnignoreMonitorJSONRequestBody, reqEditors ...RequestEditorFn) (*UnignoreMonitorResponse, error) {
+	rsp, err := c.UnignoreMonitor(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnignoreMonitorResponse(rsp)
 }
 
 // UnsnoozeMonitorWithBodyWithResponse UnsnoozeMonitor
@@ -11626,6 +12348,32 @@ func (c *ClientWithResponses) ReplaceNotificationGroupWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseReplaceNotificationGroupResponse(rsp)
+}
+
+// ListMonitorObservationsWithResponse Read controller monitor observations
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/observations/monitors (the `ListMonitorObservations` operationId).
+func (c *ClientWithResponses) ListMonitorObservationsWithResponse(ctx context.Context, params *ListMonitorObservationsParams, reqEditors ...RequestEditorFn) (*ListMonitorObservationsResponse, error) {
+	rsp, err := c.ListMonitorObservations(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMonitorObservationsResponse(rsp)
+}
+
+// GetMonitorObservationWithResponse Read one controller monitor observation
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/observations/monitors/{id} (the `GetMonitorObservation` operationId).
+func (c *ClientWithResponses) GetMonitorObservationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetMonitorObservationResponse, error) {
+	rsp, err := c.GetMonitorObservation(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMonitorObservationResponse(rsp)
 }
 
 // ListOperationsWithResponse ListOperations
@@ -13023,6 +13771,39 @@ func ParseReplaceMonitorResponse(rsp *http.Response) (*ReplaceMonitorResponse, e
 	return response, nil
 }
 
+// ParseIgnoreMonitorResponse parses an HTTP response from a IgnoreMonitorWithResponse call
+func ParseIgnoreMonitorResponse(rsp *http.Response) (*IgnoreMonitorResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &IgnoreMonitorResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.Operation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseRecoverMonitorResponse parses an HTTP response from a RecoverMonitorWithResponse call
 func ParseRecoverMonitorResponse(rsp *http.Response) (*RecoverMonitorResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -13065,6 +13846,39 @@ func ParseSnoozeMonitorResponse(rsp *http.Response) (*SnoozeMonitorResponse, err
 	}
 
 	response := &SnoozeMonitorResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.Operation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnignoreMonitorResponse parses an HTTP response from a UnignoreMonitorWithResponse call
+func ParseUnignoreMonitorResponse(rsp *http.Response) (*UnignoreMonitorResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnignoreMonitorResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -13501,6 +14315,72 @@ func ParseReplaceNotificationGroupResponse(rsp *http.Response) (*ReplaceNotifica
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest externalRef0.NotificationGroup
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListMonitorObservationsResponse parses an HTTP response from a ListMonitorObservationsWithResponse call
+func ParseListMonitorObservationsResponse(rsp *http.Response) (*ListMonitorObservationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMonitorObservationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.MonitorObservationList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest externalRef0.Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMonitorObservationResponse parses an HTTP response from a GetMonitorObservationWithResponse call
+func ParseGetMonitorObservationResponse(rsp *http.Response) (*GetMonitorObservationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMonitorObservationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.MonitorObservation
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

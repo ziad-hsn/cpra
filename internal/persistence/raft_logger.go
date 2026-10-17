@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/hashicorp/go-hclog"
 	applogger "github.com/ziad-hsn/cpra/internal/logger"
@@ -13,7 +14,10 @@ import (
 
 // raftLogSink adapts framework diagnostics without copying arbitrary error
 // strings, configuration objects or filesystem paths into application records.
-type raftLogSink struct{ logger applogger.Logger }
+type raftLogSink struct {
+	logger          applogger.Logger
+	initialElection atomic.Bool
+}
 
 func newRaftLogger() (hclog.Logger, error) {
 	logger, err := applogger.NewLoggerWithComponent("raft")
@@ -26,6 +30,11 @@ func newRaftLogger() (hclog.Logger, error) {
 }
 
 func (s *raftLogSink) Accept(_ string, level hclog.Level, message string, args ...interface{}) {
+	// One initial election is expected for this single-voter store. Repeated
+	// elections and every other warning keep their original severity.
+	if level == hclog.Warn && message == "heartbeat timeout reached, starting election" && s.initialElection.CompareAndSwap(false, true) {
+		level, message = hclog.Info, "Starting single-node Raft election"
+	}
 	fields := make([]applogger.Field, 0, min(len(args)/2, 16))
 	for i := 0; i+1 < len(args) && len(fields) < 16; i += 2 {
 		key, ok := args[i].(string)

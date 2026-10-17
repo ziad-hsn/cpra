@@ -146,7 +146,7 @@ async function bounded(promise, milliseconds, message) {
       await page.getByLabel('Bearer token').fill(token);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       await page.getByRole('button', { name: 'Sign out', exact: true }).waitFor();
-      await page.getByRole('heading', { name: 'Import configuration files', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Apply configuration', exact: true }).waitFor();
     }
     async function select(paths) {
       const chooser = page.waitForEvent('filechooser');
@@ -225,8 +225,8 @@ async function bounded(promise, milliseconds, message) {
     await page.getByRole('heading', { name: 'Original sealed validation result', exact: true }).waitFor();
     const validationRows = page.getByRole('region', { name: 'Original validation result' }).getByRole('row');
     check(await validationRows.count() === 3, 'Sealed validation did not render both original resources');
-    check(await validationRows.nth(1).getByRole('cell').allTextContents().then(cells => cells[0] === '1' && cells[1] === 'Monitor/browser-import-monitor' && cells[2] === names[0] && cells[3] === '1 / 1' && cells[4] === 'create'), 'Original monitor validation source attribution was incorrect');
-    check(await validationRows.nth(2).getByRole('cell').allTextContents().then(cells => cells[0] === '2' && cells[1] === 'Credential/browser-import-secret' && cells[2] === names[1] && cells[3] === '1 / 1' && cells[4] === 'create'), 'Original credential validation source attribution was incorrect');
+    check(await validationRows.nth(1).getByRole('cell').allTextContents().then(cells => cells[0] === '1' && cells[1] === 'Monitor/browser-import-monitor' && cells[2] === names[0] && cells[3] === '1 / 1, line 1, column 1' && cells[4] === 'create'), 'Original monitor validation source attribution was incorrect');
+    check(await validationRows.nth(2).getByRole('cell').allTextContents().then(cells => cells[0] === '2' && cells[1] === 'Credential/browser-import-secret' && cells[2] === names[1] && cells[3] === '1 / 1, line 1, column 1' && cells[4] === 'create'), 'Original credential validation source attribution was incorrect');
     check(await page.getByRole('button', { name: 'Validate whole collection', exact: true }).isDisabled(), 'An original validation was offered for resubmission');
     check(await page.getByRole('button', { name: 'Review activation', exact: true }).isEnabled(), 'Successful validation did not enable explicit activation review');
     await redactedDOM(); await safeStorage();
@@ -272,7 +272,7 @@ async function bounded(promise, milliseconds, message) {
     }
     checks.push('owner operation list and explicit detail read preserve original inventory and source-token results after local draft disposal; browsing performs no mutation');
     await page.getByRole('link', { name: 'Import files', exact: true }).click();
-    await page.getByRole('heading', { name: 'Import configuration files', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Apply configuration', exact: true }).waitFor();
 
     phase = 'malformed final file';
     const beforeMalformed = writes.length;

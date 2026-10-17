@@ -32,7 +32,7 @@ CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recov
 The current source includes a management dashboard, an HTTP API and the
 `cpractl` command-line client. Named operators manage configuration and controls;
 read-only identities observe their granted resources. Dated engineering records
-retain their historical scope and are outside the main user navigation.
+retain their historical scope in the source repository and are excluded from the public site.
 
 ## What you can do
 
@@ -73,11 +73,13 @@ coordinate monitor ownership. See [durability](durability.md) for recovery behav
 
 Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment and
 observed latency feedback. Percentile SLO measurements remain distinct from an
-SLA guarantee. The million-monitor benchmark, full endurance campaign and
-provider-account qualification remain open [shipping gates](implementation/dashboard-shipping-plan.md).
+SLA guarantee. Comparative fleet measurements and provider-account qualification
+remain open [release gates](versions.md). No 24-hour run is part of this work.
 
 [Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)
 
 ## Follow the latest development
 
-Use [versions and availability](versions.md) to choose between these main guides, the [durable release candidate](candidate/index.md), the [Go SDK candidate](sdk/index.md), and the [approved management plan](implementation/api-management-plan.md). Their implementation and publication states are recorded separately.
+Use [versions and availability](versions.md), the [Go SDK guide](sdk/index.md), and
+the [management guide](cpractl-management.md) for current behavior. Implementation,
+local verification, qualification and publication are recorded separately.

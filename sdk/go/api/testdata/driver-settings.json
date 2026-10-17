@@ -1,0 +1,522 @@
+[
+  {
+    "name": "tcp-host",
+    "category": "check",
+    "driver": "tcp",
+    "config": {
+      "host": "bad host",
+      "port": 80
+    },
+    "field": "config.host",
+    "reason": "networkHost"
+  },
+  {
+    "name": "tcp-ipv6",
+    "category": "check",
+    "driver": "tcp",
+    "config": {
+      "host": "::1",
+      "port": 80
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "http-port",
+    "category": "check",
+    "driver": "http",
+    "config": {
+      "url": "https://example.test:99999"
+    },
+    "field": "config.url",
+    "reason": "httpURL"
+  },
+  {
+    "name": "http-fragment",
+    "category": "check",
+    "driver": "http",
+    "config": {
+      "url": "https://example.test/#private-marker"
+    },
+    "field": "config.url",
+    "reason": "httpURL"
+  },
+  {
+    "name": "http-header-control",
+    "category": "check",
+    "driver": "http",
+    "config": {
+      "url": "https://example.test",
+      "headers": {
+        "X-Test": "private-marker\u0001"
+      }
+    },
+    "field": "config.headers",
+    "reason": "httpHeaders"
+  },
+  {
+    "name": "http-query",
+    "category": "check",
+    "driver": "http",
+    "config": {
+      "url": "https://example.test/path?key=private-marker"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "redis-unix",
+    "category": "check",
+    "driver": "redis",
+    "config": {
+      "addr": "/tmp/fixture.sock"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "redis-empty",
+    "category": "check",
+    "driver": "redis",
+    "config": {},
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "redis-tls-unix",
+    "category": "check",
+    "driver": "redis",
+    "config": {
+      "addr": "/tmp/fixture.sock",
+      "tls": true
+    },
+    "field": "config.addr",
+    "reason": "redisTLSTCP"
+  },
+  {
+    "name": "redis-host",
+    "category": "check",
+    "driver": "redis",
+    "config": {
+      "addr": "bad host:6379"
+    },
+    "field": "config.addr",
+    "reason": "redisAddress"
+  },
+  {
+    "name": "postgres-host-tls-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "host": "/tmp",
+      "tls": true
+    },
+    "field": "config.host",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-host-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "host": "/tmp"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-keyword-tls-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host='/tmp' password='private-marker'",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-keyword-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host='/tmp' password='private-marker'"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-query-tls-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "postgres:///db?host=%2Ftmp",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-query-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "postgres:///db?host=%2Ftmp"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-last-host",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host=/tmp host=db",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-last-host-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host=db host=/tmp",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-mixed-host-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host=db,/tmp",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-quoted-password",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host=db password='private-marker host=/tmp'",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-dsn-priority",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host=db",
+      "host": "/tmp",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "postgres-keyword-invalid",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "host='private-marker"
+    },
+    "field": "config.dsn",
+    "reason": "connectionSyntax"
+  },
+  {
+    "name": "postgres-mode",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "sslmode": "bad"
+    },
+    "field": "config.sslmode",
+    "reason": "postgresSSLMode"
+  },
+  {
+    "name": "mysql-unix-tls",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private-marker@unix(/tmp/mysql.sock)/db",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "mysqlTLSTCP"
+  },
+  {
+    "name": "mysql-unix",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private-marker@unix(/tmp/mysql.sock)/db"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mysql-tcp4",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private-marker@tcp4(db:3306)/db",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mysql-tcp6",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private-marker@tcp6([::1]:3306)/db",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mysql-slash-password",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private/marker@tcp(db:3306)/db",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mysql-missing-separator",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "private-marker"
+    },
+    "field": "config.dsn",
+    "reason": "connectionSyntax"
+  },
+  {
+    "name": "mysql-default-network",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "dsn": "user:private-marker@/db",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mysql-invalid-port",
+    "category": "check",
+    "driver": "mysql",
+    "config": {
+      "port": -1
+    },
+    "field": "config.port",
+    "reason": "optionalPortRange"
+  },
+  {
+    "name": "mongo-seeds",
+    "category": "check",
+    "driver": "mongo",
+    "config": {
+      "uri": "mongodb://one:27017,two:27017/db"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "mongo-srv",
+    "category": "check",
+    "driver": "mongo",
+    "config": {
+      "uri": "mongodb+srv://host/db"
+    },
+    "field": "config.uri",
+    "reason": "mongoURI"
+  },
+  {
+    "name": "rabbitmq-default",
+    "category": "check",
+    "driver": "rabbitmq",
+    "config": {
+      "url": "amqp://"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "rabbitmq-port",
+    "category": "check",
+    "driver": "rabbitmq",
+    "config": {
+      "url": "amqp://db:99999"
+    },
+    "field": "config.url",
+    "reason": "amqpURL"
+  },
+  {
+    "name": "kafka-ipv6",
+    "category": "check",
+    "driver": "kafka",
+    "config": {
+      "brokers": [
+        "host",
+        "[::1]",
+        "[::1]:9092"
+      ]
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "kafka-invalid",
+    "category": "check",
+    "driver": "kafka",
+    "config": {
+      "brokers": [
+        "host:0"
+      ]
+    },
+    "field": "config.brokers",
+    "reason": "dnsServer"
+  },
+  {
+    "name": "log-stdout",
+    "category": "notification",
+    "driver": "log",
+    "config": {},
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "systemd-path",
+    "category": "recovery",
+    "driver": "systemd",
+    "config": {
+      "unit": "/tmp/private-marker"
+    },
+    "field": "config.unit",
+    "reason": "systemdUnit"
+  },
+  {
+    "name": "target-conflict",
+    "category": "recovery",
+    "driver": "docker",
+    "config": {
+      "type": "aws",
+      "container": "app"
+    },
+    "field": "config.type",
+    "reason": "driverTypeConflict"
+  },
+  {
+    "name": "datadog-site",
+    "category": "notification",
+    "driver": "datadog",
+    "config": {
+      "apiKey": "private-marker",
+      "site": "bad host"
+    },
+    "field": "config.site",
+    "reason": "networkHost"
+  },
+  {
+    "name": "victorops-type",
+    "category": "notification",
+    "driver": "victorops",
+    "config": {
+      "url": "https://example.test",
+      "messageType": "private-marker"
+    },
+    "field": "config.messageType",
+    "reason": "victoropsMessageType"
+  },
+  {
+    "name": "a2a-https",
+    "category": "recovery",
+    "driver": "a2a",
+    "config": {
+      "url": "https://agent.test"
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "a2a-http",
+    "category": "recovery",
+    "driver": "a2a",
+    "config": {
+      "url": "http://agent.test"
+    },
+    "field": "config.url",
+    "reason": "a2aURL"
+  },
+  {
+    "name": "a2a-optin",
+    "category": "notification",
+    "driver": "a2a",
+    "config": {
+      "url": "http://agent.test",
+      "allowInsecureHttp": true
+    },
+    "field": "",
+    "reason": ""
+  },
+  {
+    "name": "a2a-poll",
+    "category": "recovery",
+    "driver": "a2a",
+    "config": {
+      "url": "https://agent.test",
+      "taskTimeout": "2s",
+      "pollInterval": "3s"
+    },
+    "field": "config.pollInterval",
+    "reason": "a2aPollInterval"
+  },
+  {
+    "name": "a2a-query",
+    "category": "notification",
+    "driver": "a2a",
+    "config": {
+      "url": "https://agent.test/?key=private-marker"
+    },
+    "field": "config.url",
+    "reason": "a2aURL"
+  },
+  {
+    "name": "postgres-uri-first-unix",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "postgres://db/app?host=%2Ftmp&host=db",
+      "tls": true
+    },
+    "field": "config.dsn",
+    "reason": "postgresTLSTCP"
+  },
+  {
+    "name": "postgres-uri-first-tcp",
+    "category": "check",
+    "driver": "postgres",
+    "config": {
+      "dsn": "postgres://db/app?host=db&host=%2Ftmp",
+      "tls": true
+    },
+    "field": "",
+    "reason": ""
+  }
+]

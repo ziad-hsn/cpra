@@ -247,7 +247,7 @@ result, err := collection.Apply(ctx, client.Operations, frozen)
 // Retain result.OperationID on failure as well as success.
 ```
 
-`FileNormalizationProfile` is `cpra.file.base.v1`. It permits at most 1,000
+`FileNormalizationProfile` is `cpra.file.base.v2`. New imports reject a notification group combined with an inline destination and support bounded aliases/merge keys within one streamed entry. `cpra.file.base.v1` is retained only for continuation of existing operations. It permits at most 1,000
 expanded sources, 64 MiB total raw input, 10,000 resources, 1 MiB per resource,
 16 MiB of document metadata and 512 MiB of local plaintext staging. Options can
 tighten these limits. Unsupported profiles and enlarged limits fail before
@@ -329,7 +329,7 @@ observation and returns `ErrReselectionObservation` when that count is absent.
 `ResumeFiles` uses the server's original private identity to verify the exact
 sources before continuing validation and activation. It supports ordinary
 `Freeze` file imports with an empty normalization profile, as well as
-`cpra.file.base.v1`; it never changes that profile. Preserve the original file
+the original supported file profile; it never changes that profile. Preserve the original file
 order, boundaries, comments and whitespace.
 
 ```go

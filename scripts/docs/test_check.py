@@ -59,6 +59,13 @@ class DocumentationLinksTests(unittest.TestCase):
                 self.assertEqual(len(errors), 1)
                 self.assertEqual(evidence, [])
 
+    def test_public_link_to_engineering_record_is_rejected(self):
+        record = self.docs / "implementation/record.md"
+        record.write_text("# Internal\n")
+        errors, _ = self.check_document("guide.md", "implementation/record.md")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("unpublished engineering record", errors[0])
+
     def test_implementation_exception_cannot_escape_repository(self):
         for target in ("../../../outside.md", "../../bin/verification/%2e%2e/%2e%2e/%2e%2e/outside.md",
                        str(self.root / "internal/server.go")):

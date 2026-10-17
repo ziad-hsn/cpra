@@ -27,10 +27,14 @@ func (f *feedback) adjust(current, model, maximum, queued int, at time.Time) int
 	condition := "insufficient_observations"
 	var samples uint64
 	queueBreach, resultBreach, downstream := false, false, false
+	adjustableQueueBreach := false
 	for _, r := range view.Reports {
 		samples += r.Samples
 		if r.QueueAttainment != nil && *r.QueueAttainment < .99 {
 			queueBreach = true
+			if r.Condition != "downstream_limited" {
+				adjustableQueueBreach = true
+			}
 		}
 		if r.ResultAttainment != nil && *r.ResultAttainment < .99 {
 			resultBreach = true
@@ -42,6 +46,10 @@ func (f *feedback) adjust(current, model, maximum, queued int, at time.Time) int
 	desired := max(current, model)
 	if samples >= f.config.MinimumSamples {
 		switch {
+		case adjustableQueueBreach && queued > 0:
+			condition = "queue_delay"
+			f.healthySince = time.Time{}
+			desired = max(model, int(math.Ceil(float64(current)*1.25)))
 		case downstream:
 			condition = "downstream_limited"
 			f.healthySince = time.Time{}

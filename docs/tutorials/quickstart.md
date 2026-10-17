@@ -22,6 +22,7 @@ From the CPRa checkout:
 make
 export PATH="$PWD/bin:$PATH"
 cpra -version
+cpractl version
 cpractl local init --management
 ~~~
 
@@ -47,6 +48,11 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory /tmp/cpra-demo
 
 This serves http://127.0.0.1:8080/health. Keep it running.
 
+If port 8080 is already occupied, choose another free port without stopping the
+existing service. Copy `examples/monitors.yaml` to a private working file, change
+its check URL to the chosen port, and use that file in the validation and apply
+commands below. Keep the example's `id: example-service` for the describe command.
+
 ## 3. Start CPRa and connect
 
 Run the exact **server command** printed by initialization. It selects the
@@ -66,6 +72,14 @@ Include those connection arguments with each command, or configure the matching
 CPRA_SERVER, CPRA_CA_FILE and CPRA_AUTH_TOKEN_FILE variables using the printed
 paths. Do not put a bearer in a URL or command argument.
 
+Keep token environment variables scoped to CLI commands. The server also reads
+CPRA_AUTH_TOKEN and CPRA_AUTH_TOKEN_FILE as observation-mode bootstrap inputs;
+passing its named management operator token through those inputs is rejected.
+Use the printed CLI connection arguments if running server validation in the
+same terminal. Alternatively, explicitly clear both server inputs for that
+command with `-web.auth= -web.auth-file=`; named management authentication still
+comes from the runtime configuration's policy.
+
 For the dashboard, manually trust the generated local CA in your browser, open
 https://localhost:8060, and sign in using the protected operator token read
 locally from its file. Initialization does not install trust roots. The
@@ -75,16 +89,31 @@ locally from its file. Initialization does not install trust roots. The
 
 From the checkout, with the connection arguments or variables configured:
 
+Validate the example with the `-runtime-config` path from the printed server
+command. That runtime setting supplies the root for log notifications:
+
 ~~~sh
-cpractl apply -f examples/monitors.yaml
+cpra -validate -yaml examples/monitors.yaml -runtime-config /absolute/path/from/init/runtime.yaml
+~~~
+
+Replace that path with the initializer's actual runtime path before running it.
+Validation opens no store and contacts no target. Then apply through the
+configured authenticated connection:
+
+~~~sh
+cpractl apply -f examples/monitors.yaml --wait --timeout 90s
 cpractl get monitors
 cpractl describe monitor/example-service
 cpractl get queues
 cpractl get slo
 ~~~
 
+The bounded wait keeps the original operation handle and waits for its retained
+application result before the describe request. If it times out, inspect or wait
+on that operation; do not submit a replacement merely because the wait ended.
+
 The example checks the local target every 30 seconds and writes incident
-notifications to the configured alerts.jsonl file. It has no recovery action.
+notifications to `alerts.jsonl` inside the process-configured notification log directory. It has no recovery action.
 Management imports its bootstrap manifest once. Later file edits require an
 explicit apply; editing the original file does not reload active configuration.
 The dashboard can also create and edit monitors, receivers, groups and secrets.
@@ -102,7 +131,11 @@ the healthy threshold. Intervention completion means verification is pending;
 restored-health wording follows confirmed checks. Maintenance keeps checks
 running while suppressing notifications/recovery, with no deferred alert burst.
 
-Use Ctrl+C to stop CPRa and the target. Keep the state directory for restart
+Use Ctrl+C to stop CPRa, then repeat the same server command without rerunning
+initialization. `cpractl describe monitor/example-service` must still resolve the
+committed monitor; restart does not import subsequent bootstrap-file edits.
+SIGHUP logs an unsupported-reload notice and keeps running. Stop CPRa and the
+target with Ctrl+C when finished. Keep the state directory for restart
 recovery. Unknown action outcomes are held for investigation and are not replayed
 automatically. Follow [persistence and recovery](../durability.md) for complete
 stopped backup/restore and [deployment](../how-to/deploy-to-production.md) for

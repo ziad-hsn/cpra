@@ -83,6 +83,12 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 {{- if ne .Values.persistence.enabled (eq .Values.storage.mode "raft") -}}{{ fail "raft requires persistence.enabled=true; disposable memory mode requires persistence.enabled=false" }}{{- end -}}
 {{- if and (eq .Values.persistence.accessMode "ReadWriteOnce") (not .Values.persistence.acknowledgeReadWriteOnce) -}}{{ fail "ReadWriteOnce permits multiple pods on one node; explicitly acknowledge this weaker fence" }}{{- end -}}
 {{- if and .Values.manifest.existingClaim (eq .Values.manifest.existingClaim .Values.persistence.existingClaim) -}}{{ fail "manifest and state must use separate claims" }}{{- end -}}
+{{- $stateClaim := default (printf "state-%s-0" (include "cpra.fullname" .)) .Values.persistence.existingClaim -}}
+{{- if and .Values.manifest.existingClaim (eq .Values.manifest.existingClaim $stateClaim) -}}{{ fail "manifest and state must use separate claims" }}{{- end -}}
+{{- if .Values.notificationLog.existingClaim -}}
+{{- if not .Values.notificationLog.enabled -}}{{ fail "notificationLog.existingClaim requires notificationLog.enabled=true" }}{{- end -}}
+{{- if or (eq .Values.notificationLog.existingClaim $stateClaim) (eq .Values.notificationLog.existingClaim .Values.manifest.existingClaim) -}}{{ fail "notification logs require a claim separate from state and manifest storage" }}{{- end -}}
+{{- end -}}
 {{- if and .Values.ingress.enabled (or (not .Values.ingress.host) (not .Values.ingress.tlsSecret)) -}}{{ fail "ingress requires host and tlsSecret; plaintext ingress is unsupported" }}{{- end -}}
 {{- if ne .Values.ingress.path "/" -}}{{ fail "the dashboard supports ingress path / only" }}{{- end -}}
 {{- if and .Values.kubernetesRecovery.enabled (not (or .Values.kubernetesRecovery.restartDeployments .Values.kubernetesRecovery.scaleDeployments)) -}}{{ fail "kubernetesRecovery requires at least one designated Deployment" }}{{- end -}}

@@ -67,6 +67,7 @@ const maxConfigurationBytes = 4 << 20
 
 type Config struct {
 	StateDirectory string            `yaml:"state_directory"`
+	LogDirectory   string            `yaml:"log_directory"`
 	Manifest       manifest.Manifest `yaml:"manifest"`
 	Cases          []Case            `yaml:"cases"`
 }
@@ -190,6 +191,15 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 			break
 		}
 	}
+	var notificationLog *jobs.NotificationLog
+	if c, ok := cases["code/log"]; ok && c.Configured {
+		var err error
+		notificationLog, err = jobs.OpenNotificationLog(cfg.LogDirectory, cfg.StateDirectory)
+		if err != nil {
+			return report, errors.New("log verification requires a separate private absolute log_directory")
+		}
+		defer notificationLog.Close()
+	}
 	for _, driver := range Inventory() {
 		record := Record{Driver: driver, Status: "not_configured", Operation: driver.Kind, EvidenceType: EvidenceLiveAccount, ObservationBoundary: BoundaryEffect, Reason: "not verified: no enabled user configuration"}
 		c, exists := cases[driver.Kind+"/"+driver.Name]
@@ -203,7 +213,7 @@ func Run(ctx context.Context, cfg Config, live bool) (Report, error) {
 			if !ok || !caseConfigured(c, m, cfg.Manifest) {
 				record.Reason = "not verified: selected target, test credentials, or independent observer is not configured"
 			} else {
-				record = runCase(ctx, report.RunID, driver, c, m, cfg.Manifest, cfg.StateDirectory)
+				record = runCase(ctx, report.RunID, driver, c, m, cfg.Manifest, cfg.StateDirectory, notificationLog)
 			}
 		}
 		report.Records = append(report.Records, record)
@@ -317,7 +327,7 @@ func (r *Report) summarize() {
 	r.Complete = len(r.Records) == len(Inventory()) && liveEffects == len(Inventory())
 }
 
-func runCase(parent context.Context, runID string, driver Driver, c Case, m manifest.Monitor, configuration manifest.Manifest, stateDirectory string) (r Record) {
+func runCase(parent context.Context, runID string, driver Driver, c Case, m manifest.Monitor, configuration manifest.Manifest, stateDirectory string, notificationLog *jobs.NotificationLog) (r Record) {
 	r = Record{Driver: driver, Status: "fail", Operation: driver.Kind, Configured: true, EvidenceType: c.EvidenceType, ObservationBoundary: c.ObservationBoundary, Started: time.Now().UTC()}
 	defer func() { r.DurationMS = float64(time.Since(r.Started)) / float64(time.Millisecond) }()
 	timeout := c.Timeout
@@ -357,6 +367,7 @@ func runCase(parent context.Context, runID string, driver Driver, c Case, m mani
 	}
 	d := jobs.NewDispatch(job, ecs.Entity{}, driver.Kind, c.Color, 1, c.Endpoint)
 	d.SetContext(ctx)
+	d.NotificationLog = notificationLog
 	if agent != nil {
 		agent.bind(d)
 	}

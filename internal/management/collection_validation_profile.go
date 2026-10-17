@@ -22,7 +22,7 @@ const (
 	// resolution, routing, prefix ordering or allocation/work accounting change
 	// accepted configurations or validation decisions. Schema and limit changes
 	// are also hashed, but cannot identify arbitrary Go implementation changes.
-	collectionValidationPolicyVersion = 5
+	collectionValidationPolicyVersion = 6
 	collectionProfileSchemaBytes      = 1 << 20
 	collectionProfileEncodedBytes     = 64 << 10
 	collectionProfileDriverCount      = 64
@@ -34,6 +34,7 @@ const (
 // Available means compiled built-in support, never connectivity or runtime
 // authorization. Merely embedding an external-job schema enables no driver.
 type collectionValidationProfileData struct {
+	NotificationLogEnabled  bool                       `json:"notificationLogEnabled,omitempty"`
 	ProfileVersion          uint64                     `json:"profileVersion"`
 	APIVersion              string                     `json:"apiVersion"`
 	SchemaDigest            string                     `json:"schemaDigest"`
@@ -111,8 +112,13 @@ func collectionValidationProfile() (collectionValidationProfileData, string, err
 
 func (o CatalogOptions) validationProfile() (collectionValidationProfileData, string, error) {
 	profile, digest, err := collectionValidationProfile()
-	if err != nil || !o.extendValidationProfile(&profile) {
+	if err != nil {
 		return profile, digest, err
+	}
+	changed := o.extendValidationProfile(&profile)
+	profile.NotificationLogEnabled = o.NotificationLogEnabled
+	if !changed && !o.NotificationLogEnabled {
+		return profile, digest, nil
 	}
 	raw, err := encodeCollectionValidationProfile(profile)
 	if err != nil {

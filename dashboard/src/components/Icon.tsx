@@ -5,12 +5,14 @@ import type { CSSProperties } from 'react';
  * Replaces the earlier emoji icons with a consistent, professional glyph system.
  */
 export type IconName =
-  | 'overview' | 'monitors' | 'alerts' | 'system' | 'settings'
+  | 'overview' | 'monitors' | 'alerts' | 'system' | 'settings' | 'person' | 'key'
   | 'pulse' | 'search' | 'sun' | 'moon' | 'chevron-left' | 'chevron-right'
   | 'chevron-down' | 'refresh' | 'external' | 'activity' | 'check'
   | 'warning' | 'clock' | 'gauge' | 'layers' | 'filter' | 'arrow-up' | 'arrow-down';
 
 const PATHS: Record<IconName, JSX.Element> = {
+  person: (<><circle cx="12" cy="7" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>),
+  key: (<><circle cx="8" cy="9" r="5" /><path d="m12 13 8 8M17 18l3-3M14 15l3-3" /></>),
   overview: (<><path d="M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V9h-8v12Zm0-18v4h8V3h-8Z" /></>),
   monitors: (<><path d="M2 12h4l3-8 4 16 3-8h6" /></>),
   alerts: (<><path d="M12 3a6 6 0 0 0-6 6c0 5-2 6-2 6h16s-2-1-2-6a6 6 0 0 0-6-6Z" /><path d="M10 20a2 2 0 0 0 4 0" /></>),

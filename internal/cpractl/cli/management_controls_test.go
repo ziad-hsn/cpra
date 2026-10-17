@@ -24,6 +24,8 @@ func TestManagementControlsUseExactVersionsAndSDKOperations(t *testing.T) {
 		{"reopen", "incident/current", "revision", "/incidents/current/reopen", `{"revision":"observed-version"}`, nil},
 		{"snooze", "monitor/service-api", "control-revision", "/monitors/service-api/snooze", `{"revision":"observed-version","duration":"30m","reason":"Investigating"}`, []string{"--reason-file", "-", "--for", "30m"}},
 		{"unsnooze", "monitor/service-api", "control-revision", "/monitors/service-api/unsnooze", `{"revision":"observed-version"}`, nil},
+		{"ignore", "monitor/service-api", "control-revision", "/monitors/service-api/ignore", `{"revision":"observed-version","reason":"Investigating"}`, []string{"--reason-file", "-"}},
+		{"unignore", "monitor/service-api", "control-revision", "/monitors/service-api/unignore", `{"revision":"observed-version","reason":"Investigating"}`, []string{"--reason-file", "-"}},
 		{"disable", "monitor/service-api", "resource-version", "/monitors/service-api", `{"spec":{"enabled":false}}`, nil},
 		{"enable", "monitor/service-api", "resource-version", "/monitors/service-api", `{"spec":{"enabled":true}}`, nil},
 	} {
@@ -45,7 +47,7 @@ func TestManagementControlsUseExactVersionsAndSDKOperations(t *testing.T) {
 				w.Header().Set("X-Operation-ID", cliOperationID)
 				w.Header().Set("Content-Type", "application/json")
 				switch test.action {
-				case "snooze", "unsnooze":
+				case "snooze", "unsnooze", "ignore", "unignore":
 					_ = json.NewEncoder(w).Encode(api.Operation{ID: cliOperationID, ContentDigest: strings.Repeat("a", 64), State: "committed", Committed: api.Pointer(int64(1))})
 				case "enable", "disable":
 					_ = json.NewEncoder(w).Encode(cliResource("Monitor", "service-api"))

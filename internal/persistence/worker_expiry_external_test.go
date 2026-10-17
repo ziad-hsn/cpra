@@ -239,7 +239,7 @@ func TestWorkerExpiryCommandAndSnapshotValidation(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatal("expiry format boundary", version, err)
 		}
 	}
@@ -263,7 +263,7 @@ func TestWorkerExpiryCommandAndSnapshotValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(deliveryWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(lifecycleWorkerSnapshotMagic)) {
 		t.Fatal("snapshot does not preserve the delivery worker format")
 	}
 	if bytes.Contains(raw, []byte("private-execution-parameters-canary")) {

@@ -81,7 +81,7 @@ export default function Overview() {
       <div className='page-head'>
         <div>
           <h1>Fleet Overview</h1>
-          <div className='lead'>Latest health snapshot for {formatNumber(total)} monitors</div>
+          <div className='lead'>Latest health snapshot for {formatNumber(total)} {total === 1 ? 'monitor' : 'monitors'}</div>
         </div>
       </div>
 
@@ -89,9 +89,9 @@ export default function Overview() {
       <div className='grid-kpis'>
         <KpiTile label='Total Monitors' value={formatNumber(total)} loading={isLoading} sub='registered endpoints' code='gray' icon='layers' />
         <KpiTile label='Operational' value={total > 0 ? formatPercent(upPct) : '—'} loading={isLoading} code='green' icon='check' sub='latest controller snapshot' />
-        <KpiTile label='Open Incidents' value={formatNumber(critical)} loading={isLoading} code='red' icon='warning' sub='incident + down' />
-        <KpiTile label='Verifying' value={formatNumber(byStatus.verifying ?? 0)} loading={isLoading} code='yellow' icon='clock' sub='awaiting retry' />
-        <KpiTile label='Throughput' value={formatNumber(Math.round(throughput))} loading={isLoading} code='cyan' icon='activity' sub='entities / sec' />
+        <KpiTile label='Open Incidents' value={formatNumber((byStatus.incident ?? 0) + (byStatus.verifying ?? 0))} loading={isLoading} code='red' icon='warning' sub='threshold reached; includes recovery verification' />
+        <KpiTile label='Verifying' value={formatNumber(byStatus.verifying ?? 0)} loading={isLoading} code='yellow' icon='clock' sub='awaiting healthy-check threshold' />
+        <KpiTile label='Controller processing' value={systems ? formatNumber(Math.round(throughput)) : '—'} loading={isLoading} code='cyan' icon='activity' sub='items / sec; not check completions' />
       </div>
 
       {/* Bento row 1: availability ring + status donut + throughput */}
@@ -122,13 +122,13 @@ export default function Overview() {
 
         <div className='card span-4'>
           <div className='card-head'>
-            <span className='card-title'>Throughput</span>
-            <span className='card-sub'>last {throughputHistory.length} dashboard refreshes</span>
+            <span className='card-title'>Controller processing</span>
+            <span className='card-sub'>last {throughputHistory.length} dashboard {throughputHistory.length === 1 ? 'refresh' : 'refreshes'}</span>
           </div>
           <div className='col' style={{ gap: 8 }}>
-            <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{formatNumber(Math.round(throughput))}<span className='muted' style={{ fontSize: 13, fontWeight: 500 }}> eps</span></div>
+            <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>{systems ? formatNumber(Math.round(throughput)) : '—'}<span className='muted' style={{ fontSize: 13, fontWeight: 500 }}> items/sec</span></div>
             <Sparkline data={throughputHistory} width={320} height={70} color='var(--accent)' fill />
-            <div className='muted' style={{ fontSize: 11 }}>{formatNumber(epsProcessed)} entities processed since server start</div>
+            <div className='muted' style={{ fontSize: 11 }}>{systems ? formatNumber(epsProcessed) : 'Unavailable'} items processed since server start; a monitor can be counted more than once</div>
           </div>
         </div>
       </div>
@@ -137,8 +137,8 @@ export default function Overview() {
       <div className='bento'>
         <div className='card span-5'>
           <div className='card-head'>
-            <span className='card-title'>Active Alert Codes</span>
-            <span className='card-sub'>by severity</span>
+            <span className='card-title'>Monitors with pending notifications</span>
+            <span className='card-sub'>one pending color per monitor</span>
           </div>
           {isLoading ? <LoadingSkeleton width='80%' lines={5} /> : (
             <div className='col'>
@@ -198,13 +198,13 @@ export default function Overview() {
               const hot = pct > 60;
               return (
                 <div key={name} className='col' style={{ gap: 6 }}>
-                  <span className='card-title' style={{ textTransform: 'capitalize' }}>{name} queue</span>
+                  <span className='card-title'>{{ pulse: 'Health checks', intervention: 'Recovery actions', code: 'Notifications' }[name]} queue</span>
                   <div className='row' style={{ alignItems: 'baseline', gap: 8 }}>
                     <span style={{ fontSize: 26, fontWeight: 700 }}>{formatNumber(q.queue_depth)}</span>
                     <span className='muted' style={{ fontSize: 12 }}>/ {formatNumber(q.capacity)}</span>
                   </div>
                   <span className='bar-track'><span className='bar-fill' style={{ width: pct + '%', background: hot ? 'var(--status-degraded)' : 'var(--accent)' }} /></span>
-                  <span className='muted' style={{ fontSize: 11 }}>avg wait {formatDurationNs(q.avg_queue_time)} · {formatNumber(q.dropped)} dropped</span>
+                  <span className='muted' style={{ fontSize: 11 }}>avg wait {q.dequeued > 0 ? formatDurationNs(q.avg_queue_time) : 'unavailable'} · {formatNumber(q.dropped)} dropped</span>
                 </div>
               );
             })}

@@ -27,13 +27,19 @@ type PulseMongoJob struct {
 	Entity      ecs.Entity
 	ID          uuid.UUID
 	payload     map[string]interface{}
+	tls         checkTLS
 }
 
 func newPulseMongoJob(cfg *manifest.PulseMongoConfig, timeout time.Duration, entity ecs.Entity) (Job, error) {
+	transport, err := prepareCheckTLS("mongo", cfg, cfg.TLS, cfg.InsecureSkipVerify, cfg.CAFile, cfg.ServerName)
+	if err != nil {
+		return nil, err
+	}
 	if strings.HasPrefix(strings.ToLower(cfg.URI), "mongodb+srv:") {
 		return nil, fmt.Errorf("mongodb+srv discovery cannot honor check deadlines; use a direct mongodb:// URI")
 	}
 	return &PulseMongoJob{
+		tls:     transport,
 		ID:      uuid.New(),
 		Entity:  entity,
 		URI:     cfg.URI,
@@ -53,7 +59,15 @@ func (p *PulseMongoJob) Execute() (result Result) {
 		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("mongodb+srv discovery cannot honor check deadlines; use a direct mongodb:// URI"), Payload: payload}
 	}
 	// v2 API: Connect takes no context argument.
-	client, err := mongo.Connect(options.Client().ApplyURI(p.URI))
+	settings := options.Client().ApplyURI(p.URI)
+	if p.tls.configured {
+		tlsConfig, err := p.tls.configuration("") // Driver selects each seed's hostname.
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
+		settings.SetTLSConfig(tlsConfig)
+	}
+	client, err := mongo.Connect(settings)
 	if err != nil {
 		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("failed to create mongo client: %w", err), Payload: payload}
 	}

@@ -13,7 +13,11 @@ import (
 )
 
 func prepareCatalogMonitor(p management.RuntimePreparation, _ runtimeconfig.Config) (*entities.PreparedMonitor, error) {
-	return entities.PrepareMonitor(p.Monitor, p.Endpoints, p.NotificationGroups)
+	prepared, err := entities.PrepareMonitor(p.Monitor, p.Endpoints, p.NotificationGroups)
+	if err == nil {
+		prepared.SetTargetSummary(p.CheckTargetSummary)
+	}
+	return prepared, err
 }
 
 func configureCatalogNotifications(*persistence.Policy, management.RuntimePreparation) {}

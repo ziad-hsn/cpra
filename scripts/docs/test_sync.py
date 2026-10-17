@@ -73,14 +73,18 @@ class NavigationSyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "symlink"):
             sync.sync(self.site)
 
-    def test_engineering_records_remain_available_outside_user_navigation(self):
-        for name in ("implementation/review.md", "review/version-review.md", "candidate/index.md"):
+    def test_engineering_records_remain_in_repository_but_not_public_sources(self):
+        names = ("implementation/review.md", "review/version-review.md", "candidate/index.md", "review/source.go.txt")
+        for name in names:
             path = self.docs / name
             path.parent.mkdir(exist_ok=True)
             path.write_text("# Dated engineering record\n")
         result = sync.sync(self.site)
         self.assertEqual(result["navigation_pages"], 1)
-        self.assertTrue((self.site / "_sources/docs/implementation/review.md").is_file())
+        self.assertEqual(result["excluded_engineering_files"], len(names))
+        for name in names:
+            self.assertTrue((self.docs / name).is_file())
+            self.assertFalse((self.site / "_sources/docs" / name).exists())
         self.assertNotIn("Dated engineering", self.config.read_text())
         for prefix in sync.ARCHIVE_PREFIXES:
             self.assertIn("  /" + prefix + "**\n", self.config.read_text())
@@ -88,28 +92,50 @@ class NavigationSyncTests(unittest.TestCase):
 
     def test_archive_patterns_replace_stale_settings_without_weakening_link_validation(self):
         original = self.config.read_text()
-        for setting in ("not_in_nav: |\n  /**", "not_in_nav: /**"):
+        for setting in ("exclude_docs: |\n  /**", "exclude_docs: /**"):
             for ending in ("\n", ""):
                 with self.subTest(setting=setting, ending=ending):
                     self.config.write_text(original + setting + ending)
                     sync.sync(self.site)
                     text = self.config.read_text()
-                    self.assertEqual(text.count("not_in_nav:"), 1)
-                    self.assertEqual(text.partition("not_in_nav: |\n")[2].splitlines(),
+                    self.assertEqual(text.count("exclude_docs:"), 1)
+                    self.assertEqual(text.partition("exclude_docs: |\n")[2].splitlines(),
                                      ["  /" + prefix + "**" for prefix in sync.ARCHIVE_PREFIXES])
                     self.assertIn("not_found: warn", text)
                     self.assertTrue(sync.sync(self.site, check=True)["copies_match"])
 
     def test_duplicate_archive_settings_are_rejected_before_mutation(self):
         original = self.config.read_text()
-        for second in ("not_in_nav: |\n  /two\n", "not_in_nav: |\n  /two", "not_in_nav: /two"):
+        for second in ("exclude_docs: |\n  /two\n", "exclude_docs: |\n  /two", "exclude_docs: /two"):
             with self.subTest(second=second):
-                text = original + "not_in_nav: |\n  /one\n" + second
+                text = original + "exclude_docs: |\n  /one\n" + second
                 self.config.write_text(text)
-                with self.assertRaisesRegex(ValueError, "at most one not_in_nav"):
+                with self.assertRaisesRegex(ValueError, "at most one exclude_docs"):
                     sync.sync(self.site)
                 self.assertEqual(self.config.read_text(), text)
                 self.assertFalse((self.site / "_sources/docs").exists())
+
+    def test_old_public_copy_is_removed_without_removing_repository_record(self):
+        original = self.docs / "review/old.md"
+        original.parent.mkdir()
+        original.write_text("# Internal record\n")
+        copied = self.site / "_sources/docs/review/old.md"
+        copied.parent.mkdir(parents=True)
+        copied.write_bytes(original.read_bytes())
+        with self.assertRaisesRegex(ValueError, "obsolete"):
+            sync.sync(self.site, check=True)
+        self.assertTrue(copied.exists())
+        sync.sync(self.site)
+        self.assertFalse(copied.exists())
+        self.assertTrue(original.exists())
+
+    def test_navigation_cannot_publish_an_engineering_record(self):
+        path = self.docs / "review/internal.md"
+        path.parent.mkdir()
+        path.write_text("# Internal\n")
+        self.nav.write_text(json.dumps([{"Home": "index.md"}, {"Review": "review/internal.md"}]))
+        with self.assertRaisesRegex(ValueError, "cannot appear"):
+            sync.sync(self.site)
 
     def test_source_version_and_announcement_drift_are_rejected_without_overwrite(self):
         sync.sync(self.site)

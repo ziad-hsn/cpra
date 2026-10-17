@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,33 @@ import (
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+func TestMainNamedTokenCannotAlsoBootstrapObservation(t *testing.T) {
+	for _, source := range []string{"value", "file"} {
+		t.Run(source, func(t *testing.T) {
+			f := newMainManagementFixture(t)
+			f.options.validate = true
+			if source == "file" {
+				f.options.webAuthFile = filepath.Join(t.TempDir(), "operator.token")
+				if err := os.WriteFile(f.options.webAuthFile, []byte(startupOperatorToken), 0600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				f.options.webAuth = startupOperatorToken
+			}
+			err := runCPRa(context.Background(), f.options, func() { t.Error("validation started owner") })
+			if !errors.Is(err, httpauth.ErrInvalidConfig) || !strings.Contains(err.Error(), "pass connection credentials only to cpractl") {
+				t.Fatalf("duplicate authentication must explain the conflict: %v", err)
+			}
+			if strings.Contains(err.Error(), startupOperatorToken) {
+				t.Fatal("credential appeared in validation error")
+			}
+			if _, statErr := os.Stat(f.settings.Storage.Directory); !os.IsNotExist(statErr) {
+				t.Fatal("validation opened state", statErr)
+			}
+		})
+	}
+}
 
 func mainAuthStatus(t *testing.T, f *mainManagementFixture, path, token string, basic bool) int {
 	t.Helper()

@@ -48,7 +48,11 @@ type Catalog struct {
 
 // CatalogOptions is captured at construction and cannot change during admission.
 // Optional execution settings are present only in their tagged builds.
-type CatalogOptions struct{ catalogOptionsExtensions }
+type CatalogOptions struct {
+	catalogOptionsExtensions
+	// Process-owned capability; resource configuration cannot enable it.
+	NotificationLogEnabled bool
+}
 
 func NewCatalog(store *persistence.Store, sealer *secureconfig.Sealer, options ...CatalogOptions) (*Catalog, error) {
 	if store == nil || sealer == nil || store.Status().NodeID == "" || len(options) > 1 {
@@ -86,7 +90,13 @@ func (c *Catalog) Verify(ctx context.Context) error {
 				return ErrUnavailable
 			}
 			for _, record := range records {
-				if _, err := c.open(ctx, record); err != nil {
+				resource, err := c.open(ctx, record)
+				if err != nil {
+					return err
+				}
+				if err := visitDrivers(&resource, func(category string, driver *api.DriverConfig) error {
+					return c.options.validateNotificationLog(category, *driver)
+				}); err != nil {
 					return err
 				}
 				verified++
@@ -339,7 +349,10 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 		return nil, ErrValidation
 	}
 	resource, err := api.DecodeResource(raw)
-	if err != nil || !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) {
+	if err != nil {
+		return nil, errors.Join(ErrValidation, err)
+	}
+	if !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) {
 		return nil, ErrValidation
 	}
 	if err := validateMetadata(resource.Metadata); err != nil {
@@ -545,11 +558,14 @@ func validateDesired(resource *api.Resource) error {
 }
 
 func (o CatalogOptions) validateDesired(resource *api.Resource) error {
+	if err := api.ValidateResourceSettings(*resource); err != nil {
+		return errors.Join(ErrValidation, err)
+	}
 	if resource.Kind == "Credential" {
 		var spec api.CredentialSpec
 		if api.StrictDecode(resource.Spec, &spec) != nil || spec.Value == nil ||
 			*spec.Value == "" || *spec.Value == "[REDACTED]" || *spec.Value == "<redacted>" || *spec.Value == "********" {
-			return fmt.Errorf("%w: supply a credential value; redaction placeholders are not values", ErrValidation)
+			return errors.Join(ErrValidation, api.InvalidField("spec.value", "credentialValue"))
 		}
 	}
 	return visitDrivers(resource, func(category string, driver *api.DriverConfig) error {

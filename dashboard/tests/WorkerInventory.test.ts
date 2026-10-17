@@ -4,6 +4,7 @@ import vectors from '../../sdk/go/collection/commitment/testdata/v1.json';
 import { fileNormalizationProfile, WorkerCollectionInventory, workerCollectionLimits } from '../src/api/collectionInventory';
 import { collectionFileSources, orderedCollectionSources } from '../src/import/files';
 import { BrowserCollection, PrivateCollectionBody } from '../src/import/collection';
+import { validationSourcePosition } from '../src/api/validation';
 
 const encode = (text: string) => new TextEncoder().encode(text), decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 const fromHex = (text: string) => new Uint8Array(text.match(/../g)!.map(byte => Number.parseInt(byte, 16)));
@@ -11,6 +12,24 @@ const raw = (id: string, length = 0) => encode(JSON.stringify({ apiVersion: 'cpr
 afterEach(() => vi.restoreAllMocks());
 
 describe('private worker inventory', () => {
+  it('keeps bounded coordinates local without changing operation commitments', async () => {
+    vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { new Uint8Array(array!.buffer, array!.byteOffset, array!.byteLength).set(fromHex(vectors.KeyHex)); return array; });
+    const inventory = await WorkerCollectionInventory.create(vectors.Sources.length);
+    try {
+      for (const source of vectors.Sources) {
+        await inventory.addSource(fromHex(source.BytesHex));
+        for (const item of vectors.Items.filter(item => item.Position.Source.Token === source.Token)) inventory.addItem(fromHex(item.ResourceBytesHex), item.Position.ID, item.Position.Source.Document, item.Position.Source.Item,
+          { line: 3, column: 2, fields: { 'spec.check.driver.config.url': { line: 11, column: 7 }, 'metadata.labels.password': { line: 900, column: 1 }, 'metadata.labels[123]': { line: 999, column: 1 }, PRIVATE_FIELD: { line: 99, column: 1 } } });
+      }
+      expect((await inventory.finish()).contentDigest).toBe(vectors.InventoryHex);
+      const item = inventory.page(0, 1)[0];
+      expect(validationSourcePosition(item.coordinates, 'items[0].resource.spec.check.driver.config.url')).toBe(', line 11, column 7');
+      expect(JSON.stringify(item.coordinates)).not.toMatch(/password|123|PRIVATE/);
+      for (const bytes of [inventory.createBody(), await inventory.preflightBody(), (await inventory.uploadBody(0)).bytes]) {
+        expect(decode(bytes)).not.toMatch(/coordinates|fields|column|PRIVATE_FIELD|labels\[123\]/);
+      }
+    } finally { inventory.close(); }
+  });
   it('records a profile only when the parser caller supplies that exact contract', async () => {
     const inventory = await WorkerCollectionInventory.create(1, fileNormalizationProfile);
     try {

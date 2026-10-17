@@ -97,6 +97,11 @@ func TestDockerStopGraceAndOperationBudget(t *testing.T) {
 		{want: 60 * time.Second}, {grace: 50 * time.Second, want: 70 * time.Second},
 		{grace: 10 * time.Second, configured: 30 * time.Second, want: 30 * time.Second},
 		{grace: 10 * time.Second, configured: 29 * time.Second, invalid: true},
+		{grace: 24*time.Hour - 20*time.Second, want: 24 * time.Hour},
+		{grace: 24*time.Hour - 20*time.Second, configured: 24 * time.Hour, want: 24 * time.Hour},
+		{grace: 24*time.Hour - 20*time.Second + time.Nanosecond, invalid: true},
+		{grace: 24*time.Hour - 20*time.Second + time.Nanosecond, configured: 24 * time.Hour, invalid: true},
+		{configured: 24*time.Hour + time.Nanosecond, invalid: true},
 		{grace: -time.Second, invalid: true}, {configured: -time.Second, invalid: true},
 	} {
 		budget, err := dockerOperationBudget(fixture.grace, fixture.configured)

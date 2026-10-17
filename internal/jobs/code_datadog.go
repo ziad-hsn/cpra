@@ -63,9 +63,9 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 		site = "datadoghq.com"
 	}
 	body, err := json.Marshal(map[string]interface{}{
-		"title":      "CPRA alert: " + c.Monitor,
+		"title":      "CPRa " + codeAlertTemplateFor(c.Color).Title + ": " + c.Monitor,
 		"text":       c.notificationMessage(c.Message),
-		"alert_type": "error",
+		"alert_type": datadogAlertType(c.Color),
 		"tags":       c.Tags,
 	})
 	if err != nil {
@@ -84,7 +84,7 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	if c.AppKey != "" {
 		req.Header.Set("DD-APPLICATION-KEY", c.AppKey)
 	}
-	resp, err := GetHTTPClient(10 * time.Second).Do(req)
+	resp, err := effectHTTPClient(10 * time.Second).Do(req)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
@@ -93,6 +93,19 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
 	return Result{ID: c.ID, Ent: c.Entity, Err: nil, Payload: payload}
+}
+
+func datadogAlertType(color string) string {
+	switch color {
+	case "red":
+		return "error"
+	case "yellow":
+		return "warning"
+	case "green":
+		return "success"
+	default:
+		return "info"
+	}
 }
 
 func (c *CodeDatadogJob) Copy() Job {

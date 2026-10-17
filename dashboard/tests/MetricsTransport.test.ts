@@ -36,17 +36,17 @@ describe('authenticated metrics transport', () => {
     }
   });
 
-  it('allows browser Basic/read credentials only in discovered legacy phase', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ mode: 'observation', authenticationRequired: false }))).mockResolvedValueOnce(plain());
+  it('allows browser Basic/read credentials only with discovered observation permissions', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ mode: 'observation', authenticationRequired: false }))).mockResolvedValueOnce(new Response(JSON.stringify({ principalId: 'anonymous', role: 'reader', permissions: ['GetMetrics'] }))).mockResolvedValueOnce(plain());
     const session = new DashboardSession({ origin: 'http://cpra.example', fetch: fetcher });
     await expect(session.prometheus()).rejects.toMatchObject({ reason: 'forbidden' });
     await session.discover();
     expect(await session.prometheus()).toContain('42');
-    expect(fetcher.mock.calls[1][1]).toMatchObject({ method: 'GET', credentials: 'same-origin', redirect: 'error' });
-    expect(new Headers(fetcher.mock.calls[1][1]?.headers).has('Authorization')).toBe(false);
+    expect(fetcher.mock.calls[2][1]).toMatchObject({ method: 'GET', credentials: 'same-origin', redirect: 'error' });
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).has('Authorization')).toBe(false);
     session.signOut();
     await expect(session.prometheus()).rejects.toMatchObject({ reason: 'forbidden' });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
   it('decodes UTF-8 split across streamed chunks without dropping text', async () => {
@@ -147,4 +147,13 @@ describe('authenticated metrics transport', () => {
     expect(session.getSnapshot()).toMatchObject({ phase: 'authenticated', access: { principalId: 'new-reader' } });
     expect(session.can('GetMetrics')).toBe(true);
   });
+});
+
+it('does not dispatch metrics in observation mode without its current permission', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ mode: 'observation', authenticationRequired: false })))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ principalId: 'anonymous', role: 'reader', permissions: ['GetState'] })));
+  const session = new DashboardSession({ origin: 'http://localhost', fetch: fetcher });
+  await session.discover();
+  await expect(session.prometheus()).rejects.toMatchObject({ reason: 'forbidden' });
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

@@ -116,6 +116,7 @@ func InitManagement(ctx context.Context, l installpath.Layout, options Managemen
 	}
 	config := runtimeconfig.Default()
 	config.Storage.Directory = l.StateDir
+	config.Notifications.LogDirectory = filepath.Join(l.LogDir, "notifications")
 	config.Management = runtimeconfig.Management{Enabled: true, PolicyFile: policyPath, PolicyReaderGroupID: group, PolicyReaderSID: sid,
 		TLS:        &runtimeconfig.ManagementTLS{CertFile: certPath, KeyFile: certKeyPath, ReaderGroupID: group, ReaderSID: sid},
 		Encryption: &runtimeconfig.ManagementEncryption{Local: &runtimeconfig.ManagementLocalKeys{ActiveKeyFile: keyPath, ReaderGroupID: group, ReaderSID: sid}}}

@@ -16,7 +16,7 @@ it('shows safe correlation, phase and field codes without raw server details', (
   expect(screen.getByText(operation)).toBeInTheDocument();
   expect(screen.getByText('validation')).toBeInTheDocument();
   expect(screen.getByText('invalidResource')).toBeInTheDocument();
-  expect(screen.getByText(/spec.check.driver.config: validation failed/)).toBeInTheDocument();
+  expect(screen.getByText(/spec.check.driver.config: The resource schema/)).toBeInTheDocument();
   expect(container.textContent).not.toContain(secret);
 });
 
@@ -29,4 +29,12 @@ it('bounds field output and rejects hostile codes, identities, paths and phases'
   expect(container.textContent).not.toContain(secret);
   expect(container.textContent).not.toContain('/private/');
   expect(container.textContent).not.toContain('999999');
+});
+
+it('renders reviewed validation rules instead of provider messages', () => {
+  const error = new ManagementError('http', 'Request rejected.', 422, { code: 'invalidResource', errors: [{ field: 'spec.check.driver.config.url', reason: 'required', message: secret }] });
+  const { container } = render(<ProblemDetails error={error} />);
+  expect(container.textContent).toContain('spec.check.driver.config.url');
+  expect(container.textContent).toContain('required');
+  expect(container.textContent).not.toContain(secret);
 });

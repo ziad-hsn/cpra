@@ -55,6 +55,7 @@ type managementSnapshot struct {
 	incidents             snapshotPageView[api.Incident]
 	history               snapshotPageView[api.Event]
 	actions               snapshotPageView[api.Action]
+	monitors              snapshotPageView[api.MonitorObservation]
 	monitorID             string
 	principal             string
 	generation            uint64
@@ -71,6 +72,7 @@ type managementHTTP struct {
 	operationReads        chan struct{}
 	snapshotReads         chan struct{}
 	operationReservations map[string]int64
+	observations          retainedObservations
 	catalog               *management.Catalog
 	reselection           *management.CollectionReselectionManager
 	auth                  *httpauth.Authorizer
@@ -92,23 +94,29 @@ func managementFailure(status int, code, detail string) error {
 }
 
 func (s *Server) registerManagement(mux *http.ServeMux) {
-	if s.cfg.Management == nil || s.cfg.ManagementAuth == nil {
-		return
-	}
 	s.managementOnce.Do(func() {
 		m := &managementHTTP{ready: s.mutationReady, admit: s.withMutationAdmission, mutations: make(chan struct{}, managementMaxMutations), validationReads: make(chan struct{}, 8), operationReads: make(chan struct{}, 8), snapshotReads: make(chan struct{}, 8), operationReservations: make(map[string]int64), catalog: s.cfg.Management, auth: s.cfg.ManagementAuth, snapshots: make(map[string]managementSnapshot), now: time.Now}
 		_, err := rand.Read(m.cursorKey[:])
 		m.cursorReady = err == nil
+		m.observations = management.NewObservations(s.cfg.Store)
+		if m.catalog != nil {
+			m.observations = m.catalog
+		}
 		m.reselection = s.cfg.Reselection
 		s.managementHTTP = m
 	})
 	m := s.managementHTTP
 	m.registerDiscovery(mux)
-	s.registerManagementExtensions(mux, m)
 	m.registerControls(mux)
 	m.registerHistory(mux)
 	m.registerActions(mux)
 	s.registerManagementObservations(mux, m)
+	s.registerMonitorObservations(mux, m)
+	if m.catalog == nil {
+		m.registerObservationDiscovery(mux)
+		return
+	}
+	s.registerManagementExtensions(mux, m)
 	for _, route := range managementResourceRoutes {
 		for _, entry := range []struct{ method, operation, path string }{
 			{http.MethodGet, "List" + route.plural, route.path},
@@ -149,7 +157,8 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 			return
 		}
 		result := api.Capabilities{APIVersions: []string{"v1", "v2"}, Drivers: map[string][]string{"check": {}, "recovery": {}, "notification": {}}, Resources: []string{}, PatchTypes: []string{"application/merge-patch+json"}, ResourceOperations: map[string][]string{}}
-		result.Resources = append(result.Resources, "Version", "Schema")
+		result.Resources = append(result.Resources, "Version", "Schema", "MonitorObservation")
+		result.ResourceOperations["MonitorObservation"] = []string{"ListMonitorObservations", "GetMonitorObservation"}
 		result.ResourceOperations["Version"] = []string{"GetVersion"}
 		result.ResourceOperations["Schema"] = []string{"ExplainResource"}
 		for _, capability := range jobs.Capabilities() {
@@ -163,7 +172,7 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 		}
 		result.Resources = append(result.Resources, "Incident")
 		result.ResourceOperations["Incident"] = []string{"ListIncidents", "GetIncident", "AcknowledgeIncident", "DismissIncident", "ReopenIncident"}
-		result.ResourceOperations["Monitor"] = append(result.ResourceOperations["Monitor"], "SnoozeMonitor", "UnsnoozeMonitor")
+		result.ResourceOperations["Monitor"] = append(result.ResourceOperations["Monitor"], "SnoozeMonitor", "UnsnoozeMonitor", "IgnoreMonitor", "UnignoreMonitor")
 		result.Resources = append(result.Resources, "Event")
 		result.ResourceOperations["Event"] = []string{"GetHistory"}
 		result.Resources = append(result.Resources, "Action")
@@ -189,9 +198,9 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 
 func (m *managementHTTP) managementPermissions(permissions []string) []string {
 	supported := map[string]bool{"PrepareCollection": true, "CreateOperation": true, "UploadOperation": true, "CancelOperation": true, "ValidateOperation": true, "GetOperationValidation": true, "ActivateOperation": true, "PreflightCollection": true, "GetAccess": true, "GetCapabilities": true, "GetOperation": true, "ListOperations": true,
-		"GetVersion": true, "ExplainResource": true,
+		"GetVersion": true, "ExplainResource": true, "ListMonitorObservations": true, "GetMonitorObservation": true,
 		"ListIncidents": true, "GetIncident": true, "AcknowledgeIncident": true, "DismissIncident": true,
-		"ReopenIncident": true, "SnoozeMonitor": true, "UnsnoozeMonitor": true, "GetHistory": true, "GetAction": true, "ListActions": true, "ReviewAction": true, "RecoverMonitor": true}
+		"ReopenIncident": true, "SnoozeMonitor": true, "UnsnoozeMonitor": true, "IgnoreMonitor": true, "UnignoreMonitor": true, "GetHistory": true, "GetAction": true, "ListActions": true, "ReviewAction": true, "RecoverMonitor": true}
 	for _, observation := range observationRoutes {
 		supported[observation.operation] = true
 	}
@@ -317,6 +326,11 @@ func writeManagementError(w http.ResponseWriter, err error) {
 		status, code, title, detail = 503, "requestInterrupted", "Service Unavailable", "The request was interrupted. Reconcile any submitted mutation before trying again."
 	}
 	problem := api.Problem{Type: "about:blank", Title: title, Status: int64(status), Code: code, Detail: detail, RequestID: w.Header().Get("X-Request-ID")}
+	if status == http.StatusBadRequest || status == http.StatusUnprocessableEntity {
+		if field, ok := api.ValidationFieldError(err); ok {
+			problem.Errors = []api.FieldError{field}
+		}
+	}
 	raw, _ := json.Marshal(problem)
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
@@ -418,7 +432,7 @@ func (m *managementHTTP) prepareChange(ctx context.Context, method, kind, id, ve
 	case http.MethodPost, http.MethodPut:
 		resource, err := api.DecodeResource(raw)
 		if err != nil {
-			return nil, managementFailure(400, "invalidResource", "The body must contain one valid resource without duplicate or unknown fields.")
+			return nil, errors.Join(managementFailure(400, "invalidResource", "The body must contain one valid resource without duplicate or unknown fields."), err)
 		}
 		if resource.Kind != kind || (method == http.MethodPut && resource.Metadata.ID != id) {
 			return nil, managementFailure(400, "identityMismatch", "The resource kind and identity must match the request route.")

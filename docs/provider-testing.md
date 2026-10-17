@@ -70,7 +70,7 @@ commit. Their `working_tree_provider_build` reports cannot satisfy frozen-releas
 inspection. The cache is optional and does not disable Go checksum verification
 or change the public proxy policy. Public downloads remain a separate gate.
 
-The [1 October integrity checkpoint](implementation/STATUS.md)
+The [current availability](versions.md)
 records both compiler default/all-driver package matrices and a real CLI process
 test. The unconfigured run returns exit code 2, records all 35 missing providers,
 invokes no provider operation and cannot be overwritten by a second invocation.
@@ -213,7 +213,7 @@ This does not test Kubernetes executable credential plugins or cloud clusters.
 
 ## Optional provider sandboxes
 
-Copy [sandboxes.yaml](review/source/examples/verification/sandboxes.yaml.txt) to a private file.
+Copy [sandboxes.yaml](reference/source/examples/verification/sandboxes.yaml.txt) to a private file.
 Its disabled examples cover Twilio test credentials, Telegram's test environment,
 Slack developer sandboxes and Teams developer tenants. Operators supply credentials,
 destinations and receipt observers where required, then enable configured cases:
@@ -285,4 +285,4 @@ Both A2A entries remain missing from the full provider gate until configured
 agent effects pass. Local tests cover committed starts, unknown outcomes,
 refusal to reuse state, a real process termination and independent-observer
 rejection. They use isolated HTTP fixtures and do not certify an operator's
-agent deployment. See the [A2A implementation record](implementation/a2a-jobs.md).
+agent deployment. See the [A2A driver settings](reference/jobs-reference.md).

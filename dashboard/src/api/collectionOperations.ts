@@ -1,12 +1,13 @@
-import { collectionIdentityFormat, type WorkerCollectionSummary } from './collectionInventory';
+import { collectionIdentityFormat, type FileNormalizationProfile, type WorkerCollectionSummary } from './collectionInventory';
 import { operationID, operationResultsPending } from './operations';
 import { object } from './value';
+import { safeValidationField, validationMessage } from './validation';
 import { executionObservation } from './executionResults';
 import { DashboardSession, ManagementError, type APIResponse, type CollectionRequestOperation } from './session';
 import type { ApplyResult, CollectionAdmission, Operation, Preflight, ValidationResultPage } from './generated';
 import type { PrivateCollectionBody } from '../import/collection';
 
-export type CollectionIdentity = Pick<WorkerCollectionSummary, 'identityFormat' | 'contentDigest' | 'itemCount' | 'normalizationProfile'>;
+export type CollectionIdentity = Pick<WorkerCollectionSummary, 'identityFormat' | 'contentDigest' | 'itemCount'> & { normalizationProfile?: FileNormalizationProfile };
 export const collectionTicketMaxBytes = 128 << 10;
 export const collectionStates = new Set(['pending', 'staging', 'uploading', 'validating', 'validated', 'rejected', 'interrupted', 'applying', 'committed', 'completed', 'partial', 'failed', 'canceled', 'cancelled', 'expired', 'invalidated']);
 const outcomes = new Set(['create', 'update', 'unchanged', 'invalid', 'skipped', 'conflict', 'dependency_failed', 'reserved', 'committed', 'applied', 'failed', 'canceled', 'cancelled', 'projection_failed', 'superseded', 'activation_rejected']);
@@ -46,7 +47,20 @@ function itemResults(value: unknown, maximum: number): ApplyResult[] | undefined
 export function collectionPreflight(value: unknown, expected: CollectionIdentity): Preflight {
   if (!object(value) || typeof value.valid !== 'boolean') throw invalid();
   identity(value, expected);
-  return { valid: value.valid, ...expected, items: itemResults(value.items, expected.itemCount) };
+  const result: Preflight = { valid: value.valid, ...expected, items: itemResults(value.items, expected.itemCount) };
+  if (value.errors !== undefined) {
+    if (!Array.isArray(value.errors) || value.errors.length > Math.max(1, Math.min(expected.itemCount, 10_000)) || value.valid && value.errors.length) throw invalid();
+    result.errors = value.errors.map(error => {
+      if (!object(error) || typeof error.field !== 'string' || error.field.length > 192 || typeof error.reason !== 'string' || error.reason.length > 64) throw invalid();
+      const match = /^items\[(0|[1-9][0-9]{0,9})\]\.resource(?:\.(.+))?$/.exec(error.field);
+      if (error.field === 'items') return { field: 'items', reason: 'invalidGraph', message: validationMessage('invalidGraph') };
+      if (!match || Number(match[1]) >= expected.itemCount) throw invalid();
+      const field = safeValidationField(match[2]);
+      const reason = validationMessage(error.reason) ? error.reason : 'invalidResource';
+      return { field: `items[${match[1]}].resource${field ? `.${field}` : ''}`, reason, message: validationMessage(reason) || 'Resource validation failed' };
+    });
+  }
+  return result;
 }
 export function collectionOperation(value: unknown, expected: CollectionIdentity, id?: string): Operation {
   if (!object(value) || !operationID(value.id) || (id !== undefined && value.id !== id) || typeof value.state !== 'string') throw invalid();
@@ -157,6 +171,9 @@ export function collectionValidationPage(value: unknown, expected: CollectionIde
     const result: ValidationResultPage['items'][number] = { ordinal: item.ordinal, kind: item.kind, id: item.id, source: item.source, sourceDocument: item.sourceDocument, sourceItem: item.sourceItem };
     if (item.change !== undefined) { if (typeof item.change !== 'string' || !item.change || item.change.length > 32) throw invalid(); result.change = changes.has(item.change) ? item.change : 'unrecognized'; supported &&= changes.has(item.change); }
     if (item.issue !== undefined) { if (typeof item.issue !== 'string' || !item.issue || item.issue.length > 64) throw invalid(); result.issue = validationIssues.has(item.issue) ? item.issue : 'unrecognized'; supported &&= validationIssues.has(item.issue); }
+    if (item.field !== undefined) { if (typeof item.field !== 'string' || item.field.length > 160) throw invalid(); result.field = item.field; }
+    if (item.reason !== undefined) { if (typeof item.reason !== 'string' || !item.reason || item.reason.length > 64) throw invalid(); result.reason = item.reason; }
+    if (result.field && !result.reason || result.reason && !result.issue) throw invalid();
     if (!result.change && !result.issue || summary.valid && (!result.change || result.issue)) throw invalid();
     if (item.uid !== undefined || item.resourceVersion !== undefined) {
       if (!operationID(item.uid) || !operationID(item.resourceVersion) || result.change === 'create') throw invalid();

@@ -31,22 +31,23 @@ type Queue interface {
 
 // Stats holds performance metrics for a queue.
 type Stats struct {
-	ArrivalCV      float64       `json:"arrival_cv"`
-	ArrivalSamples int           `json:"arrival_samples"`
-	LastEnqueue    time.Time     `json:"last_enqueue"`
-	LastDequeue    time.Time     `json:"last_dequeue"`
-	AvgQueueTime   time.Duration `json:"avg_queue_time"`
-	Dequeued       int64         `json:"dequeued"`
-	Dropped        int64         `json:"dropped"`
-	MaxQueueTime   time.Duration `json:"max_queue_time"`
-	QueueDepth     int           `json:"queue_depth"`
-	MaxJobLatency  time.Duration `json:"max_job_latency"`
-	AvgJobLatency  time.Duration `json:"avg_job_latency"`
-	EnqueueRate    float64       `json:"enqueue_rate"`
-	DequeueRate    float64       `json:"dequeue_rate"`
-	Enqueued       int64         `json:"enqueued"`
-	Capacity       int           `json:"capacity"`
-	SampleWindow   time.Duration `json:"sample_window"`
+	Drivers        []DriverQueueStats `json:"drivers,omitempty"`
+	ArrivalCV      float64            `json:"arrival_cv"`
+	ArrivalSamples int                `json:"arrival_samples"`
+	LastEnqueue    time.Time          `json:"last_enqueue"`
+	LastDequeue    time.Time          `json:"last_dequeue"`
+	AvgQueueTime   time.Duration      `json:"avg_queue_time"`
+	Dequeued       int64              `json:"dequeued"`
+	Dropped        int64              `json:"dropped"`
+	MaxQueueTime   time.Duration      `json:"max_queue_time"`
+	QueueDepth     int                `json:"queue_depth"`
+	MaxJobLatency  time.Duration      `json:"max_job_latency"`
+	AvgJobLatency  time.Duration      `json:"avg_job_latency"`
+	EnqueueRate    float64            `json:"enqueue_rate"`
+	DequeueRate    float64            `json:"dequeue_rate"`
+	Enqueued       int64              `json:"enqueued"`
+	Capacity       int                `json:"capacity"`
+	SampleWindow   time.Duration      `json:"sample_window"`
 	// OldestPendingAge measures a still-pending admitted copy, never an active
 	// executor. A missing source or empty queue has no age measurement.
 	OldestPendingAge       time.Duration `json:"oldest_pending_age"`

@@ -31,11 +31,12 @@ type WorkerStartResponse struct {
 	Deadline          time.Time `json:"deadline,omitempty"`
 }
 type WorkerStartCommand struct {
-	NodeID          string             `json:"node_id"`
-	OwnerEpoch      string             `json:"owner_epoch"`
-	Authority       WorkerAuthority    `json:"authority"`
-	Request         WorkerStartRequest `json:"request"`
-	ProposedGrantID string             `json:"proposed_grant_id"`
+	Maintenance     *WorkerMaintenanceDecision `json:"maintenance,omitempty"`
+	NodeID          string                     `json:"node_id"`
+	OwnerEpoch      string                     `json:"owner_epoch"`
+	Authority       WorkerAuthority            `json:"authority"`
+	Request         WorkerStartRequest         `json:"request"`
+	ProposedGrantID string                     `json:"proposed_grant_id"`
 }
 
 func (r WorkerStartRequest) validate() error {
@@ -50,6 +51,9 @@ func (r WorkerStartRequest) validate() error {
 	return nil
 }
 func (c WorkerStartCommand) validate(at time.Time) error {
+	if c.Maintenance != nil && c.Maintenance.validate(at) != nil {
+		return ErrWorkerExecutionInvalid
+	}
 	if !catalogIdentifier(c.NodeID, 256) || !catalogIdentifier(c.OwnerEpoch, 256) || !catalogIdentifier(c.ProposedGrantID, 256) || !c.Authority.sessionShapeValid() || c.Request.validate() != nil || at.IsZero() || at.Year() < 1 || at.Year() > 9998 || c.Request.ServerID != workerProtocolServerID(c.NodeID, c.Authority.Epoch) {
 		return ErrWorkerExecutionInvalid
 	}
@@ -144,9 +148,10 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 	var events []Event
 	switch l.Phase {
 	case "offered":
-		if err = f.workerOfferEligible(c, r, at); err != nil {
+		if err = f.workerOfferEligible(c, r, at); err != nil || lifecycleStorageFormat(version) && !f.workerMaintenanceAllowed(c.Maintenance, r.Intent, at) {
 			l.Phase = "rejected"
 			disposition = "rejected"
+			monitor, events = f.workerMaintenanceCancellation(c.Maintenance, r.Intent, at, version)
 		} else if c.Request.Mode == "reconcile" {
 			disposition = "pending"
 		} else {
@@ -164,7 +169,10 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 			if r.Intent.Category != "check" {
 				previous := f.image.Monitors[r.Intent.MonitorID]
 				command := Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
-				if deliveryStorageFormat(version) && r.Intent.Category == "notification" {
+				if lifecycleStorageFormat(version) {
+					command.Maintenance = c.Maintenance.Active || r.Intent.Category == "notification" && c.Maintenance.SinceQueued
+				}
+				if deliveryStorageFormat(version) && r.Intent.Category == "notification" || lifecycleStorageFormat(version) && r.Intent.Category == "recovery" {
 					command.ActionDeadline = r.Intent.Deadline
 				}
 				result := transitionAtFormat(previous, command, version)
@@ -239,7 +247,7 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 	return Result{Allowed: true, Monitor: monitor, Events: events, resultExtensions: resultExtensions{WorkerStart: &response}}
 }
 
-func (s *Store) CommitWorkerStart(ctx context.Context, a WorkerAuthority, request WorkerStartRequest) (WorkerStartResponse, error) {
+func (s *Store) CommitWorkerStart(ctx context.Context, a WorkerAuthority, request WorkerStartRequest, evaluators ...WorkerMaintenanceEvaluator) (WorkerStartResponse, error) {
 	if ctx == nil {
 		return WorkerStartResponse{}, ErrWorkerExecutionInvalid
 	}
@@ -254,6 +262,11 @@ func (s *Store) CommitWorkerStart(ctx context.Context, a WorkerAuthority, reques
 	if err := c.validate(at); err != nil {
 		return WorkerStartResponse{}, err
 	}
+	decision, err := s.prepareWorkerMaintenance(ctx, request.ExecutionID, "start", at, evaluators)
+	if err != nil {
+		return WorkerStartResponse{}, err
+	}
+	c.Maintenance = decision
 	results, err := s.Submit(ctx, []Command{{Kind: "worker_start", At: at, commandExtensions: commandExtensions{WorkerStart: &c}}})
 	if err != nil {
 		return WorkerStartResponse{}, errors.Join(ErrCommitUnconfirmed, err)
@@ -274,11 +287,16 @@ func (s *Store) CommitWorkerStart(ctx context.Context, a WorkerAuthority, reques
 		return WorkerStartResponse{}, errors.Join(ErrCommitUnconfirmed, err)
 	}
 	if out.Disposition == "granted" {
+
 		if !time.Now().Before(out.Deadline) || s.executorSession != s.fsm.image.LocalExecutorSession {
 			return WorkerStartResponse{}, errors.Join(ErrCommitUnconfirmed, ErrWorkerExecutionExpired)
 		}
 		r := s.fsm.image.WorkerExecutions.Records[request.ExecutionID]
 		if r.Lifecycle == nil || r.Lifecycle.Phase != "started" || r.Lifecycle.GrantID != out.GrantID {
+			return WorkerStartResponse{}, errors.Join(ErrCommitUnconfirmed, ErrWorkerExecutionConflict)
+		}
+		monitor := s.fsm.image.Monitors[r.Intent.MonitorID]
+		if r.Intent.Category != "check" && !monitor.ControlNotification(monitor.Actions[r.Intent.ActionID]) && (c.Maintenance == nil || !c.Maintenance.Until.IsZero() && !time.Now().Before(c.Maintenance.Until)) {
 			return WorkerStartResponse{}, errors.Join(ErrCommitUnconfirmed, ErrWorkerExecutionConflict)
 		}
 		if err = s.fsm.checkWorkerExecutionPins(r.Intent, time.Now().UTC()); err != nil {

@@ -52,7 +52,7 @@ func reselectionOperation(r *cpra.Response[api.Operation], id string, allowUnpro
 		return api.Operation{}, ErrReselectionObservation
 	}
 	o := r.Data
-	if o.IdentityFormat != commitment.Format || o.NormalizationProfile != FileNormalizationProfile && !(allowUnprofiled && o.NormalizationProfile == "") {
+	if o.IdentityFormat != commitment.Format || !SupportsFileNormalization(o.NormalizationProfile) && !(allowUnprofiled && o.NormalizationProfile == "") {
 		return api.Operation{}, ErrUnsupportedNormalization
 	}
 	if !reselectionDigest(o.ContentDigest) || o.ItemCount == nil || *o.ItemCount < 1 || *o.ItemCount > 10_000 || o.Uploaded == nil || *o.Uploaded < 0 || *o.Uploaded > *o.ItemCount || o.RetryAfterSeconds < 0 || o.RetryAfterSeconds > 86400 {

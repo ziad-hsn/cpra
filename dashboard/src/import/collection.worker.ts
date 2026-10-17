@@ -1,16 +1,17 @@
 import './generated/wasm_exec.js';
+import { safeValidationField, validationMessage } from '../api/validation';
 import parserURL from './generated/collection-parser.wasm?url';
 import parserBuild from './generated/BUILD.json';
 import { fileNormalizationProfile, WorkerCollectionInventory, workerCollectionLimits } from '../api/collectionInventory';
 import { orderedCollectionSources, type SelectedCollectionSource } from './files';
 import { CollectionImportError, type ImportLocation, type WorkerReply, type WorkerRequest } from './protocol';
 
-type ParserResult = { valid: boolean; document?: number; item?: number };
+type ParserResult = { valid: boolean; document?: number; item?: number; line?: number; column?: number; field?: string; reason?: string };
 interface GoRuntime { importObject: WebAssembly.Imports; run(instance: WebAssembly.Instance): Promise<void> }
 const scope = globalThis as unknown as {
   Go: new () => GoRuntime;
   cpraCollectionNormalizationProfile: string;
-  cpraDecodeCollection(bytes: Uint8Array, visit: (id: string, document: number, item: number, raw: string) => boolean): ParserResult;
+  cpraDecodeCollection(bytes: Uint8Array, visit: (id: string, document: number, item: number, raw: string, coordinates: string) => boolean): ParserResult;
   onmessage: (event: MessageEvent<WorkerRequest>) => void;
   postMessage(value: WorkerReply, transfer?: Transferable[]): void;
   close(): void;
@@ -62,12 +63,12 @@ async function prepare(sources: SelectedCollectionSource[]): Promise<void> {
       await inventory.addSource(raw);
       let callbackError: CollectionImportError | undefined;
       send({ kind: 'progress', phase: 'parsing', sources: index, items: inventory.itemCount });
-      const parsed = scope.cpraDecodeCollection(raw, (id, document, item, text) => {
+      const parsed = scope.cpraDecodeCollection(raw, (id, document, item, text, coordinates) => {
         let encoded: Uint8Array | undefined;
         try {
           encoded = new TextEncoder().encode(text);
           if (encoded.byteLength > workerCollectionLimits.resourceBytes) throw new CollectionImportError('quota');
-          inventory!.addItem(encoded, id, document, item);
+          inventory!.addItem(encoded, id, document, item, coordinates.length <= (256 << 10) ? JSON.parse(coordinates) : undefined);
           encoded = undefined; // The inventory now owns these bytes.
           return true;
         } catch (error) {
@@ -83,6 +84,8 @@ async function prepare(sources: SelectedCollectionSource[]): Promise<void> {
         const location: ImportLocation = { source: index + 1 };
         if (Number.isSafeInteger(parsed.document) && parsed.document! > 0) location.document = parsed.document;
         if (Number.isSafeInteger(parsed.item) && parsed.item! > 0) location.item = parsed.item;
+        for (const key of ['line', 'column'] as const) if (Number.isSafeInteger(parsed[key]) && parsed[key]! > 0 && parsed[key]! <= 100_000_000) location[key] = parsed[key];
+        if (validationMessage(parsed.reason)) { location.reason = parsed.reason; location.field = safeValidationField(parsed.field); }
         throw new CollectionImportError('invalid', location);
       }
       send({ kind: 'progress', phase: 'parsed', sources: index + 1, items: inventory.itemCount });

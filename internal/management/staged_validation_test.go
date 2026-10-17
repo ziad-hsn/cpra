@@ -278,8 +278,8 @@ func TestStagedValidationLargeInventoryAndNearLimitUpdates(t *testing.T) {
 				input = resource("Credential", "large", api.CredentialSpec{})
 			}
 			if mode == "endpoint update" {
-				config, _ := json.Marshal(map[string]string{"file": "/tmp/" + large})
-				old = resource("NotificationEndpoint", "large", api.DriverConfig{Type: "log", Config: config})
+				config, _ := json.Marshal(map[string]any{"url": "https://never-called.example/notify", "headers": map[string]string{"X-Fixture": large}})
+				old = resource("NotificationEndpoint", "large", api.DriverConfig{Type: "webhook", Config: config})
 				input = old
 				input.Metadata.Name = api.Pointer("new name")
 			}
@@ -433,15 +433,15 @@ func TestStagedValidationLargeNotificationClosureUsesLookups(t *testing.T) {
 		var r api.Resource
 		switch {
 		case i < endpoints:
-			config, _ := json.Marshal(map[string]string{"file": "/tmp/never-opened-" + strings.Repeat("x", valueBytes)})
-			r = resource("NotificationEndpoint", refs[i], api.DriverConfig{Type: "log", Config: config})
+			config, _ := json.Marshal(map[string]any{"url": "https://never-called.example/notify", "headers": map[string]string{"X-Fixture": strings.Repeat("x", valueBytes)}})
+			r = resource("NotificationEndpoint", refs[i], api.DriverConfig{Type: "webhook", Config: config})
 		case i == endpoints:
 			r = resource("NotificationGroup", "large-group", api.NotificationGroupSpec{EndpointRefs: refs})
 		default:
 			r = collectionMonitor("large-consumer", "https://example.test/health")
 			var spec api.MonitorSpec
 			_ = json.Unmarshal(r.Spec, &spec)
-			spec.Notifications = &map[string]api.AlertRule{"red": {GroupRef: api.Pointer("large-group"), NotifyType: api.Pointer("log")}}
+			spec.Notifications = &map[string]api.AlertRule{"red": {GroupRef: api.Pointer("large-group"), NotifyType: api.Pointer("webhook")}}
 			r.Spec, _ = json.Marshal(spec)
 		}
 		raw, _ := json.Marshal(r)

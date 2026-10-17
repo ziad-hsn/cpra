@@ -108,7 +108,9 @@ func TestWorkerOfferSelectionReplay(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			result := submit(t, s, command)[0]
+			// Exercise the historical envelope itself, not the current writer's
+			// version upgrade and its required maintenance decision.
+			result := s.fsm.Apply(&raft.Log{Index: s.fsm.image.Index + 1, Data: raw}).([]Result)[0]
 			if result.Err != nil || result.WorkerPoll == nil || len(result.WorkerPoll.Offers) != 1 || result.WorkerPoll.Offers[0].ExecutionID != want {
 				t.Fatalf("selection %d: %v, response %+v", selection, result.Err, result.WorkerPoll)
 			}
@@ -132,7 +134,7 @@ func TestWorkerOfferSelectionReplay(t *testing.T) {
 				t.Fatal("retry replaced a committed assignment", err)
 			}
 			snapshot := captureSnapshotBytes(t, s.fsm)
-			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(deliveryWorkerSnapshotMagic)) {
+			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(lifecycleWorkerSnapshotMagic)) {
 				t.Fatal("queue snapshot did not carry its format")
 			}
 			if err := replayed.Restore(io.NopCloser(bytes.NewReader(snapshot))); err != nil {
@@ -155,7 +157,7 @@ func TestWorkerOfferSelectionFormat(t *testing.T) {
 	for version := 1; version <= WorkerQueueFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
 			t.Fatalf("selection format %d: %v", version, err)
 		}
 	}

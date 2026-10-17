@@ -50,6 +50,34 @@ func TestPreparePreservesAbsentAndEmptyNotificationFingerprints(t *testing.T) {
 		}
 	}
 }
+
+func TestNotificationIdentityTracksTargetInsteadOfGroupPosition(t *testing.T) {
+	m := testMonitor()
+	m.Codes = manifest.Codes{"red": {Dispatch: true, NotifyGroup: "oncall"}}
+	endpoints := map[string]manifest.Endpoint{
+		"a": {Type: "webhook", Config: &manifest.CodeNotificationWebhook{URL: "https://a.invalid/delivery"}},
+		"b": {Type: "webhook", Config: &manifest.CodeNotificationWebhook{URL: "https://b.invalid/delivery"}},
+	}
+	ids := func(group []string) []string {
+		t.Helper()
+		p, err := PrepareMonitor(m, endpoints, manifest.NotificationGroups{"oncall": group})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer p.Close()
+		return p.NotificationEndpointIDs("red")
+	}
+	first := ids([]string{"a", "b"})
+	reordered := ids([]string{"b", "a"})
+	if first[0] != reordered[1] || first[1] != reordered[0] {
+		t.Fatal("group order changed destination identity")
+	}
+	endpoints["a"] = manifest.Endpoint{Type: "webhook", Config: &manifest.CodeNotificationWebhook{URL: "https://new-a.invalid/delivery"}}
+	replaced := ids([]string{"a", "b"})
+	if replaced[0] == first[0] || replaced[1] != first[1] {
+		t.Fatal("destination replacement did not change only its identity")
+	}
+}
 func monitorCount(w *ecs.World) int {
 	query := ecs.NewFilter1[components.MonitorState](w).Query()
 	count := 0

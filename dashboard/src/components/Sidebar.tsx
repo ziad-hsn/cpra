@@ -44,7 +44,7 @@ export function Sidebar() {
 
       <nav className="sidebar-nav">
         <div className="nav-section-label">Workspace</div>
-        {access.phase === 'authenticated' && access.access?.role === 'operator' && <NavLink to="/import" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Import files" title="Import files"><Icon name="settings" size={18} className="nav-icon" /><span className="nav-label">Import files</span></NavLink>}
+        {access.phase === 'authenticated' && access.access?.role === 'operator' && <NavLink to="/import" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Import files" title="Import files"><Icon name="arrow-up" size={18} className="nav-icon" /><span className="nav-label">Import files</span></NavLink>}
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -60,7 +60,7 @@ export function Sidebar() {
         ))}
         {access.phase === 'authenticated' && Object.values(resourceKinds).filter(item => session.can(item.listOperation)).map(item => (
           <NavLink key={item.route} to={item.route} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label={item.title} title={item.title}>
-            <Icon name="settings" size={18} className="nav-icon" /><span className="nav-label">{item.title}</span>
+            <Icon name={({ Monitor: "settings", Recipient: "person", NotificationEndpoint: "external", NotificationGroup: "layers", Credential: "key" } as const)[item.kind]} size={18} className="nav-icon" /><span className="nav-label">{item.title}</span>
           </NavLink>
         ))}
         {access.phase === 'authenticated' && (session.can('GetOperation') || session.can('ListOperations')) && <NavLink to="/operations" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Operation progress" title="Operation progress"><Icon name="activity" size={18} className="nav-icon" /><span className="nav-label">Operation progress</span></NavLink>}

@@ -260,7 +260,11 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 		resource, err := api.DecodeResource(item.Resource)
 		if err != nil {
 			result.Items[i].Outcome = "invalid"
-			result.Errors = append(result.Errors, api.FieldError{Field: fmt.Sprintf("items[%d].resource", i), Reason: "invalidResource", Message: "The resource schema or configuration is invalid."})
+			field, ok := api.ValidationFieldError(api.PrefixValidationError(fmt.Sprintf("items[%d].resource", i), err))
+			if !ok {
+				field = api.FieldError{Field: fmt.Sprintf("items[%d].resource", i), Reason: "invalidResource", Message: "The resource schema or configuration is invalid."}
+			}
+			result.Errors = append(result.Errors, field)
 			continue
 		}
 		if item.ID != resource.Kind+"/"+resource.Metadata.ID {
@@ -299,7 +303,14 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 				return api.Preflight{}, managementFailure(403, "forbidden", "Preflight requires read access to every referenced and affected resource kind.")
 			}
 			result.Items[i].Outcome = "invalid"
-			result.Errors = append(result.Errors, api.FieldError{Field: fmt.Sprintf("items[%d].resource", i), Reason: item.Issue, Message: collectionIssueMessage(item.Issue)})
+			field := api.FieldError{Field: fmt.Sprintf("items[%d].resource", i), Reason: item.Issue, Message: collectionIssueMessage(item.Issue)}
+			if message := api.ValidationMessage(item.Reason); message != "" {
+				field.Reason, field.Message = item.Reason, message
+				if item.Field != "" {
+					field.Field += "." + item.Field
+				}
+			}
+			result.Errors = append(result.Errors, field)
 		}
 	}
 	if err != nil && len(result.Errors) == 0 {

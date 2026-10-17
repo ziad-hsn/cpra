@@ -26,7 +26,7 @@ if [ "$cpra_uid" -eq 0 ] || [ "$cpra_group_gid" -eq 0 ] || [ "$cpra_gid" -ne "$c
     echo "CPRa requires a non-root cpra account with the cpra primary group; refusing existing identity" >&2
     exit 1
 fi
-install -d -m 0700 -o cpra -g cpra /var/lib/cpra
+install -d -m 0700 -o cpra -g cpra /var/lib/cpra /var/log/cpra
 install -d -m 0750 -o root -g cpra /etc/cpra
 for cpra_config in /etc/cpra/auth.token /etc/cpra/runtime.yaml /etc/cpra/monitors.yaml /etc/cpra/install.json; do
     if [ -L "$cpra_config" ] || { [ -e "$cpra_config" ] && [ ! -f "$cpra_config" ]; }; then

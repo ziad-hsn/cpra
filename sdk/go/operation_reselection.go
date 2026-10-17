@@ -75,7 +75,7 @@ func (s *OperationsService) CreateReselection(ctx context.Context, id string, re
 	if err := reselectionIDs(id, "", false); err != nil {
 		return nil, err
 	}
-	if req.SourceCount < 1 || req.SourceCount > 1000 || req.NormalizationProfile != "" && req.NormalizationProfile != "cpra.file.base.v1" {
+	if req.SourceCount < 1 || req.SourceCount > 1000 || !supportedCollectionProfile(req.NormalizationProfile) {
 		return nil, errReselectionRequest
 	}
 	raw, err := s.c.generated.CreateCollectionReselection(ctx, id, req)
@@ -203,7 +203,7 @@ func reselectionResponse(c *Client, raw *http.Response, requestErr error, id, at
 }
 
 func validateReselectionObservation(a api.CollectionReselectionAttempt) error {
-	if !reselectionAttemptID(a.ID) || a.NormalizationProfile != "" && a.NormalizationProfile != "cpra.file.base.v1" || a.ExpiresAt.IsZero() ||
+	if !reselectionAttemptID(a.ID) || !supportedCollectionProfile(a.NormalizationProfile) || a.ExpiresAt.IsZero() ||
 		a.SourceCount < 1 || a.SourceCount > 1000 || a.SourcesCompleted < 0 || a.SourcesCompleted > a.SourceCount ||
 		a.RawBytes < 0 || a.RawBytes > 64<<20 || a.NextOffset < 0 || a.NextOffset > a.RawBytes || a.OperationUploaded < 0 || a.OperationUploaded > 10_000 {
 		return errReselectionResponse

@@ -60,7 +60,13 @@ func newLocalCommand() *cobra.Command {
 	service := &cobra.Command{Use: "service", Short: "Install or maintain the native supervisor integration"}
 	for _, action := range []string{"render", "install", "update", "uninstall"} {
 		var binary, account, serviceBackupKey string
-		c := &cobra.Command{Use: action, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		descriptions := map[string]string{
+			"render":    "Print the native service definition without installing or starting it",
+			"install":   "Install an administrator-managed executable and native service definition",
+			"update":    "Back up stopped state and replace a locally managed installation",
+			"uninstall": "Remove a locally managed service while preserving configuration and state",
+		}
+		c := &cobra.Command{Use: action, Short: descriptions[action], Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 			l, err := installpath.Resolve(scope)
 			if err != nil {
 				return err
@@ -101,7 +107,7 @@ func newLocalCommand() *cobra.Command {
 	restore.Flags().StringVar(&restoreDir, "data-dir", "", "new destination state directory")
 	restore.Flags().StringVar(&backupDir, "backup", "", "complete backup directory")
 	restore.Flags().StringVar(&restoreKey, "backup-auth-key", "", "protected external key used to authenticate this backup")
-	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand(), newLocalEncryptionCommand())
+	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand(), newLocalEncryptionCommand(), newLocalActionsCommand(), newLocalReviewCommand())
 	registerLocalExtensions(root)
 	return root
 }

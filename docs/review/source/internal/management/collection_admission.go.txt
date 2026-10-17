@@ -64,7 +64,7 @@ func collectionIdentityBytes(value *string) ([32]byte, error) {
 
 func collectionRequestIdentity(req api.CollectionPrepareRequest, storeID, actor string) (key, source [32]byte, digest string, err error) {
 	if string(req.IdentityFormat) != commitment.Format || req.ItemCount < 1 || uint64(req.ItemCount) > commitment.MaxItems ||
-		req.NormalizationProfile != "" && req.NormalizationProfile != collection.FileNormalizationProfile ||
+		req.NormalizationProfile != "" && !collection.SupportsFileNormalization(req.NormalizationProfile) ||
 		actor == "" || len(actor) > 128 || !utf8.ValidString(actor) || strings.ContainsAny(actor, "\x00\r\n") {
 		return key, source, "", ErrValidation
 	}
@@ -100,7 +100,7 @@ func collectionRequestIdentity(req api.CollectionPrepareRequest, storeID, actor 
 // caller supplies an admission callback that rechecks current authorization.
 // Only the persistent epoch may be initialized; no operation is allocated.
 func (c *Catalog) PrepareCollection(ctx context.Context, req api.CollectionPrepareRequest, actor string, now func() time.Time, admit CollectionCommit) (api.CollectionAdmission, error) {
-	if ctx == nil || now == nil || admit == nil {
+	if ctx == nil || now == nil || admit == nil || req.NormalizationProfile != "" && req.NormalizationProfile != collection.FileNormalizationProfile {
 		return api.CollectionAdmission{}, ErrValidation
 	}
 	if err := ctx.Err(); err != nil {

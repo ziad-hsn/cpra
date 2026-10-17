@@ -15,6 +15,8 @@ MANIFEST = "review/reference-data.json"
 SOURCE_INDEX = "review/implementation-sources.md"
 EVIDENCE_INDEX = "review/local-evidence.md"
 ASSETS = "review/source/"
+PUBLIC_ASSETS = "reference/source/"
+ARCHIVE_PREFIXES = ("candidate/", "implementation/", "review/")
 LINK = re.compile(r"\[[^\]\n]*\]\(([^)\s]+)\)")
 SOURCE_PREFIXES = ("internal/", "api/openapi/", "dashboard/src/", "sdk/go/", "scripts/")
 SOURCE_SUFFIXES = {".go", ".json", ".md", ".ts", ".tsx", ".py", ".sh"}
@@ -39,7 +41,7 @@ def safe_path(root: Path, value: str) -> Path:
     return path
 
 
-def source_asset(value: str) -> str:
+def source_asset(value: str, public: bool = False) -> str:
     if value not in {"Makefile", "main_externaljobs.go", "examples/management/README.md",
                      "examples/verification/sandboxes.yaml", "examples/cpractl/endpoint.yaml",
                      "examples/cpractl/recipient.yaml", "examples/cpractl/group.yaml",
@@ -48,7 +50,7 @@ def source_asset(value: str) -> str:
             raise ValueError(f"reference is not an approved source file: {value}")
     if any(part.lower() in {"secrets", "credentials"} for part in PurePosixPath(value).parts):
         raise ValueError(f"credential files cannot become documentation: {value}")
-    return ASSETS + value + ".txt"
+    return (PUBLIC_ASSETS if public else ASSETS) + value + ".txt"
 
 
 def record_id(value: str) -> str:
@@ -88,7 +90,8 @@ def source_index(records: list[dict]) -> bytes:
              "and SHA-256. Regenerate it when referenced source changes.\n\n"
              "| Repository path | Download | SHA-256 |\n| --- | --- | --- |\n")
     for entry in records:
-        text += f"| `{entry['path']}` | [Source]({entry['asset'].removeprefix('review/')}) | `{entry['sha256']}` |\n"
+        relative = os.path.relpath(entry['asset'], 'review')
+        text += f"| `{entry['path']}` | [Source]({relative}) | `{entry['sha256']}` |\n"
     return text.encode()
 
 
@@ -107,7 +110,7 @@ def evidence_index(records: list[dict]) -> bytes:
         if entry["sha256"]:
             text += f"Bytes: {entry['bytes']}. SHA-256: `{entry['sha256']}`. "
         text += "Contents remain private; this generator did not verify the result.\n\n"
-    return text.encode()
+    return (text.rstrip() + "\n").encode()
 
 
 def prepare(root: Path = ROOT, check: bool = False) -> dict:
@@ -141,6 +144,7 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
     output = {}
     for document in sorted(docs.rglob("*.md")):
         name = document.relative_to(docs).as_posix()
+        public = not name.startswith(ARCHIVE_PREFIXES)
         safe_path(docs, name)
         if name in {SOURCE_INDEX, EVIDENCE_INDEX}:
             continue
@@ -174,13 +178,15 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
                 safe_path(root, value)
                 if resolved.is_relative_to(docs):
                     asset = resolved.relative_to(docs).as_posix()
-                    if asset.startswith(ASSETS):
+                    if asset.startswith((ASSETS, PUBLIC_ASSETS)):
                         if not asset.endswith(".txt"):
                             raise ValueError("source references must be text downloads")
-                        original = asset.removeprefix(ASSETS).removesuffix(".txt")
-                        if source_asset(original) != asset:
+                        original = asset.removeprefix(PUBLIC_ASSETS if asset.startswith(PUBLIC_ASSETS) else ASSETS).removesuffix(".txt")
+                        if source_asset(original, asset.startswith(PUBLIC_ASSETS)) != asset:
                             raise ValueError("invalid source download path")
-                        sources.add(original)
+                        sources.add((original, public))
+                        portable = os.path.relpath(docs / source_asset(original, public), document.parent)
+                        return match[0][:match.start(1) - match.start()] + portable + ")"
                     elif asset == EVIDENCE_INDEX and url.fragment:
                         if url.fragment not in by_record:
                             raise ValueError(f"unrecorded private evidence reference: {target}")
@@ -193,15 +199,15 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
                     destination = docs / EVIDENCE_INDEX
                     portable = os.path.relpath(destination, document.parent) + "#" + record_id(value)
                 else:
-                    sources.add(value)
-                    destination = docs / source_asset(value)
+                    sources.add((value, public))
+                    destination = docs / source_asset(value, public)
                     portable = os.path.relpath(destination, document.parent)
                 return match[0][:match.start(1) - match.start()] + portable + ")"
 
             lines.append(LINK.sub(replace, line))
         output[name] = "".join(lines).encode()
     source_records, total = [], 0
-    for value in sorted(sources):
+    for value, public in sorted(sources):
         path = safe_path(root, value)
         if not path.is_file() or path.stat().st_size > MAX_SOURCE_BYTES:
             raise ValueError(f"missing or oversized source reference: {value}")
@@ -212,7 +218,7 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
         total += len(content)
         if total > MAX_TOTAL_BYTES:
             raise ValueError("documentation source downloads exceed byte quota")
-        asset = source_asset(value)
+        asset = source_asset(value, public)
         output[asset] = content
         source_records.append({"path": value, "asset": asset, "bytes": len(content),
                                "sha256": hashlib.sha256(content).hexdigest()})
@@ -230,12 +236,12 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
     obsolete = set()
     owned_assets = set()
     for entry in old["sources"]:
-        if source_asset(entry["path"]) != entry["asset"]:
+        if entry["asset"] not in (source_asset(entry["path"]), source_asset(entry["path"], True)):
             raise ValueError("invalid owned source download")
         owned_assets.add(entry["asset"])
         if entry["asset"] not in output:
             obsolete.add(entry["asset"])
-    for path in (docs / ASSETS).rglob("*"):
+    for path in list((docs / ASSETS).rglob("*")) + list((docs / PUBLIC_ASSETS).rglob("*")):
         name = path.relative_to(docs).as_posix()
         safe_path(docs, name)
         if path.is_file() and name not in output and name not in owned_assets:

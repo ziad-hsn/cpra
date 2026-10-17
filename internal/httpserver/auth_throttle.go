@@ -24,7 +24,7 @@ type authThrottle struct {
 	sources map[string]authFailure
 }
 
-func (t *authThrottle) blocked(source string, at time.Time) bool {
+func (t *authThrottle) failed(source string, at time.Time) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	// Bounded opportunistic expiry; no unbounded per-request map sweep.
@@ -38,43 +38,65 @@ func (t *authThrottle) blocked(source string, at time.Time) bool {
 			delete(t.sources, key)
 		}
 	}
-	failure, found := t.sources[source]
-	return at.Before(failure.blockedUntil) || !found && len(t.sources) >= maxAuthSources
-}
-
-func (t *authThrottle) failed(source string, at time.Time) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.sources == nil {
 		t.sources = make(map[string]authFailure)
 	}
 	failure, found := t.sources[source]
 	if !found && len(t.sources) >= maxAuthSources {
-		return
+		// Evict the oldest failed source rather than letting a full table deny
+		// unrelated callers. The table and this scan have a fixed upper bound.
+		var oldest string
+		var started time.Time
+		for key, entry := range t.sources {
+			if oldest == "" || entry.started.Before(started) {
+				oldest, started = key, entry.started
+			}
+		}
+		delete(t.sources, oldest)
 	}
 	if !found || !at.Before(failure.started.Add(authFailureWindow)) {
 		failure = authFailure{started: at}
 	}
-	failure.failures++
+	failure.failures = min(maxAuthFailures, failure.failures+1)
 	if failure.failures >= maxAuthFailures {
 		failure.blockedUntil = at.Add(authFailureHold)
 	}
 	t.sources[source] = failure
+	return at.Before(failure.blockedUntil)
 }
 
 type authStatusWriter struct {
 	http.ResponseWriter
-	status int
+	status  int
+	fail    func() bool
+	limited bool
 }
 
 func (w *authStatusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func (w *authStatusWriter) WriteHeader(code int) {
 	if w.status == 0 && code >= 200 {
 		w.status = code
+		if code == http.StatusUnauthorized && w.fail() {
+			w.limited = true
+			w.Header().Del("Content-Length")
+			w.Header().Del("WWW-Authenticate")
+			w.Header().Set("Retry-After", "10")
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.ResponseWriter.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.ResponseWriter.Write([]byte(`{"type":"about:blank","title":"Too Many Requests","status":429,"code":"authentication_throttled"}` + "\n"))
+			return
+		}
+	}
+	if w.limited {
+		return
 	}
 	w.ResponseWriter.WriteHeader(code)
 }
 func (w *authStatusWriter) Write(data []byte) (int, error) {
+	if w.limited {
+		return len(data), nil
+	}
 	if w.status == 0 {
 		w.WriteHeader(http.StatusOK)
 	}
@@ -89,16 +111,12 @@ func failedAuthenticationLimit(next http.Handler) http.Handler {
 		if err != nil {
 			source = "unavailable"
 		}
-		at := time.Now()
-		if throttle.blocked(source, at) {
-			w.Header().Set("Retry-After", "10")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		observed := &authStatusWriter{ResponseWriter: w}
+		// Authority is checked on every request before failed authentication is
+		// throttled. Neither an attacker sharing a peer nor table saturation can
+		// turn a valid credential into an authentication failure.
+		observed := &authStatusWriter{ResponseWriter: w, fail: func() bool {
+			return throttle.failed(source, time.Now())
+		}}
 		next.ServeHTTP(observed, r)
-		if observed.status == http.StatusUnauthorized {
-			throttle.failed(source, time.Now())
-		}
 	})
 }

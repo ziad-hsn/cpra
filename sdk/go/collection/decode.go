@@ -1,7 +1,6 @@
 package collection
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -12,11 +11,13 @@ import (
 // document/resource body is decoded at a time. Zero values select the same
 // limits as Freeze. SourceName is a caller-supplied non-secret diagnostic label.
 type DecodeOptions struct {
-	SourceName       string
-	MaxBytes         int64
-	MaxResourceBytes int
-	MaxDocumentBytes int
-	MaxResources     int
+	SourceName               string
+	MaxBytes                 int64
+	MaxResourceBytes         int
+	MaxDocumentBytes         int
+	MaxResources             int
+	normalizationProfile     string
+	allowDestinationConflict bool
 }
 
 // Decode streams YAML/JSON resources and monitor manifests from r using Freeze's
@@ -48,9 +49,9 @@ func Decode(ctx context.Context, r io.Reader, options DecodeOptions, visit func(
 	if len(label) > 256 {
 		return fmt.Errorf("source label exceeds limit")
 	}
-	b := &builder{o: o, seen: make(map[string]Location), stream: visit}
+	b := &builder{o: o, seen: make(map[string]Location), stream: visit, normalizationProfile: options.normalizationProfile, allowDestinationConflict: options.allowDestinationConflict}
 	limited := &io.LimitedReader{R: r, N: o.MaxStagingBytes + 1}
-	input := bufio.NewReader(&contextReader{ctx: ctx, r: limited})
+	input := newSourceReader(&contextReader{ctx: ctx, r: limited})
 	first, err := peekNonspace(input)
 	if err == io.EOF {
 		err = nil

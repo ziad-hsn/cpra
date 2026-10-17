@@ -116,7 +116,7 @@ The Go SDK provides `Operations.List`, lazy `Operations.Iterate`,
 original handle when the caller stops waiting. `POST /operations/{id}/validate`
 is a separate, implemented asynchronous admission returning HTTP 202; it is not
 part of these observation methods. See the
-[validation contract](implementation/collection-validation-coordinator.md).
+[collection validation](collection-preflight.md).
 
 Inactive staging expires after 24 hours without progress. Original finalized
 validation evidence is retained separately for 30 days. Elapsed staging can be
@@ -133,17 +133,10 @@ and a shared eight-read capacity. Slow history reads run outside authentication
 and shared cursor locks, followed by fresh authorization and publication checks.
 Liveness alone does not imply that retained history is available.
 
-Frontend qualification passed 387 tests, type checks, lint, contract consistency
-and a production build, with independent source review. The corrected full
-web-server race suite and final affected durable/minimum-Go/tagged read-contract
-checks passed. The real TLS/Raft browser/restart campaign passed release-Go race
-and Go 1.25, preserving the first original validation seal after draft disposal
-and owner restart, with no additional writes or provider calls.
-See the [implementation and qualification notes](implementation/collection-operation-listing.md)
-for source boundaries and private evidence locations.
-
-Collection preparation, encrypted upload, cancellation and asynchronous validation
-have their own implemented routes. This read-path work does not finish collection
-activation, browser refresh/reselection recovery or the CLI collection application
-workflow. It also makes no production-account, million-monitor endurance or full
-shipping claim.
+Read, validation and activation contracts are exercised separately. Development
+checks are not frozen-release qualification. The final source must pass browser,
+API/SDK/CLI and real-process restart checks together; see
+[versions and availability](versions.md). Saving configuration, uploading input,
+validating a collection and activating it are distinct operations. Preserve the
+original handle when a response is lost and continue explicitly with its original
+inputs. No background write is triggered by opening an operation view.

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -55,6 +54,9 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 	timeout := pulseSchema.Timeout
 	switch cfg := pulseSchema.Config.(type) {
 	case *manifest.PulseHTTPConfig:
+		if err := validateCheckTLSSettings("http", cfg); err != nil {
+			return nil, err
+		}
 		method := cfg.Method
 		if method == "" {
 			method = http.MethodGet
@@ -68,6 +70,8 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 			Body:               cfg.Body,
 			ExpectedStatus:     cfg.ExpectedStatus,
 			InsecureSkipVerify: cfg.InsecureSkipVerify,
+			CAFile:             cfg.CAFile,
+			ServerName:         cfg.ServerName,
 			Timeout:            timeout,
 			Retries:            cfg.Retries,
 			Client:             *GetHTTPClient(timeout),
@@ -125,19 +129,23 @@ func CreatePulseJob(pulseSchema manifest.Pulse, jobID ecs.Entity) (Job, error) {
 			payload:     map[string]interface{}{"type": "pulse", "driver": "udp"},
 		}, nil
 	case *manifest.PulseGRPCConfig:
+		if err := validateCheckTLSSettings("grpc", cfg); err != nil {
+			return nil, err
+		}
 		return &PulseGRPCJob{
-			ID:            uuid.New(),
-			Entity:        jobID,
-			Host:          cfg.Host,
-			Port:          cfg.Port,
-			Service:       cfg.Service,
-			Mode:          cfg.Mode,
-			AllowInsecure: cfg.AllowInsecure,
-			ServerName:    cfg.ServerName,
-			CAFile:        cfg.CAFile,
-			Timeout:       timeout,
-			Retries:       cfg.Retries,
-			payload:       map[string]interface{}{"type": "pulse", "driver": "grpc"},
+			ID:                 uuid.New(),
+			Entity:             jobID,
+			Host:               cfg.Host,
+			Port:               cfg.Port,
+			Service:            cfg.Service,
+			Mode:               cfg.Mode,
+			AllowInsecure:      cfg.AllowInsecure,
+			InsecureSkipVerify: cfg.InsecureSkipVerify,
+			ServerName:         cfg.ServerName,
+			CAFile:             cfg.CAFile,
+			Timeout:            timeout,
+			Retries:            cfg.Retries,
+			payload:            map[string]interface{}{"type": "pulse", "driver": "grpc"},
 		}, nil
 	case *manifest.PulseDockerConfig:
 		return &PulseDockerJob{
@@ -250,7 +258,7 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 			Title:     "DEGRADED ALERT",
 			Status:    "DEGRADED",
 			Severity:  "warning",
-			Summary:   "Service health checks are failing consecutively beyond safe thresholds",
+			Summary:   "A health check reported a warning or failure; the unhealthy threshold may not yet be reached",
 			Action:    "Investigate partial outage or performance regression",
 			NextSteps: "Validate dependencies, review recent changes, and monitor closely",
 		}
@@ -259,13 +267,13 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 			Title:     "RECOVERY NOTICE",
 			Status:    "RECOVERED",
 			Severity:  "info",
-			Summary:   "Service returned to a healthy state after previous failures",
+			Summary:   "Successful health checks confirmed recovery after a previous warning or failure",
 			Action:    "No immediate action required",
 			NextSteps: "Continue monitoring stability and capture incident follow-up notes",
 		}
 	case "cyan":
 		return codeAlertTemplate{
-			Title:     "INTERVENTION SUCCESS",
+			Title:     "INTERVENTION COMPLETED",
 			Status:    "VERIFICATION_PENDING",
 			Severity:  "info",
 			Summary:   "Automated intervention completed; health verification pending",
@@ -274,12 +282,12 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 		}
 	case "gray":
 		return codeAlertTemplate{
-			Title:     "MAINTENANCE MODE",
-			Status:    "MAINTENANCE",
+			Title:     "MONITOR CONTROL CHANGE",
+			Status:    "CONTROL_CHANGED",
 			Severity:  "info",
-			Summary:   "Monitor is intentionally suppressed during planned maintenance",
-			Action:    "No action required during maintenance window",
-			NextSteps: "Re-enable monitoring once maintenance activities conclude",
+			Summary:   "Monitor enabled state changed; this does not report service recovery",
+			Action:    "Review the recorded monitor control change",
+			NextSteps: "Use health observations to assess the monitored service",
 		}
 	default:
 		return codeAlertTemplate{
@@ -543,6 +551,8 @@ type PulseHTTPJob struct {
 	Body               string
 	ExpectedStatus     []int
 	InsecureSkipVerify bool
+	CAFile             string
+	ServerName         string
 	Timeout            time.Duration
 	Retries            int
 	Entity             ecs.Entity
@@ -564,7 +574,16 @@ func (p *PulseHTTPJob) Execute() (result Result) {
 	payload := p.payload
 
 	client := *httpClient(p.Timeout, p.InsecureSkipVerify)
-	if p.Client.Transport != nil && !SSRFProtect && !p.InsecureSkipVerify {
+	if p.CAFile != "" || p.ServerName != "" {
+		configuration, err := checkTLSConfiguration(p.CAFile, p.ServerName, p.InsecureSkipVerify)
+		if err != nil {
+			return Result{ID: p.ID, Ent: p.Entity, Err: err, Payload: payload}
+		}
+		transport := client.Transport.(*http.Transport).Clone()
+		transport.TLSClientConfig = configuration
+		client.Transport = transport
+		defer transport.CloseIdleConnections()
+	} else if p.Client.Transport != nil && !SSRFProtect && !p.InsecureSkipVerify {
 		client.Transport = p.Client.Transport
 	}
 	if p.Method != "GET" && p.Method != "HEAD" && p.Method != "OPTIONS" {
@@ -884,25 +903,24 @@ func (p *PulseUDPJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseUDPJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseUDPJob) IsNil() bool                { return p == nil }
 
-// PulseGRPCJob checks a gRPC endpoint's reachability via a TCP connect. A full
-// gRPC health check would require the grpc-go client; this verifies the
-// endpoint is listening.
+// PulseGRPCJob supports explicit unary health checks and TCP reachability.
 type PulseGRPCJob struct {
 	Execution
-	EnqueueTime   time.Time
-	StartTime     time.Time
-	Host          string
-	Port          int
-	Service       string
-	Mode          string
-	AllowInsecure bool
-	ServerName    string
-	CAFile        string
-	Timeout       time.Duration
-	Retries       int
-	Entity        ecs.Entity
-	ID            uuid.UUID
-	payload       map[string]interface{}
+	EnqueueTime        time.Time
+	StartTime          time.Time
+	Host               string
+	Port               int
+	Service            string
+	Mode               string
+	AllowInsecure      bool
+	InsecureSkipVerify bool
+	ServerName         string
+	CAFile             string
+	Timeout            time.Duration
+	Retries            int
+	Entity             ecs.Entity
+	ID                 uuid.UUID
+	payload            map[string]interface{}
 }
 
 func (p *PulseGRPCJob) Execute() (result Result) {
@@ -914,6 +932,9 @@ func (p *PulseGRPCJob) Execute() (result Result) {
 	}
 	if p.Mode != "" && p.Mode != "tcp" {
 		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("unsupported gRPC check mode"), Payload: p.payload}
+	}
+	if p.CAFile != "" || p.ServerName != "" || p.Service != "" || p.AllowInsecure || p.InsecureSkipVerify {
+		return Result{ID: p.ID, Ent: p.Entity, Err: fmt.Errorf("gRPC service and TLS settings require health mode"), Payload: p.payload}
 	}
 
 	payload := p.payload
@@ -1053,8 +1074,8 @@ func (i *InterventionDockerJob) Execute() (result Result) {
 }
 
 func dockerOperationBudget(grace, configured time.Duration) (time.Duration, error) {
-	if grace < 0 || grace > 24*time.Hour {
-		return 0, fmt.Errorf("Docker stop grace must be between zero and 24h")
+	if grace < 0 || grace > 24*time.Hour-20*time.Second {
+		return 0, fmt.Errorf("Docker stop grace must allow 20s within the maximum 24h operation budget")
 	}
 	if configured == 0 {
 		return max(60*time.Second, grace+20*time.Second), nil
@@ -1086,6 +1107,7 @@ func (i *InterventionDockerJob) IsNil() bool                { return i == nil }
 
 type CodeLogJob struct {
 	Execution
+	Log         *NotificationLog
 	EnqueueTime time.Time
 	StartTime   time.Time
 	Status      string
@@ -1120,18 +1142,15 @@ func (c *CodeLogJob) Execute() (result Result) {
 	}
 	message := c.notificationMessage(buildCodeNotificationMessage(c.Monitor, tpl))
 
-	// Ensure the parent directory exists so a configured path whose
-	// directory is missing (e.g. /var/log/cpra) does not fail the write.
-	if dir := filepath.Dir(c.File); dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return Result{ID: c.ID, Ent: c.Entity, Err: fmt.Errorf("failed to create log directory %q: %w", dir, err), Payload: payload}
+	f := os.Stdout
+	if c.File != "" {
+		var err error
+		f, err = c.Log.open(c.File)
+		if err != nil {
+			return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 		}
+		defer func() { _ = f.Close() }()
 	}
-	f, err := os.OpenFile(c.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
-	}
-	defer func() { _ = f.Close() }()
 
 	now := time.Now().UTC()
 	entry := struct {
@@ -1275,7 +1294,11 @@ func (c *CodeEmailJob) Execute() (result Result) {
 	ctx, cancel := operationContext(c.Context(), 10*time.Second)
 	defer cancel()
 	result = Result{ID: c.ID, Ent: c.Entity, Payload: map[string]interface{}{"type": "code", "driver": "email", "color": c.Color}}
-	result.Err = sendEmail(ctx, c.Config, c.notificationMessage(c.Message))
+	config := c.Config
+	if config.Subject == "" {
+		config.Subject = "CPRa " + codeAlertTemplateFor(c.Color).Title + ": " + c.Monitor
+	}
+	result.Err = sendEmail(ctx, config, c.notificationMessage(c.Message))
 	return
 }
 
@@ -1309,7 +1332,7 @@ func (c *CodeWebhookJob) Execute() (result Result) {
 	if method == "" {
 		method = http.MethodPost
 	}
-	result.Err = sendJSON(ctx, "webhook", method, c.URL, c.Headers, map[string]string{"monitor": c.Monitor, "color": c.Color, "message": c.notificationMessage(c.Message)})
+	result.Err = sendJSON(ctx, "webhook", method, c.URL, c.Headers, notificationEnvelope{notificationIdentity: c.notification, Monitor: c.Monitor, Color: c.Color, Message: c.notificationMessage(c.Message)})
 	return
 }
 

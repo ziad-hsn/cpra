@@ -8,7 +8,79 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
+
+	"google.golang.org/grpc/codes"
 )
+
+// GRPCHealthError keeps only the protocol enum, never the remote status message.
+type GRPCHealthError struct {
+	Status  string
+	RPCCode codes.Code
+}
+
+func (e *GRPCHealthError) Error() string {
+	if e.Status != "" {
+		return "gRPC health status: " + e.Status
+	}
+	return "gRPC health RPC: " + e.RPCCode.String()
+}
+func (e *GRPCHealthError) Unwrap() error {
+	if e.RPCCode == codes.DeadlineExceeded {
+		return context.DeadlineExceeded
+	}
+	if e.RPCCode == codes.Canceled {
+		return context.Canceled
+	}
+	return nil
+}
+
+type CertificateExpiryError struct {
+	NotAfter      time.Time
+	DaysRemaining int
+}
+
+func (e *CertificateExpiryError) Error() string {
+	return fmt.Sprintf("TLS certificate expires in %d day(s)", e.DaysRemaining)
+}
+
+type FailureDetail struct {
+	HTTPStatus               int
+	GRPCStatus, GRPCCode     string
+	CertificateNotAfter      time.Time
+	CertificateDaysRemaining int
+}
+
+func FailureDetails(err error) FailureDetail {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return FailureDetail{}
+	}
+	var httpStatus *HTTPStatusError
+	var grpcStatus *GRPCHealthError
+	var expiry *CertificateExpiryError
+	switch {
+	case errors.As(err, &httpStatus):
+		if httpStatus.Status >= 100 && httpStatus.Status <= 599 {
+			return FailureDetail{HTTPStatus: httpStatus.Status}
+		}
+		return FailureDetail{}
+	case errors.As(err, &grpcStatus):
+		if grpcStatus.Status != "" {
+			return FailureDetail{GRPCStatus: grpcStatus.Status}
+		}
+		code := grpcStatus.RPCCode
+		if code < codes.Canceled || code > codes.Unauthenticated {
+			code = codes.Unknown
+		}
+		return FailureDetail{GRPCCode: code.String()}
+	case errors.As(err, &expiry):
+		if expiry.NotAfter.IsZero() || expiry.NotAfter.Year() < 1 || expiry.NotAfter.Year() > 9999 || expiry.DaysRemaining < -4000000 || expiry.DaysRemaining > 4000000 {
+			return FailureDetail{}
+		}
+		return FailureDetail{CertificateNotAfter: expiry.NotAfter.UTC(), CertificateDaysRemaining: expiry.DaysRemaining}
+	}
+	return FailureDetail{}
+}
 
 var ErrJobPanic = errors.New("job panicked")
 
@@ -47,7 +119,13 @@ func FailureCode(err error) string {
 	var hostname x509.HostnameError
 	var invalidCertificate x509.CertificateInvalidError
 	var network net.Error
+	var grpcStatus *GRPCHealthError
+	var expiry *CertificateExpiryError
 	switch {
+	case errors.As(err, &grpcStatus):
+		return "grpc_health_failed"
+	case errors.As(err, &expiry):
+		return "certificate_expiring"
 	case errors.As(err, &rejection):
 		return "rejected"
 	case errors.As(err, &httpStatus):

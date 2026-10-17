@@ -286,7 +286,7 @@ func (m *CollectionReselectionManager) createPreflight(ctx context.Context, id, 
 	if head.Actor != actor || head.Owner == nil || head.Owner.Actor != actor || head.Owner.Epoch != authority.Epoch {
 		return empty, nil, noHead, ErrReselectionNotFound
 	}
-	if head.NormalizationProfile != "" && head.NormalizationProfile != collection.FileNormalizationProfile || head.ItemCount > 10_000 {
+	if head.NormalizationProfile != "" && !collection.SupportsFileNormalization(head.NormalizationProfile) || head.ItemCount > 10_000 {
 		return empty, nil, noHead, ErrReselectionConflict
 	}
 	current, err := m.catalog.store.ObserveOperatorAuthority(ctx, actor, m.now())
@@ -306,7 +306,7 @@ func (m *CollectionReselectionManager) createPreflight(ctx context.Context, id, 
 }
 
 func (m *CollectionReselectionManager) Create(ctx context.Context, id, actor, profile string, count int) (CollectionReselectionStatus, error) {
-	if ctx == nil || profile != "" && profile != collection.FileNormalizationProfile || count < 1 || count > 1000 {
+	if ctx == nil || profile != "" && !collection.SupportsFileNormalization(profile) || count < 1 || count > 1000 {
 		return CollectionReselectionStatus{}, ErrValidation
 	}
 	if err := m.begin(); err != nil {

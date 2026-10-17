@@ -49,8 +49,8 @@ func (c *Catalog) Incident(ctx context.Context, id string) (api.Incident, error)
 // IncidentView freezes the ordered latest-incident index. One compact record is
 // retained per monitor; older incident events remain in retained history.
 type IncidentView struct {
-	view    persistence.IncidentView
-	catalog *Catalog
+	view  persistence.IncidentView
+	ready func(context.Context) error
 }
 
 func (c *Catalog) IncidentSnapshot() (IncidentView, error) {
@@ -62,17 +62,17 @@ func (c *Catalog) IncidentSnapshotContext(ctx context.Context) (IncidentView, er
 		return IncidentView{}, err
 	}
 	view, err := c.store.IncidentSnapshotContext(ctx)
-	return IncidentView{view: view, catalog: c}, err
+	return IncidentView{view: view, ready: c.readyContext}, err
 }
 
 func (v IncidentView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Incident, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	if v.catalog == nil {
+	if v.ready == nil {
 		return nil, "", ErrUnavailable
 	}
-	if err := v.catalog.readyContext(ctx); err != nil {
+	if err := v.ready(ctx); err != nil {
 		return nil, "", err
 	}
 	if limit < 1 || limit > 500 || (monitorID != "" && !validID(monitorID)) {
@@ -125,9 +125,12 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		status.StatusRevision = current.Revision + ":" + strconv.FormatUint(current.Generation, 10) + ":" + current.ControlRevision + ":" + current.IncidentRevision + ":" + strconv.FormatUint(current.ObservedGeneration, 10)
 		status.IncidentID = current.IncidentID
 		status.SnoozedUntil = current.SnoozedUntil
+		status.Ignored, status.IgnoredAt, status.IgnoredBy = current.Ignored, current.IgnoredAt, current.IgnoredBy
+		status.IgnoreCause, status.IgnoreReason, status.IgnoreIncidentCount = current.IgnoreCause, current.IgnoreReason, int64(current.IgnoreIncidentCount)
 		status.LastCheckedAt = current.LastCheck
 		status.LastFailure = failureView(current.LastFailure)
 		status.UnknownActions = int64(current.UnknownActions)
+		status.ActionsNeedingReview = int64(current.ActionsNeedingReview)
 		status.LastCheckLatencyMS = api.Measurement{Available: current.LatencyAvailable, Reason: "notObserved"}
 		if current.LatencyAvailable {
 			status.LastCheckLatencyMS.Reason = ""
@@ -157,5 +160,20 @@ func failureView(d persistence.FailureDiagnostic) *api.FailureDiagnostic {
 	if d.Code == "" {
 		return nil
 	}
-	return &api.FailureDiagnostic{Code: d.Code, Message: d.Message}
+	out := &api.FailureDiagnostic{Code: d.Code, Message: d.Message}
+	if d.HTTPStatus != 0 {
+		out.HTTPStatus = &d.HTTPStatus
+	}
+	if d.GRPCStatus != "" {
+		status := api.FailureDiagnosticGrpcStatus(d.GRPCStatus)
+		out.GRPCStatus = &status
+	}
+	if d.GRPCCode != "" {
+		out.GRPCCode = &d.GRPCCode
+	}
+	if !d.CertificateNotAfter.IsZero() {
+		out.CertificateNotAfter = &d.CertificateNotAfter
+		out.CertificateDaysRemaining = &d.CertificateDaysRemaining
+	}
+	return out
 }

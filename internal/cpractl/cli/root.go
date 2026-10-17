@@ -53,8 +53,8 @@ func NewRootCommand() *cobra.Command {
 
 	root.PersistentFlags().StringVar(&o.server, "server", envOr("CPRA_SERVER", "http://localhost:8060"),
 		"CPRA server address (env CPRA_SERVER)")
-	root.PersistentFlags().StringVar(&o.tokenFile, "token-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "file containing the API token (or use CPRA_AUTH_TOKEN)")
-	root.PersistentFlags().StringVar(&o.caFile, "ca-file", os.Getenv("CPRA_CA_FILE"), "PEM trust roots for API HTTPS requests")
+	root.PersistentFlags().StringVar(&o.tokenFile, "token-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "file containing the API token (env CPRA_AUTH_TOKEN_FILE; or CPRA_AUTH_TOKEN)")
+	root.PersistentFlags().StringVar(&o.caFile, "ca-file", os.Getenv("CPRA_CA_FILE"), "PEM trust roots for API HTTPS requests (env CPRA_CA_FILE)")
 	root.PersistentFlags().BoolVar(&o.insecureHTTP, "allow-insecure-http", false, "explicitly allow API authentication over HTTP for the configured origin")
 	root.PersistentFlags().DurationVar(&o.timeout, "request-timeout", 10*time.Second,
 		"per-request timeout")
@@ -78,6 +78,11 @@ func NewRootCommand() *cobra.Command {
 	get.AddCommand(newGetUploadAttemptCommand(o))
 	root.AddCommand(
 		get,
+		&cobra.Command{Use: "version", Short: "Print this client's build identity without contacting a server", Args: cobra.NoArgs,
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), "cpractl version "+version.Info())
+				return err
+			}},
 		newHealthCommand(o),
 		newReadyCommand(o),
 		newLocalCommand(),

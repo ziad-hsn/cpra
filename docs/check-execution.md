@@ -26,6 +26,23 @@ when the queue is empty. An explicitly empty workload can shrink to its minimum
 capacity after queued work drains. The mean queueing model and percentile feedback
 continue to determine capacity within the configured worker limits.
 
+Pulse work uses bounded queues and concurrency reservations per driver within
+one global worker budget. Fair dispatch also rotates active monitor flows within
+a driver; it does not allocate a permanent queue for every configured monitor.
+Checks already selected but waiting for execution remain in pending accounting.
+
+Sizing starts with Erlang C/Allen–Cunneen. Active execution ages, oldest queued
+work and configured arrival demand can request bounded additional capacity before
+hanging checks finish. A downstream-limited driver does not prevent useful
+capacity changes for other checks. Five-second evaluations, the worker bounds,
+twofold growth limit and healthy reduction hold still apply. These mechanisms
+reduce starvation; they do not guarantee that an overloaded host can meet cadence.
+
+Queue and pool observations expose driver activity, oldest pending age,
+saturation, timeouts, missed checks and limiting conditions. Use these alongside
+SLO coverage and sample counts. A short regression's maximum cadence gap is not
+a five-minute latency percentile or a production capacity claim.
+
 Capacity exhaustion leaves a check waiting for admission with its original
 scheduled timestamp. It is not a failed provider observation. Monitor snapshot
 JSON reports `check_admission: awaiting_capacity` and a warning while admission is
@@ -77,7 +94,7 @@ leave the action unknown; they do not authorize another invocation. Acceptance
 by a provider remains distinct from observed delivery.
 
 Provider-specific handling follows the
-[notification response contracts](implementation/notification-response-contracts.md).
+[provider response verification](provider-testing.md).
 Documented rate-limit delays are committed with the result and survive restart.
 The next attempt preserves the original logical delivery identity and overall
 deadline. Its delay is the larger of the provider delay and CPRa's existing
@@ -96,5 +113,5 @@ The configured batch timeout remains the bound for an otherwise idle partial
 batch, rather than a periodic wakeup for every empty shard.
 
 The controller's scheduling cadence and worker-demand refresh are unchanged by
-this result-path repair. The [local idle comparison](implementation/idle-profile-2026-10-12.md)
+this result-path repair. The [verification boundaries](versions.md)
 records measured CPU changes and their limited workload scope.

@@ -18,7 +18,7 @@ func (m *managementHTTP) registerControls(mux *http.ServeMux) {
 		var incident api.Incident
 		err := m.withObservationRead(r, "GetIncident", func(ctx context.Context) error {
 			var err error
-			incident, err = m.catalog.Incident(ctx, r.PathValue("id"))
+			incident, err = m.observations.Incident(ctx, r.PathValue("id"))
 			return err
 		})
 		if err != nil {
@@ -28,12 +28,17 @@ func (m *managementHTTP) registerControls(mux *http.ServeMux) {
 		incidentHeaders(w, incident)
 		writeManagementJSON(w, http.StatusOK, incident)
 	})
+	if m.catalog == nil {
+		return
+	}
 	for _, route := range []struct{ path, action, operation string }{
 		{"/api/v2/incidents/{id}/acknowledge", "acknowledge", "AcknowledgeIncident"},
 		{"/api/v2/incidents/{id}/dismiss", "dismiss", "DismissIncident"},
 		{"/api/v2/incidents/{id}/reopen", "reopen", "ReopenIncident"},
 		{"/api/v2/monitors/{id}/snooze", "snooze", "SnoozeMonitor"},
 		{"/api/v2/monitors/{id}/unsnooze", "unsnooze", "UnsnoozeMonitor"},
+		{"/api/v2/monitors/{id}/ignore", "ignore", "IgnoreMonitor"},
+		{"/api/v2/monitors/{id}/unignore", "unignore", "UnignoreMonitor"},
 	} {
 		mux.HandleFunc("POST "+route.path, func(w http.ResponseWriter, r *http.Request) { m.handleControl(w, r, route.action, route.operation) })
 	}
@@ -107,7 +112,7 @@ func (m *managementHTTP) handleControl(w http.ResponseWriter, r *http.Request, a
 	}
 	w.Header().Set("X-CPRa-Admission", "committed")
 	w.Header().Set("X-Commit-Index", strconv.FormatUint(result.CommittedIndex, 10))
-	if action == "snooze" || action == "unsnooze" {
+	if action == "snooze" || action == "unsnooze" || action == "ignore" || action == "unignore" {
 		writeManagementJSON(w, http.StatusOK, result.Operation)
 		return
 	}
@@ -117,7 +122,7 @@ func (m *managementHTTP) handleControl(w http.ResponseWriter, r *http.Request, a
 
 func (m *managementHTTP) handleIncidents(w http.ResponseWriter, r *http.Request) {
 	managementHeaders(w)
-	if _, err := m.auth.Authorize(r, "ListIncidents"); err != nil {
+	if _, err := m.authorizeRead(r, "ListIncidents"); err != nil {
 		writeManagementError(w, err)
 		return
 	}
@@ -130,7 +135,7 @@ func (m *managementHTTP) handleIncidents(w http.ResponseWriter, r *http.Request)
 	err = m.withSnapshotRead(r, "ListIncidents", "Incident", query, func(ctx context.Context, read *snapshotRead) error {
 		entry := &read.entry
 		if read.fresh {
-			view, err := m.catalog.IncidentSnapshotContext(ctx)
+			view, err := m.observations.IncidentSnapshotContext(ctx)
 			if err != nil {
 				return err
 			}

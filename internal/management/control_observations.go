@@ -129,8 +129,8 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		status.IgnoreCause, status.IgnoreReason, status.IgnoreIncidentCount = current.IgnoreCause, current.IgnoreReason, int64(current.IgnoreIncidentCount)
 		status.LastCheckedAt = current.LastCheck
 		status.LastFailure = failureView(current.LastFailure)
-		status.UnknownActions = int64(current.UnknownActions)
-		status.ActionsNeedingReview = int64(current.ActionsNeedingReview)
+		status.UnknownActions = api.Pointer(int64(current.UnknownActions))
+		status.ActionsNeedingReview = api.Pointer(int64(current.ActionsNeedingReview))
 		status.LastCheckLatencyMS = api.Measurement{Available: current.LatencyAvailable, Reason: "notObserved"}
 		if current.LatencyAvailable {
 			status.LastCheckLatencyMS.Reason = ""

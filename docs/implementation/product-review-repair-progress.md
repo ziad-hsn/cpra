@@ -188,6 +188,22 @@ review then requested the explicit pre-observation assertion retained above.
 independent source review closed without an outstanding finding.
 The final affected selection includes the newly exposed process-crash case.
 
+At `a8f2213`, the combined affected race row and all-package vet passed with
+3,097 passing test/subtest events and nine classified skips. All eight required
+real-server browser scenarios passed too. Inspecting their screenshots exposed
+an assertion gap: optional integer counters omitted a known zero, displaying
+"Unavailable" after an administrator had conclusively reviewed an unknown action.
+The two optional monitor-status counters now preserve their presence in both SDK
+variants. Configuration-pending or mismatched observations still omit them; a
+matching observation emits zero. CLI describe preserves absence and includes
+the review-needed count. Required observation fields and storage formats are
+unchanged. New serialized-response, SDK and CLI regressions passed; the browser
+scenario now asserts one original unknown outcome and zero actions needing review.
+Independent source review closed the correction. The failed baseline and two
+fixture-setup failures remain recorded separately from the passing checks.
+This response change requires a new freeze and affected verification; the earlier
+combined and browser passes are evidence for `a8f2213`, not the new candidate.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

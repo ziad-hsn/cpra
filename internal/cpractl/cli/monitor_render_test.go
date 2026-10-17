@@ -106,3 +106,33 @@ func TestMonitorDescribeSnoozeAvailability(t *testing.T) {
 		})
 	}
 }
+
+func TestMonitorDescribeActionCountAvailability(t *testing.T) {
+	for _, tc := range []struct{ name, raw, unknown, review string }{
+		{"missing", `{}`, "unavailable", "unavailable"},
+		{"older response", `{"statusRevision":"observed"}`, "unavailable", "unavailable"},
+		{"zero", `{"statusRevision":"observed","unknownActions":0,"actionsNeedingReview":0}`, "0", "0"},
+		{"reviewed", `{"statusRevision":"observed","unknownActions":1,"actionsNeedingReview":0}`, "1", "0"},
+		{"held", `{"statusRevision":"observed","unknownActions":2,"actionsNeedingReview":2}`, "2", "2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := cliResource("Monitor", "service")
+			r.Status = json.RawMessage(tc.raw)
+			cmd := &cobra.Command{}
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			if err := describeMonitor(cmd, r, "service"); err != nil {
+				t.Fatal(err)
+			}
+			values := map[string]string{}
+			for _, line := range strings.Split(out.String(), "\n") {
+				if key, value, ok := strings.Cut(line, ":"); ok {
+					values[key] = strings.TrimSpace(value)
+				}
+			}
+			if values["Unknown actions"] != tc.unknown || values["Actions needing review"] != tc.review {
+				t.Fatal("action counts lost their availability", out.String())
+			}
+		})
+	}
+}

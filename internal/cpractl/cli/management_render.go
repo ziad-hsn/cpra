@@ -204,10 +204,9 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 		checked = status.LastCheckedAt.UTC().Format(time.RFC3339Nano)
 	}
 	latency := measurement(status.LastCheckLatencyMS)
-	observed, unknownActions := "unavailable", "unavailable"
+	observed := "unavailable"
 	if status.StatusRevision != "" {
 		observed = strconv.FormatInt(status.ObservedGeneration, 10)
-		unknownActions = strconv.FormatInt(status.UnknownActions, 10)
 		if status.ControlRevision != "" {
 			snoozed = "not snoozed"
 			if !status.SnoozedUntil.IsZero() {
@@ -226,7 +225,8 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 		{"Check driver", spec.Check.Driver.Type}, {"Check interval", spec.Check.Interval}, {"Check timeout", spec.Check.Timeout},
 		{"Recovery driver", recovery}, {"Observed health", monitorHealth(resource.Status)}, {"Last checked", checked}, {"Latency ms", latency},
 		{"Snoozed until", snoozed}, {"Incident", strOrDash(status.IncidentID)}, {"Control version", strOrDash(status.ControlRevision)},
-		{"Unknown actions", unknownActions}, {"Last failure", diagnosticText(status.LastFailure)},
+		{"Unknown actions", operationCount(status.UnknownActions)}, {"Actions needing review", operationCount(status.ActionsNeedingReview)},
+		{"Last failure", diagnosticText(status.LastFailure)},
 	})
 }
 

@@ -3148,8 +3148,7 @@
           "actionsNeedingReview": {
             "description": "Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.",
             "format": "int64",
-            "type": "integer",
-            "x-go-type-skip-optional-pointer": true
+            "type": "integer"
           },
           "controlRevision": {
             "type": "string",
@@ -3223,8 +3222,7 @@
           },
           "unknownActions": {
             "format": "int64",
-            "type": "integer",
-            "x-go-type-skip-optional-pointer": true
+            "type": "integer"
           }
         },
         "required": [],

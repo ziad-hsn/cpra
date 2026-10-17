@@ -204,6 +204,8 @@ function check(value, message) { if (!value) throw new Error(message); }
     await page.getByRole('region', { name: 'Monitor application and observations', exact: true }).getByText(/The controller reports this configuration generation applied/).waitFor();
     await actions.getByText(/Operator review: accepted · team\/oncall/).waitFor();
     check(await page.getByRole('button', { name: /^(Review action |Request recovery|Acknowledge|Dismiss|Snooze|Disable|Enable|check now)/i }).count() === 0, 'stable-ID reader view exposed a write control');
+    await page.getByRole('region', { name: 'Monitor application and observations', exact: true }).getByText(/Unknown provider outcomes: 1 · Actions needing review: 0$/).waitFor();
+    checkpoints.push('accepted review retains the unknown provider outcome and exposes a known zero review-needed count');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-monitor-state.png'), fullPage: true });
     await auditAccessibility(page, 'reader-monitor-state', accessibility);
     checkpoints.push('saved configuration navigates to stable-ID monitor observations, history and existing action evidence');

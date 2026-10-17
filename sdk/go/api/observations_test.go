@@ -84,3 +84,36 @@ func TestObservationKnownZeroAndOlderOptionalFields(t *testing.T) {
 		t.Fatal("genuinely required action fields ignored")
 	}
 }
+
+func TestMonitorActionCountAvailabilityRoundTrip(t *testing.T) {
+	for _, raw := range []string{
+		`{}`,
+		`{"statusRevision":"observed"}`,
+		`{"unknownActions":0,"actionsNeedingReview":0}`,
+		`{"unknownActions":1,"actionsNeedingReview":0}`,
+		`{"unknownActions":2,"actionsNeedingReview":2}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			var status MonitorStatus
+			if err := DecodeResponse([]byte(raw), &status); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := json.Marshal(status)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var before, after map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(raw), &before); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(encoded, &after); err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range []string{"unknownActions", "actionsNeedingReview"} {
+				if !bytes.Equal(before[field], after[field]) {
+					t.Fatalf("%s changed availability or count: %s -> %s", field, raw, encoded)
+				}
+			}
+		})
+	}
+}

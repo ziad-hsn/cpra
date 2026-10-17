@@ -151,3 +151,75 @@ func TestMonitorObservationRequiresExplicitOwnerAcknowledgement(t *testing.T) {
 		t.Fatal("owner marker missing or fabricated a check", observed)
 	}
 }
+
+func TestMonitorActionCountsPreserveAvailability(t *testing.T) {
+	c, store := testCatalog(t)
+	ctx := t.Context()
+	r := createResource(t, c, controlResource("action-counts"))
+	assertCounts := func(input api.Resource, want string) {
+		t.Helper()
+		observed, err := c.observedResource(ctx, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(observed.Status, &fields); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"unknownActions", "actionsNeedingReview"} {
+			if string(fields[name]) != want {
+				t.Fatalf("%s = %s, want %q; status: %s", name, fields[name], want, observed.Status)
+			}
+		}
+	}
+	assertCounts(r, "") // The controller has not installed this configuration.
+	commit := func(command persistence.Command) persistence.Result {
+		t.Helper()
+		results, err := store.Submit(ctx, []persistence.Command{command})
+		if err != nil || len(results) != 1 || results[0].Err != nil {
+			t.Fatal("fixture commit", err, results)
+		}
+		return results[0]
+	}
+	guard := &persistence.CatalogGuard{Conditions: []persistence.CatalogCondition{{Key: persistence.CatalogKey{Kind: "Monitor", ID: r.Metadata.ID}, UID: r.Metadata.UID, Revision: r.Metadata.ResourceVersion}}}
+	m := persistence.Monitor{ID: r.Metadata.ID, CatalogUID: r.Metadata.UID, Revision: "execution",
+		Policy: persistence.Policy{Interval: time.Minute, Enabled: true, Intervention: true, Unhealthy: 1, Healthy: 1}}
+	m = *commit(persistence.Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, At: time.Now().UTC(), Guard: guard, Config: &m}).Monitor
+	assertCounts(r, "0")
+	for _, field := range []string{"uid", "revision"} {
+		stale := r
+		if field == "uid" {
+			stale.Metadata.UID = "other-incarnation"
+		} else {
+			stale.Metadata.ResourceVersion = "other-revision"
+		}
+		assertCounts(stale, "")
+	}
+
+	m = *commit(persistence.Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: guard, Generation: 1, Outcome: "failure", At: time.Now().UTC()}).Monitor
+	if len(m.Actions) != 1 {
+		t.Fatal("fixture did not admit one action")
+	}
+	for id := range m.Actions {
+		handle, err := store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, Guard: guard, ActionID: id, At: time.Now().UTC()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := handle.Finish(ctx); err != nil {
+			t.Fatal(err)
+		}
+		commit(persistence.Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: id, Outcome: "failure", Ambiguous: true, At: time.Now().UTC()})
+	}
+	assertCounts(r, "1")
+	deletion, err := c.PrepareDelete(ctx, "Monitor", m.ID, r.Metadata.ResourceVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CommitAs(ctx, deletion, "operator"); err != nil {
+		t.Fatal(err)
+	}
+	removed := deletion.mutation.Record
+	removal := &persistence.CatalogGuard{Removed: true, Conditions: []persistence.CatalogCondition{{Key: removed.Key, UID: removed.UID, Revision: removed.Revision}}}
+	commit(persistence.Command{Kind: "remove", MonitorID: m.ID, Revision: m.Revision, Guard: removal, At: time.Now().UTC()})
+	assertCounts(r, "")
+}

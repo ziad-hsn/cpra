@@ -1370,7 +1370,7 @@ type MonitorSpec struct {
 // MonitorStatus defines model for MonitorStatus.
 type MonitorStatus struct {
 	// ActionsNeedingReview Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.
-	ActionsNeedingReview int64       `json:"actionsNeedingReview,omitempty"`
+	ActionsNeedingReview *int64      `json:"actionsNeedingReview,omitempty"`
 	ControlRevision      string      `json:"controlRevision,omitempty"`
 	ExecutionRevision    string      `json:"executionRevision,omitempty"`
 	Health               string      `json:"health,omitempty"`
@@ -1389,7 +1389,7 @@ type MonitorStatus struct {
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty"`
 	StatusRevision     string             `json:"statusRevision,omitempty"`
-	UnknownActions     int64              `json:"unknownActions,omitempty"`
+	UnknownActions     *int64             `json:"unknownActions,omitempty"`
 }
 
 // NotificationEndpoint defines model for NotificationEndpoint.

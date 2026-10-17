@@ -20,7 +20,8 @@ import time
 from module_archive import (CORE, MODULE, ROOT, WORKER, build_archiver, sha256,
                             stage_module, tool_environment)
 
-MODULES = {MODULE: '.', CORE: 'sdk/go', WORKER: 'sdk/go/worker'}
+EXAMPLES = MODULE + '/examples/sdk'
+MODULES = {MODULE: '.', CORE: 'sdk/go', WORKER: 'sdk/go/worker', EXAMPLES: 'examples/sdk'}
 MAX_SOURCE_BYTES = 256 * 1024 ** 2
 MAX_FILE_BYTES = 32 * 1024 ** 2
 MAX_SOURCE_FILES = 20_000
@@ -139,7 +140,7 @@ def run_go(go, source, args, env, out, name, commands, timeout=900):
     return stdout.read_text()
 
 
-def module_contract(metadata, module, sdk_version=None):
+def module_contract(metadata, module, sdk_version=None, worker_version=None):
     if not isinstance(metadata, dict) or metadata.get('Module', {}).get('Path') != module \
             or metadata.get('Go') != '1.26.0':
         raise ValueError('Module path or Go compatibility changed: ' + module)
@@ -150,7 +151,8 @@ def module_contract(metadata, module, sdk_version=None):
         path, version = item.get('Path'), item.get('Version')
         if not isinstance(path, str) or not isinstance(version, str) or path in requirements:
             raise ValueError('Invalid or duplicate module requirement')
-        if path == MODULE or (path.startswith(MODULE + '/') and path != CORE):
+        allowed = {CORE, WORKER} if module == EXAMPLES else {CORE}
+        if path == MODULE or (path.startswith(MODULE + '/') and path not in allowed):
             raise ValueError('Invalid SDK dependency direction: ' + path)
         requirements[path] = version
     if module == CORE and CORE in requirements:
@@ -159,8 +161,34 @@ def module_contract(metadata, module, sdk_version=None):
         selected = requirements.get(CORE)
         if not isinstance(selected, str) or not VERSION.fullmatch(selected) \
                 or (sdk_version is not None and selected != sdk_version):
-            raise ValueError('Application and worker must retain the same explicit SDK version')
+            raise ValueError('Dependent modules must retain the same explicit SDK version')
+    if module == EXAMPLES:
+        selected = requirements.get(WORKER)
+        if not isinstance(selected, str) or not VERSION.fullmatch(selected) \
+                or (worker_version is not None and selected != worker_version):
+            raise ValueError('Examples must retain the worker version being prepared')
     return requirements
+
+
+def refresh_checksum(path, source, archive, report):
+    """Remove only stale private-candidate rows; Go supplies the replacements."""
+    if not path.exists():
+        return
+    module, version = archive['Path'], archive['Version']
+    original_rows = path.read_bytes().splitlines(keepends=True)
+    selected = {(module + ' ' + version + ' ').encode(): archive['Sum'],
+                (module + ' ' + version + '/go.mod ').encode(): archive['GoModSum']}
+    stale = [row for row in original_rows
+             if any(row.startswith(prefix) and row.strip().split()[-1].decode() != expected
+                    for prefix, expected in selected.items())]
+    if stale:
+        report.setdefault('module_checksum_refresh', []).append({
+            'path': path.relative_to(source).as_posix(), 'module': module,
+            'version': version, 'source_archive_sum': archive['Sum'],
+            'source_module_sum': archive['GoModSum'],
+            'previous_rows': [row.decode().strip() for row in stale],
+        })
+        path.write_bytes(b''.join(row for row in original_rows if row not in stale))
 
 
 def proposals(source, before):
@@ -307,6 +335,8 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
             contracts[module] = module_contract(metadata, module)
         sdk_version = contracts[MODULE][CORE]
         module_contract(json.loads((out / 'module-before-2.stdout').read_text()), WORKER, sdk_version)
+        module_contract(json.loads((out / 'module-before-3.stdout').read_text()), EXAMPLES,
+                        sdk_version, worker_version)
         report['versions'] = {CORE: sdk_version, WORKER: worker_version}
         # Normalize the leaf first: its final bytes determine dependent sums.
         run(source / 'sdk/go', ['mod', 'tidy', '-compat=1.26'], 'sdk-tidy')
@@ -323,34 +353,23 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
         env.update(GOPROXY=proxy.as_uri() + ',https://proxy.golang.org', GONOSUMDB=CORE + ',' + WORKER)
         for name, relative in [('application', '.'), ('worker', 'sdk/go/worker')]:
             if refresh_sdk_checksum:
-                # This is a proposal in the disposable source copy. Refresh
-                # only this SDK version's changed archive/definition checksums;
-                # Go verifies the new values against the staged source bytes.
-                path = source / relative / 'go.sum'
-                if path.exists():
-                    original_rows = path.read_bytes().splitlines(keepends=True)
-                    selected = {(CORE + ' ' + sdk_version + ' ').encode(): sdk['Sum'],
-                                (CORE + ' ' + sdk_version + '/go.mod ').encode(): sdk['GoModSum']}
-                    stale = [row for row in original_rows
-                             if any(row.startswith(prefix) and row.strip().split()[-1].decode() != expected
-                                    for prefix, expected in selected.items())]
-                    if stale:
-                        report.setdefault('sdk_checksum_refresh', []).append({
-                            'path': path.relative_to(source).as_posix(),
-                            'version': sdk_version, 'source_archive_sum': sdk['Sum'],
-                            'source_module_sum': sdk['GoModSum'],
-                            'previous_rows': [row.decode().strip() for row in stale],
-                        })
-                        path.write_bytes(b''.join(row for row in original_rows if row not in stale))
+                refresh_checksum(source / relative / 'go.sum', source, sdk, report)
             run(source / relative, ['mod', 'tidy', '-compat=1.26'], name + '-tidy')
             run(source / relative, ['mod', 'download', '-json', 'all'], name + '-download')
-        for index, (module, relative) in enumerate(MODULES.items()):
-            metadata = json.loads(run(source / relative, ['mod', 'edit', '-json'], 'module-after-' + str(index)))
-            module_contract(metadata, module, sdk_version)
-            run(source / relative, ['mod', 'verify'], 'module-verify-' + str(index))
-            run(source / relative, ['list', '-mod=readonly', '-m', '-json', 'all'], 'module-graph-' + str(index))
         worker = stage_module(archiver, proxy, WORKER, worker_version, source / 'sdk/go/worker', source_time)
         report['module_archives'][WORKER] = worker
+        # The worker archive includes its SDK checksum. Prepare the examples
+        # only after both dependency payloads have their final bytes.
+        if refresh_sdk_checksum:
+            for archive in (sdk, worker):
+                refresh_checksum(source / 'examples/sdk/go.sum', source, archive, report)
+        run(source / 'examples/sdk', ['mod', 'tidy', '-compat=1.26'], 'examples-tidy')
+        run(source / 'examples/sdk', ['mod', 'download', '-json', 'all'], 'examples-download')
+        for index, (module, relative) in enumerate(MODULES.items()):
+            metadata = json.loads(run(source / relative, ['mod', 'edit', '-json'], 'module-after-' + str(index)))
+            module_contract(metadata, module, sdk_version, worker_version)
+            run(source / relative, ['mod', 'verify'], 'module-verify-' + str(index))
+            run(source / relative, ['list', '-mod=readonly', '-m', '-json', 'all'], 'module-graph-' + str(index))
         consumer = out / 'consumer'
         consumer.mkdir()
         (consumer / 'go.mod').write_text('module cpra.invalid/dependency-consumer\n\ngo 1.26.0\n')
@@ -402,7 +421,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--worker-version', required=True)
     parser.add_argument('--refresh-sdk-checksum', action='store_true',
-                        help='propose refreshed SDK archive and go.mod checksums for an unpublished private candidate; only copied files change')
+                        help='propose refreshed SDK and dependent worker checksums for an unpublished private candidate, including examples; only copied files change')
     args = parser.parse_args()
     try:
         report = prepare(args.go, args.out, args.worker_version,

@@ -223,6 +223,27 @@ Generic storage/backup repetition omitted from intermediate rows remains covered
 by each compiler's full default/combined rows. Intermediate profiles are not
 reported as equivalent execution of the full affected selection.
 
+At `48aa591`, the required tagged browser campaigns, SDK/worker race and vet
+checks, deterministic generation, private fresh-consumer archive checks and
+seven vulnerability scans passed within their recorded scopes. The built-in
+scans retained the module-only OpenPGP advisory GO-2026-5932; no affected package
+or symbol was imported. These results do not qualify provider accounts or a
+public release. The worker tests used the workspace graph.
+
+Preparing a separate worker-module check then exposed stale SDK archive checksums
+in the application, worker and examples. A fresh consumer did not inspect those
+source modules' own checksum files, and workspace tests bypassed that boundary.
+The application matrix was deliberately interrupted; its completed package logs
+remain partial evidence, not a passing row. Dependency preparation now includes
+the examples after finalizing the SDK and worker payloads. Consumer verification
+also requires the original modules' version pins and both checksums to match.
+Go generated the three checksum-file proposals in an isolated source copy;
+dependency versions and module definitions are unchanged. The 49 preparation and
+archive regression tests passed, and independent source review closed the changes.
+The frozen archive and worker checks must pass with the corrected source before
+the remaining matrix can qualify it. No unpublished module was tagged to resolve
+the mismatch.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

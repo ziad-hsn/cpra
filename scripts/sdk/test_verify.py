@@ -15,6 +15,35 @@ from verify import (CORE, WORKER, VERSION,
 
 
 class ArchiveContractTests(unittest.TestCase):
+    def test_source_consumers_require_both_matching_checksums(self):
+        records = {
+            CORE: {'Path': CORE, 'Version': VERSION, 'Sum': 'h1:sdk', 'GoModSum': 'h1:sdk-mod'},
+            WORKER: {'Path': WORKER, 'Version': VERSION, 'Sum': 'h1:worker', 'GoModSum': 'h1:worker-mod'},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'go.sum'
+            valid = ''.join(f'{module} {VERSION}{suffix} {record[field]}\n'
+                            for module, record in records.items()
+                            for suffix, field in (('', 'Sum'), ('/go.mod', 'GoModSum')))
+            path.write_text(valid + 'example.com/other v1.0.0 h1:unrelated\n')
+            self.assertEqual(verify.verify_dependency_checksums(path, records), [CORE, WORKER])
+            for mutation in ('stale-sdk', 'stale-worker', 'stale-definition', 'missing', 'duplicate'):
+                with self.subTest(mutation=mutation):
+                    content = valid
+                    if mutation == 'stale-sdk':
+                        content = content.replace('h1:sdk\n', 'h1:older\n')
+                    elif mutation == 'stale-worker':
+                        content = content.replace('h1:worker\n', 'h1:older\n')
+                    elif mutation == 'stale-definition':
+                        content = content.replace('h1:sdk-mod\n', 'h1:older\n')
+                    elif mutation == 'missing':
+                        content = '\n'.join(valid.splitlines()[1:]) + '\n'
+                    else:
+                        content += valid.splitlines()[0] + '\n'
+                    path.write_text(content)
+                    with self.assertRaisesRegex(ValueError, 'checksum'):
+                        verify.verify_dependency_checksums(path, records)
+
     def test_prepared_archive_content_is_stable_across_compiler_zip_encodings(self):
         record = {'Path': verify.CORE, 'Version': 'v0.1.0-rc.1', 'Sum': 'content',
                   'GoModSum': 'module', 'Requires': {}, 'ArchiveSHA256': 'encoding-one'}

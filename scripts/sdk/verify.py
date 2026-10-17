@@ -18,7 +18,7 @@ import tempfile
 import zipfile
 
 from module_archive import build_archiver, committed_source, sha256, stage_module, tool_environment
-from prepare_dependencies import copy_prepared_source
+from prepare_dependencies import EXAMPLES, MODULE, MODULES, copy_prepared_source, module_contract
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = "github.com/ziad-hsn/cpra/sdk/go"
@@ -157,6 +157,45 @@ def verify_prepared_archives(records, preparation, compiler_sha256):
             raise ValueError('Restaged ZIP differs under the same compiler recipe')
 
 
+def verify_dependency_checksums(path, records):
+    """Check source consumers, whose sums a fresh consumer cannot validate."""
+    with path.open('rb') as stream:
+        data = stream.read(8 * 1024 ** 2 + 1)
+    if len(data) > 8 * 1024 ** 2:
+        raise ValueError('Dependency checksum file exceeds its byte limit')
+    expected = {(module, record['Version'] + suffix): record[field]
+                for module, record in records.items()
+                for suffix, field in (('', 'Sum'), ('/go.mod', 'GoModSum'))}
+    found = {}
+    for line in data.decode().splitlines():
+        fields = line.split()
+        key = tuple(fields[:2])
+        if key not in expected:
+            continue
+        if len(fields) != 3 or key in found or fields[2] != expected[key]:
+            raise ValueError('Source consumer checksum differs from the selected private module: ' + str(path))
+        found[key] = fields[2]
+    if found != expected:
+        raise ValueError('Source consumer is missing a selected private-module checksum: ' + str(path))
+    return sorted(records)
+
+
+def verify_repository_dependencies(go, source, records, env):
+    results = []
+    for module in (MODULE, WORKER, EXAMPLES):
+        relative = MODULES[module]
+        directory = source / relative
+        metadata = json.loads(run([go, 'mod', 'edit', '-json'], directory, env))
+        module_contract(metadata, module, records[CORE]['Version'], records[WORKER]['Version'])
+        dependencies = {CORE: records[CORE]}
+        if module == EXAMPLES:
+            dependencies[WORKER] = records[WORKER]
+        checked = verify_dependency_checksums(directory / 'go.sum', dependencies)
+        results.append({'module': module, 'path': relative, 'dependencies': checked,
+                        'checksumSHA256': sha256(directory / 'go.sum')})
+    return results
+
+
 def verify_consumers(go: str, artifacts: Path | None, *, published=False, sdk_version=VERSION, worker_version=VERSION, prepared=None):
     if prepared is not None and published:
         raise ValueError('Working-tree preparation cannot qualify published modules')
@@ -206,6 +245,7 @@ def verify_consumers(go: str, artifacts: Path | None, *, published=False, sdk_ve
                     proxy.as_uri() + ",https://proxy.golang.org"})
         for key in ("GOOS", "GOARCH", "GOROOT"):
             env.pop(key, None)
+        report['sourceConsumerChecksums'] = verify_repository_dependencies(go, source, records, env)
         report["compiler"] = run([go, "version"], ROOT, env).strip()
         consumer = temp / "consumer"
         consumer.mkdir()
@@ -252,6 +292,7 @@ def verify_consumers(go: str, artifacts: Path | None, *, published=False, sdk_ve
         report["checks"] = ["external consumer", "independent default dependency graph",
                             "custom API negative compilation", "worker negative compilation",
                             "tagged consumers", "no workspace or replace", "downloaded source identity",
+                            "source consumer versions and checksums",
                             "packaged readmes and licenses", "rendered Go package documentation",
                             "executable examples from downloaded modules"]
         report["candidateContentIdentityMatched"] = True

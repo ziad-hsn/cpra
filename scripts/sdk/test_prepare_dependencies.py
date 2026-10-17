@@ -92,6 +92,14 @@ class PreparationTests(unittest.TestCase):
                 prepare.module_contract(value, prepare.WORKER, 'v0.1.0-rc.1')
         with self.assertRaises(ValueError):
             prepare.module_contract(base, prepare.WORKER, 'v0.2.0')
+        example = dict(base, Module={'Path': prepare.EXAMPLES}, Require=base['Require'] + [
+            {'Path': prepare.WORKER, 'Version': 'v0.2.0'}])
+        self.assertEqual(prepare.module_contract(example, prepare.EXAMPLES, 'v0.1.0-rc.1', 'v0.2.0'),
+                         {prepare.CORE: 'v0.1.0-rc.1', prepare.WORKER: 'v0.2.0'})
+        with self.assertRaisesRegex(ValueError, 'worker version'):
+            prepare.module_contract(example, prepare.EXAMPLES, 'v0.1.0-rc.1', 'v0.3.0')
+        with self.assertRaisesRegex(ValueError, 'dependency direction'):
+            prepare.module_contract(dict(example, Module={'Path': prepare.WORKER}), prepare.WORKER)
 
     def test_existing_output_is_never_overwritten_even_on_error(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -183,6 +191,9 @@ class PreparationTests(unittest.TestCase):
                     path.mkdir(parents=True, exist_ok=True)
                     (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.26.0\n')
                     (path / 'go.sum').write_text('leaf fixture\n' if module == prepare.CORE else stale + previous_definition + unrelated)
+                    if module == prepare.EXAMPLES:
+                        with (path / 'go.sum').open('a') as stream:
+                            stream.write(prepare.WORKER + ' ' + version + ' h1:old-worker\n')
                 subprocess.run(['git', 'add', '.'], cwd=root, check=True)
                 subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                                 '-c', 'commit.gpgSign=false', 'commit', '-qm', 'Fixture'], cwd=root, check=True)
@@ -211,18 +222,28 @@ class PreparationTests(unittest.TestCase):
                                       if path == out / 'source' / relative)
                         value = {'Module': {'Path': module}, 'Go': '1.26.0',
                                  'Require': [] if module == prepare.CORE else [{'Path': prepare.CORE, 'Version': version}]}
+                        if module == prepare.EXAMPLES:
+                            value['Require'].append({'Path': prepare.WORKER, 'Version': version})
                         result = json.dumps(value)
                         (destination / (name + '.stdout')).write_text(result)
                         return result
                     if name == 'sdk-tidy':
                         (path / 'go.sum').write_text('leaf fixture\n')
-                    elif name in ('application-tidy', 'worker-tidy'):
+                    elif name in ('application-tidy', 'worker-tidy', 'examples-tidy'):
                         contents = (path / 'go.sum').read_text()
                         if stale in contents or (changed_definition and previous_definition in contents):
                             raise ValueError('checksum mismatch in copied dependent module')
                         if definition not in contents:
                             contents += definition
                         (path / 'go.sum').write_text(contents + prepare.CORE + ' ' + version + ' ' + archives[prepare.CORE]['Sum'] + '\n')
+                        if name == 'examples-tidy':
+                            # The final worker payload must already include its
+                            # complete graph and updated SDK checksum.
+                            self.assertEqual(Path(archives[prepare.WORKER]['Zip']).read_bytes(),
+                                             (out / 'source/sdk/go/worker/go.sum').read_bytes())
+                            self.assertNotIn('h1:old-worker', (path / 'go.sum').read_text())
+                            with (path / 'go.sum').open('a') as stream:
+                                stream.write(prepare.WORKER + ' ' + version + ' ' + archives[prepare.WORKER]['Sum'] + '\n')
                     elif args == ['mod', 'download', '-json', 'all']:
                         with (path / 'go.sum').open('a') as stream:
                             stream.write('complete graph fixture\n')
@@ -239,7 +260,7 @@ class PreparationTests(unittest.TestCase):
                     else:
                         report = prepare.prepare(sys.executable, out, version, root, refresh_sdk_checksum=True)
                         self.assertEqual(report['status'], 'prepared')
-                        self.assertEqual(len(report['sdk_checksum_refresh']), 2)
+                        self.assertEqual(len(report['module_checksum_refresh']), 4)
                         for module, relative in prepare.MODULES.items():
                             self.assertIn('complete graph fixture\n', (out / 'source' / relative / 'go.sum').read_text())
                         sdk = out / 'source/sdk/go/go.sum'
@@ -251,6 +272,10 @@ class PreparationTests(unittest.TestCase):
                         self.assertNotIn(stale, worker.read_text())
                         if changed_definition:
                             self.assertNotIn(previous_definition, worker.read_text())
+                        copied = Path(directory) / 'consumer-copy'
+                        prepare.copy_prepared_source(out, copied)
+                        self.assertEqual((copied / 'examples/sdk/go.sum').read_bytes(),
+                                         (out / 'source/examples/sdk/go.sum').read_bytes())
                 self.assertEqual(prepare.source_inventory(root), original)
 
     @unittest.skipIf(os.name == 'nt', 'process group boundary uses the WSL release host')

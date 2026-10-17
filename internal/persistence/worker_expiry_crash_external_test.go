@@ -103,16 +103,35 @@ func TestWorkerExpirySurvivesProcessKill(t *testing.T) {
 				if err := json.Unmarshal(raw, &saved); err != nil {
 					t.Fatal(err)
 				}
+				admin := openAuthenticationAdmin(t, cfg)
+				replayed, ok := admin.Get(saved.Monitor.ID)
+				got, _ := json.Marshal(replayed)
+				want, _ := json.Marshal(saved.Monitor)
+				if !ok || string(got) != string(want) {
+					_ = admin.Close()
+					t.Fatal("stopped replay changed the committed action or monitor")
+				}
+				if err := admin.Close(); err != nil {
+					t.Fatal(err)
+				}
+				openedAt := time.Now().UTC()
 				s, err := Open(t.Context(), cfg)
 				if err != nil {
 					t.Fatal(err)
 				}
 				defer s.Close()
 				m, _ := s.Get(saved.Monitor.ID)
-				got, _ := json.Marshal(m)
-				want, _ := json.Marshal(saved.Monitor)
+				expected := saved.Monitor.Clone()
+				if category == "recovery" && phase == "before" {
+					if m.RecoveryCheckAfter.Before(openedAt) || m.RecoveryCheckAfter.After(time.Now().UTC()) {
+						t.Fatal("restart did not require a fresh check for the queued recovery")
+					}
+					expected.RecoveryCheckAfter = m.RecoveryCheckAfter
+				}
+				got, _ = json.Marshal(m)
+				want, _ = json.Marshal(expected)
 				if string(got) != string(want) {
-					t.Fatal("replay changed the committed action or monitor")
+					t.Fatal("restart changed state beyond the recovery check barrier")
 				}
 				wantEvents := 1
 				if phase == "before" {

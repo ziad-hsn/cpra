@@ -200,8 +200,27 @@ func TestWorkerQueueOrderSurvivesProcessKill(t *testing.T) {
 				}
 				want = want[1:]
 			}
-			if n, err := s.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 100); err != nil || n != len(want) {
+			adoptable := len(want)
+			if !saved.Started {
+				adoptable-- // The restored recovery still requires a fresh check.
+			}
+			if n, err := s.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 100); err != nil || n != adoptable {
 				t.Fatal("safe queue adoption", n, err)
+			}
+			if !saved.Started {
+				original := saved.Records[0]
+				blocked, ok, err := s.WorkerExecution(t.Context(), original.Intent.ID)
+				if err != nil || !ok || !reflect.DeepEqual(blocked, original) {
+					t.Fatal("bulk adoption changed the blocked recovery", err)
+				}
+				workerRequeueFreshCheck(t, s, original.Intent)
+				if n, err := s.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 100); err != nil || n != 1 {
+					t.Fatal("fresh check did not release only the original recovery", n, err)
+				}
+				adopted, ok, err := s.WorkerExecution(t.Context(), original.Intent.ID)
+				if err != nil || !ok || !reflect.DeepEqual(adopted.Intent, original.Intent) || adopted.CommittedIndex != original.CommittedIndex {
+					t.Fatal("recovery adoption changed the original intent or commit position", err)
+				}
 			}
 			job, ok, err := s.JobType(t.Context(), "queue-check")
 			if err != nil || !ok {

@@ -244,6 +244,25 @@ The frozen archive and worker checks must pass with the corrected source before
 the remaining matrix can qualify it. No unpublished module was tagged to resolve
 the mismatch.
 
+At `ec2bbae`, private archive consumers, both independent modules on both
+compilers, standalone worker dependency checks, frontend regeneration, public
+documentation filtering and Helm 3/4 render contracts passed. Default and
+built-in application rows passed on Go 1.27.2 with race instrumentation. The
+external-worker row found two older crash fixtures that expected operational
+restart to leave the monitor unchanged and immediately adopt a queued recovery.
+Operational restart intentionally commits a fresh-check barrier. Stopped replay
+must still preserve the original records exactly.
+
+The corrected fixtures distinguish those two paths. They require unrelated work
+to remain adoptable while the original recovery is held, preserve its complete
+record during the blocked adoption, then require a fresh failed check before
+adoption with the original intent and commit position. The focused process-crash
+regression passed with race instrumentation in
+`product-worker-crash-barrier-fixtures-2`; independent source review closed the
+assertions. No runtime behavior changed. The failed external row remains failed
+evidence. The final affected application matrix runs again at the resulting
+clean commit rather than treating the earlier passes as executions of that commit.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

@@ -1307,9 +1307,9 @@
     },
     {
       "asset": "review/source/api/openapi/models.base.json.txt",
-      "bytes": 158307,
+      "bytes": 158201,
       "path": "api/openapi/models.base.json",
-      "sha256": "cb9305ea8477f1e2db3932cc1c70147a1464a98ea406e4f67a3efcf4f7ab4e9c"
+      "sha256": "c6d1423fd21e37f44b0451f8d5b61e81975c8eb7374b07461f884bb3f06fd230"
     },
     {
       "asset": "review/source/api/openapi/operations.json.txt",

@@ -1293,8 +1293,7 @@
           },
           "unknownActions": {
             "type": "integer",
-            "format": "int64",
-            "x-go-type-skip-optional-pointer": true
+            "format": "int64"
           },
           "lastFailure": {
             "$ref": "#/components/schemas/FailureDiagnostic"
@@ -1328,7 +1327,6 @@
           "actionsNeedingReview": {
             "type": "integer",
             "format": "int64",
-            "x-go-type-skip-optional-pointer": true,
             "description": "Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome."
           }
         },

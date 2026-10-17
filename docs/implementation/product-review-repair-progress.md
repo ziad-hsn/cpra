@@ -263,6 +263,17 @@ assertions. No runtime behavior changed. The failed external row remains failed
 evidence. The final affected application matrix runs again at the resulting
 clean commit rather than treating the earlier passes as executions of that commit.
 
+At `91c150a`, the actual repository documentation contract check found a stale
+archived schema reference for the optional action counters. Public rendering and
+link checks had passed because engineering references are excluded from that
+output. The reference generator refreshed the source copy and its two inventory
+entries; independent review verified byte identity with the canonical schema.
+The focused repository documentation check then passed. This changes no runtime,
+schema or public page content. The failed documentation record remains retained.
+The combined application row also stopped at its scratch guard during cold
+compilation, before producing a test verdict. Its abandoned temporary compiler
+output was removed; completed reusable compiler cache and all logs were retained.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

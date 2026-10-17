@@ -27,6 +27,9 @@ func workerRequeueCrashBoundary(t *testing.T, store *Store, authority WorkerAuth
 		t.Fatal(err)
 	}
 	if phase != "requeue-before" {
+		if in.Category == "recovery" {
+			workerRequeueFreshCheck(t, store, in)
+		}
 		if n, err := store.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 1); err != nil || n != 1 {
 			t.Fatal("requeue after owner restart", n, err)
 		}
@@ -51,6 +54,32 @@ func workerRequeueCrashBoundary(t *testing.T, store *Store, authority WorkerAuth
 	}
 	fmt.Println("WORKER_REQUEUE_BOUNDARY")
 	select {}
+}
+
+func workerRequeueFreshCheck(t *testing.T, store *Store, in WorkerExecutionIntent) {
+	t.Helper()
+	m, _ := store.Get(in.MonitorID)
+	if m.RecoveryCheckAfter.IsZero() {
+		t.Fatal("restart did not require a fresh recovery check")
+	}
+	before, _, err := store.WorkerExecution(t.Context(), in.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 1); err != nil || n != 0 {
+		t.Fatal("restored recovery was adopted before a fresh check", n, err)
+	}
+	after, _, err := store.WorkerExecution(t.Context(), in.ID)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatal("blocked recovery changed its original execution", err)
+	}
+	at := time.Now().UTC()
+	result := submit(t, store, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision,
+		Guard: &in.Guard, Generation: m.Generation + 1, At: at, ExecutionStart: at, Outcome: "failure"})[0]
+	if result.Err != nil || result.Monitor == nil || !result.Monitor.RecoveryCheckAfter.IsZero() ||
+		result.Monitor.TotalChecks != m.TotalChecks+1 || !reflect.DeepEqual(result.Monitor.Actions[in.ActionID], m.Actions[in.ActionID]) {
+		t.Fatal("fresh check did not release the original queued recovery", result.Err)
+	}
 }
 
 func TestWorkerRequeueSurvivesProcessKill(t *testing.T) {
@@ -112,6 +141,15 @@ func TestWorkerRequeueSurvivesProcessKill(t *testing.T) {
 				if err != nil || !reflect.DeepEqual(retained, saved.Record) {
 					t.Fatal("replay changed the committed requeue boundary", err)
 				}
+				restored, _ := store.Get(saved.Record.Intent.MonitorID)
+				if restored.TotalChecks != saved.Monitor.TotalChecks || restored.Generation != saved.Monitor.Generation ||
+					restored.LastOutcome != saved.Monitor.LastOutcome || restored.LastCheck != saved.Monitor.LastCheck {
+					t.Fatal("restart invented a health observation")
+				}
+				if category == "recovery" {
+					workerRequeueFreshCheck(t, store, saved.Record.Intent)
+				}
+				observed, _ := store.Get(saved.Record.Intent.MonitorID)
 				if n, err := store.RequeueWorkerExecutions(t.Context(), time.Now().UTC(), 1); err != nil || n != 1 {
 					t.Fatal("new owner could not adopt safe queued work", n, err)
 				}
@@ -143,7 +181,8 @@ func TestWorkerRequeueSurvivesProcessKill(t *testing.T) {
 					t.Fatal("replacement start issued twice", err)
 				}
 				m, _ := store.Get(in.MonitorID)
-				if m.TotalChecks != saved.Monitor.TotalChecks || m.LastOutcome != saved.Monitor.LastOutcome {
+				if m.TotalChecks != observed.TotalChecks || m.Generation != observed.Generation ||
+					m.LastOutcome != observed.LastOutcome || m.LastCheck != observed.LastCheck {
 					t.Fatal("requeue/replay invented a health observation")
 				}
 				if category != "check" && (m.Actions[in.ActionID].State != Started || m.Actions[in.ActionID].ExecutorSession != grant.GrantID) {

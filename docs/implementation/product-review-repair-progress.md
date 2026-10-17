@@ -165,6 +165,29 @@ the unpublished worker dependency uses the explicit private workspace. This
 does not establish public module availability. The next frozen matrix repeats
 the affected application and module checks against the corrected source.
 
+At `89e58a1`, the default affected row completed through a separately reviewed
+package-level continuation after the original command hit its scratch guard.
+The continuation reused only completed packages with matching source, toolchain,
+selection and log identities, reran incomplete packages, and ran full-package vet.
+This was not an uninterrupted run. The combined row then found outdated worker
+poll fixtures: current commands require selection version 2 and captured maintenance
+decisions. Historical replay commands retain their original versions.
+
+Expanding the focused regression to every requeue crash boundary also reproduced
+a runtime defect: snapshot restoration omitted the derived ready index, and the
+first poll prepared no maintenance decisions before Apply rebuilt that index.
+Poll preparation now rebuilds it under exclusive state ownership before selection;
+maintenance evaluation still happens outside the lock. The crash fixtures now
+prove that restarted recovery work remains blocked until a fresh failed check,
+without changing its original action or deadline. Separate assertions verify
+that restoration and later adoption/start do not invent health observations.
+`product-worker-poll-fixtures-1` retains the failure. The first focused repair run,
+`product-worker-restart-index-1`, passed with race instrumentation; independent
+review then requested the explicit pre-observation assertion retained above.
+`product-worker-restart-index-2` passed with that assertion, and the scoped
+independent source review closed without an outstanding finding.
+The final affected selection includes the newly exposed process-crash case.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

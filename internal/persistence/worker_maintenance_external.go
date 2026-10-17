@@ -150,12 +150,18 @@ func (s *Store) prepareWorkerMaintenance(ctx context.Context, id, purpose string
 }
 
 func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessionCommand, at time.Time, evaluators []WorkerMaintenanceEvaluator) ([]WorkerMaintenanceDecision, error) {
-	unlock, err := s.lockControllerState(ctx, false)
+	unlock, err := s.lockControllerState(ctx, true)
 	if err != nil {
 		return nil, err
 	}
 	var inputs []workerMaintenanceInput
 	if s.fsm.image.WorkerExecutions != nil && s.fsm.image.JobTypes != nil {
+		// Restored snapshots contain records, not the derived ready index. Build
+		// it before choosing which intents need a committed maintenance decision.
+		if err := s.fsm.image.WorkerExecutions.ensureIndexes(ctx); err != nil {
+			unlock()
+			return nil, err
+		}
 		ordered := s.fsm.workerOfferOrder(c)
 		s.workerMaintenanceMu.Lock()
 		if s.workerMaintenanceScan == nil {

@@ -18,11 +18,7 @@ import (
 
 func workerPollAt(t *testing.T, s *Store, a WorkerAuthority, request WorkerPollRequest, at time.Time) Result {
 	t.Helper()
-	c := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: request, ProposedSessionID: uuid.NewString()}
-	for n := 0; n < min(request.Capacity, request.Limit); n++ {
-		c.ProposedLeaseIDs = append(c.ProposedLeaseIDs, uuid.NewString())
-	}
-	return submit(t, s, Command{Kind: "worker_poll", At: at, commandExtensions: commandExtensions{WorkerSession: &c}})[0]
+	return sessionApply(t, s, a, request, at)
 }
 
 func TestWorkerRequeueExpiredOffersAllCategories(t *testing.T) {
@@ -349,10 +345,15 @@ func TestWorkerRequeueRetiredLeaseCannotBeReused(t *testing.T) {
 	}
 	request.SessionID, request.PollSequence = poll.SessionID, 2
 	request.Capacity, request.Limit = 1, 1
-	c := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: request,
+	c := WorkerSessionCommand{SelectionVersion: 2, NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Request: request,
 		ProposedSessionID: uuid.NewString(), ProposedLeaseIDs: []string{r.Lifecycle.LeaseID}}
+	pollAt := at.Add(time.Millisecond)
+	c.Maintenance, err = s.prepareWorkerPollMaintenance(t.Context(), c, pollAt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	before := cloneImageExtensions(s.fsm.image)
-	result := submit(t, s, Command{Kind: "worker_poll", At: at.Add(time.Millisecond), commandExtensions: commandExtensions{WorkerSession: &c}})[0]
+	result := submit(t, s, Command{Kind: "worker_poll", At: pollAt, commandExtensions: commandExtensions{WorkerSession: &c}})[0]
 	if !errors.Is(result.Err, ErrWorkerExecutionConflict) {
 		t.Fatal("retired lease was reused", result.Err)
 	}

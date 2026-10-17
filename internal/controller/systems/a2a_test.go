@@ -14,6 +14,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
@@ -75,7 +76,7 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 	w := ecs.NewWorld()
 	ent := releaseMonitor(t, &w, 1, 2)
 	if kind == "intervention" {
-		ecs.NewMap1[components.InterventionConfig](&w).Add(ent, &components.InterventionConfig{Action: "a2a", MaxFailures: 1})
+		ecs.NewMap1[components.InterventionConfig](&w).Add(ent, &components.InterventionConfig{Action: "a2a", MaxFailures: 1, Target: &manifest.InterventionTargetA2A{URL: endpoint, TaskTimeout: 5 * time.Second}})
 	}
 	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
 	state.MonitorID, state.Revision = "agent-monitor", "agent-revision"

@@ -15,7 +15,7 @@ func TestManagementProblemDetails(t *testing.T) {
 		Errors: []api.FieldError{{Field: "spec.check.driver.config", Reason: "invalidResource", Message: cliSecretValue}},
 	}}
 	err := managementFailure(problem)
-	for _, want := range []string{"HTTP 422", "code invalidResource", "request " + cliOperationID, "operation " + cliOperationID, "spec.check.driver.config: validation failed (invalidResource)"} {
+	for _, want := range []string{"HTTP 422", "code invalidResource", "request " + cliOperationID, "operation " + cliOperationID, "spec.check.driver.config: The resource schema, compiled driver or configuration is invalid. (invalidResource)"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("missing safe problem detail %q in %q", want, err)
 		}

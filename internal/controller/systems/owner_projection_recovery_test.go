@@ -12,6 +12,7 @@ import (
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/management"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
@@ -99,6 +100,28 @@ func prepareRecoveryProjection(t *testing.T, s *DurableSystem, id string) catalo
 	return p
 }
 
+func assertProjectionTarget(t *testing.T, s *DurableSystem, ent ecs.Entity, target string) {
+	t.Helper()
+	if !s.world.Alive(ent) || s.jobs.Get(ent) == nil {
+		t.Fatal("projected monitor has no live job storage")
+	}
+	job := s.jobs.Get(ent).PulseJob
+	for range 8 {
+		if check, ok := job.(*jobs.PulseHTTPJob); ok {
+			if check.URL != target {
+				t.Fatal("projected HTTP job lost its exact configured target")
+			}
+			return
+		}
+		wrapper, ok := job.(interface{ Unwrap() jobs.Job })
+		if !ok {
+			break
+		}
+		job = wrapper.Unwrap()
+	}
+	t.Fatal("projected monitor has no HTTP check")
+}
+
 func assertProjectionAck(t *testing.T, update catalogProjection, want error) {
 	t.Helper()
 	select {
@@ -171,9 +194,10 @@ func TestOwnerProjectionRecoveryRetainsPreparedConfigure(t *testing.T) {
 			assertProjectionAck(t, update, nil)
 			ent, ok := s.entities[resource.Metadata.ID]
 			row, indexed := s.index.Get(ent.ID())
-			if !ok || !s.world.Alive(ent) || !indexed || row.Target != "http://127.0.0.1:1/original" || s.jobs.Get(ent).PulseJob == nil || s.managed[resource.Metadata.ID].uid != resource.Metadata.UID {
+			if !ok || !s.world.Alive(ent) || !indexed || row.Target != "http://127.0.0.1:1" || s.managed[resource.Metadata.ID].uid != resource.Metadata.UID {
 				t.Fatal("original prepared jobs were not installed into the owner")
 			}
+			assertProjectionTarget(t, s, ent, "http://127.0.0.1:1/original")
 			assertProjectionObserved(t, catalog, resource.Metadata.ID, resource.Metadata.Generation)
 		})
 	}
@@ -204,9 +228,10 @@ func TestOwnerProjectionRecoveryRejectsSupersededConfigure(t *testing.T) {
 	assertProjectionAck(t, current, nil)
 	ent := s.entities[resource.Metadata.ID]
 	row, ok := s.index.Get(ent.ID())
-	if !ok || row.Target != "http://127.0.0.1:1/new" || s.states.Get(ent).Revision != current.runtime.ExecutionRevision {
+	if !ok || row.Target != "http://127.0.0.1:1" || s.states.Get(ent).Revision != current.runtime.ExecutionRevision {
 		t.Fatal("new configuration was not installed after stale guard rejection")
 	}
+	assertProjectionTarget(t, s, ent, "http://127.0.0.1:1/new")
 	assertProjectionObserved(t, catalog, resource.Metadata.ID, resource.Metadata.Generation)
 }
 
@@ -268,9 +293,10 @@ func TestOwnerProjectionRecoveryRemovesOnlyOriginalIncarnation(t *testing.T) {
 			s.startCatalogProjection(removed)
 			assertProjectionAck(t, removed, persistence.ErrCatalogDependency)
 			row, ok := s.index.Get(replacementEntity.ID())
-			if s.world.Alive(oldEntity) || !s.world.Alive(replacementEntity) || !ok || row.Target != "http://127.0.0.1:1/replacement" || s.managed[resource.Metadata.ID].uid != resource.Metadata.UID {
+			if s.world.Alive(oldEntity) || !s.world.Alive(replacementEntity) || !ok || row.Target != "http://127.0.0.1:1" || s.managed[resource.Metadata.ID].uid != resource.Metadata.UID {
 				t.Fatal("stale removal affected the replacement incarnation")
 			}
+			assertProjectionTarget(t, s, replacementEntity, "http://127.0.0.1:1/replacement")
 			assertProjectionObserved(t, catalog, resource.Metadata.ID, resource.Metadata.Generation)
 		})
 	}

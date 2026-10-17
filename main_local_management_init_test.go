@@ -21,7 +21,7 @@ import (
 func TestMainGeneratedManagementFirstRunAndRestart(t *testing.T) {
 	f := newMainManagementFixture(t)
 	root := t.TempDir()
-	layout := installpath.Layout{Scope: "user", ConfigDir: filepath.Join(root, "config"), StateDir: filepath.Join(root, "state"), BinDir: filepath.Join(root, "bin"), ServiceFile: filepath.Join(root, "cpra.service")}
+	layout := installpath.Layout{Scope: "user", ConfigDir: filepath.Join(root, "config"), StateDir: filepath.Join(root, "state"), BinDir: filepath.Join(root, "bin"), LogDir: filepath.Join(root, "logs"), ServiceFile: filepath.Join(root, "cpra.service")}
 	files, err := localadmin.InitManagement(t.Context(), layout, localadmin.ManagementInitOptions{OperatorID: "team/oncall"})
 	if err != nil {
 		t.Fatal(err)

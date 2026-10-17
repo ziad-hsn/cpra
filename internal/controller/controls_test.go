@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,11 +33,12 @@ func commitControl(t *testing.T, catalog *management.Catalog, action, id, revisi
 func TestCatalogControlsFenceQueuedCheckAndRecordStartedObservation(t *testing.T) {
 	InitializeLoggers(false)
 	defer CloseLoggers()
-	started, release := make(chan struct{}), make(chan struct{})
-	var once, unblock sync.Once
+	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once, unblock, finish sync.Once
 	var waitingCalls atomic.Int64
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/blocking" {
+			defer finish.Do(func() { close(finished) })
 			once.Do(func() { close(started) })
 			select {
 			case <-release:
@@ -52,7 +54,14 @@ func TestCatalogControlsFenceQueuedCheckAndRecordStartedObservation(t *testing.T
 	settings.Storage.Mode = "memory"
 	catalog, store := managedStore(t, settings)
 	defer store.Close()
-	commitManaged(t, catalog, managedMonitor("a-blocking", target.URL+"/blocking", true), "")
+	blocking := managedMonitor("a-blocking", target.URL+"/blocking", true)
+	var spec api.MonitorSpec
+	if err := json.Unmarshal(blocking.Spec, &spec); err != nil {
+		t.Fatal(err)
+	}
+	spec.Check.Timeout = "60s"
+	blocking.Spec, _ = json.Marshal(spec)
+	commitManaged(t, catalog, blocking, "")
 	c := managedController(t, settings, catalog, store)
 	defer func() { unblock.Do(func() { close(release) }); c.Stop() }()
 	select {
@@ -61,7 +70,10 @@ func TestCatalogControlsFenceQueuedCheckAndRecordStartedObservation(t *testing.T
 		t.Fatal("blocking check did not start")
 	}
 	commitManaged(t, catalog, managedMonitor("b-waiting", target.URL+"/waiting", true), "")
-	waitCatalog(t, func() bool { return c.PulsePool().Stats().TasksSubmitted >= 2 })
+	waitCatalog(t, func() bool {
+		stats := c.PulsePool().Queue().Stats()
+		return stats.QueueDepth == 1 && stats.Dequeued == 1
+	})
 	if waitingCalls.Load() != 0 {
 		t.Fatal("queued check reached provider before test pause")
 	}
@@ -69,9 +81,14 @@ func TestCatalogControlsFenceQueuedCheckAndRecordStartedObservation(t *testing.T
 		m, _ := store.Get(id)
 		commitControl(t, catalog, "snooze", id, m.ControlRevision, "1h")
 	}
+	select {
+	case <-finished:
+		t.Fatal("blocking request finished before the snooze committed")
+	default:
+	}
 	unblock.Do(func() { close(release) })
 	waitCatalog(t, func() bool { m, _ := store.Get("a-blocking"); return m.TotalChecks == 1 })
-	time.Sleep(150 * time.Millisecond)
+	waitCatalog(t, func() bool { return c.PulsePool().Stats().TasksCompleted >= 2 })
 	if waitingCalls.Load() != 0 {
 		t.Fatal("pre-snooze queued check reached provider")
 	}

@@ -288,6 +288,13 @@ func TestManagementHTTPSRequiredUnlessOriginExplicitlyOptedIn(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
+		if r.URL.Path == "/api/v2/access" {
+			_ = json.NewEncoder(w).Encode(api.AccessDiscovery{Mode: api.AccessDiscoveryModeManagement, AuthenticationRequired: true})
+			return
+		}
+		if r.URL.Path != "/api/v2/monitors/api" {
+			t.Error("unexpected management route")
+		}
 		_ = json.NewEncoder(w).Encode(cliResource("Monitor", "api"))
 	}))
 	defer server.Close()
@@ -307,9 +314,12 @@ func TestManagementHTTPSRequiredUnlessOriginExplicitlyOptedIn(t *testing.T) {
 		if !allowed && err == nil {
 			t.Fatal("authenticated HTTP accepted by default")
 		}
+		if !allowed && requests.Load() != 0 {
+			t.Fatal("HTTPS validation did not precede access discovery")
+		}
 	}
-	if requests.Load() != 1 {
-		t.Fatal("HTTPS validation did not precede the request")
+	if requests.Load() != 2 {
+		t.Fatal("explicit HTTP access did not discover mode and read the resource once")
 	}
 }
 

@@ -12,8 +12,9 @@ compiler is Go 1.27.2. The 24-hour run remains cancelled.
 The eight implementation areas have independent source review. The reviewer found
 no remaining actionable finding in the changed paths after the documented repairs.
 This is source review, not native-platform, provider, performance or release approval.
-The final affected compiler/tag matrix and late-catalog measurement are still pending
-at this checkpoint. No push, merge, module tag, image or documentation publication
+The late-catalog measurement passed its progress/cadence assertions; the final
+affected compiler/tag matrix is still pending at this checkpoint. No push, merge,
+module tag, image or documentation publication
 has been performed by this work.
 
 | Ticket | Implemented and reviewed | Verification boundary |
@@ -23,7 +24,7 @@ has been performed by this work.
 | 3. Authentication/secrets/files | Authentication precedes bounded failed-auth throttling; safe environment-token parsing; parsed MySQL local-file denial; rooted notification output with process-level capability; non-secret target projections | Scoped attacks, token markers, rooted-log and target fixtures passed. The executable walkthrough also checked help/flag-error token output. Native filesystem/service identity qualification remains open. |
 | 4. Validation/errors | Shared pure driver/monitor validators; reference graph checks; source coordinates through file/SDK/browser spools; bounded aliases; original normalization-v1 continuation and stricter v2 imports; safe typed causes | Full loader/manifest/capability suites and a 49-case SDK/file/management parity corpus passed at their recorded checkpoints. Final variants and retained collection-format checks remain. |
 | 5. TLS/provider content | Per-monitor TLS adapters for nine checks, trust/server-name/skip policy and pool isolation; bounded diagnostics; notification identity/content; provider correlation/severity and deliberate Pushover color overrides | Local production-path transport/provider fixtures passed. Local database handshakes and acceptance fixtures do not establish account-backed delivery/effect qualification. |
-| 6. Slow-target isolation | Bounded driver/flow dispatch under one global budget; pending/active ages; arrival-based initial sizing and incremental cold-demand floor; runtime queue diagnostics | Both startup outage scenarios passed after a retained failure. The first late-growth run timed out during activation; its corrected bounded harness requires a fresh run. No fleet or five-minute SLO pass is claimed. |
+| 6. Slow-target isolation | Bounded driver/flow dispatch under one global budget; pending/active ages; arrival-based initial sizing and incremental cold-demand floor; runtime queue diagnostics | Both startup outage scenarios and the corrected late-growth case passed cadence/progress assertions after retained failures. The late-growth fault window exceeded latency targets. No fleet or five-minute SLO pass is claimed. |
 | 7. Operator interfaces | Common v2 observation reads with stable IDs/incarnations; mode-aware SDK/CLI reads; Ignore/TLS/diagnostic/queue fields; guided five-resource webhook setup; status, errors, layout and permission repairs | Full frontend build/type/lint and 565 tests passed; all eight required real-server browser campaigns passed. Final generated contract and compiler/tag checks remain. |
 | 8. First run/docs/contributors | Readable quickstart IDs; one-time import guidance and restart reminder; SIGHUP notice/graceful shutdown; UTC machine output; workspace/editor/fast-test guidance; README/image; public source filtering and exclude_docs; repository ignores | Executable first-run/restart walkthrough and earlier strict rendered-site checks passed. Updated references need a final render. Private vulnerability reporting is still disabled and requires repository-admin configuration. |
 
@@ -42,7 +43,7 @@ means implementation and scoped review/coverage, not completion of release gates
 | Blocker 6: quickstart identities and CLI causes | Repaired with readable IDs, typed safe errors, explicit connection instructions and an executed initialization/validate/start/describe/apply/restart walkthrough. |
 | M1: worker periodic-maintenance boundaries | Repaired with committed decisions/configuration guards across offer/start/heartbeat/result paths; started outcomes remain accepted without suppressed follow-ups. |
 | M2: normal green without prior notification | Repaired using actual notification starts; canceled queued work does not qualify. Ignore recovery has the explicitly selected exception. |
-| M3: slow-target starvation | Repaired dispatch/sizing implementation; two startup measurements pass. Revised late-growth measurement and final matrix remain pending. |
+| M3: slow-target starvation | Repaired dispatch/sizing implementation; startup and late-growth measurements pass their bounded cadence/progress assertions. Fault-window latency exceeds targets; final matrix remains pending. |
 | M4: validation parity | Shared validators and the reviewed 49-case corpus replace competing target rules. PostgreSQL duplicate URI-host precedence matches pinned pgx; SDK has no provider execution dependencies. |
 | M5: source locations and generic errors | Safe field/rule causes and original coordinates survive file/collection/browser paths. Missing positions are unavailable, not fabricated. |
 | M6: observation-mode CLI | Supported bounded v2 reads work without fabricated writable catalog resources; access discovery never downgrades failed writes. |
@@ -103,6 +104,27 @@ operation handle and receipt remain in the evidence. The harness now records a
 bounded 600-second activation allowance separately from the 90-second measurement;
 that change is not a measured pass. Missing latency measurements stay null rather
 than becoming zero, with explicit rolling-window coverage.
+
+The subsequent `product-outage-growth-4` passed at commit `574de34`: all 999
+additions activated in 177.179 seconds, with a 10.128-second maximum seed-monitor
+gap. During the subsequent 90-second outage/recovery window, all 700 healthy
+monitors completed 9–10 checks and the maximum gap was 10.097 seconds. All 300
+slow targets exhibited a timeout-length hang and later recovered. Sampled maxima
+of the reported rolling p99 values reached 276.801 ms queue delay and 5.313 s total
+latency: this is not an SLO pass. The run completed before a five-minute snapshot
+and retained no raw fleet check history. Earlier startup scenarios included snapshots.
+
+`product-doc-render-frozen-1` rendered that commit privately: 73 HTML pages,
+18,038 checked internal links/assets, and no excluded engineering records in
+the generated files or 1,153 search entries. No documentation branch was changed.
+
+The first affected default/race row at `574de34` was interrupted at the scratch
+guard and is not a pass. It also exposed outdated fixtures: missing log-root/A2A
+configuration, old dispatch-counter barriers, pre-redaction target expectations,
+green eligibility and CLI access-discovery/error text. Test-only corrections
+retain exact private job-target assertions, committed fencing, actual notification
+starts and the healthy threshold. Their focused race checks passed; generation
+fixtures now include the shared validation messages. The full matrix must rerun.
 
 `product-browser-default-1` failed the guided setup fixture, and run 2 was explicitly
 interrupted before completion. Both remain failed/partial, independent of run 3.

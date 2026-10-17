@@ -201,12 +201,13 @@ func TestCatalogControllerQueuedChecksCannotUseSupersededTarget(t *testing.T) {
 	InitializeLoggers(false)
 	defer CloseLoggers()
 	var forbidden, replacement atomic.Int64
-	started, release := make(chan struct{}), make(chan struct{})
-	var once, saw sync.Once
+	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once, saw, finish sync.Once
 	defer once.Do(func() { close(release) })
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/block":
+			defer finish.Do(func() { close(finished) })
 			saw.Do(func() { close(started) })
 			select {
 			case <-release:
@@ -227,26 +228,34 @@ func TestCatalogControllerQueuedChecksCannotUseSupersededTarget(t *testing.T) {
 	block := managedMonitor("blocking", target.URL+"/block", true)
 	var spec api.MonitorSpec
 	_ = json.Unmarshal(block.Spec, &spec)
-	spec.Check.Timeout = "10s"
+	spec.Check.Timeout = "60s"
 	block.Spec, _ = json.Marshal(spec)
 	commitManaged(t, catalog, block, "")
 	c := managedController(t, settings, catalog, store)
-	defer c.Stop()
+	defer func() { once.Do(func() { close(release) }); c.Stop() }()
 	select {
 	case <-started:
 	case <-time.After(5 * time.Second):
 		t.Fatal("first worker did not start")
 	}
 	old := commitManaged(t, catalog, managedMonitor("waiting", target.URL+"/forbidden", true), "")
-	// The dispatcher can already have removed a job from the queue while it
-	// waits for the single execution slot. Submitted tasks include that wait.
-	waitCatalog(t, func() bool { return c.PulsePool().Stats().TasksSubmitted >= 2 })
+	// Fair dispatch keeps the next check queued until the execution slot is
+	// released. Observe admission, without waiting for the blocker to time out.
+	waitCatalog(t, func() bool {
+		stats := c.PulsePool().Queue().Stats()
+		return stats.QueueDepth == 1 && stats.Dequeued == 1
+	})
 	if forbidden.Load() != 0 {
 		t.Fatal("fixture did not hold the old target before replacement")
 	}
 	changed := old.Resource
 	changed.Spec = managedMonitor("waiting", target.URL+"/replacement", true).Spec
 	commitManaged(t, catalog, changed, old.Resource.Metadata.ResourceVersion)
+	select {
+	case <-finished:
+		t.Fatal("blocking request finished before the replacement committed")
+	default:
+	}
 	once.Do(func() { close(release) })
 	waitCatalog(t, func() bool { return replacement.Load() > 0 })
 	if forbidden.Load() != 0 {

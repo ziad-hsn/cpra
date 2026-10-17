@@ -42,7 +42,7 @@ class BrowserGenerationTests(unittest.TestCase):
 
     def test_models_and_descriptors_reproduce_in_distinct_roots_without_git(self):
         config = json.loads((ROOT / "dashboard/api-generation.json").read_text())
-        paths = ["dashboard/api-generation.json", config["models"], config["operations"], config["contract"], "scripts/dashboard/generate_api.py"]
+        paths = ["dashboard/api-generation.json", config["models"], config["operations"], config["contract"], "scripts/dashboard/generate_api.py", "sdk/go/api/validation_messages.json"]
         outputs = []
         with tempfile.TemporaryDirectory() as temporary:
             for name in ["first", "different-root"]:

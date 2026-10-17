@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,7 +117,7 @@ func stoppedBackupRestoreCollections(t *testing.T, root string, pending bool) {
 			t.Fatalf("cycle %d lost encrypted collection input: %v", cycle, err)
 		}
 		if !pending || cycle < 2 {
-			waitBackupCollectionCleanup(t, ctx, store, source, min(cycle, 1), uint64(max(cycle-1, 0)))
+			waitBackupCollectionCleanup(t, ctx, store, source, min(cycle, 1), uint64(max(cycle-1, 0)), 30*time.Second)
 		}
 		if err := store.Snapshot(); err != nil {
 			t.Fatal(err)
@@ -332,8 +333,23 @@ func stoppedBackupRestoreCollections(t *testing.T, root string, pending bool) {
 	if err != nil || !reflect.DeepEqual(items, []persistence.CollectionItem{newItem}) {
 		t.Fatal("fresh collection failed after restored store restart", err)
 	}
-	waitBackupCollectionCleanup(t, ctx, store, restored, 1, retired+1)
+	// The rejected normal open, administrative reset, normal start and restart
+	// each rebuild a generation. Retirement advances in bounded one-second turns.
+	waitBackupCollectionCleanup(t, ctx, store, restored, 1, retired+1, time.Minute)
 	closeStore(store)
+	finalCatalog, err := os.ReadFile(filepath.Join(restored, "collections", "generations.json"))
+	var completed struct {
+		NodeID    string   `json:"nodeID"`
+		Current   string   `json:"current"`
+		Previous  string   `json:"previous"`
+		Completed []string `json:"completed"`
+		Retired   uint64   `json:"retired"`
+	}
+	if err != nil || json.Unmarshal(finalCatalog, &completed) != nil || len(completed.Completed) != 2 ||
+		completed.NodeID != nodeID || completed.Retired < retired+1 || completed.Current == completed.Previous ||
+		!slices.Contains(completed.Completed, completed.Current) || !slices.Contains(completed.Completed, completed.Previous) {
+		t.Fatal("completed cleanup did not retain exactly current and previous generations", err)
+	}
 
 	if err := os.WriteFile(catalogPath, []byte("{}"), 0600); err != nil {
 		t.Fatal(err)
@@ -402,13 +418,14 @@ func backupCollectionInput(t *testing.T, ctx context.Context, store *persistence
 	return result.Collection.Clone(), item
 }
 
-func waitBackupCollectionCleanup(t *testing.T, ctx context.Context, store *persistence.Store, directory string, retained int, retired uint64) {
+func waitBackupCollectionCleanup(t *testing.T, ctx context.Context, store *persistence.Store, directory string, retained int, retired uint64, allowance time.Duration) {
 	t.Helper()
 	started := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, allowance)
 	defer cancel()
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
+	previousProgress := ""
 	for {
 		status := store.Status()
 		if !status.Ready {
@@ -416,6 +433,11 @@ func waitBackupCollectionCleanup(t *testing.T, ctx context.Context, store *persi
 		}
 		accounting := status.Collections
 		if accounting != nil && accounting.Available {
+			progress := fmt.Sprintf("active=%d retained=%d pinned=%d retired=%d", accounting.Active, accounting.Retained, accounting.Pinned, accounting.Retired)
+			if progress != previousProgress {
+				t.Logf("cleanup progress after %s: %s condition=%s", time.Since(started), progress, accounting.CleanupCondition)
+				previousProgress = progress
+			}
 			if accounting.CleanupCondition == "blocked" || accounting.CleanupCondition == "unavailable" {
 				t.Fatalf("collection cleanup failed: %+v", accounting)
 			}

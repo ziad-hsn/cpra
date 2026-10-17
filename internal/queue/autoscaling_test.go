@@ -180,11 +180,15 @@ func TestRuntimeMeasuresArrivalsAndExecutionForBothQueues(t *testing.T) {
 }
 
 func TestObservedRateRetainsBacklogRelief(t *testing.T) {
-	q := &sizingQueue{stats: Stats{EnqueueRate: 10, DequeueRate: 10, ArrivalCV: 1, ArrivalSamples: 256, QueueDepth: 100}}
+	q := &sizingQueue{stats: Stats{EnqueueRate: 10, DequeueRate: 10, ArrivalCV: 1, ArrivalSamples: 256}}
 	p := newSizingPool(t, q)
 	p.SetSizingPolicy(110*time.Millisecond, .15)
 	if got := p.desiredCapacity(q.Stats()); got != 4 {
 		t.Fatalf("external demand target: %d", got)
+	}
+	q.stats.QueueDepth = 100
+	if got := p.desiredCapacity(q.Stats()); got != 64 {
+		t.Fatalf("configured demand suppressed backlog relief: %d", got)
 	}
 	p.SetArrivalRate(0)
 	if got := p.desiredCapacity(q.Stats()); got != 64 {

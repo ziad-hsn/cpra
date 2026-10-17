@@ -135,6 +135,36 @@ check plus historical digest/catalog, target-guard and restore selections.
 
 ## Final verification and release boundary
 
+The second default/race row at `a69a517` completed its selected tests, with
+2,287 passing and 20 failing test/subtest events, five classified subprocess
+entry-point skips, no missing selected tests and no race diagnostic. The failures
+were stale regression fixtures: restored A2A work lacked a fresh observation,
+notification-log fixtures omitted the new process capability, observation routes
+and validation causes retained old expectations, current-writer assertions used
+older formats, and maintenance/restart fixtures expired their action deadlines.
+The backup cleanup assertion also allowed less time than its bounded retirement
+backlog needed under race instrumentation. That failed row remains retained.
+
+Seventeen test-only files correct these expectations. They strengthen original
+action identity/deadline assertions across restart, retain historical decoding
+checks, require the exact stopped backup generation pair and preserve zero-effect
+validation checks. Independent source review closed without an outstanding
+finding. Focused race records `product-fixture-regressions-3`,
+`product-fixture-restart-probes-backup-1` and
+`product-format-external-regressions-2` passed. The latter two use the final test
+source fingerprint `653694c55dd2587257811436e86475998816bf2becee0d8333fd1c85ec22dd7b`;
+the first predates the final strengthened assertions, which the restart/backup
+run then exercised. The all-built-in-plus-worker validation fixture passed in
+`product-stage-all-drivers-regression-3`; its two scratch-interrupted predecessors
+remain incomplete. These are configuration-contract checks, not provider-account
+qualification.
+
+Full SDK default/tagged and worker tagged suites passed on both compilers at
+`a69a517`, using race instrumentation on Go 1.27.2. SDK checks use `GOWORK=off`;
+the unpublished worker dependency uses the explicit private workspace. This
+does not establish public module availability. The next frozen matrix repeats
+the affected application and module checks against the corrected source.
+
 Before merge handoff, freeze the reviewed repair source and complete the affected
 application matrix on Go 1.26.0 and 1.27.2 with default, built-in, externaljobs and
 combined variants, appropriate race checks, full SDK/worker suites, generation,

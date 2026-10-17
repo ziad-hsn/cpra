@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -62,6 +63,7 @@ func agentController(t *testing.T, endpoint, kind string) (*DurableSystem, *jobs
 
 func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*DurableSystem, *jobs.Dispatch, chan []jobs.Result) {
 	t.Helper()
+	const taskTimeout = time.Minute
 	cfg := runtimeconfig.Default()
 	cfg.Storage.Directory = directory
 	store, err := persistence.Open(context.Background(), cfg)
@@ -76,14 +78,14 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 	w := ecs.NewWorld()
 	ent := releaseMonitor(t, &w, 1, 2)
 	if kind == "intervention" {
-		ecs.NewMap1[components.InterventionConfig](&w).Add(ent, &components.InterventionConfig{Action: "a2a", MaxFailures: 1, Target: &manifest.InterventionTargetA2A{URL: endpoint, TaskTimeout: 5 * time.Second}})
+		ecs.NewMap1[components.InterventionConfig](&w).Add(ent, &components.InterventionConfig{Action: "a2a", MaxFailures: 1, Target: &manifest.InterventionTargetA2A{URL: endpoint, TaskTimeout: taskTimeout}})
 	}
 	state := ecs.NewMap1[components.MonitorState](&w).Get(ent)
 	state.MonitorID, state.Revision = "agent-monitor", "agent-revision"
 	ecs.NewMap1[components.PulseConfig](&w).Get(ent).Interval = time.Hour
 	cc := ecs.NewMap1[components.CodeConfig](&w).Get(ent)
 	cc.Configs = map[string]*components.ColorCodeConfig{"red": {Dispatch: true, Notify: "a2a"}}
-	job, err := jobs.NewA2AJob(jobs.A2AConfig{URL: endpoint, Token: "agent-only-secret", AllowInsecureHTTP: true, RequestTimeout: time.Second, TaskTimeout: 5 * time.Second, PollInterval: time.Second}, kind)
+	job, err := jobs.NewA2AJob(jobs.A2AConfig{URL: endpoint, Token: "agent-only-secret", AllowInsecureHTTP: true, RequestTimeout: time.Second, TaskTimeout: taskTimeout, PollInterval: time.Second}, kind)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +120,25 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 	if !ok {
 		t.Fatal("configured monitor missing")
 	}
-	committed, err := store.Submit(context.Background(), []persistence.Command{{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, Outcome: "failure", At: time.Now().UTC()}})
+	if !m.RecoveryCheckAfter.IsZero() {
+		s.project(ent, m)
+		s.scheduleActions(ent, m)
+		s.dispatchActions(time.Now())
+		if len(q.admitted) != 0 {
+			t.Fatal("restored action dispatched before a fresh observation")
+		}
+		for id, action := range m.Actions {
+			current, _ := store.Get(m.ID)
+			if !reflect.DeepEqual(current.Actions[id], action) {
+				t.Fatal("fresh-check barrier changed the original action")
+			}
+		}
+	}
+	observed := time.Now().UTC()
+	if observed.Before(m.RecoveryCheckAfter) {
+		t.Fatal("fixture observation predates the restart barrier")
+	}
+	committed, err := store.Submit(context.Background(), []persistence.Command{{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, Outcome: "failure", At: observed, ExecutionStart: observed, ExecutionEnd: observed}})
 	if err != nil || len(committed) != 1 || committed[0].Err != nil {
 		t.Fatal("pulse commit failed", err, committed)
 	}

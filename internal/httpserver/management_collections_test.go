@@ -296,8 +296,8 @@ func TestManagementCollectionPreflightMalformedFinalResourceHasZeroEffects(t *te
 	index := store.Status().CommittedIndex
 	response, body := f.request(t, "POST", "/api/v2/collections/preflight", managementOperatorToken, raw, nil)
 	var result api.Preflight
-	if response.StatusCode != 200 || api.DecodeResponse(body, &result) != nil || result.Valid || len(result.Errors) != 1 || result.Errors[0].Field != "items[1].resource" || result.Items[0].Outcome != "notValidated" {
-		t.Fatalf("final invalid resource did not reject the whole preflight: %d", response.StatusCode)
+	if response.StatusCode != 200 || api.DecodeResponse(body, &result) != nil || result.Valid || len(result.Errors) != 1 || result.Errors[0].Field != "items[1].resource.spec" || result.Errors[0].Reason != "nonemptyReferences" || len(result.Items) != 2 || result.Items[0].Outcome != "notValidated" {
+		t.Fatalf("final invalid resource did not reject the whole preflight: status=%d errors=%+v", response.StatusCode, result.Errors)
 	}
 	if store.Status().CommittedIndex != index || wrapper.calls.Load() != 0 || !reflect.DeepEqual(files, preflightFiles(t, directory)) {
 		t.Fatal("malformed final item caused persistent effects")

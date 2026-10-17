@@ -17,7 +17,10 @@ import (
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
-type agentCrashBoundary struct{ MonitorID, Revision, ActionID, Stage string }
+type agentCrashBoundary struct {
+	MonitorID, Revision, ActionID, Stage string
+	QueuedAt, Deadline                   time.Time
+}
 
 func TestA2AControllerCrashProcess(t *testing.T) {
 	stage := os.Getenv("CPRA_AGENT_TEST_STAGE")
@@ -26,7 +29,12 @@ func TestA2AControllerCrashProcess(t *testing.T) {
 	}
 	s, dispatch, results := agentControllerAt(t, os.Getenv("CPRA_AGENT_TEST_URL"), "intervention", os.Getenv("CPRA_AGENT_TEST_DIRECTORY"))
 	boundary := func() {
-		data, err := json.Marshal(agentCrashBoundary{dispatch.MonitorID, dispatch.Revision, dispatch.ActionID, stage})
+		m, ok := s.store.Get(dispatch.MonitorID)
+		a := m.Actions[dispatch.ActionID]
+		if !ok || a.QueuedAt.IsZero() || a.Deadline.IsZero() {
+			t.Fatal("crash boundary lost original action budget")
+		}
+		data, err := json.Marshal(agentCrashBoundary{MonitorID: dispatch.MonitorID, Revision: dispatch.Revision, ActionID: dispatch.ActionID, Stage: stage, QueuedAt: a.QueuedAt, Deadline: a.Deadline})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,6 +182,9 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 			if !ok || a.State != wantState || a.Revision != boundary.Revision || sends.Load() != wantSends {
 				t.Fatal("restart changed original action or sent another message", a, sends.Load())
 			}
+			if !a.QueuedAt.Equal(boundary.QueuedAt) || !a.Deadline.Equal(boundary.Deadline) {
+				t.Fatal("restart changed the original action deadline")
+			}
 			wantReceipt := stage == "after-receipt" || stage == "before-result" || stage == "after-result"
 			if wantReceipt != (a.AgentReceipt != nil) {
 				t.Fatal("receipt durability boundary violated", a)
@@ -191,13 +202,24 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 					t.Fatal(err)
 				}
 				resumed, dispatch, results := agentControllerAt(t, server.URL, "intervention", directory)
-				if dispatch.ActionID != boundary.ActionID {
-					t.Fatal("resume invented another action")
+				if dispatch.ActionID != boundary.ActionID || !dispatch.Deadline.Equal(boundary.Deadline) {
+					t.Fatal("resume changed the original action identity or deadline")
+				}
+				current, _ := resumed.store.Get(boundary.MonitorID)
+				action := current.Actions[boundary.ActionID]
+				if !action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(boundary.Deadline) {
+					t.Fatal("fresh observation renewed the original action deadline")
 				}
 				r := dispatch.Execute()
 				results <- []jobs.Result{r}
 				if r.Err != nil || !resumed.drain() || sends.Load() != 1 {
 					t.Fatal("safe queued action did not resume exactly once", r)
+				}
+				current, _ = resumed.store.Get(boundary.MonitorID)
+				action = current.Actions[boundary.ActionID]
+				if action.ID != boundary.ActionID || action.State != persistence.Succeeded ||
+					!action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(boundary.Deadline) {
+					t.Fatal("execution or result commit changed the original action budget")
 				}
 			}
 		})

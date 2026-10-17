@@ -10,7 +10,7 @@ import (
 )
 
 func TestAgentStoragePreservesOptionalFormatBoundary(t *testing.T) {
-	if LatestFormatVersion != DeliveryWorkerFormatVersion || !supportedFormat(31) || !supportedFormat(32) || !supportedFormat(33) || !supportedFormat(34) || !supportedFormat(35) || !supportedFormat(36) || !supportedFormat(37) || !supportedFormat(38) || !supportedFormat(39) || !supportedFormat(40) || !supportedFormat(41) || supportedFormat(42) {
+	if LatestFormatVersion != LifecycleWorkerFormatVersion || !supportedFormat(31) || !supportedFormat(32) || !supportedFormat(33) || !supportedFormat(34) || !supportedFormat(35) || !supportedFormat(36) || !supportedFormat(37) || !supportedFormat(38) || !supportedFormat(39) || !supportedFormat(40) || !supportedFormat(41) || !supportedFormat(42) || !supportedFormat(43) || supportedFormat(44) {
 		t.Fatal("agent/worker format boundary changed")
 	}
 	for version := JobTypeFormatVersion; version <= WorkerScheduleFormatVersion; version++ {
@@ -34,7 +34,7 @@ func TestAgentStoragePreservesOptionalFormatBoundary(t *testing.T) {
 			if err := h.RecordAgentReceipt(t.Context(), agentReceiptCommand(a, 1, "TASK_STATE_SUBMITTED")); err != nil {
 				t.Fatal(err)
 			}
-			if s.fsm.image.Version != DeliveryWorkerFormatVersion {
+			if s.fsm.image.Version != LifecycleWorkerFormatVersion {
 				t.Fatal("optional data was written as a common format")
 			}
 			i, ledger, err := decodeSnapshot(bytes.NewReader(captureSnapshotBytes(t, s.fsm)), "")
@@ -84,10 +84,10 @@ func TestRecoveryNotificationPreservesWorkerFormatBoundary(t *testing.T) {
 	m.Policy.NotificationTriggers = map[string]string{"red": NotifyRecoveryExhausted}
 	m.Policy.WorkerNotificationSources = map[string][]WorkerNotificationSource{"red": {{}, {}}, "green": {{}}}
 	c := Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: time.Now().UTC()}
-	if commandWriteFormat(c) != DeliveryWorkerFormatVersion || commandMinimumFormat(c) != RecoveryNotificationWorkerFormatVersion {
+	if commandWriteFormat(c) != LifecycleWorkerFormatVersion || commandMinimumFormat(c) != RecoveryNotificationWorkerFormatVersion {
 		t.Fatal("new common and optional policy did not select a combined envelope")
 	}
-	for _, version := range []int{31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42} {
+	for _, version := range []int{31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44} {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
 		if (err == nil) != (version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
@@ -134,7 +134,7 @@ func TestAgentObservationPreservesWorkerFormatBoundary(t *testing.T) {
 				s.fsm.mu.Lock()
 				version := s.fsm.image.Version
 				s.fsm.mu.Unlock()
-				if version != DeliveryFormatVersion {
+				if version != LifecycleFormatVersion {
 					t.Fatal("agent connection alone enabled optional storage")
 				}
 				commitJobType(t, s, jobTypeFixture(t, s, "test-observation-order"))
@@ -149,7 +149,7 @@ func TestAgentObservationPreservesWorkerFormatBoundary(t *testing.T) {
 			}
 			defer ledger.Close()
 			stored := image.Monitors[action.MonitorID].Actions[action.ID]
-			if image.Version != DeliveryWorkerFormatVersion || image.JobTypes == nil || stored.AgentConnection == nil || stored.AgentReceipt.State != "TASK_STATE_COMPLETED" {
+			if image.Version != LifecycleWorkerFormatVersion || image.JobTypes == nil || stored.AgentConnection == nil || stored.AgentReceipt.State != "TASK_STATE_COMPLETED" {
 				t.Fatal("combined snapshot lost the connection, observation or optional state")
 			}
 			image.Version = AgentObservationFormatVersion

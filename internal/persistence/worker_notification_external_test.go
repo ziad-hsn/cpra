@@ -47,7 +47,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(record, repeated) {
 		t.Fatal("admission replay changed the original notification", err)
 	}
-	if s.fsm.image.Version != DeliveryWorkerFormatVersion {
+	if s.fsm.image.Version != LifecycleWorkerFormatVersion {
 		t.Fatal("inline source did not advance the storage format")
 	}
 	snap, err := s.fsm.Snapshot()
@@ -159,7 +159,7 @@ func TestWorkerNotificationPolicyKindsAndEndpointEncoding(t *testing.T) {
 	in, _ := inlineNotificationFixture(t, s)
 	m, _ := s.Get(in.MonitorID)
 	command := Command{Kind: "configure", Config: &m}
-	if commandWriteFormat(command) != DeliveryWorkerFormatVersion {
+	if commandWriteFormat(command) != LifecycleWorkerFormatVersion {
 		t.Fatal("configuration failed to stamp inline source format")
 	}
 	for _, kind := range []string{"Credential", "JobType", "monitor", "*"} {

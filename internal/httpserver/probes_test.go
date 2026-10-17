@@ -242,7 +242,7 @@ func TestTokenOnlyV2ProbesAreNarrowReadRoutes(t *testing.T) {
 	for _, tc := range []struct {
 		method, path string
 		status       int
-	}{{"GET", "/api/v2/healthz?extra=true", 400}, {"GET", "/api/v2/readyz?extra=true", 400}, {"POST", "/api/v2/healthz", 405}, {"POST", "/api/v2/readyz", 405}, {"GET", "/api/v2/state", 404}, {"GET", "/api/v2/monitors", 404}} {
+	}{{"GET", "/api/v2/healthz?extra=true", 400}, {"GET", "/api/v2/readyz?extra=true", 400}, {"POST", "/api/v2/healthz", 405}, {"POST", "/api/v2/readyz", 405}, {"GET", "/api/v2/state", 200}, {"POST", "/api/v2/state", 405}, {"GET", "/api/v2/monitors", 404}, {"POST", "/api/v2/monitors", 404}} {
 		request := httptest.NewRequest(tc.method, tc.path, nil)
 		request.Header.Set("Authorization", "Bearer probe-token-01234567890123456789012345678901")
 		response := httptest.NewRecorder()

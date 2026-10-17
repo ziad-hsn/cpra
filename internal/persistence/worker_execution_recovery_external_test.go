@@ -220,7 +220,7 @@ func TestWorkerExecutionPolicyStrictFormatAndBounds(t *testing.T) {
 	}
 	s := openCatalogMemory(t)
 	_, _ = workerExecutionFixture(t, s, "notification")
-	if s.fsm.image.Version != DeliveryWorkerFormatVersion || s.fsm.image.WorkerExecutions != nil {
+	if s.fsm.image.Version != LifecycleWorkerFormatVersion || s.fsm.image.WorkerExecutions != nil {
 		t.Fatal("policy-only format advancement missing")
 	}
 	data := captureSnapshotBytes(t, s.fsm)

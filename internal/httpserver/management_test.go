@@ -57,7 +57,7 @@ func newManagementFixture(t *testing.T, verified bool) *managementFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := management.NewCatalog(store, sealer)
+	catalog, err := management.NewCatalog(store, sealer, management.CatalogOptions{NotificationLogEnabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,8 +445,15 @@ func TestManagementRoutesRequireExplicitPairedConfiguration(t *testing.T) {
 	disabled.registerAPI(mux)
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/v2/self", nil))
-	if recorder.Code != 404 {
-		t.Fatal("unconfigured management route exists")
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatal("observation discovery bypassed authentication")
+	}
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		recorder = httptest.NewRecorder()
+		mux.ServeHTTP(recorder, httptest.NewRequest(method, "/api/v2/monitors", nil))
+		if recorder.Code != http.StatusNotFound {
+			t.Fatal("unconfigured management catalog route exists", method, recorder.Code)
+		}
 	}
 	f := newManagementFixture(t, true)
 	for _, config := range []ServerConfig{{Addr: "127.0.0.1:0", Management: f.catalog}, {Addr: "127.0.0.1:0", ManagementAuth: f.server.cfg.ManagementAuth}} {

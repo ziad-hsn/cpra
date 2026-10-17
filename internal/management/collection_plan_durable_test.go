@@ -54,7 +54,7 @@ func TestCollectionPlanCompilerThroughDurableFinalization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := NewCatalog(store, sealer)
+	catalog, err := NewCatalog(store, sealer, CatalogOptions{NotificationLogEnabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}

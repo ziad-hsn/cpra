@@ -239,6 +239,7 @@ func TestPolicyQueuedStartRechecksChangedRecoveryOptions(t *testing.T) {
 func TestPolicyAbsoluteMaintenanceAtPulseAndStart(t *testing.T) {
 	p := testMonitor().Policy
 	p.Intervention = true
+	p.RecoveryTimeout = 3 * time.Minute
 	start, end := policyTime().Add(time.Minute), policyTime().Add(2*time.Minute)
 	p.Maintenance = []MaintenanceWindow{{Start: start, End: end}}
 	for _, tc := range []struct {
@@ -274,11 +275,17 @@ func TestPolicyAbsoluteMaintenanceAtPulseAndStart(t *testing.T) {
 		}
 		if action.Kind == "code" {
 			r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: end})
-			if r.Allowed || r.Monitor == nil || r.Monitor.Actions[action.ID].State != Cancelled {
+			if r.Allowed || r.Monitor == nil || r.Monitor.Actions[action.ID].State != Cancelled || r.Monitor.Actions[action.ID].Outcome != "maintenance" {
 				t.Fatal("notification crossed maintenance and resumed afterward")
 			}
 		} else {
-			_ = policyStart(t, m, action, end)
+			if action.QueuedAt.IsZero() || !action.Deadline.After(end) {
+				t.Fatal("fixture recovery deadline does not span maintenance")
+			}
+			started := policyStart(t, m, action, end).Actions[action.ID]
+			if started.QueuedAt != action.QueuedAt || started.Deadline != action.Deadline {
+				t.Fatal("maintenance renewed the original recovery deadline")
+			}
 		}
 	}
 }
@@ -330,11 +337,12 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
+	base := time.Now().UTC()
 	m := testMonitor()
 	m.Policy.Intervention, m.Policy.RecoveryMaxAttempts, m.Policy.RecoveryCooldown = true, 2, time.Hour
-	m.Policy.Maintenance = []MaintenanceWindow{{Start: policyTime().Add(10 * time.Minute), End: policyTime().Add(20 * time.Minute)}}
-	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()})
-	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: policyTime().Add(time.Second), Outcome: "failure"})
+	m.Policy.Maintenance = []MaintenanceWindow{{Start: base.Add(10 * time.Minute), End: base.Add(20 * time.Minute)}}
+	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: base})
+	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: base.Add(time.Second), Outcome: "failure"})
 	m, _ = s.Get(m.ID)
 	a := interventionAction(t, m)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore})
@@ -354,22 +362,34 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	current, _ := s.Get(m.ID)
-	if !reflect.DeepEqual(current.Policy, m.Policy) || current.InterventionAttempts != 2 || current.LastInterventionFailure != failedAt || current.Actions[second.ID] != second {
+	if !reflect.DeepEqual(current.Policy, m.Policy) || current.InterventionAttempts != 2 || current.LastInterventionFailure != failedAt || current.Actions[second.ID] != second || current.RecoveryCheckAfter.IsZero() {
 		t.Fatal("restart lost policy or recovery admission state")
 	}
 	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(-time.Nanosecond)})[0]; result.Allowed {
 		t.Fatal("restart bypassed recovery cooldown")
 	}
 	fresh := current.RecoveryCheckAfter.Add(time.Second)
-	if fresh.Before(second.NotBefore) {
-		fresh = second.NotBefore
+	if !fresh.Before(second.NotBefore) {
+		t.Fatal("fixture has no remaining cooldown after reopening")
 	}
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 3, At: fresh, ExecutionStart: fresh, Outcome: "failure"})
-	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: fresh})[0]; !result.Allowed {
+	current, _ = s.Get(m.ID)
+	if !current.RecoveryCheckAfter.IsZero() || current.Actions[second.ID] != second {
+		t.Fatal("fresh observation changed the queued action or failed to clear the restart barrier")
+	}
+	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(-time.Nanosecond)})[0]; result.Allowed {
+		t.Fatal("fresh observation bypassed the original cooldown")
+	}
+	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore})[0]; !result.Allowed {
 		t.Fatal("safe queued attempt did not survive restart", result.Err)
 	}
-	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: fresh.Add(time.Second), Outcome: "failure"})
-	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 4, At: fresh.Add(2 * time.Hour), Outcome: "failure"})
+	current, _ = s.Get(m.ID)
+	started := current.Actions[second.ID]
+	if started.ID != second.ID || started.QueuedAt != second.QueuedAt || started.Deadline != second.Deadline {
+		t.Fatal("restarted attempt changed its original identity or deadline")
+	}
+	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(time.Second), Outcome: "failure"})
+	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 4, At: second.NotBefore.Add(2 * time.Hour), Outcome: "failure"})
 	current, _ = s.Get(m.ID)
 	if last := interventionAction(t, current); last.ID != second.ID || last.State != Failed || current.InterventionAttempts != 2 {
 		t.Fatal("restart reset the per-incident attempt limit")

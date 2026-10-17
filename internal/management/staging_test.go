@@ -426,7 +426,7 @@ func TestStageDecodePipelineAndValidationPerformNoProviderIO(t *testing.T) {
 func TestStageAll35DriverValidationUsesCompiledCapabilities(t *testing.T) {
 	fixtures := []struct{ category, driver, config string }{
 		{"recovery", "a2a", `{"url":"https://agent.example.test"}`}, {"notification", "a2a", `{"url":"https://agent.example.test"}`},
-		{"check", "http", `{"url":"https://example.test"}`}, {"check", "tcp", `{"host":"host","port":80}`}, {"check", "udp", `{"host":"host","port":80}`}, {"check", "dns", `{"host":"host"}`}, {"check", "icmp", `{"host":"host"}`}, {"check", "grpc", `{"host":"host","port":80}`}, {"check", "docker", `{"container":"fixture"}`}, {"check", "tls", `{"host":"host","port":443}`},
+		{"check", "http", `{"url":"https://example.test"}`}, {"check", "tcp", `{"host":"host","port":80}`}, {"check", "udp", `{"host":"host","port":80,"payload":"ping"}`}, {"check", "dns", `{"host":"host"}`}, {"check", "icmp", `{"host":"host"}`}, {"check", "grpc", `{"host":"host","port":80}`}, {"check", "docker", `{"container":"fixture"}`}, {"check", "tls", `{"host":"host","port":443}`},
 		{"check", "redis", `{}`}, {"check", "postgres", `{}`}, {"check", "mysql", `{}`}, {"check", "mongo", `{"uri":"mongodb://host"}`}, {"check", "rabbitmq", `{"url":"amqp://host"}`}, {"check", "kafka", `{"brokers":["host:9092"]}`},
 		{"recovery", "docker", `{"container":"fixture"}`}, {"recovery", "webhook", `{"url":"https://example.test"}`}, {"recovery", "kubernetes", `{"namespace":"fixture","kind":"deployment","name":"test"}`}, {"recovery", "aws", `{"operation":"reboot-instance","instanceId":"i-fixture"}`}, {"recovery", "systemd", `{"unit":"fixture.service"}`},
 		{"notification", "log", `{"file":"fixture.log"}`}, {"notification", "email", `{"server":"host:25","to":"ops@example.test","from":"cpra@example.test"}`}, {"notification", "webhook", `{"url":"https://example.test"}`}, {"notification", "slack", `{"hook":"https://example.test"}`}, {"notification", "pagerduty", `{"routingKey":"fixture"}`}, {"notification", "telegram", `{"botToken":"fixture","chatId":"fixture"}`}, {"notification", "discord", `{"webhookUrl":"https://example.test"}`}, {"notification", "opsgenie", `{"apiKey":"fixture"}`}, {"notification", "teams", `{"webhookUrl":"https://example.test"}`}, {"notification", "mattermost", `{"webhookUrl":"https://example.test"}`}, {"notification", "pushover", `{"appToken":"fixture","userKey":"fixture"}`}, {"notification", "twilio", `{"accountSid":"fixture","authToken":"fixture","from":"+15550001","to":"+15550002"}`}, {"notification", "datadog", `{"apiKey":"fixture"}`}, {"notification", "victorops", `{"restEndpointKey":"fixture","routingKey":"fixture"}`},
@@ -436,7 +436,9 @@ func TestStageAll35DriverValidationUsesCompiledCapabilities(t *testing.T) {
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.category+"/"+fixture.driver, func(t *testing.T) {
-			s := createTestStage(t, stageTestOptions(t), stageTestSealer(t, 69))
+			options := stageTestOptions(t)
+			options.Validation.NotificationLogEnabled = true
+			s := createTestStage(t, options, stageTestSealer(t, 69))
 			driver := api.DriverConfig{Type: fixture.driver, Config: json.RawMessage(fixture.config)}
 			var input api.Resource
 			if fixture.category == "notification" {

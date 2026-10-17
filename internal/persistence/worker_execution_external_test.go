@@ -177,7 +177,7 @@ func TestWorkerExecutionNotificationOriginalMixedOrdinal(t *testing.T) {
 	if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != DeliveryWorkerFormatVersion {
+	if s.fsm.image.Version != LifecycleWorkerFormatVersion {
 		t.Fatal("notification policy failed to advance format")
 	}
 	p := m.Policy.Clone()

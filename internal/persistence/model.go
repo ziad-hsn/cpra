@@ -115,6 +115,8 @@ type Monitor struct {
 	NotificationAttempted      string               `json:"notification_attempted,omitempty"`
 	RecoveryCheckAfter         time.Time            `json:"recovery_check_after,omitzero"`
 	LastFailure                FailureDiagnostic    `json:"last_failure,omitzero"`
+	ConfigurationProblem       FailureDiagnostic    `json:"configuration_problem,omitzero"`
+	ConfigurationProblemAt     time.Time            `json:"configuration_problem_at,omitzero"`
 	NotificationCorrelation    string               `json:"notification_correlation,omitempty"`
 	NotificationVersion        int                  `json:"notification_version,omitempty"`
 	NotificationEpisode        string               `json:"notification_episode,omitempty"`
@@ -312,6 +314,11 @@ func validateCommand(c Command) error {
 		}
 		if err := c.Failure.validate(commandMinimumFormat(c)); err != nil {
 			return err
+		}
+	}
+	if c.Outcome == "configuration_problem" || c.Failure.configurationProblem() {
+		if c.Kind != "pulse" || c.Outcome != "configuration_problem" || !c.Failure.configurationProblem() || c.Warning || c.Ambiguous || c.Retryable {
+			return ErrFailureDiagnostic
 		}
 	}
 	if !c.ActionDeadline.IsZero() && (c.Kind != "start" || !c.ActionDeadline.After(c.At) || c.ActionDeadline.Sub(c.At) > 24*time.Hour) {

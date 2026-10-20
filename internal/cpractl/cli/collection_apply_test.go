@@ -187,7 +187,13 @@ func TestCollectionWaitReadOnlyPartialResultFormats(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "did not complete successfully") || calls.Load() != 2 {
 				t.Fatal("partial execution reported success or collected pages", err, calls.Load())
 			}
-			if output == "table" || output == "wide" {
+			if output == "table" {
+				if !strings.Contains(stdout, "Failed:") || !strings.Contains(stdout, "Unattempted:") || !strings.Contains(stdout, "get operation "+sequencedOperationID+" --results") || strings.Contains(stdout, "Plan") || stderr != "" {
+					t.Fatal(stdout, stderr)
+				}
+				return
+			}
+			if output == "wide" {
 				if !strings.Contains(stdout, "Failed children:") || !strings.Contains(stdout, "projection_failed") || stderr != "Next cursor: next-page\n" {
 					t.Fatal(stdout, stderr)
 				}

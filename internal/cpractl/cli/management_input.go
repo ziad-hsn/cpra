@@ -22,7 +22,7 @@ func managementInputReader(cmd *cobra.Command, path string) (io.ReadCloser, erro
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, &managementCommandError{"could not open the selected input file", err}
+		return nil, localFileFailure("selected input file", err)
 	}
 	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() {

@@ -109,10 +109,15 @@ func writeMainRuntime(t *testing.T, path string, settings runtimeconfig.Config) 
 
 func startMainManagement(t *testing.T, fixture *mainManagementFixture) (*cpra.Client, func()) {
 	t.Helper()
+	return startMainManagementAt(t, fixture, "127.0.0.1:0")
+}
+
+func startMainManagementAt(t *testing.T, fixture *mainManagementFixture, listenAddress string) (*cpra.Client, func()) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ready, done := make(chan struct{}), make(chan error, 1)
 	options := fixture.options
-	options.webAddr = "127.0.0.1:0"
+	options.webAddr = listenAddress
 	var address string
 	options.webStarted = func(bound string) { address = bound }
 	go func() { done <- runCPRa(ctx, options, func() { close(ready) }) }()

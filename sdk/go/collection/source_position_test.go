@@ -173,11 +173,11 @@ func TestMalformedSourceKeepsSafeOrigin(t *testing.T) {
 func TestSourcePositionsOmitFreeFormPayloadDescendants(t *testing.T) {
 	fields := map[string]SourcePosition{}
 	for _, path := range []string{"/metadata/labels/password", "/spec/check/driver/config/headers/url", "/spec/check/driver/credentialRefs/url", "/spec/check/driver/config/parameters/password", "/spec/parameterSchema/type", "/spec/resultSchema/type", "/status/type", "/metadata/labels/spec.check.driver.config.url"} {
-		fields[path] = SourcePosition{1, 1}
+		fields[path] = SourcePosition{Line: 1, Column: 1}
 	}
 	for _, root := range []string{"/metadata/labels", "/spec/check/driver/config/headers", "/spec/check/driver/credentialRefs", "/spec/check/driver/config/parameters", "/spec/parameterSchema", "/spec/resultSchema", "/status"} {
 		for _, descendant := range []string{"/123", "/0/1", "/0/type", "/type/0"} {
-			fields[root+descendant] = SourcePosition{1, 1}
+			fields[root+descendant] = SourcePosition{Line: 1, Column: 1}
 		}
 	}
 	if got := resourceFieldPositions(fields, false); len(got) != 0 {

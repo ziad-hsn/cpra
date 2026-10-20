@@ -45,6 +45,7 @@ type CollectionValidationItem struct {
 	UID             string
 	ResourceVersion string
 	Dependencies    []persistence.CatalogKey
+	ChangedFields   []string // bounded schema paths only; no values or arbitrary map keys
 }
 
 // CollectionValidation contains observations, not executable prepared mutations.
@@ -206,6 +207,14 @@ func (c *Catalog) ValidateCollection(ctx context.Context, captured ReadView, inp
 		v.result.Items[i].Dependencies = refs
 		if !shape.Changed {
 			v.result.Items[i].Change = "unchanged"
+		} else if exists {
+			v.result.Items[i].ChangedFields = collectionChangedFields(old, r)
+			for _, field := range v.result.Items[i].ChangedFields {
+				if len(field)+16 > collectionValidationBytes-v.bytes {
+					return v.reject(i, ErrGraphLimit)
+				}
+				v.bytes += len(field) + 16
+			}
 		}
 		v.desired[key] = r
 	}

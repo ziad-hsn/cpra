@@ -74,6 +74,9 @@ func main() {
 			}
 			if field, ok := api.ValidationFieldError(err); ok {
 				result.(map[string]any)["field"] = field.Field
+				if source != nil && api.SafeValidationField(source.Field) != "" {
+					result.(map[string]any)["field"] = source.Field
+				}
 				result.(map[string]any)["reason"] = field.Reason
 			}
 			// Older parser errors expose only numeric document/item coordinates.

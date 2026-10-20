@@ -70,7 +70,6 @@ func TestYAMLScalarTypesAnchorsAndOriginalPositions(t *testing.T) {
 		{"boolean-name", strings.Replace(valid, "name: second", "name: true", 1), "line 4"},
 		{"number-groups", strings.Replace(valid, "type: tcp", "groups: 123, type: tcp", 1), "line 3"},
 		{"boolean-groups", strings.Replace(valid, "type: tcp", "groups: true, type: tcp", 1), "line 3"},
-		{"cross-entry-anchor", strings.Replace(valid, "pulse_check: {type: tcp, interval: 1s, timeout: 1s, config: {host: localhost, port: 80}}", "pulse_check: *check", 1), "monitor 2"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "monitors.yaml")

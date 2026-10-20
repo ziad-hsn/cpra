@@ -437,6 +437,16 @@
             "type": "string",
             "x-go-type-skip-optional-pointer": true
           },
+          "changedFields": {
+            "description": "Preflight-only changed schema paths from the captured resource versions. No values or free-form map keys. Arrays and private maps are reported as whole fields; large changes use metadata/spec summaries. Omitted when unavailable.",
+            "items": {
+              "maxLength": 160,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "x-go-type-skip-optional-pointer": true
+          },
           "childDisposition": {
             "$ref": "#/components/schemas/ExecutionChildDisposition"
           },
@@ -2556,6 +2566,15 @@
             "minimum": 0,
             "type": "integer"
           },
+          "configurationProblem": {
+            "$ref": "#/components/schemas/FailureDiagnostic",
+            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+          },
+          "configurationProblemAt": {
+            "description": "Last failed local preparation, in UTC. Absent when preparation is usable.",
+            "format": "date-time",
+            "type": "string"
+          },
           "configuredNotifications": {
             "items": {
               "type": "string"
@@ -2801,6 +2820,15 @@
             "description": "Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.",
             "format": "int64",
             "type": "integer"
+          },
+          "configurationProblem": {
+            "$ref": "#/components/schemas/FailureDiagnostic",
+            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+          },
+          "configurationProblemAt": {
+            "description": "Last failed local preparation, in UTC. Absent when preparation is usable.",
+            "format": "date-time",
+            "type": "string"
           },
           "controlRevision": {
             "type": "string",

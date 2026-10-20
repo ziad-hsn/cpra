@@ -24,14 +24,18 @@ func newLocalCommand() *cobra.Command {
 	}}
 	var initAccount string
 	var management bool
+	var initPort int
 	var operator, tokenOutput string
 	init := &cobra.Command{Use: "init", Args: cobra.NoArgs, Short: "Create absent starter files without replacing existing configuration", RunE: func(cmd *cobra.Command, _ []string) error {
+		if initPort < 1 || initPort > 65535 {
+			return fmt.Errorf("--port must be from 1 through 65535")
+		}
 		l, err := installpath.Resolve(scope)
 		if err != nil {
 			return err
 		}
 		if management {
-			files, err := localadmin.InitManagement(cmd.Context(), l, localadmin.ManagementInitOptions{Account: initAccount, OperatorID: operator, TokenOutput: tokenOutput})
+			files, err := localadmin.InitManagement(cmd.Context(), l, localadmin.ManagementInitOptions{Account: initAccount, OperatorID: operator, TokenOutput: tokenOutput, Port: initPort})
 			if err != nil {
 				return err
 			}
@@ -41,13 +45,18 @@ func newLocalCommand() *cobra.Command {
 				}
 				return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Management configuration initialized at %s\nOperator token saved in %s (value not printed).\n\nStart:\ncpra -yaml %s -runtime-config %s -web.addr 127.0.0.1:8060 -allow-empty\n\nConnect:\ncpractl --server https://localhost:8060 --ca-file %s --token-file %s get monitors\n\nBrowser: https://localhost:8060\nManually trust the local CA %s in your browser before signing in. Initialization does not install trust or start a service.\n", l.ConfigDir, files.Token, quote(files.Manifest), quote(files.Runtime), quote(files.CA), quote(files.Token), files.CA)
+			origin := fmt.Sprintf("https://localhost:%d", initPort)
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Management configuration initialized at %s\nOperator token saved in %s (value not printed).\n\nStart:\ncpra -yaml %s -runtime-config %s -allow-empty\n\nConnect:\ncpractl --server %s --ca-file %s --token-file %s get monitors\n\nBrowser: %s\nManually trust the local CA %s in your browser before signing in. Initialization does not install trust or start a service.\n", l.ConfigDir, files.Token, quote(files.Manifest), quote(files.Runtime), origin, quote(files.CA), quote(files.Token), origin, files.CA)
 			return err
 		}
 		if tokenOutput != "" || operator != "local/operator" {
 			return fmt.Errorf("--token-output and --operator require --management")
 		}
-		if err = localadmin.Init(l, initAccount); err != nil {
+		port := 0
+		if cmd.Flags().Changed("port") {
+			port = initPort
+		}
+		if err = localadmin.Init(l, initAccount, port); err != nil {
 			return err
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Configuration initialized at", l.ConfigDir)
@@ -55,6 +64,7 @@ func newLocalCommand() *cobra.Command {
 	}}
 	init.Flags().StringVar(&initAccount, "account", "", "system service account override (must already exist)")
 	init.Flags().BoolVar(&management, "management", false, "initialize protected named access and localhost TLS for a fresh installation")
+	init.Flags().IntVar(&initPort, "port", 8060, "loopback API port saved in runtime configuration and used by generated services")
 	init.Flags().StringVar(&operator, "operator", "local/operator", "named management operator identity")
 	init.Flags().StringVar(&tokenOutput, "token-output", "", "protected operator token output outside service-owned paths; required for system management initialization")
 	service := &cobra.Command{Use: "service", Short: "Install or maintain the native supervisor integration"}

@@ -50,3 +50,23 @@ func TestDirectoryPrecedenceAndLegacyGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWebAddress(t *testing.T) {
+	for _, test := range []struct {
+		address string
+		valid   bool
+	}{
+		{"", true}, {"localhost:8060", true}, {"127.0.0.1:19060", true}, {"[::1]:19060", true},
+		{"localhost", false}, {"localhost:0", false}, {"localhost:65536", false}, {"localhost:http", false},
+	} {
+		config := Default()
+		config.Web.Address = test.address
+		err := config.Validate()
+		if (err == nil) != test.valid {
+			t.Fatalf("address %q: %v", test.address, err)
+		}
+		if test.address == "" && config.Web.ListenAddress() != "localhost:8060" {
+			t.Fatal("default listener changed")
+		}
+	}
+}

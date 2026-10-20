@@ -84,6 +84,8 @@ type MonitorStatus struct {
 	IgnoredBy, IgnoreCause, IgnoreReason                              string
 	IgnoreIncidentCount                                               int
 	LastFailure                                                       FailureDiagnostic
+	ConfigurationProblem                                              FailureDiagnostic
+	ConfigurationProblemAt                                            time.Time
 	ObservedGeneration                                                uint64
 	ID, CatalogUID, CatalogRevision, Revision                         string
 	ControlRevision, IncidentID, IncidentRevision                     string

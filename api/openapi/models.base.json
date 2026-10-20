@@ -1347,6 +1347,15 @@
               "$ref": "#/components/schemas/FieldError"
             },
             "description": "Non-fatal configuration advisories. They do not change observed service health."
+          },
+          "configurationProblem": {
+            "$ref": "#/components/schemas/FailureDiagnostic",
+            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+          },
+          "configurationProblemAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last failed local preparation, in UTC. Absent when preparation is usable."
           }
         },
         "required": [],
@@ -1960,6 +1969,13 @@
       "ApplyResult": {
         "type": "object",
         "properties": {
+          "changedFields": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {"type": "string", "maxLength": 160},
+            "description": "Preflight-only changed schema paths from the captured resource versions. No values or free-form map keys. Arrays and private maps are reported as whole fields; large changes use metadata/spec summaries. Omitted when unavailable.",
+            "x-go-type-skip-optional-pointer": true
+          },
           "id": {
             "type": "string",
             "x-go-name": "ID"
@@ -5067,6 +5083,15 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "configurationProblem": {
+            "$ref": "#/components/schemas/FailureDiagnostic",
+            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+          },
+          "configurationProblemAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last failed local preparation, in UTC. Absent when preparation is usable."
           }
         },
         "required": [

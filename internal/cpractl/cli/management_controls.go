@@ -104,7 +104,11 @@ func addManagementControlCommands(root *cobra.Command, o *options) {
 				return errors.New("this operation requires one monitor/ID target")
 			}
 			if !validManagementVersion(revision) {
-				return fmt.Errorf("--%s must contain the explicit, unquoted version from the matching observation", flag)
+				discovery := "describe monitor/ID"
+				if incident {
+					discovery = "describe incident/ID"
+				}
+				return fmt.Errorf("--%s requires the exact unquoted version; run cpractl %s with the same connection options, inspect the current state, then submit the intended control", flag, discovery)
 			}
 			request := api.ControlRequest{Revision: revision}
 			if action == "snooze" {

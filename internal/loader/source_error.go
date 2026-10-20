@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -21,7 +22,7 @@ import (
 )
 
 // MonitorSource retains one location per streamed monitor, not its contents or
-// syntax tree. JSON offsets refer to the decompressed original input.
+// syntax tree. JSON offsets refer to decompressed input after its optional BOM.
 type MonitorSource struct {
 	Item, Line, Column int
 	Offset             int64
@@ -64,6 +65,11 @@ func inputPosition(ctx context.Context, filename string, offset int64) (int, int
 		defer gz.Close()
 		reader = gz
 	}
+	buffered := bufio.NewReader(reader)
+	if prefix, _ := buffered.Peek(3); string(prefix) == "\ufeff" {
+		_, _ = buffered.Discard(3)
+	}
+	reader = buffered
 	line, column := 1, 1
 	var buffer [32 << 10]byte
 	for offset > 0 {

@@ -75,6 +75,19 @@ func TestUnfinishedScheduledWorkCannotImproveAttainment(t *testing.T) {
 	}
 }
 
+func TestPreparationFailureCountsOnceWithoutLatencySample(t *testing.T) {
+	at := time.Unix(1700000400, 0)
+	r := New(at.Add(-time.Hour), 250*time.Millisecond, 5*time.Second)
+	r.Expect("http", at)
+	r.NotExecuted("http", at)
+	for _, after := range []time.Duration{time.Second, 15 * time.Second} {
+		v := r.View(at.Add(after), 5*time.Minute, 1).Reports[0]
+		if v.Expected != 1 || v.Missed != 1 || v.Samples != 0 || v.Timeouts != 0 || v.Overdue != 0 || v.Pending != 0 || v.Result.P99 != nil || *v.ResultAttainment != 0 {
+			t.Fatal("local preparation inflated attainment or counted twice", v)
+		}
+	}
+}
+
 func BenchmarkObserve(b *testing.B) {
 	now := time.Now()
 	r := New(now, 250*time.Millisecond, 5*time.Second)

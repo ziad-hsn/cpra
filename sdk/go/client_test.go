@@ -144,12 +144,13 @@ func TestReadRetriesOnly(t *testing.T) {
 }
 func TestCancellationAndLocalTokenFailure(t *testing.T) {
 	var calls atomic.Int32
+	cause := errors.New("secret-provider-url")
 	c := fixture(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }, func(c *Config) {
 		c.AuthToken = ""
-		c.TokenSource = func(context.Context) (string, error) { return "", errors.New("secret-provider-url") }
+		c.TokenSource = func(context.Context) (string, error) { return "", cause }
 	})
 	_, e := c.Monitors.Create(context.Background(), monitor())
-	if e == nil || errors.Is(e, ErrAmbiguous) || strings.Contains(e.Error(), "secret-provider-url") || calls.Load() != 0 {
+	if e == nil || !errors.Is(e, cause) || errors.Is(e, ErrAmbiguous) || strings.Contains(e.Error(), "secret-provider-url") || calls.Load() != 0 {
 		t.Fatal(e)
 	}
 	c = fixture(t, func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }, nil)

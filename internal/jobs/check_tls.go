@@ -8,9 +8,12 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
+
+var errCertificateFileType = errors.New("TLS CA file must be a regular file")
 
 // checkTLS is immutable execution configuration. It carries no global provider
 // registration; each check constructs its own effective transport policy.
@@ -69,20 +72,26 @@ func checkTLSConfiguration(caFile, serverName string, skip bool) (*tls.Config, e
 	}
 	file, err := openCheckCertificate(caFile)
 	if err != nil {
-		return nil, errors.New("TLS CA file is unavailable")
+		code := "ca_file_unreadable"
+		if errors.Is(err, os.ErrNotExist) {
+			code = "ca_file_missing"
+		} else if errors.Is(err, errCertificateFileType) {
+			code = "ca_file_invalid"
+		}
+		return nil, &ConfigurationError{Code: code}
 	}
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
-		return nil, errors.New("TLS CA file must be regular and at most 1 MiB")
+		return nil, &ConfigurationError{Code: "ca_file_invalid"}
 	}
 	pem, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
 	if err != nil || len(pem) > 1<<20 {
-		return nil, errors.New("TLS CA file cannot be read within its 1 MiB limit")
+		return nil, &ConfigurationError{Code: "ca_file_unreadable"}
 	}
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(pem) {
-		return nil, errors.New("TLS CA file contains no supported certificates")
+		return nil, &ConfigurationError{Code: "ca_file_invalid"}
 	}
 	config.RootCAs = roots
 	return config, nil

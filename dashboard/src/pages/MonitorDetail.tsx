@@ -69,6 +69,8 @@ export default function MonitorDetail() {
         </p>
 	    {m.warning && <p role='status' style={{ color: 'var(--status-degraded)' }}>{m.warning}</p>}
         <FailureDetails diagnostic={m.last_failure} />
+		<FailureDetails diagnostic={m.configuration_problem} label="Check configuration problem" />
+		{m.configuration_problem && <p>Health and last-check time show the last target observation. Preparation will be retried at the normal check interval; recovery actions are blocked meanwhile.</p>}
         {m.certificate_verification_disabled && <p role='status'>TLS certificate verification disabled for this monitor.</p>}
         <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Delivered (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
       </div>

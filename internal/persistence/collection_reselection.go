@@ -10,12 +10,13 @@ const CollectionReselectionFormatVersion = 14
 const collectionReselectionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-14\n"
 
 func validCollectionNormalizationProfile(profile string) bool {
-	return profile == "" || profile == "cpra.file.base.v1" || profile == "cpra.file.base.v2"
+	return profile == "" || profile == "cpra.file.base.v1" || profile == "cpra.file.base.v2" || profile == "cpra.file.base.v3"
 }
 
 func collectionProfileSupportedAt(profile string, version int) bool {
 	return validCollectionNormalizationProfile(profile) && (profile == "" || version >= CollectionReselectionFormatVersion) &&
-		(profile != "cpra.file.base.v2" || lifecycleStorageFormat(version))
+		(profile != "cpra.file.base.v2" || lifecycleStorageFormat(version)) &&
+		(profile != "cpra.file.base.v3" || actionStorageFormat(version))
 }
 
 // Retirement fences can embed an older retained receipt. Inspect both levels
@@ -87,4 +88,18 @@ func collectionReselectionCommand(c Command) bool {
 
 func collectionRetirementHasNormalization(p *CollectionExecutionRetirementFence) bool {
 	return p != nil && (p.Result.Summary.NormalizationProfile != "" || p.Retirement != nil && p.Retirement.Result.Summary.NormalizationProfile != "")
+}
+
+func collectionProfileV3Command(c Command) bool {
+	if v := c.Collection; v != nil && v.Create != nil && v.Create.NormalizationProfile == "cpra.file.base.v3" {
+		return true
+	}
+	v := c.CollectionExecute
+	if v == nil {
+		return false
+	}
+	has := func(p *CollectionExecutionRetirementFence) bool {
+		return p != nil && (p.Result.Summary.NormalizationProfile == "cpra.file.base.v3" || p.Retirement != nil && p.Retirement.Result.Summary.NormalizationProfile == "cpra.file.base.v3")
+	}
+	return has(v.Retirement) || v.SourceRetirement != nil && has(v.SourceRetirement.Retirement)
 }

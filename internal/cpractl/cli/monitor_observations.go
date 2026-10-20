@@ -73,6 +73,8 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 			{"Interval", fmt.Sprintf("%d ms", item.IntervalMS)}, {"Last check", observationTimestamp(item.LastCheckedAt)},
 			{"Last success", observationTimestamp(item.LastSuccessfulAt)}, {"Next check", observationTimestamp(item.NextCheckAt)},
 			{"Last check latency", latency}, {"Last failure", managementDisplay(failure)},
+			{"Configuration problem", diagnosticText(item.ConfigurationProblem)},
+			{"Preparation failed at", observationTimestamp(item.ConfigurationProblemAt)},
 			{"Configured notifications", managementDisplay(strings.Join(item.ConfiguredNotifications, ", "))},
 			{"Pending notifications", strconv.FormatInt(item.PendingNotifications, 10)},
 			{"Delivered notifications (retained)", strconv.FormatInt(item.CompletedNotifications, 10)},

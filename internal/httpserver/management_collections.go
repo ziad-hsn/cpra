@@ -301,6 +301,7 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 			break
 		}
 		result.Items[i].OldVersion = item.ResourceVersion
+		result.Items[i].ChangedFields = item.ChangedFields
 		if item.Change != "" {
 			result.Items[i].Outcome = item.Change
 		}

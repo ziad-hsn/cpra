@@ -15,7 +15,7 @@ func actionStorageFormat(version int) bool {
 }
 
 func requiresActionFormat(m Monitor) bool {
-	if m.InstallationID != "" || m.ActionVersion != 0 || m.Notifications != nil || len(m.Policy.NotificationTimeouts) != 0 {
+	if m.InstallationID != "" || m.ActionVersion != 0 || m.Notifications != nil || len(m.Policy.NotificationTimeouts) != 0 || m.ConfigurationProblem != (FailureDiagnostic{}) || !m.ConfigurationProblemAt.IsZero() {
 		return true
 	}
 	for _, a := range m.Actions {
@@ -51,6 +51,13 @@ func validateActionFormat(m Monitor, version int) error {
 	}
 	if !actionStorageFormat(version) || m.ActionVersion != 0 && m.ActionVersion != ActionFormatVersion || m.InstallationID != "" && !catalogIdentifier(m.InstallationID, 256) {
 		return errors.New("invalid action storage version")
+	}
+	if m.ConfigurationProblem != (FailureDiagnostic{}) {
+		if !m.ConfigurationProblem.configurationProblem() || m.ConfigurationProblemAt.IsZero() || m.ConfigurationProblem.validate(version) != nil {
+			return ErrFailureDiagnostic
+		}
+	} else if !m.ConfigurationProblemAt.IsZero() {
+		return ErrFailureDiagnostic
 	}
 	for _, a := range m.Actions {
 		if err := validateReviewNotice(a, version); err != nil {

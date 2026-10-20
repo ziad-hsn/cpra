@@ -23,6 +23,8 @@ export interface MonitorSummary {
   actions_needing_review?: number;
   certificate_verification_disabled?: boolean;
   last_failure?: FailureDiagnostic;
+	configuration_problem?: FailureDiagnostic;
+	configuration_problem_at?: string;
 	warning?: string;
   monitor_id?: string;
   latency_available?: boolean;

@@ -71,3 +71,25 @@ func TestTLSDriverModelsPreserveExplicitFalse(t *testing.T) {
 		}
 	}
 }
+
+func TestSkipVerificationRejectsUnusedTrustRoots(t *testing.T) {
+	for _, driver := range []string{"http", "tls", "grpc", "redis", "postgres", "mysql", "mongo", "rabbitmq", "kafka"} {
+		t.Run(driver, func(t *testing.T) {
+			for _, referenced := range []bool{false, true} {
+				config := DriverConfig{Type: driver, Config: json.RawMessage(`{"insecureSkipVerify":true,"caFile":"unread-private-marker.pem"}`)}
+				if referenced {
+					config.Config = json.RawMessage(`{"insecureSkipVerify":true}`)
+					config.CredentialRefs = Pointer(map[string]string{"caFile": "private-reference"})
+				}
+				err := ValidateTLSSettings(config)
+				field, ok := ValidationFieldError(err)
+				if !ok || field.Field != "config.caFile" || field.Reason != "skipVerificationCAConflict" {
+					t.Fatalf("contradictory trust settings were not rejected: %v", err)
+				}
+				if strings.Contains(err.Error(), "private") {
+					t.Fatal("validation disclosed a private setting")
+				}
+			}
+		})
+	}
+}

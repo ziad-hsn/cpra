@@ -27,6 +27,7 @@ type ParseConfig struct {
 	BatchSize           int
 	BufferSize          int
 	MaxMemory           int64
+	MaxExpandedBytes    int64 // Additional private staging budget for cross-entry YAML aliases.
 	StrictUnknownFields bool
 	JSONUseNumber       bool
 }

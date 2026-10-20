@@ -26,6 +26,12 @@ var ErrFailureDiagnostic = errors.New("invalid failure diagnostic")
 func NewFailureDiagnostic(code string) FailureDiagnostic {
 	var message string
 	switch code {
+	case "ca_file_missing":
+		message = "The configured CA file does not exist. No target check was performed."
+	case "ca_file_unreadable":
+		message = "The configured CA file cannot be read by CPRa. No target check was performed."
+	case "ca_file_invalid":
+		message = "The configured CA file must be a regular PEM certificate file of at most 1 MiB. No target check was performed."
 	case "deadline_exceeded":
 		message = "The operation did not finish within its deadline."
 	case "cancelled":
@@ -56,6 +62,10 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 	return FailureDiagnostic{Code: code, Message: message}
 }
 
+func (d FailureDiagnostic) configurationProblem() bool {
+	return d.Code == "ca_file_missing" || d.Code == "ca_file_unreadable" || d.Code == "ca_file_invalid"
+}
+
 // WithDetails renders protocol fields without accepting message text from a
 // caller. Persistent validation checks the fields and recomputes this message.
 func (d FailureDiagnostic) WithDetails() FailureDiagnostic {
@@ -84,6 +94,9 @@ func (d FailureDiagnostic) validate(version int) error {
 		return nil
 	}
 	if !deliveryStorageFormat(version) || d.Code == "" || NewFailureDiagnostic(d.Code).Code == "" {
+		return ErrFailureDiagnostic
+	}
+	if d.configurationProblem() && !actionStorageFormat(version) {
 		return ErrFailureDiagnostic
 	}
 	if !d.requiresLifecycleFormat() {

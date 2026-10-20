@@ -48,6 +48,17 @@ TLS-capable checks support a monitor-specific `ca_file`, `server_name`, and
 `insecure_skip_verify`. The CA file must be a readable regular PEM file of at most
 1 MiB; it supplies that monitor's trust roots. Static validation does not read the
 file. The service identity must be able to read it when executing the check.
+Relative CA paths resolve from the process working directory; service manifests
+should use absolute paths. Combining a CA file (or CA credential reference) with
+`insecure_skip_verify: true` is rejected rather than silently ignoring trust roots.
+
+A missing, unreadable or invalid CA file is a monitor configuration problem.
+CPRa preserves the last observed health and incident facts, suppresses new
+interventions, and retries local preparation at the normal check cadence. It
+does not contact the target or count a preparation failure as a service outage
+or recovery. Queued recovery keeps its original deadline while held; expiry
+cancels that unsent action. Fixing the file allows the next real check to update
+health. Missed work remains visible in SLO accounting.
 
 Certificate verification is enabled by default. Explicit
 `insecure_skip_verify: true` disables certificate-chain and hostname verification

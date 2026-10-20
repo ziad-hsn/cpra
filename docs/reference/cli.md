@@ -23,7 +23,7 @@ cpra_scope: main
 | `-config` | empty | Alias overriding `-yaml`. |
 | `-allow-empty` | false | Permit a deliberately empty manifest. |
 | `-web` | true | Enable dashboard, API, and metrics; management writes require runtime configuration. |
-| `-web.addr` | `localhost:8060` | Listener address; a remote bind requires authentication. |
+| `-web.addr` | runtime `web.address`, otherwise `localhost:8060` | Explicit listener override; a remote bind requires authentication. |
 | `-web.auth-file` | `CPRA_AUTH_TOKEN_FILE` | Read the authentication token from a file. |
 | `-web.auth` | `CPRA_AUTH_TOKEN` | Set a token directly; prefer a file to command-line exposure. |
 | `-web.cors` | empty | Comma-separated allowed origins; intended for development. |
@@ -34,7 +34,7 @@ cpra_scope: main
 | `-version` | false | Print build information and exit. |
 | `-runtime-config` | empty | Runtime storage, history, SLO, authentication, and management configuration. |
 | `-data-dir` | empty | Override durable storage directory. |
-| `-validate` | false | Validate configuration and compiled drivers without opening storage or providers. |
+| `-validate` | false | Validate the supplied input and compiled drivers without applying it, opening storage or contacting providers. Incidental client authentication environment values are ignored; explicit authentication options are validated. |
 | `-capabilities` | false | Print compiled driver capabilities as JSON and exit. |
 | `-shutdown-timeout` | `45s` | Maximum shutdown time; Windows service caps it at `15s`. |
 
@@ -87,6 +87,17 @@ file over `CPRA_AUTH_TOKEN`; the latter is read after flag parsing and never
 included in help/error defaults. Keep tokens out of URLs and shell arguments.
 Use `cpractl local --help` and `cpractl local service --help` for local operations;
 these are separate from API requests. Probe commands perform API reads only.
+
+`cpractl local init --management --port 19060` selects a different loopback API
+port for a fresh installation. The default is 8060. Initialization writes
+`web.address` in runtime configuration and prints matching connection commands;
+generated services read that value at startup. An explicit server `-web.addr`
+still takes precedence. Initialization never overwrites an existing runtime file.
+
+CLI errors distinguish local input/token/CA files, TLS verification, authentication
+(401), authorization (403), throttling (429), and unavailable readiness (503).
+An unconfirmed mutation retains its operation handle and uncertainty warning;
+these diagnostics do not enable an automatic retry.
 
 ## Process logs
 

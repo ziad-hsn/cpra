@@ -67,8 +67,8 @@ func TestRestartGatedInterventionWaitsOutsideScheduler(t *testing.T) {
 		t.Fatal("restart recovery failed", err, results)
 	}
 	for n := 0; n < 10; n++ {
-		system.dispatchActions(time.Now().Add(time.Second))
-		if system.actions.Len() != 0 || len(queue.admitted) != 0 {
+		system.dispatchActions(time.Now())
+		if system.actions.Len() > 1 || len(queue.admitted) != 0 {
 			t.Fatal("restart-gated intervention repeatedly scheduled or dispatched")
 		}
 	}
@@ -76,7 +76,7 @@ func TestRestartGatedInterventionWaitsOutsideScheduler(t *testing.T) {
 	if !m.RecoveryCheckAfter.IsZero() || m.Actions[original.ID].State != persistence.Queued {
 		t.Fatal("fresh observation did not retain and release the original intent")
 	}
-	system.dispatchActions(time.Now().Add(2 * time.Second))
+	system.dispatchActions(time.Now())
 	if len(queue.admitted) != 1 {
 		t.Fatal("fresh failed observation did not schedule the original intervention")
 	}

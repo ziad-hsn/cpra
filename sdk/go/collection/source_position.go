@@ -21,8 +21,9 @@ import (
 // SourcePosition identifies an original source character, using one-based lines
 // and columns. A zero position means unavailable; it is never a resource value.
 type SourcePosition struct {
-	Line   int `json:"line,omitempty"`
-	Column int `json:"column,omitempty"`
+	Line   int    `json:"line,omitempty"`
+	Column int    `json:"column,omitempty"`
+	Field  string `json:"field,omitempty"` // Original reviewed schema spelling, never a free-form mapping key.
 }
 
 // SourceError associates a safe validation cause with its original local input.
@@ -30,6 +31,7 @@ type SourcePosition struct {
 type SourceError struct {
 	Location Location
 	Cause    error
+	Field    string // Original field spelling when retained safely.
 }
 
 func (e *SourceError) Error() string { return fmt.Sprintf("%s: %s", e.Location, e.Cause) }
@@ -43,11 +45,13 @@ func (i Item) ValidationError(err error) error {
 		return nil
 	}
 	location := i.Location
+	originalField := ""
 	if field, ok := api.ValidationFieldError(err); ok {
 		path := sourceFieldKey(field.Field)
 		for {
 			if point, ok := i.FieldPositions[path]; ok && point.Line > 0 && point.Column > 0 {
 				location.Line, location.Column = point.Line, point.Column
+				originalField = api.SafeValidationField(point.Field)
 				break
 			}
 			end := strings.LastIndexAny(path, ".[ ")
@@ -57,7 +61,7 @@ func (i Item) ValidationError(err error) error {
 			path = path[:end]
 		}
 	}
-	return &SourceError{Location: location, Cause: err}
+	return &SourceError{Location: location, Cause: err, Field: originalField}
 }
 
 // Normalize spelling only for coordinate lookup. Actual resource keys, schema
@@ -118,6 +122,7 @@ func resourceFieldPositions(fields map[string]SourcePosition, manifest bool) map
 			}
 		}
 		if safeSourceField(canonical) && point.Line > 0 && point.Column > 0 {
+			point.Field = api.SafeValidationField(field)
 			out[sourceFieldKey(canonical)] = point
 		}
 	}
@@ -175,7 +180,7 @@ func yamlPositions(root *yaml.Node, line func(int) int) map[string]SourcePositio
 			return
 		}
 		if _, exists := result[path]; !exists {
-			result[path] = SourcePosition{line(n.Line), n.Column}
+			result[path] = SourcePosition{Line: line(n.Line), Column: n.Column}
 		}
 		switch n.Kind {
 		case yaml.AliasNode:
@@ -205,7 +210,11 @@ type sourceReader struct {
 }
 
 func newSourceReader(r io.Reader) *sourceReader {
-	return &sourceReader{Reader: bufio.NewReader(r), point: SourcePosition{1, 1}}
+	reader := bufio.NewReader(r)
+	if prefix, _ := reader.Peek(3); bytes.Equal(prefix, []byte{0xef, 0xbb, 0xbf}) {
+		_, _ = reader.Discard(3) // Counted by the source quota, not a visible column.
+	}
+	return &sourceReader{Reader: reader, point: SourcePosition{Line: 1, Column: 1}}
 }
 func advancePosition(point SourcePosition, data []byte) SourcePosition {
 	for _, c := range data {
@@ -407,7 +416,7 @@ func safeSourceField(path string) bool {
 				continue
 			}
 			switch parts[i+1] {
-			case "yellow", "red", "green", "cyan", "gray":
+			case "yellow", "red", "green", "cyan", "gray", "blue":
 			default:
 				return false
 			}
@@ -441,7 +450,7 @@ func jsonSourceError(raw []byte, err error, location Location) error {
 	var syntax *json.SyntaxError
 	if json.Unmarshal(raw, &value) != nil {
 		if cause := json.Unmarshal(raw, &value); errors.As(cause, &syntax) && syntax.Offset > 0 && syntax.Offset <= int64(len(raw)) {
-			point := advancePosition(SourcePosition{location.Line, location.Column}, raw[:syntax.Offset-1])
+			point := advancePosition(SourcePosition{Line: location.Line, Column: location.Column}, raw[:syntax.Offset-1])
 			location.Line, location.Column = point.Line, point.Column
 		}
 	}

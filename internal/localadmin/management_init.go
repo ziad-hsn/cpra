@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/httpauth"
@@ -25,6 +26,7 @@ import (
 
 type ManagementInitOptions struct {
 	Account, OperatorID, TokenOutput string
+	Port                             int
 }
 
 // ManagementFiles contains public locations only. The operator bearer is never
@@ -38,6 +40,10 @@ type ManagementFiles struct {
 // opens Raft, installs browser trust, or starts/installs a service. Publication
 // is exclusive and synchronous. A partial failure requires operator inspection.
 func InitManagement(ctx context.Context, l installpath.Layout, options ManagementInitOptions) (ManagementFiles, error) {
+	address, err := initializationAddress(options.Port)
+	if err != nil {
+		return ManagementFiles{}, err
+	}
 	if ctx == nil || l.Scope != "user" && l.Scope != "system" || !filepath.IsAbs(l.ConfigDir) || !filepath.IsAbs(l.StateDir) {
 		return ManagementFiles{}, errors.New("management initialization requires absolute configuration and state paths")
 	}
@@ -115,6 +121,7 @@ func InitManagement(ctx context.Context, l installpath.Layout, options Managemen
 		return ManagementFiles{}, err
 	}
 	config := runtimeconfig.Default()
+	config.Web.Address = address
 	config.Storage.Directory = l.StateDir
 	config.Notifications.LogDirectory = filepath.Join(l.LogDir, "notifications")
 	config.Management = runtimeconfig.Management{Enabled: true, PolicyFile: policyPath, PolicyReaderGroupID: group, PolicyReaderSID: sid,
@@ -162,6 +169,16 @@ func InitManagement(ctx context.Context, l installpath.Layout, options Managemen
 		return ManagementFiles{}, err
 	}
 	return files, nil
+}
+
+func initializationAddress(port int) (string, error) {
+	if port == 0 {
+		port = 8060
+	}
+	if port < 1 || port > 65535 {
+		return "", errors.New("initialization port must be from 1 through 65535")
+	}
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), nil
 }
 
 func insidePath(path, parent string) bool {

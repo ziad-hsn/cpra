@@ -20,6 +20,9 @@ func normalizedParseConfig(c ParseConfig) ParseConfig {
 	if c.MaxMemory <= 0 {
 		c.MaxMemory = 64 << 20
 	}
+	if c.MaxExpandedBytes <= 0 {
+		c.MaxExpandedBytes = c.MaxMemory
+	}
 	return c
 }
 

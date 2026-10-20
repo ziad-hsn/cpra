@@ -51,7 +51,7 @@ func main() {
 	flag.BoolVar(&o.pprof, "pprof", false, "Enable pprof web server on loopback")
 	flag.StringVar(&o.pprofAddr, "pprof.addr", "localhost:6060", "pprof listen address (loopback only)")
 	flag.BoolVar(&o.web, "web", true, "Enable dashboard, API and metrics; management writes require runtime configuration")
-	flag.StringVar(&o.webAddr, "web.addr", "localhost:8060", "Web server listen address")
+	flag.StringVar(&o.webAddr, "web.addr", "", "Web server listen address (overrides web.address; default localhost:8060)")
 	flag.StringVar(&o.webCors, "web.cors", "", "Web API CORS allowlist")
 	flag.StringVar(&o.webAuth, "web.auth", "", "API bearer token (prefer -web.auth-file; defaults to CPRA_AUTH_TOKEN)")
 	flag.StringVar(&o.webAuthFile, "web.auth-file", "", "File containing API authentication token (defaults to CPRA_AUTH_TOKEN_FILE)")
@@ -87,6 +87,9 @@ func main() {
 // an unrelated parse error. An explicitly supplied flag, including an empty
 // value, takes precedence over its corresponding environment variable.
 func resolveAuthEnvironment(o *runOptions, flags *flag.FlagSet, getenv func(string) string) {
+	if o.validate {
+		return // Static input validation does not use client authentication defaults.
+	}
 	var tokenSet, fileSet bool
 	flags.Visit(func(f *flag.Flag) {
 		tokenSet = tokenSet || f.Name == "web.auth"
@@ -117,6 +120,9 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	settings, err := runtimeconfig.Load(o.runtimeFile)
 	if err != nil {
 		return err
+	}
+	if o.webAddr == "" {
+		o.webAddr = settings.Web.ListenAddress()
 	}
 	if o.validate {
 		err = settings.ResolveValidationDirectory(o.dataDir)
@@ -153,6 +159,15 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if o.pprof && !loopbackAddress(o.pprofAddr) {
 		return errors.New("pprof.addr must be a loopback address")
 	}
+	protectedLogPaths := settings.NotificationProtectedPaths()
+	for _, file := range []string{o.runtimeFile, o.manifest, o.webAuthFile} {
+		if file != "" {
+			protectedLogPaths = append(protectedLogPaths, filepath.Dir(file))
+		}
+	}
+	if err := jobs.ValidateNotificationLogLocation(settings.Notifications.LogDirectory, protectedLogPaths...); err != nil {
+		return err
+	}
 	if !settings.Management.Enabled {
 		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil, settings.Notifications.LogDirectory != ""); err != nil {
 			return fmt.Errorf("manifest validation: %w", err)
@@ -171,7 +186,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 				fmt.Printf("configuration shape valid; %d stored job contract references require validation during startup or Apply\n", validation.UnverifiedContractReferences)
 			}
 		}
-		fmt.Println("configuration valid; provider access, persistent storage, committed authentication and stored job contracts were not tested")
+		fmt.Println("supplied configuration valid; not applied to an existing catalog. Provider access, persistent storage, committed authentication and stored job contracts were not tested")
 		return nil
 	}
 	var encryption *encryptionsetup.Handle
@@ -298,13 +313,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		}
 	}()
 	if directory := settings.Notifications.LogDirectory; directory != "" {
-		protected := settings.NotificationProtectedPaths()
-		for _, file := range []string{o.runtimeFile, o.manifest, o.webAuthFile} {
-			if file != "" {
-				protected = append(protected, filepath.Dir(file))
-			}
-		}
-		config.NotificationLog, err = jobs.OpenNotificationLog(directory, protected...)
+		config.NotificationLog, err = jobs.OpenNotificationLog(directory, protectedLogPaths...)
 		if err != nil {
 			return err
 		}

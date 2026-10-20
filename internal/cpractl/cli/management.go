@@ -110,7 +110,7 @@ func runManagementGet(cmd *cobra.Command, o *options, args []string, describe bo
 	if kind == "Monitor" {
 		access, err := client.DiscoverAccess(cmd.Context())
 		if err != nil {
-			return err
+			return managementFailure(err)
 		}
 		if access.Data.Mode == api.AccessDiscoveryModeObservation {
 			name := strings.ToLower(strings.SplitN(args[0], "/", 2)[0])
@@ -167,7 +167,7 @@ func addManagementCommands(root *cobra.Command, o *options) {
 				return err
 			}
 			if verb != "create" && !validManagementVersion(version) {
-				return errors.New("--resource-version must contain one explicit, unquoted strong resourceVersion; it is never fetched automatically")
+				return errors.New("--resource-version requires the exact unquoted resourceVersion from describe TYPE/ID; inspect the current resource and review your change before retrying")
 			}
 			var resource api.Resource
 			var patch api.MergePatch

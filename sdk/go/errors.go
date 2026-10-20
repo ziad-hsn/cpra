@@ -72,4 +72,12 @@ type TransportError struct{ Cause error }
 func (e *TransportError) Error() string { return "CPRa transport failed" }
 func (e *TransportError) Unwrap() error { return e.Cause }
 
-type localError struct{ error }
+// localError reports a pre-submission failure without printing caller-controlled
+// token-source errors. Unwrap preserves typed causes for safe local diagnostics.
+type localError struct {
+	message string
+	cause   error
+}
+
+func (e *localError) Error() string { return e.message }
+func (e *localError) Unwrap() error { return e.cause }

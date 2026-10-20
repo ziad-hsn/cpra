@@ -3,7 +3,6 @@
 package jobs
 
 import (
-	"errors"
 	"os"
 	"strings"
 )
@@ -12,11 +11,14 @@ func openCheckCertificate(path string) (*os.File, error) {
 	// Named pipes and device namespaces are not certificate files.
 	normalized := strings.ToLower(strings.ReplaceAll(path, "/", `\`))
 	if strings.HasPrefix(normalized, `\\.\`) || strings.HasPrefix(normalized, `\\?\`) {
-		return nil, errors.New("TLS CA file must be a regular file")
+		return nil, errCertificateFileType
 	}
 	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() {
-		return nil, errors.New("TLS CA file must be a regular file")
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errCertificateFileType
 	}
 	return os.Open(path)
 }

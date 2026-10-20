@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"github.com/ziad-hsn/cpra/internal/installpath"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -31,6 +33,17 @@ type Notifications struct {
 	LogDirectory string `yaml:"log_directory,omitempty" json:"-"`
 }
 
+type Web struct {
+	Address string `yaml:"address,omitempty" json:"-"`
+}
+
+func (w Web) ListenAddress() string {
+	if w.Address == "" {
+		return "localhost:8060"
+	}
+	return w.Address
+}
+
 type SLO struct {
 	QueueTarget        time.Duration `yaml:"queue_target"`
 	ResultTarget       time.Duration `yaml:"result_target"`
@@ -49,6 +62,7 @@ type Config struct {
 	History           History        `yaml:"history"`
 	SLO               SLO            `yaml:"slo"`
 	Notifications     Notifications  `yaml:"notifications,omitempty"`
+	Web               Web            `yaml:"web,omitempty" json:"-"`
 }
 
 func Default() Config {
@@ -91,6 +105,13 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.Web.Address != "" {
+		_, port, err := net.SplitHostPort(c.Web.Address)
+		number, numberErr := strconv.Atoi(port)
+		if err != nil || numberErr != nil || number < 1 || number > 65535 {
+			return fmt.Errorf("web.address requires a host and port from 1 through 65535")
+		}
+	}
 	if c.Notifications.LogDirectory != "" && !filepath.IsAbs(c.Notifications.LogDirectory) {
 		return fmt.Errorf("notifications.log_directory must be absolute")
 	}

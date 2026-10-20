@@ -157,6 +157,12 @@ func ValidateDriverSettings(category string, driver DriverConfig) error {
 			}
 		}
 	}
+	if category == "recovery" && driver.Type != "docker" && driver.Type != "a2a" && present("timeout") && !referenced("timeout") {
+		budget, err := driverDuration(fields, "timeout")
+		if err != nil || budget < 0 || budget > 24*time.Hour {
+			return InvalidField("config.timeout", "recoveryTimeout")
+		}
+	}
 	if category == "notification" && driver.Type == "victorops" && !present("url") && (!present("restEndpointKey") || !present("routingKey")) {
 		return InvalidField("config", "victoropsDestination")
 	}

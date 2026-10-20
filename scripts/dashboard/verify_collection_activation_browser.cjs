@@ -131,7 +131,7 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
     await drainCaptures();
     const original = reads.findLast(read => read.id === operationID && read.executionResult?.state === 'ready');
     check(original?.state === 'completed' && original.committed === 2 && original.applied === 2, 'Original operation did not complete both resources');
-    check(original.normalizationProfile === 'cpra.file.base.v2', 'Original file normalization profile was lost');
+    check(original.normalizationProfile === 'cpra.file.base.v3', 'Original file normalization profile was lost');
     const activations = writes.filter(write => write.path.endsWith('/activate'));
     check(activations.length === 1 && activations[0].path === `/api/v2/operations/${operationID}/activate` && activations[0].empty, 'Activation was duplicated, redirected or included a body');
 

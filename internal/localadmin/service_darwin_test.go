@@ -14,7 +14,7 @@ import (
 
 func TestDarwinInitPreservesCredentialHelpersAndRepairsManagedModes(t *testing.T) {
 	l := testLayout(t)
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	helper := filepath.Join(l.ConfigDir, "credential-helper")
@@ -30,7 +30,7 @@ func TestDarwinInitPreservesCredentialHelpersAndRepairsManagedModes(t *testing.T
 	if err := os.Chmod(managed, 0666); err != nil {
 		t.Fatal(err)
 	}
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	for path, mode := range map[string]os.FileMode{helper: 0700, managed: 0600} {
@@ -51,7 +51,7 @@ func TestDarwinInitRejectsLinkedAndSpecialState(t *testing.T) {
 	for _, kind := range []string{"symlink", "fifo"} {
 		t.Run(kind, func(t *testing.T) {
 			l := testLayout(t)
-			if err := Init(l, ""); err != nil {
+			if err := Init(l, "", 0); err != nil {
 				t.Fatal(err)
 			}
 			outside := filepath.Join(filepath.Dir(l.StateDir), "outside")
@@ -71,7 +71,7 @@ func TestDarwinInitRejectsLinkedAndSpecialState(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := Init(l, ""); err == nil {
+			if err := Init(l, "", 0); err == nil {
 				t.Fatal("initialization accepted non-regular state")
 			}
 			info, err := os.Lstat(outside)

@@ -324,6 +324,11 @@ YAML/JSON, and existing CPRa manifest envelopes. A malformed final input prevent
 the authenticated preflight request entirely. Empty files and comments produce a
 local no-op. For nonempty inputs, the server requires a named operator and validates
 the complete submitted graph together with authorized retained dependencies.
+Updated resources include changed schema paths from the same captured catalog
+versions. Secret values and arbitrary map keys are never shown; arrays and
+private maps appear as whole fields. Very large diffs use `metadata` and `spec`
+summaries. Omitted field details mean unavailable, not unchanged.
+
 The result is an observation of the current catalog; it is not a reservation or
 a guarantee that a later conditional write will succeed.
 
@@ -407,7 +412,11 @@ proposed differences do not make this dry-run command fail.
 
 `--wait` and `wait operation/ID` await retained execution readiness and print the
 first bounded result page. A canceled parent can still have accepted children
-in progress. Catalog acceptance and controller application remain separate
+in progress. Default apply/wait output shows a compact summary, the original
+operation handle and a command to inspect detailed results. Nonzero conflicts,
+blocked dependencies and failed/superseded work remain explicit. Use `-o wide`
+or `get operation ID --results` for the full counters; JSON/YAML retain the
+complete response. Catalog acceptance and controller application remain separate
 counts. Partial, failed, canceled or unsupported outcomes produce a nonzero
 exit while preserving the returned observation. JSON and YAML contain the
 canonical operation object. Use `get operation ID --results --cursor ...` for

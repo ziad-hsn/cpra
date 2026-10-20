@@ -51,6 +51,10 @@ func monitorObservation(row fleetview.MonitorSummary) api.MonitorObservation {
 		SnoozedUntil:                    observedTime(row.SnoozedUntil), LastCheckedAt: observedTime(row.LastCheck),
 		LastSuccessfulAt: observedTime(row.LastSuccess), NextCheckAt: observedTime(row.NextCheck),
 		IncidentID: row.IncidentID, CheckAdmission: row.CheckAdmission,
+		ConfigurationProblemAt: observedTime(row.ConfigurationProblemAt),
+	}
+	if row.ConfigurationProblem.Code != "" {
+		out.ConfigurationProblem = &api.FailureDiagnostic{Code: row.ConfigurationProblem.Code, Message: row.ConfigurationProblem.Message}
 	}
 	if row.LastFailure.Code != "" {
 		d := row.LastFailure

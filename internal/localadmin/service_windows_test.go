@@ -60,7 +60,7 @@ func TestServiceDACLSeparatesExecutableAndStateRights(t *testing.T) {
 }
 func TestNativeUserInitProtectsTokenACL(t *testing.T) {
 	l := testLayout(t)
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	token := filepath.Join(l.ConfigDir, "auth.token")

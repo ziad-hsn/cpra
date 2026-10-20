@@ -459,6 +459,10 @@ func (b *builder) source(ctx context.Context, source Source) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		var sourceErr *SourceAccessError
+		if errors.As(err, &sourceErr) {
+			return sourceErr
+		}
 		return fmt.Errorf("%s: source read failed", label)
 	}
 	if n > remaining {

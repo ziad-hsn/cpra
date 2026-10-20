@@ -134,7 +134,7 @@ func (f *machine) applyRecoveryReview(c Command, index uint64, version int) Resu
 	return f.applyActionReview(c, index, version)
 }
 func (m Monitor) observedUnhealthy() bool {
-	return !m.LastCheck.IsZero() && (m.LastOutcome == "failure" || m.LastOutcome == "timeout")
+	return m.ConfigurationProblem.Code == "" && !m.LastCheck.IsZero() && (m.LastOutcome == "failure" || m.LastOutcome == "timeout")
 }
 func (m Monitor) latestRecovery() (Action, bool) {
 	var latest Action

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
@@ -24,7 +25,7 @@ func freezeCollectionInputs(cmd *cobra.Command, filenames []string, settings col
 
 func freezeCollectionInputsProfile(cmd *cobra.Command, filenames []string, settings collection.Options, profile string) (*collection.Frozen, error) {
 	if profile != "" && profile != collection.FileNormalizationProfile {
-		return nil, errors.New("unsupported file profile; use cpra.file.base.v2 or omit --file-profile")
+		return nil, errors.New("unsupported file profile; use cpra.file.base.v3 or omit --file-profile")
 	}
 	sources, cleanup, err := collectionInputSources(cmd, filenames, true)
 	if err != nil {
@@ -40,6 +41,17 @@ func freezeCollectionInputsProfile(cmd *cobra.Command, filenames []string, setti
 	if err != nil {
 		if cmd.Context().Err() != nil {
 			return nil, managementFailure(cmd.Context().Err())
+		}
+		var sourceError *collection.SourceAccessError
+		if errors.As(err, &sourceError) {
+			return nil, localFileFailure("input", err)
+		}
+		var pathError *os.PathError
+		if errors.As(err, &pathError) {
+			return nil, &managementCommandError{"private collection staging is unavailable; check the temporary directory, permissions and free space", err}
+		}
+		if _, ok := api.ValidationFieldError(err); ok {
+			return nil, managementFailure(&managementCommandError{"configuration input was rejected; no changes were applied", err})
 		}
 		return nil, &managementCommandError{"collection inputs could not be frozen; check input syntax, identities, permissions and byte limits", err}
 	}

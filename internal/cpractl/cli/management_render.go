@@ -227,6 +227,7 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 		{"Snoozed until", snoozed}, {"Incident", strOrDash(status.IncidentID)}, {"Control version", strOrDash(status.ControlRevision)},
 		{"Unknown actions", operationCount(status.UnknownActions)}, {"Actions needing review", operationCount(status.ActionsNeedingReview)},
 		{"Last failure", diagnosticText(status.LastFailure)},
+		{"Configuration problem", diagnosticText(status.ConfigurationProblem)},
 	})
 }
 

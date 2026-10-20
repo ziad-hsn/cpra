@@ -168,7 +168,7 @@ type cancelBody struct {
 func (b *cancelBody) Close() error { err := b.ReadCloser.Close(); b.cancel(); return err }
 func (d *policyDoer) Do(req *http.Request) (*http.Response, error) {
 	if req.URL.Scheme != d.base.Scheme || req.URL.Host != d.base.Host {
-		return nil, &localError{errors.New("refusing request outside configured origin")}
+		return nil, &localError{message: "refusing request outside configured origin"}
 	}
 	timeout := d.timeout
 	if v, ok := req.Context().Value(timeoutKey{}).(time.Duration); ok {
@@ -182,12 +182,12 @@ func (d *policyDoer) Do(req *http.Request) (*http.Response, error) {
 		token, err = d.tokens(ctx)
 		if err != nil {
 			cancel()
-			return nil, &localError{errors.New("authentication token source failed")}
+			return nil, &localError{message: "authentication token source failed", cause: err}
 		}
 	}
 	if (d.tokens != nil && token == "") || strings.ContainsAny(token, "\r\n") {
 		cancel()
-		return nil, &localError{errors.New("invalid token")}
+		return nil, &localError{message: "invalid token"}
 	}
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)

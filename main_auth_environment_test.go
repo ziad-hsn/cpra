@@ -12,13 +12,16 @@ func TestAuthEnvironmentDoesNotEnterFlagDefaults(t *testing.T) {
 		name        string
 		args        []string
 		token, file string
+		validate    bool
 	}{
-		{"environment", nil, "environment-marker", "environment-file"},
-		{"explicit", []string{"-web.auth=explicit-token", "-web.auth-file=explicit-file"}, "explicit-token", "explicit-file"},
-		{"explicit empty", []string{"-web.auth=", "-web.auth-file="}, "", ""},
+		{"environment", nil, "environment-marker", "environment-file", false},
+		{"explicit", []string{"-web.auth=explicit-token", "-web.auth-file=explicit-file"}, "explicit-token", "explicit-file", false},
+		{"explicit empty", []string{"-web.auth=", "-web.auth-file="}, "", "", false},
+		{"validation ignores environment", nil, "", "", true},
+		{"validation preserves explicit sources", []string{"-web.auth=explicit-token", "-web.auth-file=explicit-file"}, "explicit-token", "explicit-file", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			var o runOptions
+			o := runOptions{validate: test.validate}
 			flags := flag.NewFlagSet("test", flag.ContinueOnError)
 			flags.StringVar(&o.webAuth, "web.auth", "", "API token")
 			flags.StringVar(&o.webAuthFile, "web.auth-file", "", "API token file")

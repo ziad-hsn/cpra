@@ -16,7 +16,35 @@ var errNotificationLog = errors.New("notification log requires a regular private
 // The process closes it only after all notification jobs have joined.
 type NotificationLog struct{ root *os.Root }
 
+// ValidateNotificationLogLocation checks configured path relationships without
+// opening or creating files. Runtime opening also verifies native identities,
+// permissions and aliases, which a lexical validation cannot establish.
+func ValidateNotificationLogLocation(directory string, protected ...string) error {
+	if directory == "" {
+		return nil
+	}
+	if !filepath.IsAbs(directory) {
+		return errors.New("notifications.log_directory must be absolute")
+	}
+	for _, path := range protected {
+		if path == "" {
+			continue
+		}
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return errors.New("protected notification-log boundary is invalid")
+		}
+		if logPathContains(directory, absolute) || logPathContains(absolute, directory) {
+			return errors.New("notifications.log_directory must be separate from state, manifest, runtime and authentication directories")
+		}
+	}
+	return nil
+}
+
 func OpenNotificationLog(directory string, protected ...string) (*NotificationLog, error) {
+	if err := ValidateNotificationLogLocation(directory, protected...); err != nil {
+		return nil, err
+	}
 	if !filepath.IsAbs(directory) {
 		return nil, errors.New("notifications.log_directory must be absolute")
 	}

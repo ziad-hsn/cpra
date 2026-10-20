@@ -12,6 +12,30 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestInitializationPortRejectsUnsafeRuntimeBeforeReading(t *testing.T) {
+	for _, kind := range []string{"fifo", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			l := testLayout(t)
+			if err := os.MkdirAll(l.ConfigDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(l.ConfigDir, "runtime.yaml")
+			var err error
+			if kind == "fifo" {
+				err = unix.Mkfifo(path, 0600)
+			} else {
+				err = os.Symlink(filepath.Join(t.TempDir(), "missing"), path)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := Init(l, "", 8060); err == nil {
+				t.Fatal("unsafe runtime was read or accepted")
+			}
+		})
+	}
+}
+
 func TestInstallUsesValidatedExecutableWhenSourceChanges(t *testing.T) {
 	// The installer and filesystem are real; a private supervisor fixture
 	// records commands without installing or controlling a host service.
@@ -22,7 +46,7 @@ func TestInstallUsesValidatedExecutableWhenSourceChanges(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			l := testLayout(t)
-			if err := Init(l, ""); err != nil {
+			if err := Init(l, "", 0); err != nil {
 				t.Fatal(err)
 			}
 			fixture := t.TempDir()
@@ -128,7 +152,7 @@ func writeServiceFixture(t *testing.T, path, content string) {
 
 func TestLinuxUserInitRepairsPermissionsWithoutReplacingFiles(t *testing.T) {
 	l := testLayout(t)
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	directories := []string{l.ConfigDir, l.StateDir, l.LogDir, l.BinDir, filepath.Join(l.StateDir, "history")}
@@ -163,7 +187,7 @@ func TestLinuxUserInitRepairsPermissionsWithoutReplacingFiles(t *testing.T) {
 	if err := os.WriteFile(helper, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range directories {
@@ -187,7 +211,7 @@ func TestLinuxUserInitRejectsLinkedAndSpecialState(t *testing.T) {
 	for _, kind := range []string{"symlink", "fifo"} {
 		t.Run(kind, func(t *testing.T) {
 			l := testLayout(t)
-			if err := Init(l, ""); err != nil {
+			if err := Init(l, "", 0); err != nil {
 				t.Fatal(err)
 			}
 			entry := filepath.Join(l.StateDir, "unexpected")
@@ -207,7 +231,7 @@ func TestLinuxUserInitRejectsLinkedAndSpecialState(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := Init(l, ""); err == nil {
+			if err := Init(l, "", 0); err == nil {
 				t.Fatal("initialization accepted non-regular state")
 			}
 			assertLinuxMode(t, target, 0666)
@@ -219,7 +243,7 @@ func TestLinuxUserInitRejectsLinkedExecutableAndServicePaths(t *testing.T) {
 	for _, kind := range []string{"binary", "service", "service-parent"} {
 		t.Run(kind, func(t *testing.T) {
 			l := testLayout(t)
-			if err := Init(l, ""); err != nil {
+			if err := Init(l, "", 0); err != nil {
 				t.Fatal(err)
 			}
 			target := filepath.Join(filepath.Dir(l.StateDir), "outside")
@@ -245,7 +269,7 @@ func TestLinuxUserInitRejectsLinkedExecutableAndServicePaths(t *testing.T) {
 			} else if err := os.Symlink(target, entry); err != nil {
 				t.Fatal(err)
 			}
-			if err := Init(l, ""); err == nil {
+			if err := Init(l, "", 0); err == nil {
 				t.Fatal("initialization accepted a linked managed path")
 			}
 			assertLinuxMode(t, target, 0666)

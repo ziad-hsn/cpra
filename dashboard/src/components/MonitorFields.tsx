@@ -202,6 +202,8 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
     <p>Observed health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
     {status?.ignored && <p>Ignored by {status.ignoredBy || 'Unavailable'} since {formatDateTime(status.ignoredAt ?? '')}. {status.ignoreReason} Health observations continue.</p>}
     <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
+	<FailureDetails diagnostic={status?.configurationProblem} label="Check configuration problem" />
+	{status?.configurationProblem && <p>Health shows the last target observation. Local preparation will be retried at the check interval; recovery actions are blocked meanwhile.</p>}
     {status?.warnings?.some(warning => warning.reason === 'unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>

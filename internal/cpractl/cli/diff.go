@@ -42,7 +42,7 @@ func newDiffCommand(o *options) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "diff -f FILE_OR_URL [-f FILE_OR_URL ...]",
 		Short: "Validate complete inputs and show proposed configuration changes",
-		Long:  "Freeze YAML/JSON resources or legacy manifests from files, directories, stdin (-), or explicitly selected URLs, then request an ephemeral server diff. No resources are created, changed or deleted. Exit status is 0 for no changes, 1 for differences, and 2 for failure.",
+		Long:  "Freeze YAML/JSON resources or monitor manifests from files, directories, stdin (-), or explicitly selected URLs, then request an ephemeral server diff. No resources are created, changed or deleted. Exit status is 0 for no changes, 1 for differences, and 2 for failure.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.NoArgs(cmd, args); err != nil {
 				return diffFailure(&managementCommandError{"diff accepts inputs only through -f; consult cpractl diff --help", err})
@@ -77,7 +77,7 @@ func newDiffCommand(o *options) *cobra.Command {
 			if err != nil && !errors.Is(err, collection.ErrPreflightRejected) {
 				var transport *cpra.TransportError
 				if errors.As(err, &transport) && cmd.Context().Err() == nil {
-					return &managementCommandError{"preflight response is unavailable; no active write was requested and the request was not retried", err}
+					return &managementCommandError{managementFailure(err).Error() + "; no active write was requested and the request was not retried", err}
 				}
 				return managementFailure(err)
 			}

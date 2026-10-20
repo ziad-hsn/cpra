@@ -10,7 +10,7 @@ import { sourceCoordinates, type SourceCoordinates } from './validation';
  * streaming and persistent/cross-tab resume are not provided here.
  */
 export const collectionIdentityFormat = 'cpra.collection.hmac-sha256-json-bytes.v1' as const;
-export const fileNormalizationProfile = 'cpra.file.base.v2' as const;
+export const fileNormalizationProfile = 'cpra.file.base.v3' as const;
 export type FileNormalizationProfile = typeof fileNormalizationProfile | 'cpra.file.base.v1';
 export const supportedFileNormalizationProfile = (value: unknown): value is FileNormalizationProfile => value === fileNormalizationProfile || value === 'cpra.file.base.v1';
 export const browserCollectionLimits = Object.freeze({ sourceBytes: 4 << 20, requestBytes: 4 << 20, resourceBytes: 1 << 20, items: 10_000, sources: 10_000 });

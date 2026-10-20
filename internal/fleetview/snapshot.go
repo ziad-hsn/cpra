@@ -30,6 +30,8 @@ type MonitorSummary struct {
 	UnknownNotifications            int               `json:"unknown_notifications"`
 	CertificateVerificationDisabled bool              `json:"certificate_verification_disabled"`
 	LastFailure                     FailureDiagnostic `json:"last_failure,omitzero"`
+	ConfigurationProblem            FailureDiagnostic `json:"configuration_problem,omitzero"`
+	ConfigurationProblemAt          time.Time         `json:"configuration_problem_at,omitzero"`
 	CheckAdmission                  string            `json:"check_admission,omitempty"`
 	MissedChecks                    uint64            `json:"missed_checks"`
 	QueueRejections                 uint64            `json:"queue_rejections"`

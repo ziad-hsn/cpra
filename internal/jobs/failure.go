@@ -84,6 +84,23 @@ func FailureDetails(err error) FailureDetail {
 
 var ErrJobPanic = errors.New("job panicked")
 
+// ConfigurationError identifies local check preparation that failed before
+// target invocation. It contains a reviewed code, never a path or file content.
+type ConfigurationError struct{ Code string }
+
+func (e *ConfigurationError) Error() string { return "local check configuration could not be prepared" }
+
+func ConfigurationFailure(err error) string {
+	var local *ConfigurationError
+	if errors.As(err, &local) {
+		switch local.Code {
+		case "ca_file_missing", "ca_file_unreadable", "ca_file_invalid":
+			return local.Code
+		}
+	}
+	return ""
+}
+
 // HTTPStatusError retains an observed status without a response body. It does
 // not establish rejection of an external effect or authorize another attempt.
 type HTTPStatusError struct{ Status int }
@@ -98,6 +115,9 @@ func (e *HTTPStatusError) Error() string {
 func FailureCode(err error) string {
 	if err == nil {
 		return ""
+	}
+	if code := ConfigurationFailure(err); code != "" {
+		return code
 	}
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):

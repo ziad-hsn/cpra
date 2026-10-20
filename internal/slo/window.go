@@ -184,6 +184,31 @@ func (r *Recorder) Missed(driver string, at time.Time, count uint64) {
 		r.account(driver, at, 0, count)
 	}
 }
+
+// NotExecuted replaces one previously admitted obligation with a known missed
+// check. Local preparation produced no target observation or latency sample.
+// Call exactly once after the corresponding result commits.
+func (r *Recorder) NotExecuted(driver string, scheduled time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	epoch := scheduled.UnixNano() / int64(SlotDuration)
+	window := r.state.ByDriver[driver]
+	if window == nil {
+		window = new([Slots]Bucket)
+		r.state.ByDriver[driver] = window
+	}
+	b := &window[epoch%Slots]
+	if b.Epoch > epoch {
+		return
+	}
+	if b.Epoch != epoch {
+		*b = Bucket{Epoch: epoch}
+	}
+	if b.Expected > 0 {
+		b.Expected--
+	}
+	b.Missed++
+}
 func (r *Recorder) account(driver string, at time.Time, expected, missed uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

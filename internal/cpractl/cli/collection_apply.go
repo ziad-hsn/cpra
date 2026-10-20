@@ -23,7 +23,7 @@ func newApplyCommand(o *options) *cobra.Command {
 	var fileProfile string
 	var timeout time.Duration
 	cmd := &cobra.Command{Use: "apply -f FILE_OR_URL [-f FILE_OR_URL ...]", Short: "Validate and activate a complete collection", Args: cobra.NoArgs,
-		Long: "Freeze all selected inputs, upload inactive staging, validate the complete collection, then activate its original operation. Returns after activation admission unless --wait is set. Stopping the client does not cancel server work. Use get operation ID --results to read bounded retained results. Opt into --file-profile cpra.file.base.v2 to permit later upload recovery from the exact original source bytes and source order; plain apply keeps the ordinary SDK collection contract.",
+		Long: "Freeze all selected inputs, upload inactive staging, validate the complete collection, then activate its original operation. Returns after activation admission unless --wait is set. Stopping the client does not cancel server work. Use get operation ID --results to read bounded retained results. Opt into --file-profile cpra.file.base.v3 to permit later upload recovery from the exact original source bytes and source order; plain apply keeps the ordinary SDK collection contract.",
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			if dryRun != "" && dryRun != "server" || timeout < 0 || timeout != 0 && !wait || dryRun != "" && wait {
 				return errors.New("use --dry-run=server or --wait; --timeout requires --wait and must not be negative")
@@ -89,7 +89,7 @@ func newApplyCommand(o *options) *cobra.Command {
 			return nil
 		}}
 	addCollectionInputFlags(cmd, &filenames, &settings)
-	cmd.Flags().StringVar(&fileProfile, "file-profile", "", "explicit file normalization profile: cpra.file.base.v2 (default preserves ordinary apply)")
+	cmd.Flags().StringVar(&fileProfile, "file-profile", "", "explicit file normalization profile: cpra.file.base.v3 (default preserves ordinary apply)")
 	cmd.Flags().Lookup("max-source-bytes").Usage = "cumulative source byte quota (0 uses staging quota for ordinary apply, 64 MiB with --file-profile)"
 	cmd.Flags().Lookup("max-staging-bytes").Usage = "private temporary staging byte quota (0 uses 1 GiB for ordinary apply, 512 MiB with --file-profile)"
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the original operation's retained execution result")
@@ -167,6 +167,9 @@ func collectionWaitContext(ctx context.Context, timeout time.Duration) (context.
 
 func writeCollectionOperation(cmd *cobra.Command, o *options, operation api.Operation) error {
 	if o.output != formatJSON && o.output != formatYAML {
+		if o.output != formatWide {
+			return writeCollectionSummary(cmd, operation)
+		}
 		if operation.ExecutionResult != nil {
 			return writeManagementExecutionResults(cmd, o, operation)
 		}
@@ -177,6 +180,41 @@ func writeCollectionOperation(cmd *cobra.Command, o *options, operation api.Oper
 		return err
 	}
 	return writeManagementReply(cmd, o, managementReply{data: raw}, false, false)
+}
+
+func writeCollectionSummary(cmd *cobra.Command, operation api.Operation) error {
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Operation %s: %s\n", managementDisplay(strOrDash(operation.ID)), managementDisplay(operation.State)); err != nil {
+		return err
+	}
+	counts := [][2]string{{"Uploaded", operationCount(operation.Uploaded)}, {"Accepted", operationCount(operation.Committed)}, {"Applied", operationCount(operation.Applied)}}
+	if result := operation.ExecutionResult; result != nil {
+		var c *api.ExecutionResultCounts
+		if result.Summary != nil {
+			s := result.Summary
+			c = &api.ExecutionResultCounts{Accepted: s.Accepted, Unchanged: s.Unchanged, Conflicts: s.Conflicts, DependencyBlocked: s.DependencyBlocked, Unattempted: s.Unattempted, ChildApplied: s.ChildApplied, ChildPending: s.ChildPending, ChildFailed: s.ChildFailed, ChildSuperseded: s.ChildSuperseded, ChildInvalidated: s.ChildInvalidated}
+		} else {
+			c = result.Counts
+		}
+		if c != nil {
+			counts = [][2]string{{"Accepted", fmt.Sprint(c.Accepted)}, {"Applied", fmt.Sprint(c.ChildApplied)}, {"Unchanged", fmt.Sprint(c.Unchanged)}, {"Pending", fmt.Sprint(c.ChildPending)}}
+			for _, extra := range []struct {
+				name  string
+				count int64
+			}{{"Conflicts", c.Conflicts}, {"Dependency blocked", c.DependencyBlocked}, {"Unattempted", c.Unattempted}, {"Failed", c.ChildFailed}, {"Superseded", c.ChildSuperseded}, {"Invalidated by restore", c.ChildInvalidated}} {
+				if extra.count != 0 {
+					counts = append(counts, [2]string{extra.name, fmt.Sprint(extra.count)})
+				}
+			}
+		}
+	}
+	if err := kv(cmd.OutOrStdout(), counts); err != nil {
+		return err
+	}
+	if safeManagementHandle(operation.ID) {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Inspect phases and results: cpractl get operation %s --results\n", operation.ID)
+		return err
+	}
+	return nil
 }
 
 func collectionCompletionError(operation api.Operation) error {

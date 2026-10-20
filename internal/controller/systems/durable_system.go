@@ -625,6 +625,9 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 		c.Failure.HTTPStatus, c.Failure.GRPCStatus, c.Failure.GRPCCode = detail.HTTPStatus, detail.GRPCStatus, detail.GRPCCode
 		c.Failure.CertificateNotAfter, c.Failure.CertificateDaysRemaining = detail.CertificateNotAfter, detail.CertificateDaysRemaining
 		c.Failure = c.Failure.WithDetails()
+		if r.Type == "pulse" && jobs.ConfigurationFailure(r.Err) != "" {
+			c.Outcome, c.Warning = "configuration_problem", false
+		}
 		if r.Type == "pulse" && managed {
 			guard := projection.guard.Clone()
 			c.Guard = &guard
@@ -707,7 +710,11 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 		// accepted only when the original generation, time, outcome and incarnation
 		// are still evidenced by committed state. Replaying is not that evidence.
 		if r.Monitor == nil && job.Type == "pulse" {
-			if found && current.CatalogUID == p.monitorUIDs[n] && current.Revision == commands[n].Revision && current.Generation == commands[n].Generation && current.LastCheck.Equal(commands[n].At) && current.LastOutcome == commands[n].Outcome {
+			observed := current.LastCheck.Equal(commands[n].At) && current.LastOutcome == commands[n].Outcome
+			if commands[n].Outcome == "configuration_problem" {
+				observed = current.ConfigurationProblemAt.Equal(commands[n].At) && current.ConfigurationProblem == commands[n].Failure
+			}
+			if found && current.CatalogUID == p.monitorUIDs[n] && current.Revision == commands[n].Revision && current.Generation == commands[n].Generation && observed {
 				r.Monitor = &current
 			}
 		}
@@ -733,10 +740,21 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 			continue
 		}
 		if job.Type == "pulse" {
-			s.store.SLO().Observe(job.Driver, job.Scheduled, job.ExecutionStart, job.ExecutionEnd, time.Now(), commands[n].Outcome == "timeout", 0)
+			if commands[n].Outcome == "configuration_problem" {
+				at := job.Scheduled
+				if at.IsZero() {
+					at = commands[n].At
+				}
+				s.store.SLO().NotExecuted(job.Driver, at)
+			} else {
+				s.store.SLO().Observe(job.Driver, job.Scheduled, job.ExecutionStart, job.ExecutionEnd, time.Now(), commands[n].Outcome == "timeout", 0)
+			}
 		}
 		if !exists || !s.world.Alive(ent) || s.states.Get(ent).Revision != m.Revision || m.CatalogUID != p.monitorUIDs[n] {
 			continue
+		}
+		if job.Type == "pulse" && commands[n].Outcome == "configuration_problem" {
+			s.states.Get(ent).MissedChecks++
 		}
 		if job.Type == "pulse" && !job.ExecutionStart.IsZero() {
 			s.observePulseDemand(ent)
@@ -863,7 +881,12 @@ func (s *DurableSystem) scheduleActions(ent ecs.Entity, m persistence.Monitor) {
 			}
 			// A committed fresh observation will schedule the original intent
 			// again. Polling an already-due intent cannot release this barrier.
-			if a.Kind == "intervention" && !m.RecoveryCheckAfter.IsZero() {
+			if a.Kind == "intervention" && (m.ConfigurationProblem.Code != "" || !m.RecoveryCheckAfter.IsZero()) {
+				// Keep the original deadline even while local preparation or a
+				// fresh-observation barrier prevents dispatch.
+				if !a.Deadline.IsZero() && (due.IsZero() || a.Deadline.Before(due)) {
+					due = a.Deadline
+				}
 				continue
 			}
 			queuedNotification = queuedNotification || a.Kind == "code" && !m.ControlNotification(a)
@@ -940,11 +963,16 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		encoded, remainingCancellation := 64, false
 		for _, id := range sortedMonitorActions(m) {
 			a := m.Actions[id]
-			if a.Kind != "code" || a.State != persistence.Queued || !m.OwnsAction(a) || m.ControlNotification(a) || a.Revision != state.Revision ||
-				!maintenance && !m.Policy.MaintenanceBetween(a.QueuedAt, now) && !manifest.MaintenanceBetween(state.Maintenance, a.QueuedAt, now) {
+			if a.State != persistence.Queued || !m.OwnsAction(a) || a.Revision != state.Revision {
 				continue
 			}
-			command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: true}
+			expired := !a.Deadline.IsZero() && !now.Before(a.Deadline)
+			suppressed := a.Kind == "code" && !m.ControlNotification(a) &&
+				(maintenance || m.Policy.MaintenanceBetween(a.QueuedAt, now) || manifest.MaintenanceBetween(state.Maintenance, a.QueuedAt, now))
+			if !expired && !suppressed {
+				continue
+			}
+			command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: suppressed, NoticeRevision: persistence.ActionNoticeRevision(a)}
 			if projection, ok := s.managed[m.ID]; ok {
 				g := projection.guard.Clone()
 				command.Guard = &g
@@ -970,12 +998,12 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				return
 			}
 			if len(results) != len(cancellations) {
-				s.fail(errors.New("maintenance cancellation returned incomplete results"))
+				s.fail(errors.New("action cancellation returned incomplete results"))
 				return
 			}
 			for _, result := range results {
 				if result.Allowed {
-					s.fail(errors.New("maintenance cancellation returned an execution grant"))
+					s.fail(errors.New("action cancellation returned an execution grant"))
 					return
 				}
 				if err := result.Err; err != nil && !errors.Is(err, persistence.ErrCatalogDependency) && !errors.Is(err, persistence.ErrControlConflict) {
@@ -1008,7 +1036,10 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				maintenancePending = maintenancePending || maintenance && m.Policy.Enabled && !m.Ignored
 				continue
 			}
-			if a.Kind == "intervention" && !m.RecoveryCheckAfter.IsZero() {
+			if a.Kind == "intervention" && (m.ConfigurationProblem.Code != "" || !m.RecoveryCheckAfter.IsZero()) {
+				if !a.Deadline.IsZero() {
+					s.scheduleActionAt(ent, a.Deadline)
+				}
 				continue // A fresh observation reschedules eligible work.
 			}
 			js := s.jobs.Get(ent)
@@ -1141,6 +1172,10 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 			message = "Incident opened"
 		case "incident_closed", "incident_closed_configuration_removed":
 			message = "Incident closed"
+		case "monitor_configuration_problem":
+			message, warning = "Check configuration could not be prepared", true
+		case "monitor_configuration_ready":
+			message = "Check configuration is usable again"
 		case "action_succeeded", "action_failed", "action_unknown", "action_cancelled":
 			message = "Action outcome committed"
 			warning = event.Type == "action_failed" || event.Type == "action_unknown"
@@ -1297,6 +1332,8 @@ func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview
 		summary.Phase = "incident"
 	}
 	summary.LastFailure = fleetview.FailureDiagnostic(m.LastFailure)
+	summary.ConfigurationProblem = fleetview.FailureDiagnostic(m.ConfigurationProblem)
+	summary.ConfigurationProblemAt = m.ConfigurationProblemAt
 	for _, a := range m.Actions {
 		if a.Kind != "code" || !m.OwnsAction(a) {
 			continue

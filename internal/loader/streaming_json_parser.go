@@ -84,6 +84,9 @@ func (p *StreamingJsonParser) openDecoder(ctx context.Context) (*jsonDecoder, fu
 		reader = gz
 	}
 	bufr := bufio.NewReaderSize(&boundedReader{ctx: ctx, reader: reader, remaining: p.config.MaxMemory}, 64*1024)
+	if prefix, _ := bufr.Peek(3); string(prefix) == "\ufeff" {
+		_, _ = bufr.Discard(3)
+	}
 	decoder := newJSONDecoder(bufr)
 	if p.config.StrictUnknownFields {
 		decoder.DisallowUnknownFields()

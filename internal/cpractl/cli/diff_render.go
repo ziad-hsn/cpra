@@ -14,10 +14,11 @@ import (
 )
 
 type diffItem struct {
-	ID         string       `json:"id" yaml:"id"`
-	Outcome    string       `json:"outcome" yaml:"outcome"`
-	OldVersion string       `json:"oldVersion,omitempty" yaml:"oldVersion,omitempty"`
-	Source     diffLocation `json:"source" yaml:"source"`
+	ID            string       `json:"id" yaml:"id"`
+	Outcome       string       `json:"outcome" yaml:"outcome"`
+	OldVersion    string       `json:"oldVersion,omitempty" yaml:"oldVersion,omitempty"`
+	ChangedFields []string     `json:"changedFields,omitempty" yaml:"changedFields,omitempty"`
+	Source        diffLocation `json:"source" yaml:"source"`
 }
 type diffLocation struct {
 	File     string `json:"file" yaml:"file"`
@@ -68,7 +69,15 @@ func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, prefli
 		default:
 			return result, invalid
 		}
-		result.Items = append(result.Items, diffItem{ID: item.ID, Outcome: proposed.Outcome, OldVersion: proposed.OldVersion, Source: diffSource(item.Location)})
+		if len(proposed.ChangedFields) > 64 {
+			return result, invalid
+		}
+		for _, field := range proposed.ChangedFields {
+			if api.SafeValidationField(field) == "" {
+				return result, invalid
+			}
+		}
+		result.Items = append(result.Items, diffItem{ID: item.ID, Outcome: proposed.Outcome, OldVersion: proposed.OldVersion, ChangedFields: proposed.ChangedFields, Source: diffSource(item.Location)})
 	}
 	for _, problem := range preflight.Errors {
 		issue := diffIssue{Reason: "invalidGraph", Message: "The collection cannot be validated against the observed catalog."}
@@ -91,6 +100,9 @@ func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, prefli
 			if errors.As(original.ValidationError(api.InvalidField(issue.Field, problem.Reason)), &located) {
 				source := diffSource(located.Location)
 				issue.Source = &source
+				if api.SafeValidationField(located.Field) != "" {
+					issue.Field = located.Field
+				}
 			}
 		}
 		// Error messages from a server are not input for terminal output. Render
@@ -124,9 +136,9 @@ func writeCollectionDiff(cmd *cobra.Command, o *options, result diffReport) erro
 		rows := make([][]string, 0, len(result.Items))
 		for _, item := range result.Items {
 			location := item.Source.String()
-			rows = append(rows, []string{managementDisplay(item.ID), item.Outcome, managementDisplay(strOrDash(item.OldVersion)), managementDisplay(location)})
+			rows = append(rows, []string{managementDisplay(item.ID), item.Outcome, managementDisplay(strOrDash(item.OldVersion)), strOrDash(strings.Join(item.ChangedFields, ", ")), managementDisplay(location)})
 		}
-		if err := table(w, []string{"RESOURCE", "CHANGE", "OLD VERSION", "SOURCE"}, rows); err != nil {
+		if err := table(w, []string{"RESOURCE", "CHANGE", "OLD VERSION", "FIELDS", "SOURCE"}, rows); err != nil {
 			return err
 		}
 		for _, issue := range result.Errors {

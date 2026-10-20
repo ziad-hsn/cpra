@@ -26,6 +26,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	r := Result{Monitor: &m}
 	emit := func(kind string, a *Action) {
 		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, FileIncarnation: m.FileIncarnation, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident(), Failure: m.LastFailure}
+		if kind == "monitor_configuration_problem" {
+			e.Failure = m.ConfigurationProblem
+		} else if kind == "monitor_configuration_ready" {
+			e.Failure = FailureDiagnostic{}
+		}
 		if kind == "monitor_ignored" {
 			e.Actor, e.Reason, e.ControlRevision = m.IgnoredBy, m.IgnoreReason, m.ControlRevision
 		} else if kind == "monitor_unignored" {
@@ -258,7 +263,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				!controlNotice && (!m.Policy.Enabled || m.Ignored || m.pendingAutomaticIgnore(c.At) || c.Maintenance || m.Policy.InMaintenance(c.At) || m.suppressedNotification(a)) {
 				return Result{}
 			}
-			if a.Kind == "intervention" && (!m.Policy.Intervention || a.Attempt > m.Policy.recoveryLimit() ||
+			if a.Kind == "intervention" && (m.ConfigurationProblem.Code != "" || !m.Policy.Intervention || a.Attempt > m.Policy.recoveryLimit() ||
 				m.LifecycleVersion == LifecycleFormatVersion && !m.RecoveryCheckAfter.IsZero() ||
 				m.VerifyRemaining > 0 || m.recoveryDue(c.At).After(c.At) || (a.Manual && (!m.observedUnhealthy() || m.manualRecoveryDue(c.At).After(c.At))) || m.otherActiveRecovery(a.ID)) {
 				return Result{}
@@ -366,6 +371,21 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		if c.Maintenance {
 			m.suppressMaintenanceNotifications(c.At, emit)
 		}
+	}
+	if actionStorageFormat(version) && c.Outcome == "configuration_problem" {
+		changed := m.ConfigurationProblem != c.Failure
+		m.ConfigurationProblem, m.ConfigurationProblemAt, m.Generation = c.Failure, c.At, c.Generation
+		if changed {
+			emit("monitor_configuration_problem", nil)
+		}
+		if !paused {
+			m.scheduleNextCheck(c)
+		}
+		return r // No health observation, recovery progress or new external work.
+	}
+	if m.ConfigurationProblem.Code != "" {
+		m.ConfigurationProblem, m.ConfigurationProblemAt = FailureDiagnostic{}, time.Time{}
+		emit("monitor_configuration_ready", nil)
 	}
 	m.TotalChecks++
 	if c.Outcome == "success" {
@@ -478,6 +498,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	}
 	m.observeIgnoreRecovery(c, emit)
 	m.assessReviewAlerts(c.At, emit)
+	m.scheduleNextCheck(c)
+	return r
+}
+
+func (m *Monitor) scheduleNextCheck(c Command) {
 	next := c.Scheduled.Add(m.Policy.Interval)
 	if c.Scheduled.IsZero() {
 		next = c.At.Add(m.Policy.Interval)
@@ -486,7 +511,6 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		next = next.Add((c.At.Sub(next)/m.Policy.Interval + 1) * m.Policy.Interval)
 	}
 	m.NextCheck = next
-	return r
 }
 
 func notificationRetryAt(command Command, attempt int) time.Time {

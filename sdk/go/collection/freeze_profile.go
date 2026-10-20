@@ -144,6 +144,10 @@ func (r *profileSourceReader) Read(p []byte) (int, error) {
 		if r.ctx.Err() != nil {
 			return n, r.ctx.Err()
 		}
+		var sourceErr *SourceAccessError
+		if errors.As(err, &sourceErr) {
+			return n, sourceErr
+		}
 		return n, errors.New("collection source read failed")
 	}
 	return n, err

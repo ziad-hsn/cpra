@@ -98,9 +98,9 @@ def qualify_normalization(go, node, env, goroot, wasm, temporary):
     result = json.loads(subprocess.check_output([node, str(ROOT / "scripts/dashboard/verify_collection_normalization.cjs"),
                                                 str(goroot / "lib/wasm/wasm_exec.js"), str(wasm), *paths],
                                                cwd=ROOT, env=env, text=True, timeout=60))
-    fixture_bytes = (ROOT / "sdk/go/collection/testdata/file-base-v2.json").read_bytes()
+    fixture_bytes = (ROOT / "sdk/go/collection/testdata/file-base-v3.json").read_bytes()
     fixtures = json.loads(fixture_bytes)
-    if result.get("result") != "passed" or result.get("profile") != "cpra.file.base.v2" or result.get("nativeBuilds") != 2 or result.get("wasmBuilds") != 1 or result.get("fixedCases") != len(fixtures["cases"]) or len(fixtures["cases"]) < 30:
+    if result.get("result") != "passed" or result.get("profile") != "cpra.file.base.v3" or result.get("nativeBuilds") != 2 or result.get("wasmBuilds") != 1 or result.get("fixedCases") != len(fixtures["cases"]) or len(fixtures["cases"]) < 30:
         raise ValueError("File normalization qualification did not complete")
     return hashlib.sha256(fixture_bytes).hexdigest()
 
@@ -124,7 +124,7 @@ def build(go, node, check=False):
                                                          str(goroot / "lib/wasm/wasm_exec.js"), str(wasm)], env=env, text=True, timeout=30))
         if information.get("GoVersion") != recipe["go_version"]:
             raise ValueError("Linked parser compiler identity differs")
-        if information.get("NormalizationProfile") != "cpra.file.base.v2":
+        if information.get("NormalizationProfile") != "cpra.file.base.v3":
             raise ValueError("Linked parser normalization profile is unsupported")
         normalization_fixtures = qualify_normalization(go, node, env, goroot, wasm, temporary)
         digest = source_digest(go, env)

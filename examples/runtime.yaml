@@ -31,5 +31,8 @@ manual_recovery:
 
 # File notification names are relative to this separate, private output root.
 # Prefer cpractl local init to generate the platform-specific path.
+# Examples using a log endpoint require this setting. The path must be absolute
+# and separate from state, manifests, runtime configuration and key directories.
+# Static validation checks these boundaries; startup verifies native ownership.
 # notifications:
 #   log_directory: /var/log/cpra/notifications

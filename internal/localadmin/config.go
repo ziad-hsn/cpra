@@ -25,7 +25,11 @@ var templates embed.FS
 
 // Init writes only absent starter files. It never imports the installing
 // user's credentials or enables interventions or service auto-start.
-func Init(l installpath.Layout, account string) error {
+func Init(l installpath.Layout, account string, port int) error {
+	address, err := initializationAddress(port)
+	if err != nil {
+		return err
+	}
 	for _, path := range []string{l.ConfigDir, l.StateDir, l.LogDir, filepath.Join(l.ConfigDir, "monitors.yaml"), filepath.Join(l.ConfigDir, "runtime.yaml"), filepath.Join(l.ConfigDir, "auth.token")} {
 		if path != "" {
 			if err := rejectSymlinkAncestors(path); err != nil {
@@ -33,7 +37,24 @@ func Init(l installpath.Layout, account string) error {
 			}
 		}
 	}
-	account, err := nativePrepare(l, account)
+	if port != 0 {
+		path := filepath.Join(l.ConfigDir, "runtime.yaml")
+		if info, err := os.Lstat(path); err == nil {
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("runtime configuration must be a regular file")
+			}
+			config, err := runtimeconfig.Load(path)
+			if err != nil {
+				return err
+			}
+			if config.Web.Address != "" && config.Web.ListenAddress() != address || config.Web.Address == "" && port != 8060 {
+				return fmt.Errorf("existing runtime configuration uses another address; initialization does not overwrite it")
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	account, err = nativePrepare(l, account)
 	if err != nil {
 		return err
 	}
@@ -62,7 +83,7 @@ func Init(l installpath.Layout, account string) error {
 	if err != nil {
 		return err
 	}
-	runtimeData, err := yaml.Marshal(map[string]any{"storage": map[string]any{"mode": "raft", "directory": l.StateDir}, "history": map[string]any{"retention_days": 30}, "notifications": map[string]any{"log_directory": filepath.Join(l.LogDir, "notifications")}})
+	runtimeData, err := yaml.Marshal(map[string]any{"web": map[string]any{"address": address}, "storage": map[string]any{"mode": "raft", "directory": l.StateDir}, "history": map[string]any{"retention_days": 30}, "notifications": map[string]any{"log_directory": filepath.Join(l.LogDir, "notifications")}})
 	if err != nil {
 		return err
 	}
@@ -116,16 +137,21 @@ func binaryPath(l installpath.Layout) string {
 func serviceArgs(l installpath.Layout) ([]string, error) {
 	runtimePath := filepath.Join(l.ConfigDir, "runtime.yaml")
 	managed := false
+	explicitAddress := false
 	if _, err := os.Lstat(runtimePath); err == nil {
 		config, err := runtimeconfig.Load(runtimePath)
 		if err != nil {
 			return nil, err
 		}
 		managed = config.Management.Enabled
+		explicitAddress = config.Web.Address != ""
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	args := []string{"-yaml", filepath.Join(l.ConfigDir, "monitors.yaml"), "-runtime-config", runtimePath, "-data-dir", l.StateDir, "-web.addr", "127.0.0.1:8060", "-allow-empty", "-shutdown-timeout", "45s"}
+	args := []string{"-yaml", filepath.Join(l.ConfigDir, "monitors.yaml"), "-runtime-config", runtimePath, "-data-dir", l.StateDir, "-allow-empty", "-shutdown-timeout", "45s"}
+	if !explicitAddress {
+		args = append(args, "-web.addr", "127.0.0.1:8060")
+	}
 	if !managed {
 		args = append(args, "-web.auth-file", filepath.Join(l.ConfigDir, "auth.token"))
 	}

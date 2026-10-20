@@ -77,3 +77,32 @@ func TestCollectionProfileV2RetirementFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectionProfileV3RequiresActionFormat(t *testing.T) {
+	s := openCatalogMemory(t)
+	c := ticketCreateFixture(t, s)
+	c.Create.NormalizationProfile = "cpra.file.base.v3"
+	command := Command{Kind: "collection", At: c.Create.CreatedAt, Collection: &c}
+	for version := 1; version <= LatestFormatVersion+1; version++ {
+		raw, err := json.Marshal(envelope{Version: version, Commands: []Command{command}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = decodeEnvelope(raw)
+		if (err == nil) != actionStorageFormat(version) {
+			t.Fatalf("v3 under format %d: %v", version, err)
+		}
+	}
+	r := collectionCommand(t, s, c, c.Create.CreatedAt)
+	if r.Err != nil || !actionStorageFormat(s.fsm.image.Version) {
+		t.Fatal("v3 create", r.Err)
+	}
+	if err := validateCollectionHeaders(s.fsm.image); err != nil {
+		t.Fatal(err)
+	}
+	old := s.fsm.image
+	old.Version = LifecycleFormatVersion
+	if err := validateCollectionHeaders(old); err == nil {
+		t.Fatal("v3 accepted in old snapshot")
+	}
+}

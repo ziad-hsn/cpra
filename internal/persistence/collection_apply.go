@@ -123,7 +123,7 @@ func (f *machine) applyCollection(c CollectionCommand, at time.Time, format int)
 		if s.NormalizationProfile != "" {
 			f.image.Version = max(f.image.Version, CollectionReselectionFormatVersion)
 		}
-		if s.NormalizationProfile == "cpra.file.base.v2" {
+		if s.NormalizationProfile == "cpra.file.base.v2" || s.NormalizationProfile == "cpra.file.base.v3" {
 			f.image.Version = joinStorageFormat(f.image.Version, format)
 		}
 		return collectionResult(s)

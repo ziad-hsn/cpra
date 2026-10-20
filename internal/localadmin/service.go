@@ -118,7 +118,7 @@ func Install(ctx context.Context, l installpath.Layout, source, account string, 
 		return err
 	}
 	if !update {
-		if err = Init(l, account); err != nil {
+		if err = Init(l, account, 0); err != nil {
 			return err
 		}
 	}

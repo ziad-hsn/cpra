@@ -29,6 +29,63 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 	}
 	firstLine := lineNumber + 1
 	var metadataLines []int
+	useAnchors := b.normalizationProfile != fileNormalizationV1 && b.normalizationProfile != fileNormalizationV2
+	anchors := YAMLAnchors{allowUnusedOverflow: b.normalizationProfile == ""}
+	metadataRoot := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}}
+	metadataOffset, metadataLineOffset := 0, 0
+	metadataPresent := false
+	metadataKeys := make(map[string]bool)
+	flushMetadata := func() error {
+		if !useAnchors || metadata.Len() == metadataOffset {
+			return nil
+		}
+		root, err := anchors.Parse(metadata.Bytes()[metadataOffset:], func(n int) int {
+			if n > 0 && n+metadataLineOffset <= len(metadataLines) {
+				return metadataLines[n+metadataLineOffset-1]
+			}
+			return 0
+		})
+		if err != nil {
+			return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1}, func(n int) int { return n })
+		}
+		if len(root.Content) > 0 {
+			metadataPresent = true
+			if root.Content[0].Kind != yaml.MappingNode {
+				// Standalone arrays and null documents are part of the original
+				// unprofiled input contract. They have no streamed sections and
+				// remain bounded by the complete-document metadata quota.
+				if metadataOffset == 0 && len(metadataRoot.Content[0].Content) == 0 {
+					metadataRoot = root
+					metadataOffset, metadataLineOffset = metadata.Len(), len(metadataLines)
+					return nil
+				}
+				return &SourceError{Location: Location{Source: source, Document: document}, Cause: api.InvalidField("", "invalidYAML")}
+			}
+			if metadataRoot.Content[0].Kind != yaml.MappingNode {
+				return &SourceError{Location: Location{Source: source, Document: document}, Cause: api.InvalidField("", "invalidYAML")}
+			}
+			for n := 0; n+1 < len(root.Content[0].Content); n += 2 {
+				key := root.Content[0].Content[n]
+				// Reject impossible or repeated top-level sections before retaining
+				// another expanded fragment. At most these finite sections survive.
+				switch key.Value {
+				case "apiVersion", "kind", "metadata", "spec", "status", "items", "monitors", "version", "endpoints", "notification_groups", "<<":
+				default:
+					return &SourceError{Location: Location{Source: source, Document: document, Line: key.Line, Column: key.Column}, Cause: api.InvalidField("", "unknownField")}
+				}
+				if metadataKeys[key.Value] {
+					return &SourceError{Location: Location{Source: source, Document: document, Line: key.Line, Column: key.Column}, Cause: api.InvalidField("", "duplicateField")}
+				}
+				metadataKeys[key.Value] = true
+			}
+			if len(metadataRoot.Content[0].Content) == 0 {
+				metadataRoot.Content[0].Line, metadataRoot.Content[0].Column = root.Content[0].Line, root.Content[0].Column
+			}
+			metadataRoot.Content[0].Content = append(metadataRoot.Content[0].Content, root.Content[0].Content...)
+		}
+		metadataOffset, metadataLineOffset = metadata.Len(), len(metadataLines)
+		return nil
+	}
 	sequence := ""
 	indent := -1
 	documentHasContent := false
@@ -36,12 +93,27 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		if entry.Len() == 0 {
 			return nil
 		}
-		value, root, err := b.decodeYAMLDocument(entry.Bytes())
-		positions := yamlPositions(root, func(line int) int { return entryLine + line - 1 })
+		if err := flushMetadata(); err != nil {
+			return err
+		}
+		line := func(n int) int { return entryLine + n - 1 }
+		var value any
+		var root *yaml.Node
+		var err error
+		if useAnchors {
+			root, err = anchors.Parse(entry.Bytes(), line)
+			line = func(n int) int { return n }
+			if err == nil {
+				value, err = b.decodeYAMLNode(root)
+			}
+		} else {
+			value, root, err = b.decodeYAMLDocument(entry.Bytes())
+		}
+		positions := yamlPositions(root, line)
 		adjustFirstColumn(positions, firstLine, firstColumn)
 		entry.Reset()
 		if err != nil {
-			return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1, Line: entryLine}, func(line int) int { return entryLine + line - 1 })
+			return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1, Line: entryLine}, line)
 		}
 		array, ok := value.([]any)
 		if !ok || len(array) != 1 {
@@ -55,8 +127,24 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 			return err
 		}
 		if metadata.Len() > 0 {
-			value, root, err := b.decodeYAMLDocument(metadata.Bytes())
+			if err := flushMetadata(); err != nil {
+				return err
+			}
+			var value any
+			var root *yaml.Node
+			var err error
+			if useAnchors {
+				root = metadataRoot
+				if metadataPresent {
+					value, err = b.decodeYAMLNode(root)
+				}
+			} else {
+				value, root, err = b.decodeYAMLDocument(metadata.Bytes())
+			}
 			positions := yamlPositions(root, func(line int) int {
+				if useAnchors {
+					return line
+				}
 				if line > 0 && line <= len(metadataLines) {
 					return metadataLines[line-1]
 				}
@@ -65,6 +153,9 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 			adjustFirstColumn(positions, firstLine, firstColumn)
 			if err != nil {
 				return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1}, func(line int) int {
+					if useAnchors {
+						return line
+					}
 					if line > 0 && line <= len(metadataLines) {
 						return metadataLines[line-1]
 					}
@@ -79,6 +170,11 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		}
 		metadata.Reset()
 		metadataLines = nil
+		anchors = YAMLAnchors{allowUnusedOverflow: b.normalizationProfile == ""}
+		metadataRoot = &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}}
+		metadataOffset, metadataLineOffset = 0, 0
+		metadataPresent = false
+		metadataKeys = make(map[string]bool)
 		entry.Reset()
 		sequence = ""
 		indent = -1
@@ -92,6 +188,9 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 			return err
 		}
 		line := scan.Text()
+		if strings.HasPrefix(line, "\ufeff") && (!documentHasContent || strings.HasPrefix(strings.TrimPrefix(line, "\ufeff"), "---")) {
+			line = strings.TrimPrefix(line, "\ufeff")
+		}
 		trim := strings.TrimSpace(line)
 		leading := len(line) - len(strings.TrimLeft(line, " "))
 		if leading == 0 && (trim == "---" || strings.HasPrefix(trim, "--- #") || trim == "...") {
@@ -164,6 +263,10 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		}
 	}
 	if err := scan.Err(); err != nil {
+		var sourceErr *SourceAccessError
+		if errors.As(err, &sourceErr) {
+			return sourceErr
+		}
 		return fmt.Errorf("source line exceeds resource limit or cannot be read")
 	}
 	return finish()
@@ -198,16 +301,21 @@ func (b *builder) decodeYAMLDocument(data []byte) (any, *yaml.Node, error) {
 	if err := yaml.Unmarshal(data, &document); err != nil {
 		return nil, &document, yamlSyntaxError(err)
 	}
+	value, err := b.decodeYAMLNode(&document)
+	return value, &document, err
+}
+
+func (b *builder) decodeYAMLNode(document *yaml.Node) (any, error) {
 	if len(document.Content) == 0 {
-		return nil, &document, nil
+		return nil, nil
 	}
 	if b.normalizationProfile == fileNormalizationV1 || !yamlExpansion(document.Content[0], 0) {
 		value, err := nodeValue(document.Content[0], 0)
-		return value, &document, err
+		return value, err
 	}
 	decoder := yamlValues{nodes: 65_536, bytes: 1 << 20, active: make(map[*yaml.Node]bool)}
 	value, err := decoder.value(document.Content[0], 0)
-	return value, &document, err
+	return value, err
 }
 
 func nodeValue(node *yaml.Node, depth int) (any, error) {

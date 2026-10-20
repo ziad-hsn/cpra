@@ -530,6 +530,9 @@ type ApplyResult struct {
 	// CatalogDecision Original conditional decision: accepted, unchanged, conflict, dependencyBlocked or unattempted. A child failure never changes an accepted decision. Unknown future values remain readable.
 	CatalogDecision string `json:"catalogDecision,omitempty"`
 
+	// ChangedFields Preflight-only changed schema paths from the captured resource versions. No values or free-form map keys. Arrays and private maps are reported as whole fields; large changes use metadata/spec summaries. Omitted when unavailable.
+	ChangedFields []string `json:"changedFields,omitempty"`
+
 	// ChildDisposition Controller disposition of the original accepted catalog child. Never substitutes for catalogDecision and never exists for unchanged or rejected rows.
 	ChildDisposition *ExecutionChildDisposition `json:"childDisposition,omitempty"`
 
@@ -1305,7 +1308,13 @@ type MonitorObservation struct {
 	CheckType                       string `json:"checkType"`
 
 	// CompletedNotifications Succeeded deliveries retained for this monitor incarnation; not a lifetime total.
-	CompletedNotifications  int64                    `json:"completedNotifications"`
+	CompletedNotifications int64 `json:"completedNotifications"`
+
+	// ConfigurationProblem Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation.
+	ConfigurationProblem *FailureDiagnostic `json:"configurationProblem,omitempty"`
+
+	// ConfigurationProblemAt Last failed local preparation, in UTC. Absent when preparation is usable.
+	ConfigurationProblemAt  *time.Time               `json:"configurationProblemAt,omitempty"`
 	ConfiguredNotifications []string                 `json:"configuredNotifications"`
 	Enabled                 bool                     `json:"enabled"`
 	FailedNotifications     int64                    `json:"failedNotifications"`
@@ -1380,19 +1389,25 @@ type MonitorSpec struct {
 // MonitorStatus defines model for MonitorStatus.
 type MonitorStatus struct {
 	// ActionsNeedingReview Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.
-	ActionsNeedingReview *int64      `json:"actionsNeedingReview,omitempty"`
-	ControlRevision      string      `json:"controlRevision,omitempty"`
-	ExecutionRevision    string      `json:"executionRevision,omitempty"`
-	Health               string      `json:"health,omitempty"`
-	IgnoreCause          string      `json:"ignoreCause,omitempty"`
-	IgnoreIncidentCount  int64       `json:"ignoreIncidentCount,omitempty"`
-	IgnoreReason         string      `json:"ignoreReason,omitempty"`
-	Ignored              bool        `json:"ignored,omitempty"`
-	IgnoredAt            time.Time   `json:"ignoredAt,omitempty"`
-	IgnoredBy            string      `json:"ignoredBy,omitempty"`
-	IncidentID           string      `json:"incidentID,omitempty"`
-	LastCheckLatencyMS   Measurement `json:"lastCheckLatencyMs,omitempty"`
-	LastCheckedAt        time.Time   `json:"lastCheckedAt,omitempty"`
+	ActionsNeedingReview *int64 `json:"actionsNeedingReview,omitempty"`
+
+	// ConfigurationProblem Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation.
+	ConfigurationProblem *FailureDiagnostic `json:"configurationProblem,omitempty"`
+
+	// ConfigurationProblemAt Last failed local preparation, in UTC. Absent when preparation is usable.
+	ConfigurationProblemAt *time.Time  `json:"configurationProblemAt,omitempty"`
+	ControlRevision        string      `json:"controlRevision,omitempty"`
+	ExecutionRevision      string      `json:"executionRevision,omitempty"`
+	Health                 string      `json:"health,omitempty"`
+	IgnoreCause            string      `json:"ignoreCause,omitempty"`
+	IgnoreIncidentCount    int64       `json:"ignoreIncidentCount,omitempty"`
+	IgnoreReason           string      `json:"ignoreReason,omitempty"`
+	Ignored                bool        `json:"ignored,omitempty"`
+	IgnoredAt              time.Time   `json:"ignoredAt,omitempty"`
+	IgnoredBy              string      `json:"ignoredBy,omitempty"`
+	IncidentID             string      `json:"incidentID,omitempty"`
+	LastCheckLatencyMS     Measurement `json:"lastCheckLatencyMs,omitempty"`
+	LastCheckedAt          time.Time   `json:"lastCheckedAt,omitempty"`
 
 	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	LastFailure        *FailureDiagnostic `json:"lastFailure,omitempty"`

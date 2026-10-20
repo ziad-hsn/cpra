@@ -95,6 +95,10 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		if m.LastFailure.Code != "" {
 			response["last_failure"] = m.LastFailure
 		}
+		if m.ConfigurationProblem.Code != "" {
+			response["configuration_problem"] = m.ConfigurationProblem
+			response["configuration_problem_at"] = m.ConfigurationProblemAt.UTC()
+		}
 	}
 	writeJSON(w, 200, response)
 }

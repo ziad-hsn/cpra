@@ -32,6 +32,10 @@ token hash policy, wrapping key and localhost TLS material in the platform's
 standard locations. It prints paths and exact server/client commands, never the
 token value. It refuses existing configuration/state and starts no service.
 
+If 8060 is occupied, initialize with `cpractl local init --management --port 19060`
+and use the matching address printed by that command. The selected port is saved
+in `runtime.yaml`; services read it when they start.
+
 This walkthrough is a fresh user installation. An existing installation needs
 the documented stopped upgrade/rotation procedure; initialization does not
 convert its authority or erase its data.
@@ -75,10 +79,10 @@ paths. Do not put a bearer in a URL or command argument.
 Keep token environment variables scoped to CLI commands. The server also reads
 CPRA_AUTH_TOKEN and CPRA_AUTH_TOKEN_FILE as observation-mode bootstrap inputs;
 passing its named management operator token through those inputs is rejected.
-Use the printed CLI connection arguments if running server validation in the
-same terminal. Alternatively, explicitly clear both server inputs for that
-command with `-web.auth= -web.auth-file=`; named management authentication still
-comes from the runtime configuration's policy.
+`cpra -validate` ignores these incidental client authentication environment values
+and checks the supplied file without applying it to the committed catalog.
+Normal server startup still checks its explicit and environment authentication
+inputs; use the printed server command in a separate terminal.
 
 For the dashboard, manually trust the generated local CA in your browser, open
 https://localhost:8060, and sign in using the protected operator token read

@@ -4,7 +4,7 @@
   "files": {
     "DEPENDENCIES.json": {
       "bytes": 1710,
-      "sha256": "db446cc09d5b855c522a4e9b5995afe67924fac78ea27613a110c2a7b22d1580"
+      "sha256": "dc444c8336685c6bce80d5d85007cd111420d67fd39bbccf2adc6670f6702875"
     },
     "GO-LICENSE.txt": {
       "bytes": 1453,
@@ -15,8 +15,8 @@
       "sha256": "98965146c61325c7210de9e593502b5df8ccfefe3c08b1abcd61d7f91e755c4d"
     },
     "collection-parser.wasm": {
-      "bytes": 8485872,
-      "sha256": "0a6fb857360a27ae152d8ecd081fbb94580914098752695ca60b65c2eb734654"
+      "bytes": 8560721,
+      "sha256": "a0544caf954af07e5d606ae07c8298b2337de04ab2e7a90a3aadffe2a63d443d"
     },
     "wasm_exec.js": {
       "bytes": 16992,
@@ -49,8 +49,8 @@
       "Version": "v3.0.1"
     }
   ],
-  "normalization_fixtures_sha256": "cac2f9e80ab0c06f6f06c35d41d6742da46f86274c0222a73e905ebaa9c20d5c",
-  "normalization_profile": "cpra.file.base.v2",
+  "normalization_fixtures_sha256": "003c42a7942f03801151e526ac5421be3a98abc94b44e1cb2effa05a8f901fd6",
+  "normalization_profile": "cpra.file.base.v3",
   "recipe": [
     "-trimpath",
     "-buildvcs=false",
@@ -59,6 +59,6 @@
     "-tags=",
     "-ldflags="
   ],
-  "sdk_source_sha256": "0b3b2a10cb34f1a2f23a21a3a6c3ab6562158c58b6ed1f6b6b7979eceae05150",
+  "sdk_source_sha256": "459869e9d414e4d897ce228baa45a55a9e890785d55dd2dd6b8a175c3788f910",
   "target": "js/wasm"
 }

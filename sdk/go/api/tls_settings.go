@@ -20,6 +20,9 @@ func ValidateTLSSettings(driver DriverConfig) error {
 	boolean := func(key string) bool { var value bool; _ = json.Unmarshal(fields[key], &value); return value }
 	present := func(key string) bool { return referenced(key) || len(fields[key]) > 0 && string(fields[key]) != "null" }
 	skip, ca, name := boolean("insecureSkipVerify"), text("caFile"), text("serverName")
+	if skip && (ca != "" || referenced("caFile")) {
+		return InvalidField("config.caFile", "skipVerificationCAConflict")
+	}
 	details := skip || ca != "" || name != "" || referenced("insecureSkipVerify") || referenced("caFile") || referenced("serverName")
 	if strings.ContainsAny(ca, "\x00\r\n") || strings.ContainsAny(name, "\x00\r\n /\\?#@") {
 		return InvalidField("config", "invalidTLSName")

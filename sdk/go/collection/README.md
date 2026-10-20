@@ -95,7 +95,12 @@ and manifest envelopes are supported.
 Shared endpoint/group files need no `monitors` field. YAML block monitor and
 `List.items` sequences, and their JSON counterparts, decode one resource at a
 time, including when the complete collection exceeds the document-memory limit.
-YAML aliases are rejected; render explicit values before importing them.
+UTF-8 BOMs and same-document YAML aliases are accepted. Definitions are resolved
+in source order, including across streamed entries. Forward references, cycles,
+cross-document aliases and excessive expansion fail before activation. Retained
+anchor values are bounded to 1 MiB and 65,536 nodes. Historical unprofiled inputs
+keep their existing local-entry decoding limits; if unused definitions exceed
+the retention limit, later cross-entry references fail explicitly.
 
 Manifest normalization retains deterministic name-derived IDs, explicit `false`,
 interval strings, thresholds, inline notifications, ordered groups,
@@ -247,7 +252,12 @@ result, err := collection.Apply(ctx, client.Operations, frozen)
 // Retain result.OperationID on failure as well as success.
 ```
 
-`FileNormalizationProfile` is `cpra.file.base.v2`. New imports reject a notification group combined with an inline destination and support bounded aliases/merge keys within one streamed entry. `cpra.file.base.v1` is retained only for continuation of existing operations. It permits at most 1,000
+`FileNormalizationProfile` is `cpra.file.base.v3`. New imports support BOMs and
+bounded same-document aliases across entries, and reject a notification group
+combined with an inline destination. The original `cpra.file.base.v1` and
+`cpra.file.base.v2` decoders remain available for continuation of existing
+operations with their original identities; an operation is never relabeled.
+The current profile permits at most 1,000
 expanded sources, 64 MiB total raw input, 10,000 resources, 1 MiB per resource,
 16 MiB of document metadata and 512 MiB of local plaintext staging. Options can
 tighten these limits. Unsupported profiles and enlarged limits fail before

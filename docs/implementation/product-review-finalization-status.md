@@ -12,7 +12,7 @@ are pending unless explicitly updated with current evidence.
 | 1 Effect classification and deadlines | Implemented; focused checks passed | Independent source review found no remaining blocker; final matrix pending |
 | 2 Episode eligibility, Ignore and blue | Implemented; focused checks and independent source review passed | Base/tagged lifecycle and worker checks, real Raft snapshots, dashboard checks; frozen matrix pending |
 | 3 Retained action ledger and formats 44/45 | In progress: ledger, pinned readers, installation identity and snapshot protection implemented; hot-state compaction pending | Focused Linux checks and independent source review passed; macOS cross-build only; final matrix pending |
-| 4 Configuration and CLI diagnostics | Pending | Pending |
+| 4 Configuration and CLI diagnostics | Implemented; focused checks passed | Base/tagged validation, local CA preparation, CLI/init and parser checks; independent source review; final browser/example matrix pending |
 | 5 Reservations and destination fairness | Pending | Pending |
 | 6 API/SDK/CLI/dashboard agreement | Pending | Pending |
 | 7 Documentation/security/hygiene | Pending | Pending |
@@ -230,3 +230,47 @@ references and aggregates, including historical blue conditions, and prove zero
 historical visits/copies per ordinary successful check at 0/500/5,000 retained
 records. Native permissions, tagged/race checks and the final frozen matrix also
 remain open. This checkpoint does not mark ticket 3 complete.
+
+## Ticket 4 development checkpoint
+
+Validation retains original input locations and YAML field spelling, rejects
+contradictory TLS settings/negative recovery budgets, and accepts bounded
+same-document aliases and UTF-8 BOM. New collections use file profile v3;
+v1/v2 remain available for original-operation continuation. No input is activated
+before whole-collection validation. Local CA preparation problems retain actual
+health facts and suppress configuration-induced recovery; they are not remote
+outages. Original action deadlines remain authoritative.
+
+CLI output separates input/token/TLS/authentication/staging/readiness failures,
+shows bounded field-only diffs, and summarizes application without hiding its
+original operation handle. `local init --port` defaults to 8060; generated runtime
+settings drive the service and connection examples without printing tokens.
+
+- `configuration-modules-3`: full SDK, CLI, local administration, runtime config,
+  loader, jobs and SLO checks passed on Linux/amd64 with Go 1.27.2.
+- `yaml-roots-2`: full collection/loader tests passed after retained parser
+  regressions were corrected. Source-only independent review found no remaining
+  parser blocker; golden/browser-WASM normalization checks also passed.
+- `main-config-t4`: real-process runtime port, explicit override, protected log
+  root and validation/environment checks passed.
+- `collection-source-causes-1`: source access and private staging errors remain
+  distinct; the original operation is consulted before resume input is opened.
+- `configuration-tagged-2`: focused all-built-in plus externaljobs storage,
+  controller, jobs, SDK API and collection checks passed, including local-read
+  cause preservation without exposing private paths.
+- `dashboard-build-t4-4`: sanitized pinned toolchain rebuild, parser goldens,
+  frontend build, type checks, lint and 569 tests passed. Embedded assets and
+  notices were regenerated. This does not replace real-server browser campaigns.
+- `source-read-causes-2`: immediate and delayed YAML/JSON read failures retain
+  only known local causes; arbitrary reader errors remain sanitized. Independent
+  source review confirmed the final correction.
+- `windows-ca-compile-t4`: Windows cross-build only; native execution is pending.
+- `configuration-tagged-1` and `dashboard-build-t4` were stopped by the scratch
+  guard, not test failures or passes. Logs remain retained. Only identified
+  task-owned compiler caches/temporary outputs were removed before sequential
+  reruns. Earlier failing parser and output fixtures remain in the evidence log.
+
+Independent source reviews by `notification_eligibility_review` (YAML) and
+`effect_safety_review` (configuration/CLI) informed the fixes. These are private
+working-tree checks with source digests, not frozen qualification. Final example,
+real-server browser, minimum-compiler and race checks remain in the final matrix.

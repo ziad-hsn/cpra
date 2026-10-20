@@ -80,6 +80,7 @@ func TestDiffMultipleInputsFormatsAndExitStatus(t *testing.T) {
 		calls.Add(1)
 		result := diffResponse(t, r)
 		result.Items[0].Outcome, result.Items[0].OldVersion = "update", "original-version"
+		result.Items[0].ChangedFields = []string{"spec.check.interval"}
 		_ = json.NewEncoder(w).Encode(result)
 	})
 	for _, output := range []string{"json", "yaml", "table", "wide"} {
@@ -98,7 +99,7 @@ func TestDiffMultipleInputsFormatsAndExitStatus(t *testing.T) {
 			if decodeErr != nil || !result.Valid || !result.Changed || len(result.Items) != 3 || result.Items[0].OldVersion != "original-version" || result.Items[1].Source.File != second || result.Items[2].Source.Document != 2 || result.Items[2].Source.Item != 1 {
 				t.Fatal("missing diff or local source attribution", decodeErr)
 			}
-		} else if !strings.Contains(stdout, "original-version") || !strings.Contains(stdout, second) {
+		} else if !strings.Contains(stdout, "original-version") || !strings.Contains(stdout, second) || !strings.Contains(stdout, "spec.check.interval") {
 			t.Fatal("table omitted useful diff observations")
 		}
 		assertDiffSpoolRemoved(t, spool)

@@ -2,6 +2,7 @@ package collection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,6 +24,24 @@ type Source struct {
 	url    string
 	name   string
 	reader io.Reader
+}
+
+// SourceAccessError identifies a failure reading a selected local input, as
+// distinct from private staging or API transport. Error omits the path; Unwrap
+// preserves the underlying cause for errors.Is and errors.As.
+type SourceAccessError struct{ cause error }
+
+func (e *SourceAccessError) Error() string { return "selected local input could not be read" }
+func (e *SourceAccessError) Unwrap() error { return e.cause }
+
+type localSourceReader struct{ io.ReadCloser }
+
+func (r localSourceReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	if err != nil && err != io.EOF {
+		err = &SourceAccessError{err}
+	}
+	return n, err
 }
 
 // File selects a file or directory for Freeze. Recursive traversal requires
@@ -83,7 +102,13 @@ func expand(ctx context.Context, sources []Source, recursive bool) ([]Source, er
 	return expandLimit(ctx, sources, recursive, commitment.MaxSources)
 }
 
-func expandLimit(ctx context.Context, sources []Source, recursive bool, maxSources uint64) ([]Source, error) {
+func expandLimit(ctx context.Context, sources []Source, recursive bool, maxSources uint64) (_ []Source, err error) {
+	defer func() {
+		var pathError *os.PathError
+		if errors.As(err, &pathError) {
+			err = &SourceAccessError{err}
+		}
+	}()
 	var out []Source
 	seen := make(map[string]bool)
 	add := func(path string) error {
@@ -179,7 +204,10 @@ func expandLimit(ctx context.Context, sources []Source, recursive bool, maxSourc
 func (s Source) open(ctx context.Context, o Options) (io.ReadCloser, string, error) {
 	if s.path != "" {
 		f, err := os.Open(s.path)
-		return f, s.path, err
+		if err != nil {
+			return nil, s.path, &SourceAccessError{err}
+		}
+		return localSourceReader{f}, s.path, nil
 	}
 	if s.url == "" {
 		return io.NopCloser(s.reader), s.name, nil

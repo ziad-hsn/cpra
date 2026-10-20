@@ -335,11 +335,12 @@ export default function CollectionImport() {
     <ProblemDetails error={problem} phase={failedPhase} />
     {!!summary && <section className="card" aria-label="Collection preview">
       <h2>Source-attributed preview</h2><p>Resource contents are hidden. Create, update and unchanged outcomes appear after server validation; no resources are implicitly deleted.</p>
-      {!!preflight?.errors?.length && <ul aria-label="Preview validation errors">{preflight.errors.slice(0, 10).map((issue, index) => <li key={index}>{(() => {
+      {!!preflight?.errors?.length && <ul aria-label="Preview validation errors">{preflight.errors.slice(0, 10).map((issue, index) => {
         const ordinal = /^items\[(\d+)\]/.exec(issue.field ?? '');
         const row = ordinal ? preview[Number(ordinal[1]) - offset] : undefined;
-        return row ? `${row.sourceName}, document ${row.source.document}, item ${row.source.item}${validationSourcePosition(row.coordinates, issue.field)}: ` : '';
-      })()}{validationDiagnostic(issue)}</li>)}</ul>}
+        const location = row ? `${row.sourceName}, document ${row.source.document}, item ${row.source.item}${validationSourcePosition(row.coordinates, issue.field)}: ` : '';
+        return <li key={index}>{location}{validationDiagnostic(issue, row?.coordinates)}</li>;
+      })}</ul>}
       {(preflight?.errors?.length ?? 0) > 10 && <p>Additional validation errors omitted. Correct these resources and preview again.</p>}
       <table><caption>Resources {preview.length ? offset + 1 : 0}–{offset + preview.length} of {summary.itemCount}</caption><thead><tr><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Outcome</th><th scope="col">Observed version</th></tr></thead><tbody>{preview.map(item => <tr key={item.id}><td>{item.id}</td><td>{item.sourceName}</td><td>{item.source.document} / {item.source.item}</td><td>{results.get(item.id)?.outcome ?? 'Not evaluated'}</td><td>{results.get(item.id)?.oldVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>
       <div className="row" style={{ gap: 12 }}><button className="btn" disabled={!!busy || offset === 0 || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, Math.max(0, offset - 100), signal)); }}>Previous resources</button><button className="btn" disabled={!!busy || offset + preview.length >= summary.itemCount || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, offset + 100, signal)); }}>Next resources</button></div>

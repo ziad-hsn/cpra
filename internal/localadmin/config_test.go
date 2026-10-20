@@ -15,7 +15,7 @@ import (
 
 func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
 	l := testLayout(t)
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	c := runtimeconfig.Default()
@@ -30,7 +30,7 @@ func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Init(l, ""); err == nil {
+	if err := Init(l, "", 0); err == nil {
 		t.Fatal("initialization admitted a running durable store")
 	}
 	after, err := os.ReadFile(tokenPath)
@@ -40,7 +40,7 @@ func TestInitRequiresExistingStoreToBeStopped(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatalf("initialization of a stopped store: %v", err)
 	}
 }
@@ -56,7 +56,7 @@ func testLayout(t *testing.T) installpath.Layout {
 
 func TestInitPreservesOperatorFilesAndResolvesState(t *testing.T) {
 	l := testLayout(t)
-	if err := Init(l, ""); err != nil {
+	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	c, err := runtimeconfig.Load(filepath.Join(l.ConfigDir, "runtime.yaml"))
@@ -74,7 +74,7 @@ func TestInitPreservesOperatorFilesAndResolvesState(t *testing.T) {
 	if err = os.WriteFile(filepath.Join(l.ConfigDir, "monitors.yaml"), custom, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err = Init(l, ""); err != nil {
+	if err = Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
 	again, _ := os.ReadFile(filepath.Join(l.ConfigDir, "auth.token"))

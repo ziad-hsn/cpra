@@ -27,6 +27,25 @@ func TestDriverSettingsRequireCompleteConfiguration(t *testing.T) {
 	}
 }
 
+func TestRecoveryTimeoutValidation(t *testing.T) {
+	for _, test := range []struct{ driver, fields string }{
+		{"webhook", `"url":"https://recovery.example.test"`},
+		{"systemd", `"unit":"fixture.service"`},
+		{"kubernetes", `"kind":"deployment","name":"fixture","namespace":"default"`},
+		{"aws", `"operation":"reboot-instance","instanceId":"i-fixture","region":"eu-west-1"`},
+	} {
+		t.Run(test.driver, func(t *testing.T) {
+			for _, timeout := range []string{"-1s", "invalid", "24h1s", "0s", "45s"} {
+				err := ValidateDriverSettings("recovery", DriverConfig{Type: test.driver, Config: json.RawMessage(`{` + test.fields + `,"timeout":"` + timeout + `"}`)})
+				valid := timeout == "0s" || timeout == "45s"
+				if (err == nil) != valid {
+					t.Fatalf("timeout %q: %v", timeout, err)
+				}
+			}
+		})
+	}
+}
+
 func TestDriverSettingsPreserveCredentialsAndOptionalValues(t *testing.T) {
 	for _, fixture := range []struct{ category, kind, config string }{
 		{"check", "http", `{"url":"https://example.com","retries":0,"insecureSkipVerify":false}`},

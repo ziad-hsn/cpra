@@ -167,8 +167,8 @@ class RecordedCampaignTests(unittest.TestCase):
         self.assertEqual(report['result'], 'passed')
         self.assertFalse(report['release_qualified'])
         self.assertEqual(report['source_changed'], [])
-        self.assertEqual(len(report['screenshots']), 12)
-        self.assertIn('dashboard-overview.png', {Path(item).name for item in report['screenshots']})
+        self.assertEqual(len(report['screenshots']), len(browser_campaign.SCREENSHOTS))
+        self.assertEqual({Path(item).name for item in report['screenshots']}, set(browser_campaign.SCREENSHOTS))
         for name, entry in {**report['logs'], **report['screenshots']}.items():
             self.assertEqual(hashlib.sha256((self.root/name).read_bytes()).hexdigest(), entry['sha256'])
         if os.name != 'nt':

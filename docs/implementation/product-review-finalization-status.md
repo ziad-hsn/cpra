@@ -82,7 +82,7 @@ checks from the final frozen matrix and external release gates.
 | N36 | Snapshot inner permissions too broad | Ticket 3 protection added before state writes; focused Linux tests and source review pass. Native macOS/Windows checks pending |
 | N37 | docs-check traceback / historical rewrites | Repaired concise docs-check failures and explicit historical regeneration opt-in; ticket 7 docs tests. |
 | N38 | Tracked tsbuildinfo / local agent files | Removed tracked tsbuildinfo; ignored local agent/build outputs; git inventory and ticket 7 review. |
-| N39 | IDEA and duplicated WASM/fonts | IDEA output ignored/untracked; WASM/fonts are required licensed source/distribution copies and intentionally retained; ticket 7 review. |
+| N39 | IDEA.md and duplicated WASM/fonts | IDEA.md is a tracked authored description draft and is deliberately retained; WASM/fonts are required licensed source/distribution copies and intentionally retained. The separate .idea/ editor output is ignored/untracked. |
 | N40 | Remote branches/issues/PRs | Outside cleanup authority; do not delete |
 | N41 | Repository description / unsupported alertmanager topic | Open external gate: no configured repository-administration capability to correct metadata. |
 | N42 | Desktop buttons/badges and mobile tables/IDs clip | Repaired desktop/mobile wrapping, scroll focus and table navigation; ticket 6 real-server accessibility checks. |
@@ -325,7 +325,9 @@ healthy maximum delays were 1.145/0.991 seconds for notifications/interventions,
 and the slow destination peaked at one active call. Final-source reruns remain
 required. No million-monitor or endurance campaign ran.
 
-Repository hygiene disposition: `.idea/` is ignored and has no tracked files.
+Repository hygiene disposition: `IDEA.md` is a tracked authored product-description
+draft, deliberately retained under the preserve-source constraint. It is not a
+generated build cache. The separate `.idea/` directory is ignored and has no tracked files.
 The source parser WASM and embedded hashed copy serve independent source-build
 and `go install`/archive requirements; the brand, documentation and embedded font
 copies serve their own distribution paths. Preserve these generated, licensed
@@ -869,3 +871,28 @@ correction without remaining findings in those scopes. The reviewers did not
 execute tests; the recorded invocations supply the separate execution evidence.
 These focused checks are private development evidence and do not replace the
 new frozen candidate's affected matrix or native-platform qualification.
+
+## External-worker blue fixture correction
+
+The combined built-in/external-worker matrix at `076f738` exposed two older test
+fixtures that still classified blue notifications as invalid. The production
+validators already accept the approved blue slot. The interrupted matrix retains
+both failing assertions and remains failed/incomplete; shutdown completed before
+the source was edited.
+
+The binding fixture now authenticates blue alongside every other configured
+color and checks its exact source and pinned JobType identities. Unsupported
+purple remains a rejected input. The descriptor fixture accepts blue only for
+the notification category and rejects both a recovery-category blue slot and
+an unsupported color. Existing identity fences, immutable records, cancellation,
+parameter-copy and secret-redaction assertions remain intact. No production
+implementation or storage format changed.
+
+`blue-worker-bindings-after-1` and `blue-worker-bindings-external-after-1` each pass
+all 21 selected cases under Go 1.27.2 with race detection, covering combined and
+external-only tags respectively. Independent source review closes the fixture
+correction. These focused working-tree checks do not replace the updated frozen
+candidate's affected matrix.
+
+The same review corrected N39's inventory wording: `IDEA.md` is deliberately
+retained authored source, distinct from ignored `.idea/` editor output.

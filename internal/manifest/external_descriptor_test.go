@@ -71,7 +71,18 @@ func TestExternalDescriptorBoundsAndSlotIdentity(t *testing.T) {
 	for _, tc := range []struct {
 		kind, slot, category string
 		valid                bool
-	}{{"Monitor", "check", "check", true}, {"Monitor", "recovery", "recovery", true}, {"Monitor", "notifications.red", "notification", true}, {"NotificationEndpoint", "endpoint", "notification", true}, {"Monitor", "endpoint", "notification", false}, {"Monitor", "check", "recovery", false}, {"NotificationEndpoint", "check", "check", false}, {"Monitor", "notifications.blue", "notification", false}} {
+	}{
+		{"Monitor", "check", "check", true},
+		{"Monitor", "recovery", "recovery", true},
+		{"Monitor", "notifications.red", "notification", true},
+		{"Monitor", "notifications.blue", "notification", true},
+		{"NotificationEndpoint", "endpoint", "notification", true},
+		{"Monitor", "endpoint", "notification", false},
+		{"Monitor", "check", "recovery", false},
+		{"NotificationEndpoint", "check", "check", false},
+		{"Monitor", "notifications.blue", "recovery", false},
+		{"Monitor", "notifications.purple", "notification", false},
+	} {
 		key := ExternalRuntimeKey{SourceKind: tc.kind, SourceID: "id", SourceUID: "uid", SourceRevision: "revision", Slot: tc.slot, JobType: testExternalIdentity()}
 		key.JobType.Category = tc.category
 		if (key.Validate() == nil) != tc.valid {

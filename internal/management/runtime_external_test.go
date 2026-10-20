@@ -30,7 +30,7 @@ func TestExternalRuntimeBindingsAuthenticateAllSlots(t *testing.T) {
 	}
 	notification := runtimeExternalDriver("notification")
 	rules := map[string]api.AlertRule{}
-	for _, color := range []string{"red", "yellow", "green", "cyan", "gray"} {
+	for _, color := range []string{"red", "yellow", "green", "cyan", "gray", "blue"} {
 		rules[color] = api.AlertRule{Driver: &notification}
 	}
 	input := resource("Monitor", "monitor", api.MonitorSpec{Check: api.CheckSpec{Driver: runtimeExternalDriver("check"), Interval: "60s", Timeout: "5s"}, Recovery: &api.RecoverySpec{Driver: runtimeExternalDriver("recovery")}, Notifications: &rules})
@@ -59,7 +59,7 @@ func TestExternalRuntimeBindingsAuthenticateAllSlots(t *testing.T) {
 			t.Fatal("contract or private input lost")
 		}
 	}
-	if !slices.Equal(slots, []string{"check", "recovery", "notifications.cyan", "notifications.gray", "notifications.green", "notifications.red", "notifications.yellow"}) {
+	if !slices.Equal(slots, []string{"check", "recovery", "notifications.blue", "notifications.cyan", "notifications.gray", "notifications.green", "notifications.red", "notifications.yellow"}) {
 		t.Fatal(slots)
 	}
 	// Read a private descriptor twice after removing the decrypted source bytes.
@@ -142,7 +142,7 @@ func TestExternalRuntimeBindingsRejectChangedIdentityAndReferences(t *testing.T)
 		"invalid color": func(r *api.Resource, _ *persistence.CatalogRecord) {
 			var s api.MonitorSpec
 			_ = json.Unmarshal(r.Spec, &s)
-			s.Notifications = &map[string]api.AlertRule{"blue": {}}
+			s.Notifications = &map[string]api.AlertRule{"purple": {}}
 			r.Spec, _ = json.Marshal(s)
 		},
 	}

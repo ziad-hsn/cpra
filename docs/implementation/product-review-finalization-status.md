@@ -771,3 +771,37 @@ retained-action and ledger race cases on Go 1.27.2, including rejected imported
 executor evidence and snapshot restoration. This remains development evidence;
 the final clean source needs both compiler/build-tag matrices and their required
 companions before a merge-readiness claim.
+
+### Candidate checks and worker dependency checksum after `5479764`
+
+Frozen `5479764` passed release-tool tests (717), support-script tests, documentation
+synchronization/rendering and dashboard-harness tests. These results retain that
+source identity. An abandoned negative-compilation fixture from an earlier
+scratch-limited run initially made package discovery include its intentionally
+invalid program. Its exact source and process ownership were checked before
+removing only that disposable fixture; the failed result remains retained.
+
+The subsequent parallel race matrix failed the existing backup test's collection
+cleanup allowance. Three unchanged isolated race repetitions passed, including
+authenticated backup/restore, retained generations and action/history checks.
+Independent review identified a possible repeated-preparation liveness risk under
+the 25 ms cleanup budget. Those isolated passes do not establish a cleanup repair
+or erase the contention failure. Production cleanup limits and assertions are
+unchanged. A serial package matrix preserves race instrumentation, concurrent
+test behavior, original deadlines and the full selected package inventory.
+
+Archive preflight then found that `examples/sdk/go.sum` still described the
+previous unpublished worker payload. The serial matrix was stopped with owned
+process cleanup before changing source; it remains incomplete. The canonical
+module archive and an isolated `GOWORK=off` Go download reproduce the checksum
+rejection. Removing only the obsolete private-worker checksum from a copied
+consumer lets Go generate its replacement; no module version, module definition,
+SDK checksum or third-party dependency changes. The downloaded archive matches
+the selected source bytes. The public worker-tag lookup returned 404, and no tag
+or artifact was published. `worker-checksum-preparation-1` retains the original
+failure, Go-produced proposal and exact download identity.
+
+The checksum correction requires a new frozen candidate. Full archive-consumer
+verification precedes the remaining matrices so workspace resolution cannot hide
+this distribution mismatch. The collection contention result and external
+native-platform/provider/packaging/security-administration gates remain visible.

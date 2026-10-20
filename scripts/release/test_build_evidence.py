@@ -114,6 +114,10 @@ class BuildEvidenceTests(unittest.TestCase):
                     for channel in ('stdout', 'stderr'):
                         output = directory / (name + '-' + channel + '.log')
                         output.write_bytes(b'')
+                        if name == 'dashboard-audit' and channel == 'stdout':
+                            output.write_bytes(release.encoded({'advisories': {}, 'metadata': {
+                                'dependencies': 3, 'devDependencies': 7, 'optionalDependencies': 2,
+                                'totalDependencies': 10, 'vulnerabilities': {level: 0 for level in ('info', 'low', 'moderate', 'high', 'critical')}}}))
                         row[channel] = build_campaign.fingerprint(output, self.root)
                     report['checks'].append(row)
                 (directory / 'generation.json').write_bytes(release.encoded({
@@ -294,6 +298,13 @@ class BuildEvidenceTests(unittest.TestCase):
                     {'ImportPath': module + '/empty', 'Module': {'Path': module}, 'GoFiles': ['empty.go']})))
             elif command[1] == 'test':
                 stdout.write_bytes(b''.join((json.dumps(row) + '\n').encode() for row in passed_events(module)))
+            elif command[1] == 'audit':
+                self.assertEqual(environment['NODE_TLS_REJECT_UNAUTHORIZED'], '1')
+                self.assertEqual(environment['npm_config_strict_ssl'], 'true')
+                for option in ('--only=', '--prod=false', '--dev=false', '--optional=true',
+                               '--ignore-registry-errors=false', '--ignore-unfixable=false'):
+                    self.assertIn(option, command)
+                stdout.write_bytes((source_directory / 'dashboard-audit-stdout.log').read_bytes())
             else:
                 stdout.write_bytes(b'')
                 if 'scripts/sdk/regenerate_check.py' in command:
@@ -332,6 +343,42 @@ class BuildEvidenceTests(unittest.TestCase):
         result = build.verify_build_campaigns(self.manifest, outputs)
         self.assertEqual(result['status'], 'consistent_pending_review')
         self.assertFalse(result['release_gate_passed'])
+
+    def test_recorder_rejects_exit_zero_with_invalid_or_filtered_audit_output(self):
+        source = self.paths[1].with_name(self.paths[1].stem + '.artifacts') / 'dashboard-audit-stdout.log'
+        filtered = json.loads(source.read_bytes())
+        filtered['metadata']['vulnerabilities']['high'] = 1
+        subset = json.loads(source.read_bytes())
+        subset['metadata']['devDependencies'] = 0
+        for index, payload in enumerate((b'ignored registry error', release.encoded(filtered), release.encoded(subset))):
+            with self.subTest(payload=payload):
+                output = self.root / ('invalid-audit-' + str(index) + '.json')
+                args, observe, capture = self.recorder_fixture(release.RECIPE['go_version'], output)
+                native_executable = build_campaign.executable
+                def executable(name):
+                    return Path('/fixture/bin/' + name) if name in ('node', 'pnpm') else native_executable(name)
+
+                def invalid_audit(command, cwd, environment, stdout, stderr, timeout):
+                    status = capture(command, cwd, environment, stdout, stderr, timeout)
+                    if command[1] == 'audit':
+                        stdout.write_bytes(payload)
+                    return status
+
+                with patch.object(build, 'source_snapshot', return_value=build.source_inputs(self.manifest)), \
+                        patch.object(build_campaign.dependencies, 'cache_environment', return_value={
+                            'GOMODCACHE': str(self.fixture.fixture.cache / 'modules'), 'GOPATH': str(self.fixture.fixture.cache / 'go-path')}), \
+                        patch.object(build_campaign.subprocess, 'check_output', side_effect=observe), \
+                        patch.object(build_campaign.worker_campaign, 'capture', side_effect=invalid_audit), \
+                        patch.object(build_campaign, 'executable', side_effect=executable), \
+                        patch.object(build_campaign.time, 'monotonic', side_effect=itertools.count(0, 20)):
+                    result = build_campaign.campaign(args)
+                self.assertEqual(result['result'], 'failed')
+                self.assertEqual(result['checks'][-1]['name'], 'dashboard-audit')
+                self.assertEqual(result['checks'][-1]['exit_code'], 0)
+                retained = output.with_name(output.stem + '.artifacts') / 'dashboard-audit-stdout.log'
+                self.assertEqual(retained.read_bytes(), payload)
+                self.assertEqual(result['checks'][-1]['stdout'], build_campaign.fingerprint(retained, output.parent))
+                self.assertEqual(json.loads(output.read_bytes())['result'], 'failed')
 
     def test_security_rejection_stops_before_test_matrix(self):
         output = self.root / 'security-failed.json'
@@ -452,6 +499,34 @@ class BuildEvidenceTests(unittest.TestCase):
         self.reports[1]['checks'][-2]['command'].append('Monitor.test.tsx')
         self.save()
         with self.assertRaisesRegex(ValueError, 'command'): self.verify()
+
+    def test_frontend_audit_must_be_present_and_report_zero_advisories(self):
+        directory = self.paths[1].with_name(self.paths[1].stem + '.artifacts')
+        row = next(row for row in self.reports[1]['checks'] if row['name'] == 'dashboard-audit')
+        output = directory / 'dashboard-audit-stdout.log'
+        original = output.read_bytes()
+        for change in (
+                lambda data: data['metadata']['vulnerabilities'].update(high=1),
+                lambda data: data['metadata']['vulnerabilities'].update(low=False),
+                lambda data: data['metadata']['vulnerabilities'].pop('critical'),
+                lambda data: data['metadata'].update(totalDependencies=0),
+                lambda data: data['metadata'].update(dependencies=0),
+                lambda data: data['metadata'].update(devDependencies=0),
+                lambda data: data['metadata'].update(optionalDependencies=0),
+                lambda data: data['metadata'].update(devDependencies=True),
+                lambda data: data['metadata'].update(devDependencies=11),
+                lambda data: data['metadata'].pop('devDependencies'),
+                lambda data: data.update(advisories={'id': {'severity': 'high'}}),
+                lambda data: data.pop('metadata')):
+            data = json.loads(original); change(data)
+            output.write_bytes(release.encoded(data))
+            row['stdout'] = build_campaign.fingerprint(output, self.root)
+            self.save()
+            with self.assertRaisesRegex(ValueError, 'frontend dependency audit'): self.verify()
+        output.write_bytes(original); row['stdout'] = build_campaign.fingerprint(output, self.root)
+        self.reports[1]['checks'].remove(row)
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'coverage'): self.verify()
 
     def test_symlink_raw_input_and_duplicate_json_fields_fail(self):
         directory = self.paths[0].with_name(self.paths[0].stem + '.artifacts')

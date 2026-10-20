@@ -11,6 +11,7 @@ import base64
 import hashlib
 import http.server
 import json
+import os
 import pathlib
 import re
 import socket
@@ -140,7 +141,7 @@ def validate_request(driver, method, path, headers, raw, expected_path, monitor)
         'pushover': {'token': 'local-app-token', 'user': 'local-user', 'title': 'CPRa fixture',
                      'priority': '2', 'retry': '60', 'expire': '1800', 'sound': 'pushover'},
         'twilio': {'From': '+15005550006', 'To': '+15005550009'},
-        'datadog': {'title': 'CPRA alert: ' + monitor_name, 'alert_type': 'error', 'tags': ['fixture:cpra']},
+        'datadog': {'title': 'CPRa CRITICAL ALERT: ' + monitor_name, 'alert_type': 'error', 'tags': ['fixture:cpra']},
         'pagerduty': {'routing_key': 'local-routing-key', 'event_action': 'trigger'},
     }
     if any(body.get(key) != value for key, value in fields.get(driver, {}).items()):
@@ -256,8 +257,59 @@ class ContractHandler(http.server.BaseHTTPRequestHandler):
 
 
 def run(binary, out):
-    out = pathlib.Path(out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out, output = reserve_suite(out, MODES)
+    with output:
+        return run_suite(binary, out, output)
+
+
+def reserve_suite(out, modes):
+    # Do not resolve the final name: a symlink is an existing output, including
+    # a dangling one. The verifier exclusively creates each child report too.
+    out = pathlib.Path(out).absolute()
+    reports = [out if mode == 'success' else out.with_name(out.stem + '-' + mode + '.json') for mode in modes]
+    suite = out.with_suffix('.suite.json')
+    paths = [*reports, *(pathlib.Path(str(report) + '.evidence') for report in reports), suite]
+    if any(path.exists() or path.is_symlink() for path in paths):
+        raise FileExistsError('select fresh report and evidence paths before running the suite')
+    out.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    descriptor = os.open(suite, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    output = os.fdopen(descriptor, 'w')
+    output.write('{"passed": false, "status": "running"}\n')
+    output.flush()
+    return out, output
+
+
+def write_suite(output, suite):
+    output.seek(0)
+    output.truncate()
+    json.dump(suite, output, indent=2)
+    output.write('\n')
+    output.flush()
+    os.fsync(output.fileno())
+
+
+def expected_outcome(driver, mode):
+    if mode == 'success':
+        return 'accepted'
+    # These fixtures return a generic error body. Only the named providers
+    # prove rejection from these statuses without further response evidence.
+    if mode == '400' and driver in ('pagerduty', 'opsgenie'):
+        return 'rejected'
+    if mode == '429' and driver in ('slack', 'pagerduty', 'opsgenie', 'teams', 'twilio'):
+        return 'rejected'
+    return 'unknown'
+
+
+def scenario_passed(driver, mode, record, state, run_id):
+    return (record.get('operation_invoked') is True
+            and state['count'] == 1 and state['invalid'] == 0 and state['run_id'] == run_id
+            and record['accepted'] == (mode == 'success')
+            and record['status'] == ('pass' if mode == 'success' else 'fail')
+            and record.get('outcome') == expected_outcome(driver, mode)
+            and record['duration_ms'] < 3000)
+
+
+def run_suite(binary, out, output):
     observer = pathlib.Path(__file__).with_name('observe_fixture.py').resolve()
     server = ContractServer()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -289,14 +341,12 @@ def run(binary, out):
                 for driver in DRIVERS:
                     record = next(item for item in report['records'] if item['kind'] == 'code' and item['driver'] == driver)
                     state = server.audit(driver + '-' + mode)
-                    passed = (record.get('operation_invoked') is True
-                              and state['count'] == 1 and state['invalid'] == 0 and state['run_id'] == report['run_id']
-                              and record['accepted'] == (mode == 'success') and record['status'] == ('pass' if mode == 'success' else 'fail')
-                              and record['duration_ms'] < 3000)
+                    passed = scenario_passed(driver, mode, record, state, report['run_id'])
                     suite['scenarios'].append({'driver': driver, 'mode': mode, 'passed': passed,
                                                'requests': state['count'], 'invalid_requests': state['invalid'],
                                                'request_sha256': state['digest'], 'run_id': state['run_id'],
                                                'driver_accepted': record['accepted'], 'duration_ms': record['duration_ms'],
+                                               'outcome': record.get('outcome'), 'expected_outcome': expected_outcome(driver, mode),
                                                'driver_status': record['status'], 'reason': record.get('reason', ''),
                                                'operation_invoked': record.get('operation_invoked', False),
                                                'report': report_path.name})
@@ -306,7 +356,7 @@ def run(binary, out):
         server.server_close()
         thread.join()
         suite['passed'] = len(suite['scenarios']) == len(DRIVERS) * len(MODES) and all(s['passed'] for s in suite['scenarios'])
-        out.with_suffix('.suite.json').write_text(json.dumps(suite, indent=2) + '\n')
+        write_suite(output, suite)
     return 0 if suite['passed'] else 1
 
 

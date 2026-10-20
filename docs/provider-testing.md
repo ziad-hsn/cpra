@@ -108,8 +108,8 @@ successful JSON response bodies that the production drivers do not interpret.
 
 The protocol suite runs positive and negative HTTP, TCP, UDP, DNS, TLS, SMTP and
 gRPC scenarios against actual local listeners. TLS verification stays enabled
-using a temporary trusted certificate. The current gRPC driver verifies TCP
-reachability, not the gRPC Health protocol. SMTP verifies the envelope and message
+using a temporary trusted certificate. The gRPC scenario exercises the default
+TCP reachability mode; it does not verify the optional gRPC health mode. SMTP verifies the envelope and message
 at the local receiver, not Internet mailbox delivery. DNS `server` accepts a host,
 `host:port`, or IPv6 address, with port 53 as the default.
 

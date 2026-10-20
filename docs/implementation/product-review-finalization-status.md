@@ -506,3 +506,47 @@ results are scoped to that commit and do not replace the corrected final matrix.
 `fixture-repairs-go1272-after-1` and `fixture-repairs-go1260-after-1` pass the
 actual checkout's corrected preflight, UTC and subprocess tests with the race
 detector. The reviewed diff changes only these two tests and this status record.
+
+### Companion-check corrections after `6605bdf`
+
+The frozen matrix was stopped before editing the candidate after required
+companion checks found a frontend dependency advisory and an actual keyboard
+focus escape. The interrupted matrix remains incomplete; its guard recorded
+successful process cleanup. Its completed package checks, static bundle and
+seven-variant Go vulnerability scan remain evidence for that source only.
+
+The frontend lockfile now selects `source-map-js` 1.2.2, which fixes
+GHSA-68fv-2mgg-jv7q. The rebuilt dashboard passes types, lint and all 594 component
+tests. The verified-TLS audit reports 387 dependencies and zero advisories. The
+release recorder and reader both validate the original audit payload, require
+production, development and optional inventories, and reject nonzero counts even
+when the command returns zero. Explicit selection arguments prevent inherited
+production-only or optional-exclusion settings from narrowing the audit.
+`frontend-audit-selection-1` demonstrates all 387 dependencies under those
+adversarial settings; `frontend-audit-gate-unit-after-3` passes 22 reader/recorder
+regressions, including incomplete and filtered zero-exit reports. Independent
+source and retained-output review closed both audit findings.
+
+The Dialog focus trap now handles a focused validation summary outside the
+sequential tab order. `companion-accessibility-after-2` passes 15 scenarios,
+including automatic error focus and both Tab directions, with the original
+pending-operation and background-inert assertions retained. The earlier failed
+focus case remains available. This fixture accessibility campaign is distinct
+from the required real-server browser matrix. Separate source and evidence
+review closed the focus correction without executing new tests.
+
+Local provider helpers now configure a dedicated log root, expect the corrected
+Datadog title and verify the exact outcome classification for each response.
+They refuse existing or dangling report/evidence paths before starting fixtures;
+suite summaries are exclusively created and updated through the owned stream.
+`companion-fixture-unit-after-2` passes 21 regressions;
+`companion-verification-local-after-1` passes four production-path local cases;
+`companion-verification-contracts-after-1` passes 84 HTTP contract cases; and
+`companion-verification-protocols-after-1` passes 14 protocol cases. These are
+local fixture results, not provider-account or health-RPC qualification.
+Independent source review closed the fixture corrections without running tests.
+
+The corrected source requires a new freeze and final affected matrix. No result
+above qualifies publication. Only the inactive, task-owned Go compiler temporary
+directory from the interrupted run was removed after checking process mappings
+and open descriptors; logs and failing evidence remain retained.

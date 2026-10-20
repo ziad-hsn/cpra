@@ -176,7 +176,20 @@ const secret = 'frontend-fixture-private-value-0123456789';
   check(await disable.isVisible(), 'Escape hid a pending conditional write');
   report.keyboardChecks.push({ check: 'pending-write-focus-and-escape', passed: true });
   finishPending();
-  await disable.getByRole('alert').waitFor();
+  const conflict = disable.getByRole('alert');
+  await conflict.waitFor();
+  await page.waitForFunction(() => document.querySelector('dialog[open] [role="alert"]') === document.activeElement);
+  for (const [key, expected] of [
+    ['Shift+Tab', disable.getByRole('button', { name: 'Disable', exact: true })],
+    ['Tab', disable.getByRole('button', { name: 'Cancel', exact: true })],
+  ]) {
+    await conflict.focus();
+    check(await conflict.evaluate(element => element === document.activeElement), 'Conflict summary did not receive focus');
+    await page.keyboard.press(key);
+    check(await disable.evaluate(element => element.contains(document.activeElement)), 'Tab from conflict summary left the dialog');
+    check(await expected.evaluate(element => element === document.activeElement), 'Conflict summary tab direction selected the wrong control');
+  }
+  report.keyboardChecks.push({ check: 'conflict-summary-tab-directions', passed: true });
   await modal('control-conflict', disable);
   await page.getByRole('button', { name: 'Review action action-1', exact: true }).click();
   await modal('unknown-action-review', page.getByRole('dialog', { name: 'Review unknown action', exact: true }));

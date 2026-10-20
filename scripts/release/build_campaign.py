@@ -283,6 +283,8 @@ def campaign(args):
                     build.require(row['exit_code'] == 0, name + ' failed')
                     if name == 'format':
                         build.require(row['stdout']['bytes'] == 0 and row['stderr']['bytes'] == 0, 'Go sources are unformatted')
+                    if name == 'dashboard-audit':
+                        build.frontend_audit(artifacts / (name + '-stdout.log'))
                     after = build.source_snapshot(root)
                     row['source_changed'] = sorted(path for path in set(expected) | set(after) if expected.get(path) != after.get(path))
                     build.require(not row['source_changed'], 'source changed during ' + name)

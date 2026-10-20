@@ -48,7 +48,9 @@ export function Dialog({ children, labelledBy, role = 'dialog', pending = false,
       element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden');
     if (!controls.length) { event.preventDefault(); dialog.focus(); return; }
     const first = controls[0], last = controls[controls.length - 1];
-    if (document.activeElement === dialog) { event.preventDefault(); (event.shiftKey ? last : first).focus(); }
+    // Error summaries and headings can receive focus without entering the tab
+    // sequence. Keep either direction inside the dialog from those positions.
+    if (!controls.some(control => control === document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); }
     else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }}>{children}</dialog>;

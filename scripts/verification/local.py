@@ -14,11 +14,27 @@ import tempfile
 import threading
 
 
+ROLES = {('pulse', 'http'), ('code', 'webhook'), ('code', 'log'), ('intervention', 'webhook')}
+
+
+def passing_report(report):
+    configured = [record for record in report['records'] if record.get('configured')]
+    return (len(configured) == len(ROLES)
+            and {(record['kind'], record['driver']) for record in configured} == ROLES
+            and all(record['status'] == 'pass' and record.get('operation_invoked') is True
+                    and record.get('accepted') is True and record.get('observed') is True
+                    and record.get('evidence_type') == 'local_integration' for record in configured)
+            and report.get('all_providers_verified') is False)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', required=True)
     parser.add_argument('--out', required=True)
     args = parser.parse_args()
+    output = pathlib.Path(args.out).absolute()
+    if any(path.exists() or path.is_symlink() for path in (output, pathlib.Path(str(output) + '.evidence'))):
+        raise FileExistsError('select fresh report and evidence paths before running the fixture')
     counts = {'http': 0, 'notify': 0, 'recover': 0}
     lock = threading.Lock()
 
@@ -58,25 +74,27 @@ def main():
     observer = str(pathlib.Path(__file__).with_name('observe_local.py').resolve())
     try:
         with tempfile.TemporaryDirectory(prefix='cpra-live-') as directory:
-            log = str(pathlib.Path(directory) / 'alerts.jsonl')
+            log_directory = pathlib.Path(directory) / 'notifications'
+            log_directory.mkdir(mode=0o700)
+            log_name = 'alerts.jsonl'
+            log = str(log_directory / log_name)
             monitors, cases = [], []
             for kind, driver, observation in [('pulse', 'http', 'http'), ('code', 'webhook', 'notify'), ('code', 'log', 'log'), ('intervention', 'webhook', 'recover')]:
                 ident = kind + '-' + driver
                 monitor = {'id': ident, 'name': ident, 'pulse_check': {'type': 'http', 'interval': '60s', 'timeout': '5s', 'config': {'url': url + '/health', 'expected_status': [204]}}}
                 if kind == 'code':
-                    monitor['codes'] = {'red': {'dispatch': True, 'notify': driver, 'config': {'file': log} if driver == 'log' else {'url': url + '/notify'}}}
+                    monitor['codes'] = {'red': {'dispatch': True, 'notify': driver, 'config': {'file': log_name} if driver == 'log' else {'url': url + '/notify'}}}
                 if kind == 'intervention':
                     monitor['intervention'] = {'action': 'webhook', 'target': {'type': 'webhook', 'url': url + '/recover', 'timeout': '5s'}}
                 monitors.append(monitor)
                 cases.append({'kind': kind, 'driver': driver, 'configured': True, 'evidence_type': 'local_integration', 'monitor_id': ident, 'color': 'red', 'observer': [sys.executable, observer, observation, log if observation == 'log' else url]})
             config = pathlib.Path(directory) / 'live.yaml'
-            config.write_text(json.dumps({'manifest': {'monitors': monitors}, 'cases': cases}))
-            result = subprocess.run([str(pathlib.Path(args.binary).resolve()), '-live', '-config', str(config), '-out', str(pathlib.Path(args.out).resolve())])
+            config.write_text(json.dumps({'log_directory': str(log_directory), 'manifest': {'monitors': monitors}, 'cases': cases}))
+            result = subprocess.run([str(pathlib.Path(args.binary).resolve()), '-live', '-config', str(config), '-out', str(output)])
             if result.returncode not in (0, 2):
                 return result.returncode
-            report = json.loads(pathlib.Path(args.out).read_text())
-            configured = [r for r in report['records'] if r['status'] != 'not_configured']
-            if len(configured) != 4 or any(r['status'] != 'pass' for r in configured):
+            report = json.loads(output.read_text())
+            if not passing_report(report):
                 return 1
             print('Four local scenarios passed. Full-provider verification remains incomplete.')
             return 0

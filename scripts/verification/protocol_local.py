@@ -23,7 +23,7 @@ import sys
 import tempfile
 import threading
 
-from contracts import RUN_PATTERN
+from contracts import RUN_PATTERN, reserve_suite, write_suite
 
 
 class Audit:
@@ -183,13 +183,17 @@ def datagram_handler(driver, mode, audit, key):
 
 
 def run(binary, out):
-    out = pathlib.Path(out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out, output = reserve_suite(out, ('success', 'negative'))
+    with output:
+        return run_suite(binary, out, output)
+
+
+def run_suite(binary, out, output):
     audit, servers, threads, reservations = Audit(), [], [], []
     observer = pathlib.Path(__file__).with_name('observe_fixture.py').resolve()
     suite = {'evidence_type': 'local_integration', 'provider_certification': False, 'scenarios': [],
              'binary_sha256': hashlib.sha256(pathlib.Path(binary).read_bytes()).hexdigest(),
-             'limitations': ['gRPC checks TCP reachability only; no gRPC health RPC is implemented.',
+             'limitations': ['This gRPC scenario tests the default TCP reachability mode; it does not exercise the optional health RPC.',
                              'SMTP receipt is verified at the local relay; no external inbox is involved.']}
 
     class HTTPHandler(http.server.BaseHTTPRequestHandler):
@@ -304,7 +308,7 @@ def run(binary, out):
         for reservation in reservations:
             reservation.close()
         suite['passed'] = len(suite['scenarios']) == 14 and all(s['passed'] for s in suite['scenarios'])
-        out.with_suffix('.suite.json').write_text(json.dumps(suite, indent=2) + '\n')
+        write_suite(output, suite)
     return 0 if suite['passed'] else 1
 
 

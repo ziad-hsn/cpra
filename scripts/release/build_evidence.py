@@ -38,7 +38,7 @@ VARIANTS = (
     ('worker-external', 'sdk/go/worker', sdk_evidence.WORKER, 'externaljobs'),
 )
 GENERATION_CHECKS = ('format', 'sdk-generation', 'brand-generation', 'dashboard-schema', 'dashboard-install',
-                     'dashboard-freshness', 'dashboard-types', 'dashboard-lint',
+                     'dashboard-audit', 'dashboard-freshness', 'dashboard-types', 'dashboard-lint',
                      'dashboard-tests', 'dashboard-rebuild')
 SDK_OUTPUTS = {'sdk/go/' + name for name in (
     'api/generated_base.go', 'api/generated_external.go',
@@ -213,7 +213,8 @@ def frontend_results(path):
 
 
 def check_environment():
-    environment = dict(ENVIRONMENT, GOPROXY='https://proxy.golang.org', CGO_ENABLED='0', CI='true')
+    environment = dict(ENVIRONMENT, GOPROXY='https://proxy.golang.org', CGO_ENABLED='0', CI='true',
+                       NODE_TLS_REJECT_UNAUTHORIZED='1', npm_config_strict_ssl='true')
     for name in ('CPRA_WORKER_PROCESS_RACE', 'CPRA_RUN_CLI_INTEGRATION'):
         environment.pop(name)
     return environment
@@ -228,6 +229,11 @@ def check_commands(go, programs, directory, source):
         'brand-generation': ('.', [python, '-B', 'scripts/brand/generate.py', '--check']),
         'dashboard-schema': ('.', [python, '-B', 'scripts/dashboard/generate_api.py', '--check']),
         'dashboard-install': ('dashboard', [pnpm, 'install', '--frozen-lockfile', '--prod=false']),
+        # In pinned pnpm, --prod/--dev select ONLY that class. Clearing both
+        # selectors includes both classes; optional packages stay included.
+        'dashboard-audit': ('dashboard', [pnpm, 'audit', '--json', '--audit-level=low',
+                                         '--only=', '--prod=false', '--dev=false', '--optional=true',
+                                         '--ignore-registry-errors=false', '--ignore-unfixable=false']),
         'dashboard-freshness': ('.', [python, '-B', 'scripts/dashboard/asset_manifest.py']),
         'dashboard-types': ('dashboard', [pnpm, 'exec', 'tsc', '--noEmit']),
         'dashboard-lint': ('dashboard', [pnpm, 'run', 'lint']),
@@ -266,6 +272,8 @@ def verify_checks(report, manifest, path, remember):
             require(size == record['bytes'], 'generation output size differs')
         if name == 'format':
             require(row['stdout']['bytes'] == 0 and row['stderr']['bytes'] == 0, 'Go sources are unformatted')
+        if name == 'dashboard-audit':
+            frontend_audit(directory / (name + '-stdout.log'))
     payloads = report.get('check_results')
     require(isinstance(payloads, dict) and set(payloads) == {'generation.json', 'dashboard-tests.json'},
             'original generation or dashboard results are missing')
@@ -285,6 +293,21 @@ def verify_checks(report, manifest, path, remember):
     dashboard = frontend_results(directory / 'dashboard-tests.json')
     require(report.get('dashboard_tests') == dashboard, 'dashboard summary contradicts its original cases')
     return dashboard
+
+
+def frontend_audit(path):
+    audit = read_report(path)
+    metadata = audit.get('metadata')
+    classes = ('dependencies', 'devDependencies', 'optionalDependencies', 'totalDependencies')
+    require(isinstance(metadata, dict)
+            and all(type(metadata.get(name)) is int and metadata[name] > 0 for name in classes)
+            and all(metadata[name] <= metadata['totalDependencies'] for name in classes),
+            'frontend dependency audit inventory is missing or excludes a required dependency class')
+    levels = metadata.get('vulnerabilities')
+    require(audit.get('advisories') == {} and isinstance(levels, dict)
+            and set(levels) == {'info', 'low', 'moderate', 'high', 'critical'}
+            and all(type(count) is int and count == 0 for count in levels.values()),
+            'frontend dependency audit is incomplete or contains advisories')
 
 
 def verify_build_campaigns(manifest, paths):

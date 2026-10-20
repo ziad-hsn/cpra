@@ -178,7 +178,11 @@ func TestActionProjectionRejectsForgedRecoveryCache(t *testing.T) {
 		change(m.ActionProjection)
 		i := s.fsm.image
 		i.Monitors = map[string]Monitor{m.ID: m}
-		if validateProjectionInventory(i, frozen) == nil {
+		worker, err := newWorkerActionValidation(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if validateProjectionInventory(i, frozen, worker) == nil {
 			t.Fatal("forged admission summary accepted")
 		}
 	}

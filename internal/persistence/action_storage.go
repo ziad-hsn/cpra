@@ -218,6 +218,10 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 	if progress.Sequence != i.ActionStorage.Sequence || progress.Position != i.ActionStorage.Position {
 		return errActionLedger
 	}
+	worker, err := newWorkerActionValidation(i)
+	if err != nil {
+		return err
+	}
 	if progress.Sequence != 0 {
 		if err := view.validateActionInventory(progress); err != nil {
 			return err
@@ -262,7 +266,7 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 	if err := validateActionProjectionMigration(i, view); err != nil {
 		return err
 	}
-	if err := validateProjectionInventory(i, view); err != nil {
+	if err := validateProjectionInventory(i, view, worker); err != nil {
 		return err
 	}
 	return view.walkActions(func(_ []byte, row actionLedgerRow) error {
@@ -284,11 +288,11 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 				return err
 			}
 		}
-		return validateRetainedAction(i, monitor, row.Action, !current)
+		return validateRetainedAction(i, monitor, row.Action, !current, worker)
 	})
 }
 
-func validateRetainedAction(i image, monitor Monitor, a Action, archived bool) error {
+func validateRetainedAction(i image, monitor Monitor, a Action, archived bool, worker workerActionValidation) error {
 	if err := validateWorkerRetainedAction(i, a); err != nil {
 		return err
 	}
@@ -301,7 +305,7 @@ func validateRetainedAction(i image, monitor Monitor, a Action, archived bool) e
 	default:
 		return errActionLedger
 	}
-	if err := validateActionEvidence(i, a, archived); err != nil {
+	if err := validateActionEvidence(i, a, archived, worker); err != nil {
 		return err
 	}
 	if err := validateActionIncarnation(monitor, a); err != nil {

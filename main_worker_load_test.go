@@ -34,6 +34,8 @@ type workerLoadInvocation struct {
 	ExecutionID, Kind, MonitorID string
 	Count                        int
 	Status                       string
+	Notification                 *api.WorkerNotification
+	Completed                    bool
 }
 
 type workerLoadReceipt struct {
@@ -46,12 +48,61 @@ type workerLoadReceipt struct {
 type workerLoadTarget struct {
 	mu          sync.Mutex
 	invocations map[string]workerLoadInvocation
-	checks      map[string]int
+	episodes    map[string]*workerLoadEpisode
 	totals      map[string]int
 	active      int
 	peak        int
 	release     chan struct{}
 	releaseOnce sync.Once
+}
+
+// A synthetic outage persists until the real receiver completes its recovery
+// and yellow delivery. Healthy checks then keep the closure eligible until its
+// matching green delivery completes. Handler calls never wait on another role.
+type workerLoadEpisode struct {
+	recovery bool
+	yellow   *api.WorkerNotification
+	closed   int
+}
+
+func (e *workerLoadEpisode) complete(event workerLoadInvocation) (string, error) {
+	healthy := e.recovery && e.yellow != nil
+	switch event.Kind {
+	case "check":
+		if healthy {
+			return "success", nil
+		}
+		return "failure", nil
+	case "recovery":
+		if e.recovery {
+			return "", errors.New("recovery repeated within the target outage")
+		}
+		e.recovery = true
+		return "completed", nil
+	case "notification":
+		n := event.Notification
+		if n == nil || n.IncidentID == "" || n.CorrelationID == "" || n.DeliveryID == "" || n.EndpointID == "" {
+			return "", errors.New("notification lacks its committed identity")
+		}
+		switch n.Color {
+		case "yellow":
+			if e.yellow != nil {
+				return "", errors.New("outage notification repeated within the target outage")
+			}
+			copy := *n
+			e.yellow = &copy
+		case "green":
+			if !healthy || n.IncidentID != e.yellow.IncidentID || n.CorrelationID != e.yellow.CorrelationID || n.DeliveryID == e.yellow.DeliveryID {
+				return "", errors.New("recovery notification does not close the target outage")
+			}
+			e.recovery, e.yellow = false, nil
+			e.closed++
+		default:
+			return "", errors.New("unexpected load notification color")
+		}
+		return "delivered", nil
+	}
+	return "", errors.New("unexpected load handler category")
 }
 
 func (s *workerLoadTarget) releaseInitialBatch() { s.releaseOnce.Do(func() { close(s.release) }) }
@@ -64,6 +115,11 @@ func (s *workerLoadTarget) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if s.episodes[event.MonitorID] == nil {
+		s.mu.Unlock()
+		http.Error(w, "unconfigured monitor", http.StatusBadRequest)
+		return
+	}
 	if len(s.invocations) >= 65536 {
 		s.mu.Unlock()
 		http.Error(w, "target audit capacity exhausted", http.StatusInsufficientStorage)
@@ -71,16 +127,6 @@ func (s *workerLoadTarget) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	old := s.invocations[event.ExecutionID]
 	event.Count = old.Count + 1
-	event.Status = map[string]string{"check": "success", "recovery": "completed", "notification": "delivered"}[event.Kind]
-	if event.Kind == "check" {
-		s.checks[event.MonitorID]++
-		// Real failed and healthy observations repeatedly open and close
-		// incidents. Recovery and notification work therefore keep arriving
-		// while newer checks compete for the same worker slots.
-		if phase := s.checks[event.MonitorID] % 4; phase == 1 || phase == 2 {
-			event.Status = "failure"
-		}
-	}
 	s.invocations[event.ExecutionID] = event
 	s.totals[event.Kind]++
 	s.active++
@@ -101,7 +147,17 @@ func (s *workerLoadTarget) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-r.Context().Done():
 		return
 	}
-	_ = json.NewEncoder(w).Encode(api.Outcome{Status: event.Status, Data: json.RawMessage(`{}`)})
+	s.mu.Lock()
+	current := s.invocations[event.ExecutionID]
+	status, err := s.episodes[event.MonitorID].complete(event)
+	current.Status, current.Completed = status, err == nil
+	s.invocations[event.ExecutionID] = current
+	s.mu.Unlock()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(api.Outcome{Status: status, Data: json.RawMessage(`{}`)})
 }
 
 func (s *workerLoadTarget) counts() (map[string]int, int) {
@@ -209,7 +265,7 @@ func runWorkerLoad(t *testing.T, duration time.Duration) {
 	fixture := newMainManagementFixture(t)
 	fixture.settings.ExternalJobs.Enabled = true
 	writeMainRuntime(t, fixture.options.runtimeFile, fixture.settings)
-	targetState := &workerLoadTarget{invocations: make(map[string]workerLoadInvocation), checks: make(map[string]int), totals: make(map[string]int), release: make(chan struct{})}
+	targetState := &workerLoadTarget{invocations: make(map[string]workerLoadInvocation), episodes: make(map[string]*workerLoadEpisode), totals: make(map[string]int), release: make(chan struct{})}
 	target := httptest.NewServer(targetState)
 	t.Cleanup(target.Close)
 	t.Cleanup(targetState.releaseInitialBatch)
@@ -232,11 +288,8 @@ func runWorkerLoad(t *testing.T, duration time.Duration) {
 	}
 	bootstrap.stop(t, false)
 	ids := seedWorkerLoadMonitors(t, fixture, jobs)
-	// Offset failure cycles so all categories keep arriving throughout the
-	// campaign. Green recovery notices use the normal cooldown bypass; yellow
-	// notices retain the production five-minute suppression policy.
-	for index, id := range ids {
-		targetState.checks[id] = index % 4
+	for _, id := range ids {
+		targetState.episodes[id] = &workerLoadEpisode{}
 	}
 	private := filepath.Dir(fixture.options.runtimeFile)
 	grants := make([]persistence.WorkerGrant, 0, len(jobs))
@@ -258,7 +311,7 @@ func runWorkerLoad(t *testing.T, duration time.Duration) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, server := startWorkerServerProcess(t, fixture)
+	client, server := startWorkerServerProcess(t, fixture, os.Getenv("CPRA_WORKER_LOAD_SERVER_CPU_PROFILE"))
 	keyFile := filepath.Join(private, "worker.key")
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
@@ -393,7 +446,7 @@ measurement:
 			}
 			previous = totals
 			if int(now.Sub(started).Seconds())%5 == 0 {
-				t.Logf("load sample elapsed=%s totals=%v active=%d records=%d", now.Sub(started).Round(time.Second), totals, status.ActiveHandlers, status.Records)
+				t.Logf("load sample elapsed=%s totals=%v active=%d records=%d pending_outcomes=%d", now.Sub(started).Round(time.Second), totals, status.ActiveHandlers, status.Records, status.PendingOutcomes)
 			}
 			if now.Sub(windowStart) >= 30*time.Second {
 				windows = append(windows, map[string]any{"elapsed_seconds": now.Sub(started).Seconds(), "invocations": totals, "active_handlers": status.ActiveHandlers})
@@ -401,6 +454,9 @@ measurement:
 				t.Logf("mixed load elapsed=%s totals=%v active=%d records=%d", now.Sub(started).Round(time.Second), totals, status.ActiveHandlers, status.Records)
 				if raw, err := os.ReadFile(statusFile + ".results"); err == nil && len(raw) <= 8192 {
 					t.Logf("worker result request statistics %s", raw)
+				}
+				if raw, err := os.ReadFile(statusFile + ".protocol"); err == nil && len(raw) <= 8192 {
+					t.Logf("worker admission request statistics %s", raw)
 				}
 			}
 		}
@@ -439,11 +495,13 @@ measurement:
 		t.Fatal("graceful load shutdown did not drain the journal", final, err)
 	}
 	expiredChecks := verifyWorkerLoadReceipts(t, fixture, targetState, auditFile)
+	// Restart after every load run. Receipt retirement depends on the exact
+	// per-monitor throughput and must not decide whether restoration is tested.
+	_, restarted := startWorkerServerProcess(t, fixture, os.Getenv("CPRA_WORKER_RESTORE_CPU_PROFILE"))
 	if len(expiredChecks) > 0 {
 		// The count bound intentionally retires older completed checks. Confirm
 		// explicit expiry through the normal restarted server; a generic missing
 		// record, conflict or unavailable response cannot satisfy reconciliation.
-		_, restarted := startWorkerServerProcess(t, fixture)
 		token, err := os.ReadFile(tokenFile)
 		if err != nil {
 			t.Fatal(err)
@@ -460,8 +518,8 @@ measurement:
 				t.Fatal("missing check lacked authoritative expiry after restart", row.Outcome.ExecutionID, err)
 			}
 		}
-		restarted.stop(t, false)
 	}
+	restarted.stop(t, false)
 	totals, peak := targetState.counts()
 	if peak != 16 || totals["check"] < workerLoadMonitors*int(duration/(30*time.Second)) {
 		t.Fatal("target did not observe the intended sustained workload", peak, totals)
@@ -473,6 +531,7 @@ measurement:
 		}
 	}
 	record := map[string]any{"duration_seconds": measured.Seconds(), "monitors": len(ids), "limits": limits,
+		"restart_seconds":    restarted.readinessDuration.Seconds(),
 		"target_invocations": totals, "target_peak_handlers": peak, "status_samples": samples, "saturated_samples": saturated,
 		"windows": windows, "drained": drained, "duplicate_invocations": 0, "unreconciled_outcomes": 0,
 		"expired_check_receipts":         len(expiredChecks) - expiredResults,
@@ -608,7 +667,7 @@ func verifyWorkerLoadReceipts(t *testing.T, fixture *mainManagementFixture, targ
 	}
 	perMonitor := make(map[string]map[string]int)
 	for id, invocation := range target.invocations {
-		if invocation.Count != 1 || receipts[id].ReceiptID == "" && !expiredChecks[id].CheckExpired {
+		if invocation.Count != 1 || !invocation.Completed || receipts[id].ReceiptID == "" && !expiredChecks[id].CheckExpired {
 			t.Fatal("repeated or unreconciled target invocation", id, invocation.Count)
 		}
 		if outcomes[id].Kind != invocation.Kind || outcomes[id].Status != invocation.Status {

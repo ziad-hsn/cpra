@@ -661,3 +661,113 @@ A fresh public GitHub API readback on 20 October reports private vulnerability
 reporting disabled; GitHub still detects no security policy on the default branch.
 The candidate's policy is not published by these private checks. Repository
 administration remains an external gate.
+
+### Worker admission, result delivery and snapshot validation after `76b324e`
+
+The frozen `76b324e` static/frontend/documentation, browser, provider-fixture,
+newcomer, vulnerability and bounded scheduling results retain that exact source
+identity. The complete matrix was not qualified. The separate-process worker
+load companion exposed additional admission and result-delivery defects;
+subsequent corrections require a new frozen candidate.
+
+Pure worker observation timeouts now use the read-health classification rather
+than creating unresolved-write recovery. Existing unresolved writes still close
+admission until reconciled, and permanent storage failure remains unavailable.
+Worker polling prepares only enough eligible, wire-fit offers for the requested
+capacity, while preserving committed ordering, suppressed-offer cancellation
+and bounded continuation. A unique preparation identity prevents an older
+concurrent poll from replacing a newer cursor. Expired-action reconciliation
+reads the original retained action from the ledger rather than assuming it must
+remain in the live monitor map. `worker-admission-after-3` passes 28 focused
+race test cases. The independent source review is recorded separately.
+
+The worker delivers results through at most four concurrent protocol calls,
+further bounded by configured handler concurrency. Each execution remains
+serial. Original deadlines order ready results; they are never renewed, and an
+expired delivery does not discard its original outcome. Reconciliation rotates
+through a bounded subset of held records so it does not make a complete retained
+inventory of network calls before considering fresh outcomes. Fatal journal or
+server-identity errors close admission, cancel sibling calls and join them before
+journal closure. Lost replies retain the identical durable outcome. This does
+not promise a maximum delivery delay during a result backlog or stalled calls.
+`worker-result-concurrency-after-2` passes all 141 worker-module race cases.
+`worker-result-concurrency-smoke-1` passes the real-process 60-second workload.
+Independent source review closed the implementation and test cleanup findings.
+
+The load fixture keeps each outage eligible until its independently observed
+recovery/yellow/green effects complete. The receipt statistics distinguish HTTP
+replies from accepted, finalized or unknown dispositions. Original concurrency,
+operation budgets and measurement length remain unchanged. Both
+`worker-result-concurrency-load-1` and `worker-load-restore-diagnostic-1` completed
+the five-minute measurement but failed the final restart's 20-second observation
+deadline. They are failed complete checks, not load passes. The diagnostic helper
+initially captured Linux stacks after that unchanged timeout, with a bounded
+two-second diagnostic interval and existing owned-process cleanup. Captured
+stacks showed active retained-state verification. The later readiness-only
+allowance and unconditional-restart correction are described below.
+
+A private copy of the completed, immutable 10,761,631-byte fixture snapshot
+contains 64 monitors and 2,163 retained worker executions. It is a decode fixture,
+not a complete backup. The first profiling attempt used an unsuitable directory
+and failed the directory protection check. The corrected race-instrumented
+`worker-snapshot-decode-before-2` completed decoding and validation in 8.697 seconds.
+The CPU profile confirmed repeated full execution scans during retained-action
+validation. A pass-local, quota-bounded action-to-execution index now preserves
+exact binding/fencing/outcome checks without repeatedly scanning that inventory.
+Duplicates and contradictory retained receipts fail; only absent retired receipts
+may use the existing terminal-action allowance. Reverse joins and full execution
+validation remain intact. No persisted format or replay envelope changed.
+
+`worker-action-validation-after-1` passes 45 focused race cases, including existing
+native snapshot corruption cases for unknown results/finalization. Independent
+source review closed the new lookup and its tests. The same snapshot's post-change
+decode took 7.720 seconds in `worker-snapshot-decode-after-1`; that invocation also
+ran the separately scoped forward-join benchmark afterward, so its complete CPU
+profile includes both. These are local race-instrumented diagnostic measurements,
+not fleet or native-platform capacity claims.
+
+The post-index `worker-load-restoration-after-1` still failed the shared 20-second
+observation deadline during authenticated worker verification. Source review
+confirmed that this was a fixture deadline, not the application's startup
+contract. A separate private diagnostic allowed 60 seconds only for server
+readiness, but its workload retired no check receipts, so the old conditional
+final-restart branch did not execute. `worker-startup-diagnostic-1` therefore
+proves load/drain only; it supplies no final restoration measurement.
+
+The test path now always restarts after the load, independently of
+receipt-retirement counts. Only server readiness has a 60-second allowance;
+receipt and observation waits remain 20 seconds. Original action deadlines,
+handler duration, concurrency and the five-minute measurement remain unchanged.
+It records process-launch-to-observed-readiness and emits its final evidence only
+after restart, any applicable explicit-expiry checks and graceful shutdown pass.
+
+`worker-load-restoration-after-2` passes with race instrumentation on Go 1.27.2:
+300.001 seconds of measurement, 64 monitors, 828 check effects, 740 notification
+effects and 382 recovery effects; peak concurrency 16. Independent accounting
+finds zero duplicate invocations or unreconciled outcomes. The journal drains to
+zero records, outcomes, unknown actions and live/reserved bytes, with 131,072
+allocated bytes. All 57 retired check receipts return authoritative expiry after
+restart. Final launch-to-observed-readiness is **39.061 seconds**. The test takes
+395.75 seconds; the guard, including compilation, takes 483.82 seconds and peaks
+at 4,768,313,344 task bytes, with no limit interruption or cleanup error.
+
+The retained final-startup CPU profile covers 39.55 seconds and shows decoding,
+action/worker validation and significant race-instrumentation work. Worker-page
+reads account for 0.48 cumulative sampled seconds of 39.29 total sampled CPU
+seconds; this does not justify treating pagination as the whole startup cost.
+No optimized-build, native-platform or larger-fleet startup claim follows from
+this single instrumented measurement.
+
+The evidence reader now requires a finite positive final-restart measurement and
+rejects a combined load/restart duration exceeding the raw test completion time.
+Both new regressions fail before the reader change; all 29 worker evidence tests
+pass afterward in `worker-restart-evidence-after-1`. Prior reports without that
+measurement cannot satisfy the strengthened final campaign contract. Independent source review closed the restart helpers and reader, and verified
+the retained successful load-log hash. The new frozen application/SDK/worker
+matrices remain required.
+
+`worker-action-base-validation-after-1` passes 61 untagged action-projection,
+retained-action and ledger race cases on Go 1.27.2, including rejected imported
+executor evidence and snapshot restoration. This remains development evidence;
+the final clean source needs both compiler/build-tag matrices and their required
+companions before a merge-readiness claim.

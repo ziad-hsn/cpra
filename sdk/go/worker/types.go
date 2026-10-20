@@ -25,7 +25,8 @@ var (
 )
 
 // Protocol is implemented by the SDK WorkerClient. Implementations must honor
-// context cancellation and the server's durable start/receipt contracts.
+// context cancellation and the server's durable start/receipt contracts, and
+// support concurrent calls for different executions.
 type Protocol interface {
 	Poll(context.Context, api.PollRequest) (*api.Assignments, error)
 	Start(context.Context, api.StartRequest) (*api.StartResponse, error)

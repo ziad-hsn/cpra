@@ -74,7 +74,7 @@ type storeExtensions struct {
 	// Bounded poll scan progress, protected by its own mutex. Decisions themselves
 	// are frozen into commands; replay never depends on this process-local index.
 	workerMaintenanceMu   sync.Mutex
-	workerMaintenanceScan map[string]int
+	workerMaintenanceScan map[string]*workerMaintenanceCursor
 	// The ECS owner changes these counters; API readers take detached copies.
 	// They contain 60 buckets, regardless of monitor or outstanding-work count.
 	workerScheduleMu sync.Mutex

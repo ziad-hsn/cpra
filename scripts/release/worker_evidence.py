@@ -120,6 +120,9 @@ def load_measurement(value):
     seconds = value.get('duration_seconds')
     require(type(seconds) in (float, int) and math.isfinite(seconds) and 300 <= seconds <= 360,
             'mixed load did not measure five actual minutes')
+    restart = value.get('restart_seconds')
+    require(type(restart) in (float, int) and math.isfinite(restart) and restart > 0,
+            'mixed load has no valid final restart measurement')
     require(value.get('limits') == LIMITS and type(value.get('monitors')) is int and value['monitors'] == 64,
             'mixed load changed the default journal limits or monitor count')
     for field in ('duplicate_invocations', 'unreconciled_outcomes'):
@@ -283,7 +286,8 @@ def raw_results(path, compiler, race):
     require(set(helpers) == set(TESTS), 'separate worker compiler observations are missing')
     require(len(measurements) == 1, 'exactly one raw mixed-load measurement is required')
     measurement = measurements[0]
-    require(terminal['TestMainWorkerLoad'] >= measurement['duration_seconds'] and terminal[None] >= terminal['TestMainWorkerLoad'],
+    require(terminal['TestMainWorkerLoad'] >= measurement['duration_seconds'] + measurement['restart_seconds']
+            and terminal[None] >= terminal['TestMainWorkerLoad'],
             'Go test completion contradicts the measured duration')
     return {'process_cases': sorted(process_cases()), 'load': measurement, 'test_elapsed': terminal['TestMainWorkerLoad']}
 

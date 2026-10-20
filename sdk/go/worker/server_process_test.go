@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -48,19 +49,135 @@ type serverProcessJobType struct {
 
 type serverProcessProtocol struct {
 	*cpra.WorkerClient
-	config       serverProcessConfig
-	reconciled   atomic.Int64
-	receiptAudit *os.File
-	resultMu     sync.Mutex
-	resultStats  serverProcessResultStats
+	config        serverProcessConfig
+	reconciled    atomic.Int64
+	receiptAudit  *os.File
+	auditMu       sync.Mutex
+	resultMu      sync.Mutex
+	resultStats   serverProcessResultStats
+	protocolMu    sync.Mutex
+	protocolStats serverProcessProtocolStats
+}
+
+type serverProcessCallStats struct {
+	Calls, Failed                      int
+	TotalMilliseconds, MaxMilliseconds float64
+}
+
+func (s *serverProcessCallStats) observe(elapsed time.Duration, err error) {
+	s.Calls++
+	if err != nil {
+		s.Failed++
+	}
+	milliseconds := float64(elapsed) / float64(time.Millisecond)
+	s.TotalMilliseconds += milliseconds
+	s.MaxMilliseconds = max(s.MaxMilliseconds, milliseconds)
+}
+
+type serverProcessProtocolStats struct {
+	Poll, Start                                        serverProcessCallStats
+	RequestedCapacity, ReturnedAssignments, EmptyPolls int64
+	StartDispositions                                  map[api.StartDisposition]int
+	StartModes                                         map[string]int
+	StartFailures, PollFailures                        map[string]int
+	MinimumRemainingSeconds                            *float64
+}
+
+func countProtocolFailure(counts *map[string]int, err error) {
+	if err == nil {
+		return
+	}
+	code := "transport"
+	var problem *cpra.Error
+	if errors.As(err, &problem) {
+		switch problem.Problem.Code {
+		case "unavailable", "admissionUnavailable", "requestInterrupted", "workerStartUnconfirmed", "workerExecutionQuota", "workerExecutionExpired", "workerCheckExpired", "workerPollUnconfirmed", "workerSessionExpired":
+			code = problem.Problem.Code
+		default:
+			code = "otherProblem"
+		}
+	}
+	if *counts == nil {
+		*counts = make(map[string]int)
+	}
+	(*counts)[code]++
+}
+
+func (p *serverProcessProtocol) recordPoll(request api.PollRequest, reply *api.Assignments, started time.Time, err error) {
+	if p.config.Mode != "load" {
+		return
+	}
+	observed := time.Now()
+	p.protocolMu.Lock()
+	defer p.protocolMu.Unlock()
+	s := &p.protocolStats
+	s.Poll.observe(observed.Sub(started), err)
+	countProtocolFailure(&s.PollFailures, err)
+	s.RequestedCapacity += request.Capacity
+	if err == nil && reply != nil {
+		s.ReturnedAssignments += int64(len(reply.Items))
+		if len(reply.Items) == 0 {
+			s.EmptyPolls++
+		}
+		for _, assignment := range reply.Items {
+			remaining := assignment.Deadline.Sub(observed).Seconds()
+			if s.MinimumRemainingSeconds == nil || remaining < *s.MinimumRemainingSeconds {
+				s.MinimumRemainingSeconds = &remaining
+			}
+		}
+	}
+}
+
+func (p *serverProcessProtocol) recordStart(request api.StartRequest, reply *api.StartResponse, started time.Time, err error) {
+	if p.config.Mode != "load" {
+		return
+	}
+	elapsed := time.Since(started)
+	p.protocolMu.Lock()
+	defer p.protocolMu.Unlock()
+	s := &p.protocolStats
+	s.Start.observe(elapsed, err)
+	countProtocolFailure(&s.StartFailures, err)
+	if s.StartModes == nil {
+		s.StartModes = make(map[string]int)
+	}
+	mode := string(request.Mode)
+	if request.Mode != api.StartModeBegin && request.Mode != api.StartModeReconcile {
+		mode = "invalid"
+	}
+	s.StartModes[mode]++
+	if err == nil && reply != nil {
+		if s.StartDispositions == nil {
+			s.StartDispositions = make(map[api.StartDisposition]int)
+		}
+		disposition := reply.Disposition
+		switch disposition {
+		case api.StartDispositionGranted, api.StartDispositionStarted, api.StartDispositionPending, api.StartDispositionRejected, api.StartDispositionTerminal, api.StartDispositionUnknown:
+		default:
+			disposition = "invalid"
+		}
+		s.StartDispositions[disposition]++
+	}
+}
+
+func (p *serverProcessProtocol) writeProtocolStats() error {
+	p.protocolMu.Lock()
+	s := p.protocolStats
+	s.StartDispositions = maps.Clone(s.StartDispositions)
+	s.StartModes = maps.Clone(s.StartModes)
+	s.StartFailures, s.PollFailures = maps.Clone(s.StartFailures), maps.Clone(s.PollFailures)
+	// MinimumRemainingSeconds is replaced, never mutated through its pointer.
+	p.protocolMu.Unlock()
+	return writeServerProcessJSON(p.config.StatusFile+".protocol", s)
 }
 
 type serverProcessResultStats struct {
-	Attempts, Accepted, Failed int
-	TotalMilliseconds          float64
-	MaxMilliseconds            float64
-	Statuses                   map[int]int
-	Recent                     []serverProcessResultCall
+	Attempts, Replies, Failed int
+	TotalMilliseconds         float64
+	MaxMilliseconds           float64
+	Statuses                  map[int]int
+	Dispositions              map[api.ReceiptDisposition]int
+	Recent                    []serverProcessResultCall
 }
 
 type serverProcessResultCall struct {
@@ -69,9 +186,9 @@ type serverProcessResultCall struct {
 	HTTPStatus   int
 }
 
-func (p *serverProcessProtocol) recordResultCall(kind string, started time.Time, err error) error {
+func (p *serverProcessProtocol) recordResultCall(kind string, started time.Time, receipt *api.Receipt, err error) {
 	if p.config.Mode != "load" {
-		return nil
+		return
 	}
 	duration := float64(time.Since(started)) / float64(time.Millisecond)
 	status := http.StatusOK
@@ -89,7 +206,19 @@ func (p *serverProcessProtocol) recordResultCall(kind string, started time.Time,
 	stats.TotalMilliseconds += duration
 	stats.MaxMilliseconds = max(stats.MaxMilliseconds, duration)
 	if err == nil {
-		stats.Accepted++
+		stats.Replies++
+		if receipt != nil {
+			if stats.Dispositions == nil {
+				stats.Dispositions = make(map[api.ReceiptDisposition]int)
+			}
+			disposition := receipt.Disposition
+			switch disposition {
+			case api.ReceiptDispositionAccepted, api.ReceiptDispositionFinalized, api.ReceiptDispositionUnknown:
+			default:
+				disposition = "invalid"
+			}
+			stats.Dispositions[disposition]++
+		}
 	} else {
 		stats.Failed++
 	}
@@ -101,6 +230,15 @@ func (p *serverProcessProtocol) recordResultCall(kind string, started time.Time,
 	if len(stats.Recent) > 8 {
 		stats.Recent = stats.Recent[1:]
 	}
+}
+
+func (p *serverProcessProtocol) writeResultStats() error {
+	p.resultMu.Lock()
+	stats := p.resultStats
+	stats.Statuses = maps.Clone(stats.Statuses)
+	stats.Dispositions = maps.Clone(stats.Dispositions)
+	stats.Recent = append([]serverProcessResultCall(nil), stats.Recent...)
+	p.resultMu.Unlock()
 	return writeServerProcessJSON(p.config.StatusFile+".results", stats)
 }
 
@@ -109,10 +247,19 @@ func writeServerProcessJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path+".tmp", raw, 0600); err != nil {
+	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-")
+	if err != nil {
 		return err
 	}
-	return os.Rename(path+".tmp", path)
+	defer os.Remove(file.Name())
+	_, err = file.Write(raw)
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
 }
 
 func (p *serverProcessProtocol) boundary(ctx context.Context, executionID, receiptID string) error {
@@ -124,7 +271,9 @@ func (p *serverProcessProtocol) boundary(ctx context.Context, executionID, recei
 }
 
 func (p *serverProcessProtocol) Start(ctx context.Context, request api.StartRequest) (*api.StartResponse, error) {
+	started := time.Now()
 	reply, err := p.WorkerClient.Start(ctx, request)
+	p.recordStart(request, reply, started, err)
 	if err == nil && p.config.Mode == "capacity" && request.Mode == api.StartModeReconcile && reply.Disposition == api.StartDispositionTerminal && p.reconciled.Add(1) >= 2 {
 		if err := writeServerProcessJSON(p.config.StatusFile+".reconciled", map[string]string{"executionID": request.ExecutionID, "receiptID": reply.ReceiptID}); err != nil {
 			return nil, err
@@ -161,7 +310,9 @@ func (p *serverProcessProtocol) Poll(ctx context.Context, request api.PollReques
 			return nil, err
 		}
 	}
+	started := time.Now()
 	reply, err := p.WorkerClient.Poll(ctx, request)
+	p.recordPoll(request, reply, started, err)
 	return reply, p.observeRevocation("poll", "", err)
 }
 
@@ -180,9 +331,7 @@ func (p *serverProcessProtocol) Result(ctx context.Context, outcome api.Outcome)
 	}
 	started := time.Now()
 	receipt, err := p.WorkerClient.Result(ctx, outcome)
-	if observeErr := p.recordResultCall(outcome.Kind, started, err); observeErr != nil {
-		return nil, observeErr
-	}
+	p.recordResultCall(outcome.Kind, started, receipt, err)
 	if err != nil {
 		if outcome.Kind == "check" && errors.Is(err, cpra.ErrWorkerCheckExpired) {
 			if auditErr := p.auditResult(outcome, digest, nil, true); auditErr != nil {
@@ -223,6 +372,8 @@ func (p *serverProcessProtocol) auditResult(outcome api.Outcome, digest string, 
 	if p.receiptAudit == nil {
 		return nil
 	}
+	p.auditMu.Lock()
+	defer p.auditMu.Unlock()
 	return json.NewEncoder(p.receiptAudit).Encode(struct {
 		Receipt                     *api.Receipt `json:"receipt,omitempty"`
 		Kind, Status, OutcomeDigest string
@@ -313,14 +464,24 @@ func (p *serverProcessProtocol) LateEvidence(ctx context.Context, evidence api.L
 	return receipt, nil
 }
 
-func observeServerProcessStatus(ctx context.Context, runner *Runner, mode, path string) error {
+func observeServerProcessStatus(ctx context.Context, runner *Runner, protocol *serverProcessProtocol, mode, path string) error {
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	unknownObserved := false
+	var protocolAt time.Time
 	for {
 		status, err := runner.Status()
 		if err != nil {
 			return err
+		}
+		if mode == "load" && time.Since(protocolAt) >= time.Second {
+			if err := protocol.writeProtocolStats(); err != nil {
+				return err
+			}
+			if err := protocol.writeResultStats(); err != nil {
+				return err
+			}
+			protocolAt = time.Now()
 		}
 		ready := status.DrainDeadlineExpired
 		if mode == "capacity" || mode == "load" {
@@ -422,7 +583,12 @@ func TestServerProcessHelper(t *testing.T) {
 	}
 	defer target.CloseIdleConnections()
 	handler := func(ctx context.Context, job Job) (api.Outcome, error) {
-		body, err := json.Marshal(map[string]string{"executionID": job.Assignment.ExecutionID, "kind": job.Assignment.Kind, "monitorID": job.Assignment.MonitorID})
+		body, err := json.Marshal(struct {
+			ExecutionID  string                  `json:"executionID"`
+			Kind         string                  `json:"kind"`
+			MonitorID    string                  `json:"monitorID"`
+			Notification *api.WorkerNotification `json:"notification,omitempty"`
+		}{job.Assignment.ExecutionID, job.Assignment.Kind, job.Assignment.MonitorID, job.Assignment.Notification})
 		if err != nil {
 			return api.Outcome{}, err
 		}
@@ -543,7 +709,7 @@ func TestServerProcessHelper(t *testing.T) {
 		if c.Mode == "outbox" || c.Mode == "capacity" || c.Mode == "load" {
 			path = c.StatusFile + ".capacity"
 		}
-		go func() { result <- observeServerProcessStatus(observeCtx, runner, c.Mode, path) }()
+		go func() { result <- observeServerProcessStatus(observeCtx, runner, protocol, c.Mode, path) }()
 	}
 	err = runner.Run(ctx)
 	stopObserving()

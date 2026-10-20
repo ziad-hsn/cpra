@@ -166,7 +166,7 @@ func TestWorkerMaintenanceResultPreservesHealthAndReceipt(t *testing.T) {
 }
 
 func TestWorkerMaintenancePollScanProgressAndConcurrency(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	a, request, types := workerFairnessFixture(t, s)
 	for n := range 101 {
 		commitWorkerQueueItem(t, s, types[1], fmt.Sprintf("suppressed-%03d", n))
@@ -192,6 +192,134 @@ func TestWorkerMaintenancePollScanProgressAndConcurrency(t *testing.T) {
 		})
 	}
 	wg.Wait()
+}
+
+func TestWorkerMaintenancePreparationStopsAtAvailableCapacity(t *testing.T) {
+	for _, limits := range [][2]int{{1, 1}, {10, 1}, {3, 3}} {
+		t.Run(fmt.Sprint(limits), func(t *testing.T) {
+			s := openWorkerMemory(t)
+			a, request, types := workerFairnessFixture(t, s)
+			request.Capacity, request.Limit = limits[0], limits[1]
+			var queued []WorkerExecutionRecord
+			for n := range 8 {
+				queued = append(queued, commitWorkerQueueItem(t, s, types[0], fmt.Sprintf("ready-%d", n)))
+			}
+			calls := 0
+			evaluate := func(context.Context, WorkerExecutionIntent, time.Time, time.Time) (WorkerMaintenanceDecision, error) {
+				calls++
+				return WorkerMaintenanceDecision{Available: true}, nil
+			}
+			response, err := s.CommitWorkerPoll(t.Context(), a, request, evaluate)
+			limit := min(request.Capacity, request.Limit)
+			if err != nil || len(response.Offers) != limit || calls != limit {
+				t.Fatalf("poll prepared work beyond usable capacity: offers=%d evaluations=%d want=%d err=%v", len(response.Offers), calls, limit, err)
+			}
+			for n, offer := range response.Offers {
+				if offer.ExecutionID != queued[n].Intent.ID {
+					t.Fatal("capacity bound changed committed execution order")
+				}
+			}
+		})
+	}
+}
+
+func TestWorkerMaintenanceOlderPreparationCannotReplaceNewerCursor(t *testing.T) {
+	s := openWorkerMemory(t)
+	a, request, types := workerFairnessFixture(t, s)
+	var oldest string
+	for n := range 102 {
+		r := commitWorkerQueueItem(t, s, types[1], fmt.Sprintf("recovery-%03d", n))
+		if n == 0 {
+			oldest = r.Intent.ID
+		}
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	var prepareErr error
+	command := WorkerSessionCommand{SelectionVersion: 2, Authority: a, Request: request, OwnerEpoch: s.executorSession}
+	go func() {
+		defer close(done)
+		_, prepareErr = s.prepareWorkerPollMaintenance(ctx, command, time.Now().UTC(), []WorkerMaintenanceEvaluator{
+			func(context.Context, WorkerExecutionIntent, time.Time, time.Time) (WorkerMaintenanceDecision, error) {
+				once.Do(func() {
+					close(entered)
+					select {
+					case <-release:
+					case <-ctx.Done():
+					}
+				})
+				return WorkerMaintenanceDecision{Available: true, Active: true}, ctx.Err()
+			},
+		})
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+	select {
+	case <-entered:
+	case <-t.Context().Done():
+		t.Fatal(t.Context().Err())
+	}
+	// A newer preparation fills its capacity and resets the position to zero.
+	// The old preparation must not publish its later all-suppressed offset.
+	if _, err := s.prepareWorkerPollMaintenance(t.Context(), command, time.Now().UTC(), []WorkerMaintenanceEvaluator{maintenanceEvaluator(false, false)}); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	<-done
+	if prepareErr != nil {
+		t.Fatal(prepareErr)
+	}
+	response, err := s.CommitWorkerPoll(t.Context(), a, request, maintenanceEvaluator(false, false))
+	if err != nil || len(response.Offers) != 1 || response.Offers[0].ExecutionID != oldest {
+		t.Fatal("an older preparation skipped the oldest eligible execution", err)
+	}
+}
+
+func TestWorkerMaintenanceRotatedPageRespectsOfferByteBudget(t *testing.T) {
+	s := openWorkerMemory(t)
+	a, request, types := workerFairnessFixture(t, s)
+	request.Capacity, request.Limit = 81, 81
+	var queue []string
+	for n := range 84 {
+		wireKiB := 49
+		if n == 0 {
+			wireKiB = 160
+		} else if n < 4 {
+			wireKiB = 33
+		}
+		in := workerQueueIntent(t, s, types[0], fmt.Sprintf("wire-%03d", n))
+		var err error
+		// Account for the GCM tag so the fixture has exact response costs.
+		in.Payload, err = catalogSealer(t).Seal(t.Context(), in.Binding(s.nodeID), bytes.Repeat([]byte("p"), (wireKiB<<10)-workerOfferWireOverhead-16))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
+			t.Fatal(err)
+		}
+		queue = append(queue, in.ID)
+	}
+	// A prior suppressed page can rotate preparation away from committed order.
+	s.workerMaintenanceMu.Lock()
+	s.workerMaintenanceScan = map[string]*workerMaintenanceCursor{a.WorkerUID: {position: 4}}
+	s.workerMaintenanceMu.Unlock()
+	response, err := s.CommitWorkerPoll(t.Context(), a, request, maintenanceEvaluator(false, false))
+	if err != nil || len(response.Offers) != 81 {
+		t.Fatalf("prepared capacity disagreed with committed byte selection: offers=%d err=%v", len(response.Offers), err)
+	}
+	// The 160-KiB row cannot fit alongside the selected 80 suffix rows. All
+	// emitted decisions must fit together when Apply restores committed order.
+	want := append([]string{queue[1]}, queue[4:]...)
+	for n, offer := range response.Offers {
+		if offer.ExecutionID != want[n] {
+			t.Fatal("rotated preparation reordered selected execution identities")
+		}
+	}
+	request.SessionID, request.PollSequence = response.SessionID, 2
+	response, err = s.CommitWorkerPoll(t.Context(), a, request, maintenanceEvaluator(false, false))
+	if err != nil || len(response.Offers) != 3 || response.Offers[0].ExecutionID != queue[0] {
+		t.Fatal("byte-limited preparation lost remaining queued work", err)
+	}
 }
 
 func TestWorkerRecoveryRestartCannotRenewExpiredIntent(t *testing.T) {

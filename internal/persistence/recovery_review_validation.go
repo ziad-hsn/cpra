@@ -9,6 +9,10 @@ func validateRecoveryReviewImage(i image) error {
 	if i.LocalExecutorSession != "" && (!catalogFormat(i.Version) || !catalogIdentifier(i.LocalExecutorSession, 256)) {
 		return ErrExecutorUnfenced
 	}
+	worker, err := newWorkerActionValidation(i)
+	if err != nil {
+		return err
+	}
 	seen := make(map[string]bool)
 	for _, m := range i.Monitors {
 		if m.DependencyRevision != "" && !catalogIdentifier(m.DependencyRevision, 256) {
@@ -27,7 +31,7 @@ func validateRecoveryReviewImage(i image) error {
 				return errors.New("invalid or duplicate durable action identity")
 			}
 			seen[id] = true
-			if err := validateActionEvidence(i, a, false); err != nil {
+			if err := validateActionEvidence(i, a, false, worker); err != nil {
 				return err
 			}
 		}
@@ -35,7 +39,7 @@ func validateRecoveryReviewImage(i image) error {
 	return nil
 }
 
-func validateActionEvidence(i image, a Action, archived bool) error {
+func validateActionEvidence(i image, a Action, archived bool, worker workerActionValidation) error {
 	if err := validateRecoveryNotificationAction(i.Version, a); err != nil {
 		return err
 	}
@@ -50,7 +54,7 @@ func validateActionEvidence(i image, a Action, archived bool) error {
 			return ErrExecutorUnfenced
 		}
 	} else if a.ExecutorKind == "worker" {
-		if !validExternalActionExecutor(i, a) && !(archived && validArchivedWorkerAction(i, a)) {
+		if !worker.validAction(i, a, archived) {
 			return ErrExecutorUnfenced
 		}
 	} else if (a.ExecutorKind != "local" && a.ExecutorKind != "agent") || !catalogIdentifier(a.ExecutorSession, 256) || i.LocalExecutorSession == "" || a.StartedAt.IsZero() || a.State == Queued || (!a.ExecutorFinishedAt.IsZero() && a.ExecutorFinishedAt.Before(a.StartedAt)) {

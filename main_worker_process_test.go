@@ -59,10 +59,11 @@ func TestMainWorkerServerProcessHelper(t *testing.T) {
 }
 
 type workerTestProcess struct {
-	command *exec.Cmd
-	done    chan struct{}
-	err     error
-	logPath string
+	command           *exec.Cmd
+	done              chan struct{}
+	err               error
+	logPath           string
+	readinessDuration time.Duration
 }
 
 func startWorkerTestProcess(t *testing.T, command *exec.Cmd, logPath string) *workerTestProcess {
@@ -153,7 +154,12 @@ func (p *workerTestProcess) kill(t *testing.T) {
 
 func waitWorkerProcessFile(t *testing.T, process *workerTestProcess, path string) []byte {
 	t.Helper()
-	deadline := time.NewTimer(20 * time.Second)
+	return waitWorkerProcessFileWithin(t, process, path, 20*time.Second)
+}
+
+func waitWorkerProcessFileWithin(t *testing.T, process *workerTestProcess, path string, allowance time.Duration) []byte {
+	t.Helper()
+	deadline := time.NewTimer(allowance)
 	defer deadline.Stop()
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
@@ -167,6 +173,15 @@ func waitWorkerProcessFile(t *testing.T, process *workerTestProcess, path string
 		case <-process.done:
 			t.Fatalf("child exited before observation: %v\n%s", process.err, process.output())
 		case <-deadline.C:
+			// Preserve the blocked Go stacks before terminating a failed Linux
+			// fixture. This diagnostic interval cannot turn a timeout into a pass.
+			if runtime.GOOS == "linux" {
+				_ = process.command.Process.Signal(syscall.SIGQUIT)
+				select {
+				case <-process.done:
+				case <-time.After(2 * time.Second):
+				}
+			}
 			process.stop(t, true)
 			t.Fatalf("child observation deadline: %s", process.output())
 		case <-tick.C:
@@ -174,16 +189,52 @@ func waitWorkerProcessFile(t *testing.T, process *workerTestProcess, path string
 	}
 }
 
-func startWorkerServerProcess(t *testing.T, fixture *mainManagementFixture) (*cpra.Client, *workerTestProcess) {
+func startWorkerServerProcess(t *testing.T, fixture *mainManagementFixture, cpuProfile ...string) (*cpra.Client, *workerTestProcess) {
 	t.Helper()
+	if len(cpuProfile) > 1 {
+		t.Fatal("select at most one server CPU profile")
+	}
 	base := t.TempDir()
 	ready := filepath.Join(base, "ready")
 	command := exec.Command(os.Args[0], "-test.run=^TestMainWorkerServerProcessHelper$")
+	if len(cpuProfile) == 1 && cpuProfile[0] != "" {
+		path := cpuProfile[0]
+		if !filepath.IsAbs(path) {
+			t.Fatal("server profile requires an absolute private output path")
+		}
+		if _, err := os.Lstat(path); !os.IsNotExist(err) {
+			t.Fatal("server profile output must not already exist", err)
+		}
+		source, err := os.Open(os.Args[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		retained, err := os.OpenFile(path+".test", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err != nil {
+			_ = source.Close()
+			t.Fatal(err)
+		}
+		_, copyErr := io.Copy(retained, source)
+		if err := errors.Join(copyErr, retained.Close(), source.Close()); err != nil {
+			t.Fatal("retain server profile executable", err)
+		}
+		command.Args = append(command.Args, "-test.cpuprofile="+path)
+	}
 	command.Env = append(os.Environ(), "CPRA_WORKER_PROCESS_RUNTIME="+fixture.options.runtimeFile,
 		"CPRA_WORKER_PROCESS_MANIFEST="+fixture.options.manifest,
 		"CPRA_WORKER_PROCESS_READY="+ready)
+	started := time.Now()
 	p := startWorkerTestProcess(t, command, filepath.Join(base, "server.log"))
-	address := string(waitWorkerProcessFile(t, p, ready))
+	if len(cpuProfile) == 1 && cpuProfile[0] != "" {
+		// A failed load assertion still needs a completed profile. Use the
+		// existing bounded graceful stop before the hard cleanup fallback.
+		t.Cleanup(func() { p.stop(t, false) })
+	}
+	// Startup verifies all retained snapshots and encrypted worker records.
+	// Keep its bounded allowance separate from receipt/observation waits.
+	address := string(waitWorkerProcessFileWithin(t, p, ready, time.Minute))
+	p.readinessDuration = time.Since(started)
+	t.Logf("worker server readiness duration=%s allowance=60s", p.readinessDuration)
 	host, port, err := net.SplitHostPort(address)
 	if err != nil || host != "127.0.0.1" || port == "" || port == "0" {
 		t.Fatal("child did not report its bound loopback address", address, err)

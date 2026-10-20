@@ -19,7 +19,8 @@ import test_sdk_evidence as sdk_fixtures
 
 
 def measurement():
-    return {'duration_seconds': 300.001, 'monitors': 64, 'limits': dict(worker.LIMITS),
+    return {'duration_seconds': 300.001, 'restart_seconds': 4.25,
+            'monitors': 64, 'limits': dict(worker.LIMITS),
             'target_invocations': {'check': 1440, 'recovery': 360, 'notification': 400},
             'target_peak_handlers': 16, 'status_samples': 300, 'saturated_samples': 280,
             'duplicate_invocations': 0, 'unreconciled_outcomes': 0, 'expired_check_receipts': 100,
@@ -232,6 +233,11 @@ class WorkerEvidenceTests(unittest.TestCase):
         self.events[0][-2]['Elapsed'] = 299; self.save()
         with self.assertRaises(ValueError): self.verify()
 
+    def test_restart_measurement_must_fit_within_raw_completion(self):
+        self.events[0][-2]['Elapsed'] = 302; self.save()
+        with self.assertRaisesRegex(ValueError, 'measured duration'):
+            self.verify()
+
     def test_source_inventory_added_removed_modified_or_missing_inputs_are_rejected(self):
         path = self.root / self.reports[0]['source_inventory']
         original = json.loads(path.read_text())
@@ -376,6 +382,23 @@ class WorkerEvidenceTests(unittest.TestCase):
 
 
 class WorkerAccountingTests(unittest.TestCase):
+    def test_restart_measurement_is_required_and_finite_positive(self):
+        value = measurement()
+        value.pop('restart_seconds')
+        with self.assertRaisesRegex(ValueError, 'restart'):
+            worker.load_measurement(value)
+        for invalid in (None, False, True, '4.25', 0, -1, float('nan'), float('inf'), -float('inf')):
+            with self.subTest(restart_seconds=invalid):
+                value = measurement()
+                value['restart_seconds'] = invalid
+                with self.assertRaisesRegex(ValueError, 'restart'):
+                    worker.load_measurement(value)
+        for valid in (1, 4.25):
+            with self.subTest(restart_seconds=valid):
+                value = measurement()
+                value['restart_seconds'] = valid
+                self.assertEqual(worker.load_measurement(value), value)
+
     def test_real_duration_capacity_saturation_progress_and_drain_are_required(self):
         changes = [lambda x: x.update(duration_seconds=299), lambda x: x.update(duration_seconds=float('nan')),
                    lambda x: x.update(monitors=True), lambda x: x.update(duplicate_invocations=1),

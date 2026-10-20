@@ -107,7 +107,7 @@ func (v *collectionLedgerView) reviewValidationMonitor(m Monitor, alert ReviewAl
 	}
 	return m, nil
 }
-func validateProjectionInventory(i image, v *collectionLedgerView) error {
+func validateProjectionInventory(i image, v *collectionLedgerView, worker workerActionValidation) error {
 	counts := make(map[string]ActionProjection)
 	if err := v.walkActions(func(_ []byte, row actionLedgerRow) error {
 		m := i.Monitors[row.MonitorID]
@@ -168,7 +168,7 @@ func validateProjectionInventory(i image, v *collectionLedgerView) error {
 			// Only intervention facts affect review eligibility. Other rows still
 			// need a complete chain and immutable monitor identity at the fence.
 			if row.Action.Kind == "intervention" && row.Action.State == Unknown {
-				return validateRetainedAction(i, context, row.Action, true)
+				return validateRetainedAction(i, context, row.Action, true, worker)
 			}
 			if row.Action.Kind != "intervention" && row.Action.Kind != "code" || row.Action.Revision == "" {
 				return errActionLedger

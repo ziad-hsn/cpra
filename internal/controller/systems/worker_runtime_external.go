@@ -319,10 +319,17 @@ func (s *DurableSystem) receiveWorkerDispatch() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
+	s.observeWorkerExecutions(ctx)
+}
+
+// observeWorkerExecutions projects already committed work. The dispatcher owns
+// reconciliation of uncertain submissions before publishing a completion here.
+func (s *DurableSystem) observeWorkerExecutions(ctx context.Context) {
+	r := s.workerRuntime
 	// Expiry and rejected preparation need no execution-observation slot. Finish
 	// them before the rotation so they cannot wait behind slow remote handlers.
 	if err := s.finishWorkerPreparations(ctx); err != nil {
-		s.recoveryError(err, ctx)
+		s.healthObservationError(err, ctx)
 		return
 	}
 	// Rotation bounds each tick and prevents an early slow execution from
@@ -334,7 +341,7 @@ func (s *DurableSystem) receiveWorkerDispatch() {
 		if !p.preparing && !p.finished {
 			status, exists, err := s.store.WorkerDispatchStatus(ctx, p.executionID)
 			if err != nil {
-				s.recoveryError(err, ctx)
+				s.healthObservationError(err, ctx)
 				return
 			}
 			p.finished = !exists || status.Terminal
@@ -345,7 +352,7 @@ func (s *DurableSystem) receiveWorkerDispatch() {
 		}
 		if !p.preparing && p.finished {
 			if err := s.finishWorkerPending(ctx, p); err != nil {
-				s.recoveryError(err, ctx)
+				s.healthObservationError(err, ctx)
 				return
 			}
 			delete(r.pending, token)
@@ -364,7 +371,7 @@ func (s *DurableSystem) receiveWorkerDispatch() {
 	// tick. Transfer waiting admissions into the slots just released, retaining
 	// their original identities and preparation capacity until that handoff.
 	if err := s.finishWorkerPreparations(ctx); err != nil {
-		s.recoveryError(err, ctx)
+		s.healthObservationError(err, ctx)
 	}
 }
 

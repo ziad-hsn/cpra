@@ -306,38 +306,3 @@ func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
 	}
 	return nil
 }
-func validExternalActionExecutor(i image, a Action) bool {
-	if i.Version < WorkerOfferFormatVersion || a.ExecutorKind != "worker" || a.State == Queued || a.State == Cancelled || !a.ExecutorFinishedAt.IsZero() || i.WorkerExecutions == nil {
-		return false
-	}
-	for _, r := range i.WorkerExecutions.Records {
-		l := r.Lifecycle
-		if l != nil && r.Intent.ActionID == a.ID && r.Intent.MonitorUID == a.CatalogUID && r.Intent.MonitorRevision == a.Revision && l.GrantID == a.ExecutorSession && l.StartedAt.Equal(a.StartedAt) {
-			if r.Result == nil {
-				return (l.Phase == "started" || l.Phase == "unknown") && (a.State == Started || a.State == Unknown)
-			}
-			return i.Version >= WorkerResultFormatVersion && ((l.Phase == "unknown" && a.State == Unknown) ||
-				(l.Phase == "finished" && ((a.State == Succeeded && a.Outcome == r.Result.Input.Status) || (a.State == Failed && r.Result.Input.Status == "rejected"))))
-		}
-	}
-	return false
-}
-
-// A terminal action keeps its executor identity after the bounded execution
-// receipt has been retired. If a receipt still exists it must agree exactly.
-func validArchivedWorkerAction(i image, a Action) bool {
-	if !externalStorageFormat(i.Version) || a.ExecutorKind != "worker" ||
-		(a.State != Succeeded && a.State != Failed) || !catalogIdentifier(a.ExecutorSession, 256) ||
-		a.StartedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || !a.ExecutorFinishedAt.IsZero() {
-		return false
-	}
-	if i.WorkerExecutions != nil {
-		for _, r := range i.WorkerExecutions.Records {
-			if r.Intent.ActionID == a.ID {
-				return validExternalActionExecutor(i, a)
-			}
-		}
-	}
-	return (a.State == Failed && a.Outcome == "rejected") ||
-		(a.State == Succeeded && (a.Outcome == "accepted" || a.Outcome == "completed"))
-}

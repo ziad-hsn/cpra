@@ -82,6 +82,12 @@ type workerMaintenanceInput struct {
 	queued time.Time
 }
 
+// A new cursor is installed for every preparation. Its identity prevents an
+// older evaluator from publishing progress after a newer preparation or eviction.
+type workerMaintenanceCursor struct {
+	position int
+}
+
 func (f *machine) workerMaintenanceInput(id string) (workerMaintenanceInput, bool) {
 	if f.image.WorkerExecutions == nil {
 		return workerMaintenanceInput{}, false
@@ -158,7 +164,14 @@ func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessio
 	if err != nil {
 		return nil, err
 	}
-	var inputs []workerMaintenanceInput
+	type candidate struct {
+		input   workerMaintenanceInput
+		wire    int
+		control bool
+	}
+	var inputs []candidate
+	var cursor *workerMaintenanceCursor
+	var next int
 	if s.fsm.image.WorkerExecutions != nil && s.fsm.image.JobTypes != nil {
 		// Restored snapshots contain records, not the derived ready index. Build
 		// it before choosing which intents need a committed maintenance decision.
@@ -169,28 +182,37 @@ func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessio
 		ordered := s.fsm.workerOfferOrder(c)
 		s.workerMaintenanceMu.Lock()
 		if s.workerMaintenanceScan == nil {
-			s.workerMaintenanceScan = make(map[string]int)
+			s.workerMaintenanceScan = make(map[string]*workerMaintenanceCursor)
 		}
-		if _, exists := s.workerMaintenanceScan[c.Authority.WorkerUID]; !exists && len(s.workerMaintenanceScan) >= MaxWorkerSessions {
-			for key := range s.workerMaintenanceScan {
-				delete(s.workerMaintenanceScan, key)
-				break
+		cursor = &workerMaintenanceCursor{}
+		if previous, exists := s.workerMaintenanceScan[c.Authority.WorkerUID]; exists {
+			cursor.position = previous.position
+		} else {
+			if len(s.workerMaintenanceScan) >= MaxWorkerSessions {
+				for key := range s.workerMaintenanceScan {
+					delete(s.workerMaintenanceScan, key)
+					break
+				}
 			}
 		}
+		s.workerMaintenanceScan[c.Authority.WorkerUID] = cursor
 		if len(ordered) > 0 {
-			start := s.workerMaintenanceScan[c.Authority.WorkerUID] % len(ordered)
+			start := cursor.position % len(ordered)
 			visited := 0
 			for visited < len(ordered) && len(inputs) < 100 {
-				candidate := ordered[(start+visited)%len(ordered)]
+				item := ordered[(start+visited)%len(ordered)]
 				visited++
-				if !s.fsm.workerAssignmentEligible(s.fsm.image.WorkerExecutions.Records[candidate.id], c.Authority, c.OwnerEpoch, at) {
+				record := s.fsm.image.WorkerExecutions.Records[item.id]
+				if !s.fsm.workerAssignmentEligible(record, c.Authority, c.OwnerEpoch, at) {
 					continue
 				}
-				if in, ok := s.fsm.workerMaintenanceInput(candidate.id); ok {
-					inputs = append(inputs, in)
+				if in, ok := s.fsm.workerMaintenanceInput(item.id); ok {
+					monitor := s.fsm.image.Monitors[in.intent.MonitorID]
+					inputs = append(inputs, candidate{input: in, wire: len(record.Intent.Payload.Ciphertext) + workerOfferWireOverhead,
+						control: monitor.ControlNotification(monitor.Actions[in.intent.ActionID])})
 				}
 			}
-			s.workerMaintenanceScan[c.Authority.WorkerUID] = (start + visited) % len(ordered)
+			next = (start + visited) % len(ordered)
 		}
 		s.workerMaintenanceMu.Unlock()
 	}
@@ -200,12 +222,40 @@ func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessio
 	}
 	unlock()
 	out := make([]WorkerMaintenanceDecision, 0, len(inputs))
-	for _, in := range inputs {
+	available, wire := 0, 0
+	for _, item := range inputs {
+		in := item.input
 		d, err := prepareWorkerMaintenance(ctx, in, at, evaluators)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, *d)
+		allowed := d.Available && (in.intent.Category == "check" || item.control ||
+			!d.Active && (in.intent.Category != "notification" || !d.SinceQueued))
+		if allowed && item.wire > workerOfferWireBudget-wire {
+			// Apply restores committed ordering. Every allowed decision emitted
+			// here must fit together, even when this scan began mid-page.
+			continue
+		}
+		out = append(out, *d) // Suppressed decisions still commit cancellations.
+		if allowed {
+			wire += item.wire
+			available++
+		}
+		if available >= min(c.Request.Capacity, c.Request.Limit) {
+			// Stop opening encrypted configurations once this response can fill.
+			// Restart at the oldest remaining entry: committed offers will leave
+			// the ready index, so carrying its old numeric offset skips work.
+			next = 0
+			break
+		}
 	}
+	// A full suppressed page must still advance, allowing later eligible work
+	// to progress. A concurrent preparation's newer cursor is only a scan hint;
+	// do not overwrite it or hold this mutex while evaluating configuration.
+	s.workerMaintenanceMu.Lock()
+	if cursor != nil && s.workerMaintenanceScan[c.Authority.WorkerUID] == cursor {
+		cursor.position = next
+	}
+	s.workerMaintenanceMu.Unlock()
 	return out, nil
 }

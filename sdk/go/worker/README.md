@@ -217,8 +217,13 @@ or interrupts completion writes already reserved. Status reports allocated,
 live, and reserved bytes separately. Deleting bbolt records does not shrink the
 file; offline operational compaction is not provided by this first library.
 
-The runner uses a single bounded poller and result-delivery loop. Execution
-goroutines are bounded by concurrency slots, and durable record/byte capacity is
+The runner uses one poller and at most four concurrent result/reconciliation calls,
+further limited by the configured execution concurrency. One execution's delivery
+remains serial. Pending outcomes are considered before retained-action reconciliation
+and ordered by their original deadlines; deadlines are never renewed. Reconciliation
+rotates through at most one wave of retained records before reconsidering new outcomes.
+All delivery calls are joined before the journal closes. Execution goroutines are
+bounded by concurrency slots, and durable record/byte capacity is
 reserved before requesting start permission or invoking a handler. Each pending
 execution reserves the outcome limit plus 32 KiB for bounded, JSON-escaped
 identity metadata. An outcome limit too small for its interrupted result prevents

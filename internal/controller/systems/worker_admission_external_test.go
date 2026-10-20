@@ -230,8 +230,11 @@ func TestWorkerAdmissionFullObservationCapacityStillExpiresActions(t *testing.T)
 	s, _ := workerDispatchOwner(t)
 	before := queuedExpiredWorkerActions(t, s)
 	retainWorkerCheckObservations(s, persistence.MaxWorkerExecutions)
-	s.scheduleActions(s.entities[before.ID], before)
-	s.dispatchActions(time.Now())
+	for _, action := range before.Actions {
+		if !s.dispatchWorkerAction(s.entities[before.ID], action) {
+			t.Fatal("worker action not recognized")
+		}
+	}
 	if s.workerRuntime.preparing != 2 {
 		t.Fatal("full observation capacity prevented expired actions from reaching cancellation")
 	}
@@ -239,7 +242,11 @@ func TestWorkerAdmissionFullObservationCapacityStillExpiresActions(t *testing.T)
 		awaitWorkerPreparation(t, s)
 	}
 	after, _ := s.store.Get(before.ID)
-	for _, action := range after.Actions {
+	for id := range before.Actions {
+		action, found, err := s.store.ActionContext(t.Context(), id)
+		if err != nil || !found || action.MonitorID != before.ID {
+			t.Fatal("original expired action is missing", err)
+		}
 		if action.State != persistence.Cancelled || action.Outcome != "worker_admission_expired" ||
 			!action.StartedAt.IsZero() || action.ExecutorKind != "" || s.admitted[action.ID] {
 			t.Fatal("expiry did not complete independently of execution observations", action)

@@ -51,7 +51,13 @@ func validatePolicyExtensions(Policy) error         { return nil }
 
 func policyMinimumFormat(Policy) int { return FormatVersion }
 
-func validExternalActionExecutor(image, Action) bool { return false }
+type workerActionValidation struct{}
+
+func newWorkerActionValidation(image) (workerActionValidation, error) {
+	return workerActionValidation{}, nil
+}
+
+func (workerActionValidation) validAction(image, Action, bool) bool { return false }
 
 func (*Store) maintainExtensions(time.Time) error { return nil }
 
@@ -60,8 +66,6 @@ func (*machine) indexExtensionMonitors(ctx context.Context) error { return ctx.E
 func (*machine) hasWorkerCheckState(Monitor) bool { return false }
 
 func (*Store) extendSLOView(ctx context.Context, _ *slo.View) error { return ctx.Err() }
-
-func validArchivedWorkerAction(image, Action) bool { return false }
 
 func validateWorkerActionDependencies(image, *collectionLedgerView) error { return nil }
 

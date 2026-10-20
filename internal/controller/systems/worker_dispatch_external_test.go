@@ -146,6 +146,52 @@ func TestWorkerDispatchCheckProgressesWithFullLocalQueue(t *testing.T) {
 	}
 }
 
+func TestWorkerObservationTimeoutPreservesAdmissionAndOriginalWork(t *testing.T) {
+	s, _ := workerDispatchOwner(t)
+	scheduleWorkerCheck(t, s, time.Now())
+	awaitWorkerPreparation(t, s)
+	r := s.workerRuntime
+	if len(r.order) != 1 || s.pendingWrite != nil {
+		t.Fatal("fixture needs one confirmed execution and no uncertain write")
+	}
+	token := r.order[0]
+	execution := r.pending[token].executionID
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	s.observeWorkerExecutions(ctx)
+	if !s.AdmissionReady() || s.lastError != nil || s.pendingWrite != nil || !s.store.Status().Ready {
+		t.Fatal("status-read timeout closed admission as if a write were unresolved")
+	}
+	if len(r.order) != 1 || r.order[0] != token || r.pending[token].executionID != execution || !s.pending["remote"] {
+		t.Fatal("timed-out observation discarded or replaced committed work")
+	}
+	s.recovering.Store(true)
+	s.observeWorkerExecutions(ctx)
+	if !s.recovering.Load() || s.AdmissionReady() {
+		t.Fatal("status-read timeout reopened existing write recovery")
+	}
+	s.recovering.Store(false)
+	record, found, err := s.store.WorkerExecution(t.Context(), execution)
+	if err != nil || !found {
+		t.Fatal("original execution is missing", err)
+	}
+	count, err := s.store.FinalizeWorkerExecutions(t.Context(), record.Intent.Deadline, 100)
+	if err != nil || count != 1 {
+		t.Fatal("finalize original check", count, err)
+	}
+	// A terminal status read can succeed before the subsequent projection read
+	// times out. The completed execution still belongs to the same owner.
+	r.pending[token].finished = true
+	s.observeWorkerExecutions(ctx)
+	if r.pending[token] == nil || !r.pending[token].finished || !s.pending["remote"] || !s.AdmissionReady() {
+		t.Fatal("projection timeout discarded completion or closed admission")
+	}
+	s.observeWorkerExecutions(t.Context())
+	if len(r.pending) != 0 || s.pending["remote"] || !s.AdmissionReady() {
+		t.Fatal("a fresh observation did not release the original completed check")
+	}
+}
+
 func TestWorkerDispatchActionsKeepSeparateOriginalIdentities(t *testing.T) {
 	s, _ := workerDispatchOwner(t)
 	m, _ := s.store.Get("remote")
@@ -280,8 +326,11 @@ func queuedExpiredWorkerActions(t *testing.T, s *DurableSystem) persistence.Moni
 func TestWorkerDispatchCommitsExpiredActionsWithoutAssignments(t *testing.T) {
 	s, _ := workerDispatchOwner(t)
 	before := queuedExpiredWorkerActions(t, s)
-	s.scheduleActions(s.entities[before.ID], before)
-	s.dispatchActions(time.Now())
+	for _, action := range before.Actions {
+		if !s.dispatchWorkerAction(s.entities[before.ID], action) {
+			t.Fatal("worker action not recognized")
+		}
+	}
 	if s.workerRuntime.preparing != 2 {
 		t.Fatal("recovery and notification were not dispatched for expiry")
 	}
@@ -289,10 +338,14 @@ func TestWorkerDispatchCommitsExpiredActionsWithoutAssignments(t *testing.T) {
 		awaitWorkerPreparation(t, s)
 	}
 	after, _ := s.store.Get(before.ID)
-	if len(after.Actions) != 2 || after.TotalChecks != before.TotalChecks || after.InterventionAttempts != before.InterventionAttempts {
+	if after.TotalChecks != before.TotalChecks || after.InterventionAttempts != before.InterventionAttempts {
 		t.Fatal("expiry changed health or attempts")
 	}
-	for _, a := range after.Actions {
+	for id := range before.Actions {
+		a, found, err := s.store.ActionContext(t.Context(), id)
+		if err != nil || !found || a.MonitorID != before.ID {
+			t.Fatal("original expired action is missing", err)
+		}
 		if a.State != persistence.Cancelled || a.Outcome != "worker_admission_expired" || !a.StartedAt.IsZero() || a.ExecutorKind != "" || s.admitted[a.ID] {
 			t.Fatal("expired action remained queued or acquired an executor", a)
 		}
@@ -369,6 +422,15 @@ func TestWorkerDispatchExpiryReconcilesLostReplies(t *testing.T) {
 				}
 			}
 			lost.release <- struct{}{}
+			select {
+			case result := <-d.results:
+				if !errors.Is(result.err, persistence.ErrWorkerExecutionExpired) {
+					t.Fatal("expiry reconciliation did not settle the original outcome", result.err)
+				}
+				d.results <- result
+			case <-time.After(5 * time.Second):
+				t.Fatal("expiry reconciliation did not complete")
+			}
 			awaitWorkerPreparation(t, s)
 			if committed {
 				<-d.done
@@ -377,7 +439,10 @@ func TestWorkerDispatchExpiryReconcilesLostReplies(t *testing.T) {
 			if committed {
 				wantCalls = 1
 			}
-			after, _ := s.store.Get(before.ID)
+			retained, found, err := s.store.ActionContext(t.Context(), action.ID)
+			if err != nil || !found || retained.MonitorID != before.ID {
+				t.Fatal("original expired action is missing", err)
+			}
 			page, err := s.store.History().Page(before.ID, "", 100)
 			if err != nil {
 				t.Fatal(err)
@@ -388,7 +453,7 @@ func TestWorkerDispatchExpiryReconcilesLostReplies(t *testing.T) {
 					expired++
 				}
 			}
-			if lost.changed || lost.commits.Load() != wantCalls || after.Actions[action.ID].State != persistence.Cancelled || expired != 1 || len(s.workerRuntime.pending) != 0 {
+			if lost.changed || lost.commits.Load() != wantCalls || retained.State != persistence.Cancelled || expired != 1 || len(s.workerRuntime.pending) != 0 {
 				t.Fatal("lost reply changed identity, duplicated expiry or lost owner completion", lost.commits.Load(), expired)
 			}
 		})

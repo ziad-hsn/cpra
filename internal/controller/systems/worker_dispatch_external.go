@@ -27,6 +27,7 @@ type workerDispatchStore interface {
 	WorkerExecution(context.Context, string) (persistence.WorkerExecutionRecord, bool, error)
 	ExpireWorkerAction(context.Context, persistence.WorkerExecutionIntent) error
 	GetContext(context.Context, string) (persistence.Monitor, bool, error)
+	ActionContext(context.Context, string) (persistence.ActionRecord, bool, error)
 	Flush(context.Context) error
 }
 
@@ -204,11 +205,11 @@ func (d *workerDispatcher) expireAction(ctx context.Context, in persistence.Work
 		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 		err := d.store.Flush(ctx)
 		if err == nil {
-			var m persistence.Monitor
-			m, _, err = d.store.GetContext(ctx, in.MonitorID)
+			var a persistence.ActionRecord
+			var found bool
+			a, found, err = d.store.ActionContext(ctx, in.ActionID)
 			if err == nil {
-				a, ok := m.Actions[in.ActionID]
-				if ok && a.CatalogUID == in.MonitorUID && a.Revision == in.MonitorRevision &&
+				if found && a.MonitorID == in.MonitorID && a.CatalogUID == in.MonitorUID && a.Revision == in.MonitorRevision &&
 					a.NotBefore.Equal(in.Scheduled) && a.State == persistence.Cancelled && a.Outcome == "worker_admission_expired" {
 					cancel()
 					return nil

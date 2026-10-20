@@ -559,31 +559,99 @@ func (r *Runner) saveOutcome(id string, out api.Outcome, fail func(error)) {
 }
 
 func (r *Runner) flush(ctx context.Context, fail func(error)) {
+	cursor := ""
 	for ctx.Err() == nil {
 		records, err := r.journal.records()
 		if err != nil {
 			fail(err)
 			return
 		}
-		for _, rec := range records {
-			if ctx.Err() != nil {
-				return
-			}
-			if err = r.deliverInactive(ctx, rec.ExecutionID); err != nil {
-				if ctx.Err() != nil {
-					return
-				}
-				if errors.Is(err, ErrCorrupt) || errors.Is(err, ErrIdentity) || errors.Is(err, ErrClosed) || errors.Is(err, ErrStorage) {
-					fail(err)
-					return
-				}
-				r.recordError(err)
-			}
+		records, cursor = deliveryBatch(records, cursor, min(4, r.config.Limits.Concurrency))
+		if !r.deliverRecords(ctx, records, fail) {
+			return
 		}
 		if !pause(ctx, r.config.RetryInterval) {
 			return
 		}
 	}
+}
+
+// Reconsider newly completed outcomes after at most one wave of reconciliation
+// calls. The cursor rotates through retained records, including unknown actions
+// whose receipts must be preserved, without letting their count delay outcomes
+// for an entire inventory of slow protocol calls.
+func deliveryBatch(records []journalRecord, cursor string, reconciliationLimit int) ([]journalRecord, string) {
+	sort.Slice(records, func(i, j int) bool { return records[i].ExecutionID < records[j].ExecutionID })
+	batch := make([]journalRecord, 0, len(records))
+	for _, rec := range records {
+		if rec.State == "outcome" {
+			batch = append(batch, rec)
+		}
+	}
+	start := sort.Search(len(records), func(i int) bool { return records[i].ExecutionID > cursor })
+	for visited, added := 0, 0; visited < len(records) && added < reconciliationLimit; visited++ {
+		rec := records[(start+visited)%len(records)]
+		if rec.State != "outcome" {
+			batch = append(batch, rec)
+			cursor = rec.ExecutionID
+			added++
+		}
+	}
+	return batch, cursor
+}
+
+// Each pass owns at most four protocol calls and joins them before reading the
+// next inventory. A record appears once per inventory, so retries and evidence
+// for one execution remain serial while independent receipts can progress.
+func (r *Runner) deliverRecords(ctx context.Context, records []journalRecord, fail func(error)) bool {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	// Pending results have an original execution deadline. Acknowledged unknown
+	// actions remain retained, but their reconciliation cannot precede outcomes.
+	sort.SliceStable(records, func(i, j int) bool {
+		a, b := records[i], records[j]
+		if (a.State == "outcome") != (b.State == "outcome") {
+			return a.State == "outcome"
+		}
+		return a.Deadline.Before(b.Deadline)
+	})
+	ids := make(chan string)
+	var calls sync.WaitGroup
+	var failed sync.Once
+	for range min(4, r.config.Limits.Concurrency, len(records)) {
+		calls.Go(func() {
+			for id := range ids {
+				if ctx.Err() != nil {
+					return
+				}
+				err := r.deliverInactive(ctx, id)
+				if err == nil || ctx.Err() != nil {
+					continue
+				}
+				if errors.Is(err, ErrCorrupt) || errors.Is(err, ErrIdentity) || errors.Is(err, ErrClosed) || errors.Is(err, ErrStorage) {
+					failed.Do(func() {
+						// Stop admission promptly, but keep ownership until every
+						// sibling call returns and Run can safely close the journal.
+						fail(err)
+						cancel()
+					})
+					return
+				}
+				r.recordError(err)
+			}
+		})
+	}
+dispatch:
+	for _, rec := range records {
+		select {
+		case ids <- rec.ExecutionID:
+		case <-ctx.Done():
+			break dispatch
+		}
+	}
+	close(ids)
+	calls.Wait()
+	return ctx.Err() == nil
 }
 
 // Reload after observing an inactive slot: the flush inventory may predate the

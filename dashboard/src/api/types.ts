@@ -51,7 +51,7 @@ export interface MonitorSummary {
 }
 
 export interface OverviewResponse {
-  generated: string;
+  generated?: string;
   total: number;
   disabled: number;
   by_status: Record<string, number>;
@@ -69,7 +69,7 @@ export interface MonitorsFilters {
 }
 
 export interface MonitorsResponse {
-  generated: string;
+  generated?: string;
   page: number;
   size: number;
   total: number;
@@ -78,7 +78,7 @@ export interface MonitorsResponse {
 }
 
 export interface IncidentsResponse {
-  generated: string;
+  generated?: string;
   count: number;
   incidents: MonitorSummary[];
 }
@@ -117,6 +117,8 @@ export interface SystemsResponse {
 }
 
 export interface DriverQueueStats {
+	requested_capacity?: number;
+	reserved_capacity?: number;
   driver: string;
   pending: number;
   active: number;
@@ -154,6 +156,10 @@ export interface QueueStats {
 }
 
 export interface WorkerPoolStats {
+	requested_capacity?: number;
+	reserved_capacity?: number;
+	draining_workers?: number;
+	capacity_condition?: string;
   active_executions?: number;
   oldest_execution_age?: number;
   pending_submissions?: number;

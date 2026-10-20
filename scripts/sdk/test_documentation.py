@@ -24,6 +24,11 @@ class GuideCopiesTests(unittest.TestCase):
         worker = root / "sdk/go/worker"
         worker.mkdir(parents=True)
         (worker / "README.md").write_text("# Worker journal\n")
+        for guide in sync_guides.GUIDES:
+            path = root / guide
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# Public guide\n")
         with (examples / "dao-sms/README.md").open("a") as out:
             out.write("[Worker](../../../sdk/go/worker/README.md)\n")
 
@@ -41,7 +46,8 @@ class GuideCopiesTests(unittest.TestCase):
                 self.assertNotIn("github.com", text)
                 asset = site / "source/examples/sdk/queue-registration/main.go.txt"
                 self.assertEqual(asset.read_bytes(), b"package main\n")
-                self.assertTrue((site / "source/sdk/go/worker/README.md.txt").is_file())
+                self.assertEqual((site / "worker-library.md").read_text().splitlines()[0], "# Worker journal")
+                self.assertIn("[Worker](worker-library.md)", (site / "dao-sms.md").read_text())
                 self.assertEqual(list((root / "docs/sdk").rglob("*.go")), [])
                 asset.write_text("changed\n")
                 with self.assertRaisesRegex(ValueError, "stale site"):
@@ -72,6 +78,23 @@ class GuideCopiesTests(unittest.TestCase):
                     sync_guides.generated()
                 path.write_text("[Outside](../../../../private.txt)\n")
                 with self.assertRaisesRegex(ValueError, "outside"):
+                    sync_guides.generated()
+
+    def test_public_guides_reject_historical_links_and_keep_license_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            module = root / "sdk/go"
+            (module / "LICENSE").write_text("Original license bytes\n")
+            (module / "README.md").write_text("[License](LICENSE)\n")
+            with patch.object(sync_guides, "ROOT", root):
+                outputs = sync_guides.generated()
+                self.assertEqual(outputs[Path("source/sdk/go/LICENSE.txt")], b"Original license bytes\n")
+                historical = root / "docs/implementation/record.md"
+                historical.parent.mkdir(parents=True)
+                historical.write_text("# Historical result\n")
+                (module / "README.md").write_text("[Old result](../../docs/implementation/record.md)\n")
+                with self.assertRaisesRegex(ValueError, "historical"):
                     sync_guides.generated()
 
 

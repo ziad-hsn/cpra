@@ -91,7 +91,7 @@ func TestCheckPreparationHoldsQueuedRecoveryWithoutRedispatch(t *testing.T) {
 				} else {
 					time.Sleep(time.Until(original.Deadline) + time.Second)
 					system.dispatchActions(time.Now())
-					current, _ := system.store.Get(m.ID)
+					current, _ := monitorWithActionHistory(t, system.store, m.ID)
 					if len(queue.admitted) != 0 || current.Actions[original.ID].State != persistence.Cancelled || system.lastError != nil {
 						t.Fatal("blocked recovery did not expire without dispatch", system.lastError)
 					}

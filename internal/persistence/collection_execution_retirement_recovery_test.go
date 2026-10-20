@@ -262,7 +262,7 @@ func TestCollectionExecutionRetiredRecoveryRejectsCorruption(t *testing.T) {
 }
 
 func TestCollectionExecutionRetiredRecoveryBeforeBeginAndCancellation(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, _ := executionResultInput(t, s, "create")
 	head, _ = activationSnapshotCancel(t, s, head, head.Activation.At.Add(time.Second))
 	head = executionResultViewPublish(t, s, executionItemFinalize(t, s, head))

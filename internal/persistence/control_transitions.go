@@ -38,6 +38,12 @@ func (m *Monitor) beginIncident(at time.Time) {
 	m.IncidentID = identity(fmt.Sprintf("incident/%s/%s/%d", m.ID, m.incarnationIdentity(), m.IncidentSequence))
 	m.IncidentRevision = identity("triage/" + m.IncidentID)
 	m.IncidentOpenedAt, m.IncidentClosedAt = at, time.Time{}
+	m.IncidentConfirmedAt = time.Time{}
+	m.IncidentThresholdTracked = actionStorageFormat(m.ActionVersion) && !at.IsZero()
+	m.IncidentDeliveries = nil
+	if m.IncidentThresholdTracked {
+		m.IncidentDeliveries = &NotificationCounts{}
+	}
 	m.AcknowledgedBy, m.AcknowledgedNote, m.DismissedBy, m.DismissedReason = "", "", "", ""
 	m.AcknowledgedAt, m.DismissedAt = time.Time{}, time.Time{}
 	m.Dismissed = false
@@ -66,7 +72,7 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 	m.ensureControlIdentity()
 	subject := c.Subject()
 	if subject == "incident" {
-		if m.IncidentID != c.IncidentID || !m.IncidentClosedAt.IsZero() || (!m.Incident && !m.Recovering) {
+		if m.IncidentID != c.IncidentID || !incidentOf(m).Active {
 			return Result{Err: ErrIncidentNotActive}
 		}
 		if m.IncidentRevision != c.ExpectedRevision {

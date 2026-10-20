@@ -101,7 +101,7 @@ func TestRealProcessActionCrashBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer s.Close()
-			m, _ := s.Get("stable-one")
+			m, _ := monitorWithActionHistory(t, s, "stable-one")
 			if received.Load() != before {
 				t.Fatal("restore/replay invoked external work")
 			}

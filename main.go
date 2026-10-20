@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -196,6 +195,10 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			return err
 		}
 	}
+	if os.Getenv("CPRA_ENTITY_THRESHOLD") != "" {
+		_ = encryption.Close()
+		return errors.New("CPRA_ENTITY_THRESHOLD is unsupported: all local pipelines now use bounded fair queues; remove this environment setting")
+	}
 	jobs.SSRFProtect = o.ssrfProtect
 	controller.InitializeLoggers(o.debug)
 	store, err := persistence.Open(ctx, settings)
@@ -210,11 +213,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	// Leave part of the process budget for publishing cancellation results and
 	// flushing storage. Each operation retains its own configured deadline.
 	config.WorkerConfig.DrainTimeout = o.shutdownTimeout * 2 / 3
-	if v := os.Getenv("CPRA_ENTITY_THRESHOLD"); v != "" {
-		if n, e := strconv.ParseInt(v, 10, 64); e == nil && n > 0 {
-			config.EntityCountThreshold = n
-		}
-	}
+
 	var oc *controller.Controller
 	var collections runtimeCollectionOwners
 	var webSrv *httpserver.Server
@@ -386,10 +385,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			}
 			collections.reselection = reselection
 		}
-		queueType := "hybrid"
-		if oc.UseAdaptiveQueue() {
-			queueType = "adaptive"
-		}
+		queueType := "fair"
 		admissionReady := func(ctx context.Context) bool {
 			return oc.ReadyContext(ctx) && collections.Ready(ctx)
 		}
@@ -400,7 +396,7 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 		}
 		webSrv = httpserver.New(webConfig,
 			oc.SnapshotHolder(), oc.Metrics(), oc.PulseQueue(), oc.InterventionQueue(), oc.CodeQueue(), oc.PulsePool(), oc.InterventionPool(), oc.CodePool(),
-			httpserver.PublicConfig{QueueCapacity: uint64(oc.PulseQueue().Stats().Capacity), BatchSize: config.BatchSize, AlertCooldown: config.AlertCooldown, RecoveryBypass: config.RecoveryBypass, UseAdaptive: oc.UseAdaptiveQueue(), QueueType: queueType})
+			httpserver.PublicConfig{QueueCapacity: uint64(oc.PulseQueue().Stats().Capacity), BatchSize: config.BatchSize, AlertCooldown: config.AlertCooldown, RecoveryBypass: config.RecoveryBypass, UseAdaptive: false, QueueType: queueType})
 		if err = webSrv.Start(); err != nil {
 			return err
 		}

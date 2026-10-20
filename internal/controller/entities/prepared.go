@@ -223,6 +223,12 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		if err != nil {
 			return nil, fmt.Errorf("prepare intervention: %w", err)
 		}
+		if b.jobs.InterventionJob != nil {
+			b.jobs.InterventionFlow, err = actionDestination(m.Intervention.Action, m.Intervention.Target)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	if len(codes) > 0 {
 		b.codes = &components.CodeConfig{Configs: make(map[string]*components.ColorCodeConfig, len(codes))}
@@ -244,6 +250,25 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		if err != nil {
 			return nil, fmt.Errorf("prepare notification: %w", err)
 		}
+		if b.jobs.CodeFlows == nil {
+			b.jobs.CodeFlows = make(map[string][]components.ActionFlow)
+		}
+		flows := make([]components.ActionFlow, len(b.jobs.CodeJobs[color]))
+		for index, job := range b.jobs.CodeJobs[color] {
+			if job == nil {
+				continue
+			} // External execution does not enter local queues.
+			driver, config := code.Notify, code.Config
+			if code.NotifyGroup != "" {
+				endpoint := privateEndpoints[privateGroups[code.NotifyGroup][index]]
+				driver, config = endpoint.Type, endpoint.Config
+			}
+			flows[index], err = actionDestination(driver, config)
+			if err != nil {
+				return nil, err
+			}
+		}
+		b.jobs.CodeFlows[color] = flows
 		if code.NotifyGroup != "" {
 			for _, name := range privateGroups[code.NotifyGroup] {
 				raw, err := json.Marshal(privateEndpoints[name])

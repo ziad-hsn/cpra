@@ -11,7 +11,7 @@ type InterventionTargetKubernetes struct {
 	Type           string        `yaml:"type" json:"type"`
 	KubeconfigPath string        `yaml:"kubeconfig_path" json:"kubeconfig_path"`
 	Namespace      string        `yaml:"namespace" json:"namespace"`
-	Kind           string        `yaml:"kind" json:"kind"` // deployment | statefulset | replicaset
+	Kind           string        `yaml:"kind" json:"kind"` // deployment
 	Name           string        `yaml:"name" json:"name"`
 	Replicas       *int          `yaml:"replicas" json:"replicas"` // nil = rollout restart; non-nil = scale
 	Timeout        time.Duration `yaml:"timeout" json:"timeout"`

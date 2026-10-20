@@ -157,7 +157,7 @@ export function CollectionOperationControls({ id, identity, operation, onProgres
     {!can('ValidateOperation') && !can('ActivateOperation') && !can('CancelOperation') && <p role="status">This server and identity do not offer these collection controls.</p>}
     {validation && <section aria-label="Activation review results">
       <h3>Retained validation review</h3>
-      <p>Original verdict: {validation.summary.valid ? 'Passed' : 'Rejected'}. The sealed summary covers {formatNumber(validation.summary.count)} resources. Result: <span className="mono">{validation.summary.resultID}</span>.</p>
+      <p>Original verdict: {validation.summary.valid ? 'Passed' : 'Rejected'}. The saved summary covers {formatNumber(validation.summary.count)} resources. Result: <span className="mono">{validation.summary.resultID}</span>.</p>
       {!validation.supported && <p role="status">This result contains unsupported vocabulary and cannot authorize activation.</p>}
       <div className="table-scroll" role="region" aria-label="Activation review resource results" tabIndex={0}><table className="data-table"><caption>Current validation review page</caption><thead><tr><th scope="col">Ordinal</th><th scope="col">Resource</th><th scope="col">Source / document / item</th><th scope="col">Change</th><th scope="col">Issue</th></tr></thead>
         <tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{Number(item.source.slice(7))} / {item.sourceDocument} / {item.sourceItem}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}{item.reason && <div>{validationDiagnostic(item)}</div>}</td></tr>)}</tbody></table></div>

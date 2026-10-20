@@ -189,7 +189,7 @@ func TestCollectionExecutionCommittedProgressSurvivesProcessKill(t *testing.T) {
 			}
 			defer s.Close()
 			head, ok, err := s.CollectionGet(report.OperationID)
-			if err != nil || !ok || head.Execution == nil || !reflect.DeepEqual(*head.Execution, report.Progress) || s.fsm.image.Version != CollectionExecutionFormatVersion {
+			if err != nil || !ok || head.Execution == nil || !reflect.DeepEqual(*head.Execution, report.Progress) || s.fsm.image.Version != ActionFormatVersion {
 				t.Fatal("restart changed committed execution evidence", err)
 			}
 			at := head.Execution.LastAt.Add(time.Second)

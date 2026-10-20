@@ -12,9 +12,11 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CPRA_BROWSER_EXECUTABLE,
     args: [`--ignore-certificate-errors-spki-list=${process.env.CPRA_BROWSER_CERT_PIN}`] });
   let stage = 'launch';
+  let lastPage;
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
     const page = await context.newPage(); page.setDefaultTimeout(20_000);
+    lastPage = page;
     const writes = [], errors = [], reads = [], pending = [];
     let captureFailure = '', interruptedReads = 0;
     page.on('pageerror', () => errors.push('page error'));
@@ -96,7 +98,7 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
     await page.getByRole('alert').filter({ hasText: 'All resources are staged.' }).waitFor();
     stage = 'sealed validation';
     await page.getByRole('button', { name: 'Validate whole collection', exact: true }).click();
-    await page.getByRole('heading', { name: 'Original sealed validation result', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Saved validation result', exact: true }).waitFor();
     check(writes.every(write => !write.path.endsWith('/activate')), 'Validation implicitly activated the collection');
     const originalLink = page.getByRole('region', { name: 'Apply collection' }).getByRole('link');
     const operationID = (await originalLink.innerText()).trim();
@@ -156,7 +158,7 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
     await page.getByRole('button', { name: 'Upload remaining resources', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: 'All resources are staged.' }).waitFor();
     await page.getByRole('button', { name: 'Validate whole collection', exact: true }).click();
-    await page.getByRole('heading', { name: 'Original sealed validation result', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Saved validation result', exact: true }).waitFor();
     const guidedOperationID = (await page.getByRole('region', { name: 'Apply collection' }).getByRole('link').innerText()).trim();
     check(guidedOperationID !== operationID && guidedOperationID.startsWith('op.'), 'Guided setup lost its distinct operation identity');
     await page.getByRole('button', { name: 'Review activation', exact: true }).click();
@@ -190,13 +192,115 @@ const check = (ok, message) => { if (!ok) throw new Error(message); };
       check(path.isAbsolute(process.env.CPRA_BROWSER_EVIDENCE_DIR), 'Screenshot directory must be absolute');
       await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'dashboard-overview.png'), fullPage: true });
     }
+    // Use the public API for concurrent-editor fixtures, without replacing any
+    // browser transport. The imported monitor stays disabled throughout.
+    async function api(resource, method = 'GET', body) {
+      return page.evaluate(async ({resource, method, body, token}) => {
+        const headers = {Authorization: `Bearer ${token}`};
+        if (body) headers['Content-Type'] = 'application/json';
+        if (method === 'PUT') headers['If-Match'] = `"${body.metadata.resourceVersion}"`;
+        if (method === 'POST') headers['If-None-Match'] = '*';
+        const response = await fetch(resource, {method, headers, body: body ? JSON.stringify(body) : undefined});
+        if (!response.ok) throw new Error(`Fixture request failed: ${response.status}`);
+        return response.json();
+      }, {resource, method, body, token: operator});
+    }
+    async function visit(route) {
+      await page.goto(origin + route);
+      await page.getByLabel('Bearer token').fill(operator);
+      await page.getByRole('button', {name: 'Sign in', exact: true}).click();
+      await page.getByRole('button', {name: 'Sign out', exact: true}).waitFor();
+    }
+    const document = resource => ({apiVersion: resource.apiVersion, kind: resource.kind, metadata: resource.metadata, spec: resource.spec});
+    stage = 'monitor contextual setup and concurrent edit';
+    let observed = await api('/api/v2/monitors/activated-monitor');
+    const group = await api('/api/v2/notification-groups/' + observed.spec.notifications.red.groupRef);
+    const recipientID = group.spec.recipientRefs[0];
+    const blue = {notifyType: 'webhook', recipientRefs: [recipientID]};
+    observed.spec.notifications.blue = blue;
+    observed = await api('/api/v2/monitors/activated-monitor', 'PUT', document(observed));
+    const reviewedVersion = observed.metadata.resourceVersion;
+    await visit('/monitors/by-id/activated-monitor');
+    await page.getByRole('link', {name: 'Set up notifications', exact: true}).click();
+    await page.getByLabel('Webhook destination').selectOption('recipient');
+    await page.getByLabel('Notification group name', {exact: true}).fill('Reviewed replacement group');
+    await page.getByLabel('Specific recipient ID', {exact: true}).fill(recipientID);
+    await page.getByRole('group', {name: 'Recipient', exact: true}).getByRole('button', {name: 'Use ID', exact: true}).click();
+    const beforeConditional = writes.length;
+    await page.getByRole('button', {name: 'Prepare notification setup', exact: true}).click();
+    const review = page.getByLabel('Review notification rule changes', {exact: true});
+    await review.waitFor();
+    const diff = await review.innerText();
+    check(diff.includes(reviewedVersion) && diff.includes('red') && diff.includes('green') && diff.includes('Other notification rules'), 'Conditional notification diff omitted its version or preserved rules');
+    check(writes.length === beforeConditional, 'Reviewing a conditional setup mutated configuration');
+    observed.metadata.name = 'Concurrent editor change';
+    const concurrent = await api('/api/v2/monitors/activated-monitor', 'PUT', document(observed));
+    await page.getByRole('button', {name: 'Prepare reviewed collection', exact: true}).click();
+    await page.getByRole('region', {name: 'Collection preview', exact: true}).getByRole('row').nth(2).waitFor();
+    await page.getByRole('button', {name: 'Preview on server', exact: true}).click();
+    await page.getByRole('alert').filter({hasText: 'Server preview found invalid resources or references.'}).waitFor();
+    check((await page.getByRole('list', {name: 'Preview validation errors'}).innerText()).includes('A resource version changed; reload and review the intended changes.'), 'Preflight failed for a reason other than the frozen version conflict');
+    const afterConflict = await api('/api/v2/monitors/activated-monitor');
+    check(afterConflict.metadata.resourceVersion === concurrent.metadata.resourceVersion && JSON.stringify(afterConflict.spec.notifications.blue) === JSON.stringify(blue), 'Conditional setup overwrote a concurrent edit or blue rule');
+    check(writes.slice(beforeConditional).every(write => write.path === '/api/v2/monitors/activated-monitor' || write.path === '/api/v2/collections/preflight'), 'Conflicting setup created a replacement operation or activation');
+    await page.getByRole('button', {name: 'Discard selection', exact: true}).click();
+
+    stage = 'explicitly reviewed replacement';
+    await page.getByLabel('Webhook destination').selectOption('recipient');
+    await page.getByLabel('Notification group name', {exact: true}).fill('Approved replacement group');
+    await page.getByLabel('Specific recipient ID', {exact: true}).fill(recipientID);
+    await page.getByRole('group', {name: 'Recipient', exact: true}).getByRole('button', {name: 'Use ID', exact: true}).click();
+    await page.getByRole('button', {name: 'Prepare notification setup', exact: true}).click();
+    await review.waitFor();
+    check((await review.innerText()).includes(concurrent.metadata.resourceVersion), 'Explicit new review did not show the current version');
+    await page.getByRole('button', {name: 'Prepare reviewed collection', exact: true}).click();
+    await page.getByRole('region', {name: 'Collection preview', exact: true}).getByRole('row').nth(2).waitFor();
+    await page.getByRole('button', {name: 'Preview on server', exact: true}).click();
+    await page.getByRole('alert').filter({hasText: 'Server preview passed.'}).waitFor();
+    await page.getByRole('button', {name: 'Create inactive operation', exact: true}).click();
+    await page.getByRole('alert').filter({hasText: 'Inactive operation created.'}).waitFor();
+    await page.getByRole('button', {name: 'Upload remaining resources', exact: true}).click();
+    await page.getByRole('alert').filter({hasText: 'All resources are staged.'}).waitFor();
+    await page.getByRole('button', {name: 'Validate whole collection', exact: true}).click();
+    await page.getByRole('heading', {name: 'Saved validation result', exact: true}).waitFor();
+    const replacementOperationID = (await page.getByRole('region', {name: 'Apply collection'}).getByRole('link').innerText()).trim();
+    check(replacementOperationID.startsWith('op.') && ![operationID, guidedOperationID].includes(replacementOperationID), 'New reviewed inputs reused an earlier operation');
+    await page.getByRole('button', {name: 'Review activation', exact: true}).click();
+    check((await page.getByRole('alertdialog').innerText()).includes(replacementOperationID), 'Replacement confirmation omitted its original operation');
+    await page.getByRole('button', {name: 'Confirm activation', exact: true}).click();
+    await page.getByText('Resource results are retained and ready to read.', {exact: true}).waitFor({timeout: 45_000});
+    await page.getByRole('button', {name: 'Read resource results', exact: true}).click();
+    const replacementRows = page.getByRole('region', {name: 'Application resource results'}).getByRole('row');
+    await replacementRows.nth(2).waitFor();
+    check((await replacementRows.allTextContents()).slice(1).every(row => row.includes('Change committed') && row.includes('Applied')), 'Reviewed replacement did not apply both resources');
+    const replaced = await api('/api/v2/monitors/activated-monitor');
+    check(replaced.spec.enabled === false && replaced.metadata.name === concurrent.metadata.name && JSON.stringify(replaced.spec.notifications.blue) === JSON.stringify(blue), 'Reviewed replacement changed enablement, concurrent name or blue configuration');
+    check(replaced.spec.notifications.red.groupRef !== observed.spec.notifications.red.groupRef && replaced.spec.notifications.red.groupRef === replaced.spec.notifications.green.groupRef, 'Reviewed red/green rules were not replaced together');
+    check(writes.filter(write => write.path === `/api/v2/operations/${replacementOperationID}/activate`).length === 1, 'Reviewed replacement activation repeated');
+    await page.getByRole('button', {name: 'Close this import', exact: true}).click();
+
+    stage = 'recipient contextual setup rejects an incompatible destination';
+    await api('/api/v2/notification-endpoints', 'POST', {apiVersion: 'cpra.io/v2', kind: 'NotificationEndpoint', metadata: {id: 'local-log-only'}, spec: {type: 'log', config: {}}});
+    await api('/api/v2/recipients', 'POST', {apiVersion: 'cpra.io/v2', kind: 'Recipient', metadata: {id: 'local-log-recipient'}, spec: {endpointRefs: ['local-log-only']}});
+    await visit('/recipients/local-log-recipient');
+    await page.getByRole('link', {name: 'Set up notifications', exact: true}).click();
+    await page.getByRole('combobox', {name: /^Choose monitor/}).selectOption('activated-monitor');
+    await page.getByLabel('Notification group name', {exact: true}).fill('Incompatible destination');
+    const beforeIncompatible = writes.length;
+    await page.getByRole('button', {name: 'Prepare notification setup', exact: true}).click();
+    await page.getByRole('alert').filter({hasText: 'This recipient has no webhook endpoint.'}).waitFor();
+    check(writes.length === beforeIncompatible && await page.getByRole('region', {name: 'Collection preview', exact: true}).count() === 0, 'Incompatible recipient was adopted or submitted');
+    check(!((await page.locator('body').innerText()).includes(marker)), 'Contextual setup exposed protected destination data');
     stage = 'sign out';
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await page.getByLabel('Bearer token').waitFor();
     await drainCaptures();
     check(errors.length === 0, 'Browser reported an uncaught error');
-    process.stdout.write(JSON.stringify({ operationID, guidedOperationID, resultID: original.executionResult.summary.resultID, activations: activations.length, interruptedReads,
-      checks: ['real-file-import', 'file-normalization-profile', 'whole-collection-validation', 'explicit-confirmation', 'one-bodyless-activation', 'dependency-ordered-application', 'separate-decision-and-controller', 'source-attribution', 'guided-notification-collection', 'guided-explicit-activation', 'secret-redaction', 'ephemeral-session', 'sign-out-clear'] }));
-  } catch (error) { throw new Error(`${stage}: ${error.message}`); }
+    process.stdout.write(JSON.stringify({ operationID, guidedOperationID, replacementOperationID, resultID: original.executionResult.summary.resultID, initialOperationActivations: activations.length, interruptedReads,
+      checks: ['real-file-import', 'file-normalization-profile', 'whole-collection-validation', 'explicit-confirmation', 'one-bodyless-activation', 'dependency-ordered-application', 'separate-decision-and-controller', 'source-attribution', 'guided-notification-collection', 'guided-explicit-activation', 'conditional-rule-diff', 'concurrent-edit-conflict', 'blue-rule-preserved', 'monitor-and-recipient-context', 'incompatible-recipient-rejected', 'secret-redaction', 'ephemeral-session', 'sign-out-clear'] }));
+  } catch (error) {
+    const visible = lastPage ? (await lastPage.locator('body').innerText()).slice(0, 4000).replaceAll(operator, '[token]').replaceAll(marker, '[private]') : '';
+    throw new Error(`${stage}: ${error.message}\nVisible page: ${visible}`);
+  }
   finally { await browser.close(); }
 })().catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });

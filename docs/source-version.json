@@ -17,7 +17,7 @@
   "historical_review_date": "2026-09-13",
   "development_commit": "34ef88aa3dd5ff840285d9f59ac8a95ce7ea6865",
   "integrated_main_commit": "b293f34dd57ee61c78371643de6d0ebaa75c626e",
-  "referenced_source_inventory": "review/reference-data.json",
+  "referenced_source_inventory": "reference/source-data.json",
   "referenced_source_inventory_scope": "selected linked source files only; not the full working candidate or a release attestation",
   "metadata_scope": "Development documentation template; not an attestation of the current tree or completed qualification"
 }

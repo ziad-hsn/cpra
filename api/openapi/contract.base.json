@@ -3,7 +3,7 @@
   "info": {
     "title": "CPRa SDK draft management contract",
     "version": "0.1.0-rc.1",
-    "description": "Draft contract. V2 server qualification is pending. Existing v1 is separate."
+    "description": "CPRa management and observation API. Configuration changes require conditional versions and granted permissions. Discover server capabilities before using optional operations."
   },
   "paths": {
     "/api/v2/monitors": {

@@ -236,7 +236,7 @@ func TestCollectionPlanSnapshotImportBatchesLargeArtifactByBytes(t *testing.T) {
 }
 
 func TestCollectionPlanSnapshotFormatFiveRequiresBothNamespaces(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := createCollectionFixture(t, s, 1)
 	item := collectionItemFixture(t, s, head, 1, "original")
 	if r := uploadCollectionFixture(t, s, head, item, head.ActivityAt); r.Err != nil {
@@ -296,7 +296,7 @@ func TestCollectionPlanSnapshotFormatFiveRequiresBothNamespaces(t *testing.T) {
 }
 
 func TestCollectionPlanSnapshotPreservesFrozenFormatFourBytes(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	createCatalog(t, s, catalogRecord(t, s, "Credential", "guard", "uid", "v1", "private"))
 	frozen, err := s.fsm.Snapshot()
 	if err != nil {
@@ -320,7 +320,7 @@ func TestCollectionPlanSnapshotPreservesFrozenFormatFourBytes(t *testing.T) {
 
 func TestCollectionPlanSnapshotMixedLogRecoveryAndStoppedBackup(t *testing.T) {
 	config := testConfig(t)
-	s, err := Open(context.Background(), config)
+	s, err := openReplayStore(t, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,8 @@ func TestCollectionPlanSnapshotMixedLogRecoveryAndStoppedBackup(t *testing.T) {
 		t.Fatal(result.Err)
 	}
 	head = *result.Collection
-	if err := s.Snapshot(); err != nil || s.fsm.image.Version != CollectionFormatVersion {
+	persistPausedReviewSnapshot(t, s)
+	if s.fsm.image.Version != CollectionFormatVersion {
 		t.Fatal("old input-only snapshot", err)
 	}
 	planHeader := planCodecHeader(head.ItemCount)
@@ -383,7 +384,7 @@ func TestCollectionPlanSnapshotMixedLogRecoveryAndStoppedBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal("mixed replay", err)
 	}
-	if s.fsm.image.Version != CollectionPlanFormatVersion || s.fsm.image.CatalogMutationSequence != 0 || len(s.fsm.image.Catalog) != 0 {
+	if s.fsm.image.Version != ActionFormatVersion || s.fsm.image.CatalogMutationSequence != 0 || len(s.fsm.image.Catalog) != 0 {
 		t.Fatal("restart invented catalog mutations")
 	}
 	laterFrozen, err := s.fsm.Snapshot()
@@ -450,7 +451,7 @@ func TestCollectionPlanSnapshotMixedLogRecoveryAndStoppedBackup(t *testing.T) {
 }
 
 func TestCollectionPlanSnapshotCommandFormatsAndPayloadFreeCancel(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := createCollectionFixture(t, s, 1)
 	item := collectionItemFixture(t, s, head, 1, "credential-000001")
 	r := uploadCollectionFixture(t, s, head, item, head.ActivityAt)

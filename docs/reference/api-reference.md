@@ -4,7 +4,7 @@ description: Read CPRa fleet state, monitor details, incidents, queues, worker p
 cpra_scope: main
 ---
 
-> **Current development checkout:** this reference follows the merged runtime source. See [version and availability](../versions.md) for the distinction between current development and historical candidate guides.
+See [versions and availability](../versions.md) for the supported source interfaces and tested environments.
 
 
 # HTTP API and dashboard
@@ -13,7 +13,7 @@ The default listener is `localhost:8060`. The v1 endpoints below provide compati
 
 ## Authentication
 
-Management uses named Bearer credentials and a TLS or explicitly configured trusted-proxy origin. Enter a named token in the dashboard for the current tab. The authentication middleware protects the v1 health, readiness, and metrics routes as well. Legacy read-only authentication accepts Bearer tokens or Basic authentication with username `cpra`; anonymous legacy access requires explicit loopback configuration.
+Management uses named Bearer credentials and a TLS or explicitly configured trusted-proxy origin. Enter a named token in the dashboard for the current tab. The authentication middleware protects the v1 health, readiness, and metrics routes as well. Shared-token observation authentication accepts Bearer tokens or Basic authentication with username `cpra`; anonymous observation access requires explicit loopback configuration.
 
 Use `cpractl --token-file` and the TLS settings in [management startup](../management-startup.md). Initial authentication inputs bootstrap committed authority; changing those files does not rotate existing credentials.
 
@@ -60,7 +60,7 @@ These examples assume explicitly enabled anonymous legacy loopback access. Authe
 
 Liveness returns process health, not target health. Readiness checks controller admission, recent progress, and storage availability. An explicitly empty configuration can be ready. The response reports `projection_fresh` separately; target health and projection freshness are distinct from readiness.
 
-The durable runtime uses an incremental monitor index with bounded, paginated responses. Legacy snapshot fallback can return HTTP 503 when its detailed index is unavailable. This behavior does not establish a supported-capacity benchmark.
+The durable runtime uses an incremental monitor index with bounded, paginated responses. The in-memory snapshot fallback can return HTTP 503 when its detailed index is unavailable. This behavior does not establish a supported-capacity benchmark.
 
 A fresh process may also lack a snapshot. Treat unavailable responses as unavailable data, not as an empty healthy fleet.
 

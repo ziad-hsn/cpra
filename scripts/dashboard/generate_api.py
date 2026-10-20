@@ -171,7 +171,7 @@ def generate():
                 elif kind in ("integer", "number"):
                     kind = "number"
                 label = spec.get("labels", {}).get(key, re.sub(r"([a-z])([A-Z])", r"\1 \2", key).capitalize())
-                fields.append({"key": key, "label": label, "type": kind, "protected": key in spec["protected"]})
+                fields.append({"key": key, "label": label, "type": kind, "protected": key in spec["protected"], "required": key in schemas[spec["schema"]].get("required", [])})
             descriptors[driver] = fields
         lines.append("\nexport const " + category + "Fields = " + json.dumps(descriptors, indent=2) + " as const;")
     # The browser uses only this bounded structural projection to prevent an

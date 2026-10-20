@@ -75,6 +75,13 @@ func (f *machine) workerHeartbeatAccepted(a WorkerAuthority, r WorkerExecutionRe
 		return false
 	}
 	m := f.image.Monitors[r.Intent.MonitorID]
+	if r.Intent.Category != "check" {
+		var err error
+		m, err = f.hydrateReviewDependencies(m, r.Intent.ActionID)
+		if err != nil {
+			return false
+		}
+	}
 	if r.Intent.Category == "check" {
 		return m.Generation < r.Intent.Generation
 	}
@@ -157,7 +164,7 @@ func (s *Store) CommitWorkerHeartbeat(ctx context.Context, a WorkerAuthority, re
 		return WorkerHeartbeatResponse{}, errors.Join(ErrCommitUnconfirmed, ErrWorkerExecutionUnavailable)
 	}
 	out := *results[0].WorkerHeartbeat
-	unlock, err := s.lockControllerState(ctx, false)
+	unlock, err := s.lockControllerState(ctx, true)
 	if err != nil {
 		return WorkerHeartbeatResponse{}, errors.Join(ErrCommitUnconfirmed, err)
 	}
@@ -169,6 +176,9 @@ func (s *Store) CommitWorkerHeartbeat(ctx context.Context, a WorkerAuthority, re
 	monitor := s.fsm.image.Monitors[r.Intent.MonitorID]
 	maintenanceBoundary := r.Intent.Category != "check" && !monitor.ControlNotification(monitor.Actions[r.Intent.ActionID]) && (c.Maintenance == nil || !c.Maintenance.Until.IsZero() && !time.Now().Before(c.Maintenance.Until))
 	if out.Accepted && (!s.fsm.workerHeartbeatAccepted(a, r, time.Now().UTC()) || maintenanceBoundary) {
+		if s.fsm.err != nil {
+			return WorkerHeartbeatResponse{}, errControllerUnavailable
+		}
 		return WorkerHeartbeatResponse{}, ErrWorkerExecutionConflict
 	}
 	if err := ctx.Err(); err != nil {

@@ -273,8 +273,8 @@ func TestManagementActionShowsSeparateLateProviderEvidence(t *testing.T) {
 	if after.Data.State != "unknown" || !after.Data.Held || after.Data.LateEvidence == nil || after.Data.LateEvidence.Outcome != "accepted" || after.Data.ReviewRevision == before.Data.ReviewRevision || after.Data.UpdatedAt == nil || !after.Data.UpdatedAt.Equal(at) {
 		t.Fatalf("late observation missing: %+v", after)
 	}
-	if after.Data.CreatedAt != nil {
-		t.Fatal("unknown creation time fabricated")
+	if after.Data.CreatedAt == nil || !after.Data.CreatedAt.Equal(a.QueuedAt) {
+		t.Fatal("original committed creation time changed")
 	}
 	raw, _ := json.Marshal(after.Data)
 	if strings.Contains(string(raw), "0001-01-01") {

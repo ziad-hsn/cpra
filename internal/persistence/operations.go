@@ -153,7 +153,7 @@ func (f *machine) applyOperation(update OperationUpdate, at time.Time) Result {
 		return Result{Err: ErrOperationNotFound}
 	}
 	if receipt.Key != update.Key || receipt.UID != update.UID || receipt.NewVersion != update.Revision || receipt.Subject != update.Subject || receipt.IncidentID != update.IncidentID || receipt.ActionID != update.ActionID ||
-		!operationCurrent(f.image, receipt) || at.Before(receipt.At) {
+		!f.operationCurrent(receipt) || at.Before(receipt.At) {
 		return Result{Err: ErrCatalogConflict}
 	}
 	receipt.UpdatedAt = at
@@ -221,8 +221,24 @@ func (s *Store) Operation(id string) (OperationReceipt, error) {
 }
 
 func operationCurrent(i image, r OperationReceipt) bool {
+	return operationCurrentWithAction(i, r, func(m Monitor, id string) (Action, bool) {
+		a, ok := m.Actions[id]
+		return a, ok
+	})
+}
+
+// Committed operation updates resolve the exact retained dependency. Snapshot
+// decoding uses its separately validated image until the ledger is imported.
+func (f *machine) operationCurrent(r OperationReceipt) bool {
+	return operationCurrentWithAction(f.image, r, func(m Monitor, id string) (Action, bool) {
+		a, found, err := f.actionForMonitor(m, id)
+		return a, found && err == nil
+	})
+}
+
+func operationCurrentWithAction(i image, r OperationReceipt, action func(Monitor, string) (Action, bool)) bool {
 	if r.Subject == "review" {
-		a, ok := i.Monitors[r.Key.ID].Actions[r.ActionID]
+		a, ok := action(i.Monitors[r.Key.ID], r.ActionID)
 		return ok && actionMonitorIdentity(r.Key.ID, a) == r.UID && a.Review != nil && a.Review.Revision == r.NewVersion && !a.Review.Conflict
 	}
 	current, ok := i.Catalog[r.Key.indexKey()]
@@ -237,11 +253,17 @@ func operationCurrent(i image, r OperationReceipt) bool {
 		return false
 	}
 	if r.Subject == "recovery" {
-		a, ok := m.Actions[r.ActionID]
+		a, ok := action(m, r.ActionID)
 		return ok && a.CatalogUID == r.UID && a.OperationID == r.ID && a.State != Cancelled
 	}
 	if r.Subject == "control" {
 		return m.ControlRevision == r.NewVersion
 	}
 	return m.IncidentID == r.IncidentID && m.IncidentRevision == r.NewVersion && incidentOf(m).Active
+}
+
+// Compact snapshots validate retained action receipts after importing their
+// frozen ledger. All other receipt relationships remain image-local.
+func deferredActionReceipt(i image, r OperationReceipt) bool {
+	return i.ActionStorage != nil && i.Monitors[r.Key.ID].ActionProjection != nil && (r.Subject == "review" || r.Subject == "recovery")
 }

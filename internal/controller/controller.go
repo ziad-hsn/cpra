@@ -62,30 +62,27 @@ func (l *LoggerAdapter) LogComponentState(entityID uint32, component string, act
 
 // Controller manages the ECS world and its systems using ark-tools.
 type Controller struct {
-	durableSystem        *systems.DurableSystem
-	pulseQueue           queue.Queue
-	codeQueue            queue.Queue
-	interventionQueue    queue.Queue
-	pulsePool            *queue.DynamicWorkerPool
-	mapper               *entities.EntityManager
-	world                *ecs.World
-	app                  *app.App
-	interventionPool     *queue.DynamicWorkerPool
-	codePool             *queue.DynamicWorkerPool
-	config               Config
-	entityCountThreshold int64
-	queueSwitchMutex     sync.RWMutex
-	running              bool
-	lifecycleMu          sync.Mutex
-	stopCh               chan struct{}
-	wakeups              chan struct{}
-	doneCh               chan struct{}
-	resultSystems        []app.System
-	initialized          chan struct{}
-	initializedState     atomic.Bool
-	lastProgress         atomic.Int64
-	stoppingState        atomic.Bool
-	useAdaptiveQueue     bool
+	durableSystem     *systems.DurableSystem
+	pulseQueue        queue.Queue
+	codeQueue         queue.Queue
+	interventionQueue queue.Queue
+	pulsePool         *queue.DynamicWorkerPool
+	mapper            *entities.EntityManager
+	world             *ecs.World
+	app               *app.App
+	interventionPool  *queue.DynamicWorkerPool
+	codePool          *queue.DynamicWorkerPool
+	config            Config
+	running           bool
+	lifecycleMu       sync.Mutex
+	stopCh            chan struct{}
+	wakeups           chan struct{}
+	doneCh            chan struct{}
+	resultSystems     []app.System
+	initialized       chan struct{}
+	initializedState  atomic.Bool
+	lastProgress      atomic.Int64
+	stoppingState     atomic.Bool
 
 	// Observability surfaces for the web server.
 	metricsAgg     *MetricsAggregator
@@ -117,10 +114,7 @@ type Config struct {
 	// RecoveryBypass allows recovery colors (green) to bypass the cooldown so
 	// recovery notices are always dispatched immediately.
 	RecoveryBypass bool
-	// EntityCountThreshold, when > 0, selects AdaptiveQueue during loading
-	// before Start when the entity count exceeds it. Zero disables selection.
-	// Set via the CPRA_ENTITY_THRESHOLD env var or config.
-	EntityCountThreshold int64
+
 	// TPS is the ark-tools tick rate (ticks/sec). Zero falls back to 10.
 	TPS int
 }
@@ -159,8 +153,8 @@ func NewController(config Config) *Controller {
 	world := &arkApp.World
 	mapper := entities.NewEntityManager(world)
 
-	// Pulse work has bounded driver/flow reservations; action queues retain
-	// their existing durable admission order.
+	// All local queues have bounded fair admission. Action destinations execute
+	// serially; durable admission/start guards remain the authority for effects.
 	pulseCfg := queue.DefaultQueueConfig()
 	pulseCfg.Name = "pulse"
 	pulseCfg.HybridConfig.Name = "pulse"
@@ -174,7 +168,8 @@ func NewController(config Config) *Controller {
 	interventionCfg.Name = "intervention"
 	interventionCfg.HybridConfig.Name = "intervention"
 	interventionCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
-	interventionQueue, err := queue.NewQueue(interventionCfg)
+	var interventionQueue queue.Queue
+	interventionQueue, err = queue.NewActionQueue(interventionCfg.HybridConfig.RingCapacity+interventionCfg.HybridConfig.OverflowCapacity, "recovery")
 	if err != nil {
 		SystemLogger.Fatal("Failed to create intervention HybridQueue: %v", err)
 	}
@@ -182,7 +177,8 @@ func NewController(config Config) *Controller {
 	codeCfg.Name = "code"
 	codeCfg.HybridConfig.Name = "code"
 	codeCfg.HybridConfig.DropPolicy = queue.DropPolicyDropNewest
-	codeQueue, err := queue.NewQueue(codeCfg)
+	var codeQueue queue.Queue
+	codeQueue, err = queue.NewActionQueue(codeCfg.HybridConfig.RingCapacity+codeCfg.HybridConfig.OverflowCapacity, "notification")
 	if err != nil {
 		SystemLogger.Fatal("Failed to create code HybridQueue: %v", err)
 	}
@@ -195,12 +191,14 @@ func NewController(config Config) *Controller {
 		SystemLogger.Fatal("Failed to create pulse worker pool: %v", err)
 	}
 	interventionLogger := WorkerPoolLogger.WithContext("intervention")
-	interventionPool, err := queue.NewDynamicWorkerPool(queue.NewHandle(interventionQueue), config.WorkerConfig, interventionLogger)
+	actionWorkerConfig := config.WorkerConfig
+	actionWorkerConfig.FairDispatch = true
+	interventionPool, err := queue.NewDynamicWorkerPool(queue.NewHandle(interventionQueue), actionWorkerConfig, interventionLogger)
 	if err != nil {
 		SystemLogger.Fatal("Failed to create intervention worker pool: %v", err)
 	}
 	codeLogger := WorkerPoolLogger.WithContext("code")
-	codePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(codeQueue), config.WorkerConfig, codeLogger)
+	codePool, err := queue.NewDynamicWorkerPool(queue.NewHandle(codeQueue), actionWorkerConfig, codeLogger)
 	if err != nil {
 		SystemLogger.Fatal("Failed to create code worker pool: %v", err)
 	}
@@ -234,22 +232,21 @@ func NewController(config Config) *Controller {
 	arkApp.AddSystem(durableSystem)
 
 	return &Controller{
-		durableSystem:        durableSystem,
-		app:                  arkApp,
-		world:                world,
-		mapper:               mapper,
-		pulseQueue:           pulseQueue,
-		interventionQueue:    interventionQueue,
-		codeQueue:            codeQueue,
-		pulsePool:            pulsePool,
-		interventionPool:     interventionPool,
-		codePool:             codePool,
-		config:               config,
-		entityCountThreshold: config.EntityCountThreshold,
-		metricsAgg:           metricsAgg,
-		snapshotHolder:       snapshotHolder,
-		resultSystems:        []app.System{durableSystem},
-		wakeups:              wakeups,
+		durableSystem:     durableSystem,
+		app:               arkApp,
+		world:             world,
+		mapper:            mapper,
+		pulseQueue:        pulseQueue,
+		interventionQueue: interventionQueue,
+		codeQueue:         codeQueue,
+		pulsePool:         pulsePool,
+		interventionPool:  interventionPool,
+		codePool:          codePool,
+		config:            config,
+		metricsAgg:        metricsAgg,
+		snapshotHolder:    snapshotHolder,
+		resultSystems:     []app.System{durableSystem},
+		wakeups:           wakeups,
 	}
 }
 
@@ -283,7 +280,6 @@ func (c *Controller) LoadMonitors(ctx context.Context, filename string) error {
 	}
 
 	// Check if we need to switch to AdaptiveQueue due to high entity count
-	c.CheckEntityCountAndSwitchQueue()
 
 	// Pre-calculate worker sizing from initial configuration/world (Pulse only)
 	c.precomputeSizingFromConfig()
@@ -302,7 +298,6 @@ func (c *Controller) LoadCatalog(ctx context.Context) error {
 	if err := c.durableSystem.LoadCatalog(ctx, c.config.Catalog, c.mapper); err != nil {
 		return err
 	}
-	c.CheckEntityCountAndSwitchQueue()
 	c.precomputeSizingFromConfig()
 	return nil
 }
@@ -310,6 +305,10 @@ func (c *Controller) LoadCatalog(ctx context.Context) error {
 // precomputeSizingFromConfig computes a recommended worker count from initial world contents
 // and configured (or env) service time and latency SLO. It currently targets the Pulse pool only.
 func (c *Controller) precomputeSizingFromConfig() {
+	demand := initialPulseDemand(c.world)
+	if err := c.pulsePool.SetDriverDemand(demand); err != nil {
+		panic(err)
+	}
 	// Determine τ (service time) and W_slo from env or config; fallback to sane defaults
 	tau := c.config.SizingServiceTime
 	if v := os.Getenv("CPRA_SIZING_TAU_MS"); v != "" {
@@ -327,7 +326,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 		}
 	}
 	if wSLO <= 0 {
-		wSLO = 200 * time.Millisecond
+		wSLO = tau + 250*time.Millisecond
 	}
 
 	// Compute λ for Pulse from world: sum over active monitors of 1/Interval
@@ -348,13 +347,18 @@ func (c *Controller) precomputeSizingFromConfig() {
 	if headroom <= 0 || math.IsNaN(headroom) || math.IsInf(headroom, 0) {
 		headroom = 0.15
 	} // default 15%%
-	c.pulsePool.SetSizingPolicy(wSLO, headroom)
+	runtimeTarget := wSLO
+	if c.config.SizingSLO <= 0 && os.Getenv("CPRA_SIZING_SLO_MS") == "" {
+		runtimeTarget = 0
+	}
+	c.pulsePool.SetSizingPolicy(runtimeTarget, headroom)
 	if lambda <= 0 {
+		c.pulsePool.SetModelWorkers(c.config.WorkerConfig.MinWorkers)
 		return
 	}
 	cMin, w, err := queue.FindCForSLO(lambda, tau.Seconds(), wSLO.Seconds(), 1, 1, c.pulsePool.Stats().MaxWorkers)
 	if err != nil {
-		SystemLogger.Warn("[Pre-Sizing] Could not compute Pulse workers: %v", err)
+		SystemLogger.Debug("Pulse startup model unavailable: %v", err)
 		if errors.Is(err, queue.ErrNoFeasibleCapacity) {
 			target := float64(c.pulsePool.Stats().MaxWorkers)
 			if wSLO <= tau {
@@ -372,7 +376,7 @@ func (c *Controller) precomputeSizingFromConfig() {
 	if errSafe != nil {
 		wSafe = w
 	} // fallback
-	SystemLogger.Info("[Pre-Sizing] Pulse: λ=%.2f/s τ=%.3fs W_slo=%.3fs => c_min=%d (W≈%.3fs), recommended c_safe=%d (+%.0f%%) (predicted W≈%.3fs)",
+	SystemLogger.Debug("Pulse startup sizing: λ=%.2f/s τ=%.3fs W_slo=%.3fs => c_min=%d (W≈%.3fs), recommended c_safe=%d (+%.0f%%) (predicted W≈%.3fs)",
 		lambda, tau.Seconds(), wSLO.Seconds(), cMin, w, cSafe, headroom*100.0, wSafe)
 
 	// Apply the M/M/c-derived sizing to the Pulse pool so the Erlang-C model
@@ -385,12 +389,16 @@ func (c *Controller) precomputeSizingFromConfig() {
 
 // computePulseLambda estimates arrival rate (jobs/sec) from Pulse intervals of enabled monitors.
 func computePulseLambda(world *ecs.World) float64 {
+	storage := ecs.NewMap1[components.JobStorage](world)
 	f := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
 		Without(ecs.C[components.Disabled]())
 	q := f.Query()
 	sum := 0.0
 	for q.Next() {
 		_, cfg := q.Get()
+		if !storage.Get(q.Entity()).LocalCheck() {
+			continue
+		}
 		if cfg == nil || cfg.Interval <= 0 {
 			continue
 		}
@@ -405,11 +413,15 @@ func computePulseLambda(world *ecs.World) float64 {
 // so each contributes at most one occupied worker. Explicit sizing overrides
 // remain available; measured service times take over after startup.
 func initialPulseServiceTime(world *ecs.World) time.Duration {
+	storage := ecs.NewMap1[components.JobStorage](world)
 	query := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).
 		Without(ecs.C[components.Disabled]()).Query()
 	var arrivals, occupied float64
 	for query.Next() {
 		_, check := query.Get()
+		if !storage.Get(query.Entity()).LocalCheck() {
+			continue
+		}
 		if check.Interval <= 0 {
 			continue
 		}
@@ -421,6 +433,29 @@ func initialPulseServiceTime(world *ecs.World) time.Duration {
 		return defaultServiceTime
 	}
 	return max(defaultServiceTime, time.Duration(occupied/arrivals*float64(time.Second)))
+}
+
+func initialPulseDemand(world *ecs.World) []queue.DriverDemand {
+	storage := ecs.NewMap1[components.JobStorage](world)
+	query := ecs.NewFilter2[components.MonitorState, components.PulseConfig](world).Without(ecs.C[components.Disabled]()).Query()
+	byDriver := make(map[string]queue.DriverDemand)
+	for query.Next() {
+		_, check := query.Get()
+		if !storage.Get(query.Entity()).LocalCheck() || check.Interval <= 0 {
+			continue
+		}
+		d := byDriver[check.Type]
+		d.Driver = check.Type
+		d.Monitors++
+		d.ArrivalRate += 1 / check.Interval.Seconds()
+		d.Occupancy += min(1, max(defaultServiceTime, check.Timeout).Seconds()/check.Interval.Seconds())
+		byDriver[check.Type] = d
+	}
+	out := make([]queue.DriverDemand, 0, len(byDriver))
+	for _, d := range byDriver {
+		out = append(out, d)
+	}
+	return out
 }
 
 // sizingTau returns the configured (or env-overridden) per-job service time
@@ -476,11 +511,23 @@ func (c *Controller) Start() error {
 // run is the sole owner of world initialization, updates and finalization.
 func (c *Controller) run() {
 	defer close(c.doneCh)
-	c.app.Initialize()
-	if c.durableSystem != nil {
+	var demandVersion uint64
+	updateDemand := func() {
+		if c.durableSystem == nil {
+			return
+		}
 		c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
-		c.pulsePool.SetColdOccupancy(c.durableSystem.PulseColdOccupancy())
+		version, demand := c.durableSystem.PulseDriverDemand(demandVersion)
+		if version != demandVersion {
+			if err := c.pulsePool.SetDriverDemand(demand); err != nil {
+				panic(err)
+			}
+			demandVersion = version
+		}
 	}
+	c.app.Initialize()
+	updateDemand()
+	c.pulsePool.SetModelWorkers(c.pulsePool.Stats().TargetWorkers)
 	c.lastProgress.Store(time.Now().UnixNano())
 	c.initializedState.Store(true)
 	close(c.initialized)
@@ -543,10 +590,7 @@ func (c *Controller) run() {
 			continue
 		}
 		c.app.Update()
-		if c.durableSystem != nil {
-			c.pulsePool.SetArrivalRate(c.durableSystem.PulseArrivalRate())
-			c.pulsePool.SetColdOccupancy(c.durableSystem.PulseColdOccupancy())
-		}
+		updateDemand()
 		now = time.Now()
 		c.lastProgress.Store(now.UnixNano())
 		nextAllowed = now.Add(interval)
@@ -709,38 +753,6 @@ func (c *Controller) GetWorld() *ecs.World {
 	return c.world
 }
 
-// CheckEntityCountAndSwitchQueue selects the queue implementation before
-// Start. Runtime world mutation and queue migration are intentionally rejected.
-func (c *Controller) CheckEntityCountAndSwitchQueue() {
-	if c.entityCountThreshold <= 0 || c.doneCh != nil {
-		return
-	}
-	c.queueSwitchMutex.Lock()
-	defer c.queueSwitchMutex.Unlock()
-	if c.useAdaptiveQueue || int64(c.world.Stats().Entities.Used) <= c.entityCountThreshold {
-		return
-	}
-	for _, entry := range []struct {
-		name string
-		q    queue.Queue
-	}{
-		{"intervention", c.interventionQueue}, {"code", c.codeQueue},
-	} {
-		cfg := queue.DefaultQueueConfig()
-		cfg.Type = queue.QueueTypeAdaptive
-		cfg.Name = entry.name
-		q, err := queue.NewQueue(cfg)
-		if err != nil {
-			panic(err)
-		}
-		if err := entry.q.(*queue.Handle).ReplaceEmpty(q); err != nil {
-			q.Close()
-			panic(err)
-		}
-	}
-	c.useAdaptiveQueue = true
-}
-
 // --- Accessors for the web server (read-only consumers) ---
 
 // Metrics returns the aggregator collecting per-system performance samples.
@@ -766,10 +778,3 @@ func (c *Controller) InterventionPool() *queue.DynamicWorkerPool { return c.inte
 
 // CodePool returns the code worker pool.
 func (c *Controller) CodePool() *queue.DynamicWorkerPool { return c.codePool }
-
-// UseAdaptiveQueue reports whether the controller has switched to Adaptive queues.
-func (c *Controller) UseAdaptiveQueue() bool {
-	c.queueSwitchMutex.RLock()
-	defer c.queueSwitchMutex.RUnlock()
-	return c.useAdaptiveQueue
-}

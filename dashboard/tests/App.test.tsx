@@ -126,6 +126,16 @@ function renderApp(initialRoute = '/') {
 }
 
 describe('App', () => {
+  it.each([
+    [404, 'This monitor was not found in the current controller projection.'],
+    [503, 'Monitor observations are unavailable. This does not mean the monitor was deleted or recovered.'],
+    [403, 'Your current identity cannot read this monitor. Check your connection and permissions.'],
+  ])('describes a monitor read failure accurately for HTTP %s', async (status, message) => {
+    server.use(http.get('/api/v1/monitors/:id', () => new HttpResponse(null, {status: Number(status)})));
+    renderApp('/monitors/1');
+    expect(await screen.findByText(String(message), {}, {timeout: 5000})).toBeInTheDocument();
+    expect(screen.getByRole('heading', {level: 1, name: 'Monitor details'})).toBeInTheDocument();
+  });
   it('keeps one primary page heading inside the shell', async () => {
     renderApp('/');
     expect(await screen.findByRole('heading', { level: 1, name: 'Fleet Overview' })).toBeInTheDocument();

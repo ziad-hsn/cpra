@@ -60,7 +60,7 @@ func TestControllerHoldsContradictoryOpsgenieReceipt(t *testing.T) {
 			if !system.commitResults([]jobs.Result{result}) {
 				t.Fatal("delivery outcome was not committed", system.lastError)
 			}
-			monitor, _ := store.Get(state.MonitorID)
+			monitor, _ := monitorWithActionHistory(t, store, state.MonitorID)
 			found := false
 			for _, action := range monitor.Actions {
 				if action.Kind == "code" {
@@ -85,7 +85,7 @@ func TestControllerHoldsContradictoryOpsgenieReceipt(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			restored, _ := store.Get(state.MonitorID)
+			restored, _ := monitorWithActionHistory(t, store, state.MonitorID)
 			for _, action := range restored.Actions {
 				if action.Kind == "code" && action.State != persistence.Unknown {
 					t.Fatal("restart lost unknown receipt outcome")

@@ -29,7 +29,7 @@ func (q *observationQueue) Stats() queue.Stats { return q.value }
 
 func TestManagementObservationSDKContractsAndSourceUnits(t *testing.T) {
 	f := newManagementFixture(t, true)
-	q := &observationQueue{value: queue.Stats{Capacity: 10, QueueDepth: 10, EnqueueRate: 4, DequeueRate: 3, Dropped: 2, Dequeued: 1, SampleWindow: time.Second, AvgQueueTime: 1500 * time.Microsecond, MaxQueueTime: 2 * time.Millisecond}}
+	q := &observationQueue{value: queue.Stats{Capacity: 10, QueueDepth: 10, EnqueueRate: 4, DequeueRate: 3, Dropped: 2, Dequeued: 1, SampleWindow: time.Second, AvgQueueTime: 1500 * time.Microsecond, MaxQueueTime: 2 * time.Millisecond, Drivers: []queue.DriverQueueStats{{Driver: "http", RequestedCapacity: 9, ReservedCapacity: 3, Pending: 2, Active: 3, OldestPendingAge: 1500 * time.Millisecond}}}}
 	f.server.pulseQueue, f.server.intervQueue, f.server.codeQueue = q, q, q
 	pool, err := queue.NewDynamicWorkerPool(q, queue.WorkerPoolConfig{MinWorkers: 2, MaxWorkers: 8, NumShards: 1}, nil)
 	if err != nil {
@@ -60,6 +60,9 @@ func TestManagementObservationSDKContractsAndSourceUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, item := range queues.Data.Items {
+		if len(item.Drivers) != 1 || !item.Drivers[0].ReservationAvailable || item.Drivers[0].RequestedCapacity != 9 || item.Drivers[0].ReservedCapacity != 3 || item.Drivers[0].OldestPendingMS.Value != 1500 {
+			t.Fatal("driver reservation or source unit lost", item)
+		}
 		if !item.Available || !item.Saturated || item.Utilization.Value != 1 || item.AverageWait.Value != 1.5 || item.DequeuedPerSecond != 3 || item.EnqueuedPerSecond != 4 || item.CompletedRateAvailable || item.OldestPendingMS.Available {
 			t.Fatal("queue mapping", item)
 		}
@@ -69,6 +72,9 @@ func TestManagementObservationSDKContractsAndSourceUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, item := range pools.Data.Items {
+		if !item.CapacityAccountingAvailable || item.RequestedCapacity < 2 || item.DrainingWorkers != 0 || item.CapacityCondition == "" {
+			t.Fatal("capacity accounting unavailable", item)
+		}
 		if !item.Available || item.Capacity != 2 || item.Minimum != 2 || item.Maximum != 8 || item.Workers != 0 || !item.BusyAvailable || item.Busy != 0 || item.ModelRecommendationAvailable || item.ServiceTime.Available || item.LastScaleAt != nil {
 			t.Fatal("pool source meaning lost", item)
 		}

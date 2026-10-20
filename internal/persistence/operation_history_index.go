@@ -157,16 +157,19 @@ func migrateOperationIndexPage(ctx context.Context, db *bolt.DB) (bool, error) {
 		if bytes.Equal(k, after) {
 			k, raw = cur.Next()
 		}
-		count := 0
+		count, decodedBytes := 0, 0
 		for ; k != nil && count < operationIndexBatch; k, raw = cur.Next() {
+			if count > 0 && len(raw) > historyPageBytes-decodedBytes {
+				break
+			}
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if len(k) > 1024 || len(raw) > maxHistoryEventBytes {
+			if len(k) > 1024 {
 				return ErrHistoryUnavailable
 			}
-			var e Event
-			if json.Unmarshal(raw, &e) != nil || !validHistoryPosition(e.ID) || string(k) != e.MonitorID+"\x00"+e.ID {
+			e, err := decodeHistoryEvent(raw)
+			if err != nil || !validHistoryPosition(e.ID) || string(k) != e.MonitorID+"\x00"+e.ID {
 				return ErrHistoryUnavailable
 			}
 			if e.Operation != nil {
@@ -181,6 +184,7 @@ func migrateOperationIndexPage(ctx context.Context, db *bolt.DB) (bool, error) {
 				return err
 			}
 			count++
+			decodedBytes += len(raw)
 		}
 		if k == nil {
 			if err := meta.Delete([]byte("after")); err != nil {
@@ -287,11 +291,11 @@ func validateOperationMonitorIndexContext(ctx context.Context, tx *bolt.Tx) erro
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if len(primary) > 1024 || len(raw) > maxHistoryEventBytes {
+		if len(primary) > 1024 {
 			return ErrHistoryUnavailable
 		}
-		var e Event
-		if json.Unmarshal(raw, &e) != nil {
+		e, err := decodeHistoryEvent(raw)
+		if err != nil {
 			return ErrHistoryUnavailable
 		}
 		if e.Operation == nil || !terminalOperation(*e.Operation) {

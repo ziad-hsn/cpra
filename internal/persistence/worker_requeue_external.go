@@ -153,7 +153,7 @@ func (s *Store) RequeueWorkerExecutions(ctx context.Context, at time.Time, limit
 	if s.administrative {
 		return 0, ErrWorkerSessionUnavailable
 	}
-	unlock, err := s.lockControllerState(ctx, false)
+	unlock, err := s.lockControllerState(ctx, true)
 	if err != nil {
 		return 0, err
 	}
@@ -173,6 +173,10 @@ func (s *Store) RequeueWorkerExecutions(ctx context.Context, at time.Time, limit
 				ids = append(ids, id)
 			}
 		}
+	}
+	if s.fsm.err != nil {
+		unlock()
+		return 0, errControllerUnavailable
 	}
 	slices.Sort(ids)
 	commands := make([]Command, 0, min(len(ids), limit, s.config.Storage.BatchSize))

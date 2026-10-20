@@ -354,7 +354,7 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	m.Policy.Maintenance = []MaintenanceWindow{{Start: base.Add(10 * time.Minute), End: base.Add(20 * time.Minute)}}
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: base})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: base.Add(time.Second), Outcome: "failure"})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	a := interventionAction(t, m)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore})
 	failedAt := a.NotBefore.Add(time.Second)
@@ -375,7 +375,7 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	current, _ := s.Get(m.ID)
+	current, _ := monitorWithActionHistory(t, s, m.ID)
 	if !reflect.DeepEqual(current.Policy, m.Policy) || current.InterventionAttempts != 2 || current.LastInterventionFailure != failedAt || current.Actions[second.ID] != second || current.RecoveryCheckAfter.IsZero() {
 		t.Fatal("restart lost policy or recovery admission state")
 	}
@@ -387,7 +387,7 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 		t.Fatal("fixture has no remaining cooldown after reopening")
 	}
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 3, At: fresh, ExecutionStart: fresh, Outcome: "failure"})
-	current, _ = s.Get(m.ID)
+	current, _ = monitorWithActionHistory(t, s, m.ID)
 	if !current.RecoveryCheckAfter.IsZero() || current.Actions[second.ID] != second {
 		t.Fatal("fresh observation changed the queued action or failed to clear the restart barrier")
 	}
@@ -397,15 +397,21 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	if result := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore})[0]; !result.Allowed {
 		t.Fatal("safe queued attempt did not survive restart", result.Err)
 	}
-	current, _ = s.Get(m.ID)
+	current, _ = monitorWithActionHistory(t, s, m.ID)
 	started := current.Actions[second.ID]
 	if started.ID != second.ID || started.QueuedAt != second.QueuedAt || started.Deadline != second.Deadline {
 		t.Fatal("restarted attempt changed its original identity or deadline")
 	}
 	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: second.ID, At: second.NotBefore.Add(time.Second), Outcome: "failure"})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 4, At: second.NotBefore.Add(2 * time.Hour), Outcome: "failure"})
-	current, _ = s.Get(m.ID)
-	if last := interventionAction(t, current); last.ID != second.ID || last.State != Failed || current.InterventionAttempts != 2 {
+	current, _ = monitorWithActionHistory(t, s, m.ID)
+	attempts := 0
+	for _, action := range current.Actions {
+		if action.Kind == "intervention" {
+			attempts++
+		}
+	}
+	if last := current.Actions[second.ID]; last.ID != second.ID || last.State != Failed || current.InterventionAttempts != 2 || attempts != 2 {
 		t.Fatal("restart reset the per-incident attempt limit")
 	}
 }

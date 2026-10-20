@@ -98,7 +98,10 @@ func validateAgentObservationCommand(c Command) error {
 
 func (f *machine) applyAgentObservation(c Command) Result {
 	m, exists := f.image.Monitors[c.MonitorID]
-	a, found := m.Actions[c.ActionID]
+	a, found, err := f.actionForMonitor(m, c.ActionID)
+	if err != nil {
+		return Result{Err: err}
+	}
 	if !exists || !found || a.Revision != c.Revision || a.ExecutorKind != "agent" || a.State != Unknown ||
 		a.AgentConnection == nil || a.AgentReceipt == nil || a.AgentReceipt.TaskID == "" ||
 		c.ExecutorSession != f.image.LocalExecutorSession || c.At.Before(a.StartedAt) {
@@ -122,6 +125,9 @@ func (f *machine) applyAgentObservation(c Command) Result {
 	m = m.Clone()
 	a = a.Clone()
 	a.AgentReceipt = &r
+	if m.Actions == nil {
+		m.Actions = make(map[string]Action)
+	}
 	m.Actions[a.ID] = a
 	f.image.Version = joinStorageFormat(f.image.Version, AgentObservationFormatVersion)
 	eventReceipt := r

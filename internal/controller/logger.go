@@ -459,11 +459,9 @@ var (
 // InitializeLoggers sets up all component loggers
 func InitializeLoggers(debugMode bool) {
 	// Build a single zap-backed base logger and derive component loggers
-	var cfg applogger.LoggerConfig
-	if debugMode || strings.ToLower(os.Getenv("CPRA_ENV")) != "production" {
-		cfg = applogger.DevelopmentConfig()
-	} else {
-		cfg = applogger.DefaultConfig()
+	cfg := applogger.ConfigFromEnv()
+	if debugMode && os.Getenv("CPRA_LOG_LEVEL") == "" {
+		cfg.Level = "debug"
 	}
 	base, err := applogger.NewZapLogger(cfg)
 	if err != nil {
@@ -481,7 +479,9 @@ func InitializeLoggers(debugMode bool) {
 	bind := func(name string) *Logger {
 		// Skip Logger.log and its public level method in addition to the sink wrapper.
 		comp := base.WithCallerSkip(2).With(applogger.Field{Key: "component", Value: name})
-		return newLogger(name, debugMode, comp)
+		// The wrapper must not discard debug messages that the configured sink
+		// permits. Explicit environment levels take precedence over -debug.
+		return newLogger(name, strings.EqualFold(cfg.Level, "debug"), comp)
 	}
 
 	SystemLogger = bind("SYSTEM")

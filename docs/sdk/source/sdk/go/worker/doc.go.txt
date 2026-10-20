@@ -38,7 +38,7 @@
 //
 // # Documentation and compatibility
 //
-// The corresponding management and worker server contracts remain pending.
+// The server requires the externaljobs build tag, runtime enablement and scoped authorization.
 // Fixture and process tests verify the client library's boundary, not live
 // provider effects or production-server compatibility. Hosted pkg.go.dev does
 // not select arbitrary custom build tags; use this module's README, source

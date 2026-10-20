@@ -1261,9 +1261,10 @@ func (c *CodePagerDutyJob) Execute() (result Result) {
 	ctx, cancel := operationContext(c.Context(), 10*time.Second)
 	defer cancel()
 	result = Result{ID: c.ID, Ent: c.Entity, Payload: map[string]interface{}{"type": "code", "driver": "pagerduty", "color": c.Color}}
-	target := c.URL
-	if target == "" {
-		target = "https://events.pagerduty.com/v2/enqueue"
+	target, err := pagerDutyURL(c.URL)
+	if err != nil {
+		result.Err = err
+		return
 	}
 	if c.RoutingKey == "" {
 		result.Err = fmt.Errorf("pagerduty routing_key is required")

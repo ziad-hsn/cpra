@@ -143,7 +143,15 @@ def check(candidate: Path | None = None):
         raise SystemExit(1)
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-root", type=Path)
-    check(parser.parse_args().candidate_root)
+    try:
+        check(parser.parse_args(argv).candidate_root)
+    except (OSError, ValueError) as error:
+        parser.exit(1, "Documentation check failed: " + str(error) + "\n"
+                    "Check source links and run scripts/docs/references.py for intentionally updated public references.\n")
+
+
+if __name__ == "__main__":
+    main()

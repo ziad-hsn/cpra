@@ -50,7 +50,7 @@ func TestA2AControllerReceiptCancellationDoesNotPoisonStorage(t *testing.T) {
 	if !s.drain() || !s.store.Status().Ready {
 		t.Fatal("caller cancellation permanently poisoned usable storage", s.lastError)
 	}
-	m, _ := s.store.Get(dispatch.MonitorID)
+	m, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 	if m.Actions[dispatch.ActionID].State != persistence.Unknown || m.VerifyRemaining != 0 {
 		t.Fatal("uncommitted receipt became successful intervention")
 	}
@@ -91,8 +91,10 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 	}
 	storage := ecs.NewMap1[components.JobStorage](&w).Get(ent)
 	storage.CodeJobs = map[string][]jobs.Job{"red": {job}}
+	storage.CodeFlows = map[string][]components.ActionFlow{"red": {{Driver: "a2a", Key: 1}}}
 	if kind == "intervention" {
 		storage.InterventionJob = job
+		storage.InterventionFlow = components.ActionFlow{Driver: "a2a", Key: 1}
 		cc.Configs = map[string]*components.ColorCodeConfig{}
 	}
 	q := &admissionQueue{}
@@ -116,7 +118,7 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 		t.Fatal(err)
 	}
 	s.Initialize(&w)
-	m, ok := store.Get("agent-monitor")
+	m, ok := monitorWithActionHistory(t, store, "agent-monitor")
 	if !ok {
 		t.Fatal("configured monitor missing")
 	}
@@ -128,7 +130,7 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 			t.Fatal("restored action dispatched before a fresh observation")
 		}
 		for id, action := range m.Actions {
-			current, _ := store.Get(m.ID)
+			current, _ := monitorWithActionHistory(t, store, m.ID)
 			if !reflect.DeepEqual(current.Actions[id], action) {
 				t.Fatal("fresh-check barrier changed the original action")
 			}
@@ -142,7 +144,7 @@ func agentControllerAt(t *testing.T, endpoint, kind, directory string) (*Durable
 	if err != nil || len(committed) != 1 || committed[0].Err != nil {
 		t.Fatal("pulse commit failed", err, committed)
 	}
-	m, _ = store.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, store, m.ID)
 	s.project(ent, m)
 	s.scheduleActions(ent, m)
 	s.dispatchActions(time.Now())
@@ -163,7 +165,7 @@ func TestA2AControllerCommitsStartAndReceiptBeforeNetworkProgress(t *testing.T) 
 			var dispatch *jobs.Dispatch
 			var sends, polls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				m, ok := s.store.Get(dispatch.MonitorID)
+				m, ok := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 				a := m.Actions[dispatch.ActionID]
 				if !ok || a.State != persistence.Started || a.ExecutorKind != "agent" || a.ExecutorSession == "" || !a.ExecutorFinishedAt.IsZero() {
 					t.Error("network request preceded committed start")
@@ -210,7 +212,7 @@ func TestA2AControllerCommitsStartAndReceiptBeforeNetworkProgress(t *testing.T) 
 			if !s.drain() {
 				t.Fatal("result did not commit", s.lastError)
 			}
-			m, _ := s.store.Get(dispatch.MonitorID)
+			m, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 			a := m.Actions[dispatch.ActionID]
 			if a.State != persistence.Succeeded || a.ExecutorFinishedAt.IsZero() || sends.Load() != 1 {
 				t.Fatal("action state lost", a, sends.Load())
@@ -288,7 +290,7 @@ func TestA2AControllerUnknownOutcomeSurvivesRestartWithoutSending(t *testing.T) 
 			if !s.drain() {
 				t.Fatal(s.lastError)
 			}
-			before, _ := s.store.Get(dispatch.MonitorID)
+			before, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 			a := before.Actions[dispatch.ActionID]
 			if a.State != persistence.Unknown || before.VerifyRemaining != 0 || calls.Load() != 1 {
 				t.Fatal("uncertain action treated as rejection or success", a, calls.Load())
@@ -327,7 +329,7 @@ func TestA2AControllerChangedConfigurationCannotRedirectQueuedAction(t *testing.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
 	defer server.Close()
 	s, dispatch, _ := agentController(t, server.URL, "intervention")
-	m, _ := s.store.Get(dispatch.MonitorID)
+	m, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 	newConfig := persistence.Monitor{ID: m.ID, Revision: "new-target-revision", Name: m.Name, Policy: m.Policy}
 	_, err := s.store.Submit(context.Background(), []persistence.Command{{Kind: "configure", MonitorID: m.ID, Revision: newConfig.Revision, Config: &newConfig, At: time.Now().UTC()}})
 	if err != nil {
@@ -351,7 +353,7 @@ func TestA2AControllerKeepsOldTargetReceiptAfterConfigurationChange(t *testing.T
 			return
 		}
 		polls.Add(1)
-		m, _ := s.store.Get(dispatch.MonitorID)
+		m, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 		newConfig := persistence.Monitor{ID: m.ID, Revision: "new-target-revision", Name: m.Name, Policy: m.Policy}
 		if _, err := s.store.Submit(context.Background(), []persistence.Command{{Kind: "configure", MonitorID: m.ID, Revision: newConfig.Revision, Config: &newConfig, At: time.Now().UTC()}}); err != nil {
 			t.Error(err)
@@ -369,7 +371,7 @@ func TestA2AControllerKeepsOldTargetReceiptAfterConfigurationChange(t *testing.T
 	if !s.drain() {
 		t.Fatal(s.lastError)
 	}
-	m, _ := s.store.Get(dispatch.MonitorID)
+	m, _ := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 	a := m.Actions[dispatch.ActionID]
 	if m.Revision != "new-target-revision" || m.VerifyRemaining != 0 || a.Revision != dispatch.Revision || a.State != persistence.Unknown || a.AgentReceipt == nil || a.AgentReceipt.State != "TASK_STATE_COMPLETED" || a.LateEvidence == nil {
 		t.Fatal("old completion changed replacement monitor or lost original evidence", m)

@@ -96,7 +96,7 @@ func TestManualIgnoreRetainsStartedEvidenceAndRestartState(t *testing.T) {
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(image))); err != nil {
 		t.Fatal(err)
 	}
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if !m.Ignored || m.IgnoreReason != request.Control.Reason {
 		t.Fatal("snapshot lost Ignore")
 	}
@@ -110,7 +110,7 @@ func TestManualIgnoreRetainsStartedEvidenceAndRestartState(t *testing.T) {
 		}
 	}
 	m = *applyControlRequest(t, s, controlRequest(m, "unignore", "unignore-revision", at.Add(3*time.Second))).Monitor
-	if m.Ignored || !m.Actions[a.ID].Held() {
+	if m.Ignored || !retainedAction(t, s, a.ID).Held() {
 		t.Fatal("Unignore changed provider evidence")
 	}
 }

@@ -39,7 +39,7 @@ func ticketRetry(t *testing.T, s *Store, c CollectionCommand, at time.Time) Coll
 }
 
 func TestCollectionAdmissionEpochDoesNotAllocate(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	at := time.Now().UTC()
 	first := collectionCommand(t, s, CollectionCommand{Action: "epoch", Epoch: uuid.NewString()}, at)
 	second := collectionCommand(t, s, CollectionCommand{Action: "epoch", Epoch: uuid.NewString()}, at.Add(time.Second))
@@ -209,7 +209,7 @@ func TestCollectionAdmissionRestartAfterHeaderCleanup(t *testing.T) {
 				t.Fatal(err)
 			}
 			if snapshot {
-				if err := s.Snapshot(); err != nil {
+				if err := persistStoreFixture(t, s); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -225,7 +225,7 @@ func TestCollectionAdmissionRestartAfterHeaderCleanup(t *testing.T) {
 			if result.Err != nil || result.CollectionID != head.ID || result.Collection != nil || s.fsm.image.OperationHighWater != 1 {
 				t.Fatal("restart recreated consumed ticket", result.Err)
 			}
-			if err := s.Snapshot(); err != nil {
+			if err := persistStoreFixture(t, s); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -293,7 +293,7 @@ func TestCollectionAdmissionExplicitRestoreFencesOriginalTicket(t *testing.T) {
 	t.Cleanup(func() { _ = s.Close() })
 	c := ticketCreateFixture(t, s)
 	head := collectionCommand(t, s, c, c.Create.CreatedAt).Collection.Clone()
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -314,7 +314,7 @@ func TestCollectionAdmissionExplicitRestoreFencesOriginalTicket(t *testing.T) {
 	if !done || !errors.Is(result.Err, ErrOperationExpired) || epoch == c.Create.Admission.Epoch || records != 0 || validation != nil {
 		t.Fatal("restore did not fence original creation proof", result.Err, validation)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal("restored ticket snapshot", err)
 	}
 	if _, _, err := s.CollectionGet(head.ID); !errors.Is(err, ErrOperationExpired) {

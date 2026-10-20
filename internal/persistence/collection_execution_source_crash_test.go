@@ -139,6 +139,17 @@ func sourceRetirementCrashChild(t *testing.T, directory, operation, stage string
 func TestCollectionExecutionSourceRetirementSurvivesProcessKill(t *testing.T) {
 	s, original := sourceRetirementFixture(t, true, 257)
 	config := s.config
+	// The source fixture preserves historical framing. Crash ownership and
+	// snapshots below use the real current-process startup and migration path.
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	s, err = Open(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
 	for _, stage := range []string{"validation", "plan", "input", "header"} {
 		if err := s.Snapshot(); err != nil {
 			t.Fatal(err)

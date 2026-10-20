@@ -31,7 +31,7 @@ export function RuntimeDiagnostics() {
         <dt>Projection age</dt><dd>{milliseconds(current.projectionAgeMs)}</dd>
         <dt>Storage availability</dt><dd>{current.storage.available ? 'Available' : 'Unavailable'}</dd>
         <dt>Storage mode</dt><dd>{current.storage.mode}</dd>
-        <dt>FSM-applied log position</dt><dd>{current.storage.appliedIndex === undefined ? 'Unavailable' : formatNumber(current.storage.appliedIndex)}</dd>
+        <dt>Committed controller log position</dt><dd>{current.storage.appliedIndex === undefined ? 'Unavailable' : formatNumber(current.storage.appliedIndex)}</dd>
         <dt>Last recorded commit latency</dt><dd>{milliseconds(current.storage.commitLatencyMs)}</dd>
         <dt>Last recorded snapshot duration</dt><dd>{milliseconds(current.storage.snapshotDurationMs)}</dd>
         {current.storage.generations && <>

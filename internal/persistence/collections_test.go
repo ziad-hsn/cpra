@@ -38,7 +38,10 @@ func collectionCreateFixture(t *testing.T, s *Store, count uint64) CollectionCom
 
 func collectionCommand(t *testing.T, s *Store, c CollectionCommand, at time.Time) Result {
 	t.Helper()
-	r := submit(t, s, Command{Kind: "collection", At: at, Collection: &c})
+	// Retained collection fixtures exercise their declared minimum envelope.
+	// Public Store submissions are covered separately with current writer rules.
+	command := Command{Kind: "collection", At: at, Collection: &c}
+	r := applyCatalogFormat(t, s, commandMinimumFormat(command), command)
 	if len(r) != 1 {
 		t.Fatal("missing collection result")
 	}
@@ -123,7 +126,7 @@ func TestCollectionCommandsInactiveIdempotentAndConditional(t *testing.T) {
 	}
 	// Later catalog-format commands must not downgrade the collection format.
 	createCatalog(t, s, catalogRecord(t, s, "Credential", "ordinary", "uid", "revision", "encrypted ordinary config"))
-	if s.fsm.image.Version != CatalogMutationFormatVersion {
+	if s.fsm.image.Version != ActionFormatVersion {
 		t.Fatal("catalog mutation downgraded storage")
 	}
 }
@@ -217,7 +220,7 @@ func TestCollectionSnapshotAndLaterLogRecoverFromOriginalInputs(t *testing.T) {
 				t.Fatal(r.Err)
 			}
 			if withSnapshot {
-				if err := s.Snapshot(); err != nil {
+				if err := persistStoreFixture(t, s); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -273,7 +276,7 @@ func TestCollectionProcessCrashHelper(t *testing.T) {
 	if r := uploadCollectionFixture(t, s, head, first, head.ActivityAt.Add(time.Second)); r.Err != nil {
 		t.Fatal(r.Err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	second := collectionItemFixture(t, s, head, 2, "second")
@@ -380,7 +383,7 @@ func TestCollectionExplicitRestoreInvalidatesUploadAndKeepsSnapshotComplete(t *t
 	if r := uploadCollectionFixture(t, s, head, item, head.ActivityAt.Add(time.Second)); r.Err != nil {
 		t.Fatal(r.Err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -400,7 +403,7 @@ func TestCollectionExplicitRestoreInvalidatesUploadAndKeepsSnapshotComplete(t *t
 	if s.fsm.image.Collections[head.ID].Phase != "invalidated" {
 		t.Fatal("restore lost upload fence")
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal("invalidated ciphertext cannot snapshot", err)
 	}
 	if err := s.Close(); err != nil {
@@ -426,7 +429,7 @@ func TestCollectionRecoveryRejectsMissingCommittedLogDespiteRetainedMaterializat
 	if r := uploadCollectionFixture(t, s, head, first, head.ActivityAt.Add(time.Second)); r.Err != nil {
 		t.Fatal(r.Err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	second := collectionItemFixture(t, s, head, 2, "second")

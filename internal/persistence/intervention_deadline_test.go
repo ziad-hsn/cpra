@@ -42,7 +42,7 @@ func TestInterventionDeadlineSurvivesRestart(t *testing.T) {
 			if result.Allowed == expired {
 				t.Fatal("restart did not preserve original eligibility", result.Err)
 			}
-			current, _ := s.Get(m.ID)
+			current, _ := monitorWithActionHistory(t, s, m.ID)
 			if current.Actions[a.ID].Deadline != a.Deadline || expired && current.Actions[a.ID].State != Cancelled {
 				t.Fatal("deadline or cancellation was lost")
 			}

@@ -3,13 +3,29 @@ package persistence
 import (
 	"context"
 	"errors"
+	"maps"
 	"math"
 	"reflect"
 	"slices"
 )
 
+// withAction prepares one exact command dependency without changing the live
+// projection. Existing map entries and provider facts remain immutable.
+func withAction(m Monitor, a Action) Monitor {
+	if _, present := m.Actions[a.ID]; present {
+		return m
+	}
+	m.Actions = maps.Clone(m.Actions)
+	if m.Actions == nil {
+		m.Actions = make(map[string]Action)
+	}
+	m.Actions[a.ID] = a.Clone()
+	return m
+}
+
 // actionForMonitor is used by committed commands that address exact retained
 // evidence. It does not hydrate history into the live monitor projection.
+// The caller holds FSM.mu exclusively: failed ledger reads stop admission.
 func (f *machine) actionForMonitor(m Monitor, id string) (Action, bool, error) {
 	if a, ok := m.Actions[id]; ok {
 		return a, true, nil
@@ -50,7 +66,7 @@ func (f *machine) needsActionStorage(commands []Command) bool {
 		return true
 	}
 	for _, command := range commands {
-		if command.Kind == "configure" {
+		if command.Kind == "configure" || command.Kind == "action_project" {
 			return true
 		}
 	}
@@ -141,7 +157,7 @@ func (f *machine) flushActionWrites() error {
 	if f.err != nil {
 		return f.err
 	}
-	if len(f.actionWrites) == 0 {
+	if len(f.actionWrites)+len(f.reviewWrites) == 0 {
 		return nil
 	}
 	if err := f.ensureCollectionLedger(); err != nil {
@@ -151,13 +167,18 @@ func (f *machine) flushActionWrites() error {
 	for _, row := range f.actionWrites {
 		rows = append(rows, row)
 	}
-	sequence, err := f.collections.CommitActions(f.actionPosition, rows)
+	reviews := make([]reviewRecord, 0, len(f.reviewWrites))
+	for _, r := range f.reviewWrites {
+		reviews = append(reviews, r)
+	}
+	sequence, err := f.collections.CommitActionState(f.actionPosition, rows, reviews)
 	if err != nil {
 		f.err = errors.Join(errors.New("durable action commit failed"), err)
 		return f.err
 	}
 	f.image.ActionStorage = &actionStorageState{Sequence: sequence, Position: f.actionPosition}
 	clear(f.actionWrites)
+	clear(f.reviewWrites)
 	return nil
 }
 
@@ -220,6 +241,30 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 			}
 		}
 	}
+	read := func(m Monitor, id string) (Action, bool) {
+		var data []byte
+		if view.tx != nil {
+			data = view.tx.Bucket(actionCurrentBucket).Get([]byte(id))
+		} else if view.actions != nil {
+			data = view.actions.current[id]
+		}
+		row, err := decodeActionRow(data)
+		return row.Action, err == nil && row.MonitorID == m.ID
+	}
+	for _, receipt := range i.Operations {
+		if deferredActionReceipt(i, receipt) && !operationCurrentWithAction(i, receipt, read) {
+			return errActionLedger
+		}
+	}
+	if err := validateWorkerActionDependencies(i, view); err != nil {
+		return err
+	}
+	if err := validateActionProjectionMigration(i, view); err != nil {
+		return err
+	}
+	if err := validateProjectionInventory(i, view); err != nil {
+		return err
+	}
 	return view.walkActions(func(_ []byte, row actionLedgerRow) error {
 		monitor, exists := i.Monitors[row.MonitorID]
 		if !exists || row.Sequence > progress.Sequence {
@@ -229,12 +274,25 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 			return errActionLedger
 		}
 		_, current := monitor.Actions[row.Action.ID]
+		if row.Action.ReviewNotice != nil && monitor.ActionProjection != nil {
+			r, ok, err := view.readReviewHead(reviewAlertKey(monitor.ID, row.Action.ReviewNotice.AlertID))
+			if err != nil || !ok || r.Alert == nil {
+				return errActionLedger
+			}
+			monitor, err = view.reviewValidationMonitor(monitor, *r.Alert)
+			if err != nil {
+				return err
+			}
+		}
 		return validateRetainedAction(i, monitor, row.Action, !current)
 	})
 }
 
 func validateRetainedAction(i image, monitor Monitor, a Action, archived bool) error {
-	if !catalogIdentifier(a.Revision, 256) || (a.Kind != "code" && a.Kind != "intervention") || a.Attempt < 1 ||
+	if err := validateWorkerRetainedAction(i, a); err != nil {
+		return err
+	}
+	if a.Revision == "" || (a.Kind != "code" && a.Kind != "intervention") || a.Attempt < 1 ||
 		archived && (a.State == Queued || a.State == Started) {
 		return errActionLedger
 	}

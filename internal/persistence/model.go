@@ -96,6 +96,13 @@ type Action struct {
 }
 
 type Monitor struct {
+	ActionProjection           *ActionProjection `json:"action_projection,omitempty"`
+	ReviewAssessmentKey        string            `json:"review_assessment_key,omitempty"`
+	ReviewPolicyID             string            `json:"review_policy_id,omitempty"`
+	ReviewRevisionDigest       string            `json:"review_revision_digest,omitempty"`
+	reviewEndpointIDs          map[int]string    // One detached assessment destination, never serialized.
+	reviewTimeouts             map[int]time.Duration
+	reviewAssessment           bool                 // Detached bounded assessment, never serialized.
 	InstallationID             string               `json:"installation_id,omitempty"`
 	retainedActions            map[string]Action    // Transition-local final records removed from the execution projection.
 	Notifications              *NotificationState   `json:"notifications,omitempty"`
@@ -111,6 +118,7 @@ type Monitor struct {
 	IgnoreIncidents            []time.Time          `json:"ignore_incidents,omitempty"`
 	IgnoreCountedIncident      string               `json:"ignore_counted_incident,omitempty"`
 	FileIncarnation            string               `json:"file_incarnation,omitempty"`
+	AdoptedFileIncarnation     *string              `json:"adopted_file_incarnation,omitempty"`
 	LifecycleVersion           int                  `json:"lifecycle_version,omitempty"`
 	NotificationAttempted      string               `json:"notification_attempted,omitempty"`
 	RecoveryCheckAfter         time.Time            `json:"recovery_check_after,omitzero"`
@@ -126,6 +134,7 @@ type Monitor struct {
 	ManualRequests             []time.Time          `json:"manual_requests,omitempty"`
 	heldActions                int                  // Rebuilt observation count; never authoritative.
 	unknownActions             int                  // Rebuilt after restoration; compact observation cache, never authoritative.
+	incidentNotifications      NotificationCounts   // Rebuilt observation cache for the latest incident.
 	CatalogRevision            string               `json:"catalog_revision,omitempty"`
 	ControlRevision            string               `json:"control_revision,omitempty"`
 	SnoozedUntil               time.Time            `json:"snoozed_until,omitempty"`
@@ -135,6 +144,9 @@ type Monitor struct {
 	IncidentRevision           string               `json:"incident_revision,omitempty"`
 	IncidentSequence           uint64               `json:"incident_sequence,omitempty"`
 	IncidentOpenedAt           time.Time            `json:"incident_opened_at,omitempty"`
+	IncidentConfirmedAt        time.Time            `json:"incident_confirmed_at,omitzero"`
+	IncidentThresholdTracked   bool                 `json:"incident_threshold_tracked,omitempty"`
+	IncidentDeliveries         *NotificationCounts  `json:"incident_deliveries,omitempty"`
 	IncidentClosedAt           time.Time            `json:"incident_closed_at,omitempty"`
 	AcknowledgedBy             string               `json:"acknowledged_by,omitempty"`
 	AcknowledgedAt             time.Time            `json:"acknowledged_at,omitempty"`
@@ -176,6 +188,17 @@ type Monitor struct {
 }
 
 func (m Monitor) Clone() Monitor {
+	m.ActionProjection = m.ActionProjection.clone()
+	m.reviewEndpointIDs = maps.Clone(m.reviewEndpointIDs)
+	m.reviewTimeouts = maps.Clone(m.reviewTimeouts)
+	if m.AdoptedFileIncarnation != nil {
+		incarnation := *m.AdoptedFileIncarnation
+		m.AdoptedFileIncarnation = &incarnation
+	}
+	if m.IncidentDeliveries != nil {
+		counts := *m.IncidentDeliveries
+		m.IncidentDeliveries = &counts
+	}
 	m.retainedActions = maps.Clone(m.retainedActions)
 	m.Notifications = m.Notifications.clone()
 	m.IgnoreIncidents = append([]time.Time(nil), m.IgnoreIncidents...)
@@ -298,6 +321,17 @@ func validateCommand(c Command) error {
 	}
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if c.Kind == "action_project" {
+		return validateActionProjectionCommand(c)
+	}
+	if c.Kind == "action_reconcile" {
+		extra := c
+		extra.Kind, extra.At, extra.MonitorID, extra.Revision, extra.Generation = "", time.Time{}, "", "", 0
+		if extra != (Command{}) || !catalogIdentifier(c.MonitorID, 256) || len(c.Revision) > 512 || c.Revision == "" || c.Generation == 0 {
+			return errReviewProgress
+		}
+		return nil
 	}
 	if c.Kind == "installation" {
 		return validateInstallationCommand(c)
@@ -553,6 +587,11 @@ func validateCommand(c Command) error {
 		// Configuration carries policy before an operational lifecycle exists.
 		// Validate it at the command's format; Apply assigns the stored version.
 		config := *c.Config
+		config.ActionProjection = nil
+		config.AdoptedFileIncarnation = nil
+		config.ReviewAssessmentKey = ""
+		config.ReviewPolicyID = ""
+		config.ReviewRevisionDigest = ""
 		if config.LifecycleVersion == 0 && (config.Policy.AutoIgnore != nil || config.Policy.PeriodicMaintenance || config.Policy.RecoveryTimeout != 0) {
 			config.LifecycleVersion = LifecycleFormatVersion
 		}

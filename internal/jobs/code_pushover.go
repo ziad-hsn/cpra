@@ -112,7 +112,7 @@ func (c *CodePushoverJob) Execute() (result Result) {
 	if c.Sound != "" {
 		form.Set("sound", c.Sound)
 	}
-	target, err := notificationURL(c.URL, "https://api.pushover.net/1/messages.json")
+	target, err := pushoverURL(c.URL)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

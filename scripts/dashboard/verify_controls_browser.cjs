@@ -38,6 +38,18 @@ function check(value, message) { if (!value) throw new Error(message); }
       check(response.ok, 'target-side accounting unavailable');
       return response.json();
     }
+    async function targetHealth(healthy) {
+      const response = await fetch(process.env.CPRA_BROWSER_TARGET + '/health-mode?healthy=' + healthy, { method: 'POST' });
+      check(response.ok, 'target health control unavailable');
+    }
+    async function waitState(predicate, description) {
+      for (let n = 0; n < 100; n++) {
+        const monitor = await api('/api/v2/monitors/browser-controls');
+        if (predicate(monitor.status)) return;
+        await page.waitForTimeout(100);
+      }
+      throw new Error(description);
+    }
     async function applied() {
       await page.getByText('Saved durably and applied by the controller.', { exact: true }).waitFor();
     }
@@ -87,6 +99,31 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(resumed, 'fresh checks did not resume after enabling');
     checks.push('conditional enable resumes actual HTTP checks');
 
+    await targetHealth(true);
+    await waitState(state => state.health === 'healthy', 'healthy observation did not arrive');
+    await control('Ignore', { Reason: 'Observe planned instability while this target is healthy' });
+    const beforeIgnoredChecks = await targetCount();
+    let ignoredChecksAdvanced = false;
+    for (let n = 0; n < 100; n++) {
+      if (await targetCount() >= beforeIgnoredChecks + 6) { ignoredChecksAdvanced = true; break; }
+      await page.waitForTimeout(100);
+    }
+    check(ignoredChecksAdvanced, 'health checks stopped during Ignore');
+    check((await api('/api/v2/monitors/browser-controls')).status.ignored === true, 'healthy checks incorrectly cleared manual Ignore');
+    await targetHealth(false);
+    await waitState(state => state.health === 'unhealthy' && state.ignored, 'ignored outage was not observed');
+    await targetHealth(true);
+    await waitState(state => state.health === 'healthy' && !state.ignored, 'qualifying recovery did not clear Ignore');
+    await page.getByRole('button', { name: 'Ignore', exact: true }).waitFor();
+    checks.push('healthy Ignore survives successful checks and clears only after an observed outage and verified recovery');
+    await targetHealth(false);
+    await waitState(state => state.health === 'unhealthy', 'second outage was not observed');
+    await control('Ignore', { Reason: 'Pause this known outage while investigating' });
+    await control('Unignore', { Reason: 'Resume handling the continuing outage' });
+    await waitState(state => state.health === 'unhealthy' && !state.ignored, 'Unignore altered observed health');
+    await page.getByRole('button', { name: 'Acknowledge', exact: true }).waitFor();
+    checks.push('reasoned Unignore resumes the current outage without manufacturing recovery');
+
     await page.getByRole('button', { name: 'Acknowledge', exact: true }).click();
     await page.getByLabel('Note (optional)', { exact: true }).fill('Discard this private browser draft');
     await page.goBack();
@@ -99,11 +136,11 @@ function check(value, message) { if (!value) throw new Error(message); }
     await page.reload();
     await signIn(reader);
     await page.getByRole('heading', { name: 'Monitor controls' }).waitFor();
-    check(await page.getByRole('button', { name: /^(Acknowledge|Dismiss|Reopen notifications|Snooze|End snooze|Disable|Enable)$/ }).count() === 0, 'reader sees control writes');
+    check(await page.getByRole('button', { name: /^(Acknowledge|Dismiss|Reopen notifications|Snooze|End snooze|Ignore|Unignore|Disable|Enable)$/ }).count() === 0, 'reader sees control writes');
     const storage = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }));
     check(!storage.includes(operator) && !storage.includes(reader), 'token persisted in browser storage');
     check(errors.length === 0, `uncaught browser errors: ${JSON.stringify(errors)}`);
-    check(writes.length === 7, `expected seven explicit control writes, got ${writes.length}`);
+    check(writes.length === 10, `expected ten explicit control writes, got ${writes.length}`);
     checks.push('reader remains observational; no token storage, hidden retries or page errors');
     console.log(JSON.stringify({ scope: 'normal main startup, embedded SPA, TLS, encrypted Raft, owner loop, actual local HTTP target', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checks, writes, accessibility }, null, 2));
     await context.close();

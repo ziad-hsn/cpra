@@ -36,7 +36,7 @@ func TestWorkerEvidencePreservesOutcomeAndOperatorReview(t *testing.T) {
 			original, _, _ := s.WorkerExecution(t.Context(), in.ExecutionID)
 			m, _ := s.Get(original.Intent.MonitorID)
 			if category != "check" {
-				mustResult(t, s, reviewCommand(m, m.Actions[original.Intent.ActionID], uuid.NewString(), "inconclusive", time.Now().UTC()))
+				mustResult(t, s, reviewCommand(m, retainedAction(t, s, original.Intent.ActionID), uuid.NewString(), "inconclusive", time.Now().UTC()))
 				m, _ = s.Get(m.ID)
 			}
 			first, err := s.CommitWorkerEvidence(t.Context(), a, in)
@@ -253,7 +253,7 @@ func TestWorkerEvidenceSnapshotIsFrozenAndRejectsCorruption(t *testing.T) {
 }
 
 func TestWorkerEvidenceGlobalByteLimitAndPagedRecovery(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	first, job := workerExecutionFixture(t, s, "check")
 	worker := workerPrincipal("evidence-capacity-worker")
 	worker.Grants = []WorkerGrant{{JobTypeID: job.Current.Record.Key.ID, JobTypeUID: job.Current.Record.UID, Version: job.Current.Version,

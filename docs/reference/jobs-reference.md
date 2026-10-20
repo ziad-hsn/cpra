@@ -4,7 +4,7 @@ description: Current CPRa driver availability and YAML configuration fields for 
 cpra_scope: main
 ---
 
-> **Current development checkout:** this reference describes the current source. See [version and availability](../versions.md) for its verification and publication status.
+See [versions and availability](../versions.md) for supported and tested builds.
 
 
 # Checks, recovery and notifications
@@ -345,6 +345,9 @@ Build: default. [Schema](source/internal/manifest/intervention_types_new.go.txt)
 | `body` | string |
 | `timeout` | duration, such as 10s |
 
+An omitted recovery webhook `body` sends an empty request body. An explicitly
+configured body is preserved; CPRa does not substitute a notification envelope.
+
 ### kubernetes
 
 Build: `kubernetes`. [Schema](source/internal/manifest/intervention_types_new.go.txt)
@@ -384,7 +387,7 @@ Build: `systemd`. [Schema](source/internal/manifest/intervention_types_new.go.tx
 
 ### a2a
 
-Build: default in the local, unreleased candidate. Uses an explicitly configured A2A 1.0 HTTP+JSON interface. This addition has not been published to main. See [A2A driver settings](jobs-reference.md).
+Build: default. Uses an explicitly configured A2A 1.0 HTTP+JSON interface. This addition has not been published to main. See [A2A driver settings](jobs-reference.md).
 
 | Field | Meaning |
 | --- | --- |
@@ -446,6 +449,11 @@ Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 | YAML field | Value type |
 | --- | --- |
 | `file` | string |
+
+`file` is relative to the process runtime setting `notifications.log_directory`.
+That root must be provisioned for the service account and must not overlap CPRa
+configuration or durable state. Absolute paths and path traversal are rejected.
+See the [minimal manifest and runtime example](config-schema.md).
 
 ### slack
 
@@ -592,7 +600,7 @@ Build: `twilio`. [Schema](source/internal/manifest/notification_types_new.go.txt
 
 ### a2a
 
-Build: default in the local, unreleased candidate. Delivers bounded incident context for investigation. A received message or accepted task records delivery acceptance; it does not establish recovery. Notifications never poll or cancel a remote task. Use a credential with only the intended notification/investigation authority.
+Build: default. Delivers bounded incident context for investigation. A received message or accepted task records delivery acceptance; it does not establish recovery. Notifications never poll or cancel a remote task. Use a credential with only the intended notification/investigation authority.
 
 | Field | Meaning |
 | --- | --- |

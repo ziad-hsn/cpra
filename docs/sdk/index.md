@@ -1,10 +1,8 @@
 ---
-title: SDK candidate · Build integrations with the CPRa Go SDK
-description: SDK candidate · Build integrations with the CPRa Go SDK for the reviewed CPRa source; see the version and availability notice.
+title: Build integrations with the CPRa Go SDK
+description: Build integrations with the CPRa Go SDK.
 cpra_scope: sdk
 ---
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # Build integrations with the CPRa Go SDK
 
@@ -13,14 +11,11 @@ load-balancer changes, Kubernetes Service discovery, and an external worker.
 Each lesson includes a finite local demo, expected output, code to inspect, and
 steps for supplying your own configuration.
 
-**These are candidate SDK integrations.** The private working branch implements
-v2 management, observations and complete collection application through public
-activation and retained results. Cross-process file reselection and
-external-worker server qualification remain separate unfinished gates; consult
-the [current availability](../versions.md)
-and server discovery before using a configured workflow. Local demos exercise
-SDK HTTP requests and worker behavior against fixtures; they do not establish
-production-server, cloud-account, cluster, or SMS delivery certification.
+The SDK provides management, observations and collection application. Discover
+the connected server's capabilities and permissions before choosing operations.
+Local demos use HTTP fixtures; configured modes require your server and provider
+configuration. See [versions and availability](../versions.md) for the current
+publication and qualification limits.
 
 ## Choose a lesson
 
@@ -66,13 +61,14 @@ return err
 
 If another operator edits the monitor before the patch, the server can reject
 the stale version. Inspect that conflict. Automatically fetching a newer version
-and retrying would overwrite a change you have not reviewed. This snippet shows
-the candidate contract; run the lessons against their local fixtures today.
+and retrying would overwrite a change you have not reviewed. Run the lessons below to practice those conditional changes with local fixtures.
 
 `Disable` and `Enable` change only admission state. Acknowledge records the
 person investigating the exact incident. Dismiss pauses that incident's
 notifications. Snooze pauses checks and notifications until its deadline.
-None of these operations introduces a check-now command.
+Ignore continues checks while suppressing ordinary notifications and recovery.
+When entered while healthy, it waits for a later qualifying outage and verified
+recovery; operators can also explicitly Unignore.
 
 ## Apply several resources
 
@@ -88,9 +84,7 @@ an apply operation. They accept at most one 4 MiB request. Larger inputs use
 staged validation through `collection.Apply`.
 `collection.Apply` stages the frozen collection, asks the server to validate all
 items, then requests dependency-ordered activation with per-resource conditions
-on a server implementing that complete workflow. The private working branch has
-normal-startup CLI coverage of public activation, controller application, bounded
-retained result pages and restart. Apply returns on admission and retains its
+on a server advertising that workflow. Apply returns on admission and retains its
 operation handle even when work is partial. The DAO lesson shows
 five linked resources in one apply operation.
 
@@ -107,18 +101,17 @@ first page and retains verified partial counts on interruption. Inspect the
 immutable summary outcome; a ready result may be partial or failed. Cancelling its context stops waiting;
 `Operations.Cancel` is a separate request. Resume only the original operation
 with the original frozen content. A changed file requires a new operation.
-There is no collection-wide rollback or implicit pruning. Cross-process resume
-requires the separately planned server-assisted identical-input reselection;
-freezing the same files again does not recreate the original private identity.
+There is no collection-wide rollback or implicit pruning. After a client restart, use the supported file profile and explicit `Reselect`
+workflow. Freezing the same files again does not recreate the original private
+identity or authorize a replacement operation.
 
 ## Read state and measurements
 
 `State`, `History`, `SLO.Get`, `Queues.List`, `Pools.List`, and `Systems.List`
-return structured candidate observations. `Metrics` returns structured metrics;
+return structured observations. `Metrics` returns structured metrics;
 `Prometheus` streams the exposition response to a writer. Measurement values
 carry availability and units. A missing latency measurement is not zero.
-The private server candidate now implements these bounded observation reads;
-see [management observations](../management-observations.md) for exact source
+See [management observations](../management-observations.md) for exact source
 meanings, readiness behavior, unsupported measurements, and Prometheus units.
 
 Page calls default to 100 items and accept at most 500. Use `Iterate` to process
@@ -147,7 +140,7 @@ responses.
 
 ## Find an exact method or field
 
-- [HTTP operations](api-reference.md): the complete candidate operation inventory, parameters,
+- [HTTP operations](api-reference.md): the operation inventory, parameters,
   request/response types, version conditions, build tags, and current v1 routes.
 - [Wire types](wire-types.md): resource fields, every built-in driver schema,
   optional values, tagged types, and complete nested JSON schemas.

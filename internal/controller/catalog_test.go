@@ -124,7 +124,10 @@ func TestCatalogControllerCreateEditDisableDeleteAndRestart(t *testing.T) {
 		}
 	}()
 	created := commitManaged(t, catalog, managedMonitor("editable", target.URL+"/old", true), "")
-	waitCatalog(t, func() bool { m, ok := store.Get("editable"); return ok && m.TotalChecks >= 2 && oldCalls.Load() >= 2 })
+	waitCatalog(t, func() bool {
+		m, ok := monitorWithActionHistory(t, store, "editable")
+		return ok && m.TotalChecks >= 2 && oldCalls.Load() >= 2
+	})
 	uid := created.Resource.Metadata.UID
 	updated := created.Resource
 	updated.Spec = managedMonitor("editable", target.URL+"/new", true).Spec
@@ -142,7 +145,7 @@ func TestCatalogControllerCreateEditDisableDeleteAndRestart(t *testing.T) {
 	updated = changed.Resource
 	updated.Spec = managedMonitor("editable", target.URL+"/new", false).Spec
 	disabled := commitManaged(t, catalog, updated, updated.Metadata.ResourceVersion)
-	waitCatalog(t, func() bool { m, ok := store.Get("editable"); return ok && !m.Policy.Enabled })
+	waitCatalog(t, func() bool { m, ok := monitorWithActionHistory(t, store, "editable"); return ok && !m.Policy.Enabled })
 	waitCatalog(t, func() bool {
 		r, e := catalog.Operation(context.Background(), disabled.Operation.ID)
 		return e == nil && (r.Applied != nil && *r.Applied == 1)
@@ -163,7 +166,7 @@ func TestCatalogControllerCreateEditDisableDeleteAndRestart(t *testing.T) {
 	store = nil
 	catalog, store = managedStore(t, settings)
 	c = managedController(t, settings, catalog, store)
-	m, _ := store.Get("editable")
+	m, _ := monitorWithActionHistory(t, store, "editable")
 	if m.CatalogUID != uid || m.Policy.Enabled {
 		t.Fatal("restart lost managed incarnation or disablement")
 	}
@@ -179,7 +182,7 @@ func TestCatalogControllerCreateEditDisableDeleteAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitCatalog(t, func() bool { m, ok := store.Get("editable"); return ok && m.Removed })
+	waitCatalog(t, func() bool { m, ok := monitorWithActionHistory(t, store, "editable"); return ok && m.Removed })
 	waitCatalog(t, func() bool {
 		r, e := catalog.Operation(context.Background(), deleted.Operation.ID)
 		return e == nil && (r.Applied != nil && *r.Applied == 1)
@@ -192,7 +195,7 @@ func TestCatalogControllerCreateEditDisableDeleteAndRestart(t *testing.T) {
 		t.Fatal("recreated resource reused incarnation")
 	}
 	waitCatalog(t, func() bool {
-		m, ok := store.Get("editable")
+		m, ok := monitorWithActionHistory(t, store, "editable")
 		return ok && m.CatalogUID == recreated.Resource.Metadata.UID && m.Generation > 0
 	})
 }
@@ -295,8 +298,11 @@ func TestCatalogStartupUsesBoundedConfigureBatchesWithoutProviderCalls(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Index-before.Index != 3 {
-		t.Fatalf("eight monitors should configure in three batches; got %d commits", after.Index-before.Index)
+	if after.Index-before.Index != 4 {
+		t.Fatalf("eight monitors require one installation identity and three configure batches; got %d commits", after.Index-before.Index)
+	}
+	if monitor, ok := monitorWithActionHistory(t, store, "batch-00"); !ok || monitor.InstallationID == "" {
+		t.Fatal("startup omitted durable installation identity")
 	}
 	if calls.Load() != 0 {
 		t.Fatal("startup preparation executed provider before controller start")
@@ -349,7 +355,7 @@ func TestCatalogCredentialRotationRetainsLateActionEvidenceWithoutRedelivery(t *
 	changed.Spec, _ = json.Marshal(api.CredentialSpec{Value: api.Pointer(target.URL + "/new-action")})
 	commitManaged(t, catalog, changed, changed.Metadata.ResourceVersion)
 	waitCatalog(t, func() bool {
-		m, _ := store.Get("recovering")
+		m, _ := monitorWithActionHistory(t, store, "recovering")
 		for _, a := range m.Actions {
 			if a.State == persistence.Unknown {
 				return true
@@ -370,7 +376,7 @@ func TestCatalogCredentialRotationRetainsLateActionEvidenceWithoutRedelivery(t *
 		}
 		return false
 	})
-	m, _ := store.Get("recovering")
+	m, _ := monitorWithActionHistory(t, store, "recovering")
 	unknown := false
 	for _, a := range m.Actions {
 		if a.State == persistence.Unknown {

@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { fieldsFor, listResources, object, resourceKinds, type DriverCategory, type ResourceType } from '../api/resources';
 import type { Capabilities } from '../api/generated';
+import { useFieldValidation } from './FieldValidation';
 
-export function ReferencePicker({ type, values, onChange, label, single = false, readOnly = false }: {
+export function ReferencePicker({ type, values, onChange, label, single = false, readOnly = false, field }: {
   type: ResourceType; values: string[]; onChange: (values: string[]) => void; label: string; single?: boolean; readOnly?: boolean;
+  field?: string;
 }) {
+  const validation = useFieldValidation();
   const session = useDashboardSession();
   const [cursors, setCursors] = useState(['']);
   const cursor = cursors[cursors.length - 1];
@@ -26,7 +29,7 @@ export function ReferencePicker({ type, values, onChange, label, single = false,
     </li>)}</ul> : <p className="muted">{single ? 'No override configured.' : 'No members selected.'}</p>}
     {!readOnly && <>
       {allowed && <label className="management-field"><span>Choose {label.toLowerCase()}</span>
-        <select className="input" value="" onChange={event => select(event.target.value)} disabled={values.length >= 500}>
+        <select {...validation.attributes(field)} className="input" value="" onChange={event => select(event.target.value)} disabled={values.length >= 500}>
           <option value="">Select an existing {resourceKinds[type].singular.toLowerCase()}…</option>
           {choices.data?.items.map(({ resource }) => <option key={resource.metadata.id} value={resource.metadata.id} disabled={values.includes(resource.metadata.id)}>
             {resource.metadata.name || resource.metadata.id} ({resource.metadata.id}){type === 'endpoints' && 'type' in resource.spec ? ` · ${resource.spec.type}` : ''}
@@ -40,15 +43,17 @@ export function ReferencePicker({ type, values, onChange, label, single = false,
         <button type="button" className="btn ghost" disabled={!choices.data?.nextCursor} onClick={() => setCursors([...cursors, choices.data!.nextCursor!])}>Next choices</button>
       </div>}
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <label className="management-field" style={{ flex: 1 }}><span>Specific {label.toLowerCase()} ID</span><input className="input" value={specificID} onChange={event => setSpecificID(event.target.value)} /></label>
+        <label className="management-field" style={{ flex: 1 }}><span>Specific {label.toLowerCase()} ID</span><input {...(!allowed ? validation.attributes(field) : {})} className="input" value={specificID} onChange={event => setSpecificID(event.target.value)} /></label>
         <button type="button" className="btn" disabled={!specificID || values.includes(specificID) || values.length >= 500} onClick={() => select(specificID)}>Use ID</button>
       </div>
       <p className="muted">References retain their order. Only this page of choices is loaded; adding the same ID twice is prevented.</p>
+      {validation.message(field)}
     </>}
   </fieldset>;
 }
 
-export function DriverFields({ category, spec, onChange, readOnly = false }: { category: DriverCategory; spec: Record<string, unknown>; onChange: (spec: Record<string, unknown>) => void; readOnly?: boolean }) {
+export function DriverFields({ category, spec, onChange, readOnly = false, field: fieldPath = 'spec' }: { category: DriverCategory; spec: Record<string, unknown>; onChange: (spec: Record<string, unknown>) => void; readOnly?: boolean; field?: string }) {
+  const validation = useFieldValidation();
   const session = useDashboardSession();
   const capabilities = useQuery({ queryKey: ['management', 'capabilities'], queryFn: ({ signal }) => session.get<Capabilities>('/api/v2/discovery', { signal }), enabled: !readOnly });
   const driver = typeof spec.type === 'string' ? spec.type : '';
@@ -73,12 +78,13 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
   };
   return <>
     <label className="management-field"><span>{title} driver</span>
-      {readOnly ? <span>{driver}</span> : <select className="input" aria-label={`${title} driver`} value={driver} onChange={event => changeDriver(event.target.value)} required disabled={!capabilities.data}>
+      {readOnly ? <span>{driver}</span> : <select {...validation.attributes(`${fieldPath}.type`)} className="input" aria-label={`${title} driver`} value={driver} onChange={event => changeDriver(event.target.value)} required disabled={!capabilities.data}>
         <option value="">Choose a compiled driver…</option>
         {driver && !drivers.includes(driver) && <option value={driver}>{driver} — unavailable in this server</option>}
         {drivers.filter(value => fieldsFor(value, category)).sort().map(value => <option key={value} value={value}>{value}</option>)}
       </select>}
     </label>
+    {!readOnly && validation.message(`${fieldPath}.type`)}
     {driver === 'a2a' && <p className="muted">{category === 'recovery'
       ? 'The agent performs its configured intervention. CPRa waits for task completion and then verifies the monitored service. An unconfirmed outcome requires review.'
       : 'The agent receives incident context for investigation. Delivery records agent acceptance; checks determine whether the monitored service has recovered. Use a notification credential with only the intended agent permissions.'}</p>}
@@ -87,7 +93,7 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
     {category === 'check' && config.insecureSkipVerify === true && <p role="status" className="alert warning">Certificate verification disabled. This monitor accepts untrusted certificates and hostnames. Health recovery still requires successful checks.</p>}
     {fields?.map(field => {
       const useSecret = field.protected || typeof refs[field.key] === 'string' || secretFields.includes(field.key);
-      const secretChoice = !field.protected && !readOnly && (field.type === 'string' || field.type === 'string-map' || typeof refs[field.key] === 'string') ? <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={useSecret}
+      const secretChoice = !field.protected && !readOnly && (['url', 'uri', 'dsn', 'headers', 'body', 'payload', 'webhookUrl'].includes(field.key) || typeof refs[field.key] === 'string') ? <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={useSecret}
         onChange={event => {
           setURLWarning(false);
           if (event.target.checked) {
@@ -101,7 +107,7 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
         }} />Use a secret for {field.label.toLowerCase()}</label> : null;
       if (useSecret) return <div key={field.key}>
         {secretChoice}
-        <ReferencePicker type="credentials" label={`${field.label} secret`} single readOnly={readOnly}
+        <ReferencePicker field={`${fieldPath}.credentialRefs.${field.key}`} type="credentials" label={`${field.label} secret`} single readOnly={readOnly}
           values={typeof refs[field.key] === 'string' ? [refs[field.key] as string] : []}
           onChange={values => {
             const next = { ...refs }; const nextConfig = { ...config }; delete nextConfig[field.key];
@@ -112,24 +118,25 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
       </div>;
       const present = Object.prototype.hasOwnProperty.call(config, field.key);
       const value = config[field.key];
-      if (readOnly) return <div key={field.key} className="management-field"><span>{field.label}</span><p className="mono">{!present ? 'Use default (not configured)' : field.type === 'boolean' ? value ? 'Yes' : 'No' : object(value) ? JSON.stringify(value) : Array.isArray(value) ? value.join(', ') || 'Empty list' : String(value) || 'Empty value'}</p></div>;
+      if (readOnly) return <div key={field.key} className="management-field"><span>{field.label}</span><p className="mono">{!present ? field.required ? 'Required value is missing' : 'Not configured' : field.type === 'boolean' ? value ? 'Yes' : 'No' : object(value) ? JSON.stringify(value) : Array.isArray(value) ? value.join(', ') || 'Empty list' : String(value) || 'Empty value'}</p></div>;
       return <div key={field.key} className="management-field">
         {secretChoice}
         <label className="management-field"><span>{field.label}</span>
-          {field.type === 'boolean' ? <select className="input" aria-label={field.label} value={!present ? 'default' : value ? 'true' : 'false'} disabled={readOnly}
+          {field.type === 'boolean' ? <select {...validation.attributes(`${fieldPath}.config.${field.key}`)} className="input" aria-label={field.label} value={!present ? 'default' : value ? 'true' : 'false'} disabled={readOnly}
             onChange={event => updateConfig(field.key, event.target.value === 'true', event.target.value === 'default')}>
             <option value="default">Use default</option><option value="true">Yes</option><option value="false">No</option>
-          </select> : field.type === 'number-map' || field.type === 'string-map' ? <MapInput numeric={field.type === 'number-map'} value={value} onChange={next => updateConfig(field.key, next)} /> : field.type === 'number-list' ? <NumberListInput value={value} readOnly={readOnly} onChange={next => updateConfig(field.key, next)} /> : field.type === 'string-list' ? <textarea className="input" rows={3} readOnly={readOnly}
+          </select> : field.type === 'number-map' || field.type === 'string-map' ? <MapInput field={`${fieldPath}.config.${field.key}`} numeric={field.type === 'number-map'} value={value} onChange={next => updateConfig(field.key, next)} /> : field.type === 'number-list' ? <NumberListInput field={`${fieldPath}.config.${field.key}`} value={value} readOnly={readOnly} onChange={next => updateConfig(field.key, next)} /> : field.type === 'string-list' ? <textarea {...validation.attributes(`${fieldPath}.config.${field.key}`)} className="input" rows={3} readOnly={readOnly}
             value={Array.isArray(value) ? value.join('\n') : ''} placeholder="One value per line"
             onChange={event => updateConfig(field.key, event.target.value ? event.target.value.split('\n') : [])} />
-            : <input className="input" type={field.type === 'number' ? 'number' : 'text'} readOnly={readOnly}
+            : <input {...validation.attributes(`${fieldPath}.config.${field.key}`)} className="input" type={field.type === 'number' ? 'number' : 'text'} readOnly={readOnly}
               ref={element => { element?.setCustomValidity(category === 'check' && driver === 'http' && field.key === 'url' && urlWarning ? 'This URL requires a secret reference.' : ''); }}
-              aria-invalid={category === 'check' && driver === 'http' && field.key === 'url' && urlWarning || undefined}
+              aria-invalid={category === 'check' && driver === 'http' && field.key === 'url' && urlWarning || validation.attributes(`${fieldPath}.config.${field.key}`)['aria-invalid']}
               value={typeof value === 'string' || typeof value === 'number' ? value : ''}
-              placeholder={present ? undefined : field.type === 'duration' ? 'Use default (for example 30s)' : 'Use default'}
+              required={field.required} placeholder={present ? undefined : field.required ? 'Required' : field.type === 'duration' ? 'Optional (for example 30s)' : 'Not configured'}
               onChange={event => updateConfig(field.key, field.type === 'number' ? Number(event.target.value) : event.target.value, field.type === 'number' && event.target.value === '')} />}
         </label>
-        {!readOnly && present && field.type !== 'boolean' && <button className="btn ghost" type="button" onClick={() => updateConfig(field.key, undefined, true)}>Use default for {field.label.toLowerCase()}</button>}
+        {validation.message(`${fieldPath}.config.${field.key}`)}
+        {!readOnly && !field.required && present && field.type !== 'boolean' && <button className="btn ghost" type="button" onClick={() => updateConfig(field.key, undefined, true)}>Use default for {field.label.toLowerCase()}</button>}
       </div>;
     })}
     {category === 'check' && driver === 'http' && !readOnly && <p className="muted">HTTP URLs containing credentials, a query or a fragment must use a URL secret reference. Plain target URLs can be entered directly.</p>}
@@ -138,10 +145,11 @@ export function DriverFields({ category, spec, onChange, readOnly = false }: { c
   </>;
 }
 
-function MapInput({ value, onChange, numeric }: { value: unknown; onChange: (value: Record<string, unknown>) => void; numeric: boolean }) {
+function MapInput({ value, onChange, numeric, field }: { value: unknown; onChange: (value: Record<string, unknown>) => void; numeric: boolean; field: string }) {
+  const validation = useFieldValidation();
   const [text, setText] = useState(object(value) ? JSON.stringify(value, null, 2) : '');
   useEffect(() => { setText(object(value) ? JSON.stringify(value, null, 2) : ''); }, [value]);
-  return <textarea className="input mono" rows={4} value={text} placeholder={numeric ? '{"red": 2, "green": 0}' : '{"Header-Name": "value"}'}
+  return <textarea {...validation.attributes(field)} className="input mono" rows={4} value={text} placeholder={numeric ? '{"red": 2, "green": 0}' : '{"Header-Name": "value"}'}
     onChange={event => {
       const next = event.target.value; setText(next);
       try {
@@ -156,10 +164,11 @@ export function EndpointFields(props: { spec: Record<string, unknown>; onChange:
   return <DriverFields category="notification" {...props} />;
 }
 
-function NumberListInput({ value, onChange, readOnly }: { value: unknown; onChange: (value: number[]) => void; readOnly: boolean }) {
+function NumberListInput({ value, onChange, readOnly, field }: { value: unknown; onChange: (value: number[]) => void; readOnly: boolean; field: string }) {
+  const validation = useFieldValidation();
   const [text, setText] = useState(Array.isArray(value) ? value.join('\n') : '');
   useEffect(() => { setText(Array.isArray(value) ? value.join('\n') : ''); }, [value]);
-  return <textarea className="input" rows={3} readOnly={readOnly} value={readOnly ? Array.isArray(value) ? value.join('\n') : '' : text} placeholder="One integer per line"
+  return <textarea {...validation.attributes(field)} className="input" rows={3} readOnly={readOnly} value={readOnly ? Array.isArray(value) ? value.join('\n') : '' : text} placeholder="One integer per line"
     onChange={event => {
       const next = event.target.value; setText(next);
       const values = next ? next.split('\n') : [];

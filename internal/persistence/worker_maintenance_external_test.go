@@ -31,8 +31,7 @@ func TestWorkerMaintenancePollPublishesCancellation(t *testing.T) {
 	if err != nil || len(response.Offers) != 0 {
 		t.Fatal("suppressed notification offered", err)
 	}
-	m, _ := s.Get(in.MonitorID)
-	if m.Actions[in.ActionID].State != Cancelled {
+	if retainedAction(t, s, in.ActionID).State != Cancelled {
 		t.Fatal("covered notification not cancelled")
 	}
 	changes, err := s.ControlsChangedSince(view.Cursor, 100)
@@ -61,8 +60,7 @@ func TestWorkerMaintenanceStartReevaluatesOffer(t *testing.T) {
 				t.Fatalf("maintenance start = %s; want %s", result.Disposition, want)
 			}
 			if category == "notification" {
-				m, _ := s.Get(in.MonitorID)
-				if m.Actions[in.ActionID].State != Cancelled {
+				if retainedAction(t, s, in.ActionID).State != Cancelled {
 					t.Fatal("covered notification was kept for deferred delivery")
 				}
 			}
@@ -214,7 +212,7 @@ func TestWorkerRecoveryRestartCannotRenewExpiredIntent(t *testing.T) {
 		t.Fatal("expired restored recovery was executable")
 	}
 	current, _ := s.Get(in.MonitorID)
-	if current.Actions[in.ActionID].State != Cancelled || current.Actions[in.ActionID].Deadline != original.Deadline || len(current.Actions) != len(monitor.Actions) {
+	if retainedAction(t, s, in.ActionID).State != Cancelled || retainedAction(t, s, in.ActionID).Deadline != original.Deadline || len(current.Actions) != len(monitor.Actions)-1 {
 		t.Fatal("restart renewed or replaced expired intent")
 	}
 	record, ok, err := s.WorkerExecution(t.Context(), in.ID)

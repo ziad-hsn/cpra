@@ -64,11 +64,20 @@ func (h *Handle) notifyChannel() <-chan struct{} {
 	return nil
 }
 
-func (h *Handle) partitions() int {
+func (h *Handle) requestedCapacity() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if q, ok := h.queue.(*FairQueue); ok {
-		return q.partitions()
+		return q.requestedCapacity()
 	}
-	return 1
+	return 0
+}
+
+func (h *Handle) SetDemand(demand []DriverDemand) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if q, ok := h.queue.(*FairQueue); ok {
+		return q.SetDemand(demand)
+	}
+	return fmt.Errorf("queue does not support driver demand")
 }

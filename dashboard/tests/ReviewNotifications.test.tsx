@@ -7,8 +7,8 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it('describes review and verification without relying on color or repeated live announcements', () => {
   render(<><CodeBadge code="blue" /><CodeBadge code="cyan" /></>);
-  expect(screen.getByLabelText('RECOVERY REVIEW REQUIRED')).toHaveTextContent('RECOVERY REVIEW REQUIRED');
-  expect(screen.getByLabelText('HEALTH VERIFICATION PENDING')).toHaveTextContent('HEALTH VERIFICATION PENDING');
+  expect(screen.getByText('RECOVERY REVIEW REQUIRED')).toHaveTextContent('RECOVERY REVIEW REQUIRED');
+  expect(screen.getByText('HEALTH VERIFICATION PENDING')).toHaveTextContent('HEALTH VERIFICATION PENDING');
   expect(screen.queryByRole('status')).toBeNull();
 });
 
@@ -22,11 +22,11 @@ it('requires an explicit blue destination and preserves the red rule on conditio
   fireEvent.click(await screen.findByRole('button', { name: 'Edit monitor' }));
   await waitFor(() => expect(screen.getByLabelText('Check driver')).not.toBeDisabled());
   expect(screen.getByText(/Uncertain recovery has no enabled blue notification destination/)).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Add Code'), { target: { value: 'blue' } });
-  expect(screen.getByLabelText('Code blue notification type')).toHaveValue('');
-  fireEvent.change(screen.getByLabelText('Code blue notification type'), { target: { value: 'email' } });
-  fireEvent.change(screen.getByLabelText('Specific code blue recipients ID'), { target: { value: 'review-team' } });
-  fireEvent.click(within(screen.getByRole('group', { name: 'Code blue recipients' })).getByRole('button', { name: 'Use ID' }));
+  fireEvent.change(screen.getByLabelText('Add notification'), { target: { value: 'blue' } });
+  expect(screen.getByLabelText('Notification blue driver')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('Notification blue driver'), { target: { value: 'email' } });
+  fireEvent.change(screen.getByLabelText('Specific notification blue recipients ID'), { target: { value: 'review-team' } });
+  fireEvent.click(within(screen.getByRole('group', { name: 'Notification blue recipients' })).getByRole('button', { name: 'Use ID' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(writes).toHaveLength(1));
   expect(writes[0]).toMatchObject({ method: 'PUT', match: '"rv-1"', body: { spec: {

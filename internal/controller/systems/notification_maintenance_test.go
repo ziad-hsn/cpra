@@ -150,7 +150,7 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 			s.dispatchActions(start.Add(time.Duration(turn) * time.Second))
 		}
 	}
-	m, _ = store.Get(id)
+	m, _ = monitorWithActionHistory(t, store, id)
 	if m.Actions[actionID].State != persistence.Cancelled || m.Actions[actionID].Outcome != "maintenance" {
 		t.Fatal("the actual controller deferred a notification covered by maintenance")
 	}
@@ -177,7 +177,7 @@ func testNotificationMaintenanceController(t *testing.T, waiting, missed, restar
 		t.Fatal(err)
 	}
 	defer restarted.Close()
-	m, ok := restarted.Get(id)
+	m, ok := monitorWithActionHistory(t, restarted, id)
 	if !ok || m.Generation != 1 || m.Actions[actionID].State != persistence.Cancelled {
 		t.Fatal("restart lost maintenance cancellation")
 	}

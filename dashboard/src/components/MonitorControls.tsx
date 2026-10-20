@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardSession } from '../auth/SessionBoundary';
 import { useManagementMutation } from '../hooks/mutations';
@@ -54,6 +54,8 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
   const queries = useQueryClient();
   const [draft, setDraft] = useState<FrozenControl>();
   const mutation = useManagementMutation(mutationReceipt);
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (mutation.error) errorRef.current?.focus(); }, [mutation.error]);
   const resource = useQuery({ queryKey: ['management', 'monitors', 'detail', monitorID], queryFn: ({ signal }) => getResource(session, 'monitors', monitorID, signal), enabled: session.can('GetMonitor'), refetchInterval: 5000, gcTime: 0 });
   const monitor = resource.data?.resource as Monitor | undefined;
   const incidentID = monitor?.status?.incidentID;
@@ -94,8 +96,7 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
     } catch { /* Keep the frozen request and explicit error. Never retry or update its version. */ }
   };
   const feedback = <>
-    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The saved state changed. Close this draft and inspect the latest state before making another change.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the operation or current state before taking another action.' : ''}</p>}
-    <ProblemDetails error={mutation.error} />
+    {mutation.error && <div role="alert" tabIndex={-1} ref={errorRef}><p>{mutation.error.message}{mutation.error.status === 412 ? ' The saved state changed. Close this draft and inspect the latest state before making another change.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the operation or current state before taking another action.' : ''}</p><ProblemDetails error={mutation.error} /></div>}
     {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} source="error" label="Inspect submitted operation" />}
     {mutation.response && <MutationReceipt response={mutation.response} />}
   </>;

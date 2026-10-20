@@ -13,7 +13,33 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+// openReplayMemory omits current-process startup commands so retained old
+// envelopes can establish their original image and snapshot formats. Ordinary
+// Open/restart tests continue to exercise today's explicit migration boundary.
+func openReplayMemory(t *testing.T) *Store {
+	t.Helper()
+	c := testConfig(t)
+	c.Storage.Mode = "memory"
+	s, err := openReplayStore(t, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func openReplayStore(t *testing.T, c runtimeconfig.Config) (*Store, error) {
+	t.Helper()
+	s, err := openStore(t.Context(), c, true)
+	if err != nil {
+		return nil, err
+	}
+	s.administrative = false
+	t.Cleanup(func() { _ = s.Close() })
+	return s, nil
+}
 
 // Explicit old envelopes bypass today's writer policy. They exercise the same
 // decoder/FSM online and offline recovery uses for retained historical logs.
@@ -56,7 +82,7 @@ func createCatalogFormat(t *testing.T, s *Store, format int, r CatalogRecord) Ca
 func TestCatalogFormatLegacyReplayAndUniqueSameEntryTokens(t *testing.T) {
 	for _, legacy := range []int{CatalogFormatVersion, CollectionFormatVersion} {
 		t.Run(string(rune('0'+legacy)), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			shared := createCatalogFormat(t, s, legacy, catalogRecord(t, s, "Credential", "shared", "shared-uid", "s1", "private"))
 			a := createCatalogFormat(t, s, legacy, catalogRecord(t, s, "Endpoint", "a", "a-uid", "a1", "private", shared.Key))
 			b := catalogRecord(t, s, "Endpoint", "b", "b-uid", "b1", "private", shared.Key)
@@ -100,7 +126,7 @@ func TestCatalogFormatLegacyReplayAndUniqueSameEntryTokens(t *testing.T) {
 }
 
 func TestCatalogFormatWriterMaximumAndHistoricalDecoder(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	r := catalogRecord(t, s, "Credential", "ordinary", "uid", "revision", "private")
 	create := collectionCreateFixture(t, s, 1)
 	commands := []Command{formatCatalogCommand(CatalogMutation{Record: r, Create: true}), {Kind: "collection", At: create.Create.CreatedAt, Collection: &create}}
@@ -137,7 +163,7 @@ func TestCatalogFormatWriterMaximumAndHistoricalDecoder(t *testing.T) {
 func TestCatalogFormatBootstrapTokensOnlyForAcceptedSeeds(t *testing.T) {
 	for _, format := range []int{CatalogFormatVersion, CollectionFormatVersion, CatalogMutationFormatVersion} {
 		t.Run(string(rune('0'+format)), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			manifest, records := bootstrapFixture(t, s)
 			apply := func(command BootstrapCommand) Result {
 				if format == CatalogMutationFormatVersion {
@@ -188,7 +214,7 @@ func TestCatalogFormatBootstrapTokensOnlyForAcceptedSeeds(t *testing.T) {
 }
 
 func TestCatalogFormatRejectedTypedOperationPreservesTruthfulReceipt(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	createCatalog(t, s, catalogRecord(t, s, "Credential", "existing", "uid", "s1", "private"))
 	reservation, command := allocatedCommand(t, s, reservationCommand(t, s, "reserved", time.Now().UTC()))
 	if result := applyCatalogFormat(t, s, CatalogFormatVersion, command)[0]; !errors.Is(result.Err, ErrCatalogFormatDowngrade) {
@@ -214,7 +240,7 @@ func TestCatalogFormatRejectedTypedOperationPreservesTruthfulReceipt(t *testing.
 }
 
 func TestCatalogFormatDowngradeOverflowAndSnapshotValidation(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	shared := createCatalog(t, s, catalogRecord(t, s, "Credential", "shared", "uid", "s1", "private"))
 	consumer := createCatalog(t, s, catalogRecord(t, s, "Endpoint", "consumer", "c-uid", "c1", "private", shared.Key))
 	sequence := s.fsm.image.CatalogMutationSequence
@@ -256,7 +282,7 @@ func TestCatalogFormatDowngradeOverflowAndSnapshotValidation(t *testing.T) {
 }
 
 func TestCatalogFormatV3StreamIsFrozenAndV4FramingIsExplicit(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := createCollectionFixture(t, s, 1)
 	item := collectionItemFixture(t, s, head, 1, "staged")
 	if result := uploadCollectionFixture(t, s, head, item, head.ActivityAt.Add(time.Second)); result.Err != nil {
@@ -363,7 +389,7 @@ func TestCatalogFormatCatalogOnlySnapshotsAndStoppedValidation(t *testing.T) {
 
 func TestCatalogFormatMixedSnapshotAndLogRecovery(t *testing.T) {
 	cfg := testConfig(t)
-	s, err := Open(context.Background(), cfg)
+	s, err := openReplayStore(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,9 +404,7 @@ func TestCatalogFormatMixedSnapshotAndLogRecovery(t *testing.T) {
 	if s.fsm.image.Version != CollectionFormatVersion || s.fsm.image.CatalogMutationSequence != 0 {
 		t.Fatal("legacy input was prematurely migrated")
 	}
-	if err := s.Snapshot(); err != nil {
-		t.Fatal(err)
-	}
+	persistPausedReviewSnapshot(t, s)
 	prior := s.fsm.image.Index
 	result := catalogSubmit(t, s, updateCatalogMutation(t, s, consumer, "c2", "private", shared.Key))
 	if result.Err != nil || result.CatalogMutationSequence != prior+1 {
@@ -431,7 +455,7 @@ func TestCatalogFormatMixedSnapshotAndLogRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer restored.collections.Close()
-	if restored.image.CatalogMutationSequence != result.CatalogMutationSequence || restored.image.Version != CatalogMutationFormatVersion {
-		t.Fatal("v4 snapshot restore lost sequence")
+	if restored.image.CatalogMutationSequence != result.CatalogMutationSequence || restored.image.Version != ActionFormatVersion {
+		t.Fatal("upgraded snapshot lost catalog sequence")
 	}
 }

@@ -11,17 +11,20 @@ import { StatusChip } from '../components/StatusChip';
 import { Icon } from '../components/Icon';
 import { formatNumber, formatPercent, formatDurationNs, formatUptime, timeAgo } from '../lib/format';
 import type { MonitorSummary } from '../api/types';
+import { useOnlineStatus } from '../hooks/connection';
 
 const CODE_COLORS: Record<string, string> = {
   red: 'var(--status-critical)',
   yellow: 'var(--status-degraded)',
   green: 'var(--status-operational)',
   cyan: 'var(--status-info)',
+  blue: 'var(--status-review)',
   gray: 'var(--status-disabled)',
 };
 
 export default function Overview() {
   const navigate = useNavigate();
+  const online = useOnlineStatus();
   const { data: overview, isLoading, isError, refetch } = useOverview();
   const { data: systems, dataUpdatedAt: systemsUpdatedAt } = useSystems();
   const [throughputHistory, setThroughputHistory] = useState<number[]>([]);
@@ -55,11 +58,11 @@ export default function Overview() {
     setThroughputHistory((samples) => [...samples.slice(-59), throughput]);
   }, [systems, systemsUpdatedAt, throughput]);
 
-  if (isError) {
+  if ((isError || !online) && !overview) {
     return (
       <div className='page'>
         <div className='page-head'><h1>Fleet Overview</h1></div>
-        <ErrorState message='Failed to load fleet overview' onRetry={() => refetch()} />
+        <ErrorState message={online ? 'Failed to load fleet overview' : 'You are offline. Reconnect to read fleet observations.'} onRetry={online ? () => refetch() : undefined} />
       </div>
     );
   }
@@ -85,11 +88,13 @@ export default function Overview() {
         </div>
       </div>
 
+      {(isError || !online) && <p role="alert">Saved fleet observations are shown below. Current health is unavailable{!online ? ' while offline' : ' because the latest request failed'}.</p>}
+
       {/* KPI strip */}
       <div className='grid-kpis'>
-        <KpiTile label='Total Monitors' value={formatNumber(total)} loading={isLoading} sub='registered endpoints' code='gray' icon='layers' />
+        <KpiTile label='Total Monitors' value={formatNumber(total)} loading={isLoading} sub='configured monitors' code='gray' icon='layers' />
         <KpiTile label='Operational' value={total > 0 ? formatPercent(upPct) : '—'} loading={isLoading} code='green' icon='check' sub='latest controller snapshot' />
-        <KpiTile label='Open Incidents' value={formatNumber((byStatus.incident ?? 0) + (byStatus.verifying ?? 0))} loading={isLoading} code='red' icon='warning' sub='threshold reached; includes recovery verification' />
+        <KpiTile label='Incidents and verification' value={formatNumber((byStatus.incident ?? 0) + (byStatus.verifying ?? 0))} loading={isLoading} code='red' icon='warning' sub='includes guarded manual recovery' />
         <KpiTile label='Verifying' value={formatNumber(byStatus.verifying ?? 0)} loading={isLoading} code='yellow' icon='clock' sub='awaiting healthy-check threshold' />
         <KpiTile label='Controller processing' value={systems ? formatNumber(Math.round(throughput)) : '—'} loading={isLoading} code='cyan' icon='activity' sub='items / sec; not check completions' />
       </div>

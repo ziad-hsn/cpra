@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useOverview } from '../hooks/queries';
 import { useTheme } from '../theme/useTheme';
 import { Icon } from './Icon';
+import { useOnlineStatus } from '../hooks/connection';
+import { formatDateTime } from '../lib/format';
 
 const TITLES: Record<string, { title: string; crumb: string }> = {
   '/': { title: 'Fleet Overview', crumb: 'Workspace / Overview' },
@@ -19,7 +21,13 @@ const TITLES: Record<string, { title: string; crumb: string }> = {
 };
 
 export function Topbar() {
-  const { data: overview, isLoading, isError } = useOverview();
+  const { data: overview, isLoading, isError, dataUpdatedAt, fetchStatus } = useOverview();
+  const online = useOnlineStatus();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
 
@@ -33,9 +41,17 @@ export function Topbar() {
   const verifying = overview?.by_status?.verifying ?? 0;
   const degraded = overview?.by_status?.degraded ?? 0;
   const active = (overview?.total ?? 0) - (overview?.disabled ?? 0);
-  const ok = !isLoading && !isError && active > 0 && critical === 0 && degraded === 0 && unknown === 0 && verifying === 0;
-  const statusText = isLoading ? 'Loading fleet status…'
+  const offline = !online || fetchStatus === 'paused';
+  const projectedAt = overview?.generated ? Date.parse(overview.generated) : NaN;
+  const projectionUncertain = Boolean(overview && (!Number.isFinite(projectedAt) || projectedAt > now + 30000));
+  const stale = Boolean(overview && (dataUpdatedAt && now - dataUpdatedAt > 30000 || Number.isFinite(projectedAt) && now - projectedAt > 30000));
+  const unavailable = offline || isError || stale || projectionUncertain;
+  const ok = !isLoading && !unavailable && active > 0 && critical === 0 && degraded === 0 && unknown === 0 && verifying === 0;
+  const statusText = offline ? 'Offline — current health unavailable'
+    : stale ? 'Observations are stale — current health unavailable'
+    : projectionUncertain ? 'Projection freshness unavailable — current health unavailable'
     : isError ? 'Status unavailable'
+    : isLoading ? 'Loading fleet status…'
     : active === 0 ? 'No active monitors'
     : critical > 0 ? `${critical} monitor${critical !== 1 ? 's' : ''} critical — investigate`
     : degraded > 0 ? `${degraded} monitor${degraded !== 1 ? 's' : ''} degraded — review warnings`
@@ -51,13 +67,14 @@ export function Topbar() {
       </div>
 
       <div
-        className={`status-banner ${ok ? 'ok' : critical > 0 ? 'critical' : 'pending'}`}
+        className={`status-banner ${ok ? 'ok' : !unavailable && critical > 0 ? 'critical' : 'pending'}`}
         role="status"
         aria-label="Global fleet status"
       >
         <span className="dot" aria-hidden />
         <span>
           {statusText}
+          {unavailable && overview && <small className="stale-note"> Saved observations remain visible. Last received {dataUpdatedAt ? formatDateTime(new Date(dataUpdatedAt).toISOString()) : 'at an unavailable time'}. Controller snapshot {Number.isFinite(projectedAt) ? formatDateTime(overview.generated) : 'time unavailable'}.</small>}
         </span>
       </div>
 

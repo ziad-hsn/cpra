@@ -83,7 +83,7 @@ func TestFailureDiagnosticsSurviveSnapshotAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, ok := store.Get(m.ID)
+	m, ok := monitorWithActionHistory(t, store, m.ID)
 	if !ok || m.LastFailure != d || m.Actions[id].Failure != actionFailure || m.Actions[id].Cause != d || m.Actions[id].State != Unknown {
 		t.Fatal("snapshot lost diagnostics or unknown hold")
 	}

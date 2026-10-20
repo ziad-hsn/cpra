@@ -10,6 +10,8 @@ import { mutationReceipt } from '../api/resources';
 import { useManagementMutation } from '../hooks/mutations';
 import { MutationReceipt, OperationLink } from './OperationReceipt';
 import { formatDateTime } from '../lib/format';
+import { CODE_LABELS, type CpraCode } from '../theme/tokens';
+import { CodeBadge } from './CodeBadge';
 import { Dialog } from './Dialog';
 
 export function MonitorActions({ monitorID }: { monitorID: string }) {
@@ -23,6 +25,8 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
   const cursor = cursors[cursors.length - 1];
   const page = useQuery({ queryKey: ['management', 'actions', monitorID, cursor], queryFn: ({ signal }) => loadActions(session, monitorID, cursor, signal), enabled: session.can('ListActions'), refetchInterval: query => cursor || query.state.data?.nextCursor ? false : 5000, gcTime: 0 });
   const mutation = useManagementMutation(mutationReceipt);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (mutation.error) feedbackRef.current?.focus(); }, [mutation.error]);
   useEffect(() => {
     const reset = () => { request.current?.abort(); request.current = undefined; setDraft(undefined); setError(undefined); setLoading(false); setCursors(['']); };
     const unsubscribe = session.onReset(reset);
@@ -56,8 +60,7 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
     } catch { /* Preserve the reviewed observation. Never rebase or retry a write. */ }
   };
   const feedback = <>
-    {mutation.error && <p role="alert">{mutation.error.message}{mutation.error.status === 412 ? ' The action changed since this review was opened. Close this draft and inspect its latest observation before reviewing again.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the original operation before taking another action.' : ''}</p>}
-    <ProblemDetails error={mutation.error} />
+    {mutation.error && <div role="alert" tabIndex={-1} ref={feedbackRef}><p>{mutation.error.message}{mutation.error.status === 412 ? ' The action changed since this review was opened. Close this draft and inspect its latest observation before reviewing again.' : ''}{mutation.error.reason === 'unconfirmed' ? ' Inspect the original operation before taking another action.' : ''}</p><ProblemDetails error={mutation.error} /></div>}
     {mutation.error?.response?.operationID && <OperationLink id={mutation.error.response?.operationID} source="error" label="Inspect submitted review" />}
     {mutation.response && <MutationReceipt response={mutation.response} />}
   </>;
@@ -72,6 +75,15 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
       {page.data.items.length === 0 ? <p>No retained actions for this monitor.</p> : <ul className="stack-12">{page.data.items.map(action => <li key={action.id} style={{ overflowWrap: 'anywhere' }}>
         <strong>{action.kind === 'intervention' ? 'Recovery' : action.kind === 'code' ? 'Notification' : action.kind || 'Action'}</strong> · <span className="mono">{action.id}</span>
         <p>Provider outcome: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
+        {action.color && (Object.prototype.hasOwnProperty.call(CODE_LABELS, action.color) ? <CodeBadge code={action.color as CpraCode} /> : <span>Notification: {action.color}</span>)}
+        {action.reviewNotice && <div className="stack-4">
+          <p>{action.reviewNotice.phase === 'open' ? 'Recovery outcome unknown — operator review required.' : action.reviewNotice.reason === 'health_recovered' ? 'Health recovered earlier; the recovery action outcome remains unknown.' : 'Recovery outcome reviewed.'}</p>
+          <p>Health at this notice: {action.reviewNotice.health}.</p>
+          <p>Review alert {action.reviewNotice.alertID} · Recovery action {action.reviewNotice.actionID}</p>
+          {action.reviewNotice.phase === 'close' && <p className="muted">This is a closure notification. Delivery acceptance does not prove that a provider closed its alert or that the earlier recovery succeeded.</p>}
+        </div>}
+        {action.deliveryID && <p className="muted">Delivery {action.deliveryID}{action.endpointID ? ` · Destination ${action.endpointID}` : ''}</p>}
+        {(action.queuedAt || action.deadline) && <p className="muted">Queued: {formatDateTime(action.queuedAt ?? '')} · Deadline: {formatDateTime(action.deadline ?? '')}</p>}
         <FailureDetails diagnostic={action.failure} />
         <FailureDetails diagnostic={action.cause} label="Notification cause" />
         {action.updatedAt && <p className="muted">Last recorded change: {formatDateTime(action.updatedAt)}</p>}

@@ -239,7 +239,7 @@ func TestCollectionValidationCommittedStateSurvivesProcessKill(t *testing.T) {
 			}
 			s.fsm.mu.RLock()
 			inactive := catalog.Len() == 0 && len(s.fsm.image.Monitors) == 0 && len(s.fsm.image.Operations) == 0 &&
-				s.fsm.image.CatalogMutationSequence == 0 && s.fsm.image.Version == CollectionValidationFormatVersion
+				s.fsm.image.CatalogMutationSequence == 0 && s.fsm.image.Version == ActionFormatVersion
 			s.fsm.mu.RUnlock()
 			if !inactive {
 				t.Fatal("crash replay or validation finalization activated resources")

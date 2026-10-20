@@ -17,7 +17,7 @@ import (
 	"github.com/ziad-hsn/cpra/sdk/go/internal/transport"
 )
 
-// Version identifies the SDK candidate, independently of the server API version.
+// Version identifies the SDK module, independently of the server API version.
 const Version = "0.1.0-rc.1"
 
 // DefaultMaxResponseBytes bounds an ordinary decoded response to 64 MiB.

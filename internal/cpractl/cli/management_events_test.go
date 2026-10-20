@@ -126,3 +126,20 @@ func TestRecoveryNotificationActionDescription(t *testing.T) {
 		}
 	}
 }
+
+func TestBlueNoticeDescriptionShowsRecordedHealth(t *testing.T) {
+	for _, tc := range []struct{ reason, health string }{{"health_recovered", "unhealthy"}, {"health_recovered", "unknown"}, {"action_reviewed", "unhealthy"}} {
+		t.Run(tc.reason+"/"+tc.health, func(t *testing.T) {
+			fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Error("description mutated state")
+				}
+				_ = json.NewEncoder(w).Encode(api.Action{ID: "notice", Kind: "code", Color: "blue", State: "succeeded", ReviewNotice: &api.ReviewNotice{AlertID: "condition", ActionID: "held-action", Phase: "close", Reason: tc.reason, Health: tc.health}})
+			})
+			stdout, _, err := fixture.run(t, nil, "describe", "action/notice")
+			if err != nil || !strings.Contains(stdout, "Health at notice") || !strings.Contains(stdout, tc.health) || strings.Contains(stdout, "current health") {
+				t.Fatal("notice hid recorded health", stdout, err)
+			}
+		})
+	}
+}

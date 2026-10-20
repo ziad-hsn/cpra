@@ -62,7 +62,7 @@ func restoreBase(t *testing.T) (runtimeconfig.Config, string, string) {
 	if _, err := s.CommitAuthentication(context.Background(), command); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	nodeID := s.nodeID
@@ -116,6 +116,13 @@ func openUnfinishedRestore(t *testing.T, c runtimeconfig.Config) *Store {
 		t.Fatal(err)
 	}
 	go s.run()
+	s.fsm.rebuildProjectionReviewIndex()
+	s.fsm.rebuildActionIndexes()
+	if s.fsm.image.ActionProjectionState != nil && !s.fsm.image.ActionProjectionState.Ready {
+		if err := s.migrateActionProjection(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return s
 }
 
@@ -276,7 +283,7 @@ func TestRestoreResetProcessHelper(t *testing.T) {
 	for n := 0; n < steps; n++ {
 		resetOnePage(t, s)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println("RESET_PAGE_COMMITTED")

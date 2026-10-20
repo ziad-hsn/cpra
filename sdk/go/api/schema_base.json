@@ -74,6 +74,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "deadline": {
+            "description": "Original overall execution deadline in UTC; waiting and retries do not extend it.",
+            "format": "date-time",
+            "type": "string"
+          },
           "deliveryID": {
             "type": "string",
             "x-go-name": "DeliveryID",
@@ -100,6 +105,11 @@
           },
           "failure": {
             "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "finishedAt": {
+            "description": "Time the outcome was committed in UTC; an unknown outcome remains uncertain.",
+            "format": "date-time",
+            "type": "string"
           },
           "held": {
             "description": "An unresolved action hold; independent of the recorded provider outcome.",
@@ -132,6 +142,11 @@
             "x-go-name": "MonitorID",
             "x-go-type-skip-optional-pointer": true
           },
+          "notBefore": {
+            "description": "Earliest permitted execution time in UTC.",
+            "format": "date-time",
+            "type": "string"
+          },
           "notificationEpisode": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
@@ -140,6 +155,11 @@
             "description": "Recorded provider outcome classification, unchanged by operator review.",
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "queuedAt": {
+            "description": "Original committed admission time in UTC. Retries retain this authorization.",
+            "format": "date-time",
+            "type": "string"
           },
           "reason": {
             "type": "string",
@@ -163,6 +183,11 @@
             "description": "Opaque action observation version required for a conditional operator review.",
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "startedAt": {
+            "description": "Time the execution start was committed in UTC; absence does not grant permission to retry.",
+            "format": "date-time",
+            "type": "string"
           },
           "state": {
             "type": "string"
@@ -214,7 +239,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -1397,7 +1423,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -1459,6 +1486,7 @@
         "additionalProperties": false,
         "properties": {
           "active": {
+            "description": "Admitted invocations holding a queue lease, including executor submission and result handoff. Pool busy reports actual executions separately.",
             "format": "int64",
             "type": "integer",
             "x-go-type-skip-optional-pointer": true,
@@ -1501,6 +1529,28 @@
           },
           "rejections": {
             "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "requestedCapacity": {
+            "description": "Configured timeout occupancy reservation including 15 percent headroom.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservationAvailable": {
+            "description": "Whether the new capacity accounting is supplied by this server.",
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservedCapacity": {
+            "description": "Reservation granted within current pool capacity; may be below requested capacity.",
+            "format": "int64",
+            "minimum": 0,
             "type": "integer",
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
@@ -1635,7 +1685,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -2064,7 +2115,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "reason": {
             "type": "string",
@@ -2082,7 +2134,8 @@
           "acknowledgedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "acknowledgedBy": {
             "type": "string",
@@ -2091,11 +2144,19 @@
           "closedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "dismissed": {
             "type": "boolean",
             "x-go-type-skip-optional-pointer": true
+          },
+          "firstFailureAt": {
+            "description": "First failed observation in this episode. Distinct from threshold-based incident opening; absent when unavailable.",
+            "format": "date-time",
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "id": {
             "type": "string",
@@ -2105,10 +2166,16 @@
             "type": "string",
             "x-go-name": "MonitorID"
           },
+          "notifications": {
+            "$ref": "#/components/schemas/IncidentNotifications",
+            "description": "Latest attempt state of each logical notification delivery for this incident. Earlier attempts remain in action history. Acceptance does not establish provider delivery or resolution."
+          },
           "openedAt": {
+            "description": "Time the unhealthy threshold was reached. Absent when unavailable in older state; never inferred from first failure.",
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "revision": {
             "type": "string"
@@ -2131,7 +2198,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -2150,6 +2218,44 @@
         },
         "required": [
           "items"
+        ],
+        "type": "object"
+      },
+      "IncidentNotifications": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "cancelled": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "failed": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "pending": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unknown": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending",
+          "accepted",
+          "failed",
+          "unknown",
+          "cancelled"
         ],
         "type": "object"
       },
@@ -2518,7 +2624,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -2862,7 +2969,8 @@
           "ignoredAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "ignoredBy": {
             "type": "string",
@@ -2881,7 +2989,8 @@
           "lastCheckedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "lastFailure": {
             "$ref": "#/components/schemas/FailureDiagnostic"
@@ -2894,7 +3003,8 @@
           "snoozedUntil": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "statusRevision": {
             "type": "string",
@@ -2951,7 +3061,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -3008,7 +3119,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -3217,7 +3329,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -3301,6 +3414,26 @@
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
           },
+          "capacityAccountingAvailable": {
+            "description": "Whether the new capacity accounting is supplied by this server.",
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "capacityCondition": {
+            "description": "available, growing, draining, or worker_limit; distinct from a measured SLO condition.",
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "drainingWorkers": {
+            "description": "Worker goroutines above supplied capacity while a reduction drains; these can include idle goroutines.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
           "lastScaleAt": {
             "format": "date-time",
             "type": "string"
@@ -3342,6 +3475,22 @@
           },
           "pendingResults": {
             "format": "int64",
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "requestedCapacity": {
+            "description": "Requested worker capacity before global and growth limits.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservedCapacity": {
+            "description": "Sum of configured per-driver occupancy floors before the global worker limit.",
+            "format": "int64",
+            "minimum": 0,
             "type": "integer",
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
@@ -3419,7 +3568,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -4251,7 +4401,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -4308,7 +4459,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -4897,7 +5049,8 @@
           "generatedAt": {
             "format": "date-time",
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "items": {
             "items": {
@@ -5180,7 +5333,7 @@
     }
   },
   "info": {
-    "description": "Draft contract. V2 server qualification is pending. Existing v1 is separate.",
+    "description": "CPRa management and observation API. Configuration changes require conditional versions and granted permissions. Discover server capabilities before using optional operations.",
     "title": "CPRa SDK draft management contract",
     "version": "0.1.0-rc.1"
   },

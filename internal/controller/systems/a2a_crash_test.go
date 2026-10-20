@@ -29,7 +29,7 @@ func TestA2AControllerCrashProcess(t *testing.T) {
 	}
 	s, dispatch, results := agentControllerAt(t, os.Getenv("CPRA_AGENT_TEST_URL"), "intervention", os.Getenv("CPRA_AGENT_TEST_DIRECTORY"))
 	boundary := func() {
-		m, ok := s.store.Get(dispatch.MonitorID)
+		m, ok := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 		a := m.Actions[dispatch.ActionID]
 		if !ok || a.QueuedAt.IsZero() || a.Deadline.IsZero() {
 			t.Fatal("crash boundary lost original action budget")
@@ -170,7 +170,7 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer store.Close()
-			m, ok := store.Get(boundary.MonitorID)
+			m, ok := monitorWithActionHistory(t, store, boundary.MonitorID)
 			a := m.Actions[boundary.ActionID]
 			wantState := persistence.Unknown
 			if stage == "before-admission" {
@@ -205,7 +205,7 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 				if dispatch.ActionID != boundary.ActionID || !dispatch.Deadline.Equal(boundary.Deadline) {
 					t.Fatal("resume changed the original action identity or deadline")
 				}
-				current, _ := resumed.store.Get(boundary.MonitorID)
+				current, _ := monitorWithActionHistory(t, resumed.store, boundary.MonitorID)
 				action := current.Actions[boundary.ActionID]
 				if !action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(boundary.Deadline) {
 					t.Fatal("fresh observation renewed the original action deadline")
@@ -215,7 +215,7 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 				if r.Err != nil || !resumed.drain() || sends.Load() != 1 {
 					t.Fatal("safe queued action did not resume exactly once", r)
 				}
-				current, _ = resumed.store.Get(boundary.MonitorID)
+				current, _ = monitorWithActionHistory(t, resumed.store, boundary.MonitorID)
 				action = current.Actions[boundary.ActionID]
 				if action.ID != boundary.ActionID || action.State != persistence.Succeeded ||
 					!action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(boundary.Deadline) {

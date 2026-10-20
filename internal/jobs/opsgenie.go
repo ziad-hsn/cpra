@@ -16,7 +16,7 @@ import (
 )
 
 func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
-	base, err := notificationURL(c.URL, "https://api.opsgenie.com/v2/alerts")
+	base, err := opsgenieURL(c.URL)
 	if err != nil {
 		return err
 	}

@@ -53,6 +53,9 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.Kind == "action_reconcile" || c.Kind == "action_project" {
+		return ActionFormatVersion
+	}
 	if collectionProfileV3Command(c) {
 		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
 	}

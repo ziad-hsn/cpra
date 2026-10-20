@@ -1,4 +1,4 @@
-import type { Action, ActionReview, AgentReceipt, RecoveryFailure } from './generated';
+import type { Action, ActionReview, AgentReceipt, RecoveryFailure, ReviewNotice } from './generated';
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
 import { failureView } from './failure';
@@ -27,15 +27,28 @@ export function recoveryFailureView(value: unknown): RecoveryFailure {
   return { actionID: value.actionID, driver: value.driver, attempt: value.attempt as number, maxAttempts: value.maxAttempts as number, trigger: value.trigger, outcome: 'failure', failedAt: value.failedAt };
 }
 
+export function reviewNoticeView(value: unknown): ReviewNotice {
+  if (!object(value) || !['open', 'close'].includes(String(value.phase)) || !['healthy', 'unhealthy', 'unknown'].includes(String(value.health))) return invalid();
+  for (const key of ['alertID', 'actionID'] as const) if (typeof value[key] !== 'string' || !value[key] || new TextEncoder().encode(value[key]).byteLength > 256 || /\p{Cc}/u.test(value[key])) return invalid();
+  if (value.phase === 'open' && value.reason !== undefined && value.reason !== '' || value.phase === 'close' && !['health_recovered', 'action_reviewed'].includes(String(value.reason))) return invalid();
+  return { alertID: value.alertID as string, actionID: value.actionID as string, phase: value.phase as string, health: value.health as string, ...(value.reason ? { reason: value.reason as string } : {}) };
+}
+
 export function actionView(value: unknown, monitorID: string, expectedID?: string): Action {
   if (!object(value) || typeof value.id !== 'string' || !value.id || value.id.length > 256 || (expectedID && value.id !== expectedID) || value.monitorID !== monitorID || typeof value.state !== 'string' || typeof value.held !== 'boolean' || typeof value.executorFenced !== 'boolean') return invalid();
   const action: Action = { id: value.id, monitorID, state: value.state, held: value.held, executorFenced: value.executorFenced };
   if (value.failure !== undefined) action.failure = failureView(value.failure);
   if (value.cause !== undefined) action.cause = failureView(value.cause);
   if (value.agentReceipt !== undefined) action.agentReceipt = agentReceiptView(value.agentReceipt);
+  if (value.reviewNotice !== undefined) action.reviewNotice = reviewNoticeView(value.reviewNotice);
   if (value.recoveryFailure !== undefined) action.recoveryFailure = recoveryFailureView(value.recoveryFailure);
-  for (const key of ['incarnationUID', 'incidentID', 'kind', 'executionID', 'executionRevision', 'createdAt', 'updatedAt', 'reason', 'receiptID', 'reviewRevision', 'outcome'] as const) {
+  for (const key of ['incarnationUID', 'incidentID', 'kind', 'executionID', 'executionRevision', 'reason', 'receiptID', 'reviewRevision', 'outcome', 'color', 'deliveryID', 'endpointID', 'notificationEpisode'] as const) {
     if (typeof value[key] === 'string') action[key] = value[key];
+  }
+  for (const key of ['createdAt', 'updatedAt', 'queuedAt', 'notBefore', 'deadline', 'startedAt', 'finishedAt'] as const) {
+    if (value[key] === undefined) continue;
+    if (typeof value[key] !== 'string' || value[key].length > 64 || !Number.isFinite(Date.parse(value[key])) || value[key].startsWith('0001-')) return invalid();
+    action[key] = value[key];
   }
   for (const key of ['held', 'executorFenced'] as const) if (typeof value[key] === 'boolean') action[key] = value[key];
   for (const key of ['lateEvidence', 'conflictingEvidence'] as const) {

@@ -116,12 +116,11 @@ func TestWorkerProjectionStartedAndUnstartedActions(t *testing.T) {
 					t.Fatal(err)
 				}
 				requireWorkerProjection(t, s, cursor, intent.MonitorID)
-				m, _ := s.Get(intent.MonitorID)
 				want := Cancelled
 				if start {
 					want = Unknown
 				}
-				if m.Actions[intent.ActionID].State != want {
+				if retainedAction(t, s, intent.ActionID).State != want {
 					t.Fatal("unexpected action disposition")
 				}
 			})

@@ -32,13 +32,13 @@ func TestStartPreservesLatencyAwareInitialCapacity(t *testing.T) {
 	if err := c.LoadMonitors(context.Background(), file); err != nil {
 		t.Fatal(err)
 	}
-	if got := c.pulsePool.Stats().CurrentCapacity; got != min(64, 4*len(c.pulseQueue.Stats().Drivers)) {
+	if got := c.pulsePool.Stats().CurrentCapacity; got != 4 {
 		t.Fatalf("loaded target=%d", got)
 	}
 	if err := c.Start(); err != nil {
 		t.Fatal(err)
 	}
-	if got := c.pulsePool.Stats().CurrentCapacity; got != min(64, 4*len(c.pulseQueue.Stats().Drivers)) {
+	if got := c.pulsePool.Stats().CurrentCapacity; got != 4 {
 		t.Fatalf("Start replaced target with %d", got)
 	}
 }

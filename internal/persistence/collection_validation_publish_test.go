@@ -135,7 +135,7 @@ func TestCollectionValidationPublicationRetainsItemsAfterCleanup(t *testing.T) {
 				t.Fatal("result exceeded fixed retention deadline", err)
 			}
 			raw := captureSnapshotBytes(t, s.fsm)
-			if !bytes.Contains(raw, []byte(collectionValidationSnapshotMagic)) {
+			if !bytes.Contains(raw, []byte(actionSnapshotMagic)) {
 				t.Fatal("snapshot format changed")
 			}
 		})

@@ -103,7 +103,7 @@ type MonitorStatus struct {
 type IncidentRecord struct {
 	ID, MonitorID, MonitorUID, Revision string
 	Active                              bool
-	OpenedAt, ClosedAt                  time.Time
+	FirstFailureAt, OpenedAt, ClosedAt  time.Time
 	AcknowledgedBy                      string
 	AcknowledgedAt                      time.Time
 	AcknowledgedNote                    string
@@ -111,4 +111,30 @@ type IncidentRecord struct {
 	DismissedBy                         string
 	DismissedAt                         time.Time
 	DismissedReason                     string
+	Notifications                       NotificationCounts
+	NotificationsAvailable              bool
+}
+
+// IncidentActive preserves the existing activity of older episodes whose exact
+// threshold timestamp was never recorded. New episodes require a real crossing.
+func (m Monitor) IncidentActive() bool {
+	return !m.Removed && m.IncidentClosedAt.IsZero() &&
+		(m.Incident || !m.IncidentConfirmedAt.IsZero() || !m.IncidentThresholdTracked && m.Recovering)
+}
+
+// NotificationCounts describes the latest attempt of each logical delivery,
+// not independent evidence of delivery or provider incident resolution.
+type NotificationCounts struct {
+	Pending   int64 `json:"pending"`
+	Accepted  int64 `json:"accepted"`
+	Failed    int64 `json:"failed"`
+	Unknown   int64 `json:"unknown"`
+	Cancelled int64 `json:"cancelled"`
+}
+
+func (m Monitor) IncidentNotifications() NotificationCounts {
+	if m.IncidentDeliveries != nil {
+		return *m.IncidentDeliveries
+	}
+	return NotificationCounts{}
 }

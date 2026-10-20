@@ -168,6 +168,10 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 			disposition = "granted"
 			if r.Intent.Category != "check" {
 				previous := f.image.Monitors[r.Intent.MonitorID]
+				previous, err = f.hydrateReviewDependencies(previous, r.Intent.ActionID)
+				if err != nil {
+					return Result{Err: err}
+				}
 				command := Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
 				command.NoticeRevision = ActionNoticeRevision(previous.Actions[r.Intent.ActionID])
 				if lifecycleStorageFormat(version) {

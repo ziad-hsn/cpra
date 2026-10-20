@@ -86,11 +86,11 @@ func writeQueues(p *printer, page api.QueueList) error {
 					continue
 				}
 				for _, d := range q.Drivers {
-					drivers = append(drivers, []string{managementDisplay(q.Name), managementDisplay(d.Driver), fmt.Sprint(d.Pending), fmt.Sprint(d.Active), fmt.Sprint(d.ConcurrencyLimit), measurement(d.OldestPendingMS), measurement(d.OldestActiveMS), fmt.Sprint(d.Rejections), fmt.Sprint(d.Timeouts), managementDisplay(d.Condition)})
+					drivers = append(drivers, []string{managementDisplay(q.Name), managementDisplay(d.Driver), fmt.Sprint(d.Pending), fmt.Sprint(d.Active), fmt.Sprint(d.ConcurrencyLimit), observedCount(d.ReservationAvailable, d.RequestedCapacity), observedCount(d.ReservationAvailable, d.ReservedCapacity), measurement(d.OldestPendingMS), measurement(d.OldestActiveMS), fmt.Sprint(d.Rejections), fmt.Sprint(d.Timeouts), managementDisplay(d.Condition)})
 				}
 			}
 			if len(drivers) > 0 {
-				if err := table(w, []string{"QUEUE", "DRIVER", "PENDING", "ACTIVE", "CONCURRENCY", "OLDEST PENDING MS", "OLDEST ACTIVE MS", "REJECTED", "TIMEOUTS", "CONDITION"}, drivers); err != nil {
+				if err := table(w, []string{"QUEUE", "DRIVER", "PENDING", "IN FLIGHT", "CONCURRENCY", "REQUESTED RESERVATION", "SUPPLIED RESERVATION", "OLDEST PENDING MS", "OLDEST ACTIVE MS", "REJECTED", "TIMEOUTS", "CONDITION"}, drivers); err != nil {
 					return err
 				}
 			}
@@ -102,14 +102,14 @@ func writePools(p *printer, page api.PoolList) error {
 	return p.render(page, func(w io.Writer) error {
 		headers := []string{"NAME", "WORKERS", "BUSY", "TARGET", "CAPACITY", "WAITING", "COMPLETED"}
 		if p.wide() {
-			headers = append(headers, "MINIMUM", "MAXIMUM", "SERVICE TIME MS", "MODEL", "CONDITION")
+			headers = append(headers, "MINIMUM", "MAXIMUM", "SERVICE TIME MS", "MODEL", "SLO CONDITION", "REQUESTED", "CONFIGURED FLOOR", "DRAINING", "CAPACITY CONDITION")
 		}
 		rows := make([][]string, 0, len(page.Items))
 		for _, pool := range page.Items {
 			a := page.Available && pool.Available
 			row := []string{managementDisplay(pool.Name), observedCount(a, pool.Workers), observedCount(a && pool.BusyAvailable, pool.Busy), observedCount(a, pool.Target), observedCount(a, pool.Capacity), observedCount(a, pool.WaitingTasks), observedCount(a, pool.TasksCompleted)}
 			if p.wide() {
-				row = append(row, observedCount(a, pool.Minimum), observedCount(a, pool.Maximum), observedMeasurement(a, pool.ServiceTime), observedText(a, pool.SizingModel), observedText(a, pool.SloCondition))
+				row = append(row, observedCount(a, pool.Minimum), observedCount(a, pool.Maximum), observedMeasurement(a, pool.ServiceTime), observedText(a, pool.SizingModel), observedText(a, pool.SloCondition), observedCount(a && pool.CapacityAccountingAvailable, pool.RequestedCapacity), observedCount(a && pool.CapacityAccountingAvailable, pool.ReservedCapacity), observedCount(a && pool.CapacityAccountingAvailable, pool.DrainingWorkers), observedText(a && pool.CapacityAccountingAvailable, pool.CapacityCondition))
 			}
 			rows = append(rows, row)
 		}

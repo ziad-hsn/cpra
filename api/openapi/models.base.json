@@ -1285,7 +1285,8 @@
           "lastCheckedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "lastCheckLatencyMs": {
             "$ref": "#/components/schemas/Measurement",
@@ -1295,7 +1296,8 @@
           "snoozedUntil": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "incidentID": {
             "type": "string",
@@ -1333,7 +1335,8 @@
           "ignoredAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "actionsNeedingReview": {
             "type": "integer",
@@ -1751,6 +1754,31 @@
           "notificationEpisode": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original committed admission time in UTC. Retries retain this authorization."
+          },
+          "notBefore": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Earliest permitted execution time in UTC."
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original overall execution deadline in UTC; waiting and retries do not extend it."
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the execution start was committed in UTC; absence does not grant permission to retry."
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the outcome was committed in UTC; an unknown outcome remains uncertain."
           }
         },
         "required": [
@@ -1781,12 +1809,15 @@
           "openedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Time the unhealthy threshold was reached. Absent when unavailable in older state; never inferred from first failure.",
+            "x-omitzero": true
           },
           "closedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "acknowledgedBy": {
             "type": "string",
@@ -1795,11 +1826,23 @@
           "acknowledgedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "dismissed": {
             "type": "boolean",
             "x-go-type-skip-optional-pointer": true
+          },
+          "firstFailureAt": {
+            "type": "string",
+            "format": "date-time",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true,
+            "description": "First failed observation in this episode. Distinct from threshold-based incident opening; absent when unavailable."
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/IncidentNotifications",
+            "description": "Latest attempt state of each logical notification delivery for this incident. Earlier attempts remain in action history. Acceptance does not establish provider delivery or resolution."
           }
         },
         "required": [
@@ -1972,7 +2015,10 @@
           "changedFields": {
             "type": "array",
             "maxItems": 64,
-            "items": {"type": "string", "maxLength": 160},
+            "items": {
+              "type": "string",
+              "maxLength": 160
+            },
             "description": "Preflight-only changed schema paths from the captured resource versions. No values or free-form map keys. Arrays and private maps are reported as whole fields; large changes use metadata/spec summaries. Omitted when unavailable.",
             "x-go-type-skip-optional-pointer": true
           },
@@ -2733,6 +2779,42 @@
             "$ref": "#/components/schemas/Measurement",
             "x-go-type-skip-optional-pointer": true,
             "x-go-name": "OldestSubmissionMS"
+          },
+          "requestedCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Requested worker capacity before global and growth limits.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservedCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Sum of configured per-driver occupancy floors before the global worker limit.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "drainingWorkers": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Worker goroutines above supplied capacity while a reduction drains; these can include idle goroutines.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "capacityCondition": {
+            "type": "string",
+            "description": "available, growing, draining, or worker_limit; distinct from a measured SLO condition.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "capacityAccountingAvailable": {
+            "type": "boolean",
+            "description": "Whether the new capacity accounting is supplied by this server.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
           }
         },
         "required": [
@@ -3094,7 +3176,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3229,7 +3312,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3257,7 +3341,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3285,7 +3370,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3313,7 +3399,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3341,7 +3428,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3369,7 +3457,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3397,7 +3486,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3425,7 +3515,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "available": {
             "type": "boolean",
@@ -3458,7 +3549,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "available": {
             "type": "boolean",
@@ -3491,7 +3583,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           },
           "available": {
             "type": "boolean",
@@ -3618,7 +3711,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -3674,7 +3768,8 @@
           "generatedAt": {
             "type": "string",
             "format": "date-time",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitzero": true
           }
         },
         "required": [
@@ -4881,7 +4976,8 @@
             "type": "integer",
             "format": "int64",
             "x-go-type-skip-optional-pointer": true,
-            "x-omitempty": false
+            "x-omitempty": false,
+            "description": "Admitted invocations holding a queue lease, including executor submission and result handoff. Pool busy reports actual executions separately."
           },
           "concurrencyLimit": {
             "type": "integer",
@@ -4920,6 +5016,28 @@
           "condition": {
             "type": "string",
             "description": "Current scheduling constraint; not a health or SLA claim."
+          },
+          "requestedCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Configured timeout occupancy reservation including 15 percent headroom.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservedCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Reservation granted within current pool capacity; may be below requested capacity.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
+          },
+          "reservationAvailable": {
+            "type": "boolean",
+            "description": "Whether the new capacity accounting is supplied by this server.",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false
           }
         },
         "required": [
@@ -5180,6 +5298,44 @@
           "health"
         ],
         "additionalProperties": false
+      },
+      "IncidentNotifications": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pending",
+          "accepted",
+          "failed",
+          "unknown",
+          "cancelled"
+        ],
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
       }
     }
   }

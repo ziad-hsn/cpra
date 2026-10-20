@@ -99,7 +99,7 @@ func TestAuthenticationCommittedPolicyConditionalRotationAndSnapshot(t *testing.
 	if state.Principals[0].Role != "operator" || !state.Principals[0].Revoked || !validVerifier(state.Principals[0].TokenSHA256) {
 		t.Fatal("returned policy aliases state")
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -211,10 +211,10 @@ func TestAdministrativeOpenPreservesLifecycleHistoryAndExclusiveOwnership(t *tes
 	configure(t, s)
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", Generation: 1, At: now, Outcome: "failure"})
-	m, _ := s.Get("stable-one")
+	m, _ := monitorWithActionHistory(t, s, "stable-one")
 	id := sortedActions(m.Actions)[0]
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now})
-	before, _ := s.Get(m.ID)
+	before, _ := monitorWithActionHistory(t, s, m.ID)
 	index, session := s.Status().CommittedIndex, s.fsm.image.LocalExecutorSession
 	if _, err := OpenAdministrative(context.Background(), c); err == nil {
 		t.Fatal("admin opened live state")
@@ -270,7 +270,7 @@ func TestAdministrativeOpenPreservesLifecycleHistoryAndExclusiveOwnership(t *tes
 		t.Fatal(err)
 	}
 	defer resumed.Close()
-	after, _ = resumed.Get(m.ID)
+	after, _ = monitorWithActionHistory(t, resumed, m.ID)
 	if after.Actions[id].State != Unknown {
 		t.Fatal("ordinary restart did not conservatively recover interrupted action")
 	}

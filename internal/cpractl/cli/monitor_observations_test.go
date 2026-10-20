@@ -25,7 +25,7 @@ func TestMonitorObservationCLIUsesAccessModeWithoutWritableResources(t *testing.
 		}
 	})
 	stdout, stderr, err := f.run(t, nil, "get", "monitors")
-	if err != nil || !strings.Contains(stdout, "OBSERVED HEALTH") || !strings.Contains(stdout, "unhealthy") || !strings.Contains(stderr, "next-page") || calls != 1 {
+	if err != nil || !strings.Contains(stdout, "OBSERVED HEALTH") || !strings.Contains(stdout, "down") || !strings.Contains(stderr, "next-page") || calls != 1 {
 		t.Fatal(stdout, stderr, calls, err)
 	}
 	stdout, _, err = f.run(t, nil, "describe", "monitor/api")

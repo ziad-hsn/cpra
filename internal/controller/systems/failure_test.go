@@ -96,7 +96,7 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 	if !system.commitResults([]jobs.Result{dispatch.Execute()}) || system.lastError != nil {
 		t.Fatal("check result did not commit", system.lastError)
 	}
-	m, ok := store.Get(state.MonitorID)
+	m, ok := monitorWithActionHistory(t, store, state.MonitorID)
 	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() {
 		t.Fatal("committed state lost safe cause")
 	}
@@ -205,7 +205,7 @@ func TestNotificationResponseFailureDoesNotDescribeAHealthEndpoint(t *testing.T)
 	if len(queue.admitted) != 1 || !system.commitResults([]jobs.Result{queue.admitted[0].Execute()}) {
 		t.Fatal("notification result did not commit", system.lastError)
 	}
-	m, ok := store.Get(state.MonitorID)
+	m, ok := monitorWithActionHistory(t, store, state.MonitorID)
 	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() || len(m.Actions) != 1 {
 		t.Fatal("notification result changed the health observation")
 	}

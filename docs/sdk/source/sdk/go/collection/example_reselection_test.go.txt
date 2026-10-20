@@ -33,7 +33,7 @@ spec:
 	}
 	defer frozen.Close()
 	fmt.Printf("%s: %d resource\n", frozen.NormalizationProfile(), frozen.Len())
-	// Output: cpra.file.base.v1: 1 resource
+	// Output: cpra.file.base.v3: 1 resource
 }
 
 // This example requires an existing profiled operation and its original inputs.

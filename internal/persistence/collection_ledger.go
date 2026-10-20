@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sync"
@@ -528,6 +529,11 @@ func (l *collectionLedger) freezeLocked() (*collectionLedgerView, error) {
 			return nil, err
 		}
 		v.actions = &actionLedgerMemory{progress: l.actions.progress, current: make(map[string][]byte, len(l.actions.current))}
+		v.actions.reviews = maps.Clone(l.actions.reviews)
+		v.actions.versions = maps.Clone(l.actions.versions)
+		for id, versions := range v.actions.versions {
+			v.actions.versions[id] = slices.Clone(versions)
+		}
 		for id, row := range l.actions.current {
 			v.actions.current[id] = row
 		}

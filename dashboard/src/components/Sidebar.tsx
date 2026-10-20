@@ -60,7 +60,7 @@ export function Sidebar() {
         ))}
         {access.phase === 'authenticated' && Object.values(resourceKinds).filter(item => session.can(item.listOperation)).map(item => (
           <NavLink key={item.route} to={item.route} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label={item.title} title={item.title}>
-            <Icon name={({ Monitor: "settings", Recipient: "person", NotificationEndpoint: "external", NotificationGroup: "layers", Credential: "key" } as const)[item.kind]} size={18} className="nav-icon" /><span className="nav-label">{item.title}</span>
+            <Icon name={({ Monitor: "layers", Recipient: "person", NotificationEndpoint: "external", NotificationGroup: "layers", Credential: "key" } as const)[item.kind]} size={18} className="nav-icon" /><span className="nav-label">{item.title}</span>
           </NavLink>
         ))}
         {access.phase === 'authenticated' && (session.can('GetOperation') || session.can('ListOperations')) && <NavLink to="/operations" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} aria-label="Operation progress" title="Operation progress"><Icon name="activity" size={18} className="nav-icon" /><span className="nav-label">Operation progress</span></NavLink>}

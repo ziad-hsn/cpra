@@ -134,7 +134,7 @@ func stoppedBackupRestoreCollections(t *testing.T, root string, pending bool) {
 	}}
 	backupCollectionSubmit(t, ctx, store, persistence.Command{Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision, Config: &monitor, At: at})
 	backupCollectionSubmit(t, ctx, store, persistence.Command{Kind: "pulse", MonitorID: monitor.ID, Revision: monitor.Revision, Generation: 1, Outcome: "failure", Scheduled: at, At: at})
-	monitor, _ = store.Get(monitor.ID)
+	monitor, _ = monitorWithActionHistory(t, store, monitor.ID)
 	if len(monitor.Actions) != 1 {
 		t.Fatal("fixture did not create exactly one incident action")
 	}
@@ -142,7 +142,7 @@ func stoppedBackupRestoreCollections(t *testing.T, root string, pending bool) {
 	for actionID = range monitor.Actions {
 	}
 	backupCollectionSubmit(t, ctx, store, persistence.Command{Kind: "start", MonitorID: monitor.ID, Revision: monitor.Revision, ActionID: actionID, At: at})
-	monitor, _ = store.Get(monitor.ID)
+	monitor, _ = monitorWithActionHistory(t, store, monitor.ID)
 	if monitor.Actions[actionID].State != persistence.Started {
 		t.Fatal("fixture requires an interrupted started action")
 	}
@@ -302,7 +302,7 @@ func stoppedBackupRestoreCollections(t *testing.T, root string, pending bool) {
 		receipt.Collection.Uploaded != 1 || receipt.Collection.InvalidatedByRestore == "" {
 		t.Fatal("restored upload receipt lost its original identity")
 	}
-	after, exists := store.Get(monitor.ID)
+	after, exists := monitorWithActionHistory(t, store, monitor.ID)
 	if !exists || !after.Incident || after.ID != monitor.ID || after.Revision != monitor.Revision || after.Actions[actionID].State != persistence.Unknown {
 		t.Fatal("restore lost incident state or made an interrupted action executable")
 	}

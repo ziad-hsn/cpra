@@ -271,7 +271,7 @@ func TestJobTypeDetachedReadsAndSnapshotIsolation(t *testing.T) {
 	if err := snapshot.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(jobTypeSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("job-type-private")) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(actionWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("job-type-private")) {
 		t.Fatal("snapshot framing or secrecy")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -384,7 +384,7 @@ func TestJobTypeNativeSnapshotAndLogReplay(t *testing.T) {
 	if err != nil || !ok || !reflect.DeepEqual(actual, state) {
 		t.Fatal("native snapshot+log did not preserve exact versions", err)
 	}
-	if s.fsm.image.Version != JobTypeFormatVersion || len(s.fsm.image.Catalog) != 0 {
+	if s.fsm.image.Version != ActionWorkerFormatVersion || len(s.fsm.image.Catalog) != 0 {
 		t.Fatal("wrong restored storage namespace")
 	}
 	for _, version := range actual.Versions {

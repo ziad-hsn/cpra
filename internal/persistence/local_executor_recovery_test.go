@@ -239,7 +239,7 @@ func TestLocalExecutorRetryPreservesUnknownProviderOutcome(t *testing.T) {
 	if err != nil || status != (LocalExecutorStatus{}) {
 		t.Fatal(status, err)
 	}
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	got := m.Actions[a.ID]
 	if got.State != Unknown || !got.Held() || got.Outcome != a.Outcome || got.ExecutorFinishedAt.IsZero() {
 		t.Fatal("completion recovery resolved unknown external effect", got)

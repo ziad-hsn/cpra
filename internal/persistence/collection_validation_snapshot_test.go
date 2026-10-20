@@ -10,7 +10,7 @@ import (
 )
 
 func TestCollectionValidationSnapshotMandatoryNamespacesAndFrozenV5(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := collectionFill(t, s, 1)
 	item, exists, err := s.fsm.collections.Item(head.ID, 1)
 	if err != nil || !exists {
@@ -91,7 +91,7 @@ func TestCollectionValidationSnapshotMandatoryNamespacesAndFrozenV5(t *testing.T
 }
 
 func TestCollectionValidationSnapshotAuthenticationOnlyDetachedEmptyLedger(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	if _, err := s.CommitAuthentication(context.Background(), authenticationBootstrap()); err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestCollectionValidationSnapshotAuthenticationOnlyDetachedEmptyLedger(t *te
 }
 
 func TestCollectionValidationFormatAcceptsOriginalPlanCommands(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := collectionFill(t, s, 1)
 	begin, _ := planApplyArtifact(t, s, head)
 	command := Command{Kind: "collection", At: head.ActivityAt, Collection: &CollectionCommand{
@@ -156,9 +156,7 @@ func TestCollectionValidationSnapshotStoppedAuthenticationOnlyRecovery(t *testin
 				t.Fatal(err)
 			}
 			if snapshot {
-				if err := s.Snapshot(); err != nil {
-					t.Fatal(err)
-				}
+				persistPausedReviewSnapshot(t, s)
 			}
 			if err := s.Close(); err != nil {
 				t.Fatal(err)

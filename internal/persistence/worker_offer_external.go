@@ -232,7 +232,7 @@ func (f *machine) verifyWorkerPollResponse(a WorkerAuthority, response WorkerPol
 // VerifyWorkerPollResponse fences plaintext projection against current committed
 // policy, session, source and lease state. Call it before and after decryption.
 func (s *Store) VerifyWorkerPollResponse(ctx context.Context, a WorkerAuthority, response WorkerPollResponse) error {
-	unlock, err := s.lockControllerState(ctx, false)
+	unlock, err := s.lockControllerState(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -241,6 +241,13 @@ func (s *Store) VerifyWorkerPollResponse(ctx context.Context, a WorkerAuthority,
 		return err
 	}
 	return ctx.Err()
+}
+
+// Older formats could discard completed action rows. Uncertain effects must
+// always retain their exact action, including after an authoritative receipt.
+func workerActionDependencyRequired(r WorkerExecutionRecord) bool {
+	receipt, terminal := r.TerminalReceipt()
+	return !terminal || receipt.Disposition == "unknown"
 }
 
 func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
@@ -275,13 +282,21 @@ func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
 		if l.Phase == "finished" && r.Result == nil && r.Finalization == nil {
 			return ErrWorkerExecutionInvalid
 		}
-		if r.Intent.Category != "check" && r.Result == nil && r.Finalization == nil {
+		if r.Intent.Category != "check" && workerActionDependencyRequired(r) {
 			m, ok := i.Monitors[r.Intent.MonitorID]
 			if !ok {
 				return ErrWorkerExecutionInvalid
 			}
 			a, ok := m.Actions[r.Intent.ActionID]
+			// Snapshot-image validation precedes ledger import. Recheck this exact
+			// dependency against the frozen ledger before accepting restoration.
+			if !ok && i.ActionStorage != nil && m.ActionProjection != nil {
+				return nil
+			}
 			if !ok || a.CatalogUID != r.Intent.MonitorUID || a.Revision != r.Intent.MonitorRevision || a.ExecutorKind != "worker" || a.ExecutorSession != l.GrantID || !a.StartedAt.Equal(l.StartedAt) || a.State != Started && a.State != Unknown {
+				return ErrWorkerExecutionInvalid
+			}
+			if receipt, terminal := r.TerminalReceipt(); terminal && receipt.Disposition == "unknown" && a.State != Unknown {
 				return ErrWorkerExecutionInvalid
 			}
 		}

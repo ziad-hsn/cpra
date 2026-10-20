@@ -400,16 +400,22 @@ type Action struct {
 	// ConflictingEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
-	DeliveryID          string          `json:"deliveryID,omitempty"`
-	EndpointID          string          `json:"endpointID,omitempty"`
-	ExecutionID         string          `json:"executionID,omitempty"`
-	ExecutionRevision   string          `json:"executionRevision,omitempty"`
+
+	// Deadline Original overall execution deadline in UTC; waiting and retries do not extend it.
+	Deadline          *time.Time `json:"deadline,omitempty"`
+	DeliveryID        string     `json:"deliveryID,omitempty"`
+	EndpointID        string     `json:"endpointID,omitempty"`
+	ExecutionID       string     `json:"executionID,omitempty"`
+	ExecutionRevision string     `json:"executionRevision,omitempty"`
 
 	// ExecutorFenced Whether the original executor is known finished or fenced for review.
 	ExecutorFenced bool `json:"executorFenced"`
 
 	// Failure Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	Failure *FailureDiagnostic `json:"failure,omitempty"`
+
+	// FinishedAt Time the outcome was committed in UTC; an unknown outcome remains uncertain.
+	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 
 	// Held An unresolved action hold; independent of the recorded provider outcome.
 	Held           bool   `json:"held"`
@@ -419,14 +425,20 @@ type Action struct {
 	Kind           string `json:"kind,omitempty"`
 
 	// LateEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
-	LateEvidence        *ActionEvidence `json:"lateEvidence,omitempty"`
-	MonitorID           string          `json:"monitorID,omitempty"`
-	NotificationEpisode string          `json:"notificationEpisode,omitempty"`
+	LateEvidence *ActionEvidence `json:"lateEvidence,omitempty"`
+	MonitorID    string          `json:"monitorID,omitempty"`
+
+	// NotBefore Earliest permitted execution time in UTC.
+	NotBefore           *time.Time `json:"notBefore,omitempty"`
+	NotificationEpisode string     `json:"notificationEpisode,omitempty"`
 
 	// Outcome Recorded provider outcome classification, unchanged by operator review.
-	Outcome   string `json:"outcome,omitempty"`
-	Reason    string `json:"reason,omitempty"`
-	ReceiptID string `json:"receiptID,omitempty"`
+	Outcome string `json:"outcome,omitempty"`
+
+	// QueuedAt Original committed admission time in UTC. Retries retain this authorization.
+	QueuedAt  *time.Time `json:"queuedAt,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+	ReceiptID string     `json:"receiptID,omitempty"`
 
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
@@ -436,9 +448,12 @@ type Action struct {
 	ReviewNotice *ReviewNotice `json:"reviewNotice,omitempty"`
 
 	// ReviewRevision Opaque action observation version required for a conditional operator review.
-	ReviewRevision string     `json:"reviewRevision,omitempty"`
-	State          string     `json:"state"`
-	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
+	ReviewRevision string `json:"reviewRevision,omitempty"`
+
+	// StartedAt Time the execution start was committed in UTC; absence does not grant permission to retry.
+	StartedAt *time.Time `json:"startedAt,omitempty"`
+	State     string     `json:"state"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
 // ActionEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
@@ -451,7 +466,7 @@ type ActionEvidence struct {
 
 // ActionList defines model for ActionList.
 type ActionList struct {
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []Action  `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`
@@ -872,7 +887,7 @@ type Credential struct {
 
 // CredentialList defines model for CredentialList.
 type CredentialList struct {
-	GeneratedAt time.Time    `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time    `json:"generatedAt,omitempty,omitzero"`
 	Items       []Credential `json:"items"`
 	NextCursor  string       `json:"nextCursor,omitempty"`
 	Snapshot    string       `json:"snapshot,omitempty"`
@@ -893,6 +908,7 @@ type DriverConfig struct {
 
 // DriverQueue defines model for DriverQueue.
 type DriverQueue struct {
+	// Active Admitted invocations holding a queue lease, including executor submission and result handoff. Pool busy reports actual executions separately.
 	Active           int64 `json:"active"`
 	AdmissionLimit   int64 `json:"admissionLimit"`
 	ConcurrencyLimit int64 `json:"concurrencyLimit"`
@@ -904,7 +920,16 @@ type DriverQueue struct {
 	OldestPendingMS Measurement `json:"oldestPendingMs,omitempty"`
 	Pending         int64       `json:"pending"`
 	Rejections      int64       `json:"rejections"`
-	Timeouts        int64       `json:"timeouts"`
+
+	// RequestedCapacity Configured timeout occupancy reservation including 15 percent headroom.
+	RequestedCapacity int64 `json:"requestedCapacity"`
+
+	// ReservationAvailable Whether the new capacity accounting is supplied by this server.
+	ReservationAvailable bool `json:"reservationAvailable"`
+
+	// ReservedCapacity Reservation granted within current pool capacity; may be below requested capacity.
+	ReservedCapacity int64 `json:"reservedCapacity"`
+	Timeouts         int64 `json:"timeouts"`
 }
 
 // Duration Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
@@ -960,7 +985,7 @@ type Event struct {
 
 // EventList defines model for EventList.
 type EventList struct {
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []Event   `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`
@@ -1129,29 +1154,46 @@ type FieldError struct {
 // Health defines model for Health.
 type Health struct {
 	Available   bool      `json:"available"`
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Reason      string    `json:"reason,omitempty"`
 }
 
 // Incident defines model for Incident.
 type Incident struct {
-	AcknowledgedAt time.Time `json:"acknowledgedAt,omitempty"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt,omitempty,omitzero"`
 	AcknowledgedBy string    `json:"acknowledgedBy,omitempty"`
-	ClosedAt       time.Time `json:"closedAt,omitempty"`
+	ClosedAt       time.Time `json:"closedAt,omitempty,omitzero"`
 	Dismissed      bool      `json:"dismissed,omitempty"`
+
+	// FirstFailureAt First failed observation in this episode. Distinct from threshold-based incident opening; absent when unavailable.
+	FirstFailureAt time.Time `json:"firstFailureAt,omitempty,omitzero"`
 	ID             string    `json:"id"`
 	MonitorID      string    `json:"monitorID"`
-	OpenedAt       time.Time `json:"openedAt,omitempty"`
-	Revision       string    `json:"revision"`
-	State          string    `json:"state"`
+
+	// Notifications Latest attempt state of each logical notification delivery for this incident. Earlier attempts remain in action history. Acceptance does not establish provider delivery or resolution.
+	Notifications *IncidentNotifications `json:"notifications,omitempty"`
+
+	// OpenedAt Time the unhealthy threshold was reached. Absent when unavailable in older state; never inferred from first failure.
+	OpenedAt time.Time `json:"openedAt,omitempty,omitzero"`
+	Revision string    `json:"revision"`
+	State    string    `json:"state"`
 }
 
 // IncidentList defines model for IncidentList.
 type IncidentList struct {
-	GeneratedAt time.Time  `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time  `json:"generatedAt,omitempty,omitzero"`
 	Items       []Incident `json:"items"`
 	NextCursor  string     `json:"nextCursor,omitempty"`
 	Snapshot    string     `json:"snapshot,omitempty"`
+}
+
+// IncidentNotifications defines model for IncidentNotifications.
+type IncidentNotifications struct {
+	Accepted  int64 `json:"accepted"`
+	Cancelled int64 `json:"cancelled"`
+	Failed    int64 `json:"failed"`
+	Pending   int64 `json:"pending"`
+	Unknown   int64 `json:"unknown"`
 }
 
 // InterventionTargetA2A defines model for InterventionTargetA2A.
@@ -1292,7 +1334,7 @@ type Monitor struct {
 
 // MonitorList defines model for MonitorList.
 type MonitorList struct {
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []Monitor `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`
@@ -1403,16 +1445,16 @@ type MonitorStatus struct {
 	IgnoreIncidentCount    int64       `json:"ignoreIncidentCount,omitempty"`
 	IgnoreReason           string      `json:"ignoreReason,omitempty"`
 	Ignored                bool        `json:"ignored,omitempty"`
-	IgnoredAt              time.Time   `json:"ignoredAt,omitempty"`
+	IgnoredAt              time.Time   `json:"ignoredAt,omitempty,omitzero"`
 	IgnoredBy              string      `json:"ignoredBy,omitempty"`
 	IncidentID             string      `json:"incidentID,omitempty"`
 	LastCheckLatencyMS     Measurement `json:"lastCheckLatencyMs,omitempty"`
-	LastCheckedAt          time.Time   `json:"lastCheckedAt,omitempty"`
+	LastCheckedAt          time.Time   `json:"lastCheckedAt,omitempty,omitzero"`
 
 	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	LastFailure        *FailureDiagnostic `json:"lastFailure,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty"`
+	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty,omitzero"`
 	StatusRevision     string             `json:"statusRevision,omitempty"`
 	UnknownActions     *int64             `json:"unknownActions,omitempty"`
 
@@ -1431,7 +1473,7 @@ type NotificationEndpoint struct {
 
 // NotificationEndpointList defines model for NotificationEndpointList.
 type NotificationEndpointList struct {
-	GeneratedAt time.Time              `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time              `json:"generatedAt,omitempty,omitzero"`
 	Items       []NotificationEndpoint `json:"items"`
 	NextCursor  string                 `json:"nextCursor,omitempty"`
 	Snapshot    string                 `json:"snapshot,omitempty"`
@@ -1450,7 +1492,7 @@ type NotificationGroup struct {
 
 // NotificationGroupList defines model for NotificationGroupList.
 type NotificationGroupList struct {
-	GeneratedAt time.Time           `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time           `json:"generatedAt,omitempty,omitzero"`
 	Items       []NotificationGroup `json:"items"`
 	NextCursor  string              `json:"nextCursor,omitempty"`
 	Snapshot    string              `json:"snapshot,omitempty"`
@@ -1527,7 +1569,7 @@ type OperationCreateRequestIdentityFormat string
 
 // OperationList defines model for OperationList.
 type OperationList struct {
-	GeneratedAt time.Time   `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time   `json:"generatedAt,omitempty,omitzero"`
 	Items       []Operation `json:"items"`
 	NextCursor  string      `json:"nextCursor,omitempty"`
 	Snapshot    string      `json:"snapshot,omitempty"`
@@ -1547,9 +1589,18 @@ type Pool struct {
 	Available        bool   `json:"available"`
 
 	// Busy Executions currently inside a job call; excludes idle worker goroutines and result publication.
-	Busy                         int64       `json:"busy,omitempty"`
-	BusyAvailable                bool        `json:"busyAvailable"`
-	Capacity                     int64       `json:"capacity"`
+	Busy          int64 `json:"busy,omitempty"`
+	BusyAvailable bool  `json:"busyAvailable"`
+	Capacity      int64 `json:"capacity"`
+
+	// CapacityAccountingAvailable Whether the new capacity accounting is supplied by this server.
+	CapacityAccountingAvailable bool `json:"capacityAccountingAvailable"`
+
+	// CapacityCondition available, growing, draining, or worker_limit; distinct from a measured SLO condition.
+	CapacityCondition string `json:"capacityCondition"`
+
+	// DrainingWorkers Worker goroutines above supplied capacity while a reduction drains; these can include idle goroutines.
+	DrainingWorkers              int64       `json:"drainingWorkers"`
 	LastScaleAt                  *time.Time  `json:"lastScaleAt,omitempty"`
 	Maximum                      int64       `json:"maximum"`
 	Minimum                      int64       `json:"minimum"`
@@ -1559,15 +1610,21 @@ type Pool struct {
 	OldestExecutionMS            Measurement `json:"oldestExecutionMs,omitempty"`
 	OldestSubmissionMS           Measurement `json:"oldestSubmissionMs,omitempty"`
 	PendingResults               int64       `json:"pendingResults"`
-	ScalingEvents                int64       `json:"scalingEvents"`
-	ServiceSamples               int64       `json:"serviceSamples"`
-	ServiceTime                  Measurement `json:"serviceTime,omitempty"`
-	SizingModel                  string      `json:"sizingModel"`
-	SloCondition                 string      `json:"sloCondition"`
-	Target                       int64       `json:"target"`
-	TasksCompleted               int64       `json:"tasksCompleted"`
-	TasksSubmitted               int64       `json:"tasksSubmitted"`
-	WaitingTasks                 int64       `json:"waitingTasks"`
+
+	// RequestedCapacity Requested worker capacity before global and growth limits.
+	RequestedCapacity int64 `json:"requestedCapacity"`
+
+	// ReservedCapacity Sum of configured per-driver occupancy floors before the global worker limit.
+	ReservedCapacity int64       `json:"reservedCapacity"`
+	ScalingEvents    int64       `json:"scalingEvents"`
+	ServiceSamples   int64       `json:"serviceSamples"`
+	ServiceTime      Measurement `json:"serviceTime,omitempty"`
+	SizingModel      string      `json:"sizingModel"`
+	SloCondition     string      `json:"sloCondition"`
+	Target           int64       `json:"target"`
+	TasksCompleted   int64       `json:"tasksCompleted"`
+	TasksSubmitted   int64       `json:"tasksSubmitted"`
+	WaitingTasks     int64       `json:"waitingTasks"`
 
 	// Workers Current worker goroutines, including idle workers; not a count of busy executions.
 	Workers int64 `json:"workers"`
@@ -1576,7 +1633,7 @@ type Pool struct {
 // PoolList defines model for PoolList.
 type PoolList struct {
 	Available   bool      `json:"available"`
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []Pool    `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`
@@ -1881,7 +1938,7 @@ type Queue struct {
 // QueueList defines model for QueueList.
 type QueueList struct {
 	Available   bool      `json:"available"`
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []Queue   `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`
@@ -1900,7 +1957,7 @@ type Recipient struct {
 
 // RecipientList defines model for RecipientList.
 type RecipientList struct {
-	GeneratedAt time.Time   `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time   `json:"generatedAt,omitempty,omitzero"`
 	Items       []Recipient `json:"items"`
 	NextCursor  string      `json:"nextCursor,omitempty"`
 	Snapshot    string      `json:"snapshot,omitempty"`
@@ -2079,7 +2136,7 @@ type System struct {
 // SystemList defines model for SystemList.
 type SystemList struct {
 	Available   bool      `json:"available"`
-	GeneratedAt time.Time `json:"generatedAt,omitempty"`
+	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
 	Items       []System  `json:"items"`
 	NextCursor  string    `json:"nextCursor,omitempty"`
 	Snapshot    string    `json:"snapshot,omitempty"`

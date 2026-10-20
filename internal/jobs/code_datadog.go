@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -58,10 +57,6 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "code", "driver": "datadog", "color": c.Color}
-	site := c.Site
-	if site == "" {
-		site = "datadoghq.com"
-	}
 	body, err := json.Marshal(map[string]interface{}{
 		"title":      "CPRa " + codeAlertTemplateFor(c.Color).Title + ": " + c.Monitor,
 		"text":       c.notificationMessage(c.Message),
@@ -71,7 +66,7 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}
-	target, err := notificationURL(c.URL, fmt.Sprintf("https://api.%s/api/v1/events", site))
+	target, err := datadogURL(c.URL, c.Site)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

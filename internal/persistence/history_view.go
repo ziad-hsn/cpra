@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/heap"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -42,23 +41,63 @@ func (h *HistoryStore) SnapshotContext(ctx context.Context) (HistoryView, error)
 	return HistoryView{store: h, upper: fmt.Sprintf("%020d:%08d", h.catalog.Index, 99999999), cutoff: h.catalog.Cutoff, retentionGeneration: h.retentionGeneration}, nil
 }
 
-type historyCandidates []Event
+const historyPageBytes = 4 << 20
 
-func (h historyCandidates) Len() int           { return len(h) }
-func (h historyCandidates) Less(i, j int) bool { return h[i].ID > h[j].ID }
-func (h historyCandidates) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h *historyCandidates) Push(v any)        { *h = append(*h, v.(Event)) }
-func (h *historyCandidates) Pop() any {
+// Only the next key and encoded length are retained for each daily segment.
+// Log positions, rather than dates, determine global event order.
+type historyHead struct {
+	db       *bolt.DB
+	position string
+	bytes    int
+}
+type historyHeads []historyHead
+
+func (h historyHeads) Len() int           { return len(h) }
+func (h historyHeads) Less(i, j int) bool { return h[i].position < h[j].position }
+func (h historyHeads) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *historyHeads) Push(v any)        { *h = append(*h, v.(historyHead)) }
+func (h *historyHeads) Pop() any {
 	n := len(*h) - 1
 	v := (*h)[n]
-	(*h)[n] = Event{}
+	(*h)[n] = historyHead{}
 	*h = (*h)[:n]
 	return v
 }
+func nextHistoryHead(ctx context.Context, db *bolt.DB, prefix []byte, after, upper string) (historyHead, bool, error) {
+	head := historyHead{db: db}
+	err := db.View(func(tx *bolt.Tx) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		bucket := tx.Bucket([]byte("events"))
+		if bucket == nil {
+			return ErrHistoryUnavailable
+		}
+		cursor := bucket.Cursor()
+		key := append(bytes.Clone(prefix), []byte(after)...)
+		k, raw := cursor.Seek(key)
+		if bytes.Equal(k, key) {
+			k, raw = cursor.Next()
+		}
+		if k == nil || !bytes.HasPrefix(k, prefix) {
+			return nil
+		}
+		position := string(k[len(prefix):])
+		if position > upper {
+			return nil
+		}
+		if !validHistoryPosition(position) || len(raw) == 0 || len(raw) > actionLedgerMaxFrame {
+			return ErrHistoryUnavailable
+		}
+		head.position, head.bytes = position, len(raw)
+		return nil
+	})
+	return head, head.position != "", err
+}
 
-// Page uses indexed daily segments and at most limit+1 retained candidates.
-// Memory mode examines at most 10,000 records per page, with a continuation even
-// for an empty page. Retention invalidates the view instead of changing retries.
+// Page bounds scanned records and encoded bytes globally across daily segments.
+// It never keeps database transactions open between pages. Retention invalidates
+// the view rather than silently changing a retried page.
 func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit int) ([]Event, string, error) {
 	if v.store == nil || monitorID == "" || len(monitorID) > 256 || strings.ContainsRune(monitorID, 0) || limit < 1 || limit > 500 || len(after) > 64 || (after != "" && !validHistoryPosition(after)) {
 		return nil, "", errors.New("invalid history page")
@@ -85,17 +124,19 @@ func (v HistoryView) pageLocked(ctx context.Context, monitorID, after string, li
 		return nil, "", ErrHistoryCursorExpired
 	}
 	const scanLimit = 10000
-	frontier := v.upper
-	candidates := historyCandidates{}
-	accept := func(e Event) {
-		if e.MonitorID != monitorID || e.ID <= after || e.ID > v.upper || e.At.Before(v.cutoff) {
-			return
+	items := make([]Event, 0, min(limit, 100))
+	used, inspected := 0, 0
+	last := after
+	accept := func(e Event, size int) {
+		used += size
+		inspected++
+		last = e.ID
+		if !e.At.Before(v.cutoff) {
+			items = append(items, e.Clone())
 		}
-		e = e.Clone()
-		heap.Push(&candidates, e)
-		if candidates.Len() > limit+1 {
-			heap.Pop(&candidates)
-		}
+	}
+	full := func(size int) bool {
+		return len(items) == limit || inspected == scanLimit || inspected > 0 && size > historyPageBytes-used
 	}
 	if h.dir == "" {
 		start := sort.Search(len(h.memory), func(i int) bool { return h.memory[i].ID > after })
@@ -107,84 +148,82 @@ func (v HistoryView) pageLocked(ctx context.Context, monitorID, after string, li
 			if e.ID > v.upper {
 				break
 			}
-			accept(e)
-			if i-start+1 == scanLimit && i+1 < len(h.memory) && h.memory[i+1].ID <= v.upper {
-				frontier = e.ID
-				break
+			if len(items) == limit || inspected == scanLimit || used == historyPageBytes {
+				return items, last, nil
 			}
-		}
-	} else {
-		prefix := []byte(monitorID + "\x00")
-		for day, db := range h.databases {
-			if err := ctx.Err(); err != nil {
-				return nil, "", err
+			if e.MonitorID != monitorID {
+				inspected++
+				last = e.ID
+				continue
 			}
-			if _, err := os.Stat(filepath.Join(h.dir, day+".db")); err != nil {
+			size := h.memorySizes[e.ID]
+			if size < 1 || size > actionLedgerMaxFrame {
 				return nil, "", ErrHistoryUnavailable
 			}
-			err := db.View(func(tx *bolt.Tx) error {
-				bucket := tx.Bucket([]byte("events"))
-				if bucket == nil {
-					return ErrHistoryUnavailable
-				}
-				cur := bucket.Cursor()
-				inspected, matched := 0, 0
-				for k, raw := cur.Seek(append(bytes.Clone(prefix), []byte(after)...)); k != nil && bytes.HasPrefix(k, prefix); k, raw = cur.Next() {
-					if err := ctx.Err(); err != nil {
-						return err
-					}
-					position := string(k[len(prefix):])
-					if position <= after {
-						continue
-					}
-					if position > v.upper {
-						break
-					}
-					if !validHistoryPosition(position) || len(raw) > 256<<10 {
-						return ErrHistoryUnavailable
-					}
-					var e Event
-					if json.Unmarshal(raw, &e) != nil || e.ID != position || e.MonitorID != monitorID {
-						return ErrHistoryUnavailable
-					}
-					accept(e)
-					inspected++
-					if !e.At.Before(v.cutoff) {
-						matched++
-					}
-					if matched > limit {
-						break
-					}
-					if inspected == scanLimit {
-						if position < frontier {
-							frontier = position
-						}
-						break
-					}
-				}
-				return nil
-			})
-			if err != nil {
-				return nil, "", err
+			if full(size) {
+				return items, last, nil
 			}
+			accept(e, size)
+		}
+		return items, "", nil
+	}
+	prefix := []byte(monitorID + "\x00")
+	heads := historyHeads{}
+	for day, db := range h.databases {
+		if err := ctx.Err(); err != nil {
+			return nil, "", err
+		}
+		if _, err := os.Stat(filepath.Join(h.dir, day+".db")); err != nil {
+			return nil, "", ErrHistoryUnavailable
+		}
+		head, ok, err := nextHistoryHead(ctx, db, prefix, after, v.upper)
+		if err != nil {
+			return nil, "", err
+		}
+		if ok {
+			heap.Push(&heads, head)
 		}
 	}
-	items := make([]Event, 0, candidates.Len())
-	for _, e := range candidates {
-		if e.ID <= frontier {
-			items = append(items, e)
+	for heads.Len() > 0 {
+		head := heads[0]
+		if head.position <= last {
+			return nil, "", ErrHistoryUnavailable
 		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
-	if err := ctx.Err(); err != nil {
-		return nil, "", err
-	}
-	if len(items) > limit {
-		items = items[:limit]
-		return items, items[len(items)-1].ID, nil
-	}
-	if frontier < v.upper {
-		return items, frontier, nil
+		if full(head.bytes) {
+			return items, last, nil
+		}
+		heap.Pop(&heads)
+		if err := ctx.Err(); err != nil {
+			return nil, "", err
+		}
+		var event Event
+		err := head.db.View(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket([]byte("events"))
+			if bucket == nil {
+				return ErrHistoryUnavailable
+			}
+			raw := bucket.Get(append(bytes.Clone(prefix), []byte(head.position)...))
+			if len(raw) != head.bytes {
+				return ErrHistoryUnavailable
+			}
+			var err error
+			event, err = decodeHistoryEvent(raw)
+			if err != nil || event.ID != head.position || event.MonitorID != monitorID {
+				return ErrHistoryUnavailable
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, "", err
+		}
+		accept(event, head.bytes)
+		next, ok, err := nextHistoryHead(ctx, head.db, prefix, head.position, v.upper)
+		if err != nil {
+			return nil, "", err
+		}
+		if ok {
+			heap.Push(&heads, next)
+		}
 	}
 	return items, "", nil
 }

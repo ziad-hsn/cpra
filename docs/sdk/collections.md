@@ -1,32 +1,20 @@
----
-title: SDK candidate · Configuration collections
-description: SDK candidate · Configuration collections for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
-
 # Configuration collections
 
 `collection` freezes files, directories, readers, URL inputs, or an incremental
 typed resource source, and uses the public SDK's operation protocol to apply
 them. It contains no CPRa server, provider driver, or controller dependency.
 
-**Private integration status (2026-09-24):** the working server supports bounded
-ephemeral `Preflight`/`Diff`, durable operation creation, encrypted upload,
-asynchronous validation, path-only activation and retained execution results.
-The normal TLS/Raft/controller entrypoint has been exercised through native CLI
-Apply, Wait, bounded result pages and restart. `FreezeProfile` opts file inputs
-into restart recovery through `Reselect`; ordinary `Resume` still requires the
-original open `Frozen`. These are local candidate checks and do not identify a
-published SDK or server release.
+`Preflight` and `Diff` validate bounded input without creating an apply operation.
+`Apply` creates an operation, uploads encrypted input, validates the whole
+collection and activates resources conditionally. Retained results report each
+outcome. `FreezeProfile` opts files into explicit recovery through `Reselect`;
+ordinary `Resume` requires the original open `Frozen`.
 
 This package ships in the `github.com/ziad-hsn/cpra/sdk/go` module. After a
 qualified SDK version is published, add that module to your application with
 `go get github.com/ziad-hsn/cpra/sdk/go@'REPLACE_WITH_PUBLISHED_SDK_VERSION'`. Import the package
 as `github.com/ziad-hsn/cpra/sdk/go/collection`; it has no separate version tag.
-The parent [SDK README](module-overview.md) describes candidate versions and current
-server API support.
+The parent [SDK README](module-overview.md) describes module availability and server API support.
 
 The following excerpt belongs inside a function returning `error`. `ctx` is the
 caller's context and `client` is an initialized `*cpra.Client`:
@@ -103,11 +91,16 @@ and manifest envelopes are supported.
 Shared endpoint/group files need no `monitors` field. YAML block monitor and
 `List.items` sequences, and their JSON counterparts, decode one resource at a
 time, including when the complete collection exceeds the document-memory limit.
-YAML aliases are rejected; render explicit values before importing them.
+UTF-8 BOMs and same-document YAML aliases are accepted. Definitions are resolved
+in source order, including across streamed entries. Forward references, cycles,
+cross-document aliases and excessive expansion fail before activation. Retained
+anchor values are bounded to 1 MiB and 65,536 nodes. Historical unprofiled inputs
+keep their existing local-entry decoding limits; if unused definitions exceed
+the retention limit, later cross-entry references fail explicitly.
 
 Manifest normalization retains deterministic name-derived IDs, explicit `false`,
 interval strings, thresholds, inline notifications, ordered groups,
-and all 33 built-in driver configurations. Known driver configuration field names
+and all 35 built-in driver roles. Known driver configuration field names
 are converted to the v2 camelCase names. User map keys such as HTTP headers are
 unchanged. Driver executors and provider credentials are never invoked by parsing.
 Manifest zero retries inherit positive parent retries, and a zero unhealthy
@@ -255,7 +248,12 @@ result, err := collection.Apply(ctx, client.Operations, frozen)
 // Retain result.OperationID on failure as well as success.
 ```
 
-`FileNormalizationProfile` is `cpra.file.base.v1`. It permits at most 1,000
+`FileNormalizationProfile` is `cpra.file.base.v3`. New imports support BOMs and
+bounded same-document aliases across entries, and reject a notification group
+combined with an inline destination. The original `cpra.file.base.v1` and
+`cpra.file.base.v2` decoders remain available for continuation of existing
+operations with their original identities; an operation is never relabeled.
+The current profile permits at most 1,000
 expanded sources, 64 MiB total raw input, 10,000 resources, 1 MiB per resource,
 16 MiB of document metadata and 512 MiB of local plaintext staging. Options can
 tighten these limits. Unsupported profiles and enlarged limits fail before
@@ -332,8 +330,39 @@ Applying and terminal operations can still be observed without the count.
 `Reselect` requires an explicit uploaded count in every original-operation
 observation and returns `ErrReselectionObservation` when that count is absent.
 
+## Continue a file import through activation
+
+`ResumeFiles` uses the server's original private identity to verify the exact
+sources before continuing validation and activation. It supports ordinary
+`Freeze` file imports with an empty normalization profile, as well as
+the original supported file profile; it never changes that profile. Preserve the original file
+order, boundaries, comments and whitespace.
+
+```go
+result, err := collection.ResumeFiles(ctx, client.Operations, operationID,
+    []collection.Source{
+        collection.File("shared/endpoints.yaml"),
+        collection.File("services/payments.yaml"),
+    }, collection.ReselectionOptions{})
+// Retain result.OperationID and result.VerificationAttemptID on failure.
+if err != nil {
+    return err
+}
+result, err = collection.Wait(ctx, client.Operations, result)
+```
+
+Complete uploads are verified too. The existing source and staging limits apply;
+verification does not grant permission to recreate validation or retry activation.
+If a server restart lost an unfinished compiler attempt, the original operation
+is `interrupted`. `ResumeFiles` returns `ErrReselectionState` with that state in
+`result.Operation` and submits no new work. Inspect its retained evidence before
+explicitly applying new intent. A finalized original verdict remains usable;
+the client does not compile a replacement against changed catalog state.
+For an operation already in execution, use `Wait` on its original result instead
+of `ResumeFiles`. Canceling that wait does not cancel the server operation.
+
 The server v2 management/operation contract remains a prerequisite. Package and
 HTTP fixture tests establish loader/client behavior, not production server CAS,
 encrypted server staging, real provider effects, or million-monitor qualification.
 
-<!-- Adapted from sdk/go/collection/README.md. -->
+<!-- Generated from sdk/go/collection/README.md by scripts/sdk/sync_guides.py. -->

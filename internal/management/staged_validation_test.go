@@ -54,6 +54,8 @@ func stagedValidationParity(t *testing.T, f *collectionSourceFixture, resources 
 	}
 	for i := range want.Items {
 		want.Items[i].SourceID, want.Items[i].ItemID = got.Items[i].SourceID, got.Items[i].ItemID
+		// Field diffs are request-local preflight metadata, not durable plan state.
+		want.Items[i].ChangedFields = nil
 	}
 	if !reflect.DeepEqual(want, got) {
 		t.Fatalf("staged metadata/outcome differs\nrequest-local: %+v\nstaged: %+v", want, got)

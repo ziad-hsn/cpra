@@ -92,12 +92,13 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 		t.Fatalf("public activation browser failed: %v\n%s", err, output)
 	}
 	var report struct {
-		OperationID       string `json:"operationID"`
-		GuidedOperationID string `json:"guidedOperationID"`
-		ResultID          string `json:"resultID"`
-		Activations       int    `json:"activations"`
+		OperationID                 string `json:"operationID"`
+		GuidedOperationID           string `json:"guidedOperationID"`
+		ReplacementOperationID      string `json:"replacementOperationID"`
+		ResultID                    string `json:"resultID"`
+		InitialOperationActivations int    `json:"initialOperationActivations"`
 	}
-	if len(output) > 64<<10 || json.Unmarshal(output, &report) != nil || report.OperationID == "" || report.GuidedOperationID == "" || report.ResultID == "" || report.Activations != 1 {
+	if len(output) > 64<<10 || json.Unmarshal(output, &report) != nil || report.OperationID == "" || report.GuidedOperationID == "" || report.ResultID == "" || report.InitialOperationActivations != 1 {
 		t.Fatal("browser did not report one original activation")
 	}
 	before, err := client.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
@@ -112,6 +113,10 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 	guided, err := client.Operations.ExecutionResult(ctx, report.GuidedOperationID, cpra.ExecutionResultPageOptions{})
 	if err != nil || guided.Data.State != "completed" || guided.Data.Committed == nil || *guided.Data.Committed != 5 || guided.Data.Applied == nil || *guided.Data.Applied != 5 {
 		t.Fatal("guided notification setup did not apply its five resources", err)
+	}
+	replacement, err := client.Operations.ExecutionResult(ctx, report.ReplacementOperationID, cpra.ExecutionResultPageOptions{})
+	if err != nil || replacement.Data.State != "completed" || replacement.Data.Committed == nil || *replacement.Data.Committed != 2 || replacement.Data.Applied == nil || *replacement.Data.Applied != 2 {
+		t.Fatal("reviewed notification replacement did not apply its two resources", err)
 	}
 	if monitor.Data.Spec.Notifications == nil {
 		t.Fatal("guided setup lost its notification rules")
@@ -131,7 +136,7 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 		t.Fatal("restart changed the guided notification configuration", err)
 	}
 	after, err := restarted.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
-	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v2" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
+	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v3" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
 		t.Fatal("restart changed the original public activation result", err)
 	}
 	repeated, err := restarted.Operations.Activate(ctx, report.OperationID)

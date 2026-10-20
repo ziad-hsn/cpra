@@ -326,7 +326,7 @@ func TestCollectionExecutionProgressBindsOriginalActivationAndStagingTime(t *tes
 	if !reflect.DeepEqual(saved, head) || !head.ActivityAt.Equal(saved.ActivityAt) {
 		t.Fatal("pure validation altered staging time/header")
 	}
-	if s.fsm.image.Version != 8 {
+	if s.fsm.image.Version != ActionFormatVersion {
 		t.Fatal("model-only checks changed application format")
 	}
 }

@@ -15,6 +15,7 @@
   --cpra-danger: #BD223C;
   --cpra-warning: #965B00;
   --cpra-info: #156E96;
+  --cpra-review: #315DD8;
 }
 [data-theme="dark"], [data-md-color-scheme="slate"] {
   --cpra-canvas: #15181D;
@@ -32,4 +33,5 @@
   --cpra-danger: #FF8E9D;
   --cpra-warning: #EFC46D;
   --cpra-info: #84C7EF;
+  --cpra-review: #A0B7FF;
 }

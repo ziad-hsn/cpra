@@ -216,18 +216,18 @@ func TestEnvironmentLoggingDefaults(t *testing.T) {
 	}
 	for _, value := range []string{"", "production", "unexpected"} {
 		t.Setenv("CPRA_ENV", value)
-		cfg := configFromEnv()
+		cfg := ConfigFromEnv()
 		if cfg.Level != "info" || cfg.Format != "json" || cfg.Development {
 			t.Fatalf("ordinary execution enabled developer logging: %+v", cfg)
 		}
 	}
 	t.Setenv("CPRA_ENV", "development")
-	if cfg := configFromEnv(); cfg.Level != "debug" || cfg.Format != "console" || !cfg.Development {
+	if cfg := ConfigFromEnv(); cfg.Level != "debug" || cfg.Format != "console" || !cfg.Development {
 		t.Fatalf("explicit developer logging ignored: %+v", cfg)
 	}
 	t.Setenv("CPRA_LOG_LEVEL", "warn")
 	t.Setenv("CPRA_LOG_FORMAT", "json")
-	if cfg := configFromEnv(); cfg.Level != "warn" || cfg.Format != "json" {
+	if cfg := ConfigFromEnv(); cfg.Level != "warn" || cfg.Format != "json" {
 		t.Fatalf("explicit logging overrides ignored: %+v", cfg)
 	}
 }

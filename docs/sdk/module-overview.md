@@ -1,37 +1,24 @@
----
-title: SDK candidate · CPRa Go SDK
-description: SDK candidate · CPRa Go SDK for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
-
 # CPRa Go SDK
 
 This independently versioned module contains the typed Go client for CPRa.
 It supports Go 1.26 and does not depend on the CPRa application module, controller,
 Ark, Raft, provider SDKs, or worker execution library.
 
-**Private integration status (2026-09-24):** this SDK and the current CPRa working
-branch implement v2 resource management, incident/monitor controls, audited action
-review, operation reads and observations. Tests exercise these routes through the
-public SDK and real local TLS/Raft servers; selected dashboard flows also run
-through normal application startup and restart. Collection preflight, durable
-upload, validation, public activation and retained execution results are connected
-through the shared Apply helper and native CLI. Original-file reselection has a
-connected SDK/server path and a guided browser flow for the versioned file profile.
-The shared `collection.Reselect` helper and native `cpractl resume-upload`
-support restarted clients for that profile. Additional source profiles remain
-separate work.
-External-worker server integration remains unfinished; SDK transport fixtures
-for that protocol do not establish server support.
+Use it to create and edit monitors, configure notification recipients and groups,
+apply collections, control incidents, review uncertain actions, and read health,
+queues, SLOs and history. Collection validation precedes activation. Operation
+handles preserve progress when a client stops waiting; explicit continuation uses
+the original operation and source identities.
 
-Discover the connected server's capabilities
-before selecting v2 operations; this working-branch evidence does not establish
-compatibility with an earlier published server. Both SDK modules remain
-unpublished, and candidates stay private until all agreed release gates pass.
-The planned first prerelease is `v0.1.0-rc.1`; that name does not establish that
-a downloadable tag exists.
+The optional worker module runs operator-owned checks, recovery actions and
+notifications outside the CPRa process. Both consumer and server require the
+`externaljobs` build tag; the server also requires explicit runtime enablement
+and scoped worker credentials. Provider secrets stay with the worker.
+
+Discover server capabilities before choosing operations. The modules are not yet
+published; use the repository development workspace until a qualified version is
+available. [Versions and availability](../versions.md) records the current
+support and publication status.
 
 ## Install in your application
 
@@ -168,7 +155,7 @@ branches above report errors; the runnable examples show recovery decisions.
 See the executable local HTTP fixture in [example_test.go](source/sdk/go/example_test.go.txt) to
 exercise returned data and versions without a v2 server.
 
-All 33 built-in driver configurations have concrete public structs. `Driver`
+All 35 built-in driver roles have concrete public structs. `Driver`
 validates a configuration for the `check`, `recovery`, or `notification` category.
 The driver envelope preserves raw configuration received from future servers.
 Unknown variants can be inspected, but mutation helpers reject them rather than
@@ -311,6 +298,17 @@ RFC 9457 details and field errors. Its printable message deliberately omits raw
 server detail. `ErrAmbiguous` indicates an outcome that cannot be determined;
 inspect the operation handle rather than issuing a fresh mutation.
 
+Use `errors.As(err, &ambiguous)` with a `*cpra.AmbiguousError` to read its
+`OperationID`. A failed response body can still leave a received operation
+handle available in that error and in the non-nil response. If the reply was
+lost before its headers arrived, the handle is empty. An empty handle does not
+prove the write was rejected. Read the known resource ID and compare its
+configuration and version before deciding what an operator should do; a current
+read alone may not establish which concurrent write committed. Do not issue a
+replacement create, enable a disabled monitor, or retry a recovery because an
+admission request timed out. Configuration admission uncertainty and an unknown
+external action outcome are separate states.
+
 Authenticated v2 connections require HTTPS unless the caller explicitly permits
 HTTP for the configured origin. Redirects are disabled, including when supplying
 an HTTP client. Ordinary calls default to ten seconds; context deadlines can be
@@ -331,15 +329,48 @@ required authentication source. The server must independently be built with the
 tag, have its runtime feature enabled, and authorize the worker's scope. The SDK
 is not an authorization boundary.
 
-On the private integration branch, `JobTypes()` list/create/get/replace/delete
-methods have real TLS/Raft server tests, including retained operation receipts
-and restart. The server runtime setting is `external_jobs.enabled: true`, which
+`JobTypes()` provides list/create/get/replace/delete methods with conditional
+writes and retained operation receipts. The server runtime setting is `external_jobs.enabled: true`, which
 requires authenticated management and Raft. Creation uses an absence precondition;
 replacement/deletion use the resource version returned by a read. Registration
 stores a declarative contract; it does not start a handler. Scoped worker grants
 are provisioned through [stopped local administration](../worker-authentication.md).
-Poll/start/result integration remains unfinished, so the worker methods are not
-yet qualified against a completed server.
+Production protocol routes, controller dispatch and worker-runner integration
+are implemented and have scoped local tests. Those tests do not establish native
+platform or provider-account qualification. See the repository's
+[availability matrix](../versions.md) for the current publication boundary.
+
+`Workers` reads an operator-authorized page; `IterateWorkers` lazily traverses
+the same immutable snapshot. Use management credentials, not a worker execution
+token. Compile consumers of either method with `-tags externaljobs`:
+
+```go
+workers := client.IterateWorkers(cpra.ListOptions{Limit: 100})
+for workers.Next(ctx) {
+    worker := workers.Value()
+    fmt.Printf("%s: session=%s outstanding=%d unknown=%d\n",
+        worker.WorkerID, worker.SessionStatus, worker.Active, worker.UnknownActions)
+    if worker.CapacityAvailable {
+        fmt.Printf("  last advertised free result capacity: %d\n", worker.Capacity)
+    }
+    if worker.LastSeenAt != nil {
+        fmt.Printf("  last committed poll: %s\n", worker.LastSeenAt)
+    }
+}
+if err := workers.Err(); err != nil {
+    return err
+}
+```
+
+`active` counts outstanding committed Start grants, not observed running
+handlers. `unknownActions` counts retained original unknown outcomes, including
+operator-reviewed actions. Read action status for the current hold and review;
+this observation path does not retry actions.
+Absent `lastSeenAt` means no retained poll observation. Capacity becomes
+unavailable when a session expires or belongs to the previous server owner.
+Pages share `generatedAt`; new polls and results appear only in a new query.
+The endpoint exposes no provider secrets or worker-local journal data. See the
+[worker authentication guide](../worker-authentication.md) for access requirements.
 
 The worker runner lives in its own module:
 `github.com/ziad-hsn/cpra/sdk/go/worker`. It is absent from this module's dependency
@@ -381,7 +412,7 @@ compile but do not execute their illustrated network calls. The comments and
 examples follow the [Go documentation format](https://go.dev/doc/comment) and
 [testable example convention](https://go.dev/blog/examples). After publication,
 pkg.go.dev reads these files from the downloaded module version. Its presence is
-not a claim that CPRa's pending server contracts have passed qualification.
+not a claim that the corresponding server or distribution has passed release qualification.
 
 Maintainers publishing from the complete repository checkout must follow the
 [publishing guide](publishing.md), including the separate nested
@@ -389,4 +420,4 @@ module tags, downloaded-consumer checks, and server compatibility gates. That
 guide lives outside this module archive; the installation, client behavior, and
 package documentation above are included in the downloaded module itself.
 
-<!-- Adapted from sdk/go/README.md. -->
+<!-- Generated from sdk/go/README.md by scripts/sdk/sync_guides.py. -->

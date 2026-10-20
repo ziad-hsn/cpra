@@ -90,11 +90,15 @@ it('rejects changed snapshots and does not show a misleading empty fleet', async
 });
 
 it('shows acknowledgment, dismissed notifications and closed incidents without inferring check health', async () => {
-  await setup(() => json({ ...page(1), items: [{ ...incident(1), state: 'closed', acknowledgedBy: 'alice', acknowledgedAt: '2026-09-19T12:05:00Z', dismissed: true, closedAt: '2026-09-19T12:20:00Z' }] }));
+  await setup(() => json({ ...page(1), items: [{ ...incident(1), state: 'closed', firstFailureAt: '2026-09-19T11:59:00Z', acknowledgedBy: 'alice', acknowledgedAt: '2026-09-19T12:05:00Z', dismissed: true, closedAt: '2026-09-19T12:20:00Z', notifications: {pending: 2, accepted: 3, failed: 1, unknown: 4, cancelled: 5} }] }));
   await screen.findByRole('link', { name: 'service-1' });
   expect(screen.getByLabelText('Incident page counts')).toHaveTextContent('0 open; 1 acknowledged; 1 dismissed');
   expect(screen.getByRole('region', { name: 'Latest incident page' })).toHaveTextContent('alice');
   expect(screen.getByText('Dismissed for this incident')).toBeVisible();
+  expect(screen.getByRole('columnheader', {name: 'Notifications'})).toBeVisible();
+  expect(screen.getByText('2 pending · 3 accepted · 1 failed · 4 unknown · 5 cancelled')).toBeVisible();
+  expect(screen.getByRole('columnheader', {name: 'First failure'})).toBeVisible();
+  expect(screen.getByRole('columnheader', {name: 'Threshold reached'})).toBeVisible();
   expect(screen.queryByText(/fleet is healthy/i)).not.toBeInTheDocument();
 });
 

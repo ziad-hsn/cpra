@@ -39,7 +39,7 @@ func TestStoppedBackupRestorePreservesIncidentHistoryAndUnknown(t *testing.T) {
 	}
 	apply(persistence.Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: now})
 	apply(persistence.Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: now, Outcome: "failure", Scheduled: now})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if len(m.Actions) == 0 {
 		t.Fatal("fixture did not create action")
 	}
@@ -99,7 +99,7 @@ func TestStoppedBackupRestorePreservesIncidentHistoryAndUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if !m.Incident || m.Actions[action].State != persistence.Unknown {
 		t.Fatalf("unsafe recovery: %+v", m)
 	}

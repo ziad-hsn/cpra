@@ -51,7 +51,7 @@ func TestCollectionActivationImmutableAdmissionAndNoExecution(t *testing.T) {
 	if head.Phase != "applying" || !collectionActivationsEqual(head.Activation, c.Activation) ||
 		!head.ActivityAt.Equal(original.ActivityAt) || !head.ExpiresAt.Equal(original.ExpiresAt) || !head.TerminalAt.IsZero() ||
 		len(s.fsm.image.Catalog) != 0 || len(s.fsm.image.Monitors) != 0 || len(s.fsm.image.Operations) != 0 || len(s.fsm.image.OperationReservations) != 0 ||
-		s.fsm.image.Version != CollectionActivationFormatVersion {
+		s.fsm.image.Version != ActionFormatVersion {
 		t.Fatal("admission altered original input, execution state or deadline")
 	}
 	if len(r.Events) != 1 || r.Events[0].MonitorID != "collection-activation/"+head.ID || r.Events[0].Collection != nil ||

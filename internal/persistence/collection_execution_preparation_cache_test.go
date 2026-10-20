@@ -28,13 +28,13 @@ func preparationCacheFixture(t *testing.T, disk bool, count int) (*Store, Collec
 			t.Fatal(err)
 		}
 		var err error
-		s, err = Open(context.Background(), config)
+		s, err = openReplayStore(t, config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = s.Close() })
 	} else {
-		s = openCatalogMemory(t)
+		s = openReplayMemory(t)
 	}
 	head, _ := validationPublishFixture(t, s, count, true)
 	for !head.Validation.HistorySealed {

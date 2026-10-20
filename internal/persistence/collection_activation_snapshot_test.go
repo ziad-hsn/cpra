@@ -100,7 +100,7 @@ func activationSnapshotNoExecution(t *testing.T, s *Store) {
 }
 
 func TestCollectionActivationSnapshotFrozenAdmission(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := activationSnapshotInput(t, s, true)
 	head, command := activationSnapshotAdmit(t, s, head)
 	if s.fsm.image.Version != CollectionActivationFormatVersion || head.Phase != "applying" {
@@ -150,7 +150,7 @@ func TestCollectionActivationSnapshotFrozenAdmission(t *testing.T) {
 }
 
 func TestCollectionActivationSnapshotRejectsMalformedBindingsAndDowngrade(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, _ := activationSnapshotAdmit(t, s, activationSnapshotInput(t, s, true))
 	raw := captureSnapshotBytes(t, s.fsm)
 	i, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")
@@ -248,7 +248,7 @@ func TestCollectionActivationSnapshotRejectsMalformedBindingsAndDowngrade(t *tes
 }
 
 func TestCollectionActivationSnapshotRetainsCatalogMutationTokens(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, _ := activationSnapshotAdmit(t, s, activationSnapshotInput(t, s, true))
 	activationSnapshotNoExecution(t, s)
 	// Separate explicit catalog commands establish unrelated preexisting facts;
@@ -283,7 +283,7 @@ func TestCollectionActivationSnapshotRetainsCatalogMutationTokens(t *testing.T) 
 func TestCollectionActivationSnapshotPreservesFormats3Through7(t *testing.T) {
 	for _, version := range []int{3, 4, 5, 6, 7} {
 		t.Run(string(rune('0'+version)), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head := collectionFill(t, s, 2)
 			if version == 4 {
 				createCatalogFormat(t, s, version, catalogRecord(t, s, "Credential", "older", "uid", "revision", "private"))
@@ -330,7 +330,7 @@ func TestCollectionActivationSnapshotExplicitRestoreInvalidatesAdmission(t *test
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	head, command := activationSnapshotAdmit(t, s, activationSnapshotInput(t, s, true))
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -356,7 +356,7 @@ func TestCollectionActivationSnapshotExplicitRestoreInvalidatesAdmission(t *test
 	if _, err := s.Submit(context.Background(), []Command{{Kind: "collection", At: got.TerminalAt, Collection: &command}}); !errors.Is(err, ErrAuthenticationAdminRequired) {
 		t.Fatal("administrative restore admitted execution", err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal("resnapshot restored activation", err)
 	}
 	activationSnapshotNoExecution(t, s)
@@ -410,7 +410,7 @@ func TestCollectionActivationSnapshotExplicitRestoreInvalidatesAdmission(t *test
 		t.Fatal("rejected old-epoch admission changed metadata, original namespaces or terminal outcome", err)
 	}
 	activationSnapshotNoExecution(t, s)
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal("snapshot normal service after rejected old activation", err)
 	}
 	if err := s.Close(); err != nil {

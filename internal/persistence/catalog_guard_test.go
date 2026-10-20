@@ -64,7 +64,7 @@ func TestExecutionGuardStartAndKnownOutcomeBoundary(t *testing.T) {
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: guard, At: now})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: guard, Generation: 1, At: now, Outcome: "failure"})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	ids := sortedActions(m.Actions)
 	if len(ids) != 2 {
 		t.Fatal("fixture did not open queued actions")
@@ -84,7 +84,7 @@ func TestExecutionGuardStartAndKnownOutcomeBoundary(t *testing.T) {
 	// The first action already received a committed start grant. Rotation must
 	// not discard its known result merely because the dependency guard is old.
 	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: ids[0], At: now, Outcome: "success"})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if m.Actions[ids[0]].State != Succeeded || m.Actions[ids[1]].State != Queued {
 		t.Fatal("result boundary lost committed outcome")
 	}
@@ -159,7 +159,7 @@ func TestExecutionGuardRecreationCannotAdoptPriorIncarnationActions(t *testing.T
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: guard, At: now})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: guard, Generation: 1, At: now, Outcome: "failure"})
-	old, _ := s.Get(m.ID)
+	old, _ := monitorWithActionHistory(t, s, m.ID)
 	ids := sortedActions(old.Actions)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, Guard: guard, ActionID: ids[0], At: now})
 	if result := catalogSubmit(t, s, deleteCatalogMutation(monitor, "deleted")); result.Err != nil {
@@ -179,7 +179,7 @@ func TestExecutionGuardRecreationCannotAdoptPriorIncarnationActions(t *testing.T
 	if result := submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: newGuard, At: now})[0]; result.Err != nil {
 		t.Fatal(result.Err)
 	}
-	current, _ := s.Get(m.ID)
+	current, _ := monitorWithActionHistory(t, s, m.ID)
 	if current.CatalogUID != newRecord.UID || current.Incident || current.Generation != 0 ||
 		current.Actions[ids[0]].State != Unknown || current.Actions[ids[1]].State != Cancelled ||
 		current.Actions[ids[0]].CatalogUID != monitor.UID {
@@ -189,7 +189,7 @@ func TestExecutionGuardRecreationCannotAdoptPriorIncarnationActions(t *testing.T
 		t.Fatal("new incarnation started an old action")
 	}
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: newGuard, Generation: 1, At: now, Outcome: "failure"})
-	current, _ = s.Get(m.ID)
+	current, _ = monitorWithActionHistory(t, s, m.ID)
 	newQueued := 0
 	for _, action := range current.Actions {
 		if action.State == Queued {
@@ -209,18 +209,18 @@ func TestInitialCatalogAdoptionPreservesLegacyIncidentAndActionIDs(t *testing.T)
 	configure(t, s)
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", Generation: 1, At: now, Outcome: "failure"})
-	old, _ := s.Get("stable-one")
+	old, _ := monitorWithActionHistory(t, s, "stable-one")
 	m, record, _, guard := prepareGuardFixture(t, s)
 	if result := submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: guard, At: now})[0]; result.Err != nil {
 		t.Fatal(result.Err)
 	}
-	current, _ := s.Get(m.ID)
+	current, _ := monitorWithActionHistory(t, s, m.ID)
 	if !current.Incident || current.Generation != old.Generation || len(current.Actions) != len(old.Actions) {
 		t.Fatal("initial encrypted migration reset legacy incident")
 	}
 	for id, before := range old.Actions {
 		after := current.Actions[id]
-		if before.State != after.State || before.Revision != after.Revision || after.CatalogUID != record.UID {
+		if after.State != Cancelled || before.Revision != after.Revision || after.CatalogUID != before.CatalogUID || after.FileIncarnation != before.FileIncarnation || current.CatalogUID != record.UID {
 			t.Fatal("initial encrypted migration regenerated existing action")
 		}
 	}

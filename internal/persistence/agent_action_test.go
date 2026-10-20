@@ -243,7 +243,7 @@ func TestAgentReceiptRetainsOriginalConfiguration(t *testing.T) {
 		t.Fatal("original action evidence lost after configuration change", err)
 	}
 	m, _ = s.Get(m.ID)
-	old := m.Actions[a.ID]
+	old := retainedAction(t, s, a.ID)
 	if m.Revision != changed.Revision || old.Revision != a.Revision || old.State != Unknown || !old.Held() || m.VerifyRemaining != 0 {
 		t.Fatal("receipt changed replacement monitor or resolved old action", m)
 	}
@@ -275,7 +275,7 @@ func TestAgentReceiptReviewRequiresRemoteCompletion(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = h.Finish(context.Background()) })
 			m, _ = s.Get(m.ID)
-			a = m.Actions[a.ID]
+			a = retainedAction(t, s, a.ID)
 			state := "TASK_STATE_WORKING"
 			if terminal {
 				state = "TASK_STATE_COMPLETED"
@@ -288,7 +288,7 @@ func TestAgentReceiptReviewRequiresRemoteCompletion(t *testing.T) {
 				t.Fatal(err)
 			}
 			m, _ = s.Get(m.ID)
-			a = m.Actions[a.ID]
+			a = retainedAction(t, s, a.ID)
 			if !a.Held() {
 				t.Fatal("receipt alone resolved the unknown action")
 			}

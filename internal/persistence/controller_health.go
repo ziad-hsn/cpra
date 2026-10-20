@@ -13,13 +13,13 @@ var errControllerUnavailable = errors.New("durable controller storage unavailabl
 // FSM.mu is held. Routine observations read this immutable value; execution
 // admission still reads authoritative state under Store.mu then FSM.mu.
 type controllerHealthState struct {
-	failed, bootstrap, restore bool
-	index                      uint64
-	format                     int
+	failed, bootstrap, restore, actionMigration bool
+	index                                       uint64
+	format                                      int
 }
 
 func (f *machine) controllerHealthState() controllerHealthState {
-	return controllerHealthState{failed: f.err != nil, bootstrap: f.bootstrapPending(),
+	return controllerHealthState{actionMigration: f.image.ActionProjectionState != nil && !f.image.ActionProjectionState.Ready, failed: f.err != nil, bootstrap: f.bootstrapPending(),
 		restore: f.restorePending() || f.image.Authentication != nil && f.image.Authentication.ResetRequired,
 		index:   f.image.Index, format: f.image.Version}
 }
@@ -134,7 +134,15 @@ func (s *Store) lockStateContext(ctx context.Context, write bool) (func(), error
 		s.mu.RUnlock()
 		return nil, err
 	}
-	return func() { unlockFSM(); s.mu.RUnlock() }, nil
+	return func() {
+		// Bounded admission checks may discover a permanent ledger read error.
+		// Publish it while the write lock still protects the machine state.
+		if write {
+			f.publishControllerHealth()
+		}
+		unlockFSM()
+		s.mu.RUnlock()
+	}, nil
 }
 
 // Caller holds Store.mu before FSM.mu. Do not expose a recorded permanent
@@ -153,6 +161,9 @@ func (s *Store) controllerHealthObserved(state controllerHealthState) error {
 	}
 	if s.administrative || s.opening || s.err != nil || s.fsm == nil || state.failed {
 		return errControllerUnavailable
+	}
+	if state.actionMigration {
+		return errors.Join(errControllerUnavailable, errActionProjectionPending)
 	}
 	if state.bootstrap {
 		return errors.Join(errControllerUnavailable, ErrBootstrapPending)

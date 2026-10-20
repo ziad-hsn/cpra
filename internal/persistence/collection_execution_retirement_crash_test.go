@@ -119,7 +119,9 @@ func TestCollectionExecutionRetirementSurvivesProcessKill(t *testing.T) {
 	// First recovery starts from format11 plus the first retirement log entry.
 	// Second recovery starts from a format12 partial snapshot plus completion.
 	for _, expected := range []uint64{128, 129} {
-		if err := s.Snapshot(); err != nil {
+		if expected == 128 {
+			persistPausedReviewSnapshot(t, s)
+		} else if err := s.Snapshot(); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.Close(); err != nil {

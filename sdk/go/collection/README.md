@@ -4,21 +4,17 @@
 typed resource source, and uses the public SDK's operation protocol to apply
 them. It contains no CPRa server, provider driver, or controller dependency.
 
-**Private integration status (2026-09-24):** the working server supports bounded
-ephemeral `Preflight`/`Diff`, durable operation creation, encrypted upload,
-asynchronous validation, path-only activation and retained execution results.
-The normal TLS/Raft/controller entrypoint has been exercised through native CLI
-Apply, Wait, bounded result pages and restart. `FreezeProfile` opts file inputs
-into restart recovery through `Reselect`; ordinary `Resume` still requires the
-original open `Frozen`. These are local candidate checks and do not identify a
-published SDK or server release.
+`Preflight` and `Diff` validate bounded input without creating an apply operation.
+`Apply` creates an operation, uploads encrypted input, validates the whole
+collection and activates resources conditionally. Retained results report each
+outcome. `FreezeProfile` opts files into explicit recovery through `Reselect`;
+ordinary `Resume` requires the original open `Frozen`.
 
 This package ships in the `github.com/ziad-hsn/cpra/sdk/go` module. After a
 qualified SDK version is published, add that module to your application with
 `go get github.com/ziad-hsn/cpra/sdk/go@'REPLACE_WITH_PUBLISHED_SDK_VERSION'`. Import the package
 as `github.com/ziad-hsn/cpra/sdk/go/collection`; it has no separate version tag.
-The parent [SDK README](../README.md) describes candidate versions and current
-server API support.
+The parent [SDK README](../README.md) describes module availability and server API support.
 
 The following excerpt belongs inside a function returning `error`. `ctx` is the
 caller's context and `client` is an initialized `*cpra.Client`:
@@ -104,7 +100,7 @@ the retention limit, later cross-entry references fail explicitly.
 
 Manifest normalization retains deterministic name-derived IDs, explicit `false`,
 interval strings, thresholds, inline notifications, ordered groups,
-and all 33 built-in driver configurations. Known driver configuration field names
+and all 35 built-in driver roles. Known driver configuration field names
 are converted to the v2 camelCase names. User map keys such as HTTP headers are
 unchanged. Driver executors and provider credentials are never invoked by parsing.
 Manifest zero retries inherit positive parent retries, and a zero unhealthy

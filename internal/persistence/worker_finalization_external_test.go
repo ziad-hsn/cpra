@@ -60,7 +60,7 @@ func TestWorkerFinalizationExpiresEveryAdmissionPhase(t *testing.T) {
 					if phase == "started" {
 						want, disposition = Unknown, "unknown"
 					}
-					if m.Actions[in.ActionID].State != want || r.Finalization.Receipt.Disposition != disposition || m.InterventionAttempts != before.InterventionAttempts {
+					if retainedAction(t, s, in.ActionID).State != want || r.Finalization.Receipt.Disposition != disposition || m.InterventionAttempts != before.InterventionAttempts {
 						t.Fatal("unstarted/unknown action distinction lost")
 					}
 				}
@@ -123,7 +123,7 @@ func TestWorkerFinalizationOwnerFenceAndLateEvidence(t *testing.T) {
 			}
 			before, _ := s.Get(r.Intent.MonitorID)
 			if category != "check" {
-				mustResult(t, s, reviewCommand(before, before.Actions[r.Intent.ActionID], uuid.NewString(), "inconclusive", time.Now().UTC()))
+				mustResult(t, s, reviewCommand(before, retainedAction(t, s, r.Intent.ActionID), uuid.NewString(), "inconclusive", time.Now().UTC()))
 				before, _ = s.Get(before.ID)
 			}
 			evidence := WorkerEvidenceInput{ServerID: input.ServerID, ExecutionID: input.ExecutionID, ExecutionRevision: input.ExecutionRevision, GrantID: input.GrantID,

@@ -85,7 +85,7 @@ func TestCollectionActivationProcessCrashHelper(t *testing.T) {
 	// No Close or defer: the parent kills the running owner after this IPC.
 	head := activationSnapshotInput(t, s, true)
 	if scenario == "pre-admission-snapshot-and-log" {
-		if s.fsm.image.Version != CollectionValidationRequestFormatVersion {
+		if s.fsm.image.Version != ActionFormatVersion {
 			t.Fatal("pre-admission image was not format7")
 		}
 		if err := s.Snapshot(); err != nil {
@@ -201,7 +201,7 @@ func TestCollectionActivationCommittedAdmissionSurvivesProcessKill(t *testing.T)
 				activationCrashNamespaceDigests(t, s) != report.NamespaceDigests {
 				t.Fatal("restart changed original activation, result, plan or namespace", err)
 			}
-			if s.fsm.image.Version != CollectionActivationFormatVersion {
+			if s.fsm.image.Version != ActionFormatVersion {
 				t.Fatal("replay lost format8")
 			}
 			// The original upload lifetime never becomes a new applying deadline.

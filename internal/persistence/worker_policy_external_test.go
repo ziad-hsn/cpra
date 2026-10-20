@@ -52,7 +52,7 @@ func workerCommand(t *testing.T, s *Store, mode string, p WorkerPrincipal) Worke
 }
 func workerFixture(t *testing.T) (*Store, JobTypeState, WorkerPolicyCommand) {
 	t.Helper()
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	state := commitJobType(t, s, jobTypeFixture(t, s, "worker-check"))
 	// Isolated memory fixtures exercise Apply while the production Submit guard
 	// is independently tested using real stopped/native administrative stores.
@@ -378,8 +378,8 @@ func TestWorkerPolicyFormatsSnapshotsAndQuota(t *testing.T) {
 		t.Fatal("unknown policy field accepted")
 	}
 	blob := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(blob, []byte(workerPolicySnapshotMagic)) {
-		t.Fatal("format17 framing")
+	if !bytes.HasPrefix(blob, []byte(actionWorkerSnapshotMagic)) {
+		t.Fatal("current worker-policy framing")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(blob), "")
 	if err != nil {
@@ -464,7 +464,7 @@ func TestWorkerPolicyStaleCallerTimeCannotReviveCredential(t *testing.T) {
 func TestWorkerPolicyCategoriesAndExplicitWildcard(t *testing.T) {
 	for _, category := range []string{"check", "recovery", "notification"} {
 		t.Run(category, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openWorkerMemory(t)
 			job := jobTypeFixture(t, s, "category-type")
 			job.Value.Category = category
 			state := commitJobType(t, s, job)

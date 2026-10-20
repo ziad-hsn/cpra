@@ -168,7 +168,7 @@ func TestLateResultPersistsThroughSnapshotRestartWithoutRepeatingHistory(t *test
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: now})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: now.Add(time.Second), Outcome: "failure"})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	a := interventionAction(t, m)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: now.Add(time.Second)})
 	config := m.Clone()
@@ -189,7 +189,7 @@ func TestLateResultPersistsThroughSnapshotRestartWithoutRepeatingHistory(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	current, _ := s.Get(m.ID)
+	current, _ := monitorWithActionHistory(t, s, m.ID)
 	if current.Revision != config.Revision || current.Actions[a.ID].State != Unknown || current.Actions[a.ID].LateEvidence == nil || current.Actions[a.ID].LateEvidence.Outcome != "accepted" {
 		t.Fatal("restart lost held outcome or original late evidence")
 	}

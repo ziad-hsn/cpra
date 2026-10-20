@@ -170,8 +170,9 @@ func TestRestartInterventionRequiresFreshObservation(t *testing.T) {
 }
 
 func TestLifecycleFieldsRequireNewFormat(t *testing.T) {
-	m := configuredPolicyMonitor(t, lifecyclePolicy())
-	m.ActionVersion = 0 // Exercise the supported format-42 contract independently.
+	config := testMonitor()
+	config.Policy = lifecyclePolicy()
+	m := *transitionAtFormat(Monitor{}, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: policyTime()}, LifecycleFormatVersion).Monitor
 	c := Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()}
 	if commandMinimumFormat(c) != LifecycleFormatVersion {
 		t.Fatal("lifecycle state escaped version boundary")

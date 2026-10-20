@@ -231,6 +231,11 @@ func (f *machine) checkWorkerExecution(in WorkerExecutionIntent, at time.Time) e
 	if err := f.checkWorkerActionIdentity(in); err != nil {
 		return err
 	}
+	var err error
+	m, err = f.hydrateReviewDependencies(m, in.ActionID)
+	if err != nil {
+		return err
+	}
 	result := transitionAtFormat(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at, NoticeRevision: ActionNoticeRevision(m.Actions[in.ActionID])}, f.image.Version)
 	if !result.Allowed || result.Err != nil {
 		return ErrWorkerExecutionConflict

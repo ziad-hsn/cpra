@@ -33,7 +33,16 @@ func (s *raftLogSink) Accept(_ string, level hclog.Level, message string, args .
 	// One initial election is expected for this single-voter store. Repeated
 	// elections and every other warning keep their original severity.
 	if level == hclog.Warn && message == "heartbeat timeout reached, starting election" && s.initialElection.CompareAndSwap(false, true) {
-		level, message = hclog.Info, "Starting single-node Raft election"
+		level, message = hclog.Debug, "Starting single-node Raft election"
+	}
+	if level == hclog.Info {
+		switch message {
+		case "initial configuration", "entering follower state", "entering candidate state",
+			"pre-vote successful, starting election", "election won", "entering leader state",
+			"starting snapshot up to", "snapshot complete up to", "no logs to truncate", "compacting logs",
+			"starting restore from snapshot", "restored from snapshot":
+			level = hclog.Debug
+		}
 	}
 	fields := make([]applogger.Field, 0, min(len(args)/2, 16))
 	for i := 0; i+1 < len(args) && len(fields) < 16; i += 2 {

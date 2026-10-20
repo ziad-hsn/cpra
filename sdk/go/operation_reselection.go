@@ -70,7 +70,7 @@ func reselectionAttemptID(id string) bool {
 // original operation. It does not upload, verify, renew or activate that operation.
 // NormalizationProfile must match the original, including empty for ordinary
 // file input. The server verifies source bytes and resource identities.
-// Discover server support before use; this candidate contract is additive.
+// Discover server support before use; reselection requires its advertised capability.
 func (s *OperationsService) CreateReselection(ctx context.Context, id string, req api.CollectionReselectionCreateRequest) (*Response[api.CollectionReselectionAttempt], error) {
 	if err := reselectionIDs(id, "", false); err != nil {
 		return nil, err

@@ -77,7 +77,7 @@ func TestWorkerResultProcessCrashHelper(t *testing.T) {
 	if category == "recovery" {
 		// Restarted queued recovery needs a new health observation before any
 		// worker may start the retained action.
-		m, _ := store.Get(in.MonitorID)
+		m, _ := monitorWithActionHistory(t, store, in.MonitorID)
 		at := time.Now().UTC()
 		submit(t, store, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Guard: &in.Guard,
 			Generation: m.Generation + 1, At: at, ExecutionStart: at, Outcome: "failure"})
@@ -162,7 +162,7 @@ func TestWorkerResultProcessCrashHelper(t *testing.T) {
 		evidence = WorkerEvidenceInput{ServerID: identity.ServerID, ExecutionID: in.ID, ExecutionRevision: in.Revision,
 			GrantID: grant.GrantID, OriginalReceiptID: r.Result.Receipt.ReceiptID, EvidenceID: uuid.NewString(), Digest: authenticationVerifier("original-evidence"), Payload: payload.Clone()}
 		if category != "check" {
-			m, _ := store.Get(in.MonitorID)
+			m, _ := monitorWithActionHistory(t, store, in.MonitorID)
 			mustResult(t, store, reviewCommand(m, m.Actions[in.ActionID], uuid.NewString(), "inconclusive", time.Now().UTC()))
 		}
 		if phase != "before-evidence" {
@@ -180,7 +180,7 @@ func TestWorkerResultProcessCrashHelper(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatal(err)
 	}
-	monitor, _ := store.Get(in.MonitorID)
+	monitor, _ := monitorWithActionHistory(t, store, in.MonitorID)
 	raw, err := json.Marshal(workerResultCrashState{Authority: authority, Start: start, Input: input, Record: record, Monitor: monitor, Evidence: evidence, SLO: store.fsm.image.WorkerSLO})
 	if err != nil {
 		t.Fatal(err)
@@ -325,7 +325,7 @@ func workerResultCrashCases(t *testing.T, phases []string) {
 					if len(r.Evidence) != 1 || r.Result.Receipt != first {
 						t.Fatal("evidence changed original outcome")
 					}
-					m, _ := store.Get(saved.Record.Intent.MonitorID)
+					m, _ := monitorWithActionHistory(t, store, saved.Record.Intent.MonitorID)
 					if category != "check" && !reflect.DeepEqual(m.Actions[saved.Record.Intent.ActionID].Review, saved.Monitor.Actions[saved.Record.Intent.ActionID].Review) {
 						t.Fatal("evidence/restart changed operator review")
 					}
@@ -340,7 +340,7 @@ func workerResultCrashCases(t *testing.T, phases []string) {
 						t.Fatal("restart invented timing or lost an obligation", report)
 					}
 				}
-				monitor, _ := store.Get(saved.Record.Intent.MonitorID)
+				monitor, _ := monitorWithActionHistory(t, store, saved.Record.Intent.MonitorID)
 				requireWorkerProjectionView(t, store, monitor.ID)
 				if monitor.TotalChecks != saved.Monitor.TotalChecks || monitor.LastOutcome != saved.Monitor.LastOutcome {
 					t.Fatal("restart or repeated outcome invented an observation")

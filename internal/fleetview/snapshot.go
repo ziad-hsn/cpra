@@ -47,9 +47,9 @@ type MonitorSummary struct {
 	Incident                        bool              `json:"incident" yaml:"incident"`
 	PendingCode                     string            `json:"pending_code" yaml:"pending_code"`
 	ConsecutiveFailures             int               `json:"consecutive_failures" yaml:"consecutive_failures"`
-	LastCheck                       time.Time         `json:"last_check" yaml:"last_check"`
-	LastSuccess                     time.Time         `json:"last_success" yaml:"last_success"`
-	NextCheck                       time.Time         `json:"next_check" yaml:"next_check"`
+	LastCheck                       time.Time         `json:"last_check,omitzero" yaml:"last_check"`
+	LastSuccess                     time.Time         `json:"last_success,omitzero" yaml:"last_success"`
+	NextCheck                       time.Time         `json:"next_check,omitzero" yaml:"next_check"`
 	ActiveCodes                     []string          `json:"active_codes" yaml:"active_codes"`
 	// Target is a human-readable endpoint for display (URL for http, host:port for
 	// tcp/udp/grpc, host for icmp/dns/docker). Empty when not derivable.

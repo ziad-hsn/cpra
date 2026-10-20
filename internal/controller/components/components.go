@@ -318,11 +318,18 @@ func (c *CodeStatus) Copy() *CodeStatus {
 
 // JobStorage consolidates all job storage instead of separate job components.
 // This single component replaces PulseJob, InterventionJob, CodeJob, etc.
+type ActionFlow struct {
+	Driver string
+	Key    uint64
+}
+
 type JobStorage struct {
 	jobStorageExtensions
-	PulseJob        jobs.Job
-	InterventionJob jobs.Job
-	CodeJobs        map[string][]jobs.Job // Jobs for each code color (one per delivery endpoint)
+	InterventionFlow ActionFlow
+	CodeFlows        map[string][]ActionFlow
+	PulseJob         jobs.Job
+	InterventionJob  jobs.Job
+	CodeJobs         map[string][]jobs.Job // Jobs for each code color (one per delivery endpoint)
 }
 
 func (j *JobStorage) Copy() *JobStorage {
@@ -332,6 +339,11 @@ func (j *JobStorage) Copy() *JobStorage {
 	cpy := &JobStorage{
 		jobStorageExtensions: j.jobStorageExtensions.clone(),
 		CodeJobs:             make(map[string][]jobs.Job),
+		InterventionFlow:     j.InterventionFlow,
+		CodeFlows:            make(map[string][]ActionFlow, len(j.CodeFlows)),
+	}
+	for color, flows := range j.CodeFlows {
+		cpy.CodeFlows[color] = slices.Clone(flows)
 	}
 	if j.PulseJob != nil {
 		cpy.PulseJob = j.PulseJob.Copy()

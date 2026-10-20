@@ -42,7 +42,32 @@ monitors:
         config: {file: alerts.jsonl}
 ~~~
 
+Log destinations require a process-owned root outside configuration and state.
+Save this separate runtime file, replacing the path with an absolute directory
+that the CPRa account can write:
+
+~~~yaml
+notifications:
+  log_directory: /var/log/cpra/notifications
+~~~
+
+Validate without applying, then start using both files:
+
+~~~bash
+cpra -yaml monitors.yaml -runtime-config runtime.yaml -validate
+cpra -yaml monitors.yaml -runtime-config runtime.yaml
+~~~
+
+For a user installation, choose an account-owned absolute log path. Service
+installations must provision its ownership before startup. See the
+[quickstart](../tutorials/quickstart.md) for the complete protected initialization flow.
+
 ## Monitor and check fields
+
+The optional top-level `version` is an integer manifest metadata field, such as
+`version: 2`; it is not the application version or the `cpra.io/v2` API version.
+Omitting it keeps the same monitor syntax. It does not enable drivers, switch
+storage formats or select a different validation policy.
 
 | Field | Meaning |
 | --- | --- |
@@ -130,7 +155,19 @@ monitors:
         notify_group: operators
 ~~~
 
-A group succeeds when at least one destination accepts delivery. It does not require every destination to succeed. `dispatch` defaults to true for a declared rule; set it to false to suppress that rule.
+CPRa tracks each destination independently. One destination's success does not
+mark another destination delivered, and an unfinished destination does not replay
+a confirmed delivery. Inspect per-endpoint outcomes to distinguish acceptance,
+failure and uncertainty. `dispatch` defaults to true for a declared rule; set it
+to false to suppress that rule.
+
+The optional `trigger` normally defaults to `state_change`. A red rule on a
+monitor with an intervention can instead select `recovery_failed` (a confirmed
+failed attempt) or `recovery_exhausted` (confirmed failure at the incident's
+attempt limit). These triggers do not turn an unknown effect into a confirmed
+failure. Configure **blue** separately to notify that recovery is unknown and
+needs operator review. Blue never inherits red destinations. See the
+[notification lifecycle](../explanation/incident-lifecycle.md).
 
 ## Maintenance
 
@@ -172,6 +209,11 @@ restart. The manifest field is `target`, not `config`.
 
 YAML monitors must be a block sequence. Each monitor entry and metadata section has a 1 MiB limit. JSON is decoded incrementally. Both paths have a decompressed-input budget; streaming does not make memory use independent of monitor count.
 
+UTF-8 input may begin with a BOM. YAML anchors and aliases may refer to an earlier
+entry in the same document, within the resource and total expansion limits.
+Cycles, excessive expansion and references across document boundaries are
+rejected. Error locations retain the original file, field spelling and position.
+
 Missing, malformed, and semantically invalid manifests fail startup. Unknown
 fields, duplicate keys, wrong types, required-setting omissions and unavailable
 compiled/platform drivers are rejected. An empty manifest requires
@@ -184,3 +226,10 @@ resources and references rather than embedding values in shared manifests.
 Operators with credential-use/configuration permissions are trusted to select
 destinations. Keep bearer tokens and wrapping keys in protected files outside
 the state directory; include retained keys separately in your backup procedure.
+
+File-mode inline credentials are not a safe management import format. Move each
+sensitive value into a `Credential`, then use the driver's `credentialRefs` field
+in the management resource. The
+[credential and endpoint walkthrough](../cpractl-management.md#create-contacts-destinations-and-a-monitor)
+shows the conversion without putting a secret on the command line. Validation
+checks the supplied input; it does not apply that input to an existing catalog.

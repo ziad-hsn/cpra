@@ -85,7 +85,7 @@ func TestStopDeadlineCancelsWorkAndRetainsUnknownAction(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("cooperative operation/owner leaked after cancellation")
 	}
-	m, ok := store.Get("shutdown-test")
+	m, ok := monitorWithActionHistory(t, store, "shutdown-test")
 	if !ok {
 		t.Fatal("missing monitor")
 	}

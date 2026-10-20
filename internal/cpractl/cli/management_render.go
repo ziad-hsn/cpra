@@ -176,7 +176,11 @@ func monitorHealth(raw json.RawMessage) string {
 	if json.Unmarshal(raw, &status) != nil || status.LastCheckedAt.IsZero() {
 		return "unknown"
 	}
-	switch status.Health {
+	return healthDisplay(string(status.Health))
+}
+
+func healthDisplay(health string) string {
+	switch health {
 	case "healthy":
 		return "up"
 	case "unhealthy":

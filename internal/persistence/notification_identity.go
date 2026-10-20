@@ -174,6 +174,9 @@ func (p Policy) MaintenanceBetween(from, through time.Time) bool {
 }
 
 func notificationEndpointIdentity(m Monitor, color string, endpoint int) string {
+	if value, ok := m.reviewEndpointIDs[endpoint]; color == "blue" && ok {
+		return value
+	}
 	if ids := m.Policy.NotificationEndpointIDs[color]; endpoint >= 0 && endpoint < len(ids) {
 		return identity(fmt.Sprintf("endpoint/%s/%s/%s", m.ID, m.incarnationIdentity(), ids[endpoint]))
 	}

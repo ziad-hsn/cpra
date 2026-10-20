@@ -27,5 +27,11 @@
   "source/examples/sdk/queue-registration/main.go.txt",
   "source/examples/sdk/queue-registration/main_test.go.txt",
   "source/examples/sdk/queue-registration/registrations.jsonl",
-  "source/sdk/go/worker/README.md.txt"
+  "source/sdk/go/LICENSE.txt",
+  "source/sdk/go/collection/example_reselection_test.go.txt",
+  "source/sdk/go/collection/example_test.go.txt",
+  "source/sdk/go/example_test.go.txt",
+  "source/sdk/go/worker/LICENSE.txt",
+  "source/sdk/go/worker/doc.go.txt",
+  "source/sdk/go/worker/example_test.go.txt"
 ]

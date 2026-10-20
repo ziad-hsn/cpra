@@ -153,7 +153,7 @@ it('uses current state and readiness in observation mode without writable manage
   expect(valueFor('Controller initialization and progress')).toHaveTextContent(/^Ready$/);
   expect(valueFor('Dashboard projection')).toHaveTextContent(/^Stale$/);
   expect(valueFor('Last recorded commit latency')).toHaveTextContent(/^0 ms$/);
-  expect(valueFor('FSM-applied log position')).toHaveTextContent(/^12$/);
+  expect(valueFor('Committed controller log position')).toHaveTextContent(/^12$/);
   await screen.findByText(/^Readiness endpoint:/);
   expect(requests.map(request => request.path)).toEqual(['/api/v2/access', '/api/v2/self', '/api/v2/state', '/api/v2/readyz']);
   expect(requests.every(request => request.authorization === null && request.method === 'GET')).toBe(true);

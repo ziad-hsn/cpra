@@ -4,17 +4,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 LESSONS = ["queue-registration", "elb-deregistration", "kubernetes-services", "dao-sms"]
+GUIDES = {
+    "sdk/go/README.md": "module-overview.md",
+    "sdk/go/collection/README.md": "collections.md",
+    "sdk/go/worker/README.md": "worker-library.md",
+    "api/openapi/README.md": "openapi.md",
+    "examples/sdk/README.md": "examples.md",
+}
 SOURCE_SUFFIXES = {".go", ".json", ".jsonl", ".yaml", ".yml", ".md", ".txt", ".sh", ".mod", ".sum"}
 
 
 def lesson(name: str, assets: dict[Path, bytes]) -> str:
     path = ROOT / "examples/sdk" / name / "README.md"
+    return source_page(path, assets)
+
+
+def source_page(path: Path, assets: dict[Path, bytes]) -> str:
     text = path.read_text()
 
     def link(match):
@@ -27,19 +39,24 @@ def lesson(name: str, assets: dict[Path, bytes]) -> str:
             raise ValueError("link outside repository: " + target)
         if not resolved.is_file():
             raise ValueError("broken example link: " + str(resolved))
+        relative_source = resolved.relative_to(ROOT).as_posix()
         if resolved == ROOT / "examples/sdk/README.md":
             target = "index.md"
+        elif relative_source in GUIDES:
+            target = GUIDES[relative_source]
         elif resolved.name == "README.md" and resolved.parent.name in LESSONS:
             target = resolved.parent.name + ".md"
-        elif resolved.is_relative_to(ROOT / "docs/sdk") and not resolved.is_relative_to(ROOT / "docs/sdk/source"):
-            target = resolved.relative_to(ROOT / "docs/sdk").as_posix()
+        elif resolved.is_relative_to(ROOT / "docs") and not resolved.is_relative_to(ROOT / "docs/sdk/source"):
+            if resolved.relative_to(ROOT / "docs").parts[0] in {"implementation", "review", "candidate"}:
+                raise ValueError("public SDK guide links to a historical record: " + target)
+            target = Path(os.path.relpath(resolved, ROOT / "docs/sdk")).as_posix()
         else:
-            if resolved.suffix not in SOURCE_SUFFIXES or any(part.startswith(".") for part in resolved.relative_to(ROOT).parts):
+            if (resolved.suffix not in SOURCE_SUFFIXES and resolved.name != "LICENSE") or any(part.startswith(".") for part in resolved.relative_to(ROOT).parts):
                 raise ValueError("unsupported source asset: " + str(resolved))
             relative = Path("source") / resolved.relative_to(ROOT)
             # Text suffixes avoid undeclared MkDocs pages and Go packages under
             # docs/. The source content remains byte-for-byte identical.
-            if relative.suffix in {".md", ".go", ".mod", ".sum", ".sh"}:
+            if relative.suffix in {".md", ".go", ".mod", ".sum", ".sh"} or relative.name == "LICENSE":
                 relative = relative.with_name(relative.name + ".txt")
             assets[relative] = resolved.read_bytes()
             target = relative.as_posix()
@@ -48,12 +65,14 @@ def lesson(name: str, assets: dict[Path, bytes]) -> str:
         return "[" + label + "](" + target + ")"
 
     text = re.sub(r"\[([^\]\n]+)\]\(([^)\s]+)\)", link, text)
-    return text + "\n<!-- Generated from examples/sdk/" + name + "/README.md by scripts/sdk/sync_guides.py. -->\n"
+    return text + "\n<!-- Generated from " + path.relative_to(ROOT).as_posix() + " by scripts/sdk/sync_guides.py. -->\n"
 
 
 def generated() -> dict[Path, bytes]:
     assets: dict[Path, bytes] = {}
     pages = {Path(name + ".md"): lesson(name, assets).encode() for name in LESSONS}
+    for source, destination in GUIDES.items():
+        pages[Path(destination)] = source_page(ROOT / source, assets).encode()
     pages.update(assets)
     pages[Path("source/manifest.json")] = (json.dumps(sorted(str(p) for p in assets), indent=2) + "\n").encode()
     return pages

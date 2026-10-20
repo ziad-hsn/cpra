@@ -175,6 +175,11 @@ omit server-assigned UID, resourceVersion and generation. Stable IDs identify
 resources across display-name changes; delete/recreate produces a new
 incarnation and version.
 
+Resource, control, incident and action-review revisions are distinct opaque
+preconditions. Their formats may differ; do not parse them as UUIDs, manufacture
+a revision or substitute one kind for another. Read the exact resource/control
+or action being changed and use the corresponding revision from that response.
+
 Use a JSON merge-patch file for a targeted edit. The
 [patch example](reference/source/examples/cpractl/disable.json.txt) disables the monitor by
 explicitly setting `spec.enabled` to `false`:

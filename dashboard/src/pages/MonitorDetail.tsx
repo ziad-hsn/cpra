@@ -13,12 +13,15 @@ import { Icon } from '../components/Icon';
 import { formatDateTime, formatNumber, formatMs, formatMeasuredLatency, formatUptime, uptimeColor } from '../lib/format';
 import type { CpraCode } from '../theme/tokens';
 import type { ReactNode } from 'react';
+import { ApiError } from '../api/client';
+import { useOnlineStatus } from '../hooks/connection';
 
 export default function MonitorDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const session = useDashboardSession();
-  const { data: monitor, isLoading, isError, refetch } = useMonitor(id);
+  const { data: monitor, isLoading, isError, error, refetch } = useMonitor(id);
+  const online = useOnlineStatus();
 
   const backBtn = (
     <button className='btn ghost' onClick={() => navigate('/monitors')}>
@@ -26,8 +29,14 @@ export default function MonitorDetail() {
     </button>
   );
 
-  if (isError) {
-    return <div className='page'><h1>Monitor details</h1><div>{backBtn}</div><ErrorState message={'Monitor ' + id + ' not found'} onRetry={() => refetch()} /></div>;
+  const absent = error instanceof ApiError && error.status === 404;
+  const denied = error instanceof ApiError && (error.status === 401 || error.status === 403);
+  if ((isError || !online) && (!monitor || absent || denied)) {
+    const message = !online ? 'You are offline. Reconnect to read this monitor.'
+      : absent ? 'This monitor was not found in the current controller projection.'
+      : denied ? 'Your current identity cannot read this monitor. Check your connection and permissions.'
+      : 'Monitor observations are unavailable. This does not mean the monitor was deleted or recovered.';
+    return <div className='page'><h1>Monitor details</h1><div>{backBtn}</div><ErrorState message={message} onRetry={online && !denied ? () => refetch() : undefined} /></div>;
   }
   if (isLoading || !monitor) {
     return <div className='page'><h1>Monitor details</h1><div>{backBtn}</div><div className='card'><LoadingSkeleton lines={6} /></div></div>;
@@ -41,6 +50,9 @@ export default function MonitorDetail() {
   return (
     <div className='page'>
       <div className='row' style={{ gap: 8, flexWrap: 'wrap' }}>{backBtn}{m.monitor_id && session.can('GetMonitor') && <Link className='btn' to={`/monitor-configurations/${encodeURIComponent(m.monitor_id)}`}>View saved configuration</Link>}</div>
+      {m.monitor_id && session.can('GetMonitor') && session.can('CreateOperation') && <Link className="btn" to={`/import?monitor=${encodeURIComponent(m.monitor_id)}`}>Set up notifications</Link>}
+
+      {(isError || !online) && <p role="alert">Saved monitor observations are shown below. Current health is unavailable{!online ? ' while offline' : ' because the latest request failed'}.</p>}
 
       <div className='card' style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div className='spread' style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
@@ -72,7 +84,8 @@ export default function MonitorDetail() {
 		<FailureDetails diagnostic={m.configuration_problem} label="Check configuration problem" />
 		{m.configuration_problem && <p>Health and last-check time show the last target observation. Preparation will be retried at the normal check interval; recovery actions are blocked meanwhile.</p>}
         {m.certificate_verification_disabled && <p role='status'>TLS certificate verification disabled for this monitor.</p>}
-        <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Delivered (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
+        <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Accepted (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
+        <p className='muted'>Acceptance records the provider response; it does not prove a recipient received the notification.</p>
       </div>
 
       {m.monitor_id && <MonitorControls key={`controls/${m.monitor_id}`} monitorID={m.monitor_id} />}

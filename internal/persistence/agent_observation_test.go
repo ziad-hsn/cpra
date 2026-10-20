@@ -101,7 +101,13 @@ func TestAgentObservationRetainsUnknownOutcomeAndReview(t *testing.T) {
 				after.Outcome != a.Outcome || !after.FinishedAt.Equal(a.FinishedAt) || after.ReviewRevision == a.ReviewRevision {
 				t.Fatal("observation resolved the action or lost the review precondition")
 			}
-			before.Actions[a.ID] = after.Action.Clone()
+			if before.ActionProjection != nil && before.ActionProjection.LatestRecovery != nil && before.ActionProjection.LatestRecovery.ID == a.ID {
+				updated := after.Action.Clone()
+				before.ActionProjection.LatestRecovery = &updated
+			}
+			if _, exists := before.Actions[a.ID]; exists {
+				before.Actions[a.ID] = after.Action.Clone()
+			}
 			if !reflect.DeepEqual(before, m) {
 				t.Fatal("observation changed incident, scheduling or action admission")
 			}
@@ -232,7 +238,11 @@ func TestAgentConnectionSnapshotAndReadsAreDetached(t *testing.T) {
 	fromView, _, _ := view.Get(a.ID)
 	fromView.AgentConnection.Payload.Nonce[0] ^= 1
 	m, _ := s.Get(a.MonitorID)
-	m.Actions[a.ID].AgentConnection.Payload.WrappedKey[0] ^= 1
+	if _, exists := m.Actions[a.ID]; exists {
+		t.Fatal("completed action entered hot projection")
+	}
+	fromView.AgentConnection.Payload.WrappedKey[0] ^= 1
+	defer view.Close()
 	if err := s.RecordAgentObservation(t.Context(), a, nextAgentObservation(a, "TASK_STATE_COMPLETED")); err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +255,7 @@ func TestAgentConnectionSnapshotAndReadsAreDetached(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	retained := image.Monitors[a.MonitorID].Actions[a.ID]
+	retained := snapshotAction(t, ledger, a.ID)
 	if image.Version != ActionFormatVersion || retained.AgentReceipt.State != "TASK_STATE_WORKING" {
 		t.Fatal("snapshot was not frozen before the later observation")
 	}
@@ -314,6 +324,7 @@ func TestAgentObservationCommandAndSnapshotBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
+	image.Monitors[a.MonitorID] = withAction(image.Monitors[a.MonitorID], snapshotAction(t, ledger, a.ID))
 	image.Version = AgentActionFormatVersion
 	if validateRecoveryReviewImage(image) == nil {
 		t.Fatal("old snapshot version accepted connection payload")
@@ -347,8 +358,8 @@ func TestAgentConnectionPreservesManifestAdoption(t *testing.T) {
 	// The pure transition receives a configuration whose catalog guard was
 	// already checked by Apply. Test adoption without manufacturing a catalog.
 	result := transition(m, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &configured, At: time.Now().UTC()})
-	adopted := result.Monitor.Actions[a.ID]
-	if adopted.CatalogUID != configured.CatalogUID || !adopted.Held() || !result.Monitor.otherActiveRecovery("new-action") {
+	adopted := retainedAction(t, s, a.ID)
+	if result.Monitor.AdoptedFileIncarnation == nil || *result.Monitor.AdoptedFileIncarnation != adopted.FileIncarnation || !result.Monitor.OwnsAction(adopted) || adopted.CatalogUID != "" || !adopted.Held() || !result.Monitor.otherActiveRecovery("new-action") {
 		t.Fatal("adoption released or orphaned an unknown intervention")
 	}
 	plain, err := agentObservationSealer(t).Open(t.Context(), AgentConnectionBinding(s.Status().NodeID, m.ID, adopted), adopted.AgentConnection.Payload)
@@ -357,7 +368,8 @@ func TestAgentConnectionPreservesManifestAdoption(t *testing.T) {
 		t.Fatal("adoption redirected or lost the original connection", err)
 	}
 	bound := adopted.Clone()
-	bound.AgentConnection.CatalogUID = "adopted-incarnation"
+	bound.CatalogUID = "replacement-incarnation"
+	bound.AgentConnection.CatalogUID = bound.CatalogUID
 	if _, err := agentObservationSealer(t).Open(t.Context(), AgentConnectionBinding(s.Status().NodeID, m.ID, bound), bound.AgentConnection.Payload); err == nil {
 		t.Fatal("cleartext source incarnation replaced the authenticated origin")
 	}

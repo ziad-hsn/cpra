@@ -60,6 +60,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		enabledChanged := previous.ID != "" && !previous.Removed && previous.Policy.Enabled != c.Config.Policy.Enabled
 		if m.ID == "" {
 			m = c.Config.Clone()
+			m.ActionProjection = nil
+			m.AdoptedFileIncarnation = nil
+			m.ReviewAssessmentKey = ""
 			if lifecycleStorageFormat(version) && m.CatalogUID == "" {
 				m.FileIncarnation = identity("file/" + m.ID)
 			}
@@ -71,11 +74,29 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			if m.CatalogUID == "" && c.Config.CatalogUID != "" {
 				// Initial manifest migration adopts the existing incident and action
 				// identities once. Existing ambiguous actions stay conservatively held.
-				m.CatalogUID = c.Config.CatalogUID
-				for id, action := range m.Actions {
-					action.CatalogUID = m.CatalogUID
-					m.Actions[id] = action
+				if actionStorageFormat(version) && m.ActionProjection != nil {
+					// Preserve retained bindings. Adoption keeps their holds but never
+					// turns old file work into permission for a catalog executor.
+					incarnation := m.FileIncarnation
+					m.AdoptedFileIncarnation = &incarnation
+					for _, id := range sortedActions(m.Actions) {
+						action := m.Actions[id]
+						if action.State == Queued {
+							action.State, action.Outcome, action.FinishedAt = Cancelled, "configuration_changed", c.At
+							emit("action_cancelled", &action)
+						} else if action.State == Started {
+							action.State, action.Outcome, action.FinishedAt = Unknown, "configuration_changed_while_started", c.At
+							emit("action_unknown", &action)
+						}
+						m.Actions[id] = action
+					}
+				} else {
+					for id, action := range m.Actions {
+						action.CatalogUID = c.Config.CatalogUID
+						m.Actions[id] = action
+					}
 				}
+				m.CatalogUID = c.Config.CatalogUID
 			}
 			if m.Revision != c.Revision || m.Removed || recreated {
 				for _, id := range sortedActions(m.Actions) {
@@ -103,6 +124,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				notifications := m.Notifications
 				incarnation := m.FileIncarnation
 				m = c.Config.Clone()
+				m.ActionProjection = nil
+				m.AdoptedFileIncarnation = nil
+				m.ReviewAssessmentKey = ""
 				if lifecycleStorageFormat(version) && m.CatalogUID == "" {
 					m.FileIncarnation = identity("file/" + m.ID + "/" + incarnation)
 				}
@@ -131,6 +155,8 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			m.Policy = c.Config.Policy.Clone()
 		}
 		m.ensureControlIdentity()
+		m.ReviewPolicyID = "" // Operational notification policy may change without an execution revision.
+		m.ReviewRevisionDigest = ""
 		if c.Config.InstallationID != "" {
 			m.InstallationID = c.Config.InstallationID
 		}
@@ -421,6 +447,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.observeOutageQualification(c)
 		m.Recovering, m.Warning, m.RecoveryStreak = true, false, 0
 		if m.ConsecutiveFailures >= max(1, m.Policy.Unhealthy) {
+			if m.IncidentThresholdTracked && m.IncidentConfirmedAt.IsZero() {
+				m.IncidentConfirmedAt = c.At.UTC()
+			}
 			m.countIgnoreIncident(c.At, emit)
 		}
 		if m.VerifyRemaining > 0 && c.Generation > m.VerificationAfter {
@@ -527,6 +556,9 @@ func sortedActions(actions map[string]Action) []string {
 }
 
 func (m *Monitor) pendingIntervention() bool {
+	if m.ActionProjection != nil && m.ActionProjection.RecoveryHeld > 0 {
+		return true
+	}
 	for _, a := range m.Actions {
 		if m.OwnsAction(a) && a.Kind == "intervention" && (a.State == Queued || a.State == Started || a.Held()) {
 			return true
@@ -536,6 +568,9 @@ func (m *Monitor) pendingIntervention() bool {
 }
 
 func (m *Monitor) unresolvedIntervention() bool {
+	if m.ActionProjection != nil && m.ActionProjection.RecoveryHeld > 0 {
+		return true
+	}
 	for _, a := range m.Actions {
 		if m.OwnsAction(a) && a.Kind == "intervention" && (a.State == Started || a.Held()) {
 			return true

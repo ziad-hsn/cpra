@@ -33,6 +33,13 @@ func (s *NotificationState) clone() *NotificationState {
 	c := *s
 	c.Deliveries = maps.Clone(s.Deliveries)
 	c.ReviewAlerts = maps.Clone(s.ReviewAlerts)
+	for id, alert := range c.ReviewAlerts {
+		if alert.Owner != nil {
+			owner := *alert.Owner
+			alert.Owner = &owner
+			c.ReviewAlerts[id] = alert
+		}
+	}
 	return &c
 }
 
@@ -201,22 +208,13 @@ func validateNotificationState(m Monitor, version int) error {
 		}
 	}
 	for id, alert := range s.ReviewAlerts {
-		if id != alert.ID || !catalogIdentifier(id, 256) || !catalogIdentifier(alert.ActionID, 256) || !catalogIdentifier(alert.IncidentID, 256) ||
-			!catalogIdentifier(alert.Revision, 256) || !catalogIdentifier(alert.EndpointID, 256) || alert.Endpoint < 0 || alert.Endpoint >= 10000 || alert.OpenedAt.IsZero() ||
-			(!alert.ClosedAt.IsZero() && alert.ClosedAt.Before(alert.OpenedAt)) || alert.CloseReason != "" && alert.CloseReason != "health_recovered" && alert.CloseReason != "action_reviewed" ||
-			(!alert.RecoveredAt.IsZero() && alert.RecoveredAt.Before(alert.OpenedAt)) || alert.ProviderCorrelationVersion != 1 ||
-			(alert.ClosedAt.IsZero() != (alert.CloseReason == "")) || alert.ClosingStarted && !alert.OpeningStarted ||
-			(alert.Health != "healthy" && alert.Health != "unhealthy" && alert.Health != "unknown") || alert.ClosureBlocked != "" && alert.ClosureBlocked != "configuration_changed" && alert.ClosureBlocked != "incarnation_changed" {
-			return errors.New("invalid recovery review alert")
+		if id != alert.ID {
+			return errors.New("invalid recovery review alert identity")
 		}
 		if err := m.validateReviewAlert(alert); err != nil {
 			return err
 		}
-		for _, delivery := range []string{alert.OpeningDelivery, alert.ClosingDelivery} {
-			if delivery != "" && !catalogIdentifier(delivery, 256) {
-				return errors.New("invalid recovery review alert delivery")
-			}
-		}
+
 	}
 	return nil
 }

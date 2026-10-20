@@ -53,7 +53,8 @@ func TestObservationFileActionsRetainOriginalIncarnations(t *testing.T) {
 	apply(persistence.Command{Kind: "remove"})
 	m = apply(persistence.Command{Kind: "configure", Config: &config})
 	m = apply(persistence.Command{Kind: "pulse", Generation: m.Generation + 1, CheckControlRevision: m.ControlRevision, Outcome: "failure"})
-	if !m.Actions[original.ID].Held() || m.FileIncarnation == "" {
+	retained, found, err := store.ActionContext(t.Context(), original.ID)
+	if err != nil || !found || !retained.Held || m.FileIncarnation == "" {
 		t.Fatal("fixture lost original hold or new incarnation")
 	}
 	s := newTestServer(t)

@@ -49,7 +49,7 @@ func TestRestartSnapshotHistoryAndPartialDelivery(t *testing.T) {
 	configure(t, s)
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", Generation: 1, At: now, Scheduled: now, Outcome: "failure"})
-	m, _ := s.Get("stable-one")
+	m, _ := monitorWithActionHistory(t, s, "stable-one")
 	ids := sortedActions(m.Actions)
 	if len(ids) != 2 || !m.Incident {
 		t.Fatalf("missing incident/outbox: %+v", m)
@@ -76,7 +76,7 @@ func TestRestartSnapshotHistoryAndPartialDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if m.Actions[ids[0]].State != Succeeded || m.Actions[ids[1]].State != Unknown {
 		t.Fatalf("unsafe recovered actions: %+v", m.Actions)
 	}
@@ -127,13 +127,13 @@ func TestConfigurationChangeCancelsOnlyUnsent(t *testing.T) {
 	configure(t, s)
 	now := time.Now().UTC()
 	submit(t, s, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", Generation: 1, At: now, Outcome: "failure"})
-	m, _ := s.Get("stable-one")
+	m, _ := monitorWithActionHistory(t, s, "stable-one")
 	ids := sortedActions(m.Actions)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: ids[0], At: now})
 	newConfig := testMonitor()
 	newConfig.Revision = "r2"
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: "r2", Config: &newConfig, At: now})
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if m.Actions[ids[0]].State != Unknown || m.Actions[ids[1]].State != Cancelled {
 		t.Fatal(m.Actions)
 	}

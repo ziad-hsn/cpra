@@ -8,7 +8,7 @@ export { object } from './value';
 export const resourceKinds = {
   monitors: { kind: 'Monitor', singular: 'Monitor', title: 'Monitor configurations', path: '/api/v2/monitors', route: '/monitor-configurations', operations: 'Monitor', listOperation: 'ListMonitors', description: 'Manage saved check, recovery and notification settings. Saved configuration and controller observations have separate versions; a saved change may still be awaiting application.' },
   recipients: { kind: 'Recipient', singular: 'Recipient', title: 'Recipients', path: '/api/v2/recipients', route: '/recipients', operations: 'Recipient', listOperation: 'ListRecipients', description: 'Notification contacts collect a person’s delivery endpoints. Contacts are separate from dashboard access.' },
-  endpoints: { kind: 'NotificationEndpoint', singular: 'Notification endpoint', title: 'Notification endpoints', path: '/api/v2/notification-endpoints', route: '/notification-endpoints', operations: 'NotificationEndpoint', listOperation: 'ListNotificationEndpoints', description: 'Configure destinations using built-in notification drivers. A monitor’s Code selects the delivery type; its recipients and groups supply matching destinations.' },
+  endpoints: { kind: 'NotificationEndpoint', singular: 'Notification endpoint', title: 'Notification endpoints', path: '/api/v2/notification-endpoints', route: '/notification-endpoints', operations: 'NotificationEndpoint', listOperation: 'ListNotificationEndpoints', description: 'Configure destinations using built-in notification drivers. A monitor’s notification rule selects the delivery type; its recipients and groups supply matching destinations.' },
   groups: { kind: 'NotificationGroup', singular: 'Notification group', title: 'Notification groups', path: '/api/v2/notification-groups', route: '/notification-groups', operations: 'NotificationGroup', listOperation: 'ListNotificationGroups', description: 'Groups contain recipients, direct endpoints, or both. Groups cannot contain other groups. Direct endpoints and recipient references can be used together.' },
   credentials: { kind: 'Credential', singular: 'Secret', title: 'Secrets', path: '/api/v2/credentials', route: '/secrets', operations: 'Credential', listOperation: 'ListCredentials', description: 'Secret values are write-only. Protected values are encrypted before durable admission; provider credentials are separate from dashboard bearer tokens.' },
 } as const;
@@ -17,7 +17,7 @@ export type ResourceType = keyof typeof resourceKinds;
 export type ManagedResource = Monitor | Recipient | NotificationEndpoint | NotificationGroup | Credential;
 export type ResourceView = { resource: ManagedResource; unsupported?: string };
 export type ResourcePage = { items: ResourceView[]; nextCursor?: string; snapshot?: string };
-export type FieldDescriptor = { readonly key: string; readonly label: string; readonly type: string; readonly protected: boolean };
+export type FieldDescriptor = { readonly key: string; readonly label: string; readonly type: string; readonly protected: boolean; readonly required: boolean };
 
 export type DriverCategory = 'check' | 'recovery' | 'notification';
 const driverFields = { check: checkFields, recovery: recoveryFields, notification: notificationFields };

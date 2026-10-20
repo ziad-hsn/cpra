@@ -1,6 +1,7 @@
 import type { ManagementError } from '../api/session';
 import { correlationID } from '../api/correlation';
 import { safeValidationField, validationMessage } from '../api/validation';
+import { useFieldValidation } from './FieldValidation';
 
 const codes = new Set([
   'internalError', 'unauthorized', 'forbidden', 'admissionBusy', 'admissionUnavailable', 'outcomeUnconfirmed', 'operationAllocationUnconfirmed', 'requestInterrupted', 'unavailable',
@@ -13,6 +14,7 @@ const phases = new Set(['upload', 'validation', 'activation', 'cancellation', 'o
 /** Correlation and reviewed codes are useful; raw provider detail and submitted
  * values are deliberately excluded from the rendered error, including secrets. */
 export function ProblemDetails({ error, phase }: { error?: ManagementError; phase?: string }) {
+  const validation = useFieldValidation();
   if (!error) return null;
   const request = error.response?.requestID || error.problem?.requestID;
   const operation = error.response?.operationID || error.problem?.operationID;
@@ -28,6 +30,9 @@ export function ProblemDetails({ error, phase }: { error?: ManagementError; phas
     </dl>
     {!!fields.length && <ul aria-label="Field errors">{fields.slice(0, 10).map((field, index) => <li key={index}>
       {safeValidationField(field.field) || 'Resource field'}: {validationMessage(field.reason) || 'validation failed'}{field.reason && codes.has(field.reason) ? ` (${field.reason})` : ''}.
+      {field.field && validation.target(field.field) && <button type="button" className="btn ghost" onClick={() => {
+        const target = validation.target(field.field!); if (target) document.getElementById(target)?.focus();
+      }}>Go to {safeValidationField(field.field)}</button>}
     </li>)}</ul>}
     {fields.length > 10 && <p>Additional field errors omitted.</p>}
   </div>;

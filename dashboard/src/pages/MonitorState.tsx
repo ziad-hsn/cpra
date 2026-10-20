@@ -26,6 +26,7 @@ export default function MonitorState() {
       <h1 className="page-title">Monitor state</h1>
       <Link className="btn ghost" to="/monitor-configurations">Monitor configurations</Link>
       {validID && canRead && <Link className="btn ghost" to={`/monitor-configurations/${encodeURIComponent(monitorID)}`}>View saved configuration</Link>}
+      {validID && canRead && session.can('CreateOperation') && <Link className="btn" to={`/import?monitor=${encodeURIComponent(monitorID)}`}>Set up notifications</Link>}
     </div>
     {!validID ? <p role="alert">This monitor ID is not valid.</p> : !canRead ? <p role="status">Your identity cannot read this monitor. This view requires the management API.</p> : detail.isError || (monitor && !matched) ? <section className="card" role="alert">
       <p>Monitor state is unavailable. Controls cannot use an older or mismatched observation.</p>

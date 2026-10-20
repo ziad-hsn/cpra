@@ -163,7 +163,7 @@ a:hover { color: var(--accent-bright); }
 
 /* ---------- Topbar ---------- */
 .topbar {
-  height: 64px;
+  min-height: 64px;
   background: var(--surface-1);
   border-bottom: 1px solid var(--border-default);
   display: flex; align-items: center; gap: 16px;
@@ -177,6 +177,7 @@ a:hover { color: var(--accent-bright); }
 
 .status-banner {
   display: flex; align-items: center; gap: 9px;
+  min-width: 0; overflow-wrap: anywhere;
   padding: 7px 14px; border-radius: 999px;
   font-size: 12.5px; font-weight: 600;
   border: 1px solid transparent;
@@ -184,7 +185,10 @@ a:hover { color: var(--accent-bright); }
 }
 .status-banner.ok { background: var(--status-bg-operational); border-color: var(--status-border-operational); color: var(--status-operational); }
 .status-banner.critical { background: var(--status-bg-critical); border-color: var(--status-border-critical); color: var(--status-critical); }
-.status-banner .dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; animation: pulse 2s var(--ease) infinite; }
+.status-banner .dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 999px; background: currentColor; animation: pulse 2s var(--ease) infinite; }
+.stale-note { display: block; font-weight: 400; }
+.route-failure { max-width: 48rem; margin: 3rem auto; padding: 1.5rem; }
+.route-failure .row { gap: 12px; flex-wrap: wrap; }
 
 .topbar-spacer { flex: 1; }
 

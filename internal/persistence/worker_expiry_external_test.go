@@ -53,13 +53,18 @@ func TestWorkerExpiryCancelsOnlyTheOriginalUnstartedAction(t *testing.T) {
 				t.Fatal(err)
 			}
 			after, _ := s.Get(in.MonitorID)
-			a := after.Actions[in.ActionID]
+			a := retainedAction(t, s, in.ActionID)
 			if a.State != Cancelled || a.Outcome != "worker_admission_expired" || !a.StartedAt.IsZero() ||
 				a.ExecutorKind != "" || a.ExecutorSession != "" || a.FinishedAt.Before(in.Deadline) {
 				t.Fatal("expiry invented an invocation or lost its disposition", a)
 			}
 			comparison := after.Clone()
 			comparison.Actions[in.ActionID] = before.Actions[in.ActionID]
+			comparison.ActionProjection = before.ActionProjection.clone()
+			comparison.Notifications = before.Notifications.clone()
+			comparison.IncidentDeliveries = before.IncidentDeliveries
+			comparison.incidentNotifications = before.incidentNotifications
+			_ = projectionSnapshot(t, s) // validate every derived count against retained facts
 			if !reflect.DeepEqual(before, comparison) {
 				t.Fatal("expiry changed another endpoint, health, counters, cooldown or incident")
 			}
@@ -207,10 +212,9 @@ func TestWorkerExpiryAndAdmissionHaveOneWinner(t *testing.T) {
 		})
 		wg.Go(func() { _, admissionErr = s.CommitWorkerExecution(t.Context(), in) })
 		wg.Wait()
-		m, _ := s.Get(in.MonitorID)
 		_, admitted, err := s.WorkerExecution(t.Context(), in.ID)
 		if err != nil || (expiry.Err == nil) == (admissionErr == nil) || admitted != (admissionErr == nil) ||
-			(m.Actions[in.ActionID].State == Cancelled) == admitted {
+			(retainedAction(t, s, in.ActionID).State == Cancelled) == admitted {
 			t.Fatal("admission and expiry did not preserve a single winner", expiry.Err, admissionErr, err)
 		}
 	}
@@ -274,9 +278,19 @@ func TestWorkerExpiryCommandAndSnapshotValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if saved.Monitors[in.MonitorID].Actions[in.ActionID].Outcome != "worker_admission_expired" {
+	pin, err := ledger.pinActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pin.Close()
+	row, found, err := pin.Get(t.Context(), in.ActionID)
+	if err != nil || !found {
+		t.Fatal("archived expiry", err)
+	}
+	if row.Action.Outcome != "worker_admission_expired" {
 		t.Fatal("snapshot lost expiry")
 	}
+	saved.Monitors[in.MonitorID] = withAction(saved.Monitors[in.MonitorID], row.Action)
 	saved.Version = WorkerNotificationFormatVersion
 	if validateImageExtensions(saved) == nil {
 		t.Fatal("snapshot downgrade accepted")

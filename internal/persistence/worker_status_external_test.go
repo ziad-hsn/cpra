@@ -86,7 +86,7 @@ func TestWorkerStatusesTerminalActionsAndNoWrites(t *testing.T) {
 				if err != nil || !ok {
 					t.Fatal("execution missing", err)
 				}
-				monitor, ok := s.Get(execution.Intent.MonitorID)
+				monitor, ok := monitorWithActionHistory(t, s, execution.Intent.MonitorID)
 				if !ok {
 					t.Fatal("action monitor missing")
 				}

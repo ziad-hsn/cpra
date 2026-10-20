@@ -244,6 +244,7 @@ func queueObservation(name string, source queue.Queue) api.Queue {
 	}
 	for _, driver := range stats.Drivers {
 		d := api.DriverQueue{Driver: driver.Driver, Pending: int64(driver.Pending), Active: int64(driver.Active), ConcurrencyLimit: int64(driver.ConcurrencyLimit), AdmissionLimit: int64(driver.AdmissionLimit), Rejections: driver.Rejections, Timeouts: driver.Timeouts, Condition: driver.Condition,
+			RequestedCapacity: int64(driver.RequestedCapacity), ReservedCapacity: int64(driver.ReservedCapacity), ReservationAvailable: true,
 			OldestPendingMS: unavailableMeasurement("queue_empty"), OldestActiveMS: unavailableMeasurement("no_active_work")}
 		if driver.Pending > 0 {
 			d.OldestPendingMS = durationMeasurement(driver.OldestPendingAge)
@@ -262,6 +263,8 @@ func poolObservation(name string, source *queue.DynamicWorkerPool) api.Pool {
 		return result
 	}
 	stats := source.Stats()
+	result.RequestedCapacity, result.ReservedCapacity = int64(stats.RequestedCapacity), int64(stats.ReservedCapacity)
+	result.DrainingWorkers, result.CapacityCondition, result.CapacityAccountingAvailable = int64(stats.DrainingWorkers), stats.CapacityCondition, true
 	result.Available, result.Workers, result.Capacity, result.Target = true, int64(stats.RunningWorkers), int64(stats.CurrentCapacity), int64(stats.TargetWorkers)
 	result.Minimum, result.Maximum = int64(stats.MinWorkers), int64(stats.MaxWorkers)
 	result.WaitingTasks, result.PendingResults = int64(stats.WaitingTasks), int64(stats.PendingResults)
@@ -300,7 +303,7 @@ func (s *Server) managementSystems() ([]api.System, bool) {
 			value.AverageUpdateDuration = observationMeasurement(float64(stats.TotalDuration) / float64(time.Millisecond) / float64(stats.TotalUpdates))
 			value.MinimumUpdateDuration, value.MaximumUpdateDuration = durationMeasurement(stats.MinUpdateDuration), durationMeasurement(stats.MaxUpdateDuration)
 			if !stats.LastUpdateTime.IsZero() {
-				at := stats.LastUpdateTime
+				at := stats.LastUpdateTime.UTC()
 				value.ProgressAt = &at
 			}
 		}

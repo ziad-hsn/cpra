@@ -7,12 +7,11 @@ The examples use a separate Go module so AWS and Kubernetes dependencies stay
 out of the public SDK. Go 1.26 or later is required. Node, Redis, a Kubernetes
 cluster, an AWS account, and SMS credentials are unnecessary for the local demos.
 
-**Current boundary:** the private working branch implements v2 management and
-public collection activation with retained execution results. Cross-process
-file reselection and external-worker qualification remain separate gates.
-These finite demos use clearly labeled local fixtures. Configured modes
-require a server that implements and qualifies every operation the chosen example
-uses; passing a local demo does not establish that server capability.
+These finite demos use local fixtures. Configured modes connect to the actual
+CPRa management API and, where applicable, Kubernetes, AWS or an external worker.
+Discover server capabilities and use credentials with the necessary permissions.
+See [versions and availability](../../docs/versions.md) for publication and
+qualification status; a local demo does not prove a provider-account effect.
 
 The collection fixture accepts preparation tickets and verifies the keyed item
 and inventory commitments produced by `collection.Freeze`. Repeating Create with
@@ -28,7 +27,7 @@ All fixture state and private
 input remain in process memory; there is no Raft, encrypted storage, retained
 history, restore fencing or provider certification in this mock server.
 
-## Set up the candidate workspace
+## Set up the development workspace
 
 From the CPRa repository root, select your installed Go compiler and create a
 workspace for the unpublished SDK modules:

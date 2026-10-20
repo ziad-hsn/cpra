@@ -742,7 +742,7 @@ type ClientInterface interface {
 
 	// WorkerHeartbeatWithBody WorkerHeartbeat
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -751,7 +751,7 @@ type ClientInterface interface {
 
 	// WorkerHeartbeat WorkerHeartbeat
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -760,7 +760,7 @@ type ClientInterface interface {
 
 	// WorkerLateEvidenceWithBody WorkerLateEvidence
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -769,7 +769,7 @@ type ClientInterface interface {
 
 	// WorkerLateEvidence WorkerLateEvidence
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -778,7 +778,7 @@ type ClientInterface interface {
 
 	// WorkerPollWithBody WorkerPoll
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -787,7 +787,7 @@ type ClientInterface interface {
 
 	// WorkerPoll WorkerPoll
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -796,7 +796,7 @@ type ClientInterface interface {
 
 	// WorkerResultWithBody WorkerResult
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -805,7 +805,7 @@ type ClientInterface interface {
 
 	// WorkerResult WorkerResult
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -814,7 +814,7 @@ type ClientInterface interface {
 
 	// WorkerStartWithBody WorkerStart
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -823,7 +823,7 @@ type ClientInterface interface {
 
 	// WorkerStart WorkerStart
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1760,7 +1760,7 @@ func (c *Client) ListWorkers(ctx context.Context, params *ListWorkersParams, req
 
 // WorkerHeartbeatWithBody WorkerHeartbeat
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1779,7 +1779,7 @@ func (c *Client) WorkerHeartbeatWithBody(ctx context.Context, contentType string
 
 // WorkerHeartbeat WorkerHeartbeat
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1798,7 +1798,7 @@ func (c *Client) WorkerHeartbeat(ctx context.Context, body WorkerHeartbeatJSONRe
 
 // WorkerLateEvidenceWithBody WorkerLateEvidence
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1817,7 +1817,7 @@ func (c *Client) WorkerLateEvidenceWithBody(ctx context.Context, contentType str
 
 // WorkerLateEvidence WorkerLateEvidence
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1836,7 +1836,7 @@ func (c *Client) WorkerLateEvidence(ctx context.Context, body WorkerLateEvidence
 
 // WorkerPollWithBody WorkerPoll
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1855,7 +1855,7 @@ func (c *Client) WorkerPollWithBody(ctx context.Context, contentType string, bod
 
 // WorkerPoll WorkerPoll
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1874,7 +1874,7 @@ func (c *Client) WorkerPoll(ctx context.Context, body WorkerPollJSONRequestBody,
 
 // WorkerResultWithBody WorkerResult
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1893,7 +1893,7 @@ func (c *Client) WorkerResultWithBody(ctx context.Context, contentType string, b
 
 // WorkerResult WorkerResult
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1912,7 +1912,7 @@ func (c *Client) WorkerResult(ctx context.Context, body WorkerResultJSONRequestB
 
 // WorkerStartWithBody WorkerStart
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1931,7 +1931,7 @@ func (c *Client) WorkerStartWithBody(ctx context.Context, contentType string, bo
 
 // WorkerStart WorkerStart
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8312,7 +8312,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerHeartbeatWithBodyWithResponse WorkerHeartbeat
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8321,7 +8321,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerHeartbeatWithResponse WorkerHeartbeat
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8330,7 +8330,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerLateEvidenceWithBodyWithResponse WorkerLateEvidence
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8339,7 +8339,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerLateEvidenceWithResponse WorkerLateEvidence
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8348,7 +8348,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerPollWithBodyWithResponse WorkerPoll
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8357,7 +8357,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerPollWithResponse WorkerPoll
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8366,7 +8366,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerResultWithBodyWithResponse WorkerResult
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8375,7 +8375,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerResultWithResponse WorkerResult
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8384,7 +8384,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerStartWithBodyWithResponse WorkerStart
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8393,7 +8393,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerStartWithResponse WorkerStart
 	//
-	// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -13529,7 +13529,7 @@ func (c *ClientWithResponses) ListWorkersWithResponse(ctx context.Context, param
 
 // WorkerHeartbeatWithBodyWithResponse WorkerHeartbeat
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13544,7 +13544,7 @@ func (c *ClientWithResponses) WorkerHeartbeatWithBodyWithResponse(ctx context.Co
 
 // WorkerHeartbeatWithResponse WorkerHeartbeat
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13559,7 +13559,7 @@ func (c *ClientWithResponses) WorkerHeartbeatWithResponse(ctx context.Context, b
 
 // WorkerLateEvidenceWithBodyWithResponse WorkerLateEvidence
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13574,7 +13574,7 @@ func (c *ClientWithResponses) WorkerLateEvidenceWithBodyWithResponse(ctx context
 
 // WorkerLateEvidenceWithResponse WorkerLateEvidence
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13589,7 +13589,7 @@ func (c *ClientWithResponses) WorkerLateEvidenceWithResponse(ctx context.Context
 
 // WorkerPollWithBodyWithResponse WorkerPoll
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13604,7 +13604,7 @@ func (c *ClientWithResponses) WorkerPollWithBodyWithResponse(ctx context.Context
 
 // WorkerPollWithResponse WorkerPoll
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13619,7 +13619,7 @@ func (c *ClientWithResponses) WorkerPollWithResponse(ctx context.Context, body W
 
 // WorkerResultWithBodyWithResponse WorkerResult
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13634,7 +13634,7 @@ func (c *ClientWithResponses) WorkerResultWithBodyWithResponse(ctx context.Conte
 
 // WorkerResultWithResponse WorkerResult
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13649,7 +13649,7 @@ func (c *ClientWithResponses) WorkerResultWithResponse(ctx context.Context, body
 
 // WorkerStartWithBodyWithResponse WorkerStart
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13664,7 +13664,7 @@ func (c *ClientWithResponses) WorkerStartWithBodyWithResponse(ctx context.Contex
 
 // WorkerStartWithResponse WorkerStart
 //
-// Private protocol-1 contract; server execution routes remain unavailable pending interoperability qualification.
+// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

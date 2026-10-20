@@ -287,7 +287,7 @@ func (q *HybridQueue) Stats() Stats {
 		depth = 0
 	}
 
-	elapsed := time.Since(time.Unix(0, q.startNano.Load()))
+	elapsed := time.Since(observedTime(q.startNano.Load()))
 	if elapsed <= 0 {
 		elapsed = time.Millisecond
 	}
@@ -312,8 +312,8 @@ func (q *HybridQueue) Stats() Stats {
 		AvgJobLatency: avgWait,
 		EnqueueRate:   float64(enqueued) / elapsed.Seconds(),
 		DequeueRate:   float64(dequeued) / elapsed.Seconds(),
-		LastEnqueue:   time.Unix(0, q.lastEnqueueNano.Load()),
-		LastDequeue:   time.Unix(0, q.lastDequeueNano.Load()),
+		LastEnqueue:   observedTime(q.lastEnqueueNano.Load()),
+		LastDequeue:   observedTime(q.lastDequeueNano.Load()),
 		SampleWindow:  elapsed,
 	})
 }

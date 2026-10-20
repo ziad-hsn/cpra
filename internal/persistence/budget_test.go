@@ -49,9 +49,9 @@ func dormantCatalogStore(t *testing.T) (*Store, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Store{config: c, nodeID: "test-store", requests: make(chan submission, 1024),
+	s := &Store{config: c, nodeID: "test-store", installationID: "test-installation", installationReady: true, requests: make(chan submission, 1024),
 		stop: make(chan struct{}), done: make(chan struct{}),
-		fsm: &machine{image: image{Version: FormatVersion, Monitors: make(map[string]Monitor)}, history: history}}
+		fsm: &machine{image: image{Version: ActionFormatVersion, InstallationID: "test-installation", Monitors: make(map[string]Monitor)}, history: history}}
 	s.fsm.publishControllerHealth()
 	var once sync.Once
 	start := func() { once.Do(func() { go s.run() }) }

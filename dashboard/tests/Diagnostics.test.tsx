@@ -12,6 +12,24 @@ const queue: QueueStats = { queue_depth: 120, capacity: 100, last_enqueue: '', l
 const pool: WorkerPoolStats = { current_capacity: 32, target_workers: 64, min_workers: 2, max_workers: 500, running_workers: 16, waiting_tasks: 120, pending_results: 15,
   tasks_submitted: 200, tasks_completed: 60, scaling_events: 3, last_scale_time: '', slo_condition: 'controller_limited', sizing_model: 'erlang-c+allen-cunneen', service_cv: 0, service_samples: 100, service_time: 10_000_000 };
 
+it('shows missing capacity accounting as unavailable instead of zero', () => {
+  render(<PoolDiagnostics name="pulse" pool={pool} />);
+  expect(screen.getByText('Requested capacity / configured floor').parentElement).toHaveTextContent('Unavailable / Unavailable');
+  expect(screen.getByText('Workers draining after reduction').parentElement).toHaveTextContent('Unavailable');
+  expect(screen.getByText('Capacity condition').parentElement).toHaveTextContent('Not reported');
+});
+
+it('distinguishes a configured reservation shortfall from actual execution', () => {
+  render(<><QueueDiagnostics name="pulse" queue={{...queue,drivers:[{driver:'http',requested_capacity:120,reserved_capacity:60,pending:3,active:60,concurrency_limit:60,admission_limit:100,oldest_pending_age:1_000_000_000,oldest_active_age:2_000_000_000,rejections:2,timeouts:4,condition:'insufficient_driver_capacity'}]}} />
+    <PoolDiagnostics name="pulse" pool={{...pool,requested_capacity:120,reserved_capacity:120,draining_workers:3,capacity_condition:'worker_limit',active_executions:59,pending_submissions:1}} /></>);
+  expect(screen.getByText('Requested / supplied reservation').parentElement).toHaveTextContent('120 / 60');
+  expect(screen.getByText('Pending / in flight').parentElement).toHaveTextContent('3 / 60');
+  expect(screen.getByText('Active work / oldest age').parentElement).toHaveTextContent('59 / Unavailable');
+  expect(screen.getByText('Removed from queue, awaiting execution').parentElement).toHaveTextContent('1');
+  expect(screen.getByText('Workers draining after reduction').parentElement).toHaveTextContent('3');
+  expect(screen.getByText('Capacity condition').parentElement).toHaveTextContent('worker limit');
+});
+
 it('shows actual queue saturation and distinguishes observed waits from oldest queued work', () => {
   render(<QueueDiagnostics name="pulse" queue={queue} />);
   const region = screen.getByRole('region', { name: 'pulse queue diagnostics' });

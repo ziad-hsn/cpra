@@ -148,7 +148,7 @@ func TestAgentObservationPreservesWorkerFormatBoundary(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer ledger.Close()
-			stored := image.Monitors[action.MonitorID].Actions[action.ID]
+			stored := snapshotAction(t, ledger, action.ID)
 			if image.Version != ActionWorkerFormatVersion || image.JobTypes == nil || stored.AgentConnection == nil || stored.AgentReceipt.State != "TASK_STATE_COMPLETED" {
 				t.Fatal("combined snapshot lost the connection, observation or optional state")
 			}

@@ -35,7 +35,7 @@ export async function fixture(type: ResourceType, id?: string, options: { reader
       : response({ items: [...records.values()].filter(item => item.kind === definition.kind).map(item => options.summaries ? { ...item, spec: {} } : item), snapshot: 'page-snapshot' });
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : undefined;
     writes.push({ method, path: url.pathname, body, match: headers.get('If-Match') });
-    if (options.writeProblem) return response(options.writeProblem, 503, { 'Content-Type': 'application/problem+json' });
+    if (options.writeProblem) return response(options.writeProblem, typeof options.writeProblem.status === 'number' ? options.writeProblem.status : 503, { 'Content-Type': 'application/problem+json' });
     if (options.failWrite) throw new TypeError('lost response');
     const makeReceipt = (id: string, oldVersion?: string): Operation => {
       const operation: Operation = { id: options.lostResponseBody ? 'c47948b9-084b-4109-a862-0312e7a77102' : `operation-${writes.length}`, state: 'committed', contentDigest: '0'.repeat(64), committed: 1, applied: 0, validated: true,

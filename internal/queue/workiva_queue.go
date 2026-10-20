@@ -248,7 +248,7 @@ func (q *WorkivaQueue) Stats() Stats {
 	if depth < 0 {
 		depth = 0
 	}
-	elapsed := time.Since(time.Unix(0, q.startUnixNano.Load()))
+	elapsed := time.Since(observedTime(q.startUnixNano.Load()))
 	if elapsed <= 0 {
 		elapsed = time.Millisecond
 	}
@@ -266,8 +266,8 @@ func (q *WorkivaQueue) Stats() Stats {
 		AvgQueueTime: time.Duration(avgWaitNs),
 		EnqueueRate:  float64(enq) / elapsed.Seconds(),
 		DequeueRate:  float64(deq) / elapsed.Seconds(),
-		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
-		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
+		LastEnqueue:  observedTime(q.lastEnqueueUnixNano.Load()),
+		LastDequeue:  observedTime(q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
 	}
 	if q.closed.Load() == 1 {

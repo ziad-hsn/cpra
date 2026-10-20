@@ -98,6 +98,33 @@ func TestOverview(t *testing.T) {
 	}
 }
 
+func TestUnavailableProjectionOmitsGenerationTime(t *testing.T) {
+	s := newTestServer(t)
+	s.holder = fleetview.NewHolder()
+	// Empty aggregate responses have no observation timestamp. Detail routes
+	// retain their unavailable status until an empty projection is published.
+	for _, path := range []string{"/api/v1/overview", "/api/v1/monitors", "/api/v1/incidents"} {
+		if path != "/api/v1/overview" {
+			w := httptest.NewRecorder()
+			apiMux(s).ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+			if w.Code != http.StatusServiceUnavailable {
+				t.Fatal("unavailable details returned an empty success", path, w.Code)
+			}
+			s.holder.Set(&fleetview.StatsSnapshot{})
+		}
+		w := httptest.NewRecorder()
+		apiMux(s).ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		var payload map[string]json.RawMessage
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &payload) != nil {
+			t.Fatal(path, w.Code)
+		}
+		if _, present := payload["generated"]; present || strings.Contains(w.Body.String(), "0001-01-01") {
+			t.Fatal("missing projection fabricated a generation time", path)
+		}
+		s.holder = fleetview.NewHolder()
+	}
+}
+
 func TestMonitorsListFiltering(t *testing.T) {
 	s := newTestServer(t)
 	r := httptest.NewRequest("GET", "/api/v1/monitors?status=down&size=10", nil)

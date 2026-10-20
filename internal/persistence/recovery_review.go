@@ -139,11 +139,15 @@ func (m Monitor) observedUnhealthy() bool {
 func (m Monitor) latestRecovery() (Action, bool) {
 	var latest Action
 	found := false
+	if m.ActionProjection != nil && m.ActionProjection.LatestRecovery != nil {
+		latest = m.ActionProjection.LatestRecovery.Clone()
+		found = m.OwnsAction(latest) && (latest.IncidentID == "" || latest.IncidentID == m.IncidentID)
+	}
 	for _, a := range m.Actions {
 		if a.Kind != "intervention" || !m.OwnsAction(a) || (a.IncidentID != "" && a.IncidentID != m.IncidentID) {
 			continue
 		}
-		if !found || a.Attempt > latest.Attempt || (a.Attempt == latest.Attempt && (a.NotBefore.After(latest.NotBefore) || (a.NotBefore.Equal(latest.NotBefore) && a.ID > latest.ID))) {
+		if !found || a.ID == latest.ID || a.Attempt > latest.Attempt || (a.Attempt == latest.Attempt && (a.NotBefore.After(latest.NotBefore) || (a.NotBefore.Equal(latest.NotBefore) && a.ID > latest.ID))) {
 			latest, found = a, true
 		}
 	}
@@ -228,7 +232,10 @@ func (f *machine) addActionReceipt(r OperationReceipt) {
 func (f *machine) applyActionReview(c Command, index uint64, version int) Result {
 	r := c.ActionReview
 	previous, ok := f.image.Monitors[c.MonitorID]
-	a, exists := previous.Actions[r.ActionID]
+	a, exists, err := f.actionForMonitor(previous, r.ActionID)
+	if err != nil {
+		return Result{Err: err}
+	}
 	if !ok || !exists || actionMonitorIdentity(c.MonitorID, a) != r.MonitorUID || a.State != Unknown || ActionReviewRevision(a) != r.ExpectedRevision {
 		return Result{Err: ErrActionReviewConflict}
 	}
@@ -249,9 +256,13 @@ func (f *machine) applyActionReview(c Command, index uint64, version int) Result
 	if f.pendingOperationCount() >= maxPendingCatalogOperations {
 		return Result{Err: ErrCatalogBusy}
 	}
+	previous = withAction(previous, a)
 	m := previous.Clone()
 	a = a.Clone()
 	a.Review = &ActionReview{Revision: r.Revision, Resolution: r.Resolution, Actor: r.Actor, At: c.At, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...)}
+	if m.Actions == nil {
+		m.Actions = make(map[string]Action)
+	}
 	m.Actions[a.ID] = a
 	var events []Event
 	if actionStorageFormat(version) {
@@ -289,7 +300,7 @@ func (f *machine) supersedeActionReceipts(previous Monitor, at time.Time) []Even
 		}
 		for _, id := range ids {
 			r, ok := f.image.Operations[id]
-			if !ok || (r.Subject != "review" && r.Subject != "recovery") || operationCurrent(f.image, r) {
+			if !ok || (r.Subject != "review" && r.Subject != "recovery") || f.operationCurrent(r) {
 				continue
 			}
 			r.State, r.Outcome = "partial", "superseded"
@@ -305,6 +316,15 @@ func (f *machine) supersedeActionReceipts(previous Monitor, at time.Time) []Even
 }
 
 func (m Monitor) otherActiveRecovery(id string) bool {
+	if m.ActionProjection != nil {
+		n := m.ActionProjection.RecoveryHeld
+		if a, ok := m.Actions[id]; ok && m.OwnsAction(a) && a.Kind == "intervention" && a.Held() {
+			n--
+		}
+		if n > 0 {
+			return true
+		}
+	}
 	for _, a := range m.Actions {
 		if a.ID != id && m.OwnsAction(a) && a.Kind == "intervention" && (a.State == Started || a.Held()) {
 			return true
@@ -318,6 +338,11 @@ func (m Monitor) otherActiveRecovery(id string) bool {
 // times; no automatic retry permission or failure counter is manufactured.
 func (m Monitor) manualRecoveryDue(at time.Time) time.Time {
 	due := m.recoveryDue(at)
+	if m.ActionProjection != nil && !m.ActionProjection.RejectedAt.IsZero() {
+		if next := m.ActionProjection.RejectedAt.Add(m.Policy.RecoveryCooldown); next.After(due) {
+			due = next
+		}
+	}
 	for _, a := range m.Actions {
 		if a.Kind != "intervention" || !m.OwnsAction(a) || a.IncidentID != m.IncidentID || a.State != Unknown || a.Held() || a.Review == nil || a.Review.Resolution != "rejected" {
 			continue

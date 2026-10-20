@@ -27,7 +27,7 @@ func workerOfferFixture(t *testing.T, category string) (*Store, WorkerAuthority,
 
 func workerPollFixture(t *testing.T, category string) (*Store, WorkerAuthority, WorkerPollRequest, WorkerExecutionIntent, WorkerPrincipal) {
 	t.Helper()
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	in, job := workerExecutionFixture(t, s, category)
 	s.administrative = true
 	p := workerPrincipal("assigned-worker")
@@ -259,8 +259,7 @@ func TestWorkerStartConcurrentDuplicateBeginAndUnknown(t *testing.T) {
 	if unknown.Err != nil || unknown.WorkerStart.Disposition != "unknown" || unknown.WorkerStart.GrantID != grant {
 		t.Fatal("unknown", unknown.Err)
 	}
-	m, _ := s.Get(in.MonitorID)
-	if m.Actions[in.ActionID].State != Unknown || !m.Actions[in.ActionID].Held() {
+	if retainedAction(t, s, in.ActionID).State != Unknown || !retainedAction(t, s, in.ActionID).Held() {
 		t.Fatal("remote outcome not conservatively held")
 	}
 	if validateRecoveryReviewImage(s.fsm.image) != nil {
@@ -473,8 +472,7 @@ func TestWorkerOfferNativeRestartFencesOffersAndHoldsStarts(t *testing.T) {
 					if response.Disposition != "unknown" || response.GrantID != grant.GrantID {
 						t.Fatal("restart regranted or lost uncertainty", response)
 					}
-					monitor, _ := store.Get(in.MonitorID)
-					action := monitor.Actions[in.ActionID]
+					action := retainedAction(t, store, in.ActionID)
 					if action.State != Unknown || !action.Held() || actionExecutorFenced(action, store.executorSession) {
 						t.Fatal("remote action not held")
 					}

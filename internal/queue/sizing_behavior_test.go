@@ -26,7 +26,7 @@ func TestSizingModelHonorsLatencyTarget(t *testing.T) {
 	}
 }
 
-func TestColdDemandSurvivesHistoricalFastSamples(t *testing.T) {
+func TestConfiguredDemandSurvivesHistoricalFastSamples(t *testing.T) {
 	for _, warm := range []bool{false, true} {
 		q, _ := NewFairQueue(2000, "http", "tcp")
 		cfg := DefaultWorkerPoolConfig()
@@ -42,14 +42,19 @@ func TestColdDemandSurvivesHistoricalFastSamples(t *testing.T) {
 			}
 		}
 		p.SetArrivalRate(100)
-		p.SetColdOccupancy(290)
+		p.SetTargetWorkers(2)
+		if err := p.SetDriverDemand([]DriverDemand{{Driver: "http", Monitors: 300, ArrivalRate: 100, Occupancy: 290}}); err != nil {
+			t.Fatal(err)
+		}
 		for _, current := range []int{2, 4, 8, 16, 32, 64, 128} {
-			p.SetTargetWorkers(current)
+			p.antsPool.Tune(current)
 			if got := p.desiredCapacity(Stats{}); got != current*2 {
 				t.Fatalf("warm=%t current=%d desired=%d; new demand erased or growth bound exceeded", warm, current, got)
 			}
 		}
-		p.SetColdOccupancy(0)
+		if err := p.SetDriverDemand(nil); err != nil {
+			t.Fatal(err)
+		}
 		if got := p.desiredCapacity(Stats{}); got >= 128 {
 			t.Fatalf("observed cold demand retained: %d", got)
 		}

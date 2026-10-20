@@ -21,6 +21,10 @@ func (r *raftLogRecorder) Info(message string, _ ...logger.Field) {
 	r.levels = append(r.levels, "info")
 	r.messages = append(r.messages, message)
 }
+func (r *raftLogRecorder) Debug(message string, _ ...logger.Field) {
+	r.levels = append(r.levels, "debug")
+	r.messages = append(r.messages, message)
+}
 func (r *raftLogRecorder) Warn(message string, _ ...logger.Field) {
 	r.levels = append(r.levels, "warn")
 	r.messages = append(r.messages, message)
@@ -32,8 +36,25 @@ func TestSingleNodeInitialElectionDiagnostic(t *testing.T) {
 	sink.Accept("raft", hclog.Warn, "storage write delayed")
 	sink.Accept("raft", hclog.Warn, "heartbeat timeout reached, starting election")
 	sink.Accept("raft", hclog.Warn, "heartbeat timeout reached, starting election")
-	if len(recorder.levels) != 3 || recorder.levels[0] != "warn" || recorder.levels[1] != "info" || recorder.levels[2] != "warn" || recorder.messages[1] != "Starting single-node Raft election" {
+	if len(recorder.levels) != 3 || recorder.levels[0] != "warn" || recorder.levels[1] != "debug" || recorder.levels[2] != "warn" || recorder.messages[1] != "Starting single-node Raft election" {
 		t.Fatalf("unexpected diagnostic severity: %v %v", recorder.levels, recorder.messages)
+	}
+}
+
+func TestRoutineRaftActivityIsDebugOnly(t *testing.T) {
+	recorder := &raftLogRecorder{}
+	sink := &raftLogSink{logger: recorder}
+	for _, message := range []string{"initial configuration", "entering leader state", "restored from snapshot", "snapshot complete up to"} {
+		sink.Accept("raft", hclog.Info, message)
+	}
+	for _, level := range recorder.levels {
+		if level != "debug" {
+			t.Fatal("routine activity is noisy", recorder.levels)
+		}
+	}
+	sink.Accept("raft", hclog.Info, "pre-vote campaign failed, waiting for election timeout")
+	if recorder.levels[len(recorder.levels)-1] != "info" {
+		t.Fatal("abnormal activity was silenced")
 	}
 }
 

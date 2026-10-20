@@ -52,7 +52,7 @@ func reselectionUpload(t *testing.T, s *Store, head CollectionState, id string) 
 }
 
 func TestCollectionReselectionProfileAdmissionBindingAndLegacyIdentity(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	c := ticketCreateFixture(t, s)
 	legacy := c.Create.Clone()
 	if legacy.Binding(s.nodeID).Revision != legacy.ContentDigest {
@@ -253,7 +253,7 @@ func TestCollectionReselectionFencesOriginalOwnerAndDeadline(t *testing.T) {
 }
 
 func TestCollectionReselectionProfileSnapshotAndRetainedReceipt(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := reselectionCreate(t, s, "cpra.file.base.v1", 1)
 	upload := reselectionUpload(t, s, head, "first")
 	head = validationApplyAllowed(t, collectionCommand(t, s, upload, head.ActivityAt.Add(time.Second)))

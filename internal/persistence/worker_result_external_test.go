@@ -47,7 +47,7 @@ func TestWorkerResultOriginalReceiptAllCategories(t *testing.T) {
 			t.Run(category+"/"+status, func(t *testing.T) {
 				s, a, start, input := workerResultFixture(t, category, status)
 				original, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
-				before, _ := s.Get(original.Intent.MonitorID)
+				before, _ := monitorWithActionHistory(t, s, original.Intent.MonitorID)
 				receipt, err := s.CommitWorkerResult(t.Context(), a, input)
 				if err != nil || receipt.ExecutionID != input.ExecutionID || receipt.WorkerUID != a.WorkerUID || receipt.ReceiptID == "" {
 					t.Fatal("result", receipt, err)
@@ -66,7 +66,7 @@ func TestWorkerResultOriginalReceiptAllCategories(t *testing.T) {
 				if saved.Result == nil || saved.Result.Receipt != receipt || saved.Result.Input.Status != status {
 					t.Fatal("receipt not retained")
 				}
-				after, _ := s.Get(original.Intent.MonitorID)
+				after, _ := monitorWithActionHistory(t, s, original.Intent.MonitorID)
 				if category == "check" {
 					if after.Generation != original.Intent.Generation {
 						t.Fatal("check watermark not finalized")
@@ -93,7 +93,7 @@ func TestWorkerResultOriginalReceiptAllCategories(t *testing.T) {
 					t.Fatal("receipt replay", err)
 				}
 				retained, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
-				unchanged, _ := s.Get(original.Intent.MonitorID)
+				unchanged, _ := monitorWithActionHistory(t, s, original.Intent.MonitorID)
 				if !reflect.DeepEqual(saved, retained) || !reflect.DeepEqual(after, unchanged) {
 					t.Fatal("duplicate changed committed state")
 				}
@@ -125,7 +125,7 @@ func TestWorkerResultOriginalReceiptAllCategories(t *testing.T) {
 func TestWorkerRecoveryRejectedRetryPreservesBudgetAfterSnapshot(t *testing.T) {
 	s, authority, _, input := workerResultFixture(t, "recovery", "rejected")
 	execution, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
-	m, _ := s.Get(execution.Intent.MonitorID)
+	m, _ := monitorWithActionHistory(t, s, execution.Intent.MonitorID)
 	first := m.Actions[execution.Intent.ActionID]
 	config := m.Clone()
 	config.Policy.RecoveryMaxAttempts = 2
@@ -133,14 +133,14 @@ func TestWorkerRecoveryRejectedRetryPreservesBudgetAfterSnapshot(t *testing.T) {
 	if _, err := s.CommitWorkerResult(t.Context(), authority, input); err != nil {
 		t.Fatal(err)
 	}
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if a := m.Actions[first.ID]; a.State != Failed || !a.Retryable || !a.Deadline.Equal(first.Deadline) {
 		t.Fatal("worker rejection lost its positive retry evidence or deadline")
 	}
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(captureSnapshotBytes(t, s.fsm)))); err != nil {
 		t.Fatal(err)
 	}
-	m, _ = s.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	r := submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, At: time.Now().UTC(), Outcome: "failure", Guard: &execution.Intent.Guard})[0]
 	if r.Err != nil || r.Monitor == nil {
 		t.Fatal(r.Err)
@@ -197,7 +197,7 @@ func TestWorkerResultConcurrentDeliveryAndOwnership(t *testing.T) {
 		}
 	}
 	r, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
-	m, _ := s.Get(r.Intent.MonitorID)
+	m, _ := monitorWithActionHistory(t, s, r.Intent.MonitorID)
 	if m.Actions[r.Intent.ActionID].State != Succeeded || m.VerifyRemaining != max(1, m.Policy.Healthy) {
 		t.Fatal("result transition not applied")
 	}
@@ -212,13 +212,13 @@ func TestWorkerResultMissingAndDelayedCheckPreserveHealth(t *testing.T) {
 			}
 			s, a, _, input := workerResultFixture(t, category, status)
 			r, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
-			before, _ := s.Get(r.Intent.MonitorID)
+			before, _ := monitorWithActionHistory(t, s, r.Intent.MonitorID)
 			command := WorkerResultCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: a, Input: input}
 			result := submit(t, s, Command{Kind: "worker_result", At: r.Intent.Deadline, commandExtensions: commandExtensions{WorkerResult: &command}})[0]
 			if result.Err != nil || result.WorkerResult == nil {
 				t.Fatal(result.Err)
 			}
-			after, _ := s.Get(r.Intent.MonitorID)
+			after, _ := monitorWithActionHistory(t, s, r.Intent.MonitorID)
 			if category == "check" {
 				if result.WorkerResult.Disposition != "finalized" || after.LastOutcome != before.LastOutcome || after.TotalChecks != before.TotalChecks || after.Generation != r.Intent.Generation {
 					t.Fatal("late check invented health")
@@ -344,7 +344,7 @@ func TestWorkerResultCommandBoundsAndFormat(t *testing.T) {
 }
 
 func TestWorkerResultLargeOutcomesRemainPaged(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	first, job := workerExecutionFixture(t, s, "check")
 	worker := workerPrincipal("large-result-worker")
 	worker.Grants = []WorkerGrant{{JobTypeID: job.Current.Record.Key.ID, JobTypeUID: job.Current.Record.UID,

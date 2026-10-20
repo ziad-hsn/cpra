@@ -26,7 +26,7 @@ func TestCollectionValidationRequestSnapshotPreservesLegacyNamespaceFormats(t *t
 		{CollectionValidationFormatVersion, collectionValidationSnapshotMagic, true, true},
 	} {
 		t.Run(tc.magic, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head := collectionFill(t, s, 2)
 			if tc.version == CatalogMutationFormatVersion {
 				// Format4 was first introduced by a catalog mutation and requires
@@ -62,7 +62,7 @@ func TestCollectionValidationRequestSnapshotPreservesFormat6ResultsAndAuthority(
 			name = "validated"
 		}
 		t.Run(name, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head, authority := validationApplyInput(t, s, 2)
 			head, begin, items := validationApplyIntent(t, s, head, authority, valid)
 			head = validationApplyAllowed(t, validationApplyCommand(t, s, head, "validation_begin", &begin, nil))
@@ -151,7 +151,7 @@ func verifyRequestSnapshotStreams(t *testing.T, raw []byte) {
 }
 
 func TestCollectionValidationRequestSnapshotRetainsUniqueCatalogTokens(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := validationHistoryCrashInput(t, s, 1)
 	requestSnapshotBegin(t, s, head)
 	shared := createCatalogFormat(t, s, CollectionValidationRequestFormatVersion, catalogRecord(t, s, "Credential", "shared", "shared-uid", "s1", "private"))
@@ -212,7 +212,7 @@ func requestSnapshotInterrupt(t *testing.T, s *Store, head CollectionState) Coll
 }
 
 func TestCollectionValidationRequestSnapshotFreezesOriginalRequestAndClaim(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := validationHistoryCrashInput(t, s, 2)
 	if s.fsm.image.Version != CollectionValidationFormatVersion {
 		t.Fatal("old input was not format6")
@@ -275,7 +275,7 @@ func TestCollectionValidationRequestSnapshotFreezesOriginalRequestAndClaim(t *te
 }
 
 func TestCollectionValidationRequestSnapshotRejectsDowngradeAndMalformedMetadata(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head := validationHistoryCrashInput(t, s, 2)
 	head, _ = requestSnapshotBegin(t, s, head)
 	head = requestSnapshotClaim(t, s, head)
@@ -388,7 +388,7 @@ func TestCollectionValidationRequestSnapshotRealRaftRestart(t *testing.T) {
 				}
 				defer reopened.Close()
 				got, found, err := reopened.CollectionGet(head.ID)
-				if err != nil || !found || !reflect.DeepEqual(got, head) || reopened.fsm.image.Version != CollectionValidationRequestFormatVersion {
+				if err != nil || !found || !reflect.DeepEqual(got, head) || reopened.fsm.image.Version != ActionFormatVersion {
 					t.Fatal("restart lost original request/claim/interruption", err)
 				}
 				if len(reopened.fsm.image.Catalog) != 0 || len(reopened.fsm.image.Monitors) != 0 || len(reopened.fsm.image.Operations) != 0 {

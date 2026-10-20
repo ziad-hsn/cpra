@@ -28,7 +28,7 @@ func lifecycleReplacement(s AuthenticationState) AuthenticationCommand {
 func TestAuthenticationLifecycleHistoricalReplayAndExplicitUpgrade(t *testing.T) {
 	for _, format := range []int{CatalogFormatVersion, CollectionFormatVersion, CatalogMutationFormatVersion, CollectionPlanFormatVersion} {
 		t.Run(fmt.Sprint(format), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			c := authenticationBootstrap()
 			first := lifecycleCommand(t, s, format, c)
 			if first.Err != nil || first.Authentication.Version != AuthenticationFormatVersion {
@@ -171,7 +171,7 @@ func TestAuthenticationLifecycleRestoreStartsNewEpoch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

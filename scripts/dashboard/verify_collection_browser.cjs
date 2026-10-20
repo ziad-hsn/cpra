@@ -222,7 +222,7 @@ async function bounded(promise, milliseconds, message) {
     await page.getByRole('button', { name: 'Upload remaining resources', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: 'All resources are staged.' }).waitFor();
     await page.getByRole('button', { name: 'Validate whole collection', exact: true }).click();
-    await page.getByRole('heading', { name: 'Original sealed validation result', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Saved validation result', exact: true }).waitFor();
     const validationRows = page.getByRole('region', { name: 'Original validation result' }).getByRole('row');
     check(await validationRows.count() === 3, 'Sealed validation did not render both original resources');
     check(await validationRows.nth(1).getByRole('cell').allTextContents().then(cells => cells[0] === '1' && cells[1] === 'Monitor/browser-import-monitor' && cells[2] === names[0] && cells[3] === '1 / 1, line 1, column 1' && cells[4] === 'create'), 'Original monitor validation source attribution was incorrect');
@@ -232,7 +232,7 @@ async function bounded(promise, milliseconds, message) {
     await redactedDOM(); await safeStorage();
     await bounded(Promise.all([...responseRecords.values()].filter(record => record.path.endsWith('/validation')).map(record => record.completion)), 10_000, 'Original validation observation timed out');
     check(!responseFailure && observedValidation && sealedValidationReads > 0, responseFailure || 'Original import validation was not observed before draft disposal');
-    checks.push('inactive create and upload followed by exactly one asynchronous validation request; original sealed results display local source coordinates; no activation');
+    checks.push('inactive create and upload followed by exactly one asynchronous validation request; saved validation results display local source coordinates; no activation');
 
     phase = 'discard and malformed final file';
     await page.getByRole('button', { name: 'Close this import', exact: true }).click();

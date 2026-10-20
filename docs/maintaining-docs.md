@@ -90,25 +90,28 @@ artifact without replacing the tracked site; the output path must be absent.
 
 ## Implementation references and private records
 
-Run `scripts/docs/references.py` after editing repository files referenced by
-implementation records. It copies selected UTF-8 source files byte for byte into
-`review/source/` for internal records and `reference/source/` for explicitly
-linked public examples/API sources, with `.txt` suffixes. It rewrites repository
-links and records their hashes in the repository-only
-`review/reference-data.json`. Internal source copies and the index are excluded
-from the public site. These selected downloads are not a complete source release
-or verification evidence; public copies are included only when a public guide
-references them.
+Run `scripts/docs/references.py` after editing sources linked from public guides.
+By default it updates only public links, their selected UTF-8 source copies in
+`reference/source/`, and `reference/source-data.json`. Downloads retain exact
+bytes with `.txt` suffixes. They are selected references, not a complete source
+release or verification evidence.
+
+Dated implementation and review records retain their original source copies and
+evidence inventory. Routine synchronization must not replace those bytes with
+the current checkout. `--include-archives` is an explicit maintenance operation
+for intentionally revising those records; inspect its changes separately. Its
+`review/source/` copies and `review/reference-data.json` remain excluded from the
+public site.
 
 Links from internal records to ignored `bin/verification/` artifacts lead to
 the repository-only `review/local-evidence.md` index. That index records each path,
 availability at preparation, and a file hash when available. It never copies the
 artifact contents and never verifies a result. Missing records remain explicit.
-`--check` verifies the prepared index without requiring private artifacts on CI;
+`--include-archives --check` verifies that prepared historical index without requiring private artifacts on CI;
 it does not reinterpret their recorded availability as current evidence.
 
-`make docs-references` refreshes these references. `make docs-check` verifies
-their freshness and navigation as well as the source contracts. Preparation
+`make docs-references` refreshes public references. `make docs-check` verifies
+public-reference freshness and navigation as well as the source contracts. Preparation
 rejects symlinks, paths outside the repository, credential files, binary inputs
 and oversized downloads before rewriting documents. Code fences are preserved.
 The [MkDocs file-layout rules](https://www.mkdocs.org/user-guide/writing-your-docs/#file-layout)
@@ -130,11 +133,12 @@ filter for assets so the `/cpra/` prefix works on deep pages.
 
 ## SDK references
 
-In a complete SDK candidate checkout, run `scripts/sdk/reference.py` and
+From the application checkout, run `scripts/sdk/reference.py` and
 `scripts/sdk/sync_guides.py` to regenerate references and lesson source assets.
-Their `--check` modes verify the outputs. Import `docs/sdk` into canonical docs
-with the candidate notices retained. Reconcile reviewed wording before replacing
-pages. Source downloads keep exact bytes and `.txt` suffixes for Go/Markdown.
+Their `--check` modes verify the outputs. Public guides are generated from each
+module's README and the maintained examples. Source downloads keep exact bytes
+and `.txt` suffixes for Go/Markdown. Availability is recorded centrally in
+[versions and availability](versions.md).
 
 Update the snapshot inventory when candidate inputs change. An unchanged parent
 commit cannot identify new uncommitted content. SDK fixtures do not establish

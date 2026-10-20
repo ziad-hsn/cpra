@@ -36,7 +36,8 @@ export function QueueDiagnostics({ name, queue: q }: { name: string; queue: Queu
     <StatRow label="Variability samples" value={number(q.arrival_samples)} /><StatRow label="Rate sample window" value={q.sample_window > 0 ? duration(q.sample_window) : 'Unavailable'} />
     {q.drivers?.map(driver => <section key={driver.driver} aria-label={`${driver.driver} scheduling`}>
       <h4>{driver.driver}</h4>
-      <StatRow label="Pending / active" value={`${number(driver.pending)} / ${number(driver.active)}`} />
+      <StatRow label="Pending / in flight" value={`${number(driver.pending)} / ${number(driver.active)}`} />
+      <StatRow label="Requested / supplied reservation" value={`${number(driver.requested_capacity)} / ${number(driver.reserved_capacity)}`} />
       <StatRow label="Concurrency allowance" value={number(driver.concurrency_limit)} />
       <StatRow label="Oldest pending / active" value={`${driver.pending ? duration(driver.oldest_pending_age) : 'None'} / ${driver.active ? duration(driver.oldest_active_age) : 'None'}`} />
       <StatRow label="Rejected / timed out" value={`${number(driver.rejections)} / ${number(driver.timeouts)}`} />
@@ -51,7 +52,10 @@ export function PoolDiagnostics({ name, pool: p }: { name: string; pool: WorkerP
     <h3 className="card-title" style={{ textTransform: 'capitalize' }}>{name}</h3>
     <StatRow label="Running / capacity" value={`${number(p.running_workers)} / ${number(p.current_capacity)}`} />
     <StatRow label="Target workers" value={number(p.target_workers)} /><StatRow label="Worker bounds" value={`${number(p.min_workers)} – ${number(p.max_workers)}`} />
-    <StatRow label="Active checks / oldest age" value={`${number(p.active_executions)} / ${(p.active_executions ?? 0) > 0 ? duration(p.oldest_execution_age) : 'None'}`} />
+    <StatRow label="Requested capacity / configured floor" value={`${number(p.requested_capacity)} / ${number(p.reserved_capacity)}`} />
+    <StatRow label="Workers draining after reduction" value={number(p.draining_workers)} />
+    <StatRow label="Capacity condition" value={p.capacity_condition?.replaceAll('_', ' ') || 'Not reported'} />
+    <StatRow label="Active work / oldest age" value={`${number(p.active_executions)} / ${(p.active_executions ?? 0) > 0 ? duration(p.oldest_execution_age) : 'None'}`} />
     <StatRow label="Removed from queue, awaiting execution" value={number(p.pending_submissions)} />
     <StatRow label="Oldest awaiting execution" value={(p.pending_submissions ?? 0) > 0 ? duration(p.oldest_submission_age) : 'None'} />
     <StatRow label="Waiting tasks" value={number(p.waiting_tasks)} /><StatRow label="Pending results" value={number(p.pending_results)} />

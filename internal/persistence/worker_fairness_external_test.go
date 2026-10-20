@@ -89,7 +89,7 @@ func workerFairnessFixture(t *testing.T, s *Store) (WorkerAuthority, WorkerPollR
 func TestWorkerOfferSelectionReplay(t *testing.T) {
 	for _, selection := range []int{0, 1} {
 		t.Run(fmt.Sprint(selection), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openWorkerMemory(t)
 			a, request, types := workerFairnessFixture(t, s)
 			oldest := commitWorkerQueueItem(t, s, types[1], "z-recovery")
 			later := commitWorkerQueueItem(t, s, types[0], "a-check")
@@ -198,7 +198,7 @@ func commitWorkerQueueItem(t *testing.T, s *Store, job JobTypeState, id string) 
 }
 
 func TestWorkerOfferSameCommitUsesStableIdentityOrder(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	a, request, types := workerFairnessFixture(t, s)
 	var commands []Command
 	for i, id := range []string{"z-check", "a-recovery", "m-notification"} {
@@ -229,7 +229,7 @@ func TestWorkerOfferSameCommitUsesStableIdentityOrder(t *testing.T) {
 }
 
 func TestWorkerOfferByteBudgetPreservesQueueProgress(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	a, request, types := workerFairnessFixture(t, s)
 	const count = 40
 	var queue []string
@@ -266,7 +266,7 @@ func TestWorkerOfferByteBudgetPreservesQueueProgress(t *testing.T) {
 }
 
 func TestWorkerOffersDoNotStarveOlderTypes(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openWorkerMemory(t)
 	a, request, types := workerFairnessFixture(t, s)
 	// Recovery sorts after both other types. It must still be assigned first
 	// when its committed intent is oldest.

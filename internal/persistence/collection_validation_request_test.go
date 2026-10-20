@@ -42,7 +42,7 @@ func requestTestArtifact(t *testing.T, s *Store, head CollectionState, c Collect
 }
 
 func TestCollectionValidationRequestImmutableClaimAndRetry(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	input, authority := validationApplyInput(t, s, 2)
 	requested := requestTestBegin(t, s, input, authority)
 	if requested.Phase != "validating" || requested.ValidationRequest.Claim != nil || requested.Plan != nil || requested.Validation != nil ||

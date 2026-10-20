@@ -65,7 +65,7 @@ are not repeated when another endpoint is unfinished. Confirmed retryable
 notification rejections have at most three attempts per endpoint.
 
 Managed monitor recovery settings can explicitly allow more than one recovery
-attempt per incident. An omitted or zero `maxAttempts` preserves the legacy
+attempt per incident. An omitted or zero `maxAttempts` uses the default
 single-attempt policy. Each queued recovery reserves an attempt; a further
 attempt requires a confirmed failed recovery and observes the configured
 `cooldown` after that failure. Raising the limit does not retry unknown actions
@@ -277,6 +277,24 @@ the identities and provider keys of existing actions, and never infer notificati
 exposure from an unsent queued action. Newly created snapshot payloads are private
 to the process or service identity; stopped administrative inspection preserves
 the existing service's directory ownership and permissions.
+
+Formats **44** (built-in drivers) and **45** (`externaljobs`) store retained
+actions, review assertions and blue-notification assessments in an indexed
+ledger inside the Store-owned generation. Current monitor state keeps active
+execution references and bounded summaries. A successful routine check does not
+scan or copy the action history. Paginated reads and reviews still return the
+original action identities and evidence after restart or snapshot restoration.
+Unresolved records are retained; this bounds active processing, not total disk
+usage as unknown actions accumulate.
+
+Normal startup migrates supported older state through committed transitions and
+resumes an interrupted migration before admitting work. Migration does not invoke
+providers, invent evidence that an old notification started, or release an
+unknown intervention. Back up the complete stopped store before upgrading.
+An older executable that cannot read formats 44/45 cannot be used to roll back
+the upgraded directory. Restore a compatible pre-upgrade backup to a separate
+directory only after considering external effects that occurred since it was
+taken; restoring state cannot reverse those effects.
 
 `cpractl local backup --data-dir /path/state --output /path/new-backup --backup-auth-key /path/backup-keys/authentication.key` performs
 this stopped operation with exclusive locking and an HMAC-SHA256 authenticated

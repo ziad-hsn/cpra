@@ -45,7 +45,7 @@ func TestCollectionPlanProcessCrashHelper(t *testing.T) {
 	}
 	config := testConfig(t)
 	config.Storage.Directory = directory
-	s, err := Open(context.Background(), config)
+	s, err := openReplayStore(t, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,9 +53,7 @@ func TestCollectionPlanProcessCrashHelper(t *testing.T) {
 	// process after the durable command acknowledgement below.
 	head := collectionFill(t, s, 4)
 	if scenario == "v3-partial" {
-		if err := s.Snapshot(); err != nil {
-			t.Fatal("input-only snapshot", err)
-		}
+		persistPausedReviewSnapshot(t, s)
 		s.fsm.mu.RLock()
 		version := s.fsm.image.Version
 		s.fsm.mu.RUnlock()
@@ -67,9 +65,7 @@ func TestCollectionPlanProcessCrashHelper(t *testing.T) {
 	head = planApplyBegin(t, s, head, begin)
 	head = planApplyAll(t, s, head, parts[:2])
 	if scenario != "v3-partial" {
-		if err := s.Snapshot(); err != nil {
-			t.Fatal("partial plan snapshot", err)
-		}
+		persistPausedReviewSnapshot(t, s)
 	}
 	// Leave a valid row open at the committed prefix boundary. This checks
 	// reconstruction of codec state, beyond merely restoring complete rows.
@@ -226,7 +222,7 @@ func TestCollectionPlanCommittedStateSurvivesProcessKill(t *testing.T) {
 			s.fsm.mu.RLock()
 			defer s.fsm.mu.RUnlock()
 			if catalog.Len() != 0 || len(s.fsm.image.Monitors) != 0 || len(s.fsm.image.Operations) != 0 ||
-				s.fsm.image.CatalogMutationSequence != 0 || s.fsm.image.Version != CollectionPlanFormatVersion {
+				s.fsm.image.CatalogMutationSequence != 0 || s.fsm.image.Version != ActionFormatVersion {
 				t.Fatal("crash replay or finalization activated catalog resources")
 			}
 		})

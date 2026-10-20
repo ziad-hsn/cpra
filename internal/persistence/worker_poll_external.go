@@ -36,11 +36,14 @@ func (s *Store) WaitWorkerPoll(ctx context.Context, authority WorkerAuthority, r
 	c := WorkerSessionCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: authority, Request: request}
 	deadline := time.Now().Add(time.Duration(request.WaitSeconds) * time.Second)
 	for {
-		unlock, err := s.lockControllerState(ctx, false)
+		unlock, err := s.lockControllerState(ctx, true)
 		if err != nil {
 			return err
 		}
 		ready, err := s.fsm.workerPollReady(ctx, c, time.Now().UTC())
+		if s.fsm.err != nil {
+			err = errControllerUnavailable
+		}
 		unlock()
 		if err != nil {
 			return err

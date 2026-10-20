@@ -106,7 +106,7 @@ func TestRecoveryNotificationSurvivesProcessKill(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer s.Close()
-			m, found := s.Get(ids.Monitor)
+			m, found := monitorWithActionHistory(t, s, ids.Monitor)
 			if !found {
 				t.Fatal("original monitor lost")
 			}

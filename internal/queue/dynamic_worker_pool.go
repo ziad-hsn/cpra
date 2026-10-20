@@ -52,6 +52,10 @@ type ResultRouter struct {
 
 // WorkerPoolStats exposes runtime metrics for the dynamic worker pool.
 type WorkerPoolStats struct {
+	RequestedCapacity   int           `json:"requested_capacity"`
+	ReservedCapacity    int           `json:"reserved_capacity"`
+	DrainingWorkers     int           `json:"draining_workers"`
+	CapacityCondition   string        `json:"capacity_condition"`
 	ActiveExecutions    int           `json:"active_executions"`
 	OldestExecutionAge  time.Duration `json:"oldest_execution_age"`
 	PendingSubmissions  int           `json:"pending_submissions"`
@@ -66,7 +70,7 @@ type WorkerPoolStats struct {
 	ServiceSamples      int           `json:"service_samples"`
 	ArrivalRate         float64       `json:"arrival_rate"`
 	SizingModel         string        `json:"sizing_model"`
-	LastScaleTime       time.Time     `json:"last_scale_time"`
+	LastScaleTime       time.Time     `json:"last_scale_time,omitzero"`
 	MinWorkers          int           `json:"min_workers"`
 	MaxWorkers          int           `json:"max_workers"`
 	CurrentCapacity     int           `json:"current_capacity"`
@@ -211,6 +215,7 @@ type DynamicWorkerPool struct {
 	tasksCompleted     atomic.Int64
 	scalingEvents      atomic.Int64
 	lastTarget         atomic.Int64
+	requestedCapacity  atomic.Int64
 	lastScaleTime      atomic.Int64
 	stopping           atomic.Int32
 	started            atomic.Bool
@@ -229,8 +234,7 @@ type DynamicWorkerPool struct {
 
 	// serviceTime is the externally-provided per-job service time (tau, seconds),
 	// stored as float64 bits. Used until completed jobs provide observations.
-	serviceTime   atomic.Uint64
-	coldOccupancy atomic.Uint64
+	serviceTime atomic.Uint64
 }
 
 // WorkerPoolConfig holds configuration for the DynamicWorkerPool.
@@ -267,7 +271,7 @@ func DefaultWorkerPoolConfig() WorkerPoolConfig {
 		ResultBatchTimeout: 10 * time.Millisecond,
 		ResultChannelDepth: 2048,
 		NumShards:          0,
-		TargetQueueLatency: 100 * time.Millisecond,
+		TargetQueueLatency: 250 * time.Millisecond,
 		PreAlloc:           false,
 		NonBlocking:        false,
 		MaxBlockingTasks:   0,
@@ -306,7 +310,7 @@ func NewDynamicWorkerPool(q Queue, config WorkerPoolConfig, logger Logger) (*Dyn
 		config.ResultChannelDepth = config.MinWorkers * 2
 	}
 	if config.TargetQueueLatency <= 0 {
-		config.TargetQueueLatency = 100 * time.Millisecond
+		config.TargetQueueLatency = 250 * time.Millisecond
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -690,6 +694,7 @@ func (p *DynamicWorkerPool) putResultBatch(batch []jobs.Result) {
 
 // autoScale periodically tunes the ants pool capacity based on queue depth.
 func (p *DynamicWorkerPool) autoScale() {
+	lastCondition := "available"
 	defer p.wg.Done()
 
 	ticker := time.NewTicker(p.config.AdjustmentInterval)
@@ -717,12 +722,16 @@ func (p *DynamicWorkerPool) autoScale() {
 			}
 			if desired != current {
 				p.antsPool.Tune(desired)
-				if p.logger != nil {
-					p.logger.Printf("Tuned worker pool capacity to %d (queue depth=%d)", desired, stats.QueueDepth)
-				}
 				p.lastTarget.Store(int64(desired))
 				p.lastScaleTime.Store(time.Now().UnixNano())
 				p.scalingEvents.Add(1)
+			}
+			state := p.Stats()
+			if state.CapacityCondition != lastCondition {
+				if p.logger != nil {
+					p.logger.Printf("Worker capacity %s: requested=%d supplied=%d active=%d pending=%d", state.CapacityCondition, state.RequestedCapacity, state.CurrentCapacity, state.ActiveExecutions, stats.QueueDepth+state.PendingSubmissions)
+				}
+				lastCondition = state.CapacityCondition
 			}
 		}
 	}
@@ -764,28 +773,24 @@ func (p *DynamicWorkerPool) GetVariabilityCoefficients() (ca, cs float64) {
 func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 	current := p.antsPool.Cap()
 	minimum, maximum := p.minimumCapacity(), p.config.MaxWorkers
-	if current < minimum {
-		current = minimum
-	}
+	current = max(1, current)
 	lambda := p.getArrivalRate()
 	active, _, activeMean := p.activeExecutions.summary()
 	pending, oldest, _ := p.pendingSubmissions.summary()
 	stats.QueueDepth += pending
 	stats.OldestPendingAge = max(stats.OldestPendingAge, oldest)
 	relief := func(model float64) int {
-		headroom := 0.15
-		if policy := p.sizingPolicy.Load(); policy != nil {
-			headroom = policy.headroom
-		}
-		model = max(model, math.Float64frombits(p.coldOccupancy.Load())*(1+headroom)*float64(p.driverPartitions()))
+		model = max(model, float64(p.reservationFloor()))
 		if stats.QueueDepth > 0 && stats.OldestPendingAge > p.config.TargetQueueLatency {
 			model = max(model, float64(current)*1.25)
 		}
-		return int(math.Ceil(min(float64(maximum), min(float64(current)*2, max(float64(minimum), model)))))
+		model = max(float64(minimum), model)
+		p.requestedCapacity.Store(int64(math.Ceil(min(model, float64(math.MaxInt32)))))
+		return int(math.Ceil(min(float64(maximum), min(float64(current)*2, model))))
 	}
 	if p.arrivalRateSet.Load() && lambda == 0 && stats.QueueDepth == 0 && active == 0 {
 		p.sizingModel.Store(sizingWaiting)
-		return minimum
+		return relief(float64(minimum))
 	}
 	if !finitePositive(lambda) {
 		lambda = stats.EnqueueRate
@@ -849,14 +854,6 @@ func (p *DynamicWorkerPool) desiredCapacity(stats Stats) int {
 			desired *= depth / targetDepth
 		}
 	}
-	// Fixed driver reservations need a global budget large enough to supply
-	// the model recommendation to the busiest driver. Unused seats do not
-	// allocate worker goroutines; the configured global maximum still applies.
-	if p.config.FairDispatch {
-		if q, ok := p.Queue().(interface{ partitions() int }); ok {
-			desired *= float64(q.partitions())
-		}
-	}
 	// Apply bounds before conversion, then limit growth to 2x per adjustment.
 	// These constrain actuation; they do not replace the queueing model.
 	return relief(desired)
@@ -869,7 +866,18 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 	pending := int(p.pendingResults.Load())
 	active, activeAge, _ := p.activeExecutions.summary()
 	submissions, submissionAge, _ := p.pendingSubmissions.summary()
+	capacity, running := p.antsPool.Cap(), p.antsPool.Running()
+	requested := max(p.config.MinWorkers, int(p.requestedCapacity.Load()), p.reservationFloor())
+	condition := "available"
+	if requested > p.config.MaxWorkers {
+		condition = "worker_limit"
+	} else if requested > capacity {
+		condition = "growing"
+	} else if active+submissions > capacity {
+		condition = "draining"
+	}
 	return WorkerPoolStats{
+		RequestedCapacity: requested, ReservedCapacity: p.reservationFloor(), DrainingWorkers: max(0, running-capacity), CapacityCondition: condition,
 		ActiveExecutions: active, OldestExecutionAge: activeAge, PendingSubmissions: submissions, OldestSubmissionAge: submissionAge,
 		Attempts: p.attempts.Load(), AttemptTimeouts: p.attemptTimeouts.Load(),
 		AttemptDuration: time.Duration(p.attemptDuration.Load()), RetryDelay: time.Duration(p.retryDelay.Load()),
@@ -878,14 +886,14 @@ func (p *DynamicWorkerPool) Stats() WorkerPoolStats {
 		ServiceTime:  time.Duration(mean * float64(time.Second)), ServiceCV: cv, ServiceSamples: samples, SizingModel: models[p.sizingModel.Load()],
 		MinWorkers:      p.config.MinWorkers,
 		MaxWorkers:      p.config.MaxWorkers,
-		CurrentCapacity: p.antsPool.Cap(),
-		RunningWorkers:  p.antsPool.Running(),
+		CurrentCapacity: capacity,
+		RunningWorkers:  running,
 		WaitingTasks:    submissions,
 		TargetWorkers:   int(p.lastTarget.Load()),
 		TasksSubmitted:  p.tasksSubmitted.Load(),
 		TasksCompleted:  p.tasksCompleted.Load(),
 		ScalingEvents:   p.scalingEvents.Load(),
-		LastScaleTime:   time.Unix(0, p.lastScaleTime.Load()),
+		LastScaleTime:   observedTime(p.lastScaleTime.Load()),
 		PendingResults:  pending,
 	}
 }
@@ -907,7 +915,7 @@ func (p *DynamicWorkerPool) Resume() {
 	}
 	if p.antsPool != nil {
 		// Restore to minimum workers
-		p.antsPool.Tune(p.config.MinWorkers)
+		p.SetTargetWorkers(max(p.config.MinWorkers, int(p.lastTarget.Load())))
 	}
 }
 
@@ -932,41 +940,34 @@ func (p *DynamicWorkerPool) SetServiceTime(tau float64) {
 	p.serviceTime.Store(math.Float64bits(tau))
 }
 
-// SetColdOccupancy supplies bounded, owner-computed demand from new or changed
-// checks. Old fast samples cannot erase this floor. The normal five-second
-// evaluation and twofold growth limit still govern capacity changes.
-func (p *DynamicWorkerPool) SetColdOccupancy(occupied float64) {
-	if occupied < 0 || math.IsNaN(occupied) || math.IsInf(occupied, 0) {
-		return
+// SetDriverDemand changes reservations without actuating capacity. The next
+// ordinary evaluation applies the original twofold growth limit.
+func (p *DynamicWorkerPool) SetDriverDemand(demand []DriverDemand) error {
+	q, ok := p.Queue().(interface{ SetDemand([]DriverDemand) error })
+	if !ok {
+		return errors.New("worker queue does not support driver demand")
 	}
-	p.coldOccupancy.Store(math.Float64bits(occupied))
+	return q.SetDemand(demand)
 }
 
 func (p *DynamicWorkerPool) getServiceTime() float64 {
 	return math.Float64frombits(p.serviceTime.Load())
 }
 
-func (p *DynamicWorkerPool) driverPartitions() int {
+func (p *DynamicWorkerPool) reservationFloor() int {
 	if p.config.FairDispatch {
-		if q, ok := p.Queue().(interface{ partitions() int }); ok {
-			return q.partitions()
+		if q, ok := p.Queue().(interface{ requestedCapacity() int }); ok {
+			return q.requestedCapacity()
 		}
 	}
-	return 1
+	return 0
 }
 func (p *DynamicWorkerPool) minimumCapacity() int {
-	return max(p.config.MinWorkers, min(p.config.MaxWorkers, p.driverPartitions()))
+	return p.config.MinWorkers
 }
 
-// SetModelWorkers expands a per-driver model recommendation into the global
-// reservation budget. Explicit SetTargetWorkers calls already use that budget.
+// SetModelWorkers applies the global model recommendation at startup.
 func (p *DynamicWorkerPool) SetModelWorkers(n int) {
-	partitions := p.driverPartitions()
-	if n > p.config.MaxWorkers/partitions {
-		n = p.config.MaxWorkers
-	} else {
-		n *= partitions
-	}
 	p.SetTargetWorkers(n)
 }
 
@@ -975,6 +976,8 @@ func (p *DynamicWorkerPool) SetModelWorkers(n int) {
 // M/M/c-derived initial sizing computed at startup.
 func (p *DynamicWorkerPool) SetTargetWorkers(n int) {
 	minW, maxW := p.minimumCapacity(), p.config.MaxWorkers
+	n = max(n, p.reservationFloor())
+	p.requestedCapacity.Store(int64(n))
 	if maxW < minW {
 		maxW = minW
 	}
@@ -989,9 +992,6 @@ func (p *DynamicWorkerPool) SetTargetWorkers(n int) {
 	}
 	p.lastTarget.Store(int64(n))
 	p.lastScaleTime.Store(time.Now().UnixNano())
-	if p.logger != nil {
-		p.logger.Printf("Set target workers to %d", n)
-	}
 }
 
 // ReplaceQueue replaces the current queue with a new one.

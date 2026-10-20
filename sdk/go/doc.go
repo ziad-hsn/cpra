@@ -1,11 +1,9 @@
 // Package cpra provides typed clients for CPRa management and observation APIs.
 //
-// This unpublished candidate has local server integration for resource management,
-// controls, action review, operation reads, observations and bounded ephemeral
-// collection preflight. Resumable collections and tagged external-worker server
-// integration have private implementation checks; release qualification is open.
-// Discover the connected
-// server's capabilities; a client method alone does not establish server support.
+// Use resource services for conditional configuration changes, incident controls,
+// action review, collections and observations. Discover the connected server's
+// capabilities before choosing an operation; access and build options can differ.
+// Module availability and supported server versions are documented in the README.
 //
 // # Getting started
 //

@@ -62,3 +62,7 @@ func (*machine) hasWorkerCheckState(Monitor) bool { return false }
 func (*Store) extendSLOView(ctx context.Context, _ *slo.View) error { return ctx.Err() }
 
 func validArchivedWorkerAction(image, Action) bool { return false }
+
+func validateWorkerActionDependencies(image, *collectionLedgerView) error { return nil }
+
+func validateWorkerRetainedAction(image, Action) error { return nil }

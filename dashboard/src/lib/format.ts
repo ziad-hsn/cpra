@@ -19,7 +19,7 @@ export function formatDurationNs(ns: number): string {
   return `${(s / 3600).toFixed(1)}h`;
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(iso?: string): string {
   if (!iso || iso.startsWith('0001-01-01')) return '—';
   try {
     const d = new Date(iso);
@@ -32,6 +32,7 @@ export function formatDateTime(iso: string): string {
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
+      timeZoneName: 'short',
     });
   } catch {
     return '—';

@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -73,6 +74,7 @@ func TestBlueSnapshotRestartRetainsHoldAndClosure(t *testing.T) {
 		t.Fatal("recovery start", r.Err)
 	}
 	m = *submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: recovery.ID, At: at.Add(time.Millisecond), Outcome: "failure", Ambiguous: true})[0].Monitor
+	m = reconcileReviewFacts(t, s, m.ID, at.Add(time.Millisecond))
 	opening := notificationByColor(t, m, "blue", Queued)
 	r = submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: opening.ID, NoticeRevision: ActionNoticeRevision(opening), At: at.Add(2 * time.Millisecond), ExecutorSession: s.executorSession})[0]
 	if !r.Allowed {
@@ -92,8 +94,9 @@ func TestBlueSnapshotRestartRetainsHoldAndClosure(t *testing.T) {
 	for n := 2; n <= 3; n++ {
 		m = *submit(t, s, Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: uint64(n), At: at.Add(time.Duration(n) * time.Second), Outcome: "success"})[0].Monitor
 	}
+	m = reconcileReviewFacts(t, s, m.ID, at.Add(3*time.Second))
 	closing := notificationByColor(t, m, "blue", Queued)
-	if closing.NotificationCorrelation != opening.NotificationCorrelation || !m.Actions[recovery.ID].Held() {
+	if closing.NotificationCorrelation != opening.NotificationCorrelation || !retainedAction(t, s, recovery.ID).Held() {
 		t.Fatal("restore changed the condition or effect hold")
 	}
 	if err = s.Snapshot(); err != nil {
@@ -107,8 +110,44 @@ func TestBlueSnapshotRestartRetainsHoldAndClosure(t *testing.T) {
 		t.Fatal("closure snapshot restoration", err)
 	}
 	m, _ = s.Get(config.ID)
-	if got := m.Actions[closing.ID]; got.State != Queued || !got.Deadline.Equal(closing.Deadline) || got.ReviewNotice == nil || got.ReviewNotice.Reason != "health_recovered" || !m.Actions[recovery.ID].Held() {
+	if got := m.Actions[closing.ID]; got.State != Queued || !got.Deadline.Equal(closing.Deadline) || got.ReviewNotice == nil || got.ReviewNotice.Reason != "health_recovered" || !retainedAction(t, s, recovery.ID).Held() {
 		t.Fatal("restart changed queued closure or released unknown action")
+	}
+}
+
+func TestReviewMaintenanceAdmitsBlueWithoutControllerTicks(t *testing.T) {
+	s, err := Open(t.Context(), testConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	config := testMonitor()
+	config.Policy = lifecyclePolicy()
+	config.Policy.Intervention, config.Policy.Endpoints = true, map[string]int{"blue": 1}
+	at := time.Now().UTC()
+	mustResult(t, s, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: at})
+	m := *submit(t, s, Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: 1, At: at, Outcome: "failure"})[0].Monitor
+	recovery := interventionAction(t, m)
+	mustResult(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: recovery.ID, At: at, ExecutorSession: s.executorSession})
+	results := submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: recovery.ID, At: at.Add(time.Millisecond), Outcome: "failure", Ambiguous: true})
+	if len(results) != 1 || results[0].Err != nil || results[0].Monitor == nil {
+		t.Fatalf("record unknown recovery outcome: %+v", results)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		// Only observe. The real Store maintenance loop must commit the pending
+		// review assessment; this test does not invoke its reconciliation helper.
+		current, ok := s.Get(m.ID)
+		if ok && queuedColorCount(current, "blue") == 1 {
+			if !current.RecoveryHeld() || !retainedAction(t, s, recovery.ID).Held() {
+				t.Fatal("automatic review assessment released the unknown effect")
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("background review assessment did not admit the blue notification")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -214,6 +253,8 @@ func TestBlueEvidenceSurvivesMonitorRecreation(t *testing.T) {
 	s := openCatalogMemory(t)
 	s.fsm.mu.Lock()
 	defer s.fsm.mu.Unlock()
+	// Preserve coverage of synchronous pre-cutover action-review replay.
+	s.fsm.image.ActionProjectionState = nil
 	a := m.Actions[recovery.ID]
 	a.ExecutorKind, a.ExecutorSession = "local", "stopped-original-owner"
 	m.Actions[a.ID] = a
@@ -285,4 +326,28 @@ func TestBlueDeferredClosureUsesCurrentHealthAndOriginalProviderScheme(t *testin
 	if err := validateNotificationIdentity(m, ActionFormatVersion); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func reconcileReviewFacts(t *testing.T, s *Store, id string, at time.Time) Monitor {
+	t.Helper()
+	for step := 0; step < 20000; step++ {
+		s.fsm.mu.RLock()
+		l := s.fsm.collections
+		rows, err := l.reviewPage(reviewPrefix("fact", id), "", 1)
+		s.fsm.mu.RUnlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			m, _ := s.Get(id)
+			return m
+		}
+		r := rows[0]
+		result := submit(t, s, Command{Kind: "action_reconcile", MonitorID: id, Revision: r.Key, Generation: r.Fact.Revision, At: at})[0]
+		if result.Err != nil && !errors.Is(result.Err, errReviewProgress) {
+			t.Fatal(result.Err)
+		}
+	}
+	t.Fatal("review assessment did not drain")
+	return Monitor{}
 }

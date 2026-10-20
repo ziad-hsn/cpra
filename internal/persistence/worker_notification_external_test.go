@@ -93,7 +93,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 func TestWorkerNotificationGrantsSeparateMonitorAndEndpoint(t *testing.T) {
 	for _, kind := range []string{"Monitor", "NotificationEndpoint"} {
 		t.Run(kind, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openWorkerMemory(t)
 			inline, job := inlineNotificationFixture(t, s)
 			endpoint := workerExecutionSourceFixture(t, s, job, false)
 			for _, in := range []WorkerExecutionIntent{inline, endpoint} {

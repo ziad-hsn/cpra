@@ -59,7 +59,7 @@ type PublicConfig struct {
 
 // overviewResp is the /api/v1/overview payload.
 type overviewResp struct {
-	Generated   time.Time      `json:"generated"`
+	Generated   time.Time      `json:"generated,omitzero"`
 	Total       int            `json:"total"`
 	Disabled    int            `json:"disabled"`
 	ByStatus    map[string]int `json:"by_status"`
@@ -71,7 +71,7 @@ type overviewResp struct {
 
 // monitorsResp is the /api/v1/monitors payload.
 type monitorsResp struct {
-	Generated time.Time            `json:"generated"`
+	Generated time.Time            `json:"generated,omitzero"`
 	Page      int                  `json:"page"`
 	Size      int                  `json:"size"`
 	Total     int                  `json:"total"`
@@ -104,7 +104,7 @@ type systemsResp struct {
 
 // incidentsResp is the /api/v1/incidents payload.
 type incidentsResp struct {
-	Generated time.Time            `json:"generated"`
+	Generated time.Time            `json:"generated,omitzero"`
 	Count     int                  `json:"count"`
 	Incidents []MonitorSummaryJSON `json:"incidents"`
 }

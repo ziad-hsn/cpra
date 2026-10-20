@@ -14,16 +14,23 @@ func incidentView(record persistence.IncidentRecord) api.Incident {
 	state := "closed"
 	if record.Active {
 		state = "open"
+	} else if record.ClosedAt.IsZero() {
+		state = "pending"
 	}
-	return api.Incident{ID: record.ID, MonitorID: record.MonitorID, Revision: record.Revision, State: state,
-		OpenedAt: record.OpenedAt, ClosedAt: record.ClosedAt, AcknowledgedBy: record.AcknowledgedBy,
-		AcknowledgedAt: record.AcknowledgedAt, Dismissed: record.Dismissed}
+	result := api.Incident{ID: record.ID, MonitorID: record.MonitorID, Revision: record.Revision, State: state,
+		FirstFailureAt: record.FirstFailureAt.UTC(), OpenedAt: record.OpenedAt.UTC(), ClosedAt: record.ClosedAt.UTC(), AcknowledgedBy: record.AcknowledgedBy,
+		AcknowledgedAt: record.AcknowledgedAt.UTC(), Dismissed: record.Dismissed}
+	if record.NotificationsAvailable {
+		v := record.Notifications
+		result.Notifications = &api.IncidentNotifications{Pending: v.Pending, Accepted: v.Accepted, Failed: v.Failed, Unknown: v.Unknown, Cancelled: v.Cancelled}
+	}
+	return result
 }
 
 func incidentFromMonitor(m persistence.Monitor) api.Incident {
 	return incidentView(persistence.IncidentRecord{ID: m.IncidentID, MonitorID: m.ID, MonitorUID: m.CatalogUID,
-		Revision: m.IncidentRevision, Active: !m.Removed && m.IncidentClosedAt.IsZero() && (m.Incident || m.Recovering), OpenedAt: m.IncidentOpenedAt, ClosedAt: m.IncidentClosedAt,
-		AcknowledgedBy: m.AcknowledgedBy, AcknowledgedAt: m.AcknowledgedAt, Dismissed: m.Dismissed})
+		Revision: m.IncidentRevision, Active: m.IncidentActive(), FirstFailureAt: m.IncidentOpenedAt, OpenedAt: m.IncidentConfirmedAt, ClosedAt: m.IncidentClosedAt,
+		AcknowledgedBy: m.AcknowledgedBy, AcknowledgedAt: m.AcknowledgedAt, Dismissed: m.Dismissed, Notifications: m.IncidentNotifications(), NotificationsAvailable: m.IncidentDeliveries != nil})
 }
 
 func (c *Catalog) Incident(ctx context.Context, id string) (api.Incident, error) {
@@ -127,10 +134,10 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		status.ObservedGeneration = int64(current.ObservedGeneration)
 		status.StatusRevision = current.Revision + ":" + strconv.FormatUint(current.Generation, 10) + ":" + current.ControlRevision + ":" + current.IncidentRevision + ":" + strconv.FormatUint(current.ObservedGeneration, 10)
 		status.IncidentID = current.IncidentID
-		status.SnoozedUntil = current.SnoozedUntil
-		status.Ignored, status.IgnoredAt, status.IgnoredBy = current.Ignored, current.IgnoredAt, current.IgnoredBy
+		status.SnoozedUntil = current.SnoozedUntil.UTC()
+		status.Ignored, status.IgnoredAt, status.IgnoredBy = current.Ignored, current.IgnoredAt.UTC(), current.IgnoredBy
 		status.IgnoreCause, status.IgnoreReason, status.IgnoreIncidentCount = current.IgnoreCause, current.IgnoreReason, int64(current.IgnoreIncidentCount)
-		status.LastCheckedAt = current.LastCheck
+		status.LastCheckedAt = current.LastCheck.UTC()
 		status.LastFailure = failureView(current.LastFailure)
 		status.ConfigurationProblem = failureView(current.ConfigurationProblem)
 		if !current.ConfigurationProblemAt.IsZero() {
@@ -180,7 +187,8 @@ func failureView(d persistence.FailureDiagnostic) *api.FailureDiagnostic {
 		out.GRPCCode = &d.GRPCCode
 	}
 	if !d.CertificateNotAfter.IsZero() {
-		out.CertificateNotAfter = &d.CertificateNotAfter
+		at := d.CertificateNotAfter.UTC()
+		out.CertificateNotAfter = &at
 		out.CertificateDaysRemaining = &d.CertificateDaysRemaining
 	}
 	return out

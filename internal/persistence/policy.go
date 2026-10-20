@@ -108,6 +108,9 @@ func (m Monitor) recoveryAttempts() int {
 
 func (m Monitor) lastRecoveryFailure() time.Time {
 	last := m.LastInterventionFailure
+	if m.ActionProjection != nil && m.ActionProjection.LastFailure.After(last) {
+		last = m.ActionProjection.LastFailure
+	}
 	for _, action := range m.Actions {
 		if m.OwnsAction(action) && action.Kind == "intervention" && action.State == Failed && action.FinishedAt.After(last) {
 			last = action.FinishedAt

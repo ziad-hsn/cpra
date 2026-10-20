@@ -83,7 +83,7 @@ func TestDeliveredNotificationSurvivesAnotherFailedCheck(t *testing.T) {
 func TestNotificationHistoricalLogReplay(t *testing.T) {
 	for _, version := range []int{1, 2, 14, 31, 33, 35, NotificationFormatVersion, DeliveryFormatVersion} {
 		t.Run(strconv.Itoa(version), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			fixtureVersion := NotificationFormatVersion
 			if version == DeliveryFormatVersion {
 				fixtureVersion = DeliveryFormatVersion
@@ -121,7 +121,7 @@ func TestNotificationHistoricalLogReplay(t *testing.T) {
 }
 
 func TestNotificationSnapshotThenNewObservation(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	m, delivered, pending := notificationTransitionFixture(t, Unknown)
 	s.fsm.image.Monitors[m.ID] = m.Clone()
 	c := Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1,

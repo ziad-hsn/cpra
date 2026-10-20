@@ -14,10 +14,12 @@ import asset_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = {
-    "github.com/ziad-hsn/cpra": ["TestMainManagementControlsBrowser", "TestMainManagementRecoveryReviewBrowser", "TestMainManagementCollectionBrowser", "TestMainManagementCollectionExecutionBrowser", "TestMainManagementCollectionActivationBrowser", "TestMainManagementCollectionReselectionBrowser", "TestMainManagementCollectionContinuationBrowser"],
+    "github.com/ziad-hsn/cpra": ["TestMainManagementControlsBrowser", "TestMainManagementRecoveryReviewBrowser", "TestMainReviewNotificationsBrowser", "TestMainManagementCollectionBrowser", "TestMainManagementCollectionExecutionBrowser", "TestMainManagementCollectionActivationBrowser", "TestMainManagementCollectionReselectionBrowser", "TestMainManagementCollectionContinuationBrowser"],
     "github.com/ziad-hsn/cpra/internal/httpserver": ["TestManagementBrowser"],
 }
 SCREENSHOTS = (
+    'dashboard-populated-demo.png', 'review-blue-opening.png', 'review-blue-health-closure.png',
+    'review-blue-unknown-closure.png', 'offline-route.png', 'review-blue-mobile.png',
     'dashboard-overview.png',
     'guarded-recovery-dialog.png', 'unknown-review-inconclusive-dialog.png',
     'unknown-review-accepted-dialog.png', 'mobile-reader-incidents-scrolled.png',

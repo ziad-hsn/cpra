@@ -35,6 +35,7 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	view, err := s.StoppedActions(ctx)
+	defer view.Close()
 	observed, ok, _ := view.Get(a.ID)
 	if err != nil || !ok || observed.State != Started {
 		t.Fatal("administrative read performed recovery", err)
@@ -48,7 +49,9 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	if _, err = s.ReviewStoppedAction(ctx, c); !errors.Is(err, ErrActionReviewConflict) {
 		t.Fatal("stale observation accepted", err)
 	}
+	view.Close()
 	view, err = s.StoppedActions(ctx)
+	defer view.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,9 +74,10 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	if r.Operation.State != "completed" || len(s.fsm.image.Operations) != 0 {
 		t.Fatal("stopped review retained pending owner work")
 	}
-	if err = s.Snapshot(); err != nil {
-		t.Fatal(err)
+	if err = s.Snapshot(); err == nil {
+		t.Fatal("administrative owner created a snapshot")
 	}
+	view.Close()
 	if err = s.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +98,21 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	}
 	if _, err = s.ReviewStoppedAction(ctx, c); !errors.Is(err, ErrAuthenticationAdminRequired) {
 		t.Fatal("live owner accepted local review", err)
+	}
+	// Snapshot only under normal ownership, after replaying the stopped review.
+	if err = s.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, _, err = s.ActionContext(ctx, a.ID)
+	if err != nil || restored.Review == nil || restored.Review.Revision != body.Revision || restored.Held {
+		t.Fatal("snapshot lost stopped review", err)
 	}
 }
 
@@ -122,5 +141,68 @@ func TestStoppedReviewDoesNotFenceRemoteExecution(t *testing.T) {
 				t.Fatal("exclusive filesystem ownership was treated as remote fencing", r.Err)
 			}
 		})
+	}
+}
+
+func TestStoppedNotificationReviewPreservesDeliveryCounts(t *testing.T) {
+	cfg := testConfig(t)
+	s, err := Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	configure(t, s)
+	at := time.Now().UTC()
+	m := *submit(t, s, Command{Kind: "pulse", MonitorID: "stable-one", Revision: "r1", Generation: 1, Outcome: "failure", At: at})[0].Monitor
+	var notice Action
+	for _, a := range m.Actions {
+		if a.Kind == "code" && a.Color == "red" && a.Endpoint == 0 {
+			notice = a
+		}
+	}
+	if notice.ID == "" {
+		t.Fatal("no notification")
+	}
+	m = *mustResult(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: notice.ID, At: at, ExecutorSession: s.executorSession}).Monitor
+	notice = m.Actions[notice.ID]
+	before := m.IncidentNotifications()
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = OpenAdministrative(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := Command{Kind: "local_action_review", MonitorID: m.ID, At: at.Add(time.Second), ActionReview: &ActionReviewCommand{
+		ActionID: notice.ID, MonitorUID: actionMonitorIdentity(m.ID, notice), ExpectedRevision: ActionReviewRevision(notice),
+		Revision: "notice-review", OperationID: "notice-review", Actor: "administrator", Reason: "Inspected provider records", Resolution: "inconclusive"}}
+	r, err := s.ReviewStoppedAction(t.Context(), c)
+	if err != nil || !r.Allowed {
+		t.Fatal("stopped review rejected", err)
+	}
+	after := r.Monitor.IncidentNotifications()
+	if after.Pending != before.Pending-1 || after.Unknown != before.Unknown+1 {
+		t.Fatal("interrupted delivery was not counted", before, after)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	incident, found, err := s.IncidentContext(t.Context(), m.IncidentID)
+	if err != nil || !found || incident.Notifications != after {
+		t.Fatal("snapshot changed notification counts", incident, err)
 	}
 }

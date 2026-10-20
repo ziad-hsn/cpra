@@ -430,7 +430,7 @@ func TestCollectionReceiptRaftCleanupRestartAndRestore(t *testing.T) {
 				t.Fatal(err)
 			}
 			if snapshot {
-				if err := s.Snapshot(); err != nil {
+				if err := persistStoreFixture(t, s); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -482,7 +482,7 @@ func TestCollectionReceiptRaftCleanupRestartAndRestore(t *testing.T) {
 			if err != nil || !reflect.DeepEqual(prior, want) {
 				t.Fatal("restore rewrote already-terminal receipt", err)
 			}
-			if err := s.Snapshot(); err != nil {
+			if err := persistStoreFixture(t, s); err != nil {
 				t.Fatal(err)
 			}
 			page, err := s.History().Page("collection/"+second.ID, "", 100)

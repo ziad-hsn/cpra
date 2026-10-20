@@ -44,7 +44,10 @@ func (s *Store) ReviewStoppedAction(ctx context.Context, c Command) (Result, err
 
 func (f *machine) applyLocalActionReview(c Command, index uint64, version int) Result {
 	previous, ok := f.image.Monitors[c.MonitorID]
-	a, found := previous.Actions[c.ActionReview.ActionID]
+	a, found, err := f.actionForMonitor(previous, c.ActionReview.ActionID)
+	if err != nil {
+		return Result{Err: err}
+	}
 	if !ok || !found || actionMonitorIdentity(c.MonitorID, a) != c.ActionReview.MonitorUID ||
 		ActionReviewRevision(a) != c.ActionReview.ExpectedRevision || c.At.Before(a.StartedAt) || (a.State != Unknown && a.State != Started) {
 		return Result{Err: ErrActionReviewConflict}
@@ -54,9 +57,13 @@ func (f *machine) applyLocalActionReview(c Command, index uint64, version int) R
 	}
 	m := previous.Clone()
 	m.upgradeLifecycle()
+	originalReviewRevision := ActionReviewRevision(a)
 	var events []Event
 	if a.State == Started {
 		a.State, a.Outcome, a.FinishedAt = Unknown, "interrupted_after_start", c.At
+		if m.Actions == nil {
+			m.Actions = make(map[string]Action)
+		}
 		m.Actions[a.ID] = a
 		events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision,
 			At: c.At, Type: "action_unknown", ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome})
@@ -67,6 +74,12 @@ func (f *machine) applyLocalActionReview(c Command, index uint64, version int) R
 	body.ExpectedRevision = ActionReviewRevision(a)
 	c.ActionReview = &body
 	oldSession := f.image.LocalExecutorSession
+	// Count the interrupted start against its original state before presenting
+	// the converted action to review. This detached monitor is discarded if the
+	// review fails, so a rejected assertion cannot change delivery observations.
+	f.updateIncidentDeliveryCounts(previous, m)
+	f.projectActions(previous, &m)
+	m = withAction(m, a)
 	f.image.LocalExecutorSession = c.ExecutorSession
 	f.image.Monitors[m.ID] = m
 	r := f.applyActionReview(c, index, version)
@@ -82,7 +95,7 @@ func (f *machine) applyLocalActionReview(c Command, index uint64, version int) R
 	// Preserve the precondition supplied by the administrator, including when
 	// the same transaction first marks an interrupted start unknown.
 	if r.Operation != nil {
-		r.Operation.OldVersion = ActionReviewRevision(previous.Actions[c.ActionReview.ActionID])
+		r.Operation.OldVersion = originalReviewRevision
 		// A stopped review has no asynchronous controller projection. Complete
 		// its receipt in this transaction; retained history owns the audit record.
 		r.Operation.State, r.Operation.Outcome = "completed", "applied"

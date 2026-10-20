@@ -9,7 +9,72 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	applogger "github.com/ziad-hsn/cpra/internal/logger"
 )
+
+func TestControllerInitializationUsesProcessLoggingPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name, environment, level, format     string
+		debug, wantJSON, wantDebug, wantInfo bool
+	}{
+		{name: "default", wantJSON: true, wantInfo: true},
+		{name: "development", environment: "development", wantDebug: true, wantInfo: true},
+		{name: "explicit-json-debug", level: "debug", format: "json", wantJSON: true, wantDebug: true, wantInfo: true},
+		{name: "explicit-console-warn", level: "warn", format: "console", debug: true},
+		{name: "debug-flag", debug: true, wantJSON: true, wantDebug: true, wantInfo: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, key := range []string{"CPRA_ENV", "CPRA_LOG_LEVEL", "CPRA_LOG_FORMAT", "CPRA_LOG_DEVELOPMENT", "CPRA_LOG_SAMPLING", "CPRA_LOG_SAMPLE_INITIAL", "CPRA_LOG_SAMPLE_THEREAFTER"} {
+				t.Setenv(key, "")
+			}
+			t.Setenv("CPRA_ENV", tc.environment)
+			t.Setenv("CPRA_LOG_LEVEL", tc.level)
+			t.Setenv("CPRA_LOG_FORMAT", tc.format)
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			previous := os.Stderr
+			os.Stderr = w
+			t.Cleanup(func() { os.Stderr = previous; _ = r.Close(); _ = w.Close() })
+			done := make(chan []byte, 1)
+			go func() { data, _ := io.ReadAll(r); done <- data }()
+			InitializeLoggers(tc.debug)
+			SystemLogger.Debug("controller-debug-marker")
+			SystemLogger.Info("controller-info-marker")
+			SystemLogger.Warn("controller-warn-marker")
+			shared, err := applogger.NewLoggerWithComponent("shared-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			shared.Warn("shared-warn-marker")
+			_ = shared.Sync()
+			CloseLoggers()
+			_ = w.Close()
+			output := string(<-done)
+			if strings.Contains(output, "\x1b") || strings.Contains(output, "controller-debug-marker") != tc.wantDebug || strings.Contains(output, "controller-info-marker") != tc.wantInfo {
+				t.Fatalf("logging policy differs: %q", output)
+			}
+			if !strings.Contains(output, "controller-warn-marker") || !strings.Contains(output, "shared-warn-marker") {
+				t.Fatal("missing warning records", output)
+			}
+			for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+				if json.Valid([]byte(line)) != tc.wantJSON {
+					t.Fatalf("mixed or unexpected process format: %q", line)
+				}
+				if tc.wantJSON {
+					var record map[string]any
+					_ = json.Unmarshal([]byte(line), &record)
+					stamp, ok := record["ts"].(string)
+					if !ok || !strings.HasSuffix(stamp, "Z") {
+						t.Fatal("machine timestamp is not explicit UTC", line)
+					}
+				}
+			}
+		})
+	}
+}
 
 func TestStructuredControllerLoggerReportsCallSitesWithoutColor(t *testing.T) {
 	t.Setenv("CPRA_ENV", "development")

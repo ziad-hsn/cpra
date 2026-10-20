@@ -18,8 +18,11 @@ func fairTestJob(driver string, flow uint64) *jobs.Dispatch {
 
 func TestFairQueueReservesAdmissionAndExecutionForOtherDrivers(t *testing.T) {
 	q, _ := NewFairQueue(8, "http", "tcp")
-	for range 4 {
-		if err := q.Enqueue(fairTestJob("http", 1)); err != nil {
+	if err := q.SetDemand([]DriverDemand{{Driver: "http", Monitors: 4, Occupancy: 1}, {Driver: "tcp", Monitors: 4, Occupancy: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 4 {
+		if err := q.Enqueue(fairTestJob("http", uint64(i))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -87,6 +90,88 @@ func TestFairQueueNewFlowProgressesWhileExistingFlowIsHeld(t *testing.T) {
 	}
 }
 
+func TestActionQueueLateDestinationAdmittedBetweenStalledFlows(t *testing.T) {
+	q, err := NewActionQueue(64, "notification")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held []*fairLease
+	for _, flow := range []uint64{1, 2} {
+		if err := q.Enqueue(fairTestJob("webhook", flow)); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.acquire(4)
+		if err != nil || job == nil {
+			t.Fatal("stalled fixture did not start", err)
+		}
+		held = append(held, job.(*fairLease))
+	}
+	for n := 0; n < 128; n++ {
+		err := q.Enqueue(fairTestJob("webhook", uint64(n%2+1)))
+		if err != nil && !errors.Is(err, ErrQueueFull) {
+			t.Fatal(err)
+		}
+	}
+	if q.depth != 63 || q.active != 2 {
+		t.Fatal("fixture did not saturate existing destinations", q.depth, q.active)
+	}
+	for n := 0; n < 4; n++ {
+		if err := q.Enqueue(fairTestJob("webhook", 3)); err != nil {
+			t.Fatal("late destination lost its admission slot", err)
+		}
+		job, err := q.acquire(4)
+		if err != nil || job == nil || job.(*fairLease).flow.key != 3 {
+			t.Fatal("healthy destination could not use spare execution capacity", err)
+		}
+		job.(*fairLease).complete(jobs.Result{})
+	}
+	for _, lease := range held {
+		lease.complete(jobs.Result{})
+	}
+	if q.depth > q.capacity || len(q.drivers["webhook"].flows) > q.capacity {
+		t.Fatal("flow capacity exceeded")
+	}
+}
+
+func TestFairQueueLateCheckAdmittedBetweenStalledFlows(t *testing.T) {
+	q, err := NewFairQueue(64, "http")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < 8; n++ {
+		if err := q.Enqueue(fairTestJob("http", uint64(n%2+1))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var held []*fairLease
+	for n := 0; n < 4; n++ {
+		job, err := q.acquire(5)
+		if err != nil || job == nil {
+			t.Fatal("failed to occupy slow flows", err)
+		}
+		held = append(held, job.(*fairLease))
+	}
+	for n := 0; n < 128; n++ {
+		if err := q.Enqueue(fairTestJob("http", uint64(n%2+1))); err != nil && !errors.Is(err, ErrQueueFull) {
+			t.Fatal(err)
+		}
+	}
+	if q.depth != 63 || q.active != 4 {
+		t.Fatal("fixture did not refill both stalled flows", q.depth, q.active)
+	}
+	if err := q.Enqueue(fairTestJob("http", 3)); err != nil {
+		t.Fatal("healthy check excluded from admission", err)
+	}
+	job, err := q.acquire(5)
+	if err != nil || job == nil || job.(*fairLease).flow.key != 3 {
+		t.Fatal("healthy check excluded from spare execution seat", err)
+	}
+	job.(*fairLease).complete(jobs.Result{})
+	for _, lease := range held {
+		lease.complete(jobs.Result{})
+	}
+}
+
 func TestFairQueueBoundsFlowsAndReportsOldestPending(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		q, _ := NewFairQueue(2000, "http")
@@ -145,10 +230,13 @@ func TestFairQueueLateThirdDriverRetainsAdmissionAndExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := q.SetDemand([]DriverDemand{{Driver: "http", Monitors: 4, Occupancy: 1}, {Driver: "grpc", Monitors: 4, Occupancy: 1}, {Driver: "tcp", Monitors: 4, Occupancy: 1}}); err != nil {
+		t.Fatal(err)
+	}
 	var held []*fairLease
 	for _, driver := range []string{"http", "grpc"} {
-		for range 4 {
-			if err := q.Enqueue(fairTestJob(driver, 1)); err != nil {
+		for i := range 4 {
+			if err := q.Enqueue(fairTestJob(driver, uint64(i))); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -185,20 +273,20 @@ func TestFairCapacityFloorSurvivesIdleAndSmallTargets(t *testing.T) {
 	}
 	defer p.DrainAndStop()
 	p.SetTargetWorkers(1)
-	if p.Stats().CurrentCapacity != 3 {
-		t.Fatal("explicit target erased driver reservations")
+	if p.Stats().CurrentCapacity != 1 {
+		t.Fatal("idle compiled drivers reserved capacity")
 	}
 	p.SetArrivalRate(0)
-	if p.desiredCapacity(Stats{}) != 3 {
-		t.Fatal("empty catalog erased driver reservations")
+	if p.desiredCapacity(Stats{}) != 1 {
+		t.Fatal("empty catalog reserved capacity")
 	}
 	p.SetModelWorkers(2)
-	if p.Stats().CurrentCapacity != 6 {
-		t.Fatal("initial model omitted reservation overhead")
+	if p.Stats().CurrentCapacity != 2 {
+		t.Fatal("initial model multiplied by compiled drivers")
 	}
 	p.SetArrivalRate(100)
 	p.SetServiceTime(.1)
-	if got := p.desiredCapacity(Stats{QueueDepth: 20}); got < 3 || got > 8 {
+	if got := p.desiredCapacity(Stats{QueueDepth: 20}); got < 2 || got > 4 {
 		t.Fatal("catalog growth violated global bounds")
 	}
 }

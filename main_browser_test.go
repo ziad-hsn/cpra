@@ -42,14 +42,22 @@ func TestMainManagementControlsBrowser(t *testing.T) {
 	}
 	fixture := newMainManagementFixture(t)
 	var calls atomic.Int64
+	var healthy atomic.Bool
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health-mode" && r.Method == http.MethodPost {
+			healthy.Store(r.URL.Query().Get("healthy") == "true")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		if r.URL.Path == "/count" {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(calls.Load())
 			return
 		}
 		calls.Add(1)
-		w.WriteHeader(503)
+		if !healthy.Load() {
+			w.WriteHeader(503)
+		}
 	}))
 	defer target.Close()
 	client, stop := startMainManagement(t, fixture)

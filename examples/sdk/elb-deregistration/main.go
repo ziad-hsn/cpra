@@ -1,5 +1,5 @@
 // elb-deregistration consumes EventBridge/CloudTrail deregistration events from SQS.
-// Its CPRa v2 calls require the planned management server; see README.md.
+// Its CPRa v2 calls require an authenticated management server; see README.md.
 package main
 
 import (

@@ -127,14 +127,13 @@ func bindNotificationContext(job Job, dispatch *Dispatch) {
 	for range 8 {
 		switch target := job.(type) {
 		case *CodePagerDutyJob:
-			url := target.URL
-			if url == "" {
-				url = "https://events.pagerduty.com/v2/enqueue"
+			url, err := pagerDutyURL(target.URL)
+			if err == nil {
+				target.CorrelationKey = correlation("pagerduty", url, target.RoutingKey)
 			}
-			target.CorrelationKey = correlation("pagerduty", url, target.RoutingKey)
 			return
 		case *CodeOpsgenieJob:
-			url, err := notificationURL(target.URL, "https://api.opsgenie.com/v2/alerts")
+			url, err := opsgenieURL(target.URL)
 			if err == nil {
 				target.CorrelationKey = correlation("opsgenie", url, target.APIKey)
 			}

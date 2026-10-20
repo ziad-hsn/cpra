@@ -13,6 +13,10 @@ type jobStorageExtensions struct {
 	ExternalJobs *ExternalJobStorage
 }
 
+func (j *JobStorage) LocalCheck() bool {
+	return j == nil || j.ExternalJobs == nil || j.ExternalJobs.Check == nil
+}
+
 // ExternalJobStorage contains inert inputs, not local jobs or execution grants.
 // Notification positions match CodeJobs exactly. Repeated destinations may share
 // one private binding; Clone preserves that sharing without borrowing its input.

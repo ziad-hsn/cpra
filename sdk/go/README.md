@@ -4,30 +4,21 @@ This independently versioned module contains the typed Go client for CPRa.
 It supports Go 1.26 and does not depend on the CPRa application module, controller,
 Ark, Raft, provider SDKs, or worker execution library.
 
-**Private integration status:** this SDK and the current CPRa working
-branch implement v2 resource management, incident/monitor controls, audited action
-review, operation reads and observations. Tests exercise these routes through the
-public SDK and real local TLS/Raft servers; selected dashboard flows also run
-through normal application startup and restart. Collection preflight, durable
-upload, validation, public activation and retained execution results are connected
-through the shared Apply helper and native CLI. Original-file reselection has a
-connected SDK/server path and a guided browser flow for the versioned file profile.
-The shared `collection.Reselect` helper and native `cpractl resume-upload`
-support restarted clients for that profile. Additional source profiles remain
-separate work.
-External-worker server routes and controller dispatch are connected when the
-server is built with `externaljobs` and explicitly enabled. The
-[separate-process tests](../../docs/implementation/worker-dispatch.md#separate-process-verification)
-exercise the real SDK worker runner and CPRa server, including crash recovery
-and result delivery. Final candidate qualification and independent review remain
-pending; local process evidence does not establish provider-account verification.
+Use it to create and edit monitors, configure notification recipients and groups,
+apply collections, control incidents, review uncertain actions, and read health,
+queues, SLOs and history. Collection validation precedes activation. Operation
+handles preserve progress when a client stops waiting; explicit continuation uses
+the original operation and source identities.
 
-Discover the connected server's capabilities
-before selecting v2 operations; this working-branch evidence does not establish
-compatibility with an earlier published server. Both SDK modules remain
-unpublished, and candidates stay private until all agreed release gates pass.
-The planned first prerelease is `v0.1.0-rc.1`; that name does not establish that
-a downloadable tag exists.
+The optional worker module runs operator-owned checks, recovery actions and
+notifications outside the CPRa process. Both consumer and server require the
+`externaljobs` build tag; the server also requires explicit runtime enablement
+and scoped worker credentials. Provider secrets stay with the worker.
+
+Discover server capabilities before choosing operations. The modules are not yet
+published; use the repository development workspace until a qualified version is
+available. [Versions and availability](../../docs/versions.md) records the current
+support and publication status.
 
 ## Install in your application
 
@@ -164,7 +155,7 @@ branches above report errors; the runnable examples show recovery decisions.
 See the executable local HTTP fixture in [example_test.go](example_test.go) to
 exercise returned data and versions without a v2 server.
 
-All 33 built-in driver configurations have concrete public structs. `Driver`
+All 35 built-in driver roles have concrete public structs. `Driver`
 validates a configuration for the `check`, `recovery`, or `notification` category.
 The driver envelope preserves raw configuration received from future servers.
 Unknown variants can be inspected, but mutation helpers reject them rather than
@@ -338,16 +329,16 @@ required authentication source. The server must independently be built with the
 tag, have its runtime feature enabled, and authorize the worker's scope. The SDK
 is not an authorization boundary.
 
-On the private integration branch, `JobTypes()` list/create/get/replace/delete
-methods have real TLS/Raft server tests, including retained operation receipts
-and restart. The server runtime setting is `external_jobs.enabled: true`, which
+`JobTypes()` provides list/create/get/replace/delete methods with conditional
+writes and retained operation receipts. The server runtime setting is `external_jobs.enabled: true`, which
 requires authenticated management and Raft. Creation uses an absence precondition;
 replacement/deletion use the resource version returned by a read. Registration
 stores a declarative contract; it does not start a handler. Scoped worker grants
 are provisioned through [stopped local administration](../../docs/worker-authentication.md).
-Production protocol routes have scoped integration tests. Controller dispatch
-and complete worker-runner interoperability remain unfinished, so the worker
-methods are not yet qualified against a completed execution system.
+Production protocol routes, controller dispatch and worker-runner integration
+are implemented and have scoped local tests. Those tests do not establish native
+platform or provider-account qualification. See the repository's
+[availability matrix](../../docs/versions.md) for the current publication boundary.
 
 `Workers` reads an operator-authorized page; `IterateWorkers` lazily traverses
 the same immutable snapshot. Use management credentials, not a worker execution
@@ -379,7 +370,7 @@ Absent `lastSeenAt` means no retained poll observation. Capacity becomes
 unavailable when a session expires or belongs to the previous server owner.
 Pages share `generatedAt`; new polls and results appear only in a new query.
 The endpoint exposes no provider secrets or worker-local journal data. See the
-[observation contract](../../docs/implementation/worker-status.md) for bounds.
+[worker authentication guide](../../docs/worker-authentication.md) for access requirements.
 
 The worker runner lives in its own module:
 `github.com/ziad-hsn/cpra/sdk/go/worker`. It is absent from this module's dependency
@@ -421,7 +412,7 @@ compile but do not execute their illustrated network calls. The comments and
 examples follow the [Go documentation format](https://go.dev/doc/comment) and
 [testable example convention](https://go.dev/blog/examples). After publication,
 pkg.go.dev reads these files from the downloaded module version. Its presence is
-not a claim that CPRa's pending server contracts have passed qualification.
+not a claim that the corresponding server or distribution has passed release qualification.
 
 Maintainers publishing from the complete repository checkout must follow the
 [publishing guide](../../docs/sdk/publishing.md), including the separate nested

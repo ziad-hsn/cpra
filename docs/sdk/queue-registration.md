@@ -9,9 +9,9 @@ The important sequence is: read a message, establish that the intended monitor
 exists, then acknowledge the message. If the result is uncertain or an existing
 monitor belongs to someone else, the message stays pending.
 
-The local demo works now. Configured CPRa access requires the management v2 server,
-which is not implemented in the current application. The demo's HTTP fixture
-does not run a scheduler, providers, or health checks.
+Configured mode connects to CPRa's management v2 API. Use server discovery and
+an operator credential with the required monitor permissions. The local demo
+uses an HTTP fixture; it does not run CPRa's scheduler, providers or health checks.
 
 ## Run the lesson
 

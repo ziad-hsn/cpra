@@ -125,7 +125,7 @@ func TestCollectionExecutionSnapshotRecoversCachesAndPendingCompletion(t *testin
 		t.Fatal(r.Err)
 	}
 	preparedBytes := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(preparedBytes, []byte(collectionExecutionSnapshotMagic)) {
+	if !bytes.HasPrefix(preparedBytes, []byte(actionSnapshotMagic)) {
 		t.Fatal("execution snapshot has wrong format")
 	}
 	accepted := executeStoreCommand(t, s, executeDecision(prepared), at.Add(time.Second))

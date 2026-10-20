@@ -39,6 +39,18 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 		a := actions[0]
 		rows := [][2]string{{"Action", managementDisplay(a.ID)}, {"Monitor", managementDisplay(a.MonitorID)}, {"Monitor UID", managementDisplay(a.IncarnationUID)}, {"Incident", managementDisplay(a.IncidentID)}, {"Kind", managementDisplay(a.Kind)}, {"Provider state", managementDisplay(a.State)}, {"Provider outcome", managementDisplay(a.Outcome)}, {"Held", strconv.FormatBool(a.Held)}, {"Executor fenced", strconv.FormatBool(a.ExecutorFenced)}, {"Review revision", managementDisplay(a.ReviewRevision)}, {"Execution ID", managementDisplay(a.ExecutionID)}, {"Execution revision", managementDisplay(a.ExecutionRevision)}, {"Created at", optionalManagementTime(a.CreatedAt)}, {"Updated at", optionalManagementTime(a.UpdatedAt)}}
 		rows = append(rows, [2]string{"Failure", diagnosticText(a.Failure)}, [2]string{"Notification cause", diagnosticText(a.Cause)})
+		rows = append(rows, [2]string{"Notification color", managementDisplay(a.Color)}, [2]string{"Delivery", managementDisplay(a.DeliveryID)}, [2]string{"Destination", managementDisplay(a.EndpointID)}, [2]string{"Notification episode", managementDisplay(a.NotificationEpisode)}, [2]string{"Queued at", optionalManagementTime(a.QueuedAt)}, [2]string{"Not before", optionalManagementTime(a.NotBefore)}, [2]string{"Deadline", optionalManagementTime(a.Deadline)}, [2]string{"Started at", optionalManagementTime(a.StartedAt)}, [2]string{"Finished at", optionalManagementTime(a.FinishedAt)})
+		if n := a.ReviewNotice; n != nil {
+			purpose := "Recovery outcome unknown - operator review required"
+			if n.Phase == "close" {
+				if n.Reason == "health_recovered" {
+					purpose = "Health recovered earlier; the recovery action outcome remains unknown"
+				} else {
+					purpose = "Recovery outcome reviewed"
+				}
+			}
+			rows = append(rows, [2]string{"Review alert", managementDisplay(n.AlertID)}, [2]string{"Recovery action", managementDisplay(n.ActionID)}, [2]string{"Notice phase", managementDisplay(n.Phase)}, [2]string{"Notice purpose", purpose}, [2]string{"Health at notice", managementDisplay(n.Health)})
+		}
 		if a.Review != nil {
 			references, _ := json.Marshal(a.Review.EvidenceRefs)
 			rows = append(rows, [2]string{"Operator assertion", managementDisplay(string(a.Review.Resolution))}, [2]string{"Reviewed by", managementDisplay(a.Review.Actor)}, [2]string{"Reviewed at", managementObservedTime(a.Review.ReviewedAt)}, [2]string{"Review reason", managementDisplay(a.Review.Reason)}, [2]string{"Review note", managementDisplay(a.Review.Note)}, [2]string{"Evidence references", string(references)}, [2]string{"Review conflict", strconv.FormatBool(a.Review.Conflict)})

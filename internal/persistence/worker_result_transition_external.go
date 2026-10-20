@@ -48,6 +48,12 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		result.Monitor.LastLatency, result.Monitor.LatencyAvailable = 0, false
 		return result.Monitor, result.Events, true, false, false
 	}
+	var err error
+	previous, err = f.hydrateReviewDependencies(previous, in.ActionID)
+	if err != nil {
+		f.err = err
+		return nil, nil, false, false, true
+	}
 	action, found := previous.Actions[in.ActionID]
 	if !exists || !found || action.CatalogUID != in.MonitorUID || action.Revision != in.MonitorRevision ||
 		action.ExecutorKind != "worker" || action.ExecutorSession != l.GrantID {

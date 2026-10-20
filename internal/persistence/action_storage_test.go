@@ -3,9 +3,69 @@ package persistence
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 )
+
+func TestRetainedActionReviewAndLateEvidenceUseExactRecord(t *testing.T) {
+	s := openCatalogMemory(t)
+	m, a, g, execution := localUnknown(t, s)
+	if err := execution.Finish(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = s.Get(m.ID)
+	a = retainedAction(t, s, a.ID)
+	// Exercise ledger-only lookup independently of the projection migration.
+	// The committed row is retained; no provider facts are fabricated here.
+	archive := func() {
+		t.Helper()
+		s.fsm.mu.Lock()
+		defer s.fsm.mu.Unlock()
+		previous := s.fsm.image.Monitors[m.ID]
+		projected := previous.Clone()
+		delete(projected.Actions, a.ID)
+		s.fsm.image.Monitors[m.ID] = projected
+		s.fsm.updateActionIndexes(previous, projected)
+	}
+	archive()
+	at := time.Now().UTC().Add(time.Minute)
+	review := reviewCommand(m, a, "archived-review", "rejected", at)
+	stale := *review.ActionReview
+	stale.ExpectedRevision = "outdated"
+	bad := review
+	bad.ActionReview = &stale
+	if result := submit(t, s, bad)[0]; !errors.Is(result.Err, ErrActionReviewConflict) {
+		t.Fatal("archived action accepted stale review", result.Err)
+	}
+	r := mustResult(t, s, review)
+	m, a = *r.Monitor, r.Monitor.Actions[a.ID]
+	if a.State != Unknown || a.Held() || a.Review == nil {
+		t.Fatal("review changed retained provider facts")
+	}
+	// A contradictory late result must still cancel later queued recovery and
+	// supersede the reviewed assertion, despite the action leaving the hot map.
+	m = *mustResult(t, s, manualCommand(m, g, "after-archived-review", at.Add(2*time.Minute))).Monitor
+	queued := latestManual(t, m)
+	archive()
+	if !s.fsm.operationCurrent(*r.Operation) {
+		t.Fatal("pending receipt lost its archived action dependency")
+	}
+	late := Command{Kind: "late_result", MonitorID: m.ID, Revision: a.Revision, ActionID: a.ID,
+		Outcome: "success", ExecutionStart: a.StartedAt, ExecutionEnd: a.StartedAt.Add(time.Second), At: at.Add(3 * time.Minute)}
+	r = mustResult(t, s, late)
+	current := r.Monitor.Actions[a.ID]
+	if !current.Held() || !current.Review.Conflict || current.LateEvidence == nil || r.Monitor.Actions[queued.ID].State != Cancelled {
+		t.Fatal("archived contradictory evidence failed to restore hold and fence queued recovery")
+	}
+	if receipt, err := s.Operation("archived-review"); err != nil || receipt.Outcome != "superseded" {
+		t.Fatal("archived review receipt was not superseded", err)
+	}
+	archive()
+	if duplicate := submit(t, s, late)[0]; duplicate.Err != nil || !duplicate.Allowed || duplicate.Monitor != nil {
+		t.Fatal("archived late evidence is not idempotent", duplicate.Err)
+	}
+}
 
 func TestActionLedgerSnapshotRejectsInvalidArchivedEvidence(t *testing.T) {
 	for _, damage := range []string{"retry", "executor", "review", "diagnostic", "late", "kind"} {
@@ -139,4 +199,21 @@ func TestActionLedgerRetainsCompletedRetryAttempt(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertRecords()
+}
+
+func snapshotAction(t *testing.T, ledger *collectionLedger, id string) Action {
+	t.Helper()
+	if ledger == nil {
+		t.Fatal("missing action ledger")
+	}
+	pin, err := ledger.pinActions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pin.Close()
+	row, found, err := pin.Get(t.Context(), id)
+	if err != nil || !found {
+		t.Fatalf("snapshot action %s: found=%v err=%v", id, found, err)
+	}
+	return row.Action
 }

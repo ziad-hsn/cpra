@@ -134,7 +134,7 @@ func TestUncooperativeRecoveryRetainsOwnerAndProcessLockUntilReturn(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("recovery did not receive the production worker context")
 	}
-	state, ok := store.Get("uncooperative")
+	state, ok := monitorWithActionHistory(t, store, "uncooperative")
 	if !ok {
 		t.Fatal("durable monitor missing")
 	}
@@ -175,7 +175,7 @@ func TestUncooperativeRecoveryRetainsOwnerAndProcessLockUntilReturn(t *testing.T
 		t.Fatal("controller joined merely because a competing process failed to open storage")
 	default:
 	}
-	state, _ = store.Get("uncooperative")
+	state, _ = monitorWithActionHistory(t, store, "uncooperative")
 	if !state.Actions[actionID].ExecutorFinishedAt.IsZero() {
 		t.Fatal("cancellation falsely recorded executor completion")
 	}
@@ -185,7 +185,7 @@ func TestUncooperativeRecoveryRetainsOwnerAndProcessLockUntilReturn(t *testing.T
 	case <-time.After(8 * time.Second):
 		t.Fatal("controller did not join after recovery actually returned")
 	}
-	state, _ = store.Get("uncooperative")
+	state, _ = monitorWithActionHistory(t, store, "uncooperative")
 	action := state.Actions[actionID]
 	if action.State != persistence.Succeeded || action.ExecutorFinishedAt.IsZero() || effects.Load() != 1 {
 		t.Fatal("shutdown lost known recovery success/completion or repeated the provider")
@@ -232,7 +232,7 @@ func TestExecutorProcessLockProbe(t *testing.T) {
 		t.Fatal("released state could not be reopened", err)
 	}
 	defer store.Close()
-	m, ok := store.Get("uncooperative")
+	m, ok := monitorWithActionHistory(t, store, "uncooperative")
 	if !ok || len(m.Actions) == 0 {
 		t.Fatal("reopened state lost the recovery action")
 	}

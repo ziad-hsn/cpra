@@ -28,17 +28,38 @@ it('saves A2A recovery settings through the monitor editor with separate recover
 const capabilities: Capabilities = { apiVersions: ['cpra.io/v2'], drivers: { check: Object.keys(checkFields), recovery: Object.keys(recoveryFields), notification: Object.keys(notificationFields) }, resources: [], patchTypes: [] };
 const basic = () => ({ check: { driver: { type: 'tcp', config: { host: 'localhost', port: 443 } }, interval: '60s', timeout: '5s' } });
 
+it('maps rejected monitor fields to the actual editor controls and focuses the summary', async () => {
+  const spec = {...basic(), recovery: {driver: {type: 'docker', config: {container: 'designated-test'}}, cooldown: '2m'},
+    notifications: {red: {driver: {type: 'log', config: {file: 'notices.jsonl'}}, endpointRefs: ['destination'], trigger: 'state_change'}}};
+  const fields = ['spec.recovery.cooldown', 'spec.notifications.red.trigger', 'spec.notifications.red.endpointRefs'];
+  const {writes} = await fixture('monitors', 'fields', {initial: [resource('monitors', 'fields', spec)], writeProblem: {
+    status: 422, code: 'invalidResource', errors: fields.map(field => ({field, reason: 'required', message: 'private-validation-marker'})),
+  }});
+  fireEvent.click(await screen.findByRole('button', {name: 'Edit monitor'}));
+  await waitFor(() => expect(screen.getByLabelText('Check driver')).not.toBeDisabled());
+  fireEvent.click(screen.getByRole('button', {name: 'Save'}));
+  const summary = await screen.findByRole('alert');
+  expect(summary).toHaveFocus();
+  await waitFor(() => expect(writes).toHaveLength(1));
+  for (const field of fields) {
+    fireEvent.click(screen.getByRole('button', {name: `Go to ${field}`}));
+    expect(document.activeElement).toHaveAttribute('aria-invalid', 'true');
+    expect(document.activeElement).toHaveAttribute('aria-describedby');
+  }
+  expect(document.body.textContent).not.toContain('private-validation-marker');
+});
+
 it('preserves recovery escalation when changing notification routing', async () => {
   const spec = { ...basic(), recovery: { driver: { type: 'docker', config: { container: 'designated-test' } }, maxAttempts: 2 }, notifications: { red: { driver: { type: 'log', config: {} }, trigger: 'recovery_exhausted' } } };
   const { writes } = await fixture('monitors', 'escalation', { initial: [resource('monitors', 'escalation', spec)] });
   fireEvent.click(await screen.findByRole('button', { name: 'Edit monitor' }));
-  expect(screen.getByLabelText('Code red trigger')).toHaveValue('recovery_exhausted');
+  expect(screen.getByLabelText('Notification red trigger')).toHaveValue('recovery_exhausted');
   vi.spyOn(window, 'confirm').mockReturnValue(true);
-  fireEvent.click(screen.getByRole('button', { name: 'Use typed recipients for Code red' }));
-  await waitFor(() => expect(screen.getByLabelText('Code red notification type')).not.toBeDisabled());
-  fireEvent.change(screen.getByLabelText('Code red notification type'), { target: { value: 'a2a' } });
-  fireEvent.change(screen.getByLabelText('Specific code red recipients ID'), { target: { value: 'investigator' } });
-  fireEvent.click(within(screen.getByRole('group', { name: 'Code red recipients' })).getByRole('button', { name: 'Use ID' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Use typed recipients for Notification red' }));
+  await waitFor(() => expect(screen.getByLabelText('Notification red driver')).not.toBeDisabled());
+  fireEvent.change(screen.getByLabelText('Notification red driver'), { target: { value: 'a2a' } });
+  fireEvent.change(screen.getByLabelText('Specific notification red recipients ID'), { target: { value: 'investigator' } });
+  fireEvent.click(within(screen.getByRole('group', { name: 'Notification red recipients' })).getByRole('button', { name: 'Use ID' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(writes).toHaveLength(1));
   expect(writes[0].body?.spec).toMatchObject({ notifications: { red: { trigger: 'recovery_exhausted', notifyType: 'a2a', recipientRefs: ['investigator'] } } });
@@ -48,7 +69,7 @@ it('rejects recovery triggers without a red rule and recovery configuration', ()
   const rule = { trigger: 'recovery_exhausted', notifyType: 'a2a', recipientRefs: ['investigator'] };
   expect(validateMonitorDraft({ ...basic(), notifications: { red: rule } }, capabilities)).toMatch(/configured recovery/);
   const spec = { ...basic(), recovery: { driver: { type: 'docker', config: { container: 'test' } } } };
-  expect(validateMonitorDraft({ ...spec, notifications: { yellow: rule } }, capabilities)).toMatch(/Code red/);
+  expect(validateMonitorDraft({ ...spec, notifications: { yellow: rule } }, capabilities)).toMatch(/Notification red/);
   expect(validateMonitorDraft({ ...spec, notifications: { red: { ...rule, trigger: 'unknown' } } }, capabilities)).toMatch(/unsupported notification trigger/);
   expect(validateMonitorDraft({ ...spec, notifications: { red: rule } }, capabilities)).toBeUndefined();
 });
@@ -75,13 +96,13 @@ it('creates a monitor with guided timing, labels, enabled state and typed Code d
   fireEvent.change(screen.getByLabelText('New label key'), { target: { value: 'team' } });
   fireEvent.change(screen.getByLabelText('New label value'), { target: { value: 'commerce' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add label' }));
-  fireEvent.change(screen.getByLabelText('Add Code'), { target: { value: 'red' } });
-  fireEvent.change(screen.getByLabelText('Code red notification type'), { target: { value: 'telegram' } });
-  fireEvent.change(screen.getByLabelText('Code red dispatch'), { target: { value: 'false' } });
-  fireEvent.change(screen.getByLabelText('Specific code red recipients ID'), { target: { value: 'primary-oncall' } });
-  fireEvent.click(within(screen.getByRole('group', { name: 'Code red recipients' })).getByRole('button', { name: 'Use ID' }));
-  fireEvent.change(screen.getByLabelText('Specific code red group ID'), { target: { value: 'commerce-team' } });
-  fireEvent.click(within(screen.getByRole('group', { name: 'Code red group' })).getByRole('button', { name: 'Use ID' }));
+  fireEvent.change(screen.getByLabelText('Add notification'), { target: { value: 'red' } });
+  fireEvent.change(screen.getByLabelText('Notification red driver'), { target: { value: 'telegram' } });
+  fireEvent.change(screen.getByLabelText('Notification red dispatch'), { target: { value: 'false' } });
+  fireEvent.change(screen.getByLabelText('Specific notification red recipients ID'), { target: { value: 'primary-oncall' } });
+  fireEvent.click(within(screen.getByRole('group', { name: 'Notification red recipients' })).getByRole('button', { name: 'Use ID' }));
+  fireEvent.change(screen.getByLabelText('Specific notification red group ID'), { target: { value: 'commerce-team' } });
+  fireEvent.click(within(screen.getByRole('group', { name: 'Notification red group' })).getByRole('button', { name: 'Use ID' }));
   fireEvent.submit(form);
   await waitFor(() => expect(writes).toHaveLength(1));
   expect(writes[0]).toMatchObject({ method: 'POST', path: '/api/v2/monitors', match: null, body: {

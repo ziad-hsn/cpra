@@ -24,16 +24,8 @@ receivers, groups and secrets through the dashboard, API or Go SDK.
 ## Availability
 
 **CPRa is in development; the first qualified release is not published.** Build
-this checkout using the local workspace below. Public application, SDK and worker
-module tags, packages, images and the Helm chart remain subject to qualification.
-The intended first version is `v0.1.0-rc.1`; the chart uses `0.1.0-rc.1`. SDK and
-worker versions are independent modules with the same Go 1.26 minimum.
-
-[Versions and availability](docs/versions.md) is the current support matrix.
-Linux amd64 development tests do not qualify all six planned Linux/macOS/Windows
-amd64/arm64 targets. Native service, filesystem, provider-account and comparative
-performance gates remain open where their environments or evidence are missing.
-The 24-hour test is cancelled.
+this checkout using the instructions below. [Versions and availability](docs/versions.md)
+lists supported source interfaces, tested environments and distribution status.
 
 [Documentation](docs/index.md) · [Quickstart](docs/tutorials/quickstart.md) ·
 [Configuration](docs/reference/config-schema.md) · [Drivers](docs/reference/jobs-reference.md) ·
@@ -54,8 +46,11 @@ use documentation from the same checkout as your executable.
   restart systemd units or ask an A2A agent to investigate.
 - Supports acknowledge, dismiss, snooze, disable and Ignore as distinct controls.
   Ignore continues checks while suppressing ordinary alerts and interventions;
-  verified recovery clears it. Optional automatic Ignore uses an explicit outage
-  count and rolling window. Gray notices describe actual enable/disable changes.
+  verified recovery from a qualifying outage clears it. Ignore applied while
+  healthy waits for a later outage or explicit Unignore. Optional automatic Ignore
+  uses an explicit outage count and rolling window. Gray notices describe actual
+  enable/disable changes; configured blue notices request review of an uncertain
+  recovery action without treating health recovery as proof of its outcome.
 - Lets operators apply collections from files, directories or explicitly requested
   URLs. Validation precedes activation; operation receipts preserve progress and
   item failures. Interrupted application requires explicit continuation.
@@ -65,8 +60,8 @@ use documentation from the same checkout as your executable.
 
 ![CPRa dashboard showing monitor state, notification queues and management navigation](docs/assets/dashboard-overview.png)
 
-Current development dashboard, captured from a local fixture with one disabled
-monitor. This illustration is not production capacity evidence.
+Dashboard demonstration with synthetic monitor data. See the quickstart to
+create your own monitors and notification destinations.
 
 ## Build and run locally
 
@@ -79,6 +74,7 @@ export PATH="$PWD/bin:$PATH"
 cpra -version
 cpractl version
 cpractl local init --management
+# For a different local listener, use: cpractl local init --management --port 8443
 ```
 
 Make generates an ignored `bin/cpra-sdk.work` containing the application, SDK and
@@ -96,8 +92,8 @@ System installation requires a protected operator-token output outside
 service-owned configuration and state.
 
 Use the printed server command. Trust the generated local CA explicitly in your
-browser, open `https://localhost:8060` and sign in with the token from its protected
-file. The CLI uses `--server`, `--ca-file` and `--token-file`; the corresponding
+browser, open the printed Browser URL (`https://localhost:8060` by default), and
+sign in with the token from its protected file. The CLI uses `--server`, `--ca-file` and `--token-file`; the corresponding
 `CPRA_SERVER`, `CPRA_CA_FILE` and `CPRA_AUTH_TOKEN_FILE` variables make connections
 repeatable. Keep token values out of URLs and command arguments.
 

@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, Routes, Route, Link } from 'react-
 import { Layout } from './components/Layout';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { SessionBoundary } from './auth/SessionBoundary';
+import { useOnlineStatus } from './hooks/connection';
 import './styles/global.css';
 import './styles/management.css';
 
@@ -18,11 +19,23 @@ const ManagementResources = lazy(() => import('./pages/ManagementResources'));
 const CollectionImport = lazy(() => import('./pages/CollectionImport'));
 
 function PageFallback() {
+  const online = useOnlineStatus();
   return (
     <div className="card">
-      <LoadingSkeleton lines={4} />
+      {online ? <LoadingSkeleton lines={4} /> : <p role="status">You are offline. Reconnect to load this page.</p>}
     </div>
   );
+}
+
+/** Rendering and lazy-module failures must never expose a stack or error payload. */
+export function RouteFailure() {
+  const online = useOnlineStatus();
+  return <main className="page route-failure">
+    <div className="page-head"><h1>{online ? 'This page could not be loaded' : 'You are offline'}</h1></div>
+    <p>{online ? 'The dashboard could not display this page. Reload to try again.' : 'Reconnect, then reload the dashboard. Current monitor health is unavailable.'}</p>
+    <p>Reloading does not repeat submitted changes. Check the original operation or resource before trying a change again. You may need to sign in again.</p>
+    <div className="row"><button className="btn" onClick={() => window.location.reload()}>Reload dashboard</button><a className="btn" href="/">Go to overview</a></div>
+  </main>;
 }
 
 function NotFound() {
@@ -70,7 +83,7 @@ export function AppShell() {
 }
 
 export default function App() {
-  const [router] = useState(() => createBrowserRouter([{ path: '*', element: <AppShell /> }]));
+  const [router] = useState(() => createBrowserRouter([{ path: '*', element: <AppShell />, errorElement: <RouteFailure /> }]));
   return (
     <RouterProvider router={router} />
   );

@@ -85,7 +85,8 @@ Normal server startup still checks its explicit and environment authentication
 inputs; use the printed server command in a separate terminal.
 
 For the dashboard, manually trust the generated local CA in your browser, open
-https://localhost:8060, and sign in using the protected operator token read
+the Browser URL printed by initialization (`https://localhost:8060` by default),
+and sign in using the protected operator token read
 locally from its file. Initialization does not install trust roots. The
 [management startup guide](../management-startup.md) explains trust and rotation.
 

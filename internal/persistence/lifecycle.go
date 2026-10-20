@@ -93,7 +93,8 @@ func validateLifecycle(m Monitor, version int) error {
 // OwnsAction distinguishes retained historical evidence from the active
 // configuration, including remove/re-add in a file-configured installation.
 func (m Monitor) OwnsAction(a Action) bool {
-	return a.CatalogUID == m.CatalogUID && a.FileIncarnation == m.FileIncarnation
+	return a.CatalogUID == m.CatalogUID && a.FileIncarnation == m.FileIncarnation ||
+		m.CatalogUID != "" && m.AdoptedFileIncarnation != nil && a.CatalogUID == "" && a.FileIncarnation == *m.AdoptedFileIncarnation
 }
 
 func (m Monitor) incarnationIdentity() string {

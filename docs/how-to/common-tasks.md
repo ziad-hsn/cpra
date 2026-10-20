@@ -30,8 +30,11 @@ Token length is not proof of randomness. See [protected initialization](../tutor
 
 Management uses a named operator/reader bearer. The dashboard accepts it for
 the current tab, and the CLI reads `--token-file`; never put tokens in URLs.
-Observation mode can use its configured reader bearer or Basic authentication
-with username `cpra`. Authentication failure remains a failure and does not
+Observation mode intentionally sends a Basic challenge for the HTML page, so
+the browser shows its native login prompt. Enter `cpra` as the username and the
+configured reader token as the password. API clients may instead send that token
+as a bearer. Management uses the dashboard's own named-bearer sign-in form.
+Authentication failure remains a failure and does not
 downgrade management writes. Trust the generated local CA explicitly in the
 browser or configure a trusted certificate; initialization installs no trust roots.
 

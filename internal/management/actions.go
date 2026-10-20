@@ -67,7 +67,7 @@ func (c *Catalog) PrepareAction(ctx context.Context, action, id string, req api.
 		}
 		command.Kind = "action_review"
 		command.MonitorID = a.MonitorID
-		command.ActionReview = &persistence.ActionReviewCommand{ActionID: id, MonitorUID: a.CatalogUID, ExpectedRevision: req.Revision, Revision: op, OperationID: op, Reason: req.Reason, Note: req.Note, Resolution: req.Resolution, EvidenceRefs: append([]string(nil), req.EvidenceRefs...)}
+		command.ActionReview = &persistence.ActionReviewCommand{ActionID: id, MonitorUID: a.ReviewMonitorIdentity(), ExpectedRevision: req.Revision, Revision: op, OperationID: op, Reason: req.Reason, Note: req.Note, Resolution: req.Resolution, EvidenceRefs: append([]string(nil), req.EvidenceRefs...)}
 	case "recover":
 		if req.Resolution != "" || req.Note != "" || len(req.EvidenceRefs) != 0 {
 			return nil, persistence.ErrControlInvalid

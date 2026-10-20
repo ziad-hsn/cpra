@@ -1,24 +1,14 @@
----
-title: SDK candidate · CPRa SDK contract sources
-description: SDK candidate · CPRa SDK contract sources for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
-
 # CPRa SDK contract sources
 
-These files define the **management v2 client contract for the private candidate**.
-The working branch implements and tests resource management, incident controls,
-action review, and observations through the normal server, SDK and dashboard.
-Collection staging/activation and the external-worker protocol still have
-outstanding server gates. The
-[current availability](../versions.md)
-records the implemented boundaries and execution evidence; generated code alone
-does not establish server coverage. The SDK uses the current management and observation contract.
+These files define CPRa's management and observation v2 wire contracts.
+Server discovery lists registered operations; `/api/v2/self` identifies the
+operations authorized for the current caller. Optional worker operations require
+`externaljobs` in the client and server, runtime enablement and scoped credentials.
+See [versions and availability](../versions.md) for supported versions
+and qualification boundaries.
 
 - `models.base.json` defines the canonical public types, including concrete data
-  structures for all 33 built-in driver configurations. Optional mutable fields
+  structures for all 35 built-in driver configurations. Optional mutable fields
   retain presence. Duration configuration uses Go duration strings, not numeric
   nanoseconds or ISO-8601 durations. Driver envelopes preserve raw unknown data
   for observation; SDK mutation validation selects a concrete category/type.
@@ -53,17 +43,16 @@ exclusive build constraints. Handwritten convenience methods and validation stay
 separate from generated transport/types; do not edit generated output directly.
 
 `TestOperationInventory` and `TestExternalOperationInventory` exercise every
-inventoried draft method against an HTTP contract fixture. They check the
+inventoried method against an HTTP contract fixture. They check the
 **client's method/path serialization and decoding boundary**, not Raft admission,
 server authorization, controller behavior, external delivery, or provider effects.
 Separate SDK tests check retries, response bounds, optional field presence,
 preconditions, cancellation, and build exclusion. Publication requires actual
 server v2 and worker-protocol qualification in addition to these tests.
 
-The six original-file reselection operations are marked `implemented` after the
-working-branch TLS/SDK and normal-startup/restart tests passed. Routes and runtime
-discovery remain conditional on the server reselection manager; normal managed
-web startup configures it. Older published servers may not provide these routes.
+Original-file reselection supports explicit continuation after a client restart.
+Its six operations remain conditional on the server's reselection manager;
+normal management startup configures it. Discover support before using them.
 `TestReselectionOperationInventory` covers their distinct 201/202/204 status codes
 and bounded `application/octet-stream` source body. Generated models and browser
 operation descriptors describe wire contracts; they do not advertise runtime
@@ -77,7 +66,7 @@ selects the actual driver key; `recipientRefs` and `groupRef` provide destinatio
 That typed mode excludes inline drivers and direct rule endpoint references.
 Local SDK validation checks shapes and duplicate references; matching destination
 methods, reverse dependencies and delivery deduplication require the authoritative
-server catalog. Legacy endpoint-only group fanout remains supported.
+server catalog. Endpoint-only group fanout remains supported.
 
 `GET /api/v2/self` returns `AccessInfo` with `principalId`, `role`, and an explicit
 `permissions` array. Permissions exactly match case-sensitive OpenAPI operation IDs
@@ -86,4 +75,4 @@ permission: discovery lists supported operations, while self describes access fo
 the authenticated request. An empty permission array grants no operations.
 `GET /api/v2/operations` and recipient list routes use bounded cursor pagination.
 
-<!-- Adapted from api/openapi/README.md. -->
+<!-- Generated from api/openapi/README.md by scripts/sdk/sync_guides.py. -->

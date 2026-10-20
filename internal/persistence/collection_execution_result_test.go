@@ -100,7 +100,7 @@ func TestCollectionExecutionResultClassificationAndImmutableRetry(t *testing.T) 
 		{"all conflicts", "create", "conflict", "failed", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head, begin := executionResultInput(t, s, tc.change)
 			initialActivity := head.ActivityAt
 			head, child := executionResultDecide(t, s, head, begin, tc.decision)
@@ -170,7 +170,7 @@ func TestCollectionExecutionResultClassificationAndImmutableRetry(t *testing.T) 
 }
 
 func TestCollectionExecutionResultWaitsForOriginalChildAndFence(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, begin := executionResultInput(t, s, "create")
 	head, child := executionResultDecide(t, s, head, begin, "accepted")
 	stale := executionResultFinalizeCommand(t, head)
@@ -198,7 +198,7 @@ func TestCollectionExecutionResultWaitsForOriginalChildAndFence(t *testing.T) {
 func TestCollectionExecutionResultCancellationPreservesReceiptAndAbandonedPreparation(t *testing.T) {
 	for _, stage := range []string{"before begin", "prepared", "child pending"} {
 		t.Run(stage, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head, begin := executionResultInput(t, s, "create")
 			var child *OperationReceipt
 			at := head.Activation.At.Add(time.Second)
@@ -253,7 +253,7 @@ func TestCollectionExecutionResultCancellationPreservesReceiptAndAbandonedPrepar
 }
 
 func TestCollectionExecutionResultStrictFormatsAndHistoricalWire(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, begin := executionResultInput(t, s, "create")
 	head, _ = activationSnapshotCancel(t, s, head, head.Activation.At.Add(time.Second))
 	finalize := executionResultFinalizeCommand(t, head)
@@ -302,7 +302,7 @@ func TestCollectionExecutionResultStrictFormatsAndHistoricalWire(t *testing.T) {
 }
 
 func TestCollectionExecutionResultSnapshotRejectsChangedFacts(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
 	head, begin := executionResultInput(t, s, "create")
 	head, child := executionResultDecide(t, s, head, begin, "accepted")
 	head = executionResultSettle(t, s, head, child, true)
@@ -367,7 +367,7 @@ func TestCollectionExecutionResultSnapshotRejectsChangedFacts(t *testing.T) {
 func TestCollectionExecutionResultColdCertificationRejectsMissingEvidence(t *testing.T) {
 	for _, namespace := range []string{"input", "outcome", "terminal", "orphan"} {
 		t.Run(namespace, func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head, begin := executionResultInput(t, s, "create")
 			head, child := executionResultDecide(t, s, head, begin, "accepted")
 			head = executionResultSettle(t, s, head, child, true)

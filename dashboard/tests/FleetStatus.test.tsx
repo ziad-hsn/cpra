@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { onlineManager } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { Topbar } from '../src/components/Topbar';
 import Overview from '../src/pages/Overview';
@@ -8,17 +9,53 @@ import type { OverviewResponse } from '../src/api/types';
 
 const data=vi.hoisted(()=>({
  overview:{generated:new Date().toISOString(),total:1,disabled:0,by_status:{degraded:1},by_pulse_type:{tls:1},by_code:{yellow:1},up_percent:0,index_capped:false} as OverviewResponse,
+ updatedAt: Date.now(),
 }));
 vi.mock('../src/hooks/queries',()=>({
- useOverview:()=>({data:data.overview,isLoading:false,isError:false}),
+ useOverview:()=>({data:data.overview,isLoading:false,isError:false,dataUpdatedAt:data.updatedAt,fetchStatus:'idle'}),
  useSystems:()=>({}),
  useIncidents:()=>({data:undefined,isLoading:false,isError:true,error:new Error('HTTP 503')}),
  useQueues:()=>({}),
  useMonitors:()=>({data:undefined,isLoading:false,isError:true,error:new Error('HTTP 503')}),
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); onlineManager.setOnline(true); data.updatedAt = Date.now(); data.overview.generated = new Date().toISOString(); });
+
+it('labels cached healthy observations unavailable while offline', () => {
+ data.overview = {...data.overview, total: 1, disabled: 0, by_status: {up: 1}};
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ expect(screen.getByRole('status', {name:'Global fleet status'})).toHaveTextContent('All systems operational');
+ act(() => onlineManager.setOnline(false));
+ expect(screen.getByRole('status', {name:'Global fleet status'})).toHaveTextContent('Offline — current health unavailable');
+ expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
+ expect(screen.getByText(/Saved observations remain visible/)).toBeInTheDocument();
+});
+
+it('labels an old cached response stale even before a request fails', () => {
+ data.overview = {...data.overview, total: 1, disabled: 0, by_status: {up: 1}};
+ data.updatedAt = Date.now() - 31000;
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ expect(screen.getByRole('status', {name:'Global fleet status'})).toHaveTextContent('Observations are stale — current health unavailable');
+ expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
+});
+
+it('does not confuse fresh HTTP reception with a progressing controller', () => {
+ data.overview = {...data.overview, generated: new Date(Date.now() - 60000).toISOString(), total: 1, disabled: 0, by_status: {up: 1}};
+ data.updatedAt = Date.now();
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ expect(screen.getByRole('status', {name:'Global fleet status'})).toHaveTextContent('Observations are stale — current health unavailable');
+ expect(screen.getByText(/Controller snapshot/)).toBeInTheDocument();
+ expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
+});
+
+it.each(['', 'invalid', new Date(Date.now() + 60000).toISOString()])('does not claim freshness from an absent, invalid or future controller time: %s', generated => {
+ data.overview = {...data.overview, generated, total: 1, disabled: 0, by_status: {up: 1}};
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ expect(screen.getByRole('status', {name:'Global fleet status'})).toHaveTextContent('Projection freshness unavailable');
+ expect(screen.queryByText('All systems operational')).not.toBeInTheDocument();
+});
 
 it('never reports a TLS-warning-only fleet as operational',()=>{
+ data.overview = {...data.overview, total: 1, disabled: 0, by_status: {degraded: 1}};
  render(<MemoryRouter><Topbar /></MemoryRouter>);
  expect(screen.getByRole('status',{name:'Global fleet status'})).not.toHaveTextContent('All systems operational');
 });

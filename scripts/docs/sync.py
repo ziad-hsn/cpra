@@ -228,7 +228,12 @@ def main():
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--release", type=Path, help="render metadata from the matching clean, frozen RELEASE.json")
     args = parser.parse_args()
-    print(json.dumps(sync(args.site, args.check, args.release), indent=2))
+    try:
+        result = sync(args.site, args.check, args.release)
+    except (OSError, ValueError) as error:
+        parser.exit(1, "Documentation synchronization failed: " + str(error) + "\n"
+                    "Check the site path and source inputs; regenerate intentionally before using --check.\n")
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

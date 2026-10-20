@@ -24,6 +24,16 @@ func actionView(a persistence.ActionRecord) api.Action {
 	}
 	out.AgentReceipt = agentReceiptView(a.AgentReceipt)
 	out.RecoveryFailure = recoveryFailureView(a.RecoveryFailure)
+	utc := func(at time.Time) *time.Time {
+		if at.IsZero() {
+			return nil
+		}
+		value := at.UTC()
+		return &value
+	}
+	out.CreatedAt, out.QueuedAt = utc(a.QueuedAt), utc(a.QueuedAt)
+	out.NotBefore, out.Deadline = utc(a.NotBefore), utc(a.Deadline)
+	out.StartedAt, out.FinishedAt = utc(a.StartedAt), utc(a.FinishedAt)
 	// NotBefore is a scheduling bound, not an action creation timestamp.
 	updated := a.StartedAt
 	if a.AgentReceipt != nil && a.AgentReceipt.ObservedAt.After(updated) {
@@ -36,7 +46,7 @@ func actionView(a persistence.ActionRecord) api.Action {
 	}
 	if a.Review != nil {
 		r := a.Review
-		out.Review = &api.ActionReview{Revision: r.Revision, Resolution: api.ActionReviewResolution(r.Resolution), Actor: r.Actor, ReviewedAt: r.At, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...), Conflict: r.Conflict}
+		out.Review = &api.ActionReview{Revision: r.Revision, Resolution: api.ActionReviewResolution(r.Resolution), Actor: r.Actor, ReviewedAt: r.At.UTC(), Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...), Conflict: r.Conflict}
 		if r.At.After(updated) {
 			updated = r.At
 		}
@@ -48,11 +58,12 @@ func actionView(a persistence.ActionRecord) api.Action {
 		if e.RecordedAt.After(updated) {
 			updated = e.RecordedAt
 		}
-		return &api.ActionEvidence{Outcome: e.Outcome, ExecutionStart: e.ExecutionStart, ExecutionEnd: e.ExecutionEnd, RecordedAt: e.RecordedAt}
+		return &api.ActionEvidence{Outcome: e.Outcome, ExecutionStart: e.ExecutionStart.UTC(), ExecutionEnd: e.ExecutionEnd.UTC(), RecordedAt: e.RecordedAt.UTC()}
 	}
 	out.LateEvidence = evidence(a.LateEvidence)
 	out.ConflictingEvidence = evidence(a.ConflictingEvidence)
 	if !updated.IsZero() {
+		updated = updated.UTC()
 		out.UpdatedAt = &updated
 	}
 	return out
@@ -62,7 +73,7 @@ func agentReceiptView(receipt *persistence.AgentReceipt) *api.AgentReceipt {
 	if receipt == nil {
 		return nil
 	}
-	out := &api.AgentReceipt{Sequence: strconv.FormatUint(receipt.Sequence, 10), ObservedAt: receipt.ObservedAt}
+	out := &api.AgentReceipt{Sequence: strconv.FormatUint(receipt.Sequence, 10), ObservedAt: receipt.ObservedAt.UTC()}
 	if receipt.TaskID != "" {
 		out.TaskID = api.Pointer(receipt.TaskID)
 	}
@@ -145,5 +156,5 @@ func recoveryFailureView(f *persistence.RecoveryFailure) *api.RecoveryFailure {
 	if f == nil {
 		return nil
 	}
-	return &api.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: api.RecoveryFailureTrigger(f.Trigger), Outcome: "failure", FailedAt: f.FailedAt}
+	return &api.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: api.RecoveryFailureTrigger(f.Trigger), Outcome: "failure", FailedAt: f.FailedAt.UTC()}
 }

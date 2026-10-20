@@ -188,7 +188,7 @@ func TestWorkerQueueOrderSurvivesProcessKill(t *testing.T) {
 			want := saved.Records
 			if saved.Started {
 				original := saved.Records[0]
-				m, _ := s.Get(original.Intent.MonitorID)
+				m, _ := monitorWithActionHistory(t, s, original.Intent.MonitorID)
 				if a := m.Actions[original.Intent.ActionID]; a.State != Unknown || !a.Held() {
 					t.Fatal("restart did not hold uncertain action")
 				}

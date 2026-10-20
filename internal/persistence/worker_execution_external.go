@@ -356,6 +356,9 @@ func (s *Store) WorkerExecutionsReady(ctx context.Context, kind JobTypeReference
 		page.Next = id
 		return true
 	})
+	if f.err != nil {
+		return WorkerExecutionPage{}, errControllerUnavailable
+	}
 	if err != nil {
 		return WorkerExecutionPage{}, err
 	}

@@ -1,10 +1,8 @@
 ---
-title: SDK candidate · Prepare the SDK for Go packages and publication
-description: SDK candidate · Prepare the SDK for Go packages and publication for the reviewed CPRa source; see the version and availability notice.
+title: Prepare the SDK for Go packages and publication
+description: Prepare the SDK for Go packages and publication.
 cpra_scope: sdk
 ---
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # Prepare the SDK for Go packages and publication
 

@@ -1,10 +1,21 @@
 """Isolation-report accounting tests; no capacity or runtime claim."""
 import unittest
 
-from isolation import latency_summary
+from isolation import latency_summary, fault_window_gaps, duration_budget
 
 
 class LatencySummaryTests(unittest.TestCase):
+    def test_late_fault_window_counts_silent_boundaries(self):
+        self.assertEqual(fault_window_gaps([10, 20, 410, 430, 480], 400, 460), [10, 20, 30])
+        self.assertEqual(fault_window_gaps([10, 480], 400, 460), [60])
+
+    def test_every_scenario_includes_shutdown_in_fifteen_minute_limit(self):
+        self.assertEqual(duration_budget(400, 60, 60), 620)
+        self.assertEqual(duration_budget(0, 60, 30, 600), 790)
+        for values in ((900, 60, 60), (400, 60, 60, 600), (0, 60, 30, 900), (-1, 60, 60)):
+            with self.assertRaises(ValueError):
+                duration_budget(*values)
+
     def test_unavailable_and_nonfinite_values_are_not_zero_measurements(self):
         for missing in (None, float('nan'), float('inf'), True, '1', -1):
             with self.subTest(value=missing):

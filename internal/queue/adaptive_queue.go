@@ -212,7 +212,7 @@ func (q *AdaptiveQueue) Stats() Stats {
 	depth := enq - deq
 	enqueued := q.enqueuedCount.Load()
 	dequeued := q.dequeuedCount.Load()
-	elapsed := time.Since(time.Unix(0, q.startUnixNano.Load()))
+	elapsed := time.Since(observedTime(q.startUnixNano.Load()))
 	if elapsed <= 0 {
 		elapsed = time.Millisecond
 	}
@@ -231,8 +231,8 @@ func (q *AdaptiveQueue) Stats() Stats {
 		AvgQueueTime: time.Duration(avgWaitNs),
 		EnqueueRate:  float64(enqueued) / elapsed.Seconds(),
 		DequeueRate:  float64(dequeued) / elapsed.Seconds(),
-		LastEnqueue:  time.Unix(0, q.lastEnqueueUnixNano.Load()),
-		LastDequeue:  time.Unix(0, q.lastDequeueUnixNano.Load()),
+		LastEnqueue:  observedTime(q.lastEnqueueUnixNano.Load()),
+		LastDequeue:  observedTime(q.lastDequeueUnixNano.Load()),
 		SampleWindow: elapsed,
 	})
 }

@@ -12,7 +12,7 @@ func TestCollectionProfileV1OnlyReconcilesCurrentCreates(t *testing.T) {
 	c := ticketCreateFixture(t, s)
 	c.Create.NormalizationProfile = "cpra.file.base.v1"
 	at := c.Create.CreatedAt
-	if r := collectionCommand(t, s, c, at); !errors.Is(r.Err, ErrCollectionInvalid) || s.fsm.image.OperationHighWater != 0 {
+	if r := submit(t, s, Command{Kind: "collection", At: at, Collection: &c})[0]; !errors.Is(r.Err, ErrCollectionInvalid) || s.fsm.image.OperationHighWater != 0 {
 		t.Fatal("unused v1 ticket allocated new state", r.Err)
 	}
 	// The retained historical envelope establishes the original operation.

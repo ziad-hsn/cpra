@@ -9,8 +9,8 @@ const identity = (value: unknown): value is string => typeof value === 'string' 
 function incident(value: unknown): Incident {
   if (!object(value) || !identity(value.id) || !identity(value.monitorID) || !identity(value.revision) || typeof value.state !== 'string') throw invalid();
   const result: Incident = { id: value.id, monitorID: value.monitorID, revision: value.revision,
-    state: value.state === 'open' || value.state === 'closed' ? value.state : 'unrecognized' };
-  for (const key of ['openedAt', 'closedAt', 'acknowledgedAt'] as const) {
+    state: value.state === 'open' || value.state === 'closed' || value.state === 'pending' ? value.state : 'unrecognized' };
+  for (const key of ['firstFailureAt', 'openedAt', 'closedAt', 'acknowledgedAt'] as const) {
     if (value[key] !== undefined) {
       if (typeof value[key] !== 'string' || !Number.isFinite(Date.parse(value[key]))) throw invalid();
       // Existing Go time.Time fields serialize their zero value despite omitempty.
@@ -25,6 +25,16 @@ function incident(value: unknown): Incident {
   if (value.dismissed !== undefined) {
     if (typeof value.dismissed !== 'boolean') throw invalid();
     result.dismissed = value.dismissed;
+  }
+  if (value.notifications !== undefined) {
+    const source = value.notifications;
+    if (!object(source)) throw invalid();
+    const counts = {pending: 0, accepted: 0, failed: 0, unknown: 0, cancelled: 0};
+    for (const key of Object.keys(counts) as (keyof typeof counts)[]) {
+      if (typeof source[key] !== 'number' || !Number.isSafeInteger(source[key]) || source[key] < 0) throw invalid();
+      counts[key] = source[key];
+    }
+    result.notifications = counts;
   }
   return result;
 }

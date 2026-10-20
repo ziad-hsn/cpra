@@ -146,7 +146,7 @@ func TestWorkerExpirySurvivesProcessKill(t *testing.T) {
 					}
 				}
 				m, _ = s.Get(m.ID)
-				a := m.Actions[saved.Intent.ActionID]
+				a := retainedAction(t, s, saved.Intent.ActionID)
 				if a.State != Cancelled || a.Outcome != "worker_admission_expired" || !a.StartedAt.IsZero() || len(workerExpiryEvents(t, s, m.ID)) != 1 {
 					t.Fatal("recovery repeated or invented an invocation")
 				}

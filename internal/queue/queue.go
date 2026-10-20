@@ -34,8 +34,8 @@ type Stats struct {
 	Drivers        []DriverQueueStats `json:"drivers,omitempty"`
 	ArrivalCV      float64            `json:"arrival_cv"`
 	ArrivalSamples int                `json:"arrival_samples"`
-	LastEnqueue    time.Time          `json:"last_enqueue"`
-	LastDequeue    time.Time          `json:"last_dequeue"`
+	LastEnqueue    time.Time          `json:"last_enqueue,omitzero"`
+	LastDequeue    time.Time          `json:"last_dequeue,omitzero"`
 	AvgQueueTime   time.Duration      `json:"avg_queue_time"`
 	Dequeued       int64              `json:"dequeued"`
 	Dropped        int64              `json:"dropped"`
@@ -53,4 +53,12 @@ type Stats struct {
 	OldestPendingAge       time.Duration `json:"oldest_pending_age"`
 	OldestPendingAvailable bool          `json:"oldest_pending_available"`
 	OldestPendingReason    string        `json:"oldest_pending_reason,omitempty"`
+}
+
+// observedTime returns an absent value until the first recorded observation.
+func observedTime(nanos int64) time.Time {
+	if nanos == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, nanos).UTC()
 }

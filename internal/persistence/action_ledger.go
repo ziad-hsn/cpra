@@ -18,6 +18,11 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// Older configure commands allowed revisions close to 2 MiB. Retained actions
+// add identities, review evidence and execution metadata to that original value.
+// Keep their row allowance separate from collection resource/plan limits.
+const actionLedgerMaxFrame = maxCommitBytes
+
 var (
 	errActionLedger      = errors.New("action ledger is corrupt or incompatible")
 	actionRowsBucket     = []byte("action_versions")
@@ -27,6 +32,7 @@ var (
 	actionEpisodeBucket  = []byte("action_episodes")
 	actionIncidentBucket = []byte("action_incidents")
 	actionReviewBucket   = []byte("action_reviews")
+	actionCooldownBucket = []byte("action_cooldowns")
 	actionMetaBucket     = []byte("action_metadata")
 )
 
@@ -83,15 +89,18 @@ func (d *actionCommandDigest) sum() string {
 // The disposable memory mode mirrors disk version selection. Raft mode keeps
 // these indexes in bbolt; no all-history Go tree or payload cache is allocated.
 type actionLedgerMemory struct {
-	progress  actionLedgerProgress
-	current   map[string][]byte
-	versions  map[string][][]byte
-	order     *btree.BTreeG[string]
-	byMonitor *btree.BTreeG[string]
+	progress    actionLedgerProgress
+	current     map[string][]byte
+	versions    map[string][][]byte
+	order       *btree.BTreeG[string]
+	byMonitor   *btree.BTreeG[string]
+	byCooldown  *btree.BTreeG[string]
+	reviews     map[string][]byte
+	reviewOrder *btree.BTreeG[string]
 }
 
 func newActionLedgerMemory() *actionLedgerMemory {
-	return &actionLedgerMemory{current: make(map[string][]byte), versions: make(map[string][][]byte),
+	return &actionLedgerMemory{reviews: make(map[string][]byte), reviewOrder: newReviewOrder(), byCooldown: newReviewOrder(), current: make(map[string][]byte), versions: make(map[string][][]byte),
 		order: btree.NewG(32, func(a, b string) bool { return a < b }), byMonitor: btree.NewG(32, func(a, b string) bool { return a < b })}
 }
 
@@ -117,6 +126,13 @@ func (m *actionLedgerMemory) validate() error {
 			total += uint64(len(data))
 		}
 	}
+	for key, data := range m.reviews {
+		r, err := decodeReviewRecord(data)
+		if err != nil || r.Key != key || r.Sequence > m.progress.Sequence {
+			return errActionLedger
+		}
+		total += uint64(len(data))
+	}
 	if total != m.progress.Bytes {
 		return errActionLedger
 	}
@@ -124,7 +140,7 @@ func (m *actionLedgerMemory) validate() error {
 }
 
 func actionBuckets() [][]byte {
-	return [][]byte{actionRowsBucket, actionCurrentBucket, actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionMetaBucket}
+	return [][]byte{actionRowsBucket, actionCurrentBucket, actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionMetaBucket, actionCooldownBucket, reviewRowsBucket, reviewReadyBucket}
 }
 
 func actionOwnerKey(monitorID string, a Action) string {
@@ -147,6 +163,7 @@ func actionRowKeys(row actionLedgerRow) map[string]string {
 		episode = a.IncidentID
 	}
 	return map[string]string{
+		string(actionCooldownBucket): rejectionIndexKey(row),
 		string(actionMonitorBucket):  row.MonitorID + "\x00" + a.ID,
 		string(actionOwnerBucket):    owner + a.ID,
 		string(actionEpisodeBucket):  owner + episode + "\x00" + a.ID,
@@ -163,7 +180,7 @@ func encodeActionRow(row actionLedgerRow) ([]byte, error) {
 		return nil, errActionLedger
 	}
 	data, err := json.Marshal(row)
-	if err != nil || len(data) > collectionLedgerMaxFrame {
+	if err != nil || len(data) > actionLedgerMaxFrame {
 		return nil, errActionLedger
 	}
 	return data, nil
@@ -171,7 +188,7 @@ func encodeActionRow(row actionLedgerRow) ([]byte, error) {
 
 func decodeActionRow(data []byte) (actionLedgerRow, error) {
 	var row actionLedgerRow
-	if len(data) == 0 || len(data) > collectionLedgerMaxFrame {
+	if len(data) == 0 || len(data) > actionLedgerMaxFrame {
 		return row, errActionLedger
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -191,6 +208,9 @@ func actionVersionKey(id string, sequence uint64) []byte {
 }
 
 func actionDiskHead(tx *bolt.Tx, id string) (actionLedgerRow, []byte, bool, error) {
+	return actionDiskHeadDecoded(tx, id, decodeActionRow)
+}
+func actionDiskHeadDecoded(tx *bolt.Tx, id string, decode func([]byte) (actionLedgerRow, error)) (actionLedgerRow, []byte, bool, error) {
 	versions, current := tx.Bucket(actionRowsBucket), tx.Bucket(actionCurrentBucket)
 	if versions == nil || current == nil {
 		return actionLedgerRow{}, nil, false, errActionLedger
@@ -210,7 +230,7 @@ func actionDiskHead(tx *bolt.Tx, id string) (actionLedgerRow, []byte, bool, erro
 		}
 		return actionLedgerRow{}, nil, false, nil
 	}
-	row, err := decodeActionRow(data)
+	row, err := decode(data)
 	if err != nil || row.Action.ID != id || !bytes.Equal(key, actionVersionKey(id, row.Sequence)) || !bytes.Equal(head, data) {
 		return actionLedgerRow{}, nil, false, errActionLedger
 	}
@@ -267,7 +287,11 @@ func actionBucketCount(tx *bolt.Tx) int {
 // consolidates multiple edits of a row before calling. Eviction from a monitor
 // projection is deliberately not a deletion from this evidence ledger.
 func (l *collectionLedger) CommitActions(position actionLedgerPosition, rows []actionLedgerRow) (uint64, error) {
-	if position.Index == 0 || len(rows) == 0 {
+	return l.CommitActionState(position, rows, nil)
+}
+
+func (l *collectionLedger) CommitActionState(position actionLedgerPosition, rows []actionLedgerRow, reviews []reviewRecord) (uint64, error) {
+	if position.Index == 0 || len(rows)+len(reviews) == 0 {
 		return 0, errActionLedger
 	}
 	rows = slices.Clone(rows)
@@ -285,6 +309,16 @@ func (l *collectionLedger) CommitActions(position actionLedgerPosition, rows []a
 			return 0, err
 		}
 	}
+	reviews = slices.Clone(reviews)
+	slices.SortFunc(reviews, func(a, b reviewRecord) int { return strings.Compare(a.Key, b.Key) })
+	for n, r := range reviews {
+		if n > 0 && reviews[n-1].Key == r.Key {
+			return 0, errActionLedger
+		}
+		if err := digest.addReview(r); err != nil {
+			return 0, err
+		}
+	}
 	hash := digest.sum()
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -295,7 +329,7 @@ func (l *collectionLedger) CommitActions(position actionLedgerPosition, rows []a
 		if l.actions == nil {
 			l.actions = newActionLedgerMemory()
 		}
-		return l.commitMemoryActions(position, rows, hash)
+		return l.commitMemoryActions(position, rows, reviews, hash)
 	}
 	var sequence uint64
 	err := l.db.Update(func(tx *bolt.Tx) error {
@@ -361,6 +395,20 @@ func (l *collectionLedger) CommitActions(position actionLedgerPosition, rows []a
 				}
 			}
 		}
+		for _, r := range reviews {
+			r.Sequence = sequence
+			data, err := encodeReviewUpdate(tx.Bucket(reviewRowsBucket).Get([]byte(r.Key)), r)
+			if err != nil {
+				return err
+			}
+			if old := tx.Bucket(reviewRowsBucket).Get([]byte(r.Key)); old != nil {
+				used -= uint64(len(old))
+			}
+			used += uint64(len(data))
+			if err := putReviewRecord(tx, r, data); err != nil {
+				return err
+			}
+		}
 		progress, err := json.Marshal(actionLedgerProgress{Position: position, Sequence: sequence, Digest: hash, Bytes: used})
 		if err != nil {
 			return errActionLedger
@@ -383,7 +431,7 @@ func nextActionSequence(previous actionLedgerProgress, position actionLedgerPosi
 	return previous.Sequence + 1, nil
 }
 
-func (l *collectionLedger) commitMemoryActions(position actionLedgerPosition, rows []actionLedgerRow, digest string) (uint64, error) {
+func (l *collectionLedger) commitMemoryActions(position actionLedgerPosition, rows []actionLedgerRow, reviews []reviewRecord, digest string) (uint64, error) {
 	m := l.actions
 	sequence, err := nextActionSequence(m.progress, position, digest)
 	if err != nil || sequence == m.progress.Sequence {
@@ -414,7 +462,31 @@ func (l *collectionLedger) commitMemoryActions(position actionLedgerPosition, ro
 		used += uint64(len(data))
 		encoded[i] = data
 	}
+	reviewData := make([][]byte, len(reviews))
+	for i, r := range reviews {
+		r.Sequence = sequence
+		data, err := encodeReviewUpdate(m.reviews[r.Key], r)
+		if err != nil {
+			return 0, err
+		}
+		used -= uint64(len(m.reviews[r.Key]))
+		used += uint64(len(data))
+		reviewData[i] = data
+	}
+	for i, r := range reviews {
+		m.reviews[r.Key] = reviewData[i]
+		if r.Deleted {
+			m.reviewOrder.Delete(r.Key)
+		} else {
+			m.reviewOrder.ReplaceOrInsert(r.Key)
+		}
+	}
 	for i, row := range rows {
+		if old := m.current[row.Action.ID]; old != nil {
+			prior, _ := decodeActionRow(old)
+			m.byCooldown.Delete(rejectionIndexKey(prior))
+		}
+		m.byCooldown.ReplaceOrInsert(rejectionIndexKey(row))
 		m.current[row.Action.ID] = encoded[i]
 		m.versions[row.Action.ID] = append(m.versions[row.Action.ID], encoded[i])
 		m.order.ReplaceOrInsert(row.Action.ID)
@@ -545,6 +617,9 @@ func (v *actionLedgerPin) read(ctx context.Context, read func(*bolt.Tx, *actionL
 }
 
 func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, sequence uint64) (actionLedgerRow, bool, error) {
+	return readActionVersionDecoded(tx, memory, id, sequence, decodeActionRow)
+}
+func readActionVersionDecoded(tx *bolt.Tx, memory *actionLedgerMemory, id string, sequence uint64, decode func([]byte) (actionLedgerRow, error)) (actionLedgerRow, bool, error) {
 	var data []byte
 	if sequence == 0 {
 		return actionLedgerRow{}, false, nil
@@ -555,7 +630,7 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 		if bucket == nil || current == nil {
 			return actionLedgerRow{}, false, errActionLedger
 		}
-		latest, _, found, err := actionDiskHead(tx, id)
+		latest, _, found, err := actionDiskHeadDecoded(tx, id, decode)
 		if err != nil || !found {
 			return actionLedgerRow{}, false, err
 		}
@@ -573,12 +648,12 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 		if !bytes.HasPrefix(key, []byte(id+"\x00")) {
 			return actionLedgerRow{}, false, errActionLedger
 		}
-		successor, err = decodeActionRow(value)
+		successor, err = decode(value)
 		if err != nil || successor.Action.ID != id || !bytes.Equal(key, actionVersionKey(id, successor.Sequence)) || successor.Sequence <= sequence {
 			return actionLedgerRow{}, false, errActionLedger
 		}
 		if data != nil {
-			row, err := decodeActionRow(data)
+			row, err := decode(data)
 			if err != nil || row.Sequence != sequence || row.Action.ID != id || successor.Previous != row.Sequence {
 				return actionLedgerRow{}, false, errActionLedger
 			}
@@ -592,7 +667,7 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 			}
 			return actionLedgerRow{}, false, nil
 		}
-		row, err := decodeActionRow(value)
+		row, err := decode(value)
 		if err != nil || binary.BigEndian.Uint64(key[len(prefix):]) != row.Sequence || row.Sequence > sequence || row.Action.ID != id || successor.Previous != row.Sequence {
 			return actionLedgerRow{}, false, errActionLedger
 		}
@@ -608,7 +683,7 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 		if !bytes.Equal(versions[len(versions)-1], memory.current[id]) {
 			return actionLedgerRow{}, false, errActionLedger
 		}
-		index, err := actionMemoryVersion(versions, sequence)
+		index, err := actionMemoryVersion(versions, sequence, decode)
 		if err != nil {
 			return actionLedgerRow{}, false, err
 		}
@@ -616,13 +691,13 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 			data = versions[index]
 		}
 		if index+1 < len(versions) {
-			successor, err := decodeActionRow(versions[index+1])
+			successor, err := decode(versions[index+1])
 			if err != nil {
 				return actionLedgerRow{}, false, err
 			}
 			var selected uint64
 			if index >= 0 {
-				row, err := decodeActionRow(data)
+				row, err := decode(data)
 				if err != nil {
 					return actionLedgerRow{}, false, err
 				}
@@ -636,18 +711,18 @@ func readActionVersion(tx *bolt.Tx, memory *actionLedgerMemory, id string, seque
 	if data == nil {
 		return actionLedgerRow{}, false, nil
 	}
-	row, err := decodeActionRow(data)
+	row, err := decode(data)
 	if err != nil || row.Sequence > sequence || row.Action.ID != id {
 		return actionLedgerRow{}, false, errActionLedger
 	}
 	return row, true, nil
 }
 
-func actionMemoryVersion(versions [][]byte, sequence uint64) (int, error) {
+func actionMemoryVersion(versions [][]byte, sequence uint64, decode func([]byte) (actionLedgerRow, error)) (int, error) {
 	lo, hi := 0, len(versions)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		row, err := decodeActionRow(versions[mid])
+		row, err := decode(versions[mid])
 		if err != nil {
 			return -1, err
 		}
@@ -678,6 +753,9 @@ func (v *actionLedgerPin) Get(ctx context.Context, id string) (actionLedgerRow, 
 }
 
 func (v *actionLedgerPin) Page(ctx context.Context, monitorID, after string, limit int) ([]actionLedgerRow, string, error) {
+	return v.pageBounded(ctx, monitorID, after, limit, collectionLedgerPageLimit, collectionLedgerPageBytes)
+}
+func (v *actionLedgerPin) pageBounded(ctx context.Context, monitorID, after string, limit, visits, maxBytes int) ([]actionLedgerRow, string, error) {
 	if limit < 1 || limit > 500 || after != "" && !catalogIdentifier(after, 256) || monitorID != "" && !catalogIdentifier(monitorID, 256) {
 		return nil, "", errActionLedger
 	}
@@ -687,7 +765,8 @@ func (v *actionLedgerPin) Page(ctx context.Context, monitorID, after string, lim
 		if v.sequence == 0 {
 			return nil
 		}
-		visited, last := 0, ""
+		visited, last, decoded := 0, "", 0
+		decode := func(data []byte) (actionLedgerRow, error) { decoded += len(data); return decodeActionRow(data) }
 		visit := func(id string) (bool, error) {
 			if err := ctx.Err(); err != nil {
 				return false, err
@@ -695,13 +774,16 @@ func (v *actionLedgerPin) Page(ctx context.Context, monitorID, after string, lim
 			if id > v.upperID {
 				return false, nil
 			}
-			if visited == collectionLedgerPageLimit {
+			// Stop between complete identity lookups. One existing large record
+			// and its bounded version-proof reads may exceed the page budget;
+			// it must remain readable without repeatedly making no progress.
+			if visited == visits || visited > 0 && decoded >= maxBytes {
 				next = last
 				return false, nil
 			}
 			visited++
 			last = id
-			row, found, err := readActionVersion(tx, memory, id, v.sequence)
+			row, found, err := readActionVersionDecoded(tx, memory, id, v.sequence, decode)
 			if err != nil || !found {
 				return err == nil, err
 			}
@@ -709,7 +791,7 @@ func (v *actionLedgerPin) Page(ctx context.Context, monitorID, after string, lim
 				return false, errActionLedger
 			}
 			encoded, _ := encodeActionRow(row)
-			if len(rows) == limit || len(rows) > 0 && size+len(encoded) > collectionLedgerPageBytes {
+			if len(rows) == limit || len(rows) > 0 && size+len(encoded) > maxBytes {
 				next = rows[len(rows)-1].Action.ID
 				return false, nil
 			}

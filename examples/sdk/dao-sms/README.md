@@ -11,12 +11,14 @@ You will register two custom JobTypes, connect them to a monitor, and run their
 compiled Go handlers in a separate worker. The check issues read requests only.
 It never signs transactions, reads a wallet key, or changes a contract.
 
-**Server prerequisite:** CPRa's v2 management API and worker dispatcher are still
-pending. The default demo runs local protocol fixtures. The `register` and
-`worker` modes contain the real SDK call paths, but need the corresponding server
-contracts before they can operate against CPRa. A successful demo proves the
-example's behavior against fixtures, including actual loopback HTTP and encrypted
-worker storage; it does not prove production-server integration or SMS delivery.
+**Server prerequisite:** `register` and `worker` use CPRa's v2 management API and
+external-worker protocol. Build the server and these clients with `externaljobs`,
+enable external jobs in the runtime configuration, and configure separate
+operator and scoped worker credentials. Worker provider secrets remain local to
+the worker. The default demo uses local protocol fixtures, loopback HTTP and an
+encrypted worker journal. Its success does not establish provider-account
+qualification or handset delivery. See the parent [SDK examples setup](../README.md)
+for build and connection requirements.
 
 ## Run the lesson locally
 

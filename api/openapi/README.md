@@ -1,13 +1,11 @@
 # CPRa SDK contract sources
 
-These files define the **management v2 client contract for the private candidate**.
-The working branch implements and tests resource management, incident controls,
-action review, and observations through the normal server, SDK and dashboard.
-Collection staging/activation and the external-worker protocol still have
-outstanding server gates. The
-[implementation progress](../../docs/implementation/dashboard-implementation-progress.md)
-records the implemented boundaries and execution evidence; generated code alone
-does not establish server coverage. The SDK uses the current management and observation contract.
+These files define CPRa's management and observation v2 wire contracts.
+Server discovery lists registered operations; `/api/v2/self` identifies the
+operations authorized for the current caller. Optional worker operations require
+`externaljobs` in the client and server, runtime enablement and scoped credentials.
+See [versions and availability](../../docs/versions.md) for supported versions
+and qualification boundaries.
 
 - `models.base.json` defines the canonical public types, including concrete data
   structures for all 35 built-in driver configurations. Optional mutable fields
@@ -45,17 +43,16 @@ exclusive build constraints. Handwritten convenience methods and validation stay
 separate from generated transport/types; do not edit generated output directly.
 
 `TestOperationInventory` and `TestExternalOperationInventory` exercise every
-inventoried draft method against an HTTP contract fixture. They check the
+inventoried method against an HTTP contract fixture. They check the
 **client's method/path serialization and decoding boundary**, not Raft admission,
 server authorization, controller behavior, external delivery, or provider effects.
 Separate SDK tests check retries, response bounds, optional field presence,
 preconditions, cancellation, and build exclusion. Publication requires actual
 server v2 and worker-protocol qualification in addition to these tests.
 
-The six original-file reselection operations are marked `implemented` after the
-working-branch TLS/SDK and normal-startup/restart tests passed. Routes and runtime
-discovery remain conditional on the server reselection manager; normal managed
-web startup configures it. Older published servers may not provide these routes.
+Original-file reselection supports explicit continuation after a client restart.
+Its six operations remain conditional on the server's reselection manager;
+normal management startup configures it. Discover support before using them.
 `TestReselectionOperationInventory` covers their distinct 201/202/204 status codes
 and bounded `application/octet-stream` source body. Generated models and browser
 operation descriptors describe wire contracts; they do not advertise runtime

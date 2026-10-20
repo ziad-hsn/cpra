@@ -75,7 +75,10 @@ func (f *machine) applyWorkerExpiry(c WorkerExpireCommand, at time.Time) Result 
 		return Result{Err: ErrWorkerExecutionConflict}
 	}
 	previous, ok := f.image.Monitors[c.MonitorID]
-	a, exists := previous.Actions[c.ActionID]
+	a, exists, err := f.actionForMonitor(previous, c.ActionID)
+	if err != nil {
+		return Result{Err: err}
+	}
 	if !ok || !exists || a.CatalogUID != c.MonitorUID || a.Revision != c.MonitorRevision || !a.NotBefore.Equal(c.Scheduled) {
 		return Result{Err: ErrWorkerExecutionConflict}
 	}
@@ -150,17 +153,22 @@ func (s *Store) ExpireWorkerAction(ctx context.Context, in WorkerExecutionIntent
 	return nil
 }
 
+func validateWorkerRetainedAction(i image, a Action) error {
+	if a.Outcome != "worker_admission_expired" {
+		return nil
+	}
+	if i.Version < WorkerExpiryFormatVersion || a.State != Cancelled || a.CatalogUID == "" ||
+		(a.Kind != "intervention" && a.Kind != "code") || !a.StartedAt.IsZero() || a.ExecutorKind != "" || a.ExecutorSession != "" || !a.ExecutorFinishedAt.IsZero() ||
+		a.FinishedAt.IsZero() || a.FinishedAt.Before(a.NotBefore) || a.LateEvidence != nil || a.Review != nil || a.ConflictingEvidence != nil {
+		return ErrWorkerExecutionInvalid
+	}
+	return nil
+}
 func validateWorkerExpiryImage(i image) error {
 	for _, m := range i.Monitors {
 		for _, a := range m.Actions {
-			if a.Outcome != "worker_admission_expired" {
-				continue
-			}
-			if i.Version < WorkerExpiryFormatVersion || a.State != Cancelled || a.CatalogUID == "" ||
-				(a.Kind != "intervention" && a.Kind != "code") || !a.StartedAt.IsZero() ||
-				a.ExecutorKind != "" || a.ExecutorSession != "" || !a.ExecutorFinishedAt.IsZero() ||
-				a.FinishedAt.IsZero() || a.FinishedAt.Before(a.NotBefore) || a.LateEvidence != nil || a.Review != nil || a.ConflictingEvidence != nil {
-				return ErrWorkerExecutionInvalid
+			if err := validateWorkerRetainedAction(i, a); err != nil {
+				return err
 			}
 		}
 	}

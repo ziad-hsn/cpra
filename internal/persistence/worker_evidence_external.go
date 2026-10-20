@@ -107,7 +107,10 @@ func (f *machine) workerEvidenceExecution(a WorkerAuthority, serverID, execution
 		return WorkerExecutionRecord{}, ErrWorkerExecutionConflict
 	}
 	if r.Intent.Category != "check" {
-		action, ok := f.image.Monitors[r.Intent.MonitorID].Actions[r.Intent.ActionID]
+		action, ok, err := f.actionForMonitor(f.image.Monitors[r.Intent.MonitorID], r.Intent.ActionID)
+		if err != nil {
+			return WorkerExecutionRecord{}, err
+		}
 		if !ok || action.CatalogUID != r.Intent.MonitorUID || action.Revision != r.Intent.MonitorRevision || action.ExecutorKind != "worker" || action.ExecutorSession != l.GrantID {
 			return WorkerExecutionRecord{}, ErrWorkerExecutionConflict
 		}
@@ -127,7 +130,7 @@ func (s *Store) WorkerEvidenceExecution(ctx context.Context, a WorkerAuthority, 
 	if serverID != workerProtocolServerID(s.nodeID, a.Epoch) {
 		return WorkerExecutionRecord{}, ErrWorkerSessionIdentity
 	}
-	unlock, err := s.lockControllerState(ctx, false)
+	unlock, err := s.lockControllerState(ctx, true)
 	if err != nil {
 		return WorkerExecutionRecord{}, err
 	}
@@ -186,7 +189,10 @@ func (f *machine) applyWorkerEvidence(c WorkerEvidenceCommand, at time.Time, ind
 	var events []Event
 	if r.Intent.Category != "check" {
 		m := f.image.Monitors[r.Intent.MonitorID]
-		a := m.Actions[r.Intent.ActionID]
+		a, _, err := f.actionForMonitor(m, r.Intent.ActionID)
+		if err != nil {
+			return Result{Err: err}
+		}
 		events = []Event{{MonitorID: r.Intent.MonitorID, CatalogUID: r.Intent.MonitorUID, Revision: r.Intent.MonitorRevision, At: at,
 			Type: "worker_late_evidence", IncidentID: a.IncidentID, ActionID: r.Intent.ActionID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint,
 			Actor: c.Authority.WorkerID, Outcome: "recorded", EvidenceRefs: []string{receipt.ReceiptID}}}

@@ -34,8 +34,8 @@ func TestNotificationDeadlineStartsAtIntent(t *testing.T) {
 	if r.Allowed {
 		t.Fatal("expired queue acquired a new budget")
 	}
-	current, _ := s.Get(m.ID)
-	if current.Actions[a.ID].State != Cancelled || !current.Actions[a.ID].Deadline.Equal(a.Deadline) {
+	current := retainedAction(t, s, a.ID)
+	if current.State != Cancelled || !current.Deadline.Equal(a.Deadline) {
 		t.Fatal("original deadline or cancellation lost")
 	}
 }

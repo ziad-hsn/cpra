@@ -8,13 +8,13 @@ import (
 
 // NewLoggerFromEnv creates a logger based on environment variables
 func NewLoggerFromEnv() (Logger, error) {
-	cfg := configFromEnv()
+	cfg := ConfigFromEnv()
 	return NewZapLogger(cfg)
 }
 
 // NewLoggerWithComponent creates a logger with a component field pre-set
 func NewLoggerWithComponent(component string) (Logger, error) {
-	cfg := configFromEnv()
+	cfg := ConfigFromEnv()
 	logger, err := NewZapLogger(cfg)
 	if err != nil {
 		return nil, err
@@ -23,8 +23,8 @@ func NewLoggerWithComponent(component string) (Logger, error) {
 	return logger.With(Field{Key: "component", Value: component}), nil
 }
 
-// configFromEnv builds LoggerConfig from environment variables
-func configFromEnv() LoggerConfig {
+// ConfigFromEnv applies the process logging defaults and explicit environment overrides.
+func ConfigFromEnv() LoggerConfig {
 	cfg := DefaultConfig()
 
 	// Normal foreground and service runs share the quiet structured default.

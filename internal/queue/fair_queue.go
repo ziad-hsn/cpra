@@ -12,8 +12,8 @@ import (
 
 const fairDriverLimit = 64
 
-// FairQueue partitions admission and execution across the configured driver set,
-// including idle drivers. Reservations are not lent to non-preemptible work.
+// FairQueue partitions admission and execution across eligible configured demand.
+// Spare capacity can be shared; idle compiled drivers reserve nothing.
 // Flows exist only while they have accepted pending or active work, so their
 // count is bounded by queue capacity plus the global execution limit.
 type FairQueue struct {
@@ -22,6 +22,7 @@ type FairQueue struct {
 	order                                         []*fairDriver
 	next, depth, active, capacity, executionLimit int
 	closed                                        bool
+	serialFlows                                   bool
 	wakeup                                        chan struct{}
 	started, lastEnqueue, lastDequeue             time.Time
 	first, last                                   *fairEntry
@@ -32,6 +33,8 @@ type FairQueue struct {
 
 type fairDriver struct {
 	name                      string
+	demand                    DriverDemand
+	reservation               int
 	flows                     map[uint64]*fairFlow
 	first                     *fairFlow // Circular list of flows with pending work only.
 	depth, active             int
@@ -43,6 +46,7 @@ type fairDriver struct {
 type fairFlow struct {
 	key            uint64
 	first, last    *fairEntry
+	depth          int
 	active         int
 	previous, next *fairFlow
 }
@@ -123,21 +127,22 @@ func (l *fairLease) complete(result jobs.Result) {
 }
 
 type DriverQueueStats struct {
-	Driver           string        `json:"driver"`
-	Pending          int           `json:"pending"`
-	Active           int           `json:"active"`
-	ConcurrencyLimit int           `json:"concurrency_limit"`
-	AdmissionLimit   int           `json:"admission_limit"`
-	OldestPendingAge time.Duration `json:"oldest_pending_age"`
-	OldestActiveAge  time.Duration `json:"oldest_active_age"`
-	Rejections       int64         `json:"rejections"`
-	Timeouts         int64         `json:"timeouts"`
-	Condition        string        `json:"condition"`
+	Driver            string        `json:"driver"`
+	RequestedCapacity int           `json:"requested_capacity"`
+	ReservedCapacity  int           `json:"reserved_capacity"`
+	Pending           int           `json:"pending"`
+	Active            int           `json:"active"`
+	ConcurrencyLimit  int           `json:"concurrency_limit"`
+	AdmissionLimit    int           `json:"admission_limit"`
+	OldestPendingAge  time.Duration `json:"oldest_pending_age"`
+	OldestActiveAge   time.Duration `json:"oldest_active_age"`
+	Rejections        int64         `json:"rejections"`
+	Timeouts          int64         `json:"timeouts"`
+	Condition         string        `json:"condition"`
 }
 
-// NewFairQueue uses all compiled check drivers unless an explicit driver set is
-// supplied. The set is immutable: catalog growth never steals an idle driver's
-// reserved capacity. Optional drivers absent from the binary reserve nothing.
+// NewFairQueue registers compiled check drivers unless names are supplied.
+// Registration permits admission; it creates no demand or reserved capacity.
 func NewFairQueue(capacity int, names ...string) (*FairQueue, error) {
 	if len(names) == 0 {
 		for _, c := range jobs.Capabilities() {
@@ -160,7 +165,25 @@ func NewFairQueue(capacity int, names ...string) (*FairQueue, error) {
 	}
 	return q, nil
 }
-func (q *FairQueue) partitions() int { return len(q.order) }
+
+// NewActionQueue serializes each private destination while permitting unrelated
+// destinations to progress. Identities are never exported as metric labels.
+func NewActionQueue(capacity int, kind string) (*FairQueue, error) {
+	var names []string
+	for _, c := range jobs.Capabilities() {
+		if c.Kind == kind && c.Available {
+			names = append(names, c.Driver)
+		}
+	}
+	if len(names) == 0 {
+		return nil, errors.New("no compiled action drivers")
+	}
+	q, err := NewFairQueue(capacity, names...)
+	if err == nil {
+		q.serialFlows = true
+	}
+	return q, err
+}
 func (q *FairQueue) notify() {
 	select {
 	case q.wakeup <- struct{}{}:
@@ -174,7 +197,7 @@ func (q *FairQueue) Enqueue(job jobs.Job) error {
 	}
 	identity, ok := job.(interface{ QueueIdentity() (string, uint64) })
 	if !ok {
-		return errors.New("pulse queue requires a driver and flow identity")
+		return errors.New("fair queue requires a driver and flow identity")
 	}
 	driver, key := identity.QueueIdentity()
 	q.mu.Lock()
@@ -184,16 +207,22 @@ func (q *FairQueue) Enqueue(job jobs.Job) error {
 	}
 	d := q.drivers[driver]
 	if d == nil {
-		return errors.New("pulse queue driver is not registered")
+		return errors.New("fair queue driver is not registered")
 	}
-	if q.depth >= q.capacity || d.depth >= q.capacity/len(q.order) {
+	f := d.flows[key]
+	admissionLimit := q.admissionLimit(d)
+	// An existing flow cannot consume the last waiting slot.
+	// Several stalled destinations must not exclude a new flow while execution
+	// capacity is still available. No accepted work is evicted to make this room.
+	reservedForNewFlow := f != nil &&
+		(q.capacity > 1 && q.depth >= q.capacity-1 || admissionLimit > 1 && d.depth >= admissionLimit-1)
+	if reservedForNewFlow || q.depth >= q.capacity || d.depth >= admissionLimit || f != nil && f.depth >= max(1, admissionLimit/2) {
 		q.dropped++
 		d.dropped++
 		return ErrQueueFull
 	}
 	now := time.Now()
 	job.SetEnqueueTime(now)
-	f := d.flows[key]
 	if f == nil {
 		f = &fairFlow{key: key}
 		d.flows[key] = f
@@ -219,6 +248,7 @@ func (q *FairQueue) Enqueue(job jobs.Job) error {
 		f.last.next = e
 	}
 	f.last = e
+	f.depth++
 	d.depth++
 	q.depth++
 	q.enqueued++
@@ -262,14 +292,18 @@ func (q *FairQueue) take(capacity int, reserve bool) (jobs.Job, error) {
 	if reserve && (capacity <= 0 || q.active >= capacity) {
 		return nil, nil
 	}
-	driverLimit := max(1, capacity/len(q.order))
+	reserved := q.reservations(capacity, false)
 	for n := 0; n < len(q.order); n++ {
 		index := (q.next + n) % len(q.order)
 		d := q.order[index]
+		driverLimit := q.executionLimitFor(d, capacity, reserved)
 		if d.depth == 0 || reserve && d.active >= driverLimit {
 			continue
 		}
 		flowLimit := fairShare(driverLimit, len(d.flows))
+		if q.serialFlows {
+			flowLimit = 1
+		}
 		first := d.first
 		f := first
 		for f != nil {
@@ -277,6 +311,7 @@ func (q *FairQueue) take(capacity int, reserve bool) (jobs.Job, error) {
 			if !reserve || f.active < flowLimit {
 				e := f.first
 				f.first = e.next
+				f.depth--
 				if f.first == nil {
 					f.last = nil
 					d.removeFlow(f)
@@ -366,7 +401,7 @@ func (q *FairQueue) Stats() Stats {
 	defer q.mu.Unlock()
 	_, cv, samples := q.arrivals.snapshot()
 	elapsed := time.Since(q.started)
-	stats := Stats{ArrivalCV: cv, ArrivalSamples: samples, Capacity: q.capacity, QueueDepth: q.depth, Enqueued: q.enqueued, Dequeued: q.dequeued, Dropped: q.dropped, LastEnqueue: q.lastEnqueue, LastDequeue: q.lastDequeue, MaxQueueTime: q.maxWait, SampleWindow: elapsed, OldestPendingReason: "queue_empty"}
+	stats := Stats{ArrivalCV: cv, ArrivalSamples: samples, Capacity: q.capacity, QueueDepth: q.depth, Enqueued: q.enqueued, Dequeued: q.dequeued, Dropped: q.dropped, LastEnqueue: q.lastEnqueue.UTC(), LastDequeue: q.lastDequeue.UTC(), MaxQueueTime: q.maxWait, SampleWindow: elapsed, OldestPendingReason: "queue_empty"}
 	if q.dequeued > 0 {
 		stats.AvgQueueTime = q.totalWait / time.Duration(q.dequeued)
 	}
@@ -383,10 +418,11 @@ func (q *FairQueue) Stats() Stats {
 	return stats
 }
 func (q *FairQueue) driverStats() []DriverQueueStats {
-	limit := max(1, q.executionLimit/len(q.order))
+	reserved := q.reservations(q.executionLimit, false)
 	out := make([]DriverQueueStats, 0, len(q.order))
-	for _, d := range q.order {
-		s := DriverQueueStats{Driver: d.name, Pending: d.depth, Active: d.active, ConcurrencyLimit: limit, AdmissionLimit: q.capacity / len(q.order), Rejections: d.dropped, Timeouts: d.timeouts, Condition: "idle"}
+	for i, d := range q.order {
+		limit := q.executionLimitFor(d, q.executionLimit, reserved)
+		s := DriverQueueStats{Driver: d.name, Pending: d.depth, Active: d.active, RequestedCapacity: d.reservation, ReservedCapacity: reserved[i], ConcurrencyLimit: limit, AdmissionLimit: q.admissionLimit(d), Rejections: d.dropped, Timeouts: d.timeouts, Condition: "idle"}
 		if d.pendingFirst != nil {
 			s.OldestPendingAge = time.Since(d.pendingFirst.at)
 		}
@@ -402,7 +438,7 @@ func (q *FairQueue) driverStats() []DriverQueueStats {
 			if q.active >= q.executionLimit {
 				s.Condition = "worker_capacity"
 			}
-			if q.executionLimit > 0 && q.executionLimit < len(q.order) {
+			if d.reservation > reserved[i] {
 				s.Condition = "insufficient_driver_capacity"
 			}
 		}

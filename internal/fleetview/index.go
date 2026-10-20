@@ -53,6 +53,10 @@ func NewIndex(monitors []MonitorSummary) *Index {
 
 func (i *Index) Put(m MonitorSummary) {
 	m.ActiveCodes = slices.Clone(m.ActiveCodes)
+	m.LastCheck, m.LastSuccess, m.NextCheck = m.LastCheck.UTC(), m.LastSuccess.UTC(), m.NextCheck.UTC()
+	m.SnoozedUntil, m.ConfigurationProblemAt = m.SnoozedUntil.UTC(), m.ConfigurationProblemAt.UTC()
+	m.LastFailure.CertificateNotAfter = m.LastFailure.CertificateNotAfter.UTC()
+	m.ConfigurationProblem.CertificateNotAfter = m.ConfigurationProblem.CertificateNotAfter.UTC()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	p, ok := i.rows[m.ID]
@@ -90,7 +94,7 @@ func (i *Index) Put(m MonitorSummary) {
 		}
 	}
 	i.count(m, 1)
-	i.aggregate.Generated = time.Now()
+	i.aggregate.Generated = time.Now().UTC()
 }
 
 // Remove removes one live observation row without mutating any retained reader
@@ -110,7 +114,7 @@ func (i *Index) Remove(id uint32) bool {
 	}
 	i.count(*m, -1)
 	i.aggregate.Total--
-	i.aggregate.Generated = time.Now()
+	i.aggregate.Generated = time.Now().UTC()
 	return true
 }
 
@@ -182,7 +186,7 @@ func (i *Index) count(m MonitorSummary, delta int) {
 		i.aggregate.Disabled += delta
 	}
 }
-func (i *Index) Touch(at time.Time) { i.mu.Lock(); i.aggregate.Generated = at; i.mu.Unlock() }
+func (i *Index) Touch(at time.Time) { i.mu.Lock(); i.aggregate.Generated = at.UTC(); i.mu.Unlock() }
 func (i *Index) Get(id uint32) (MonitorSummary, bool) {
 	i.mu.RLock()
 	p, ok := i.rows[id]

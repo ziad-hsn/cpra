@@ -6,7 +6,7 @@ cpra_scope: development
 
 # Versions and availability
 
-This source is under private release-repair qualification as of 17 October 2026.
+This source is under private release-repair qualification as of 20 October 2026.
 The intended first release is application/SDK/worker `v0.1.0-rc.1` and Helm chart
 `0.1.0-rc.1`. These are planned versions, not proof that installable public tags,
 assets or registry entries exist. Candidates remain access-controlled until the
@@ -55,8 +55,10 @@ matched comparative capacity campaign remain unqualified. Missing configuration
 is not a passing verification result. Short local isolation experiments do not
 establish five-minute SLO attainment or million-monitor capacity.
 
-The 24-hour endurance test is cancelled. GitHub private vulnerability reporting
-still needs enabled/read-back verification before announcement. Historical
+The 24-hour endurance test is cancelled. GitHub's reporting-status API returned
+`enabled: false` on 20 October 2026. Repository administration must enable private
+vulnerability reporting and verify the reporting form before announcement; the
+available connector does not expose that setting. Historical
 engineering plans and evidence are preserved in the repository, outside the
 public site and search index. Release documentation must use the final release
 metadata; an earlier successful check does not qualify later source changes.

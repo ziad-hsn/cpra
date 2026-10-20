@@ -1,12 +1,28 @@
 import { afterEach, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ManagementError } from '../src/api/session';
 import { ProblemDetails } from '../src/components/ProblemDetails';
+import { FieldInput, FieldValidation } from '../src/components/FieldValidation';
 
 afterEach(cleanup);
 const request = 'c47948b9-084b-4109-a862-0312e7a77102';
 const operation = '964cbcb8-9bc9-43de-bd64-0c1169898c6d';
 const secret = 'credential-value-that-must-not-reach-output';
+
+it('connects a safe field error to its actual input without echoing remote values', () => {
+  const error = new ManagementError('http', 'Request rejected.', 422, {errors: [{field: 'spec.check.driver.config.url', reason: 'required', message: secret}]});
+  function Form({error}: {error?: ManagementError}) { return <FieldValidation error={error}>
+    <ProblemDetails error={error} /><label>Target URL<FieldInput field="spec.check.driver.config.url" /></label>
+  </FieldValidation>; }
+  const rendered = render(<Form />);
+  rendered.rerender(<Form error={error} />);
+  const input = screen.getByRole('textbox', {name: 'Target URL'});
+  expect(input).toHaveAttribute('aria-invalid', 'true');
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)).toHaveTextContent('required');
+  fireEvent.click(screen.getByRole('button', {name: 'Go to spec.check.driver.config.url'}));
+  expect(input).toHaveFocus();
+  expect(document.body.innerHTML).not.toContain(secret);
+});
 
 it('shows safe correlation, phase and field codes without raw server details', () => {
   const error = new ManagementError('http', 'Request rejected.', 422, { code: 'invalidResource', requestID: request, operationID: operation,

@@ -191,7 +191,7 @@ func TestActionReviewExecutorFenceProviderFactsAndLateConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	stale := reviewCommand(m, a, "stale-review", "rejected", at)
 	stale.ActionReview.ExpectedRevision = oldVersion
 	if r := submit(t, s, stale)[0]; !errors.Is(r.Err, ErrActionReviewConflict) {
@@ -200,18 +200,18 @@ func TestActionReviewExecutorFenceProviderFactsAndLateConflict(t *testing.T) {
 	before := m.Clone()
 	r := mustResult(t, s, reviewCommand(m, a, "review-one", "rejected", at))
 	m = *r.Monitor
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	if a.State != Unknown || a.Outcome != "external_outcome_unknown" || a.Held() || a.Review.Actor != "oncall" || r.Operation.Subject != "review" {
 		t.Fatal("review rewrote provider facts", a)
 	}
-	if m.InterventionAttempts != before.InterventionAttempts || len(m.Actions) != len(before.Actions) || m.VerifyRemaining != before.VerifyRemaining {
+	if m.InterventionAttempts != before.InterventionAttempts || activeActionCount(m) != activeActionCount(before) || m.VerifyRemaining != before.VerifyRemaining {
 		t.Fatal("review rearmed work")
 	}
 	// Automatic failure observations cannot treat the operator assertion as a provider rejection.
 	m.Policy.Unhealthy = 1
 	m = *mustResult(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: g, At: at}).Monitor
 	m = controlPulse(t, s, m, g, at.Add(time.Second), "failure")
-	if len(m.Actions) != 1 || m.InterventionAttempts != 1 {
+	if activeActionCount(m) != 0 || m.InterventionAttempts != 1 {
 		t.Fatal("review caused automatic retry")
 	}
 	// A later explicit request consumes the remaining ordinary attempt budget.
@@ -220,7 +220,7 @@ func TestActionReviewExecutorFenceProviderFactsAndLateConflict(t *testing.T) {
 	late := Command{Kind: "late_result", MonitorID: m.ID, Revision: a.Revision, ActionID: a.ID, Outcome: "success", ExecutionStart: a.StartedAt, ExecutionEnd: a.StartedAt.Add(time.Second), At: at.Add(3 * time.Minute)}
 	lr := mustResult(t, s, late)
 	m = *lr.Monitor
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	if !a.Held() || a.Review.Resolution != "rejected" || !a.Review.Conflict || a.LateEvidence.Outcome != "accepted" || len(lr.Events) < 2 {
 		t.Fatal("late contradiction did not restore hold", a)
 	}
@@ -244,7 +244,7 @@ func TestActionReviewExecutorFenceProviderFactsAndLateConflict(t *testing.T) {
 		t.Fatal("cancelled recovery receipt stayed pending", op, err)
 	}
 	resolved := mustResult(t, s, reviewCommand(m, a, "fresh-accepted-review", "accepted", late.At.Add(time.Second)))
-	if resolved.Monitor.Actions[a.ID].Held() || resolved.Monitor.Actions[second.ID].State != Cancelled || resolved.Monitor.InterventionAttempts != m.InterventionAttempts || len(resolved.Monitor.Actions) != len(m.Actions) {
+	if retainedAction(t, s, a.ID).Held() || retainedAction(t, s, second.ID).State != Cancelled || resolved.Monitor.InterventionAttempts != m.InterventionAttempts || activeActionCount(*resolved.Monitor) != activeActionCount(m) {
 		t.Fatal("fresh review rearmed cancelled work or reset budget")
 	}
 }
@@ -255,7 +255,7 @@ func TestActionReviewFrozenIndexesAndSnapshotValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	at := time.Now().UTC().Add(time.Second)
 	view, err := s.ActionSnapshot()
 	if err != nil {
@@ -264,7 +264,7 @@ func TestActionReviewFrozenIndexesAndSnapshotValidation(t *testing.T) {
 	old, _, _ := view.Get(a.ID)
 	r := mustResult(t, s, reviewCommand(m, a, "indexed-review", "accepted", at))
 	m = *r.Monitor
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	row, ok, err := s.Action(a.ID)
 	if err != nil || !ok || row.Held || !row.ExecutorFenced || row.ReviewRevision == old.ReviewRevision {
 		t.Fatal(row, ok, err)
@@ -292,7 +292,7 @@ func TestActionReviewFrozenIndexesAndSnapshotValidation(t *testing.T) {
 		t.Fatal("valid action snapshot rejected", err)
 	}
 	corrupt := frozen.image.Monitors[m.ID].Clone()
-	bad := corrupt.Actions[a.ID]
+	bad := retainedAction(t, s, a.ID)
 	bad.Review.Resolution = "succeeded"
 	corrupt.Actions[a.ID] = bad
 	frozen.image.Monitors[m.ID] = corrupt
@@ -330,7 +330,7 @@ func TestManualRecoveryAndReviewRealRaftRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	at := time.Now().UTC().Add(time.Second)
 	m = *mustResult(t, s, reviewCommand(m, a, "restart-review", "rejected", at)).Monitor
 	if err = s.Snapshot(); err != nil {
@@ -345,7 +345,7 @@ func TestManualRecoveryAndReviewRealRaftRestart(t *testing.T) {
 	}
 	defer s.Close()
 	got, _ := s.Get(m.ID)
-	if !reflect.DeepEqual(got.ManualRequests, m.ManualRequests) || got.Actions[a.ID].Review == nil || got.Actions[a.ID].Held() || got.InterventionAttempts != 1 {
+	if !reflect.DeepEqual(got.ManualRequests, m.ManualRequests) || retainedAction(t, s, a.ID).Review == nil || retainedAction(t, s, a.ID).Held() || got.InterventionAttempts != 1 {
 		t.Fatal("recovery/review lost on restart", got)
 	}
 	if r := submit(t, s, manualCommand(got, g, "too-soon", policyTime().Add(30*time.Second)))[0]; !errors.Is(r.Err, ErrRecoveryRateLimited) {
@@ -369,7 +369,7 @@ func TestActionReviewHistoricalIncarnationAndContradictoryFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	at := time.Now().UTC().Add(time.Second)
 	// Reuse the public monitor ID through the actual catalog and owner paths.
 	record := requireCatalog(t, s, CatalogKey{Kind: "Monitor", ID: m.ID})
@@ -391,13 +391,16 @@ func TestActionReviewHistoricalIncarnationAndContradictoryFacts(t *testing.T) {
 	config.IncidentID, config.IncidentRevision, config.ControlRevision = "", "", ""
 	config.IncidentSequence = 0
 	config.IncidentOpenedAt, config.IncidentClosedAt = time.Time{}, time.Time{}
+	config.IncidentConfirmedAt = time.Time{}
+	config.IncidentThresholdTracked = false
+	config.IncidentDeliveries = nil
 	config.Incident, config.Recovering, config.InterventionAttempted = false, false, false
 	config.InterventionAttempts = 0
 	m = *mustResult(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: config.Revision, Config: &config, Guard: g, At: at}).Monitor
 	before := m.Clone()
 	r := mustResult(t, s, reviewCommand(m, a, "historical-review", "accepted", at))
 	m = *r.Monitor
-	old := m.Actions[a.ID]
+	old := retainedAction(t, s, a.ID)
 	if m.CatalogUID != recreated.UID || old.CatalogUID == m.CatalogUID || m.Generation != before.Generation || m.InterventionAttempts != before.InterventionAttempts {
 		t.Fatal("review changed new incarnation")
 	}
@@ -411,7 +414,7 @@ func TestActionReviewHistoricalIncarnationAndContradictoryFacts(t *testing.T) {
 	late.Outcome = "failure"
 	late.At = late.At.Add(time.Second)
 	m = *mustResult(t, s, late).Monitor
-	old = m.Actions[a.ID]
+	old = retainedAction(t, s, a.ID)
 	if !old.Held() || old.ConflictingEvidence == nil || old.LateEvidence.Outcome != "accepted" || old.ConflictingEvidence.Outcome != "rejected" || old.Review.Resolution != "accepted" {
 		t.Fatal("contradictory facts overwritten", old)
 	}
@@ -438,13 +441,13 @@ func TestActionReviewUnclassifiedCannotClearAndReturnsDetachedCopies(t *testing.
 	r.Monitor.ManualRequests[0] = time.Time{}
 	r.Monitor.Actions[a.ID] = Action{}
 	current, _ := s.Get(m.ID)
-	if current.Actions[a.ID].ID != a.ID || current.ManualRequests[0].IsZero() {
+	if retainedAction(t, s, a.ID).ID != a.ID || current.ManualRequests[0].IsZero() {
 		t.Fatal("mutable result escaped into committed state")
 	}
 	m = *mustResult(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, Guard: g, At: at}).Monitor
 	result := submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: at, Outcome: "failure", Ambiguous: true})[0]
 	m = *result.Monitor
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	if r := submit(t, s, reviewCommand(m, a, "unclassified-review", "accepted", at))[0]; !errors.Is(r.Err, ErrExecutorUnfenced) {
 		t.Fatal("unclassified executor treated as stopped", r.Err)
 	}
@@ -452,7 +455,7 @@ func TestActionReviewUnclassifiedCannotClearAndReturnsDetachedCopies(t *testing.
 	m = *r.Monitor
 	r.Monitor.Actions[a.ID].Review.EvidenceRefs[0] = "changed"
 	current, _ = s.Get(m.ID)
-	if !current.Actions[a.ID].Held() || current.Actions[a.ID].Review.EvidenceRefs[0] == "changed" {
+	if !retainedAction(t, s, a.ID).Held() || retainedAction(t, s, a.ID).Review.EvidenceRefs[0] == "changed" {
 		t.Fatal("inconclusive review or copy ownership violated")
 	}
 }
@@ -464,7 +467,7 @@ func TestManualRecoveryReviewRejectionPreservesLongCooldown(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
-	a = m.Actions[a.ID]
+	a = retainedAction(t, s, a.ID)
 	at := time.Now().UTC().Add(time.Second)
 	m = *mustResult(t, s, reviewCommand(m, a, "cooldown-review", "rejected", at)).Monitor
 	m.Policy.RecoveryCooldown = time.Hour
@@ -475,7 +478,7 @@ func TestManualRecoveryReviewRejectionPreservesLongCooldown(t *testing.T) {
 	r := mustResult(t, s, manualCommand(m, g, "after-one-hour", at.Add(time.Hour)))
 	m = *r.Monitor
 	next := latestManual(t, m)
-	if m.Actions[a.ID].State != Unknown || m.LastInterventionFailure != (time.Time{}) {
+	if retainedAction(t, s, a.ID).State != Unknown || m.LastInterventionFailure != (time.Time{}) {
 		t.Fatal("cooldown manufactured provider failure")
 	}
 	// A policy increase between queued admission and execution is respected too.
@@ -484,4 +487,56 @@ func TestManualRecoveryReviewRejectionPreservesLongCooldown(t *testing.T) {
 	if r := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: next.ID, Guard: g, At: at.Add(time.Hour)})[0]; r.Allowed {
 		t.Fatal("queued manual action bypassed revised cooldown")
 	}
+}
+
+func retainedAction(t *testing.T, s *Store, id string) Action {
+	t.Helper()
+	r, ok, err := s.ActionContext(t.Context(), id)
+	if err != nil || !ok {
+		t.Fatalf("retained action %s: %v", id, err)
+	}
+	return r.Action
+}
+
+// monitorWithActionHistory is an assertion helper for retained provider facts.
+// Runtime Get intentionally returns only current execution references. Tests
+// of that bounded projection use Get directly; history assertions page the
+// independently indexed ledger just like operator observations do.
+func monitorWithActionHistory(t *testing.T, s *Store, id string) (Monitor, bool) {
+	t.Helper()
+	m, ok := s.Get(id)
+	if !ok {
+		return m, false
+	}
+	view, err := s.ActionSnapshotContext(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer view.Close()
+	m.Actions = make(map[string]Action)
+	after := ""
+	for {
+		rows, next, err := view.PageByMonitor(id, after, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			m.Actions[row.ID] = row.Action
+		}
+		if next == "" {
+			break
+		}
+		after = next
+	}
+	return m, true
+}
+
+func activeActionCount(m Monitor) int {
+	n := 0
+	for _, a := range m.Actions {
+		if a.State == Queued || a.State == Started {
+			n++
+		}
+	}
+	return n
 }

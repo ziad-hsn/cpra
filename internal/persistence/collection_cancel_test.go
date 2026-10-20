@@ -349,7 +349,7 @@ func TestCollectionCancelSnapshotAndLogRestart(t *testing.T) {
 			// from retiring this input before the explicit replay boundary checks.
 			c := collectionCancelFixture(head, head.ActivityAt.Add(time.Hour))
 			if position == "before-cancel" {
-				if err := s.Snapshot(); err != nil {
+				if err := persistStoreFixture(t, s); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -357,7 +357,7 @@ func TestCollectionCancelSnapshotAndLogRestart(t *testing.T) {
 				t.Fatal(got.Err)
 			}
 			if position == "after-cancel" {
-				if err := s.Snapshot(); err != nil {
+				if err := persistStoreFixture(t, s); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -468,7 +468,7 @@ func TestCollectionCancelExplicitRestoreKeepsTerminalOutcome(t *testing.T) {
 	if got := collectionCommand(t, s, c, c.Cancel.At); got.Err != nil {
 		t.Fatal(got.Err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -492,7 +492,7 @@ func TestCollectionCancelExplicitRestoreKeepsTerminalOutcome(t *testing.T) {
 	if _, err := s.Submit(context.Background(), []Command{{Kind: "collection", At: c.Cancel.At, Collection: &c}}); !errors.Is(err, ErrAuthenticationAdminRequired) {
 		t.Fatal("administrative restore admitted cancellation", err)
 	}
-	if err := s.Snapshot(); err != nil {
+	if err := persistStoreFixture(t, s); err != nil {
 		t.Fatal("terminal restored snapshot", err)
 	}
 	page, err := s.History().Page("collection/"+head.ID, "", 100)

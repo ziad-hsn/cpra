@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/raft"
 	raftbolt "github.com/hashicorp/raft-boltdb/v2"
+	applogger "github.com/ziad-hsn/cpra/internal/logger"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/slo"
 	bolt "go.etcd.io/bbolt"
@@ -158,6 +159,17 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	}
 	started = true
 	go s.run()
+	s.fsm.rebuildProjectionReviewIndex()
+	s.fsm.rebuildActionIndexes()
+	// Finish the non-executing projection conversion before restore fencing
+	// mutates actions. A stopped administrator may only do this while opening
+	// a restored store; ordinary administrative reads remain non-migrating.
+	if !administrative || s.restoreMarker != nil && s.fsm.image.ActionProjectionState != nil && !s.fsm.image.ActionProjectionState.Ready {
+		if err = s.migrateActionProjection(ctx); err != nil {
+			_ = s.Close()
+			return nil, err
+		}
+	}
 	if err = s.finishRestore(ctx); err != nil {
 		_ = s.Close()
 		return nil, err
@@ -199,15 +211,43 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	}
 	s.background.Add(1)
 	go s.maintain()
-	if _, err = s.Submit(ctx, []Command{{Kind: "recover", At: time.Now().UTC()}}); err != nil {
+	recovered, err := s.Submit(ctx, []Command{{Kind: "recover", At: time.Now().UTC()}})
+	if err != nil {
 		s.Close()
 		return nil, err
+	}
+	if len(recovered) != 0 && len(recovered[0].Events) != 0 {
+		log, logErr := applogger.NewLoggerWithComponent("persistence")
+		if logErr != nil {
+			_ = s.Close()
+			return nil, logErr
+		}
+		logRecoveredActions(log, recovered[0].Events)
 	}
 	if _, err = s.Submit(ctx, []Command{{Kind: "local_session", At: time.Now().UTC(), ExecutorSession: s.executorSession}}); err != nil {
 		s.Close()
 		return nil, err
 	}
 	return s, nil
+}
+
+// Called only after the new recovery command commits, never while replaying
+// old logs or restoring a snapshot. Retained history remains authoritative.
+func logRecoveredActions(log applogger.Logger, events []Event) {
+	for _, event := range events {
+		if event.Type != "action_unknown" {
+			continue
+		}
+		log.Warn("Interrupted action outcome is unknown; operator review required",
+			applogger.Field{Key: "event_type", Value: event.Type},
+			applogger.Field{Key: "monitor_id", Value: event.MonitorID},
+			applogger.Field{Key: "monitor_uid", Value: event.CatalogUID},
+			applogger.Field{Key: "incident_id", Value: event.IncidentID},
+			applogger.Field{Key: "action_id", Value: event.ActionID},
+			applogger.Field{Key: "action_kind", Value: event.Kind},
+			applogger.Field{Key: "delivery_id", Value: event.DeliveryID},
+			applogger.Field{Key: "endpoint_id", Value: event.EndpointID})
+	}
 }
 
 func (s *Store) openRaft(ctx context.Context) error {
@@ -359,7 +399,7 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 		if administrativeCommandExtension(c) && !s.administrative {
 			return nil, ErrAuthenticationAdminRequired
 		}
-		if s.administrative && c.Kind != "authentication" && c.Kind != "restore_reset" && c.Kind != "barrier" && c.Kind != "local_action_review" && !administrativeCommandExtension(c) {
+		if s.administrative && !(s.opening && c.Kind == "action_project") && c.Kind != "authentication" && c.Kind != "restore_reset" && c.Kind != "barrier" && c.Kind != "local_action_review" && !administrativeCommandExtension(c) {
 			return nil, ErrAuthenticationAdminRequired
 		}
 		if c.Kind == "authentication" && c.Authentication != nil && c.Authentication.Mode != "bootstrap" && !s.administrative {
@@ -416,6 +456,9 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 		}
 		if err := validateCommand(c); err != nil {
 			return nil, err
+		}
+		if c.Kind == "configure" && !catalogIdentifier(c.Revision, 256) {
+			return nil, errors.New("monitor configuration revision must be a nonempty identity of at most 256 bytes")
 		}
 		version = joinStorageFormat(version, commandWriteFormat(c))
 		encoded, err := json.Marshal(c)
@@ -683,10 +726,17 @@ func (s *Store) maintain() {
 	defer ticker.Stop()
 	collectionTicker := time.NewTicker(time.Second)
 	defer collectionTicker.Stop()
+	reviewTicker := time.NewTicker(50 * time.Millisecond)
+	defer reviewTicker.Stop()
+	reviewAfter := ""
 	for {
 		select {
 		case <-s.stop:
 			return
+		case <-reviewTicker.C:
+			if err := s.maintainReviewWork(&reviewAfter); err != nil {
+				s.MarkUnavailable(err)
+			}
 		case <-collectionTicker.C:
 			gcContext, gcCancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 			gcErr := s.collectionGenerations.maintain(gcContext)
@@ -793,10 +843,24 @@ func (s *Store) Reconcile(ctx context.Context, present map[string]bool, at time.
 	s.fsm.mu.RUnlock()
 	slices.SortFunc(commands, func(a, b Command) int { return strings.Compare(a.MonitorID, b.MonitorID) })
 	for len(commands) > 0 {
-		n := min(len(commands), s.config.Storage.BatchSize)
+		n, encoded := 0, 64
+		for n < min(len(commands), s.config.Storage.BatchSize) {
+			bound, err := CommandEncodedBound(commands[n])
+			if err != nil || bound+65 > maxCommitBytes {
+				return errors.New("removed monitor guard exceeds durable command capacity")
+			}
+			if encoded+bound+1 > maxCommitBytes {
+				break
+			}
+			encoded += bound + 1
+			n++
+		}
 		results, err := s.Submit(ctx, commands[:n])
 		if err != nil {
 			return err
+		}
+		if len(results) != n {
+			return errors.New("monitor removal returned incomplete commit results")
 		}
 		for _, result := range results {
 			if result.Err != nil {

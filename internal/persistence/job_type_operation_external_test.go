@@ -77,12 +77,12 @@ func TestJobTypeOperationAtomicReceiptsAndSnapshot(t *testing.T) {
 	if err != nil || len(rows) != 1 || rows[0] != r {
 		t.Fatal("ordinary operation list omitted terminal JobType", rows, err)
 	}
-	// Exact frozen format16 allocator state restores before the resource commit.
+	// The current frozen allocator state restores before the resource commit.
 	sink := &collectionTestSink{}
 	if err := frozen.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(jobTypeOperationSnapshotMagic)) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(actionWorkerSnapshotMagic)) {
 		t.Fatal("wrong reserved snapshot format")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -563,7 +563,7 @@ func TestJobTypeOperationSnapshotPreservesCollectionSections(t *testing.T) {
 	c, r := reserveJobType(t, s, jobTypeFixture(t, s, "probe"))
 	committed := commitJobTypeOperation(t, s, c, r)
 	blob := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(blob, []byte(jobTypeOperationSnapshotMagic)) {
+	if !bytes.HasPrefix(blob, []byte(actionWorkerSnapshotMagic)) {
 		t.Fatal("format16 snapshot framing missing")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(blob), "")

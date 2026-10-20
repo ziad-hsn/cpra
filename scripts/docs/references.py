@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = "review/reference-data.json"
+PUBLIC_MANIFEST = "reference/source-data.json"
 SOURCE_INDEX = "review/implementation-sources.md"
 EVIDENCE_INDEX = "review/local-evidence.md"
 ASSETS = "review/source/"
@@ -113,11 +114,19 @@ def evidence_index(records: list[dict]) -> bytes:
     return (text.rstrip() + "\n").encode()
 
 
-def prepare(root: Path = ROOT, check: bool = False) -> dict:
+def prepare(root: Path = ROOT, check: bool = False, include_archives: bool = False) -> dict:
     root = root.resolve()
     docs = root / "docs"
-    manifest_path = safe_path(docs, MANIFEST)
+    manifest_name = MANIFEST if include_archives else PUBLIC_MANIFEST
+    manifest_path = safe_path(docs, manifest_name)
     old = json.loads(manifest_path.read_bytes()) if manifest_path.is_file() else {"format_version": 1, "sources": [], "private": []}
+    if not include_archives and not manifest_path.is_file():
+        # Adopt previously generated public copies without rewriting the dated
+        # inventory or any historical source/evidence bytes.
+        prior = safe_path(docs, MANIFEST)
+        if prior.is_file():
+            inventory = json.loads(prior.read_bytes())
+            old["sources"] = [entry for entry in inventory.get("sources", []) if entry.get("asset", "").startswith(PUBLIC_ASSETS)]
     if old.get("format_version") != 1 or not isinstance(old.get("sources"), list) or not isinstance(old.get("private"), list):
         raise ValueError("unsupported documentation reference inventory")
     old_private = {}
@@ -145,6 +154,8 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
     for document in sorted(docs.rglob("*.md")):
         name = document.relative_to(docs).as_posix()
         public = not name.startswith(ARCHIVE_PREFIXES)
+        if not public and not include_archives:
+            continue
         safe_path(docs, name)
         if name in {SOURCE_INDEX, EVIDENCE_INDEX}:
             continue
@@ -188,6 +199,8 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
                         portable = os.path.relpath(docs / source_asset(original, public), document.parent)
                         return match[0][:match.start(1) - match.start()] + portable + ")"
                     elif asset == EVIDENCE_INDEX and url.fragment:
+                        if not include_archives:
+                            raise ValueError(f"public documentation links private evidence: {name}")
                         if url.fragment not in by_record:
                             raise ValueError(f"unrecorded private evidence reference: {target}")
                         private.add(by_record[url.fragment])
@@ -195,6 +208,8 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
                 if url.query or url.fragment:
                     raise ValueError(f"source/evidence references cannot contain query or fragment: {target}")
                 if value.startswith("bin/verification/"):
+                    if not include_archives:
+                        raise ValueError(f"public documentation links private evidence: {name}")
                     private.add(value)
                     destination = docs / EVIDENCE_INDEX
                     portable = os.path.relpath(destination, document.parent) + "#" + record_id(value)
@@ -230,9 +245,10 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
             private_records.append(old_private[value])
         else:
             private_records.append(private_record(root, value))
-    output[MANIFEST] = encoded({"format_version": 1, "sources": source_records, "private": private_records})
-    output[SOURCE_INDEX] = source_index(source_records)
-    output[EVIDENCE_INDEX] = evidence_index(private_records)
+    output[manifest_name] = encoded({"format_version": 1, "sources": source_records, "private": private_records})
+    if include_archives:
+        output[SOURCE_INDEX] = source_index(source_records)
+        output[EVIDENCE_INDEX] = evidence_index(private_records)
     obsolete = set()
     owned_assets = set()
     for entry in old["sources"]:
@@ -241,7 +257,8 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
         owned_assets.add(entry["asset"])
         if entry["asset"] not in output:
             obsolete.add(entry["asset"])
-    for path in list((docs / ASSETS).rglob("*")) + list((docs / PUBLIC_ASSETS).rglob("*")):
+    assets = [PUBLIC_ASSETS, ASSETS] if include_archives else [PUBLIC_ASSETS]
+    for path in (path for prefix in assets for path in (docs / prefix).rglob("*")):
         name = path.relative_to(docs).as_posix()
         safe_path(docs, name)
         if path.is_file() and name not in output and name not in owned_assets:
@@ -268,4 +285,10 @@ def prepare(root: Path = ROOT, check: bool = False) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
-    print(json.dumps(prepare(check=parser.parse_args().check), indent=2))
+    parser.add_argument("--include-archives", action="store_true", help="explicitly regenerate historical engineering references; ordinary synchronization preserves them")
+    args = parser.parse_args()
+    try:
+        result = prepare(check=args.check, include_archives=args.include_archives)
+    except (OSError, ValueError) as error:
+        parser.exit(1, "Documentation references failed: " + str(error) + "\n")
+    print(json.dumps(result, indent=2))

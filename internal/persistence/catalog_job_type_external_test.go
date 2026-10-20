@@ -56,7 +56,7 @@ func TestCatalogJobTypeCurrentReferencesAndRetainedVersions(t *testing.T) {
 			original := commitJobType(t, s, jobTypeFixture(t, s, "pinned-check"))
 			ref := catalogJobTypeRef(original.Current)
 			source := createCatalog(t, s, catalogJobTypeRecord(t, s, "consumer", original.Current))
-			if s.fsm.image.Version != CatalogJobTypeFormatVersion {
+			if s.fsm.image.Version != ActionWorkerFormatVersion {
 				t.Fatal("source failed to advance format")
 			}
 			view, err := s.CatalogSnapshotContext(t.Context())
@@ -295,7 +295,7 @@ func TestCatalogJobTypeBootstrapAndLookupCancellation(t *testing.T) {
 			t.Fatal("seed ref", res)
 		}
 	}
-	if s.fsm.image.Version != CatalogJobTypeFormatVersion || !s.fsm.jobTypeCatalogReferenced(job.Current.Record.Key.ID, job.Current.Record.UID) {
+	if s.fsm.image.Version != ActionWorkerFormatVersion || !s.fsm.jobTypeCatalogReferenced(job.Current.Record.Key.ID, job.Current.Record.UID) {
 		t.Fatal("bootstrap missed index or format")
 	}
 	s.fsm.mu.Lock()
@@ -387,7 +387,7 @@ func TestCatalogJobTypeCollectionPreparedAndDecisionRecovery(t *testing.T) {
 			prepared := executeCandidate(t, begin, s.fsm.collectionExecutionIndex, 1, head.Execution.LastAt.Add(time.Second))
 			prepared.Prepared.Record.JobTypeReferences = []JobTypeReference{catalogJobTypeRef(job.Current)}
 			head = validationApplyAllowed(t, executeStoreCommand(t, s, prepared, prepared.Prepared.At))
-			if s.fsm.image.Version != CatalogJobTypeFormatVersion {
+			if s.fsm.image.Version != ActionWorkerFormatVersion {
 				t.Fatal("preparation failed to gate format")
 			}
 			if deleteBeforeDecision {
@@ -539,7 +539,7 @@ func TestCatalogJobTypeExplicitEmptySourceDeletion(t *testing.T) {
 			if removed.Err != nil || !removed.Allowed || !removed.Catalog.Removed || len(removed.Catalog.JobTypeReferences) != 0 {
 				t.Fatal("explicit-empty source cannot be deleted", removed.Err)
 			}
-			if s.fsm.image.Version != CatalogJobTypeFormatVersion || validateCatalogImage(s.fsm.image) != nil {
+			if s.fsm.image.Version != ActionWorkerFormatVersion || validateCatalogImage(s.fsm.image) != nil {
 				t.Fatal("empty tombstone snapshot invalid")
 			}
 			if _, ledger, err := decodeSnapshot(bytes.NewReader(captureSnapshotBytes(t, s.fsm)), ""); err != nil {

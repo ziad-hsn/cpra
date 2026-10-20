@@ -74,7 +74,9 @@ func TestWorkerSLOReceiptTimingAndConcurrentDuplicates(t *testing.T) {
 }
 
 func TestWorkerSLOHistoricalAdmissionUnavailable(t *testing.T) {
-	s := openCatalogMemory(t)
+	s := openReplayMemory(t)
+	s.executorSession = "historical-owner"
+	applyCatalogFormat(t, s, CatalogFormatVersion, Command{Kind: "local_session", ExecutorSession: s.executorSession, At: time.Now().UTC()})
 	job := commitJobType(t, s, jobTypeFixture(t, s, "historical-check"))
 	monitor := testMonitor()
 	monitor.Policy.Endpoints = nil

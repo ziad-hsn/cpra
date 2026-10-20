@@ -40,6 +40,7 @@ func TestRecoveryCancelsUnadmittedIntervention(t *testing.T) {
 	}
 	applyIncidentPulse(t, system, ent, jobs.Result{})
 	m = applyIncidentPulse(t, system, ent, jobs.Result{})
+	m, _ = monitorWithActionHistory(t, system.store, m.ID)
 	if m.Recovering || m.Actions[actions[0].ID].State != persistence.Cancelled {
 		t.Fatal("confirmed health did not cancel unsent recovery")
 	}
@@ -141,6 +142,9 @@ func TestProjectionReportsConsecutivePulseFailures(t *testing.T) {
 	if !ok || row.ConsecutiveFailures != 2 {
 		t.Fatal("projection lost consecutive failed checks")
 	}
+	if row.Phase == "verifying" {
+		t.Fatal("queued intervention was reported as health verification")
+	}
 	system.dispatchActions(time.Now())
 	if len(queue.admitted) != 1 {
 		t.Fatal("recovery was not dispatched")
@@ -151,7 +155,7 @@ func TestProjectionReportsConsecutivePulseFailures(t *testing.T) {
 	}
 	m, _ = system.store.Get(m.ID)
 	row, _ = system.index.Get(ent.ID())
-	if m.ConsecutiveFailures != 2 || row.ConsecutiveFailures != 2 || row.Status != "verifying" {
+	if m.ConsecutiveFailures != 2 || row.ConsecutiveFailures != 2 || row.Status != "verifying" || row.Phase != "verifying" {
 		t.Fatal("intervention success reset failures or claimed restored health")
 	}
 	m = applyIncidentPulse(t, system, ent, jobs.Result{})
@@ -185,7 +189,7 @@ func TestExpiredInterventionNeverInvokesProvider(t *testing.T) {
 				t.Fatal("expired result did not reconcile", system.lastError)
 			}
 		}
-		current, _ := system.store.Get(monitor.ID)
+		current, _ := monitorWithActionHistory(t, system.store, monitor.ID)
 		if calls.Load() != 0 || current.Actions[original.ID].State != persistence.Cancelled {
 			t.Fatal("expired queue did not cancel without a provider invocation")
 		}

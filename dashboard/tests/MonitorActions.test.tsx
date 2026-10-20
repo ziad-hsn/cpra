@@ -5,13 +5,14 @@ import { DashboardSession } from '../src/api/session';
 import { SessionBoundary } from '../src/auth/SessionBoundary';
 import { MonitorActions } from '../src/components/MonitorActions';
 import { operationContracts } from '../src/api/generated';
-import { agentReceiptView, recoveryFailureView } from '../src/api/actions';
+import { agentReceiptView, recoveryFailureView, actionView, reviewNoticeView } from '../src/api/actions';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function actions(options: { agent?: boolean; reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
+async function actions(options: { blue?: boolean; blueHealth?: string; blueReason?: string; agent?: boolean; reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
   const action: Record<string, unknown> = { id: 'execution-1', monitorID: 'checkout', incarnationUID: 'original-monitor-uid', state: 'unknown', kind: 'intervention', reviewRevision: 'observed-1', held: true, executorFenced: !options.unfenced,
     ...(options.reviewedConflict ? { review: { revision: 'review-old', resolution: 'rejected', actor: 'alice', reviewedAt: '2026-09-14T00:00:00Z', reason: 'Provider records checked', note: '<script>not executable</script>', evidenceRefs: ['javascript:alert(1)'], conflict: true } } : {}) };
+  if (options.blue) Object.assign(action, {kind:'code',color:'blue',state:'failed',held:false,deliveryID:'closure-delivery',endpointID:'original-destination',reviewNotice:{alertID:'review-condition',actionID:'unknown-recovery',phase:'close',health:options.blueHealth ?? 'healthy',reason:options.blueReason ?? 'health_recovered',providerBody:'private-body'},deadline:'2026-10-20T00:00:45Z',queuedAt:'2026-10-20T00:00:00Z'});
   if (options.agent) action.agentReceipt = { sequence: '1', taskID: 'agent-task', state: 'TASK_STATE_WORKING', observedAt: '2026-09-30T00:00:00Z', providerOutput: 'private-agent-output', url: 'https://private-agent.test' };
   const writes: { method: string; path: string; match: string | null; body: Record<string, unknown> }[] = [];
   const permissions = Object.keys(operationContracts).filter(name => !options.reader || name.startsWith('Get') || name.startsWith('List'));
@@ -89,6 +90,7 @@ it('keeps a conflicted request on the original review version without retrying i
   fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Reviewed receipt' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Record review' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/changed|conflict/i);
+  expect(screen.getByRole('alert')).toHaveFocus();
   expect(writes).toHaveLength(1);
   expect(writes[0].match).toBe('"observed-1"');
   expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -190,3 +192,30 @@ it('retains only confirmed original recovery context and rejects impossible esca
     expect(() => recoveryFailureView({ ...failure, ...patch })).toThrow();
   }
 });
+
+it('shows blue health closure separately from provider delivery and original action outcome',async()=>{
+ const {writes}=await actions({reader:true,blue:true});
+ expect(await screen.findByText('Health recovered earlier; the recovery action outcome remains unknown.')).toBeInTheDocument();
+ expect(screen.getByText(/Delivery closure-delivery/)).toHaveTextContent('original-destination');
+ expect(screen.getByText(/Provider outcome: failed/)).toBeInTheDocument();
+ expect(document.body.textContent).not.toContain('private-body');expect(writes).toHaveLength(0);
+});
+it('rejects malformed blue identities and dates while dropping unexpected fields',()=>{
+ const n={alertID:'blue',actionID:'recovery',phase:'close',health:'healthy',reason:'health_recovered'};
+ expect(reviewNoticeView({...n,providerBody:'secret'})).toEqual(n);
+ for(const value of [{...n,phase:'open'},{...n,health:'assumed'},{...n,actionID:'bad\nID'}]) expect(()=>reviewNoticeView(value)).toThrow();
+ const a={id:'a',monitorID:'m',state:'unknown',held:true,executorFenced:false};
+ expect(()=>actionView({...a,queuedAt:'0001-01-01T00:00:00Z'},'m')).toThrow();
+ expect(actionView({...a,deadline:'2026-10-20T00:00:00Z',reviewNotice:n},'m')).toMatchObject({deadline:'2026-10-20T00:00:00Z',reviewNotice:n});
+});
+
+for (const [reason, health] of [['health_recovered','unhealthy'],['health_recovered','unknown'],['action_reviewed','unhealthy']]) {
+ it(`shows historical blue closure health for ${reason}/${health}`,async()=>{
+  const {writes}=await actions({blue:true,blueHealth:health,blueReason:reason});
+  expect(await screen.findByText(`Health at this notice: ${health}.`)).toBeInTheDocument();
+  expect(screen.queryByText(/current health:/)).not.toBeInTheDocument();
+  if(reason==='health_recovered')expect(screen.getByText(/Health recovered earlier/)).toBeInTheDocument();
+  else expect(screen.getByText('Recovery outcome reviewed.')).toBeInTheDocument();
+  expect(writes).toHaveLength(0);
+ });
+}

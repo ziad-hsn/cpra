@@ -29,66 +29,67 @@ type checkSchedule struct {
 	checkScheduleExtensions
 	next, ready int64
 	arrivalRate float64
-	// Only a matching result from this process establishes service demand.
-	observed      bool
-	coldOccupancy float64
+	driver      string
+	occupancy   float64
 }
 
 type DurableSystem struct {
 	systemExtensions
-	notificationLog     *jobs.NotificationLog
-	catalogRuntime      *catalogRuntime
-	agentObserver       *agentObserver
-	agentSealer         *secureconfig.Sealer
-	agentStoreID        string
-	managed             map[string]managedMonitor
-	checks              []checkSchedule
-	pulseArrivalRate    float64
-	pulseColdOccupancy  float64
-	activePulseMonitors int
-	store               *persistence.Store
-	world               *ecs.World
-	states              *ecs.Map1[components.MonitorState]
-	configs             *ecs.Map1[components.PulseConfig]
-	jobs                *ecs.Map1[components.JobStorage]
-	codes               *ecs.Map1[components.CodeConfig]
-	disabled            *ecs.Map1[components.Disabled]
-	ignored             *ecs.Map1[components.Ignored]
-	pauses              *ecs.Map1[components.CheckPause]
-	controls            *ecs.Map1[components.ControlState]
-	controlCursor       persistence.ControlCursor
-	controlView         *persistence.ControlView
-	controlAfter        string
-	snoozes             *controlDeadlines
-	interventions       *ecs.Map1[components.InterventionConfig]
-	scheduler           *PulseScheduler
-	actions             *PulseScheduler
-	actionDue           map[ecs.Entity]time.Time
-	queues              map[string]queue.Queue
-	results             []<-chan []jobs.Result
-	resultCursor        int
-	processed           int
-	entities            map[string]ecs.Entity
-	admitted            map[string]bool
-	pending             map[string]bool
-	pendingCheckID      map[string]uuid.UUID
-	holder              *fleetview.Holder
-	index               *fleetview.Index
-	config              runtimeconfig.Config
-	cooldown            time.Duration
-	recoveryBypass      bool
-	stopping            atomic.Bool
-	recovering          atomic.Bool
-	nextRecovery        time.Time
-	pendingWrite        *ownerWrite
-	resultBacklog       []jobs.Result
-	committer           ownerCommitter
-	controlsPending     bool
-	ownerInitialized    bool
-	lastSLO             time.Time
-	lastError           error
-	logger              Logger
-	wakeup              chan<- struct{}
+	notificationLog        *jobs.NotificationLog
+	catalogRuntime         *catalogRuntime
+	agentObserver          *agentObserver
+	agentSealer            *secureconfig.Sealer
+	agentStoreID           string
+	managed                map[string]managedMonitor
+	checks                 []checkSchedule
+	pulseArrivalRate       float64
+	pulseDemand            map[string]queue.DriverDemand
+	pulseDemandVersion     uint64
+	publishedDemandVersion uint64
+	activePulseMonitors    int
+	store                  *persistence.Store
+	world                  *ecs.World
+	states                 *ecs.Map1[components.MonitorState]
+	configs                *ecs.Map1[components.PulseConfig]
+	jobs                   *ecs.Map1[components.JobStorage]
+	codes                  *ecs.Map1[components.CodeConfig]
+	disabled               *ecs.Map1[components.Disabled]
+	ignored                *ecs.Map1[components.Ignored]
+	pauses                 *ecs.Map1[components.CheckPause]
+	controls               *ecs.Map1[components.ControlState]
+	controlCursor          persistence.ControlCursor
+	controlView            *persistence.ControlView
+	controlAfter           string
+	snoozes                *controlDeadlines
+	interventions          *ecs.Map1[components.InterventionConfig]
+	scheduler              *PulseScheduler
+	actions                *PulseScheduler
+	actionDue              map[ecs.Entity]time.Time
+	queues                 map[string]queue.Queue
+	results                []<-chan []jobs.Result
+	resultCursor           int
+	processed              int
+	entities               map[string]ecs.Entity
+	admitted               map[string]bool
+	pending                map[string]bool
+	pendingCheckID         map[string]uuid.UUID
+	holder                 *fleetview.Holder
+	index                  *fleetview.Index
+	config                 runtimeconfig.Config
+	cooldown               time.Duration
+	recoveryBypass         bool
+	stopping               atomic.Bool
+	recovering             atomic.Bool
+	nextRecovery           time.Time
+	pendingWrite           *ownerWrite
+	resultBacklog          []jobs.Result
+	committer              ownerCommitter
+	controlsPending        bool
+	ownerInitialized       bool
+	lastSLO                time.Time
+	lastError              error
+	logger                 Logger
+	wakeup                 chan<- struct{}
 }
 
 func NewDurableSystem(w *ecs.World, store *persistence.Store, cfg runtimeconfig.Config, holder *fleetview.Holder, logger Logger, pq, iq, cq queue.Queue, channels []<-chan []jobs.Result, cooldown time.Duration, bypass bool) *DurableSystem {
@@ -125,14 +126,29 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 		s.entities[m.MonitorID] = q.Entity()
 	}
 	q = f.Query()
-	commands := make([]persistence.Command, 0, s.config.Storage.BatchSize)
+	maxCommands, maxBytes := s.store.CommandLimits()
+	commands := make([]persistence.Command, 0, min(maxCommands, 100))
+	encoded := 64 // Conservative versioned envelope bound, shared with Submit.
 	flush := func() error {
 		if len(commands) == 0 {
 			return nil
 		}
-		_, err := s.store.Submit(ctx, commands)
+		results, err := s.store.Submit(ctx, commands)
+		if err != nil {
+			return err
+		}
+		if len(results) != len(commands) {
+			return errors.New("file configuration returned incomplete commit results")
+		}
+		for _, result := range results {
+			if result.Err != nil {
+				return result.Err
+			}
+		}
+		clear(commands)
 		commands = commands[:0]
-		return err
+		encoded = 64
+		return nil
 	}
 	for q.Next() {
 		ent := q.Entity()
@@ -178,13 +194,20 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 			}
 		}
 		m := persistence.Monitor{ID: state.MonitorID, Revision: state.Revision, Name: state.Name, Policy: policy}
-		commands = append(commands, persistence.Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: time.Now().UTC()})
-		if len(commands) == cap(commands) {
+		command := persistence.Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: time.Now().UTC()}
+		bound, err := persistence.CommandEncodedBound(command)
+		if err != nil || bound+65 > maxBytes {
+			q.Close()
+			return errors.New("monitor configuration exceeds durable command capacity")
+		}
+		if len(commands) > 0 && (len(commands) >= maxCommands || encoded+bound+1 > maxBytes) {
 			if err := flush(); err != nil {
 				q.Close()
 				return err
 			}
 		}
+		commands = append(commands, command)
+		encoded += bound + 1
 	}
 	if err := flush(); err != nil {
 		return err
@@ -210,7 +233,9 @@ func (s *DurableSystem) Initialize(*ecs.World) {
 		maximum = max(maximum, ent.ID())
 	}
 	s.checks = make([]checkSchedule, int(maximum)+1)
-	s.pulseArrivalRate, s.pulseColdOccupancy, s.activePulseMonitors = 0, 0, 0
+	s.pulseArrivalRate, s.activePulseMonitors = 0, 0
+	s.pulseDemand = make(map[string]queue.DriverDemand)
+	s.pulseDemandVersion++
 	for id, ent := range s.entities {
 		m, ok := s.store.Get(id)
 		if !ok {
@@ -249,10 +274,19 @@ func (s *DurableSystem) Initialize(*ecs.World) {
 // Read only on the owner loop after initialization.
 func (s *DurableSystem) PulseArrivalRate() float64 { return s.pulseArrivalRate }
 
-// PulseColdOccupancy reserves estimated worker time for checks whose current
-// configuration has no local execution observation. It is maintained on the
-// owner loop, without rescanning the fleet on each controller update.
-func (s *DurableSystem) PulseColdOccupancy() float64 { return s.pulseColdOccupancy }
+// PulseDriverDemand is read only by the world owner. A changed version causes
+// one bounded driver summary copy; ordinary check completions change neither.
+func (s *DurableSystem) PulseDriverDemand(since uint64) (uint64, []queue.DriverDemand) {
+	if since == s.pulseDemandVersion {
+		return since, nil
+	}
+	demand := make([]queue.DriverDemand, 0, len(s.pulseDemand))
+	for _, d := range s.pulseDemand {
+		demand = append(demand, d)
+	}
+	slices.SortFunc(demand, func(a, b queue.DriverDemand) int { return strings.Compare(a.Driver, b.Driver) })
+	return s.pulseDemandVersion, demand
+}
 
 func (s *DurableSystem) setPulseDemand(ent ecs.Entity, interval time.Duration) {
 	if int(ent.ID()) >= len(s.checks) {
@@ -260,41 +294,45 @@ func (s *DurableSystem) setPulseDemand(ent ecs.Entity, interval time.Duration) {
 	}
 	interval = localPulseInterval(s.jobs.Get(ent), interval)
 	slot := &s.checks[ent.ID()]
-	rate := 0.0
+	cfg := s.configs.Get(ent)
+	rate, occupancy := 0.0, 0.0
 	if interval > 0 {
 		rate = 1 / interval.Seconds()
+		occupancy = min(1, max(4*time.Millisecond, cfg.Timeout).Seconds()*rate)
 	}
-	cold := 0.0
-	if rate > 0 && !slot.observed {
-		cold = min(1, max(4*time.Millisecond, s.configs.Get(ent).Timeout).Seconds()*rate)
-	}
-	s.pulseColdOccupancy = max(0, s.pulseColdOccupancy+cold-slot.coldOccupancy)
-	slot.coldOccupancy = cold
-	if rate == slot.arrivalRate {
+	if rate == slot.arrivalRate && occupancy == slot.occupancy && cfg.Type == slot.driver {
 		return
 	}
+	if s.pulseDemand == nil {
+		s.pulseDemand = make(map[string]queue.DriverDemand)
+	}
 	if slot.arrivalRate > 0 {
+		d := s.pulseDemand[slot.driver]
+		d.Monitors--
+		d.ArrivalRate = max(0, d.ArrivalRate-slot.arrivalRate)
+		d.Occupancy = min(float64(d.Monitors), max(0, d.Occupancy-slot.occupancy))
+		if d.Monitors == 0 {
+			delete(s.pulseDemand, slot.driver)
+		} else {
+			s.pulseDemand[slot.driver] = d
+		}
 		s.activePulseMonitors--
 	}
 	if rate > 0 {
+		d := s.pulseDemand[cfg.Type]
+		d.Driver = cfg.Type
+		d.Monitors++
+		d.ArrivalRate += rate
+		d.Occupancy = min(float64(d.Monitors), d.Occupancy+occupancy)
+		s.pulseDemand[cfg.Type] = d
 		s.activePulseMonitors++
 	}
 	s.pulseArrivalRate += rate - slot.arrivalRate
-	slot.arrivalRate = rate
+	slot.arrivalRate, slot.occupancy, slot.driver = rate, occupancy, cfg.Type
 	if s.activePulseMonitors == 0 {
 		s.pulseArrivalRate = 0
-		s.pulseColdOccupancy = 0
 	}
-}
-
-func (s *DurableSystem) observePulseDemand(ent ecs.Entity) {
-	if int(ent.ID()) >= len(s.checks) {
-		return
-	}
-	slot := &s.checks[ent.ID()]
-	slot.observed = true
-	s.pulseColdOccupancy = max(0, s.pulseColdOccupancy-slot.coldOccupancy)
-	slot.coldOccupancy = 0
+	s.pulseDemandVersion++
 }
 
 func (s *DurableSystem) resetCheckSchedule(ent ecs.Entity) {
@@ -569,7 +607,12 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 		// never apply that old result to the new incident or verification cycle.
 		if r.Type != "pulse" && r.ActionID != "" && !r.ExecutionStart.IsZero() {
 			if found {
-				if a, ok := current.Actions[r.ActionID]; ok && a.State == persistence.Unknown && a.Revision == r.Revision {
+				a, ok, err := s.store.ActionContext(ctx, r.ActionID)
+				if err != nil {
+					s.recoveryError(err, ctx)
+					return false
+				}
+				if ok && a.MonitorID == r.MonitorID && a.State == persistence.Unknown && a.Revision == r.Revision {
 					outcome := "success"
 					if r.Err != nil {
 						outcome = "failure"
@@ -756,9 +799,6 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 		if job.Type == "pulse" && commands[n].Outcome == "configuration_problem" {
 			s.states.Get(ent).MissedChecks++
 		}
-		if job.Type == "pulse" && !job.ExecutionStart.IsZero() {
-			s.observePulseDemand(ent)
-		}
 		s.project(ent, m)
 		s.scheduleActions(ent, m)
 		if s.index != nil {
@@ -769,6 +809,19 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 }
 
 func (s *DurableSystem) dispatchChecks(now time.Time) {
+	// Catalog/control changes are projected during this owner turn. Publish their
+	// demand before the first newly eligible job can reach the dispatcher.
+	if version, demand := s.PulseDriverDemand(s.publishedDemandVersion); version != s.publishedDemandVersion {
+		if q, ok := s.queues["pulse"].(interface {
+			SetDemand([]queue.DriverDemand) error
+		}); ok {
+			if err := q.SetDemand(demand); err != nil {
+				s.fail(err)
+				return
+			}
+		}
+		s.publishedDemandVersion = version
+	}
 	for _, ent := range s.scheduler.Due(now) {
 		if s.stopping.Load() {
 			return
@@ -929,6 +982,11 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 	defer cancel()
 	s.actions.EnqueueReady(s.actions.Due(now))
 	ready := s.actions.ConsumeReady(s.config.Storage.BatchSize)
+	type destination struct {
+		pipeline, driver string
+		flow             uint64
+	}
+	denied := make(map[destination]bool)
 	for n, ent := range ready {
 		if s.stopping.Load() {
 			return
@@ -1060,6 +1118,17 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				return
 			}
 			d := jobs.NewDispatch(prototype, ent, a.Kind, a.Color, 0, a.Endpoint)
+			flow := js.InterventionFlow
+			if a.Kind == "code" {
+				if flows := js.CodeFlows[a.Color]; a.Endpoint >= 0 && a.Endpoint < len(flows) {
+					flow = flows[a.Endpoint]
+				}
+			}
+			d.Driver, d.FlowKey = flow.Driver, flow.Key
+			destination := destination{a.Kind, flow.Driver, flow.Key}
+			if denied[destination] {
+				continue // Preserve order when an earlier delivery could not enter this queue.
+			}
 			d.NotificationLog = s.notificationLog
 			d.MonitorID, d.Revision, d.ActionID = m.ID, a.Revision, id
 			d.IncidentID, d.CatalogUID, d.Attempt = a.IncidentID, a.CatalogUID, a.Attempt
@@ -1151,6 +1220,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				return execution, err
 			}
 			if err := s.queues[a.Kind].Enqueue(d); err != nil {
+				denied[destination] = true
 				continue
 			}
 			s.admitted[id] = true
@@ -1176,6 +1246,10 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 			message, warning = "Check configuration could not be prepared", true
 		case "monitor_configuration_ready":
 			message = "Check configuration is usable again"
+		case "monitor_ignored":
+			message = "Monitor entered Ignore"
+		case "monitor_unignored":
+			message = "Monitor left Ignore"
 		case "action_succeeded", "action_failed", "action_unknown", "action_cancelled":
 			message = "Action outcome committed"
 			warning = event.Type == "action_failed" || event.Type == "action_unknown"
@@ -1201,6 +1275,19 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 				name = strings.ToValidUTF8(name[:256], "")
 			}
 			fields = append(fields, "monitor_name", name)
+			if event.Type == "monitor_ignored" || event.Type == "monitor_unignored" {
+				cause := monitor.IgnoreCause
+				if event.Type == "monitor_unignored" {
+					cause = "operator"
+					if event.Actor == "system" && event.Reason == "verified_recovery" {
+						cause = "verified_recovery"
+					}
+				}
+				if cause != "operator" && cause != "incident_frequency" && cause != "verified_recovery" {
+					cause = "unavailable"
+				}
+				fields = append(fields, "ignore_cause", cause, "ignore_incident_count", len(monitor.IgnoreIncidents), "control_revision", event.ControlRevision)
+			}
 		}
 		if event.ActionID != "" {
 			fields = append(fields, "action_id", event.ActionID, "action_kind", event.Kind,
@@ -1225,7 +1312,16 @@ func sortedMonitorActions(m persistence.Monitor) []string {
 	for id := range m.Actions {
 		ids = append(ids, id)
 	}
-	slices.Sort(ids)
+	slices.SortFunc(ids, func(left, right string) int {
+		a, b := m.Actions[left], m.Actions[right]
+		if order := a.QueuedAt.Compare(b.QueuedAt); order != 0 {
+			return order
+		}
+		if order := a.NotBefore.Compare(b.NotBefore); order != 0 {
+			return order
+		}
+		return strings.Compare(left, right)
+	})
 	return ids
 }
 
@@ -1262,6 +1358,9 @@ func (s *DurableSystem) project(ent ecs.Entity, m persistence.Monitor) {
 	if m.Warning {
 		state.PulseWarning = "check requires attention"
 	}
+	if m.RecoveryHeld() {
+		state.SetInterventionPending(true)
+	}
 	state.PendingCode = ""
 	for _, a := range m.Actions {
 		if !m.OwnsAction(a) {
@@ -1290,22 +1389,13 @@ func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview
 		colors = append(colors, c)
 	}
 	slices.Sort(colors)
-	unknown := 0
-	for _, a := range m.Actions {
-		if a.State == persistence.Unknown {
-			unknown++
-		}
-	}
+	unknown := m.UnknownActionCount()
 	uptime := float64(0)
 	if m.TotalChecks > 0 {
 		uptime = float64(m.SuccessfulChecks) / float64(m.TotalChecks)
 	}
 	summary := fleetview.MonitorSummary{Uptime: uptime, ID: ent.ID(), MonitorID: m.ID, Name: m.Name, PulseType: cfg.Type, Status: status, Incident: m.Incident, PendingCode: state.PendingCode, ConsecutiveFailures: m.ConsecutiveFailures, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: state.NextCheckTime, ActiveCodes: colors, Target: pulseTarget(cfg), IntervalMs: cfg.Interval.Milliseconds(), LatencyMs: float64(m.LastLatency) / float64(time.Millisecond), LatencyAvailable: m.LatencyAvailable, UnknownActions: unknown, Warning: state.PulseWarning}
-	for _, action := range m.Actions {
-		if action.Held() {
-			summary.ActionsNeedingReview++
-		}
-	}
+	summary.ActionsNeedingReview = m.HeldActionCount()
 	summary.IncarnationUID = m.IncarnationID()
 	summary.Source = "file"
 	if m.CatalogUID != "" {
@@ -1326,29 +1416,16 @@ func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview
 			summary.Health = "unhealthy"
 		}
 	}
-	if m.Recovering {
+	if m.VerifyRemaining > 0 {
 		summary.Phase = "verifying"
-	} else if m.Incident {
+	} else if m.Incident || !m.IncidentConfirmedAt.IsZero() && m.IncidentClosedAt.IsZero() {
 		summary.Phase = "incident"
 	}
 	summary.LastFailure = fleetview.FailureDiagnostic(m.LastFailure)
 	summary.ConfigurationProblem = fleetview.FailureDiagnostic(m.ConfigurationProblem)
 	summary.ConfigurationProblemAt = m.ConfigurationProblemAt
-	for _, a := range m.Actions {
-		if a.Kind != "code" || !m.OwnsAction(a) {
-			continue
-		}
-		switch a.State {
-		case persistence.Queued, persistence.Started:
-			summary.PendingNotifications++
-		case persistence.Succeeded:
-			summary.CompletedNotifications++
-		case persistence.Failed:
-			summary.FailedNotifications++
-		case persistence.Unknown:
-			summary.UnknownNotifications++
-		}
-	}
+	counts := m.RetainedNotifications()
+	summary.PendingNotifications, summary.CompletedNotifications, summary.FailedNotifications, summary.UnknownNotifications = int(counts.Pending), int(counts.Accepted), int(counts.Failed), int(counts.Unknown)
 	s.checkAdmission(ent, &summary)
 	return summary
 }

@@ -25,8 +25,11 @@ Collections retain their original `identityFormat`, `contentDigest`, `itemCount`
 and upload progress. They can be uploading, validating, validated, rejected,
 interrupted, canceled, expired or invalidated. An empty ordinary `items` array does
 not mean a collection's validation evidence is missing: its original resource
-results have their own read endpoint. The current collection path reports zero
-committed and applied resources because collection activation remains unfinished.
+results have their own read endpoint. Counts stay zero until activation admits
+resources. Explicit activation uses the original operation and per-resource
+preconditions; committed and applied counts can differ while controller work is
+pending or when only part of the collection succeeds. Read the retained item
+results before continuing or correcting a partial operation.
 
 An explicit `validated: true` means the original retained validation passed;
 `validated: false` means it was rejected. Pending or interrupted work omits this

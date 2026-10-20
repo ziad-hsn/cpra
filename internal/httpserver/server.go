@@ -185,7 +185,7 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	controller.SystemLogger.Info("Web server listening at %s://%s (API: /api/v1, metrics: /metrics)", scheme, s.srv.Addr)
+	controller.SystemLogger.Info("Web server listening at %s://%s (API: /api/v1 and /api/v2, metrics: /metrics)", scheme, s.srv.Addr)
 	return nil
 }
 
@@ -848,6 +848,24 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		writeGauge(&b, "cpra_queue_avg_wait_seconds", "Average queue wait (s).", lbl, qs.AvgQueueTime.Seconds())
 		writeGauge(&b, "cpra_queue_max_wait_seconds", "Max queue wait (s).", lbl, qs.MaxQueueTime.Seconds())
 		writeGauge(&b, "cpra_queue_avg_job_latency_seconds", "Average job latency (s).", lbl, qs.AvgJobLatency.Seconds())
+		if qs.OldestPendingAvailable {
+			writeGauge(&b, "cpra_queue_oldest_pending_seconds", "Age of oldest admitted queued item in seconds; absent when queue is empty.", lbl, qs.OldestPendingAge.Seconds())
+		}
+		for _, d := range qs.Drivers {
+			driverLabels := []kv{{"pipeline", name}, {"driver", d.Driver}}
+			writeGauge(&b, "cpra_driver_requested_capacity", "Configured timeout occupancy reservation in workers, before global limits.", driverLabels, float64(d.RequestedCapacity))
+			writeGauge(&b, "cpra_driver_reserved_capacity", "Reservation supplied from the current global worker budget.", driverLabels, float64(d.ReservedCapacity))
+			writeGauge(&b, "cpra_driver_pending", "Admitted work still in the driver queue.", driverLabels, float64(d.Pending))
+			writeGauge(&b, "cpra_driver_inflight", "Queue leases held through submission, invocation and result handoff.", driverLabels, float64(d.Active))
+			writeCounter(&b, "cpra_driver_rejections_total", "Driver queue admission rejections.", driverLabels, float64(d.Rejections))
+			writeCounter(&b, "cpra_driver_timeouts_total", "Completed invocations with a timeout.", driverLabels, float64(d.Timeouts))
+			if d.Pending > 0 {
+				writeGauge(&b, "cpra_driver_oldest_pending_seconds", "Age of oldest pending driver work in seconds; absent when empty.", driverLabels, d.OldestPendingAge.Seconds())
+			}
+			if d.Active > 0 {
+				writeGauge(&b, "cpra_driver_oldest_inflight_seconds", "Age of oldest driver lease in seconds; absent when idle.", driverLabels, d.OldestActiveAge.Seconds())
+			}
+		}
 	}
 
 	poolStats := map[string]queue.WorkerPoolStats{
@@ -860,6 +878,14 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		writeGauge(&b, "cpra_workers_running", "Running workers.", lbl, float64(ps.RunningWorkers))
 		writeGauge(&b, "cpra_workers_capacity", "Worker pool capacity.", lbl, float64(ps.CurrentCapacity))
 		writeGauge(&b, "cpra_workers_target", "Target worker count.", lbl, float64(ps.TargetWorkers))
+		writeGauge(&b, "cpra_workers_requested", "Requested worker capacity before global and growth limits.", lbl, float64(ps.RequestedCapacity))
+		writeGauge(&b, "cpra_workers_reserved", "Sum of configured timeout occupancy reservations before global limits.", lbl, float64(ps.ReservedCapacity))
+		writeGauge(&b, "cpra_workers_draining", "Worker goroutines above reduced capacity; may include idle goroutines.", lbl, float64(ps.DrainingWorkers))
+		writeGauge(&b, "cpra_workers_executing", "Invocations currently executing, excluding result handoff.", lbl, float64(ps.ActiveExecutions))
+		writeGauge(&b, "cpra_workers_pending_submissions", "Dequeued work awaiting execution.", lbl, float64(ps.PendingSubmissions))
+		if ps.PendingSubmissions > 0 {
+			writeGauge(&b, "cpra_workers_oldest_submission_seconds", "Oldest dequeued work awaiting execution in seconds.", lbl, ps.OldestSubmissionAge.Seconds())
+		}
 		writeGauge(&b, "cpra_workers_waiting", "Waiting tasks.", lbl, float64(ps.WaitingTasks))
 		writeCounter(&b, "cpra_tasks_submitted_total", "Total tasks submitted.", lbl, float64(ps.TasksSubmitted))
 		writeCounter(&b, "cpra_tasks_completed_total", "Total tasks completed.", lbl, float64(ps.TasksCompleted))

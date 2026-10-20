@@ -4,10 +4,8 @@ description: Run CPRa to check services, send alerts and perform configured reco
 cpra_scope: main
 ---
 
-> **Current development:** includes durable management and the writable dashboard.
 > Start with the [protected management quickstart](tutorials/quickstart.md).
-> [Versions and availability](versions.md) distinguishes implemented behavior
-> from completed qualification and published artifacts.
+> See [versions and availability](versions.md) for installation and support status.
 
 <div class="cpra-hero" markdown>
 
@@ -31,8 +29,7 @@ CPRa (Continuous Pulse and Recovery Agent) is a self-hosted monitoring and recov
 
 The current source includes a management dashboard, an HTTP API and the
 `cpractl` command-line client. Named operators manage configuration and controls;
-read-only identities observe their granted resources. Dated engineering records
-retain their historical scope in the source repository and are excluded from the public site.
+read-only identities observe their granted resources.
 
 ## What you can do
 
@@ -66,20 +63,20 @@ retain their historical scope in the source repository and are excluded from the
 
 ## Start with a small deployment
 
-Run one owner for each state directory. This development source defaults to
+Run one owner for each state directory. CPRa defaults to
 single-node Raft and restores committed incident state after restart. An explicit
 memory-only mode is available for disposable runs. Separate CPRa instances do not
 coordinate monitor ownership. See [durability](durability.md) for recovery behavior.
 
 Worker sizing uses Erlang C with an Allen–Cunneen variability adjustment and
 observed latency feedback. Percentile SLO measurements remain distinct from an
-SLA guarantee. Comparative fleet measurements and provider-account qualification
-remain open [release gates](versions.md). No 24-hour run is part of this work.
+SLA guarantee. Use [queue diagnostics](how-to/performance-tuning.md) to inspect
+the capacity available to your configured checks and destinations.
 
 [Deployment guide](how-to/deploy-to-production.md) · [Queueing model](explanation/queueing-theory.md) · [Current changes](release-notes.md) · [FAQ](faq.md)
 
-## Follow the latest development
+## Build integrations
 
-Use [versions and availability](versions.md), the [Go SDK guide](sdk/index.md), and
-the [management guide](cpractl-management.md) for current behavior. Implementation,
-local verification, qualification and publication are recorded separately.
+Use the [Go SDK](sdk/index.md) for monitor management, incident controls, collections
+and observations. The [management guide](cpractl-management.md) explains conditional
+writes and how to continue an interrupted collection without duplicating changes.

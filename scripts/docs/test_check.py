@@ -1,4 +1,6 @@
 from pathlib import Path
+import contextlib
+import io
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -84,6 +86,17 @@ class DocumentationLinksTests(unittest.TestCase):
 
 
 class SourceLayoutTests(unittest.TestCase):
+    def test_source_failure_is_actionable_without_a_traceback(self):
+        for error in (FileNotFoundError('missing source contract'), ValueError('public references differ')):
+            with self.subTest(error=type(error).__name__), patch.object(check, 'check', side_effect=error):
+                output = io.StringIO()
+                with contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as stopped:
+                    check.main([])
+                self.assertEqual(stopped.exception.code, 1)
+                self.assertIn('Documentation check failed: ' + str(error), output.getvalue())
+                self.assertIn('scripts/docs/references.py', output.getvalue())
+                self.assertNotIn('Traceback', output.getvalue())
+
     def test_current_layout_and_pre_refactor_candidate_are_supported(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -1,7 +1,7 @@
 import { validationDiagnostic, validationSourcePosition } from '../api/validation';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAccess, useDashboardSession } from '../auth/SessionBoundary';
 import { BrowserCollection, CollectionImportError, type ImportProgress } from '../import/collection';
 import { collectionFileSources } from '../import/files';
@@ -23,6 +23,8 @@ const unavailable = 'This server or identity does not offer the complete staging
 
 export default function CollectionImport() {
   const session = useDashboardSession();
+  const [parameters] = useSearchParams();
+  const initialReference = (name: string) => { const value = parameters.get(name) ?? ''; return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value) ? value : ''; };
   const access = useAccess();
   const lifetime = useRef<PrivateImport>({ active: true, generation: 0, busy: false, createAttempted: false });
   const [summary, setSummary] = useState<WorkerCollectionSummary>();
@@ -34,6 +36,8 @@ export default function CollectionImport() {
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState('');
   const [problem, setProblem] = useState<ManagementError>();
+  const feedbackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (feedback || problem) feedbackRef.current?.focus(); }, [feedback, problem]);
   const [failedPhase, setFailedPhase] = useState('');
   const [uncertain, setUncertain] = useState(false);
   const [preflight, setPreflight] = useState<Preflight>();
@@ -82,7 +86,7 @@ export default function CollectionImport() {
         if (!lifetime.current.operation && correlationID(id) && summary) storeOperation({ ...summary, id, state: 'unrecognized' });
         setFeedback(lifetime.current.activationAttempted && lifetime.current.operation
           ? 'Activation outcome unconfirmed. Read the original operation to reconcile it before another activation request. Accepted changes may already be applying; no automatic retry or new operation was submitted.'
-          : 'Outcome unconfirmed. No automatic retry was made. Read the original operation before continuing. If creation returned no handle, only an explicit retry using this tab’s original admission ticket is available.');
+          : 'Outcome unconfirmed. No automatic retry was made. Read the original operation before continuing. If creation returned no handle, only an explicit retry using this tab’s original request identity is available.');
       } else if (error.reason === 'not-admitted') setFeedback('No configuration change was submitted. The server did not confirm admission. Inspect the original operation before retrying.');
       else if (error.status === 410) setFeedback('This original operation has expired or been invalidated. It cannot be resumed. No new apply was started.');
       else if (error.reason === 'forbidden' || error.status === 403) setFeedback('Your identity is not permitted to perform this step. No further step was submitted.');
@@ -195,7 +199,7 @@ export default function CollectionImport() {
     if (!current(signal)) return;
     setValidationLocations(locations);
     setProblem(undefined); setFailedPhase('');
-    setValidation(value); setValidationStatus(!value.supported ? 'Unsupported result vocabulary — read only' : value.summary.valid ? 'Passed — original sealed result' : 'Rejected — original sealed result');
+    setValidation(value); setValidationStatus(!value.supported ? 'Unsupported result vocabulary — read only' : value.summary.valid ? 'Passed — saved validation result' : 'Rejected — saved validation result');
     setFeedback(!value.supported ? 'This retained result uses unsupported vocabulary. It is read only and cannot authorize activation.' : value.summary.valid ? 'The original validation passed. No activation was requested.' : 'The original validation was rejected. Review its source-attributed results; changed intent requires a new operation.');
     // A sealed verdict does not determine today's operation state: cancellation
     // may have happened afterward. Observe the original receipt before enabling
@@ -204,7 +208,7 @@ export default function CollectionImport() {
       const response = await readCollection(session, value, value.operationID, signal);
       if (current(signal)) { storeOperation(response.data); setUncertain(false); }
     } catch (error) {
-      if (current(signal)) { setProblem(error instanceof ManagementError ? error : undefined); setFailedPhase('observation'); setUncertain(true); setFeedback('The original sealed result is retained below, but current operation progress could not be confirmed. Read original progress before another step; no mutation was submitted.'); }
+      if (current(signal)) { setProblem(error instanceof ManagementError ? error : undefined); setFailedPhase('observation'); setUncertain(true); setFeedback('The saved validation result is retained below, but current operation progress could not be confirmed. Read original progress before another step; no mutation was submitted.'); }
     }
   }
   function validationFailure(error: unknown, id: string): number | undefined {
@@ -233,7 +237,7 @@ export default function CollectionImport() {
       if (!current(signal)) return;
       storeOperation(response.data as Operation); setUncertain(false);
       if (action === 'ValidateOperation') {
-        setPreflight(undefined); setValidationStatus('Accepted — awaiting original sealed result');
+        setPreflight(undefined); setValidationStatus('Accepted — awaiting saved validation result');
         setFeedback('Validation was accepted. No verdict or activation is implied; waiting reads the original result.');
         waitDelay.current = collectionDelay(response as APIResponse<Operation>); setWaitKind('validation'); setWaiting(true);
       } else {
@@ -313,7 +317,7 @@ export default function CollectionImport() {
     {!operator && <p role="status">Import requires an operator identity. Existing resources and operation observations remain available to authorized readers.</p>}
     {operator && !durable && <p role="status">{unavailable}</p>}
     {capabilities.isError && <p role="alert">Server capabilities could not be read. Server import steps remain disabled.</p>}
-    {operator && !summary && <NotificationSetup disabled={!durable || !!busy} onPrepare={files => select(files, true)} onDirty={setNotificationDraft}
+    {operator && !summary && <NotificationSetup initialMonitor={initialReference('monitor')} initialRecipient={initialReference('recipient')} disabled={!durable || !!busy} onPrepare={files => select(files, true)} onDirty={setNotificationDraft}
       onStart={() => {
         const owned = lifetime.current;
         if (!owned.active || owned.busy || owned.notificationPreparing || owned.collection) return false;
@@ -331,8 +335,7 @@ export default function CollectionImport() {
         {!summary.preflightAvailable && <p>This collection exceeds the 4 MiB ephemeral preview limit. Whole-collection validation is available after staged upload when the server supports it.</p>}
       </>}
     </section>
-    {feedback && <p role="alert">{feedback}</p>}
-    <ProblemDetails error={problem} phase={failedPhase} />
+    {(feedback || problem) && <div role="alert" tabIndex={-1} ref={feedbackRef}>{feedback && <p>{feedback}</p>}<ProblemDetails error={problem} phase={failedPhase} /></div>}
     {!!summary && <section className="card" aria-label="Collection preview">
       <h2>Source-attributed preview</h2><p>Resource contents are hidden. Create, update and unchanged outcomes appear after server validation; no resources are implicitly deleted.</p>
       {!!preflight?.errors?.length && <ul aria-label="Preview validation errors">{preflight.errors.slice(0, 10).map((issue, index) => {
@@ -363,7 +366,7 @@ export default function CollectionImport() {
           <button className="btn" disabled={!canStep('CancelOperation') || !collectionCancelable(operation)} onClick={() => setConfirm('cancel')}>Cancel original operation</button>
         </div>
         {waiting && <p role="status">Waiting on the original {waitKind === 'validation' ? 'validation result' : 'operation'}. Only GET reads occur, at least five seconds apart; the server may request a longer interval. Stopping this wait does not cancel the operation.</p>}
-        {validation && <section aria-label="Original validation result"><h3>Original sealed validation result</h3><p>{validation.summary.valid ? 'Passed' : 'Rejected'}; {validation.itemCount} original resources. Result: <span className="mono">{validation.summary.resultID}</span></p>
+        {validation && <section aria-label="Original validation result"><h3>Saved validation result</h3><p>{validation.summary.valid ? 'Passed' : 'Rejected'}; {validation.itemCount} original resources. Result: <span className="mono">{validation.summary.resultID}</span></p>
           {validation.summary.summaryOnly && <p>This result contains a bounded summary only. No per-resource verdict is available.</p>}
           {validation.summary.issue && <p>Summary issue: {validation.summary.issue}</p>}
           {!!validation.items.length && <table><caption>Original validation outcomes</caption><thead><tr><th scope="col">Ordinal</th><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Change</th><th scope="col">Issue</th><th scope="col">Observed version</th></tr></thead><tbody>{validation.items.map(item => <tr key={item.ordinal}><td>{item.ordinal}</td><td>{item.kind}/{item.id}</td><td>{lifetime.current.sourceNames?.[Number(item.source.slice(7)) - 1] ?? 'Local filename unavailable'}</td><td>{item.sourceDocument} / {item.sourceItem}{validationLocations[item.ordinal]}</td><td>{item.change ?? 'Not evaluated'}</td><td>{item.issue ?? 'None'}{item.reason && <div>{validationDiagnostic(item)}</div>}</td><td>{item.resourceVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>}
@@ -372,14 +375,14 @@ export default function CollectionImport() {
         {!!resultPage.length && <><h3>Original operation results</h3><ul>{resultPage.map(item => <li key={item.id}>{item.id}: {item.outcome}; committed {item.committed === undefined ? 'unavailable' : String(item.committed)}, applied {item.applied === undefined ? 'unavailable' : String(item.applied)}</li>)}</ul></>}
         {cursor && <button className="btn" disabled={!!busy || !allowed.has('GetOperation')} onClick={() => { void refresh(cursor); }}>Next result page</button>}
         {(operation.executionResult || lifetime.current.activationAttempted) && <CollectionExecution key={`execution:${operation.id}:${summary.contentDigest}`} id={operation.id} identity={summary} observation={operation.executionResult} sourceNames={lifetime.current.sourceNames} />}
-        {collectionTerminal(operation) && <p>This operation is terminal. The private file worker and admission ticket have been closed. Committed changes are not undone.</p>}
+        {collectionTerminal(operation) && <p>This operation is terminal. The local input session has been closed. Committed changes are not undone.</p>}
       </>}
     </section>}
     {confirm && <ConfirmDialog title={confirm === 'activate' ? 'Activate this collection?' : 'Cancel this original operation?'} pending={!!busy}
       cancelLabel="Keep reviewing" confirmLabel={confirm === 'activate' ? 'Confirm activation' : 'Confirm cancellation'} pendingLabel="Submitting…"
       confirmDisabled={confirm === 'activate' && (!canStep('ActivateOperation') || !activationReady(operation))} onCancel={() => setConfirm(undefined)}
       onConfirm={() => { void control(confirm === 'activate' ? 'ActivateOperation' : 'CancelOperation'); }}>
-      {confirm === 'activate' && <p>Apply the {summary?.itemCount} resources reviewed for operation <span className="mono">{operation?.id}</span>, using sealed validation result <span className="mono">{validation?.summary.resultID}</span>.</p>}
+      {confirm === 'activate' && <p>Apply the {summary?.itemCount} resources reviewed for operation <span className="mono">{operation?.id}</span>, using saved validation result <span className="mono">{validation?.summary.resultID}</span>.</p>}
       <p>{confirm === 'activate' ? 'This changes active configuration and can affect monitoring, recovery and notification delivery. Each resource is conditional; conflicts or dependency failures can produce partial results.' : 'Cancellation is a separate server request. It does not roll back changes already committed or reverse external actions.'}</p>
     </ConfirmDialog>}
   </main>;

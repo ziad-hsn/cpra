@@ -2,19 +2,120 @@ package systems
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
 
-func TestColdPulseDemandTracksNewChangedAndPausedChecks(t *testing.T) {
+type rejectFirstDestinationQueue struct {
+	admissionQueue
+	flow     uint64
+	attempts []string
+}
+
+func (q *rejectFirstDestinationQueue) Enqueue(job jobs.Job) error {
+	d := job.(*jobs.Dispatch)
+	if d.FlowKey == q.flow {
+		q.attempts = append(q.attempts, d.ActionID)
+		if len(q.attempts) == 1 {
+			return queue.ErrQueueFull
+		}
+	}
+	return q.admissionQueue.Enqueue(job)
+}
+
+func TestActionDestinationRejectionPreservesOrderAndUnrelatedProgress(t *testing.T) {
+	w := ecs.NewWorld()
+	mgr := entities.NewEntityManager(&w)
+	mgr.Endpoints = map[string]manifest.Endpoint{
+		"first":  {Type: "log", Config: &manifest.CodeNotificationLog{File: "shared.jsonl"}},
+		"second": {Type: "log", Config: &manifest.CodeNotificationLog{File: "shared.jsonl"}},
+		"other":  {Type: "log", Config: &manifest.CodeNotificationLog{File: "other.jsonl"}},
+	}
+	mgr.NotificationGroups = manifest.NotificationGroups{"all": {"first", "second", "other"}}
+	m := manifest.Monitor{Name: "ordered", Enabled: true, Pulse: manifest.Pulse{Type: "http", Interval: time.Second, Timeout: time.Second,
+		UnhealthyThreshold: 1, HealthyThreshold: 1, Config: &manifest.PulseHTTPConfig{Url: "http://127.0.0.1"}}, Codes: manifest.Codes{"red": {Dispatch: true, NotifyGroup: "all"}}}
+	if err := mgr.CreateEntityFromMonitor(&m, &w); err != nil {
+		t.Fatal(err)
+	}
+	query := ecs.NewFilter1[components.MonitorState](&w).Query()
+	var ent ecs.Entity
+	for query.Next() {
+		ent = query.Entity()
+	}
+	q := &rejectFirstDestinationQueue{}
+	s := newIncidentSystem(t, &w, nil, q)
+	flows := s.jobs.Get(ent).CodeFlows["red"]
+	if len(flows) != 3 || flows[0] != flows[1] || flows[0] == flows[2] {
+		t.Fatal("test requires two shared and one independent destination", flows)
+	}
+	q.flow = flows[0].Key
+	observed := applyIncidentPulse(t, s, ent, jobs.Result{Err: errors.New("down")})
+	s.dispatchActions(time.Now().UTC())
+	if s.lastError != nil || len(q.attempts) != 1 || len(q.admitted) != 1 || q.admitted[0].(*jobs.Dispatch).FlowKey == q.flow {
+		t.Fatal("later shared delivery overtook rejection or blocked unrelated destination", s.lastError, q.attempts, len(q.admitted))
+	}
+	// At the next scheduled turn both shared deliveries enter in original order.
+	next := time.Now().UTC().Add(time.Second)
+	s.scheduleActionAt(ent, next)
+	s.dispatchActions(next.Add(time.Second))
+	if len(q.attempts) != 3 || q.attempts[0] != q.attempts[1] || len(q.admitted) != 3 {
+		t.Fatal("retry lost original order", q.attempts)
+	}
+	for _, a := range observed.Actions {
+		stored, ok := s.store.Get(observed.ID)
+		if !ok || stored.Actions[a.ID].State != persistence.Queued {
+			t.Fatal("admission invoked provider/start guard")
+		}
+	}
+}
+
+func TestConfiguredDemandRemovalBoundsRounding(t *testing.T) {
+	w := ecs.NewWorld()
+	entities := make([]ecs.Entity, 11)
+	for i := range entities {
+		entities[i] = releaseMonitor(t, &w, 1, 1)
+	}
+	s := NewDurableSystem(&w, nil, runtimeconfig.Default(), &fleetview.Holder{}, noopLogger{}, nil, nil, nil, nil, time.Minute, false)
+	s.checks = make([]checkSchedule, int(entities[len(entities)-1].ID())+1)
+	for i, e := range entities {
+		cfg := s.configs.Get(e)
+		cfg.Type = "http"
+		cfg.Timeout = time.Second
+		cfg.Interval = 10 * time.Second
+		if i == 0 {
+			cfg.Timeout = cfg.Interval
+		}
+		s.setPulseDemand(e, cfg.Interval)
+	}
+	q, err := queue.NewFairQueue(64, "http")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entities[1:] {
+		s.resetCheckSchedule(e)
+		_, demand := s.PulseDriverDemand(0)
+		if err := q.SetDemand(demand); err != nil {
+			t.Fatal("valid removal failed capacity admission", err)
+		}
+	}
+	if d := s.pulseDemand["http"]; d.Monitors != 1 || math.Abs(d.Occupancy-1) > 1e-9 {
+		t.Fatal("surviving configured reservation lost", d)
+	}
+}
+
+func TestConfiguredPulseDemandTracksChangedAndPausedChecks(t *testing.T) {
 	w := ecs.NewWorld()
 	ent := releaseMonitor(t, &w, 1, 1)
 	s := NewDurableSystem(&w, nil, runtimeconfig.Default(), &fleetview.Holder{}, noopLogger{}, nil, nil, nil, nil, time.Minute, false)
@@ -24,14 +125,21 @@ func TestColdPulseDemandTracksNewChangedAndPausedChecks(t *testing.T) {
 	s.setPulseDemand(ent, cfg.Interval)
 	assertDemand := func(want float64) {
 		t.Helper()
-		if math.Abs(s.PulseColdOccupancy()-want) > 1e-9 {
-			t.Fatalf("cold occupancy=%g want=%g", s.PulseColdOccupancy(), want)
+		sum := 0.0
+		for _, demand := range s.pulseDemand {
+			sum += demand.Occupancy
+		}
+		if math.Abs(sum-want) > 1e-9 {
+			t.Fatalf("configured occupancy=%g want=%g", sum, want)
 		}
 	}
 	assertDemand(.5)
-	s.observePulseDemand(ent)
+	version := s.pulseDemandVersion
 	s.setPulseDemand(ent, cfg.Interval)
-	assertDemand(0)
+	assertDemand(.5)
+	if version != s.pulseDemandVersion {
+		t.Fatal("unchanged projection republished demand")
+	}
 	// Replacement invalidates observations and releases the previous demand.
 	s.resetCheckSchedule(ent)
 	cfg.Timeout = 20 * time.Second
@@ -42,7 +150,7 @@ func TestColdPulseDemandTracksNewChangedAndPausedChecks(t *testing.T) {
 	if s.PulseArrivalRate() != 0 {
 		t.Fatal("inactive check retains arrival demand")
 	}
-	s.setPulseDemand(ent, cfg.Interval) // Re-enable requires a fresh observation.
+	s.setPulseDemand(ent, cfg.Interval) // Re-enable restores the configured reservation.
 	assertDemand(1)
 }
 

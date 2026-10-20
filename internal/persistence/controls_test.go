@@ -113,8 +113,9 @@ func TestControlsExactIncidentTriageAndDismissal(t *testing.T) {
 	if m.Actions[started.ID].State != Failed {
 		t.Fatal("actual rejection not retained")
 	}
-	before := m.Clone()
+	before, _ := monitorWithActionHistory(t, s, m.ID)
 	m = *applyControlRequest(t, s, controlRequest(m, "reopen", "reopen-one", at.Add(6*time.Second))).Monitor
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if m.Dismissed || !reflect.DeepEqual(m.Actions, before.Actions) || m.InterventionAttempts != before.InterventionAttempts {
 		t.Fatal("reopen replayed prior actions or reset recovery budget")
 	}
@@ -147,9 +148,10 @@ func TestControlsSnoozeFencesQueuedChecksAndRetainsStartedResults(t *testing.T) 
 	if r := submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, At: at, Outcome: "failure", Guard: g, CheckControlRevision: oldVersion})[0]; r.Monitor != nil {
 		t.Fatal("unstarted paused pulse changed state")
 	}
-	prior := m.Clone()
+	prior, _ := monitorWithActionHistory(t, s, m.ID)
 	r := submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, At: at.Add(time.Second), Outcome: "failure", Guard: g, CheckControlRevision: oldVersion, ExecutionStart: at.Add(-time.Second), ExecutionEnd: at})[0]
 	m = *r.Monitor
+	m, _ = monitorWithActionHistory(t, s, m.ID)
 	if m.TotalChecks != prior.TotalChecks+1 || m.NextCheck != prior.NextCheck || m.PulseFailures != prior.PulseFailures || !reflect.DeepEqual(m.Actions, prior.Actions) {
 		t.Fatal("started check observation lost or produced new work")
 	}

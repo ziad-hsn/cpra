@@ -219,7 +219,7 @@ func TestAlertFanoutRetainsIndependentDelivery(t *testing.T) {
 			}
 		}
 	}
-	m, _ = system.store.Get(m.ID)
+	m, _ = monitorWithActionHistory(t, system.store, m.ID)
 	red := incidentActions(m, "code", "red")
 	if len(red) != 3 || len(seen) != 3 {
 		t.Fatal("fanout lost endpoints", len(red), len(seen))
@@ -302,9 +302,17 @@ func TestNotificationConfirmedRejectionStopsAfterThreeAttempts(t *testing.T) {
 		time.Sleep(time.Minute)
 		system.actions.EnqueueReady([]ecs.Entity{ent})
 		system.dispatchActions(time.Now().UTC())
+		monitor, _ = monitorWithActionHistory(t, system.store, monitor.ID)
 		actions := incidentActions(monitor, "code", "red")
-		if len(actions) != 1 || actions[0].State != persistence.Failed || actions[0].Attempt != 3 || calls != 3 || len(notifications.admitted) != 3 {
+		if len(actions) != 3 || calls != 3 || len(notifications.admitted) != 3 {
 			t.Fatal("exhausted notification restarted", actions, calls)
+		}
+		attempts := map[int]bool{}
+		for _, action := range actions {
+			if action.State != persistence.Failed || action.Attempt < 1 || action.Attempt > 3 || attempts[action.Attempt] || action.DeliveryID != first.DeliveryID || action.Deadline != first.Deadline {
+				t.Fatal("confirmed rejection history lost its attempt or delivery identity", action)
+			}
+			attempts[action.Attempt] = true
 		}
 	})
 }

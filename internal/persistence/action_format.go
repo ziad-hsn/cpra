@@ -15,7 +15,7 @@ func actionStorageFormat(version int) bool {
 }
 
 func requiresActionFormat(m Monitor) bool {
-	if m.InstallationID != "" || m.ActionVersion != 0 || m.Notifications != nil || len(m.Policy.NotificationTimeouts) != 0 || m.ConfigurationProblem != (FailureDiagnostic{}) || !m.ConfigurationProblemAt.IsZero() {
+	if m.AdoptedFileIncarnation != nil || m.ActionProjection != nil || m.ReviewAssessmentKey != "" || m.ReviewPolicyID != "" || m.ReviewRevisionDigest != "" || m.InstallationID != "" || m.ActionVersion != 0 || m.Notifications != nil || len(m.Policy.NotificationTimeouts) != 0 || m.ConfigurationProblem != (FailureDiagnostic{}) || !m.ConfigurationProblemAt.IsZero() {
 		return true
 	}
 	for _, a := range m.Actions {
@@ -43,6 +43,9 @@ func (m *Monitor) upgradeActions(at time.Time, emit func(string, *Action)) {
 }
 
 func validateActionFormat(m Monitor, version int) error {
+	if err := validateActionProjection(m, version); err != nil {
+		return err
+	}
 	if err := validateNotificationState(m, version); err != nil {
 		return err
 	}
@@ -63,7 +66,7 @@ func validateActionFormat(m Monitor, version int) error {
 		if err := validateReviewNotice(a, version); err != nil {
 			return err
 		}
-		if a.ReviewNotice != nil {
+		if a.ReviewNotice != nil && m.ActionProjection == nil {
 			if m.Notifications == nil {
 				return errors.New("review notification has no alert state")
 			}

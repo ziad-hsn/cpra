@@ -10,6 +10,7 @@ import { DirtyDraftGuard } from '../components/DirtyDraftGuard';
 import { MutationReceipt, OperationLink } from '../components/OperationReceipt';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProblemDetails } from '../components/ProblemDetails';
+import { FieldInput, FieldValidation } from '../components/FieldValidation';
 import { LabelFields, MonitorFields, MonitorStatusDetails, validateMonitorDraft } from '../components/MonitorFields';
 import type { Capabilities, Metadata, Monitor } from '../api/generated';
 
@@ -159,7 +160,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
     : mutation.error?.status === 409 || mutation.error?.status === 412 ? 'The resource changed or a reference prevents this operation. Your draft has not been overwritten. Compare the latest resource before deciding.'
       : mutation.error ? `The request did not complete${mutation.error.status ? ` (HTTP ${mutation.error.status})` : ''}. Review the highlighted fields and server availability.` : '');
 
-  return <div className="page management-page">
+  return <FieldValidation error={mutation.error}><div className="page management-page">
     <DirtyDraftGuard dirty={changed} />
     <div className="page-head"><div><h1>{definition.title}</h1><p className="lead">{definition.description}</p></div>
       {!id && !creating && canCreate && <Link className="btn primary" to={createRoute}>Create {definition.singular.toLowerCase()}</Link>}
@@ -184,6 +185,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
       {!canRead ? <p>Your identity cannot read this resource.</p> : detail.isError ? <p role="alert">Resource unavailable. <button className="btn" onClick={() => void detail.refetch()}>Retry</button></p> : !value ? <p>Loading resource…</p> : <div className="card">
         <div className="card-head"><h2>{value.metadata.name || value.metadata.id}</h2><div className="row" style={{ gap: 8 }}>
           {type === 'monitors' && <Link className="btn" to={`/monitors/by-id/${encodeURIComponent(value.metadata.id)}`}>View monitoring and controls</Link>}
+          {(type === 'monitors' || type === 'recipients') && session.can('CreateOperation') && session.can('GetMonitor') && <Link className="btn" to={`/import?${type === 'monitors' ? 'monitor' : 'recipient'}=${encodeURIComponent(value.metadata.id)}`}>Set up notifications</Link>}
           {canEdit && !detail.data?.unsupported && <button className="btn" onClick={() => startEdit(value)}>Edit {definition.singular.toLowerCase()}</button>}
           {canDelete && <button className="btn" disabled={!value.metadata.uid || !value.metadata.resourceVersion} onClick={() => setDeleteTarget(structuredClone(value))}>Delete {definition.singular.toLowerCase()}</button>}
         </div></div>
@@ -198,19 +200,19 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
     {creating && !canCreate && <p>Your identity cannot create these resources.</p>}
     {draft && <form className="card management-form" aria-label={`${creating ? 'Create' : 'Edit'} ${definition.singular.toLowerCase()}`} onSubmit={event => { event.preventDefault(); if (event.currentTarget.reportValidity()) void save(); }}>
       <h2>{draft.baseline ? 'Edit' : 'Create'} {definition.singular.toLowerCase()}</h2>
-      <label className="management-field"><span>Stable ID</span><input className="input" required value={draft.id} readOnly={!!draft.baseline} onChange={event => update({ id: event.target.value })} /></label>
+      <label className="management-field"><span>Stable ID</span><FieldInput field="metadata.id" className="input" required value={draft.id} readOnly={!!draft.baseline} onChange={event => update({ id: event.target.value })} /></label>
       {type === 'monitors' && !draft.baseline && <p className="muted">Start the stable ID with a letter or digit. Use 1–128 letters, digits, dots, underscores, colons or hyphens. Change the display name later to rename a monitor while keeping its identity.</p>}
-      <label className="management-field"><span>Name</span><input className="input" value={draft.name} onChange={event => update({ name: event.target.value, namePresent: true })} /></label>
+      <label className="management-field"><span>Name</span><FieldInput field="metadata.name" className="input" value={draft.name} onChange={event => update({ name: event.target.value, namePresent: true })} /></label>
       {draft.baseline && <p className="muted">Editing version <span className="mono">{draft.baseline.metadata.resourceVersion}</span>. Background updates do not replace this draft.</p>}
       <LabelFields labels={draft.labels} onChange={labels => update({ labels })} />
       {type === 'monitors' ? <MonitorFields spec={draft.spec} onChange={spec => update({ spec })} /> : type === 'credentials' ? <>
-        <label className="management-field"><span>Description</span><input className="input" value={typeof draft.spec.description === 'string' ? draft.spec.description : ''} onChange={event => update({ spec: { ...draft.spec, description: event.target.value } })} /></label>
+        <label className="management-field"><span>Description</span><FieldInput field="spec.description" className="input" value={typeof draft.spec.description === 'string' ? draft.spec.description : ''} onChange={event => update({ spec: { ...draft.spec, description: event.target.value } })} /></label>
         {draft.baseline && <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={draft.replaceSecret} onChange={event => update({ replaceSecret: event.target.checked, secret: '' })} />Replace the secret value</label>}
-        {draft.replaceSecret && <label className="management-field"><span>New secret value</span><input className="input" type="password" autoComplete="off" spellCheck={false} value={draft.secret} onChange={event => update({ secret: event.target.value })} /></label>}
+        {draft.replaceSecret && <label className="management-field"><span>New secret value</span><FieldInput field="spec.value" className="input" type="password" autoComplete="off" spellCheck={false} value={draft.secret} onChange={event => update({ secret: event.target.value })} /></label>}
         <p className="muted">The value is write-only and cleared when submitted or when this editor closes. Existing values are never filled into this form. Reference this secret by its ID from an endpoint.</p>
       </> : type === 'endpoints' ? <EndpointFields spec={draft.spec} onChange={spec => update({ spec })} /> : <>
-        <ReferencePicker type="endpoints" label="Endpoint references" values={references(draft.spec.endpointRefs)} onChange={endpointRefs => update({ spec: { ...draft.spec, endpointRefs } })} />
-        {type === 'groups' && <ReferencePicker type="recipients" label="Recipient references" values={references(draft.spec.recipientRefs)} onChange={recipientRefs => update({ spec: { ...draft.spec, recipientRefs } })} />}
+        <ReferencePicker field="spec.endpointRefs" type="endpoints" label="Endpoint references" values={references(draft.spec.endpointRefs)} onChange={endpointRefs => update({ spec: { ...draft.spec, endpointRefs } })} />
+        {type === 'groups' && <ReferencePicker field="spec.recipientRefs" type="recipients" label="Recipient references" values={references(draft.spec.recipientRefs)} onChange={recipientRefs => update({ spec: { ...draft.spec, recipientRefs } })} />}
       </>}
       {comparison && <section className="card" aria-label="Latest resource comparison"><h3>Latest resource</h3>
         <p>Your draft: {draft.name || draft.id}, version {draft.baseline?.metadata.resourceVersion || 'new'}. Latest: {comparison.resource.metadata.name || comparison.resource.metadata.id}, version {comparison.resource.metadata.resourceVersion}.</p>
@@ -221,5 +223,5 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
       <div className="row" style={{ gap: 12 }}><button className="btn primary" type="submit" disabled={mutation.pending || mutation.error?.reason === 'unconfirmed'}>{mutation.pending ? 'Saving…' : 'Save'}</button><button type="button" className="btn ghost" onClick={finishEditor}>Cancel editing</button></div>
     </form>}
     {deleteTarget && <ConfirmDialog title={`Delete ${deleteTarget.metadata.name || deleteTarget.metadata.id}?`} pending={mutation.pending} onCancel={() => setDeleteTarget(undefined)} onConfirm={() => void remove()}><p>The server blocks deletion while other resources reference this object. Recorded history and unknown actions are preserved.</p></ConfirmDialog>}
-  </div>;
+  </div></FieldValidation>;
 }

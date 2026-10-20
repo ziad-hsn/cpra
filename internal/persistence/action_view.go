@@ -135,6 +135,11 @@ func (f *machine) rebuildActionIndexesContext(ctx context.Context) (err error) {
 	return ctx.Err()
 }
 func (f *machine) indexAction(id string, a Action) {
+	if f.image.ActionStorage != nil && a.State != Queued && a.State != Started {
+		f.actionIndex.Delete(actionItem{key: a.ID})
+		f.actionsByMonitor.Delete(actionItem{key: id + "\x00" + a.ID})
+		return
+	}
 	f.actionIndex.ReplaceOrInsert(actionItem{key: a.ID, monitorID: id, action: a})
 	f.actionsByMonitor.ReplaceOrInsert(actionItem{key: id + "\x00" + a.ID, monitorID: id, action: a})
 }

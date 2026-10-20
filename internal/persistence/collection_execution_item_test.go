@@ -402,9 +402,7 @@ func TestCollectionExecutionItemRestoredChildDisposition(t *testing.T) {
 	s, head, command := preparationCacheFixture(t, true, 2)
 	head, accepted := preparationCacheAccept(t, s, head, command)
 	config := s.config
-	if err := s.Snapshot(); err != nil {
-		t.Fatal(err)
-	}
+	persistPausedReviewSnapshot(t, s)
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}

@@ -119,6 +119,7 @@ it('retains safe validation error metadata after a polling read without repeatin
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Validate whole collection' })));
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(screen.getByText('historyUnavailable')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveFocus();
     expect(screen.getByText('validation')).toBeInTheDocument();
     expect(screen.getByText('c47948b9-084b-4109-a862-0312e7a77102')).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
@@ -284,9 +285,9 @@ it('supports staging and async validation without advertising activation, render
   await click('Create inactive operation'); await screen.findByText(/Inactive operation created/);
   await click('Upload remaining resources'); await screen.findByText(/All resources are staged/);
   await click('Validate whole collection'); await screen.findByText(/Validation was accepted/);
-  expect(screen.queryByRole('heading', { name: 'Original sealed validation result' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Saved validation result' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Validate whole collection' })).toBeDisabled();
-  await click('Read original validation result'); await screen.findByRole('heading', { name: 'Original sealed validation result' });
+  await click('Read original validation result'); await screen.findByRole('heading', { name: 'Saved validation result' });
   const results = screen.getByRole('region', { name: 'Original validation result' });
   expect(within(results).getByRole('table')).toHaveTextContent('service.yaml');
   expect(within(results).getAllByRole('row')).toHaveLength(101);
@@ -317,10 +318,10 @@ it('polls only original validation GET after202, honors confirmed pending Retry-
     await act(async () => { await vi.advanceTimersByTimeAsync(1); }); expect(reads()).toBe(1);
     expect(screen.getByText('Pending — no verdict yet')).toBeInTheDocument();
     expect(screen.getByText('validationPending')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Original sealed validation result' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Saved validation result' })).not.toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(11999); }); expect(reads()).toBe(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); }); expect(reads()).toBe(2);
-    expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Saved validation result' })).toBeInTheDocument();
     expect(screen.queryByText('validationPending')).not.toBeInTheDocument();
     expect(screen.queryByText('c47948b9-084b-4109-a862-0312e7a77102')).not.toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(30000); }); expect(reads()).toBe(2);
@@ -357,7 +358,7 @@ it.each([
   expect(screen.getByText('c47948b9-084b-4109-a862-0312e7a77102')).toBeInTheDocument();
   expect(screen.getAllByText('964cbcb8-9bc9-43de-bd64-0c1169898c6d').length).toBeGreaterThan(0);
   expect(screen.getByText('validation')).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Original sealed validation result' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Saved validation result' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Validate whole collection' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
   expect(writes.filter(write => write.path.endsWith('/validate'))).toHaveLength(1);
@@ -381,8 +382,8 @@ it('reads authoritative phase after a sealed verdict without fabricating success
   await click('Create inactive operation'); await screen.findByText(/Inactive operation created/);
   await click('Upload remaining resources'); await screen.findByText(/All resources are staged/);
   await click('Validate whole collection'); await screen.findByText(/Validation was accepted/);
-  await click('Read original validation result'); await screen.findByText(/sealed result is retained below/);
-  expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+  await click('Read original validation result'); await screen.findByText(/saved validation result is retained below/);
+  expect(screen.getByRole('heading', { name: 'Saved validation result' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
   expect(screen.getByText('validating')).toBeInTheDocument();
   expect(writes.filter(write => /\/(validate|activate|cancel)$/.test(write.path))).toHaveLength(1);
@@ -394,7 +395,7 @@ it.each(['rejected', 'canceled'])('reconciles actual %s phase after a sealed res
   await click('Upload remaining resources'); await screen.findByText(/All resources are staged/);
   await click('Validate whole collection'); await screen.findByText(/Validation was accepted/);
   await click('Read original validation result'); await screen.findByText(state);
-  expect(collection.close).toHaveBeenCalled(); expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+  expect(collection.close).toHaveBeenCalled(); expect(screen.getByRole('heading', { name: 'Saved validation result' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
   expect(writes.filter(write => /\/(validate|activate|cancel)$/.test(write.path))).toHaveLength(1);
 });
@@ -410,7 +411,7 @@ it('retains a previously read sealed verdict but disables later mutation if curr
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeEnabled();
   options.validationError = { status: 503, code: 'historyUnavailable' };
   await click('Read original validation result'); expect(screen.getAllByText(/validation history is unavailable/).length).toBeGreaterThan(0);
-  expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Saved validation result' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
 });
 
@@ -531,7 +532,7 @@ it('connects partial application results to bounded source-attributed pages with
 
 it('keeps an expired sealed validation read-only and does not open activation confirmation', async () => {
   frozen(); await fixture({ validationExpiresAt: '2026-09-21T00:00:00Z' }); await reviewCollection();
-  expect(screen.getByRole('heading', { name: 'Original sealed validation result' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Saved validation result' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review activation' })).toBeDisabled();
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 });

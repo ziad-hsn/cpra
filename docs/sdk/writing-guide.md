@@ -1,10 +1,8 @@
 ---
-title: SDK candidate · Maintain the SDK lessons and reference
-description: SDK candidate · Maintain the SDK lessons and reference for the reviewed CPRa source; see the version and availability notice.
+title: Maintain the SDK lessons and reference
+description: Maintain the SDK lessons and reference.
 cpra_scope: sdk
 ---
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
 
 # Maintain the SDK lessons and reference
 
@@ -46,18 +44,10 @@ same recorded result” to “the worker provides robust recovery.” These are
 editing prompts, not an AI-origin detector. Keep technical terms when they help
 readers distinguish an incident, assignment, execution, receipt, or version.
 
-## Review iterations for this change
+## Verify a documentation change
 
-The first pass separated finite local demos from configured modes, because the
-current server has no v2 management routes. Each lesson now names that boundary
-before its first command.
-
-The second pass replaced vague coverage with observable checks: Kubernetes
-creates DNS monitors for all Services and TCP monitors for usable TCP ports;
-AWS verifies target absence before changing a mapped monitor; the DAO worker
-reports gateway acceptance separately from handset delivery.
-
-The verification pass runs the commands and checks duplicate delivery, stale
-versions, lost replies, malformed inputs, and build exclusion. Independent
-review corrections and executed results are recorded in [verification](verification.md).
-Update that record when the behavior or commands change.
+Run the finite demos and focused checks for duplicate delivery, stale versions,
+lost replies, malformed inputs and build exclusion. Regenerate source references
+from canonical files, then build the site and follow its local links. Keep public
+instructions current; retain dated results in repository engineering records.
+See [verification](verification.md) for commands and evidence boundaries.

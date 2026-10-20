@@ -2,13 +2,84 @@ package persistence
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
+
+func TestActionLedgerLargeHistoricalRowsRoundTripBothStreams(t *testing.T) {
+	for _, disk := range []bool{false, true} {
+		for _, reviews := range []bool{false, true} {
+			t.Run(fmt.Sprintf("disk=%v/reviews=%v", disk, reviews), func(t *testing.T) {
+				ledger := newLedgerTest(t, disk, 32<<20)
+				row := testActionRow("large-revision")
+				row.Action.Revision = strings.Repeat("r", 2095864)
+				row.Action.Review = &ActionReview{Revision: "review", Resolution: "inconclusive", Actor: "operator", At: policyTime(), Reason: "Inspected provider", Note: strings.Repeat("n", 2048)}
+				row.Sequence = 1
+				encoded, err := encodeActionRow(row)
+				if err != nil || len(encoded) <= 2<<20 {
+					t.Fatal("fixture must cross the previous action-row limit", len(encoded), err)
+				}
+				var policy []reviewRecord
+				if reviews {
+					m := testMonitor()
+					m.ID, m.Revision = row.MonitorID, row.Action.Revision
+					m.Policy.Endpoints = map[string]int{"blue": 1}
+					policy = testReviewPolicy(t, ledger, &m)
+				}
+				if _, err := ledger.CommitActionState(actionLedgerPosition{Index: 1}, []actionLedgerRow{row}, policy); err != nil {
+					t.Fatal(err)
+				}
+				view, err := ledger.Freeze()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer view.Close()
+				var stream bytes.Buffer
+				if err := writeActionLedger(&stream, view); err != nil {
+					t.Fatal(err)
+				}
+				magic := actionLedgerMagic
+				if reviews {
+					magic = actionLedgerMagicV2
+				}
+				if !bytes.HasPrefix(stream.Bytes(), magic) {
+					t.Fatal("wrong stream version")
+				}
+				restored := newLedgerTest(t, disk, 32<<20)
+				if _, err := importActionLedger(bytes.NewReader(stream.Bytes()), restored); err != nil {
+					t.Fatal(err)
+				}
+				pin, err := restored.pinActions()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer pin.Close()
+				got, ok, err := pin.Get(t.Context(), row.Action.ID)
+				if err != nil || !ok || got.Action.Revision != row.Action.Revision || got.Action.Review.Note != row.Action.Review.Note {
+					t.Fatal("large original evidence changed", err)
+				}
+				// Reject oversized lengths before allocating or reading their payload.
+				broken := bytes.Clone(stream.Bytes())
+				headerLen := int(binary.BigEndian.Uint32(broken[len(magic):]))
+				frame := len(magic) + 4 + headerLen
+				limit := uint32(actionLedgerMaxFrame)
+				if reviews {
+					limit++
+				} // V2 includes the frame-kind byte.
+				binary.BigEndian.PutUint32(broken[frame:], limit+1)
+				if _, err := importActionLedger(bytes.NewReader(broken), newLedgerTest(t, disk, 32<<20)); !errors.Is(err, errActionLedger) {
+					t.Fatal("oversized frame accepted", err)
+				}
+			})
+		}
+	}
+}
 
 func TestActionLedgerFrozenSnapshotAndImport(t *testing.T) {
 	for _, disk := range []bool{false, true} {

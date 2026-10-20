@@ -65,7 +65,7 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 		return kv(cmd.OutOrStdout(), [][2]string{
 			{"View", "Monitor observation (read-only)"}, {"Stable ID", managementDisplay(item.MonitorID)},
 			{"Name", managementDisplay(item.Name)}, {"Incarnation", managementDisplay(item.IncarnationUID)},
-			{"Configuration source", managementDisplay(string(item.Source))}, {"Observed health", managementDisplay(string(item.Health))},
+			{"Configuration source", managementDisplay(string(item.Source))}, {"Observed health", healthDisplay(string(item.Health))},
 			{"Incident phase", managementDisplay(string(item.Phase))}, {"Enabled", strconv.FormatBool(item.Enabled)},
 			{"Ignored", strconv.FormatBool(item.Ignored)}, {"Snoozed until", observationTimestamp(item.SnoozedUntil)},
 			{"Check type", managementDisplay(item.CheckType)}, {"Target", managementDisplay(item.Target)},
@@ -77,7 +77,7 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 			{"Preparation failed at", observationTimestamp(item.ConfigurationProblemAt)},
 			{"Configured notifications", managementDisplay(strings.Join(item.ConfiguredNotifications, ", "))},
 			{"Pending notifications", strconv.FormatInt(item.PendingNotifications, 10)},
-			{"Delivered notifications (retained)", strconv.FormatInt(item.CompletedNotifications, 10)},
+			{"Accepted notifications (retained)", strconv.FormatInt(item.CompletedNotifications, 10)},
 			{"Failed notifications (retained)", strconv.FormatInt(item.FailedNotifications, 10)},
 			{"Unknown notifications", strconv.FormatInt(item.UnknownNotifications, 10)},
 			{"Unknown provider outcomes", strconv.FormatInt(item.UnknownActions, 10)},
@@ -90,7 +90,7 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 	}
 	rows := make([][]string, 0, len(page.Items))
 	for _, item := range page.Items {
-		row := []string{managementDisplay(item.MonitorID), managementDisplay(item.Name), managementDisplay(string(item.Health)), strconv.FormatBool(item.Enabled), strconv.FormatBool(item.Ignored), strconv.FormatInt(item.PendingNotifications, 10)}
+		row := []string{managementDisplay(item.MonitorID), managementDisplay(item.Name), healthDisplay(string(item.Health)), strconv.FormatBool(item.Enabled), strconv.FormatBool(item.Ignored), strconv.FormatInt(item.PendingNotifications, 10)}
 		if o.output == formatWide {
 			row = append(row, managementDisplay(item.CheckType), managementDisplay(item.Target), observationTimestamp(item.LastCheckedAt))
 		}

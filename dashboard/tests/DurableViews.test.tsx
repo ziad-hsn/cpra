@@ -35,5 +35,6 @@ it('shows the audited operator and attention note as text in the retained timeli
   render(wrap(<MonitorTimeline monitorID='monitor' />));
   expect(await screen.findByRole('cell', { name: 'alice' })).toBeInTheDocument();
   expect(screen.getByRole('cell', { name: '<script>investigating</script>' })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Event timeline table' })).toHaveAttribute('tabindex', '0');
   expect(document.querySelector('script')).toBeNull();
 });

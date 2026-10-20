@@ -141,12 +141,12 @@ func lazyRoutingLookup(t *testing.T, count, valueBytes int, sourceReserve ...res
 		case "NotificationGroup":
 			spec = api.NotificationGroupSpec{EndpointRefs: refs}
 		case "NotificationEndpoint":
-			config, err := json.Marshal(map[string]string{"file": strings.Repeat("x", valueBytes)})
+			config, err := json.Marshal(map[string]any{"url": "https://example.test/notify", "headers": map[string]string{"X-Fixture": strings.Repeat("x", valueBytes)}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer clear(config)
-			spec = api.DriverConfig{Type: "log", Config: config}
+			spec = api.DriverConfig{Type: "webhook", Config: config}
 		default:
 			return false, nil
 		}

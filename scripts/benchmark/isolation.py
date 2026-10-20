@@ -53,30 +53,46 @@ def latency_summary(observations):
     return summaries
 
 
-async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=False, cli=None, activation_timeout=600):
+def fault_window_gaps(times, begin, end):
+    """Include silent time at both boundaries, even when no target was visited."""
+    inside = [at for at in times if begin <= at <= end]
+    return [b-a for a,b in zip([begin]+inside, inside+[end])]
+
+
+def duration_budget(onset, fault, recovery, activation=0):
+    # Startup, bounded API reads and supervisor shutdown are part of the limit.
+    total = onset + fault + recovery + activation + 100
+    if onset < 0 or fault < 10 or recovery < 10 or total > 900:
+        raise ValueError('scenario including startup and shutdown must fit within 900 seconds')
+    return total
+
+
+async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=False, cli=None, activation_timeout=600, onset=0, fault=60, recovery=30):
+    duration_budget(onset, fault, recovery, activation_timeout if cli else 0)
     work = pathlib.Path(tempfile.mkdtemp(prefix=name + '-', dir=output))
     started = time.monotonic()
     visits = {str(n): [] for n in range(healthy)}
     counters = {'slow_requests': 0, 'healthy_requests': 0, 'connections': 0, 'peak_connections': 0}
-    slow_visits = {str(n): {'hung': 0, 'recovered': 0, 'timeout_duration_hangs': 0, 'maximum_hang_seconds': 0} for n in range(slow)}
+    slow_visits = {str(n): {'before_fault': 0, 'hung': 0, 'recovered': 0, 'timeout_duration_hangs': 0, 'maximum_hang_seconds': 0} for n in range(slow)}
     counters.update(hanging=0, peak_hanging=0, disconnected_hangs=0, unexpected_requests=0)
     tasks = set()
     writers = set()
-    faults_end = float('inf')
+    faults_start, faults_end = float('inf'), float('inf')
     process = None
     snapshots = []
     apply_task = None
-    environment = {key: os.environ[key] for key in ('PATH', 'LANG', 'GOMAXPROCS') if key in os.environ}
-    environment.update(HOME=str(work / 'home'), XDG_CONFIG_HOME=str(work / 'user-config'),
+    environment = {key: os.environ[key] for key in ('PATH', 'HOME', 'LANG', 'GOMAXPROCS') if key in os.environ}
+    environment.update(XDG_CONFIG_HOME=str(work / 'user-config'),
                        XDG_STATE_HOME=str(work / 'user-state'), TZ='UTC',
                        TMPDIR=str(work / 'tmp'), CPRA_LOG_FORMAT='json', CPRA_LOG_LEVEL='info')
-    (work / 'home').mkdir(mode=0o700)
     (work / 'tmp').mkdir(mode=0o700)
     state = work / 'state'
     with binary.open('rb') as executable:
         binary_digest = hashlib.file_digest(executable, 'sha256').hexdigest()
     result = {'scenario': name, 'slow_monitors': slow, 'healthy_monitors': healthy,
               'timeout_seconds': timeout, 'cadence_seconds': cadence,
+              'fault_onset_seconds': onset, 'fault_duration_seconds': fault, 'recovery_duration_seconds': recovery,
+              'scenario_deadline_seconds': 900,
               'storage': 'raft', 'scope': 'private development isolation regression; not frozen release qualification',
               'gomaxprocs': os.environ.get('GOMAXPROCS', 'runtime default'),
               'binary_sha256': binary_digest}
@@ -105,7 +121,7 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                         counters['unexpected_requests'] += 1
                         return
                     counters['slow_requests'] += 1
-                    if time.monotonic() < faults_end:
+                    if faults_start <= time.monotonic() < faults_end:
                         slow_visits[key]['hung'] += 1
                         counters['hanging'] += 1
                         counters['peak_hanging'] = max(counters['peak_hanging'], counters['hanging'])
@@ -120,7 +136,10 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                         finally:
                             counters['hanging'] -= 1
                         return
-                    slow_visits[key]['recovered'] += 1
+                    if time.monotonic() >= faults_end:
+                        slow_visits[key]['recovered'] += 1
+                    else:
+                        slow_visits[key]['before_fault'] += 1
                 else:
                     key = path.removeprefix('/healthy/')
                     if key not in visits:
@@ -138,15 +157,18 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
             writers.discard(writer)
             tasks.discard(task)
 
-    async def tcp_target(reader, writer):
-        visits['0'].append(time.monotonic() - started)
+    async def tcp_target(reader, writer, key):
+        visits[key].append(time.monotonic() - started)
         counters['healthy_requests'] += 1
         writer.close()
         await writer.wait_closed()
 
     http = await asyncio.start_server(target, '127.0.0.1', 0, limit=65536)
     port = http.sockets[0].getsockname()[1]
-    tcp_server = await asyncio.start_server(tcp_target, '127.0.0.1', 0) if tcp else None
+    tcp_servers = []
+    if tcp:
+        for n in range(healthy):
+            tcp_servers.append(await asyncio.start_server(lambda r, w, key=str(n): tcp_target(r, w, key), '127.0.0.1', 0))
     monitors = []
     for n in range(slow):
         monitors.append({'id': f'slow-{n}', 'name': f'Slow {n}', 'enabled': True,
@@ -160,7 +182,7 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                  'config': {'url': f'http://127.0.0.1:{port}/healthy/{n}'}}
         if tcp:
             check = {'type': 'tcp', 'interval': '5s', 'timeout': '2s',
-                     'config': {'host': '127.0.0.1', 'port': tcp_server.sockets[0].getsockname()[1]}}
+                     'config': {'host': '127.0.0.1', 'port': tcp_servers[n].sockets[0].getsockname()[1]}}
         monitors.append({'id': f'healthy-{n}', 'name': f'Healthy {n}', 'enabled': True, 'pulse_check': check})
     (config / 'monitors.json').write_text(json.dumps({'monitors': monitors}))
     (config / 'runtime.yaml').write_text('storage:\n  mode: raft\n  directory: ' + str(work / 'state') +
@@ -283,12 +305,12 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                 apply_task = asyncio.create_task(run_cli(['--output', 'json', 'apply', '-f', str(config / 'growth.json'),
                                                          '--wait', '--timeout', f'{activation_timeout}s'], seconds=activation_timeout+60))
             else:
-                faults_end = started + 60
+                faults_start, faults_end = started + onset, started + onset + fault
             previous_mono, previous_wall = started, time.time()
             max_rss = max_fds = 0
             cpu_start = pathlib.Path(f'/proc/{process.pid}/stat').read_text().split()
             max_loop_delay = 0
-            while activated is None or time.monotonic() - activated < 90:
+            while activated is None or time.monotonic() - activated < onset + fault + recovery:
                 if activated is None and time.monotonic() - started > activation_timeout+60:
                     raise RuntimeError('collection activation deadline exceeded')
                 if activated is None and apply_task.done():
@@ -301,9 +323,9 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                         raise RuntimeError('growth collection did not apply the expected resource count')
                     activated = time.monotonic()
                     result['collection_apply_seconds'] = activated - started
-                    faults_end = activated + 60
+                    faults_start, faults_end = activated + onset, activated + onset + fault
                 tick = time.monotonic()
-                row = {'at_seconds': tick - started, 'phase': 'activation' if activated is None else 'fault' if tick < faults_end else 'recovery'}
+                row = {'at_seconds': tick - started, 'phase': 'activation' if activated is None else 'healthy' if tick < faults_start else 'fault' if tick < faults_end else 'recovery'}
                 for route in ('queues', 'pools', 'slo', 'state'):
                     try:
                         row[route] = await asyncio.to_thread(observe, route)
@@ -327,7 +349,7 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
             offset = activated - started
             after = {key: [at-offset for at in times if at >= offset] for key, times in visits.items()}
             gaps = [b-a for times in after.values() for a, b in zip([0]+times, times+[elapsed-offset])]
-            fault_gaps = [b-a for times in after.values() for a,b in zip([0]+[t for t in times if t<60], [t for t in times if t<60]+[60])]
+            fault_gaps = [gap for times in after.values() for gap in fault_window_gaps(times, onset, onset+fault)]
             if cli:
                 seed_gaps = [b-a for a,b in zip(visits['0'], visits['0'][1:]+[elapsed])]
                 first = [times[0] for key, times in visits.items() if key != '0' and times]
@@ -364,7 +386,7 @@ async def scenario(binary, output, name, slow, healthy, timeout, cadence, tcp=Fa
                 result['passed'] = False
         http.close()
         await http.wait_closed()
-        if tcp_server:
+        for tcp_server in tcp_servers:
             tcp_server.close()
             await tcp_server.wait_closed()
         for writer in list(writers):
@@ -394,18 +416,26 @@ async def main():
     parser.add_argument('--binary', required=True, type=pathlib.Path)
     parser.add_argument('--output', required=True, type=pathlib.Path)
     parser.add_argument('--cli', type=pathlib.Path, help='cpractl executable for the post-startup catalog scenario')
-    parser.add_argument('--scenarios', choices=('file', 'growth', 'all'), default='file')
+    parser.add_argument('--scenarios', choices=('file', 'growth', 'late-http', 'late-tcp', 'all'), default='file')
     parser.add_argument('--activation-timeout', type=int, default=600, help='collection activation allowance in seconds (30–900); measured separately from cadence')
     args = parser.parse_args()
     if not 30 <= args.activation_timeout <= 900:
         parser.error('--activation-timeout must be between 30 and 900 seconds')
-    if args.scenarios != 'file' and args.cli is None:
+    if args.scenarios in ('growth', 'all') and args.cli is None:
         parser.error('--cli is required for catalog growth')
+    try:
+        duration_budget(0, 60, 30, args.activation_timeout if args.scenarios in ('growth', 'all') else 0)
+    except ValueError as error:
+        parser.error(str(error))
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     results = []
     if args.scenarios in ('file', 'all'):
         results.append(await scenario(args.binary.resolve(), args.output.resolve(), '200-slow-http-healthy-tcp', 200, 1, 10, 10, tcp=True))
         results.append(await scenario(args.binary.resolve(), args.output.resolve(), '300-slow-http-700-healthy-http', 300, 700, 5, 10))
+    if args.scenarios in ('late-http', 'all'):
+        results.append(await scenario(args.binary.resolve(), args.output.resolve(), 'late-300-slow-http-700-healthy-http', 300, 700, 5, 10, onset=400, recovery=60))
+    if args.scenarios in ('late-tcp', 'all'):
+        results.append(await scenario(args.binary.resolve(), args.output.resolve(), 'late-300-slow-http-700-healthy-tcp', 300, 700, 5, 10, tcp=True, onset=400, recovery=60))
     if args.scenarios in ('growth', 'all'):
         results.append(await scenario(args.binary.resolve(), args.output.resolve(), 'catalog-growth-300-slow-700-healthy', 300, 700, 5, 10, cli=args.cli.resolve(), activation_timeout=args.activation_timeout))
     raise SystemExit(0 if all(results) else 1)

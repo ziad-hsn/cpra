@@ -168,7 +168,7 @@ func TestCollectionExecutionRetirementRejectsForeignFormatAndLiveWork(t *testing
 func TestCollectionExecutionRetirementNoBeginAndPreparedCancellation(t *testing.T) {
 	for _, prepared := range []bool{false, true} {
 		t.Run(fmt.Sprint(prepared), func(t *testing.T) {
-			s := openCatalogMemory(t)
+			s := openReplayMemory(t)
 			head, begin := executionResultInput(t, s, "create")
 			at := head.Activation.At.Add(time.Second)
 			if prepared {

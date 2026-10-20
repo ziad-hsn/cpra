@@ -194,6 +194,10 @@ func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessio
 		}
 		s.workerMaintenanceMu.Unlock()
 	}
+	if s.fsm.err != nil {
+		unlock()
+		return nil, errControllerUnavailable
+	}
 	unlock()
 	out := make([]WorkerMaintenanceDecision, 0, len(inputs))
 	for _, in := range inputs {

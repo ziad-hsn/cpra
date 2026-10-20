@@ -40,6 +40,7 @@ type HistoryStore struct {
 	catalog                                      historyCatalog
 	databases                                    map[string]*bolt.DB
 	memory                                       []Event
+	memorySizes                                  map[string]int
 	memoryOperations                             map[string]Event
 	memoryCollectionTree                         *btree.BTreeG[operationMemoryItem]
 	memoryCollectionReceipts                     map[string]Event
@@ -170,7 +171,18 @@ func (h *HistoryStore) append(index uint64, events []Event, at time.Time) error 
 	if index <= h.catalog.Index {
 		return nil
 	}
+	if h.dir == "" && h.memorySizes == nil {
+		h.memorySizes = make(map[string]int)
+	}
 	for _, event := range events {
+		raw, err := encodeHistoryEvent(event)
+		if err != nil {
+			h.err = ErrHistoryUnavailable
+			return h.err
+		}
+		if h.dir == "" {
+			h.memorySizes[event.ID] = len(raw)
+		}
 		if collectionExecutionHistoryEvent(event) && validateCollectionExecutionHistoryEvent(event) != nil {
 			h.err = ErrHistoryUnavailable
 			return h.err
@@ -274,7 +286,13 @@ func (h *HistoryStore) append(index uint64, events []Event, at time.Time) error 
 			h.catalog.Cutoff = cutoff
 		}
 		before := len(h.memory)
-		h.memory = slices.DeleteFunc(h.memory, func(e Event) bool { return e.At.Before(h.catalog.Cutoff) })
+		h.memory = slices.DeleteFunc(h.memory, func(e Event) bool {
+			if e.At.Before(h.catalog.Cutoff) {
+				delete(h.memorySizes, e.ID)
+				return true
+			}
+			return false
+		})
 		if len(h.memory) != before {
 			h.retentionGeneration++
 		}
@@ -394,7 +412,13 @@ func (h *HistoryStore) Expire(at time.Time) error {
 		}
 	}
 	if h.dir == "" {
-		h.memory = slices.DeleteFunc(h.memory, func(e Event) bool { return e.At.Before(cutoff) })
+		h.memory = slices.DeleteFunc(h.memory, func(e Event) bool {
+			if e.At.Before(cutoff) {
+				delete(h.memorySizes, e.ID)
+				return true
+			}
+			return false
+		})
 		h.expireMemoryOperations()
 		h.expireMemoryCollections()
 		h.expireMemoryValidationHistory()

@@ -47,9 +47,22 @@ func TestWorkerPolicyNativeRestoreAndFreshProvision(t *testing.T) {
 				revoked.Revoked = true
 				before = commitWorker(t, s, workerCommand(t, s, "upsert", revoked))
 			}
-			if err := s.Snapshot(); err != nil {
+			// Administrative handles do not run snapshot maintenance. Use a normal
+			// stopped-owner reopen to verify the production snapshot path.
+			if err := s.Close(); err != nil {
 				t.Fatal(err)
 			}
+			snapshotOwner, err := Open(t.Context(), config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := snapshotOwner.Snapshot(); err != nil {
+				t.Fatal(err)
+			}
+			if err := snapshotOwner.Close(); err != nil {
+				t.Fatal(err)
+			}
+			s = openAuthenticationAdmin(t, config)
 			if err := s.Close(); err != nil {
 				t.Fatal(err)
 			}
@@ -122,7 +135,7 @@ func TestWorkerPolicyNativeRestoreAndFreshProvision(t *testing.T) {
 				}
 			}
 			current := commitWorker(t, s, cmd)
-			if current.ResetRequired || current.Workers[candidate.ID].UID != candidate.UID || s.fsm.image.Version != WorkerPolicyFormatVersion {
+			if current.ResetRequired || current.Workers[candidate.ID].UID != candidate.UID || s.fsm.image.Version != ActionWorkerFormatVersion {
 				t.Fatal("explicit provisioning failed reset boundary")
 			}
 			if _, err := s.AuthenticateWorker(t.Context(), candidate.TokenSHA256, cmd.At); err != nil {
@@ -162,9 +175,22 @@ func TestWorkerPolicyNativeRestoreAndFreshProvision(t *testing.T) {
 					t.Fatal("management reused restored verifier", err)
 				}
 			}
-			if err := s.Snapshot(); err != nil {
+			// Administrative handles do not run snapshot maintenance. Use a normal
+			// stopped-owner reopen to verify the production snapshot path.
+			if err := s.Close(); err != nil {
 				t.Fatal(err)
 			}
+			snapshotOwner, err = Open(t.Context(), config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := snapshotOwner.Snapshot(); err != nil {
+				t.Fatal(err)
+			}
+			if err := snapshotOwner.Close(); err != nil {
+				t.Fatal(err)
+			}
+			s = openAuthenticationAdmin(t, config)
 			expected, err := s.WorkerPolicy(t.Context())
 			if err != nil {
 				t.Fatal(err)

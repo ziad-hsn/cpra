@@ -185,11 +185,11 @@ func validateHistoryOperationsContext(ctx context.Context, db *bolt.DB) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if len(key) > 1024 || len(raw) > maxHistoryEventBytes {
+			if len(key) > 1024 {
 				return ErrHistoryUnavailable
 			}
-			var event Event
-			if json.Unmarshal(raw, &event) != nil {
+			event, err := decodeHistoryEvent(raw)
+			if err != nil {
 				return ErrHistoryUnavailable
 			}
 			if err := validateHistoryExecutionPublicationEvent(tx, key, raw, event); err != nil {

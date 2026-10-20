@@ -1,11 +1,3 @@
----
-title: SDK candidate · CPRa external worker library
-description: SDK candidate · CPRa external worker library for the reviewed CPRa source; see the version and availability notice.
-cpra_scope: sdk
----
-
-> **Unpublished SDK candidate:** this guide follows the source in this checkout. Confirm the connected server’s capabilities and release qualification before using candidate APIs. See [availability and source](../versions.md#current-development-source).
-
 # CPRa external worker library
 
 This independently versioned Go 1.26 module runs operator-owned Go handlers in a
@@ -14,15 +6,22 @@ Importing this package without the tag fails at compile time. The separate SDK
 contains the tagged low-level protocol client; normal SDK applications do not
 depend on this module or bbolt.
 
-**Qualification:** the tests exercise protocol fixtures and real worker-process
-termination. CPRa's management/external-worker server contracts are a release
-prerequisite; fixture success is not evidence of production-server integration,
-provider certification, or a published module version.
+The server requires `externaljobs`, explicit runtime enablement and separately
+provisioned worker credentials. Operators register versioned JobTypes; workers
+receive only authorized assignments. Provider credentials stay with the worker.
+See [worker authentication](../worker-authentication.md) for provisioning
+and [versions and availability](../versions.md) for current support.
 
-The private server now implements JobType registration and
-[stopped worker credential provisioning](../worker-authentication.md).
-Assignment, start, heartbeat, result and late-evidence routes remain unfinished;
-provisioning a token does not make this runner usable against those routes yet.
+The runner records permission to execute and the outcome in its encrypted local
+journal. Restart never invokes an interrupted handler again. It resends the same
+saved result until the server supplies the matching receipt. Missing or ambiguous
+replies do not authorize another external effect.
+
+The server may retire completed check receipts. Only the exact HTTP 410
+`workerCheckExpired` problem allows the runner to remove that check's replay
+record without invoking it again. Generic conflicts, missing records, network
+failures and unavailable storage do not authorize removal. Intervention and
+notification evidence, including unknown outcomes, remains retained.
 
 ## Add the module to your worker application
 
@@ -182,9 +181,11 @@ A lost start reply, `started`, or `unknown` never invokes a handler. Journal
 recovery sends `reconcile`; `pending` retains the reservation until the server
 reports an authoritative state. `started` records an interrupted outcome without
 invocation. An authoritative `rejected` releases only an unstarted reservation;
-`terminal` confirms the retained receipt. Uncertain recovery and notification
-entries remain held after an unknown-result receipt. No local timeout or missing
-response releases that hold.
+`terminal` confirms the retained receipt and carries no executable grant or
+deadline. Uncertain recovery and notification entries remain held after an
+unknown-result receipt, including across restart and repeated matching terminal
+responses. A different receipt is an identity error. No local timeout or missing
+response releases that hold; late evidence remains attached to the original receipt.
 
 Each `Run` creates a fresh client session nonce. One poll is outstanding at a
 time; its exact nonce, session, sequence, capabilities, capacity, and limit remain
@@ -198,8 +199,8 @@ must match their original identities. Poll offers do not authorize execution.
 An outbox result or late evidence uses the journal's original server ID and worker
 UID and does not require a current polling session or new-work grant. A rotated
 credential for the same UID can deliver it; a different UID or restored server ID
-cannot silently adopt the journal. This is a client boundary, not a claim that
-server execution routes or provider-side fencing are implemented.
+cannot silently adopt the journal. These checks do not fence a remote provider
+or establish complete controller/runner interoperability.
 
 `QueueLateEvidence` appends evidence using the original receipt and a stable new
 evidence identity. It does not replace the result, clear the hold, or re-enable
@@ -233,6 +234,14 @@ still alive**. A supervisor must terminate an uncooperative process. Lease expir
 does not fence an external process, and this library cannot sandbox hostile Go
 code. Use a separate service account, process/container resource limits, network
 policy, and provider credentials; never mount the CPRa server state or key paths.
+
+To deliver retained outcomes without accepting new assignments, pass an empty
+`NewRegistry()` to `New` with the original journal, key, worker UID and server
+identity. `Run` skips polling when no handlers are registered, while its journal
+delivery and reconciliation loop continues. It requires current credentials;
+authentication rejection leaves saved outcomes pending. Cancel its context to
+stop it. A zero `PendingOutcomes` count does not mean every record was retired:
+inspect `Records` and `UnknownActions`, since unknown actions retain their holds.
 
 ## Verification and versioning
 
@@ -283,4 +292,4 @@ For publication from the complete repository checkout, follow the
 repository document outside this nested module archive; the installation and
 execution requirements above remain available in the downloaded module.
 
-<!-- Adapted from sdk/go/worker/README.md. -->
+<!-- Generated from sdk/go/worker/README.md by scripts/sdk/sync_guides.py. -->

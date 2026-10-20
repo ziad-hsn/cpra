@@ -38,7 +38,7 @@ cpra_scope: main
 | `-capabilities` | false | Print compiled driver capabilities as JSON and exit. |
 | `-shutdown-timeout` | `45s` | Maximum shutdown time; Windows service caps it at `15s`. |
 
-For initial observation authentication, a token file overrides a direct or environment token. An unreadable or empty token file fails startup. Once authentication authority is committed, stopped local authentication operations manage credentials; changing bootstrap files does not rotate them. See [management startup](../management-startup.md). `CPRA_ENTITY_THRESHOLD` optionally influences startup queue selection; there is no live queue migration.
+For initial observation authentication, a token file overrides a direct or environment token. An unreadable or empty token file fails startup. Once authentication authority is committed, stopped local authentication operations manage credentials; changing bootstrap files does not rotate them. See [management startup](../management-startup.md). All fleet sizes use fair queues; startup rejects the removed `CPRA_ENTITY_THRESHOLD` setting.
 
 ## Client commands
 
@@ -104,5 +104,5 @@ these diagnostics do not enable an automatic retry.
 Ordinary foreground and service runs use JSON at info level with UTC timestamps.
 Set `CPRA_ENV=development` explicitly for verbose console diagnostics, or select
 `CPRA_LOG_LEVEL` and `CPRA_LOG_FORMAT` directly. The first single-node Raft election
-is informational; later election warnings remain visible. No output format adds
+is logged at debug level; later election warnings remain visible. No output format adds
 terminal colour to JSON or file records.

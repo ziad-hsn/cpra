@@ -26,13 +26,26 @@ capacity recommendation. Feedback uses a 30-second window evaluated every five
 seconds, at least 1,000 observations, and real queued work before reacting to a
 queue-delay breach. Growth remains bounded by worker limits and twofold per
 adjustment. Shrinking requires 60 healthy seconds, is limited to 10% per
-adjustment and cannot cross below the model recommendation. Slow execution and
+adjustment and cannot cross below the model recommendation or configured
+timeout-occupancy floor. Slow execution and
 controller-limited conditions are reported instead of repeatedly increasing
-workers in response to delay they cannot remedy.
+workers in response to delay they cannot remedy. Each eligible local check
+contributes `min(1, timeout / interval)` to its driver's floor, with 15% headroom
+rounded up once per driver. Fast observations do not erase that reservation.
+Disabled, snoozed, removed and external-worker checks do not reserve local check
+workers. Changes in eligible configuration refresh the floor. If the global
+limit is insufficient, CPRa reports the requested and supplied capacity separately.
+
+Driver allowances and bounded destination flows prevent one stalled destination
+from taking every waiting slot or worker when capacity permits. Notifications
+and interventions each serialize work for a private destination within their
+own pipeline; the two pipelines have independent pools. Queued work
+still needs its original durable start authorization and deadline; fairness does
+not permit another attempt of an unknown action. See [capacity diagnostics](how-to/performance-tuning.md).
 
 These are observed operating targets, not a contractual SLA or an unconditional
-capacity guarantee. A one-million-monitor or 24-hour claim requires the
-corresponding completed campaign evidence described in [validation](validation.md).
+capacity guarantee. Large-scale qualification remains separate, as described in
+[validation](validation.md). The previously proposed 24-hour run is canceled.
 
 Scheduled obligations are recorded before queue admission. Checks still missing a
 committed result become overdue once their five-second bucket and five-second

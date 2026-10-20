@@ -41,7 +41,7 @@ func changeOf(m Monitor) ControlChange {
 	return ControlChange{MonitorID: m.ID, MonitorUID: m.CatalogUID, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, Enabled: m.Policy.Enabled, Removed: m.Removed}
 }
 func incidentOf(m Monitor) IncidentRecord {
-	return IncidentRecord{ID: m.IncidentID, MonitorID: m.ID, MonitorUID: m.CatalogUID, Revision: m.IncidentRevision, Active: !m.Removed && m.IncidentClosedAt.IsZero() && (m.Incident || m.Recovering), OpenedAt: m.IncidentOpenedAt, ClosedAt: m.IncidentClosedAt, AcknowledgedBy: m.AcknowledgedBy, AcknowledgedAt: m.AcknowledgedAt, AcknowledgedNote: m.AcknowledgedNote, Dismissed: m.Dismissed, DismissedBy: m.DismissedBy, DismissedAt: m.DismissedAt, DismissedReason: m.DismissedReason}
+	return IncidentRecord{ID: m.IncidentID, MonitorID: m.ID, MonitorUID: m.CatalogUID, Revision: m.IncidentRevision, Active: m.IncidentActive(), FirstFailureAt: m.IncidentOpenedAt, OpenedAt: m.IncidentConfirmedAt, ClosedAt: m.IncidentClosedAt, AcknowledgedBy: m.AcknowledgedBy, AcknowledgedAt: m.AcknowledgedAt, AcknowledgedNote: m.AcknowledgedNote, Dismissed: m.Dismissed, DismissedBy: m.DismissedBy, DismissedAt: m.DismissedAt, DismissedReason: m.DismissedReason, Notifications: m.incidentNotifications, NotificationsAvailable: m.IncidentDeliveries != nil}
 }
 func statusOf(m Monitor) MonitorStatus {
 	return MonitorStatus{ConfigurationProblem: m.ConfigurationProblem, ConfigurationProblemAt: m.ConfigurationProblemAt, Ignored: m.Ignored, IgnoredAt: m.IgnoredAt, IgnoredBy: m.IgnoredBy, IgnoreCause: m.IgnoreCause, IgnoreReason: m.IgnoreReason, IgnoreIncidentCount: len(m.IgnoreIncidents), ObservedGeneration: m.ownerObserved.generation, ID: m.ID, CatalogUID: m.CatalogUID, CatalogRevision: m.CatalogRevision, Revision: m.Revision, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: m.NextCheck, Enabled: m.Policy.Enabled, Removed: m.Removed, Incident: m.Incident, Recovering: m.Recovering, Warning: m.Warning, LatencyAvailable: m.LatencyAvailable, Generation: m.Generation, TotalChecks: m.TotalChecks, SuccessfulChecks: m.SuccessfulChecks, LastOutcome: m.LastOutcome, LastFailure: m.LastFailure, LastLatency: m.LastLatency, UnknownActions: m.unknownActions, ActionsNeedingReview: m.heldActions}
@@ -78,14 +78,18 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 		}
 		m.ensureControlIdentity()
 		m.unknownActions, m.heldActions = 0, 0
+		if m.ActionProjection != nil {
+			m.unknownActions, m.heldActions = m.ActionProjection.Unknown, m.ActionProjection.Held
+		}
+		m.incidentNotifications = m.IncidentNotifications()
 		for _, a := range m.Actions {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if a.Held() {
+			if m.ActionProjection == nil && a.Held() {
 				m.heldActions++
 			}
-			if a.State == Unknown {
+			if m.ActionProjection == nil && a.State == Unknown {
 				m.unknownActions++
 			}
 		}
@@ -98,7 +102,13 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 // installMonitor runs only in Apply. Trees contain immutable scalar projections;
 // readers never walk mutable action maps or scan the fleet for an incident page.
 func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
+	f.updateIncidentDeliveryCounts(previous, m)
+	m = m.Clone()
 	f.recordActionWrites(previous, m)
+	f.recordReviewWork(previous, &m, at)
+	f.projectActions(previous, &m)
+	f.indexProjectionReviews(previous, m)
+	m.reviewAssessment = false
 	m.retainedActions = nil
 	f.image.Version = joinStorageFormat(f.image.Version, policyMinimumFormat(m.Policy))
 	f.image.Version = joinStorageFormat(f.image.Version, recoveryNotificationPolicyFormat(m.Policy))
@@ -134,11 +144,15 @@ func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
 	}
 	// Cache the count at commit time so observation requests never scan actions.
 	m.unknownActions, m.heldActions = 0, 0
+	if m.ActionProjection != nil {
+		m.unknownActions, m.heldActions = m.ActionProjection.Unknown, m.ActionProjection.Held
+	}
+	m.incidentNotifications = m.IncidentNotifications()
 	for _, a := range m.Actions {
-		if a.Held() {
+		if m.ActionProjection == nil && a.Held() {
 			m.heldActions++
 		}
-		if a.State == Unknown {
+		if m.ActionProjection == nil && a.State == Unknown {
 			m.unknownActions++
 		}
 	}

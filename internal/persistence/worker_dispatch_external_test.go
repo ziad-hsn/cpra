@@ -104,12 +104,17 @@ func TestWorkerDispatchGlobalCapacityStillAllowsActionExpiry(t *testing.T) {
 			}
 		}
 		m, _ := s.Get(in.MonitorID)
-		action := m.Actions[in.ActionID]
+		action := retainedAction(t, s, in.ActionID)
 		if action.State != Cancelled || action.Outcome != "worker_admission_expired" ||
 			!action.StartedAt.IsZero() || action.ExecutorKind != "" || len(workerExpiryEvents(t, s, in.MonitorID)) != 1 {
 			t.Fatal("expiry lost its original disposition or fabricated an invocation", category, action)
 		}
 		m.Actions[in.ActionID] = original.Actions[in.ActionID]
+		m.ActionProjection = original.ActionProjection.clone()
+		m.Notifications = original.Notifications.clone()
+		m.IncidentDeliveries = original.IncidentDeliveries
+		m.incidentNotifications = original.incidentNotifications
+		_ = projectionSnapshot(t, s)
 		if !reflect.DeepEqual(original, m) {
 			t.Fatal("expiry changed health, attempts, cooldown or another action", category)
 		}

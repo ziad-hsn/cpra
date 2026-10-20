@@ -13,11 +13,23 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 	var command Command
 	c := reflect.ValueOf(&command).Elem()
 	frozen := reflect.TypeFor[operationCommandDigestV1]()
-	if c.NumField() != frozen.NumField()+7 {
+	if c.NumField() != frozen.NumField()+9 {
 		t.Fatal("Command gained a field without a reviewed legacy projection")
 	}
 	for n := 0; n < c.NumField(); n++ {
 		field := c.Type().Field(n)
+		if field.Name == "InstallationID" || field.Name == "NoticeRevision" {
+			tag := "installation_id,omitempty"
+			if field.Name == "NoticeRevision" {
+				tag = "notice_revision,omitempty"
+			}
+			if field.Type != reflect.TypeFor[string]() || field.Tag.Get("json") != tag {
+				t.Fatal("unreviewed installation/notification identity shape")
+			}
+			// Format 44/45 execution identities never enter the frozen
+			// management-operation digest; nonzero values are rejected.
+			continue
+		}
 		if field.Name == "Failure" || field.Name == "RetryDelay" {
 			want, tag := reflect.TypeFor[FailureDiagnostic](), "failure,omitzero"
 			if field.Name == "RetryDelay" {
@@ -130,6 +142,8 @@ func TestOperationDigestRejectsExecutionOnlyFields(t *testing.T) {
 		{"failure", func(c *Command) { c.Failure = NewFailureDiagnostic("dns_failed") }},
 		{"retry delay", func(c *Command) { c.RetryDelay = time.Second }},
 		{"action deadline", func(c *Command) { c.ActionDeadline = c.At.Add(time.Minute) }},
+		{"installation identity", func(c *Command) { c.InstallationID = "installation" }},
+		{"notice revision", func(c *Command) { c.NoticeRevision = "notice" }},
 	} {
 		t.Run(mutate.name, func(t *testing.T) {
 			c := base

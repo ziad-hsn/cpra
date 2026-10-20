@@ -9,10 +9,10 @@ names such as `redis.payments.svc.cluster.local`. CPRa also needs DNS access and
 network permission to reach the namespace. The discovery program may run in the
 cluster or use an explicitly supplied kubeconfig from your workstation.
 
-The local demo works now. Connecting it to CPRa requires the planned management
-v2 server, which is not implemented in the current application. A passing demo
-tests client behavior against HTTP fixtures; it does not establish Kubernetes or
-CPRa production compatibility.
+Configured mode uses Kubernetes discovery and CPRa's management v2 API. Check
+the connected server's capabilities and permissions before making changes.
+The finite demo uses local HTTP fixtures; it does not establish cluster DNS,
+network access or Kubernetes-account permissions.
 
 ## Try the local demo
 

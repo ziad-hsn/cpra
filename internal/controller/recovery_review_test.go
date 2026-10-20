@@ -69,8 +69,8 @@ func TestCatalogManualRecoveryAndHistoricalReviewUseOwnerReceipts(t *testing.T) 
 			_ = store.Close()
 		}
 	}()
-	waitCatalog(t, func() bool { m, _ := store.Get("manual-recovery"); return m.TotalChecks > 0 })
-	m, _ := store.Get("manual-recovery")
+	waitCatalog(t, func() bool { m, _ := monitorWithActionHistory(t, store, "manual-recovery"); return m.TotalChecks > 0 })
+	m, _ := monitorWithActionHistory(t, store, "manual-recovery")
 	if m.Incident || m.LastOutcome != "failure" || calls.Load() != 0 {
 		t.Fatal("manual fixture did not preserve failed observation below automatic threshold")
 	}
@@ -81,7 +81,7 @@ func TestCatalogManualRecoveryAndHistoricalReviewUseOwnerReceipts(t *testing.T) 
 	})
 	var action persistence.ActionRecord
 	waitCatalog(t, func() bool {
-		m, _ := store.Get("manual-recovery")
+		m, _ := monitorWithActionHistory(t, store, "manual-recovery")
 		for id, a := range m.Actions {
 			if a.Kind == "intervention" && a.State == persistence.Unknown {
 				var err error
@@ -148,7 +148,7 @@ func TestCatalogManualRecoveryAndHistoricalReviewUseOwnerReceipts(t *testing.T) 
 	if err != nil || action.State != persistence.Unknown || action.Held || action.Review == nil || action.Review.Actor != "oncall-alice" || action.Review.Resolution != "accepted" {
 		t.Fatal("historical review changed provider facts or failed to retain its assertion")
 	}
-	m, _ = store.Get("manual-recovery")
+	m, _ = monitorWithActionHistory(t, store, "manual-recovery")
 	if m.CatalogUID != newRecord.Resource.Metadata.UID || m.Policy.Enabled || m.TotalChecks != 0 || calls.Load() != 1 {
 		t.Fatal("historical review redirected or replayed work against the replacement monitor")
 	}

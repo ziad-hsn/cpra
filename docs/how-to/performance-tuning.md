@@ -42,11 +42,56 @@ controller limitations and insufficient coverage.
 
 A twofold per-adjustment growth limit means capacity changes are not instantaneous. Adding workers can increase pressure on a slow or overloaded target; measure that target before raising limits.
 
+The local check floor sums `min(1, timeout / interval)` for each eligible monitor,
+adds 15% headroom per driver and rounds up. Compiled but unused drivers reserve
+no workers. Observed fast responses do not remove the floor before a late outage.
+The global maximum remains authoritative. `worker_limit` and
+`insufficient_driver_capacity` identify requested capacity that cannot be supplied.
+
+Use `get pools -o wide` and `get queues -o wide` to inspect requested capacity,
+supplied driver reservations, active work, pending submissions and oldest waiting
+work. A queue lease includes submission, invocation and result handoff; actual
+executing work is reported separately. Draining worker goroutines may include idle
+goroutines after a capacity reduction. A field unavailable on an older server is
+not a measured zero.
+
+The check queue preserves driver allowances and fair destination flows.
+Notification and intervention queues serialize a private destination while
+allowing other destinations to progress. Destination keys never appear in
+observations or metric labels. No worker can be forcibly preempted; a reduced
+limit waits for existing work to drain. A budget too small to run two operations
+cannot provide simultaneous progress for two destinations.
+
+Prometheus exports `cpra_driver_requested_capacity`,
+`cpra_driver_reserved_capacity`, `cpra_driver_pending` and
+`cpra_driver_inflight` as counts, with bounded `pipeline` and `driver` labels.
+`cpra_driver_rejections_total` and `cpra_driver_timeouts_total` are cumulative
+counts. `cpra_driver_oldest_pending_seconds` and
+`cpra_driver_oldest_inflight_seconds` are durations in seconds and are absent
+when the corresponding work is absent. Worker gauges separate requested,
+reserved, running, executing, draining and pending-submission counts.
+
+## HTTP connection reuse
+
+Status-only HTTP checks close each response body without waiting for an unused
+body to arrive. With Go 1.27, the standard transport can drain a small unread
+HTTP/1 response asynchronously and reuse its connection. Go 1.26 remains
+supported, but these early closes can require a new connection on the next check.
+See the [Go connection reuse guidance](https://go.dev/blog/http-connection-reuse).
+
+This applies to checks using the shared HTTP client. Explicit per-monitor CA or
+server-name settings currently use an isolated transport. Notifications and
+interventions retain their separate transport and replay policy: connection reuse
+does not establish that repeating an external effect is safe.
+
 ## Know where configuration lives
 
 Worker limits, queue capacity, snapshot interval, and sizing policy are programmatic controller or worker-pool settings. They are not arbitrary fields in the monitor YAML. The server exposes only the [documented flags](../reference/cli.md).
 
-`CPRA_ENTITY_THRESHOLD` is a startup queue-selection input. Live queue migration is unsupported. Dynamic worker pools reject eager worker preallocation because it conflicts with resizing.
+The controller uses fair queues for all fleet sizes. `CPRA_ENTITY_THRESHOLD` is
+no longer supported and startup rejects it rather than bypassing admission
+fairness. Dynamic worker pools reject eager worker preallocation because it
+conflicts with resizing.
 
 ## Profile a controlled instance
 
@@ -66,8 +111,6 @@ when idle, with coalesced background hints and a one-second progress fallback.
 Pending work retains the configured update interval. A short empty/one-monitor
 CPU observation qualifies only that setup; it does not measure a fleet's rate,
 percentile attainment or endurance.
-
-Hybrid queues provide overflow handling; the segmented Workiva implementation serializes producers while publishing or sealing a segment. It should not be described as wholly lock-free.
 
 The comparative 10,000/100,000/1,000,000-monitor campaign remains outstanding.
 Its physical-host disk and measurement requirements are described in

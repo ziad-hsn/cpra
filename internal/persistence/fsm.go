@@ -60,8 +60,9 @@ func decodeEnvelope(data []byte) (envelope, error) {
 }
 
 type image struct {
-	InstallationID string              `json:"installation_id,omitempty"`
-	ActionStorage  *actionStorageState `json:"action_storage,omitempty"`
+	ActionProjectionState *actionProjectionState `json:"action_projection_state,omitempty"`
+	InstallationID        string                 `json:"installation_id,omitempty"`
+	ActionStorage         *actionStorageState    `json:"action_storage,omitempty"`
 	imageExtensions
 	CatalogMutationSequence      uint64                          `json:"catalog_mutation_sequence,omitempty"`
 	CollectionAdmissions         map[string]CollectionAdmission  `json:"collection_admissions,omitempty"`
@@ -82,8 +83,10 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
+	projectionReviews     map[string]*btree.BTreeG[string]
 	actionPosition        actionLedgerPosition
 	actionWrites          map[string]actionLedgerRow
+	reviewWrites          map[string]reviewRecord
 	controllerWakeups     chan struct{} // Coalesced hints; never replay authority.
 	collectionGenerations *collectionGenerations
 	collectionUpload      *collectionUploadTransaction // Apply-owned; never snapshot authority.
@@ -136,8 +139,9 @@ func (f *machine) Apply(log *raft.Log) any {
 		return f.err
 	}
 	f.actionWrites = nil
+	f.reviewWrites = nil
 	f.actionPosition = actionLedgerPosition{Index: log.Index}
-	defer func() { f.actionWrites = nil; f.actionPosition = actionLedgerPosition{} }()
+	defer func() { f.reviewWrites = nil; f.actionWrites = nil; f.actionPosition = actionLedgerPosition{} }()
 	if actionStorageFormat(batch.Version) && f.image.ActionStorage == nil && f.needsActionStorage(batch.Commands) {
 		if err := f.migrateActionStorage(log.Index); err != nil {
 			f.err = err
@@ -188,6 +192,18 @@ func (f *machine) Apply(log *raft.Log) any {
 			results = append(results, Result{Err: ErrCatalogFormatDowngrade})
 			continue
 		}
+		if c.Kind == "action_project" {
+			r := f.applyActionProjection(c)
+			results = append(results, r)
+			if f.err != nil {
+				return f.err
+			}
+			continue
+		}
+		if state := f.image.ActionProjectionState; state != nil && !state.Ready {
+			results = append(results, Result{Err: errActionProjectionPending})
+			continue
+		}
 		if c.Kind == "authentication" {
 			r := f.applyAuthentication(*c.Authentication)
 			results = append(results, r)
@@ -205,6 +221,16 @@ func (f *machine) Apply(log *raft.Log) any {
 		}
 		if f.restorePending() || f.image.Authentication != nil && f.image.Authentication.ResetRequired {
 			results = append(results, Result{Err: ErrAuthenticationResetRequired})
+			continue
+		}
+		if c.Kind == "action_reconcile" {
+			r := f.applyReviewStep(c)
+			if r.Err != nil && !errors.Is(r.Err, errReviewProgress) {
+				f.err = r.Err
+				return f.err
+			}
+			results = append(results, r)
+			events = append(events, r.Events...)
 			continue
 		}
 		if c.Kind == "barrier" {
@@ -340,6 +366,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			continue
 		}
 		if c.Kind == "recover" {
+			firstEvent := len(events)
 			ids := make([]string, 0)
 			for id, m := range f.image.Monitors {
 				for _, a := range m.Actions {
@@ -358,7 +385,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			if len(ids) != 0 && lifecycleStorageFormat(batch.Version) {
 				f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 			}
-			results = append(results, Result{Allowed: true})
+			results = append(results, Result{Allowed: true, Events: append([]Event(nil), events[firstEvent:]...)})
 			continue
 		}
 		if c.Kind == "configure" || c.Kind == "start" || c.Kind == "pulse" || c.Kind == "remove" {
@@ -394,7 +421,28 @@ func (f *machine) Apply(log *raft.Log) any {
 			config.InstallationID = f.image.InstallationID
 			c.Config = &config
 		}
-		r := transitionAtFormat(f.image.Monitors[c.MonitorID], c, batch.Version)
+		previous := f.image.Monitors[c.MonitorID]
+		if c.Kind == "start" || c.Kind == "result" || c.Kind == "late_result" {
+			var err error
+			previous, err = f.hydrateReviewDependencies(previous, c.ActionID)
+			if err != nil {
+				f.err = err
+				return err
+			}
+		}
+		if c.Kind == "late_result" {
+			if _, projected := previous.Actions[c.ActionID]; !projected {
+				a, found, err := f.actionForMonitor(previous, c.ActionID)
+				if err != nil {
+					return err
+				}
+				if found {
+					// A detached command input, never a shared mutable projection.
+					previous = withAction(previous, a)
+				}
+			}
+		}
+		r := transitionAtFormat(previous, c, batch.Version)
 		if r.Monitor != nil && (deliveryStorageFormat(batch.Version) || c.Kind == "pulse" && notificationStorageFormat(batch.Version)) {
 			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 		}
@@ -402,7 +450,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			f.image.Version = joinStorageFormat(f.image.Version, commandMinimumFormat(c))
 		}
 		if r.Monitor != nil {
-			events = append(events, f.installMonitor(f.image.Monitors[c.MonitorID], *r.Monitor, c.At)...)
+			events = append(events, f.installMonitor(previous, *r.Monitor, c.At)...)
 		}
 		events = append(events, r.Events...)
 		results = append(results, r)
@@ -424,6 +472,11 @@ func (f *machine) Apply(log *raft.Log) any {
 	for n := range results {
 		if results[n].Monitor != nil {
 			copy := results[n].Monitor.Clone()
+			if current, ok := f.image.Monitors[copy.ID]; ok {
+				copy.ActionProjection = current.ActionProjection.clone()
+				copy.unknownActions = current.unknownActions
+				copy.heldActions = current.heldActions
+			}
 			results[n].Monitor = &copy
 		}
 	}
@@ -443,6 +496,7 @@ func (f *machine) Snapshot() (raft.FSMSnapshot, error) {
 		return nil, fmt.Errorf("history has not reached the snapshot position")
 	}
 	i := image{InstallationID: f.image.InstallationID, LocalExecutorSession: f.image.LocalExecutorSession, Version: f.image.Version, Index: f.image.Index, SLO: f.image.SLO.Clone(), Monitors: make(map[string]Monitor, len(f.image.Monitors))}
+	i.ActionProjectionState = f.image.ActionProjectionState.clone()
 	if f.image.ActionStorage != nil {
 		copy := *f.image.ActionStorage
 		i.ActionStorage = &copy
@@ -535,6 +589,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 	if err := validateImageExtensions(i); err != nil {
 		return i, err
 	}
+	if err := validateActionProjectionState(i); err != nil {
+		return i, err
+	}
 	if err := validateActionStorageHeader(i); err != nil {
 		return i, err
 	}
@@ -564,7 +621,7 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 	}
 	for id, receipt := range i.Operations {
 		if receipt.validate() != nil || id != receipt.ID || receipt.State != "committed" || receipt.CommittedIndex > i.Index ||
-			!operationCurrent(i, receipt) {
+			!operationCurrent(i, receipt) && !deferredActionReceipt(i, receipt) {
 			return i, errors.New("invalid pending operation receipt")
 		}
 	}
@@ -667,6 +724,7 @@ func (f *machine) Restore(reader io.ReadCloser) error {
 	f.rebuildCatalogIndexes()
 	f.rebuildControlIndexes()
 	f.rebuildActionIndexes()
+	f.rebuildProjectionReviewIndex()
 	f.controlChanges, f.controlSequence = nil, 0
 	f.controlEpoch++
 	// Restore happens before runtime subscribers are admitted. Discard previous

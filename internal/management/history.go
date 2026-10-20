@@ -46,7 +46,7 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 		if actor == "" && e.Operation != nil {
 			actor = e.Operation.Actor
 		}
-		event := api.Event{ID: e.ID, MonitorID: e.MonitorID, Kind: e.Type, Time: e.At, Actor: actor, Reason: e.Reason, Note: e.Note, IncidentID: e.IncidentID, ActionID: e.ActionID, Outcome: e.Outcome, ControlRevision: e.ControlRevision, EvidenceRefs: append([]string(nil), e.EvidenceRefs...)}
+		event := api.Event{ID: e.ID, MonitorID: e.MonitorID, Kind: e.Type, Time: e.At.UTC(), Actor: actor, Reason: e.Reason, Note: e.Note, IncidentID: e.IncidentID, ActionID: e.ActionID, Outcome: e.Outcome, ControlRevision: e.ControlRevision, EvidenceRefs: append([]string(nil), e.EvidenceRefs...)}
 		event.Failure, event.Cause = failureView(e.Failure), failureView(e.Cause)
 		event.AgentReceipt = agentReceiptView(e.AgentReceipt)
 		event.RecoveryFailure = recoveryFailureView(e.RecoveryFailure)

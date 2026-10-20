@@ -59,7 +59,7 @@ func (m *managementHTTP) readOperationDetail(ctx context.Context, id string, que
 	}
 	var after uint64
 	err = func() error {
-		defer m.mu.Unlock()
+		defer m.unlockSnapshots()
 		if !m.cursorReady {
 			return management.ErrUnavailable
 		}
@@ -162,7 +162,7 @@ func (m *managementHTTP) publishCollectionExecutionPage(ctx context.Context, rea
 	if err := m.lockSnapshots(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	now := m.now().UTC()
 	if now.Before(read.observed) || now.Before(read.entry.created) {
 		return management.ErrUnavailable

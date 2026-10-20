@@ -83,15 +83,8 @@ func validateLifecycle(m Monitor, version int) error {
 		return err
 	}
 	for _, a := range m.Actions {
-		if a.ProviderCorrelationVersion < 0 || a.ProviderCorrelationVersion > 1 || a.ProviderCorrelationVersion != 0 && a.Kind != "code" {
-			return errors.New("invalid provider correlation version")
-		}
-		if a.Control != nil && (a.Kind != "code" || a.Color != "gray" || !catalogIdentifier(a.Control.Revision, 256) || a.Control.At.IsZero() || a.Control.At.Year() < 1 || a.Control.At.Year() > 9999) {
-			return errors.New("invalid control notification")
-		}
-		if a.FileIncarnation != "" && !catalogIdentifier(a.FileIncarnation, 256) ||
-			(a.State == Queued || a.State == Started) && !m.OwnsAction(a) {
-			return errors.New("invalid action incarnation")
+		if err := validateActionIncarnation(m, a); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -160,8 +153,23 @@ func (m *Monitor) cancelQueuedInterventions(at time.Time, outcome string, emit f
 }
 
 func (m *Monitor) setNotificationCorrelation(value string) {
+	value = m.namespacedIdentity(value)
 	if m.NotificationCorrelation != value && m.LifecycleVersion == LifecycleFormatVersion {
 		m.ProviderCorrelationVersion = 1
 	}
 	m.NotificationCorrelation = value
+}
+
+func validateActionIncarnation(m Monitor, a Action) error {
+	if a.ProviderCorrelationVersion < 0 || a.ProviderCorrelationVersion > 1 || a.ProviderCorrelationVersion != 0 && a.Kind != "code" {
+		return errors.New("invalid provider correlation version")
+	}
+	if a.Control != nil && (a.Kind != "code" || a.Color != "gray" || !catalogIdentifier(a.Control.Revision, 256) || a.Control.At.IsZero() || a.Control.At.Year() < 1 || a.Control.At.Year() > 9999) {
+		return errors.New("invalid control notification")
+	}
+	if a.FileIncarnation != "" && !catalogIdentifier(a.FileIncarnation, 256) ||
+		(a.State == Queued || a.State == Started) && !m.OwnsAction(a) {
+		return errors.New("invalid action incarnation")
+	}
+	return nil
 }

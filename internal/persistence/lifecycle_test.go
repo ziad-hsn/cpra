@@ -265,7 +265,7 @@ func TestFileMonitorRecreationSeparatesHistoricalActions(t *testing.T) {
 	if r.Allowed {
 		t.Fatal("old intervention was replayed on new target")
 	}
-	if err := validateLifecycle(m, LifecycleFormatVersion); err != nil {
+	if err := validateLifecycle(m, ActionFormatVersion); err != nil {
 		t.Fatal(err)
 	}
 	old.Review = &ActionReview{Revision: "review-old", Resolution: "rejected", Actor: "administrator", Reason: "Inspected the original target", At: at.Add(time.Second)}

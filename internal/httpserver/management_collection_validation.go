@@ -239,7 +239,7 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 	}
 	var after uint64
 	err := func() error {
-		defer m.mu.Unlock()
+		defer m.unlockSnapshots()
 		if !m.cursorReady {
 			return management.ErrUnavailable
 		}
@@ -340,7 +340,7 @@ func (m *managementHTTP) publishCollectionValidationPage(ctx context.Context, re
 	if err := m.lockSnapshots(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	now := m.now().UTC()
 	if now.Before(read.observed) || now.Before(read.entry.created) {
 		return management.ErrUnavailable

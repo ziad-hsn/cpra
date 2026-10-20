@@ -75,6 +75,12 @@ func snapshotBlockedFixture(t *testing.T, kind string) (*managementFixture, *sna
 	case "Incident":
 		entry.incidents = &snapshotBlockedView[api.Incident]{entry.incidents, gate}
 	case "Action":
+		// This fixture substitutes a blocking page implementation to exercise
+		// policy/cursor locking. Keep its underlying view alive independently;
+		// production action handle retention has separate overlap coverage.
+		owner := entry.actionOwner
+		t.Cleanup(func() { _ = owner.Close() })
+		entry.actionOwner = nil
 		entry.actions = &snapshotBlockedView[api.Action]{entry.actions, gate}
 	case "History":
 		entry.history = &snapshotBlockedView[api.Event]{entry.history, gate}

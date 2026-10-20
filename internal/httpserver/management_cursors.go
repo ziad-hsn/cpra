@@ -115,7 +115,7 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 	if err := m.lockSnapshots(ctx); err != nil {
 		return nil, err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	if !m.cursorReady {
 		return nil, management.ErrUnavailable
 	}
@@ -138,6 +138,13 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 			return nil, management.ErrUnavailable
 		}
 		read.entry, read.cursor = entry, cursor
+		if entry.actionOwner != nil {
+			view, err := entry.actionOwner.Retain()
+			if err != nil {
+				return nil, management.ErrUnavailable
+			}
+			read.entry.actions, read.entry.actionOwner = view, &view
+		}
 		read.entry.snapshotExtensions.retain()
 		return read, nil
 	}
@@ -164,7 +171,7 @@ func (m *managementHTTP) publishSnapshotRead(ctx context.Context, read *snapshot
 	if err := m.lockSnapshots(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	now := m.now().UTC()
 	if now.Before(read.observed) {
 		return management.ErrUnavailable
@@ -177,7 +184,17 @@ func (m *managementHTTP) publishSnapshotRead(ctx context.Context, read *snapshot
 		return managementFailure(410, "cursorExpired", "The cursor expired. Start a new query.")
 	}
 	if read.after != "" {
-		m.snapshots[read.cursor.View] = read.entry
+		if read.fresh {
+			published := read.entry
+			if published.actionOwner != nil {
+				view, err := published.actionOwner.Retain()
+				if err != nil {
+					return management.ErrUnavailable
+				}
+				published.actions, published.actionOwner = view, &view
+			}
+			m.snapshots[read.cursor.View] = published
+		}
 		read.published = true
 	}
 	// Existing terminal pages retain their immutable view for retry until TTL.
@@ -189,15 +206,19 @@ func (m *managementHTTP) releaseSnapshotRead(read *snapshotRead) {
 		return
 	}
 	defer read.entry.snapshotExtensions.release()
+	if read.entry.actionOwner != nil {
+		defer read.entry.actionOwner.Close()
+	}
 	if !read.fresh || read.published {
 		return
 	}
 	m.mu.Lock()
 	if entry, ok := m.snapshots[read.cursor.View]; ok {
 		entry.snapshotExtensions.release()
+		m.queueActionClose(entry)
 	}
 	delete(m.snapshots, read.cursor.View)
-	m.mu.Unlock()
+	m.unlockSnapshots()
 }
 
 func boundSnapshotPage[T any](items []T, after string, id func(T) string) ([]T, string, error) {
@@ -243,9 +264,46 @@ func (m *managementHTTP) pruneSnapshots(now time.Time, principal string, generat
 		// An older in-flight request must never delete a newer generation's cursor.
 		if !now.Before(entry.expires) || entry.principal == principal && entry.generation < generation {
 			entry.snapshotExtensions.release()
+			m.queueActionClose(entry)
 			delete(m.snapshots, key)
 		}
 	}
+}
+
+func (m *managementHTTP) queueActionClose(entry managementSnapshot) {
+	if entry.actionOwner != nil {
+		m.actionCloses = append(m.actionCloses, entry.actionOwner)
+	}
+}
+
+// Releasing a retired generation can close its database. Do that outside the
+// cursor lock, including on expiry without any subsequent HTTP traffic.
+func (m *managementHTTP) unlockSnapshots() {
+	closing := m.actionCloses
+	m.actionCloses = nil
+	m.mu.Unlock()
+	for _, view := range closing {
+		_ = view.Close()
+	}
+}
+
+func (m *managementHTTP) expireSnapshots() {
+	m.mu.Lock()
+	m.pruneSnapshots(m.now().UTC(), "", 0)
+	m.unlockSnapshots()
+}
+
+func (m *managementHTTP) closeSnapshots() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	for key, entry := range m.snapshots {
+		entry.snapshotExtensions.release()
+		m.queueActionClose(entry)
+		delete(m.snapshots, key)
+	}
+	m.unlockSnapshots()
 }
 
 func (m *managementHTTP) snapshotCountQuota(principal string) error {

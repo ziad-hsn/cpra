@@ -60,3 +60,5 @@ func (*machine) indexExtensionMonitors(ctx context.Context) error { return ctx.E
 func (*machine) hasWorkerCheckState(Monitor) bool { return false }
 
 func (*Store) extendSLOView(ctx context.Context, _ *slo.View) error { return ctx.Err() }
+
+func validArchivedWorkerAction(image, Action) bool { return false }

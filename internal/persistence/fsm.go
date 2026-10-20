@@ -60,6 +60,8 @@ func decodeEnvelope(data []byte) (envelope, error) {
 }
 
 type image struct {
+	InstallationID string              `json:"installation_id,omitempty"`
+	ActionStorage  *actionStorageState `json:"action_storage,omitempty"`
 	imageExtensions
 	CatalogMutationSequence      uint64                          `json:"catalog_mutation_sequence,omitempty"`
 	CollectionAdmissions         map[string]CollectionAdmission  `json:"collection_admissions,omitempty"`
@@ -80,6 +82,8 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
+	actionPosition        actionLedgerPosition
+	actionWrites          map[string]actionLedgerRow
 	controllerWakeups     chan struct{} // Coalesced hints; never replay authority.
 	collectionGenerations *collectionGenerations
 	collectionUpload      *collectionUploadTransaction // Apply-owned; never snapshot authority.
@@ -131,6 +135,16 @@ func (f *machine) Apply(log *raft.Log) any {
 		f.err = fmt.Errorf("invalid committed command at %d: %w", log.Index, err)
 		return f.err
 	}
+	f.actionWrites = nil
+	f.actionPosition = actionLedgerPosition{Index: log.Index}
+	defer func() { f.actionWrites = nil; f.actionPosition = actionLedgerPosition{} }()
+	if actionStorageFormat(batch.Version) && f.image.ActionStorage == nil && f.needsActionStorage(batch.Commands) {
+		if err := f.migrateActionStorage(log.Index); err != nil {
+			f.err = err
+			return err
+		}
+		f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
+	}
 	var executionIndex *collectionExecutionIndex
 	var executionErr error
 	var publicationPage *collectionExecutionItemPage
@@ -154,6 +168,15 @@ func (f *machine) Apply(log *raft.Log) any {
 	var events []Event
 	var at time.Time
 	for commandIndex := 0; commandIndex < len(batch.Commands); commandIndex++ {
+		if err := f.flushActionWrites(); err != nil {
+			f.err = err
+			return err
+		}
+		if f.actionPosition.Ordinal == math.MaxUint32 {
+			f.err = errActionLedger
+			return f.err
+		}
+		f.actionPosition.Ordinal++
 		c := batch.Commands[commandIndex]
 		if c.At.After(at) {
 			at = c.At
@@ -276,6 +299,11 @@ func (f *machine) Apply(log *raft.Log) any {
 			events = append(events, r.Events...)
 			continue
 		}
+		if c.Kind == "installation" {
+			r := f.applyInstallation(c)
+			results = append(results, r)
+			continue
+		}
 		if c.Kind == "operation_expire" {
 			r := Result{Allowed: true, Events: f.expireOperationReservations(c.At)}
 			results = append(results, r)
@@ -357,6 +385,15 @@ func (f *machine) Apply(log *raft.Log) any {
 				}
 			}
 		}
+		if c.Kind == "configure" && c.Config != nil && f.image.InstallationID != "" {
+			config := *c.Config
+			if config.InstallationID != "" && config.InstallationID != f.image.InstallationID {
+				results = append(results, Result{Err: errInstallationIdentity})
+				continue
+			}
+			config.InstallationID = f.image.InstallationID
+			c.Config = &config
+		}
 		r := transitionAtFormat(f.image.Monitors[c.MonitorID], c, batch.Version)
 		if r.Monitor != nil && (deliveryStorageFormat(batch.Version) || c.Kind == "pulse" && notificationStorageFormat(batch.Version)) {
 			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
@@ -369,6 +406,10 @@ func (f *machine) Apply(log *raft.Log) any {
 		}
 		events = append(events, r.Events...)
 		results = append(results, r)
+	}
+	if err := f.flushActionWrites(); err != nil {
+		f.err = err
+		return err
 	}
 	for n := range events {
 		events[n].ID = fmt.Sprintf("%020d:%08d", log.Index, n)
@@ -401,7 +442,11 @@ func (f *machine) Snapshot() (raft.FSMSnapshot, error) {
 	if index < f.image.Index {
 		return nil, fmt.Errorf("history has not reached the snapshot position")
 	}
-	i := image{LocalExecutorSession: f.image.LocalExecutorSession, Version: f.image.Version, Index: f.image.Index, SLO: f.image.SLO.Clone(), Monitors: make(map[string]Monitor, len(f.image.Monitors))}
+	i := image{InstallationID: f.image.InstallationID, LocalExecutorSession: f.image.LocalExecutorSession, Version: f.image.Version, Index: f.image.Index, SLO: f.image.SLO.Clone(), Monitors: make(map[string]Monitor, len(f.image.Monitors))}
+	if f.image.ActionStorage != nil {
+		copy := *f.image.ActionStorage
+		i.ActionStorage = &copy
+	}
 	i.imageExtensions = cloneImageExtensions(f.image)
 	i.CatalogMutationSequence = f.image.CatalogMutationSequence
 	i.OperationEpoch = f.image.OperationEpoch
@@ -490,6 +535,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 	if err := validateImageExtensions(i); err != nil {
 		return i, err
 	}
+	if err := validateActionStorageHeader(i); err != nil {
+		return i, err
+	}
 	if err := validateCollectionHeaders(i); err != nil {
 		return i, err
 	}
@@ -521,6 +569,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 		}
 	}
 	for id, m := range i.Monitors {
+		if m.InstallationID != i.InstallationID {
+			return i, errInstallationIdentity
+		}
 		if id == "" || m.ID != id || m.Revision == "" || m.Policy.Interval <= 0 {
 			return i, fmt.Errorf("invalid monitor in snapshot")
 		}

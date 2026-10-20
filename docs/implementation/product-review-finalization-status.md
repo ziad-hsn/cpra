@@ -11,7 +11,7 @@ are pending unless explicitly updated with current evidence.
 | --- | --- | --- |
 | 1 Effect classification and deadlines | Implemented; focused checks passed | Independent source review found no remaining blocker; final matrix pending |
 | 2 Episode eligibility, Ignore and blue | Implemented; focused checks and independent source review passed | Base/tagged lifecycle and worker checks, real Raft snapshots, dashboard checks; frozen matrix pending |
-| 3 Retained action ledger and formats 44/45 | Pending | Pending |
+| 3 Retained action ledger and formats 44/45 | In progress: ledger, pinned readers, installation identity and snapshot protection implemented; hot-state compaction pending | Focused Linux checks and independent source review passed; macOS cross-build only; final matrix pending |
 | 4 Configuration and CLI diagnostics | Pending | Pending |
 | 5 Reservations and destination fairness | Pending | Pending |
 | 6 API/SDK/CLI/dashboard agreement | Pending | Pending |
@@ -44,7 +44,7 @@ are pending unless explicitly updated with current evidence.
 
 | ID | Finding | Disposition / ticket |
 | --- | --- | --- |
-| N01 | Old open incident loses recovery green on upgrade | Ticket 3: require provable started exposure and original correlation |
+| N01 | Old open incident loses recovery green on upgrade | Ticket 3 focused upgrade regression passes: require provable started exposure and original correlation |
 | N02 | Fresh healthy check cancels restored queued recovery | Intentional approved cancel-on-health safety rule |
 | N03 | Compiled-driver fixed capacity split | Ticket 5 |
 | N04 | Capacity oscillation and frequent tuning logs | Ticket 5 |
@@ -52,7 +52,7 @@ are pending unless explicitly updated with current evidence.
 | N06 | Running workers exceed requested reduced capacity | Verify draining semantics; ticket 5, not automatically a leak |
 | N07 | Small fleets lack 1,000 control observations | Intentional insufficient-evidence rule; ticket 7 documentation |
 | N08 | Driver aggregate SLO differs from one monitor | Intentional aggregation; ticket 7 documentation |
-| N09 | Independent installations share provider correlation | Ticket 3 |
+| N09 | Independent installations share provider correlation | Ticket 3 implementation and focused regression pass: persisted installation namespace; existing action/provider identities unchanged |
 | N10 | Mixed machine zones / zero times | Ticket 6 |
 | N11 | Bootstrap file changes/deletion ignored after import | Intentional import-once; clarify output/examples in tickets 4/7 |
 | N12 | Negative webhook recovery timeout | Ticket 4 |
@@ -79,7 +79,7 @@ are pending unless explicitly updated with current evidence.
 | N33 | Init lacks port and repeatable connection output | Ticket 4; no bearer values in output |
 | N34 | CLI health vocabulary inconsistent | Ticket 6 |
 | N35 | Client auth environment breaks validation | Ticket 4; retain startup authority validation |
-| N36 | Snapshot inner permissions too broad | Ticket 3 defense in depth; private parent already restricts traversal |
+| N36 | Snapshot inner permissions too broad | Ticket 3 protection added before state writes; focused Linux tests and source review pass. Native macOS/Windows checks pending |
 | N37 | docs-check traceback / historical rewrites | Ticket 7 |
 | N38 | Tracked tsbuildinfo / local agent files | Ticket 7 |
 | N39 | IDEA and duplicated WASM/fonts | Inspect publication/reuse; preserve useful sources/assets/licenses, ticket 7 |
@@ -181,3 +181,52 @@ Ticket 3 still must remove retained actions and old review conditions from the
 hot monitor projection. Ticket 6 still includes real-server browser coverage and
 the broader observation, error, offline and layout repairs. These development
 checks do not close either ticket or qualify a public release.
+
+## Ticket 3 foundation checkpoint
+
+Committed transitions now materialize action records into the Store-owned bbolt
+generation. Records retain monitor/incarnation, episode, review and action
+indexes, replay positions and predecessor versions. Snapshots freeze the ledger
+at the exact committed progress marker, validate its inventory and restore it
+with the collection generation. Complete stopped backups include that generation.
+API/action readers pin immutable sequences without retaining a native read
+transaction between requests. Independent close ownership and cancellable reads
+prevent expired HTTP cursors from invalidating an in-flight response or waiting
+indefinitely behind a writer during request cleanup.
+
+Fresh installations commit a distinct namespace before admitting monitor
+configuration. Complete restoration preserves it. Existing provider keys,
+action IDs and started notification exposure are not rewritten. In particular,
+upgrading an existing blue condition cannot open a second alert under a new key.
+Snapshot state files are protected before the FSM writes them; stopped
+administrative access preserves an existing service-owned snapshot directory.
+
+- `ledger-readers-3`: persistence, management, HTTP, local administration and
+  controller checks passed on Linux with Go 1.27.2.
+- `ledger-reader-close-1` and `ledger-pin-cancel-1`: cancellation while a writer
+  owns the ledger, final-reader release, and canceled pin creation passed.
+- `installation-regression-1`: broader persistence snapshot/restore/review and
+  notification-format regressions passed.
+- `installation-snapshots-2`: independent installation identity, preserved
+  started exposure, original blue identity, restore and Linux permissions passed.
+- `ledger-darwin-crossbuild-1`: macOS arm64 persistence test executable compiled.
+  This is cross-build evidence, not native execution or ACL qualification.
+- `ledger-windows-crossbuild-1`: Windows amd64 persistence test executable
+  compiled, including the service-grant preservation fixture. Native execution
+  remains pending.
+- `ledger-tagged-foundation-1`: focused ledger, reader, installation and snapshot
+  tests passed with `externaljobs` on Linux.
+- Failed intermediate checks are retained in the private evidence directory;
+  the corrected checks have different labels and source fingerprints.
+- Independent reviewer `action_ledger_review` inspected the ledger, reader
+  ownership, migration identity and native permission branches. Its reported
+  lifetime, old-blue identity, administrator ownership and Darwin metadata
+  findings were corrected. The final source review found no remaining blocker
+  in this foundation checkpoint; the reviewer ran no builds or tests.
+
+**M4 remains open.** `Monitor.Actions` still retains historical records. The
+next step is to reduce that frequently copied projection to current execution
+references and aggregates, including historical blue conditions, and prove zero
+historical visits/copies per ordinary successful check at 0/500/5,000 retained
+records. Native permissions, tagged/race checks and the final frozen matrix also
+remain open. This checkpoint does not mark ticket 3 complete.

@@ -35,7 +35,7 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	view, err := s.StoppedActions(ctx)
-	observed, ok := view.Get(a.ID)
+	observed, ok, _ := view.Get(a.ID)
 	if err != nil || !ok || observed.State != Started {
 		t.Fatal("administrative read performed recovery", err)
 	}
@@ -52,7 +52,7 @@ func TestStoppedActionReviewPreservesEvidenceAndRestarts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unchanged, _ := view.Get(a.ID)
+	unchanged, _, _ := view.Get(a.ID)
 	if unchanged.State != Started || unchanged.ExecutorFenced {
 		t.Fatal("failed review changed action or fenced execution")
 	}

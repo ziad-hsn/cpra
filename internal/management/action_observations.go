@@ -107,6 +107,13 @@ func (c *Catalog) ActionSnapshotContext(ctx context.Context) (ActionView, error)
 	v, err := c.store.ActionSnapshotContext(ctx)
 	return ActionView{view: v, ready: c.readyContext}, err
 }
+
+func (v ActionView) Retain() (ActionView, error) {
+	view, err := v.view.Retain()
+	return ActionView{view: view, ready: v.ready}, err
+}
+
+func (v ActionView) Close() error { return v.view.Close() }
 func (v ActionView) Page(ctx context.Context, monitorID, after string, limit int) ([]api.Action, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
@@ -120,14 +127,7 @@ func (v ActionView) Page(ctx context.Context, monitorID, after string, limit int
 	if monitorID != "" && !validID(monitorID) {
 		return nil, "", ErrValidation
 	}
-	var rows []persistence.ActionRecord
-	var next string
-	var err error
-	if monitorID == "" {
-		rows, next, err = v.view.Page(after, limit)
-	} else {
-		rows, next, err = v.view.PageByMonitor(monitorID, after, limit)
-	}
+	rows, next, err := v.view.PageContext(ctx, monitorID, after, limit)
 	if err != nil {
 		return nil, "", err
 	}

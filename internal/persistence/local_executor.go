@@ -211,7 +211,11 @@ func (f *machine) applyExecutorCommand(c Command) Result {
 	if !ok {
 		return Result{Allowed: true}
 	} // A definitively ungranted start has no executor to finish.
-	a, ok := m.Actions[c.ActionID]
+	_, projected := m.Actions[c.ActionID]
+	a, ok, err := f.actionForMonitor(m, c.ActionID)
+	if err != nil {
+		return Result{Err: err}
+	}
 	if !ok || a.ExecutorSession != c.ExecutorSession {
 		return Result{Allowed: true}
 	}
@@ -226,7 +230,13 @@ func (f *machine) applyExecutorCommand(c Command) Result {
 	}
 	m = m.Clone()
 	a.ExecutorFinishedAt = c.At
+	if m.Actions == nil {
+		m.Actions = make(map[string]Action)
+	}
 	m.Actions[a.ID] = a
+	if !projected {
+		m.retireAction(a.ID)
+	}
 	return Result{Allowed: true, Monitor: &m}
 }
 func actionExecutorFenced(a Action, session string) bool {

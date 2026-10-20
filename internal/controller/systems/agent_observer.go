@@ -94,7 +94,8 @@ func (o *agentObserver) scan(after string) string {
 	if err != nil {
 		return after
 	}
-	rows, next, err := view.Page(after, 100)
+	rows, next, err := view.PageContext(o.ctx, "", after, 100)
+	_ = view.Close() // Provider reads below must not pin a storage generation.
 	if err != nil {
 		return after
 	}

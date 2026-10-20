@@ -75,6 +75,10 @@ func (f *machine) applyLocalActionReview(c Command, index uint64, version int) R
 		f.image.Monitors[m.ID] = previous
 		return r
 	}
+	// The temporary lifecycle upgrade above is part of this accepted review.
+	// Compare against the original image so sibling action changes are included
+	// in the same durable ledger transaction as the reviewed action.
+	f.recordActionWrites(previous, *r.Monitor)
 	// Preserve the precondition supplied by the administrator, including when
 	// the same transaction first marks an interrupted start unknown.
 	if r.Operation != nil {

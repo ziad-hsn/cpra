@@ -47,6 +47,9 @@ type reply struct {
 var ErrCommitUnconfirmed = errors.New("durable commit outcome unknown")
 
 type Store struct {
+	installationMu        sync.Mutex
+	installationID        string
+	installationReady     bool
 	collectionGenerations *collectionGenerations
 	storeExtensions
 	administrative  bool
@@ -159,6 +162,11 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 		_ = s.Close()
 		return nil, err
 	}
+	s.installationID = s.fsm.image.InstallationID
+	s.installationReady = s.installationID != ""
+	if !s.installationReady {
+		s.installationID = identity("installation/" + s.nodeID)
+	}
 	// The generation is selected only after complete snapshot/log recovery and
 	// explicit restore fencing. An old materialization never decides replay.
 	if s.fsm.collections != nil {
@@ -170,6 +178,12 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	s.opening = false
 	if administrative {
 		return s, nil
+	}
+	if len(s.fsm.image.Monitors) != 0 {
+		if err = s.ensureInstallation(ctx); err != nil {
+			_ = s.Close()
+			return nil, err
+		}
 	}
 	if s.fsm.image.Authentication != nil && s.fsm.image.Authentication.ResetRequired {
 		_ = s.Close()
@@ -198,7 +212,7 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 
 func (s *Store) openRaft(ctx context.Context) error {
 	dir := s.config.Storage.Directory
-	snaps, err := raft.NewFileSnapshotStore(dir, s.config.Storage.SnapshotRetain, io.Discard)
+	snaps, err := newSnapshotStore(dir, s.config.Storage.SnapshotRetain, s.administrative)
 	if err != nil {
 		return err
 	}
@@ -332,6 +346,9 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 	if len(commands) == 0 {
 		return nil, nil
 	}
+	if len(commands) > s.config.Storage.BatchSize {
+		return nil, fmt.Errorf("durable batch exceeds %d commands", s.config.Storage.BatchSize)
+	}
 	for _, c := range commands {
 		if c.Kind == "local_action_review" && !s.administrative {
 			return nil, ErrAuthenticationAdminRequired
@@ -350,6 +367,17 @@ func (s *Store) Submit(ctx context.Context, commands []Command) ([]Result, error
 		}
 		if c.Kind == "restore_reset" && (!s.opening || s.restoreMarker == nil || c.Restore == nil || c.Restore.Marker != *s.restoreMarker) {
 			return nil, ErrRestoreInvalid
+		}
+	}
+	for _, c := range commands {
+		if c.Kind == "configure" {
+			if err := validateCommand(c); err != nil {
+				return nil, err
+			}
+			if err := s.ensureInstallation(ctx); err != nil {
+				return nil, err
+			}
+			break
 		}
 	}
 	// Close prevents new Add calls before the submission loop waits for callers.
@@ -724,7 +752,19 @@ func (s *Store) closeResources() error {
 		err = errors.Join(err, s.fsm.history.Close())
 	}
 	if s.fsm != nil && s.fsm.collections != nil {
-		err = errors.Join(err, s.fsm.collections.Close())
+		if closeErr := s.fsm.collections.closeAndWait(); closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
+	}
+	if s.collectionGenerations != nil {
+		var closeErr error
+		s.collectionGenerations.live.Range(func(_, value any) bool {
+			closeErr = errors.Join(closeErr, value.(*collectionLedger).closeAndWait())
+			return true
+		})
+		if closeErr != nil {
+			return errors.Join(err, closeErr)
+		}
 	}
 	if s.log != nil {
 		err = errors.Join(err, s.log.Close())

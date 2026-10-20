@@ -39,7 +39,13 @@ var (
 // Recovery always writes a fresh generation from a snapshot and committed logs;
 // the selected generation is never used to decide the outcome of log replay.
 type collectionLedger struct {
+	actions                  *actionLedgerMemory
 	viewPins                 atomic.Int64 // Native lifetime accounting, never serialized.
+	pinsMu                   sync.Mutex   // Never held across native reads or writes.
+	closing                  bool
+	actionPins               map[*actionLedgerPin]struct{}
+	closeDone                chan struct{}
+	closeNativeErr           error
 	closedNative             atomic.Bool
 	mu                       sync.RWMutex
 	db                       *bolt.DB
@@ -341,21 +347,43 @@ func (l *collectionLedger) Bytes() (int64, error) {
 	return size, err
 }
 
-// Close requires every frozen view to be released. bbolt deliberately waits for
-// read transactions before unmapping its database. Snapshot.Release owns this.
+// Close releases the owner's reference. Frozen snapshots and action cursors
+// retain the generation until their last reader finishes. Never wait for a UI
+// cursor or snapshot while the FSM lock is held.
 func (l *collectionLedger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.closed {
-		return nil
+		return l.closeNativeErr
 	}
 	l.closed = true
+	l.pinsMu.Lock()
+	l.closing = true
+	l.closeDone = make(chan struct{})
+	pinned := l.viewPins.Load() != 0
+	l.pinsMu.Unlock()
+	if pinned {
+		return nil
+	}
+	return l.closeNativeLocked()
+}
+
+func (l *collectionLedger) closeNativeLocked() error {
+	if l.closedNative.Load() {
+		return nil
+	}
+	if l.closeNativeErr != nil {
+		return l.closeNativeErr
+	}
+	defer close(l.closeDone)
 	l.rows, l.keys, l.operationBytes = nil, nil, nil
 	l.planRows, l.planOperationBytes = nil, nil
 	l.validationRows, l.validationOperationBytes = nil, nil
 	l.executionRows, l.executionStats, l.executionOrder = nil, nil, nil
+	l.actions = nil
 	if l.db != nil {
 		err := l.db.Close()
+		l.closeNativeErr = err
 		if err == nil {
 			l.closedNative.Store(true)
 		}
@@ -365,7 +393,50 @@ func (l *collectionLedger) Close() error {
 	return nil
 }
 
+func (l *collectionLedger) releasePin() error {
+	l.pinsMu.Lock()
+	if l.viewPins.Add(-1) < 0 {
+		l.pinsMu.Unlock()
+		panic("unbalanced ledger generation ownership")
+	}
+	last := l.closing && l.viewPins.Load() == 0
+	l.pinsMu.Unlock()
+	if last {
+		// Closing the owner already drained its writer. Releasing a cursor on
+		// a live generation never waits behind unrelated native writes.
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		return l.closeNativeLocked()
+	}
+	return nil
+}
+
+// The Store calls this before releasing its Raft ownership lock. UI cursors
+// are invalidated and in-flight pages finish; real snapshot transactions are
+// drained by Raft shutdown and their final Release. No FSM lock is held here.
+func (l *collectionLedger) closeAndWait() error {
+	if err := l.Close(); err != nil {
+		return err
+	}
+	l.pinsMu.Lock()
+	pins := make([]*actionLedgerPin, 0, len(l.actionPins))
+	for pin := range l.actionPins {
+		pins = append(pins, pin)
+	}
+	done := l.closeDone
+	l.pinsMu.Unlock()
+	var result error
+	for _, pin := range pins {
+		result = errors.Join(result, pin.Close())
+	}
+	<-done
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return errors.Join(result, l.closeNativeErr)
+}
+
 type collectionLedgerView struct {
+	actions                  *actionLedgerMemory
 	ledger                   *collectionLedger
 	mu                       sync.Mutex // bbolt read transactions are not safe for concurrent access.
 	tx                       *bolt.Tx
@@ -452,6 +523,15 @@ func (l *collectionLedger) freezeLocked() (*collectionLedgerView, error) {
 	v.freezePlans(l)
 	v.freezeValidation(l)
 	v.freezeExecution(l)
+	if l.actions != nil {
+		if err := l.actions.validate(); err != nil {
+			return nil, err
+		}
+		v.actions = &actionLedgerMemory{progress: l.actions.progress, current: make(map[string][]byte, len(l.actions.current))}
+		for id, row := range l.actions.current {
+			v.actions.current[id] = row
+		}
+	}
 	return v, nil
 }
 
@@ -466,10 +546,11 @@ func (v *collectionLedgerView) Close() error {
 	v.planRows, v.planOperationBytes = nil, nil
 	v.validationRows, v.validationOperationBytes = nil, nil
 	v.executionRows, v.executionStats, v.executionOrder = nil, nil, nil
+	v.actions = nil
 	if v.tx != nil {
 		err := v.tx.Rollback()
 		if v.ledger != nil {
-			v.ledger.viewPins.Add(-1)
+			err = errors.Join(err, v.ledger.releasePin())
 			v.ledger = nil
 		}
 		return err

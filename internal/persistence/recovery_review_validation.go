@@ -23,47 +23,54 @@ func validateRecoveryReviewImage(i image) error {
 			}
 		}
 		for id, a := range m.Actions {
-			if err := validateRecoveryNotificationAction(i.Version, a); err != nil {
-				return err
-			}
-			if err := validateAgentAction(i.Version, a); err != nil {
-				return err
-			}
 			if id != a.ID || seen[id] {
 				return errors.New("invalid or duplicate durable action identity")
 			}
 			seen[id] = true
-			if a.Manual != (a.OperationID != "") || (a.Manual && (a.Kind != "intervention" || !catalogIdentifier(a.OperationID, 256))) {
-				return errors.New("invalid manual recovery action")
+			if err := validateActionEvidence(i, a, false); err != nil {
+				return err
 			}
-			if a.ExecutorKind == "" {
-				if a.ExecutorSession != "" || !a.ExecutorFinishedAt.IsZero() {
-					return ErrExecutorUnfenced
-				}
-			} else if a.ExecutorKind == "worker" {
-				if !validExternalActionExecutor(i, a) {
-					return ErrExecutorUnfenced
-				}
-			} else if (a.ExecutorKind != "local" && a.ExecutorKind != "agent") || !catalogIdentifier(a.ExecutorSession, 256) || i.LocalExecutorSession == "" || a.StartedAt.IsZero() || a.State == Queued || (!a.ExecutorFinishedAt.IsZero() && a.ExecutorFinishedAt.Before(a.StartedAt)) {
-				return ErrExecutorUnfenced
-			}
-			if a.ConflictingEvidence != nil {
-				if a.ConflictingEvidence.validateAtFormat(a, i.Version) != nil || a.LateEvidence == nil || a.LateEvidence.Outcome == a.ConflictingEvidence.Outcome || a.Review == nil {
-					return ErrLateEvidenceConflict
-				}
-			}
-			if r := a.Review; r != nil {
-				if a.State != Unknown || !catalogIdentifier(r.Revision, 256) || !catalogIdentifier(r.Actor, 128) || r.At.IsZero() || !controlText(r.Reason) || strings.TrimSpace(r.Reason) == "" || !controlText(r.Note) || !validEvidenceRefs(r.EvidenceRefs) || !validReviewResolution(r.Resolution) {
-					return ErrActionReviewConflict
-				}
-				if r.Resolution != "inconclusive" && !actionExecutorFenced(a, i.LocalExecutorSession) {
-					return ErrExecutorUnfenced
-				}
-				conflict := r.Resolution != "inconclusive" && (a.ConflictingEvidence != nil || (a.LateEvidence != nil && a.LateEvidence.Outcome != r.Resolution))
-				if conflict != r.Conflict {
-					return ErrActionReviewConflict
-				}
-			}
+		}
+	}
+	return nil
+}
+
+func validateActionEvidence(i image, a Action, archived bool) error {
+	if err := validateRecoveryNotificationAction(i.Version, a); err != nil {
+		return err
+	}
+	if err := validateAgentAction(i.Version, a); err != nil {
+		return err
+	}
+	if a.Manual != (a.OperationID != "") || (a.Manual && (a.Kind != "intervention" || !catalogIdentifier(a.OperationID, 256))) {
+		return errors.New("invalid manual recovery action")
+	}
+	if a.ExecutorKind == "" {
+		if a.ExecutorSession != "" || !a.ExecutorFinishedAt.IsZero() {
+			return ErrExecutorUnfenced
+		}
+	} else if a.ExecutorKind == "worker" {
+		if !validExternalActionExecutor(i, a) && !(archived && validArchivedWorkerAction(i, a)) {
+			return ErrExecutorUnfenced
+		}
+	} else if (a.ExecutorKind != "local" && a.ExecutorKind != "agent") || !catalogIdentifier(a.ExecutorSession, 256) || i.LocalExecutorSession == "" || a.StartedAt.IsZero() || a.State == Queued || (!a.ExecutorFinishedAt.IsZero() && a.ExecutorFinishedAt.Before(a.StartedAt)) {
+		return ErrExecutorUnfenced
+	}
+	if a.ConflictingEvidence != nil {
+		if a.ConflictingEvidence.validateAtFormat(a, i.Version) != nil || a.LateEvidence == nil || a.LateEvidence.Outcome == a.ConflictingEvidence.Outcome || a.Review == nil {
+			return ErrLateEvidenceConflict
+		}
+	}
+	if r := a.Review; r != nil {
+		if a.State != Unknown || !catalogIdentifier(r.Revision, 256) || !catalogIdentifier(r.Actor, 128) || r.At.IsZero() || !controlText(r.Reason) || strings.TrimSpace(r.Reason) == "" || !controlText(r.Note) || !validEvidenceRefs(r.EvidenceRefs) || !validReviewResolution(r.Resolution) {
+			return ErrActionReviewConflict
+		}
+		if r.Resolution != "inconclusive" && !actionExecutorFenced(a, i.LocalExecutorSession) {
+			return ErrExecutorUnfenced
+		}
+		conflict := r.Resolution != "inconclusive" && (a.ConflictingEvidence != nil || (a.LateEvidence != nil && a.LateEvidence.Outcome != r.Resolution))
+		if conflict != r.Conflict {
+			return ErrActionReviewConflict
 		}
 	}
 	return nil

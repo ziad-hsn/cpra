@@ -55,6 +55,7 @@ type managementSnapshot struct {
 	incidents             snapshotPageView[api.Incident]
 	history               snapshotPageView[api.Event]
 	actions               snapshotPageView[api.Action]
+	actionOwner           *management.ActionView
 	monitors              snapshotPageView[api.MonitorObservation]
 	monitorID             string
 	principal             string
@@ -78,6 +79,7 @@ type managementHTTP struct {
 	auth                  *httpauth.Authorizer
 	mu                    sync.Mutex
 	snapshots             map[string]managementSnapshot
+	actionCloses          []*management.ActionView // Released after the cursor mutex is unlocked.
 	cursorKey             [32]byte
 	cursorReady           bool
 	now                   func() time.Time

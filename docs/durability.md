@@ -263,10 +263,20 @@ not an empty successful history query.
 
 For a consistent backup, stop CPRa cleanly and copy the **entire data directory**,
 including `identity.json`, `raft.db`, `snapshots/`, and `history/` (catalog and all
-retained segments). Preserve permissions. Keep the matching monitor manifest,
+retained segments), together with `collections/` and its generation metadata.
+That Store-owned generation also contains retained action and review evidence;
+copying only the Raft database or snapshots is insufficient. Preserve permissions.
+Keep the matching monitor manifest,
 runtime configuration, credential configuration and binary version separately.
 Credentials should remain in their existing secret-management arrangement.
 A Raft snapshot by itself is not a complete history backup.
+
+Fresh installations commit a distinct namespace for new action and provider
+correlation identities. Complete disaster recovery preserves it. Upgrades retain
+the identities and provider keys of existing actions, and never infer notification
+exposure from an unsent queued action. Newly created snapshot payloads are private
+to the process or service identity; stopped administrative inspection preserves
+the existing service's directory ownership and permissions.
 
 `cpractl local backup --data-dir /path/state --output /path/new-backup --backup-auth-key /path/backup-keys/authentication.key` performs
 this stopped operation with exclusive locking and an HMAC-SHA256 authenticated

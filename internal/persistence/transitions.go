@@ -126,6 +126,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			m.Policy = c.Config.Policy.Clone()
 		}
 		m.ensureControlIdentity()
+		if c.Config.InstallationID != "" {
+			m.InstallationID = c.Config.InstallationID
+		}
 		if deliveryStorageFormat(version) {
 			m.upgradeNotifications(c.At, emit)
 			if m.Policy.InMaintenance(c.At) {
@@ -332,7 +335,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && !m.snoozed(c.At) &&
 			(m.ControlNotification(a) || m.Policy.Enabled && !m.Ignored && !m.suppressedNotification(a)) &&
 			(m.NotificationVersion != DeliveryFormatVersion || m.notificationEligible(a) && (m.ControlNotification(a) || !m.Policy.InMaintenance(c.At) && !m.NotificationMaintenance) && notificationRetryAt(c, a.Attempt).Before(a.Deadline)) {
-			delete(m.Actions, a.ID)
+			m.retireAction(a.ID)
 			a.Attempt++
 			if m.NotificationVersion == DeliveryFormatVersion {
 				a.ID = identity(fmt.Sprintf("%s/attempt/%d", a.DeliveryID, a.Attempt))
@@ -625,7 +628,7 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 			// Keep pending/uncertain historical effects attached to their original
 			// delivery; they cannot veto an independent episode or destination.
 			if a.State != Queued && a.State != Started && a.State != Unknown && a.Review == nil {
-				delete(m.Actions, id)
+				m.retireAction(id)
 			}
 			continue
 		}
@@ -633,7 +636,7 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 			return
 		}
 		if a.State != Unknown && a.Review == nil {
-			delete(m.Actions, id)
+			m.retireAction(id)
 		}
 	}
 	m.Sequence++
@@ -644,6 +647,7 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 	if m.FileIncarnation != "" {
 		id = identity(m.FileIncarnation + "/" + id)
 	}
+	id = m.namespacedIdentity(id)
 	a := Action{ID: id, CatalogUID: m.CatalogUID, IncidentID: m.notificationIncident(), Revision: m.Revision, Kind: kind, Color: color, Endpoint: endpoint, Attempt: 1, State: Queued, NotBefore: at}
 	a.FileIncarnation = m.FileIncarnation
 	if kind == "code" && m.NotificationVersion == DeliveryFormatVersion {

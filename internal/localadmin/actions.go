@@ -80,12 +80,9 @@ func ReadStoppedActions(ctx context.Context, directory, monitorID, after string,
 	if err != nil {
 		return page, &authenticationError{"cannot read stopped actions", err}
 	}
-	var rows []persistence.ActionRecord
-	if monitorID == "" {
-		rows, page.NextCursor, err = view.Page(after, limit)
-	} else {
-		rows, page.NextCursor, err = view.PageByMonitor(monitorID, after, limit)
-	}
+	defer view.Close()
+	rows, next, err := view.PageContext(ctx, monitorID, after, limit)
+	page.NextCursor = next
 	if err != nil {
 		return page, &authenticationError{"invalid action page request", err}
 	}
@@ -112,7 +109,11 @@ func ReviewStoppedAction(ctx context.Context, request LocalActionReviewRequest) 
 	if err != nil {
 		return report, &authenticationError{"cannot read stopped actions", err}
 	}
-	a, found := view.Get(request.ActionID)
+	defer view.Close()
+	a, found, err := view.GetContext(ctx, request.ActionID)
+	if err != nil {
+		return report, &authenticationError{"cannot read stopped action", err}
+	}
 	if !found {
 		return report, errors.New("action was not found in the selected store")
 	}
@@ -129,9 +130,13 @@ func ReviewStoppedAction(ctx context.Context, request LocalActionReviewRequest) 
 		return report, &authenticationError{"action review was not confirmed; inspect local actions and the intended revision before another review", err}
 	}
 	updatedView, readErr := s.StoppedActions(ctx)
-	updated, _ := updatedView.Get(a.ID)
 	report.Outcome = "committed"
 	if readErr != nil {
+		return report, &authenticationError{"review committed; updated action could not be read", readErr}
+	}
+	defer updatedView.Close()
+	updated, found, readErr := updatedView.GetContext(ctx, a.ID)
+	if readErr != nil || !found {
 		return report, &authenticationError{"review committed; updated action could not be read", readErr}
 	}
 	value := localAction(updated)

@@ -130,7 +130,7 @@ func TestAgentReceiptSnapshotAndReadsAreDetached(t *testing.T) {
 	if !sameAgentReceipt(*image.Monitors[m.ID].Actions[a.ID].AgentReceipt, first.Receipt) {
 		t.Fatal("snapshot was changed after freeze")
 	}
-	prior, _ := view.Get(a.ID)
+	prior, _, _ := view.Get(a.ID)
 	if !sameAgentReceipt(*prior.AgentReceipt, first.Receipt) {
 		t.Fatal("action view was not frozen")
 	}
@@ -152,7 +152,7 @@ func TestAgentReceiptFencesRemoteWorkSeparatelyFromLocalReturn(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: time.Now().UTC(), Outcome: "failure", Retryable: true})
+			submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: time.Now().UTC(), Outcome: "failure", Ambiguous: true})
 			if err := h.Finish(context.Background()); err != nil {
 				t.Fatal(err)
 			}

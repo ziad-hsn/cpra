@@ -204,8 +204,9 @@ func verifyAgentConnections(ctx context.Context, store *persistence.Store, open 
 	if err != nil {
 		return err
 	}
+	defer view.Close()
 	for after := ""; ; {
-		rows, next, err := view.Page(after, 100)
+		rows, next, err := view.PageContext(ctx, "", after, 100)
 		if err != nil {
 			return err
 		}

@@ -229,7 +229,7 @@ func TestAgentConnectionSnapshotAndReadsAreDetached(t *testing.T) {
 	read, _, _ := s.Action(a.ID)
 	read.AgentConnection.Payload.Ciphertext[0] ^= 1
 	view, _ := s.ActionSnapshot()
-	fromView, _ := view.Get(a.ID)
+	fromView, _, _ := view.Get(a.ID)
 	fromView.AgentConnection.Payload.Nonce[0] ^= 1
 	m, _ := s.Get(a.MonitorID)
 	m.Actions[a.ID].AgentConnection.Payload.WrappedKey[0] ^= 1

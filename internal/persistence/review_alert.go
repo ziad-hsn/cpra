@@ -83,7 +83,13 @@ func (m *Monitor) assessReviewAlerts(at time.Time, emit func(string, *Action)) {
 			}
 			for endpoint := range m.Policy.Endpoints["blue"] {
 				endpointID := notificationEndpointIdentity(*m, "blue", endpoint)
-				key := identity("review-alert/" + a.ID + "/" + m.IncidentID + "/" + endpointID)
+				originalKey := identity("review-alert/" + a.ID + "/" + m.IncidentID + "/" + endpointID)
+				// Namespace admission cannot reopen a condition already committed
+				// by an older writer with an established provider correlation.
+				if old, exists := s.ReviewAlerts[originalKey]; exists && old.ActionID == a.ID && old.IncidentID == m.IncidentID && old.EndpointID == endpointID {
+					continue
+				}
+				key := m.namespacedIdentity(originalKey)
 				if _, exists := s.ReviewAlerts[key]; exists {
 					continue
 				}
@@ -196,7 +202,7 @@ func (m *Monitor) queueReviewNotice(alert *ReviewAlert, phase string, at time.Ti
 		}
 	}
 	m.Sequence++
-	id = identity(fmt.Sprintf("review-delivery/%s/%s/%s/%d", m.incarnationIdentity(), alert.ID, phase, m.Sequence))
+	id = m.namespacedIdentity(identity(fmt.Sprintf("review-delivery/%s/%s/%s/%d", m.incarnationIdentity(), alert.ID, phase, m.Sequence)))
 	notice := &ReviewNotice{AlertID: alert.ID, ActionID: alert.ActionID, Phase: phase, Health: alert.Health}
 	if phase == "close" {
 		notice.Reason = alert.CloseReason

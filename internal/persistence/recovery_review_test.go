@@ -261,7 +261,7 @@ func TestActionReviewFrozenIndexesAndSnapshotValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, _ := view.Get(a.ID)
+	old, _, _ := view.Get(a.ID)
 	r := mustResult(t, s, reviewCommand(m, a, "indexed-review", "accepted", at))
 	m = *r.Monitor
 	a = m.Actions[a.ID]

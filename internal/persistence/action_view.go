@@ -103,6 +103,7 @@ type actionItem struct {
 	action    Action
 }
 type ActionView struct {
+	reader          *actionReader
 	tree, byMonitor *btree.BTreeG[actionItem]
 	session         string
 	Index           uint64
@@ -176,6 +177,20 @@ func (s *Store) actionSnapshotLocked(ctx context.Context) (ActionView, error) {
 	if f.err != nil {
 		return ActionView{}, f.err
 	}
+	if f.image.ActionStorage != nil && f.image.ActionStorage.Sequence != 0 {
+		if f.collections == nil {
+			return ActionView{}, errActionLedger
+		}
+		pin, err := f.collections.pinActionsContext(ctx)
+		if err != nil {
+			return ActionView{}, err
+		}
+		if pin.sequence != f.image.ActionStorage.Sequence {
+			_ = pin.Close()
+			return ActionView{}, errActionLedger
+		}
+		return ActionView{reader: newActionReader(pin), session: f.image.LocalExecutorSession, Index: f.image.Index}, nil
+	}
 	if f.actionIndex == nil {
 		if err := f.rebuildActionIndexesContext(ctx); err != nil {
 			return ActionView{}, err
@@ -196,8 +211,17 @@ func (s *Store) ActionContext(ctx context.Context, id string) (ActionRecord, boo
 	if err != nil {
 		return ActionRecord{}, false, err
 	}
-	defer unlock()
 	f := s.fsm
+	if f.image.ActionStorage != nil && f.image.ActionStorage.Sequence != 0 {
+		view, err := s.actionSnapshotLocked(ctx)
+		unlock()
+		if err != nil {
+			return ActionRecord{}, false, err
+		}
+		defer view.Close()
+		return view.GetContext(ctx, id)
+	}
+	defer unlock()
 	var item actionItem
 	var ok bool
 	if f.actionIndex != nil {
@@ -224,15 +248,42 @@ func (s *Store) ActionContext(ctx context.Context, id string) (ActionRecord, boo
 	}
 	return r, ok, nil
 }
-func (v ActionView) Get(id string) (ActionRecord, bool) {
+
+// Retain transfers an independent close responsibility to another reader.
+func (v ActionView) Retain() (ActionView, error) {
+	if v.reader != nil {
+		var err error
+		v.reader, err = v.reader.retain()
+		return v, err
+	}
+	return v, nil
+}
+
+func (v ActionView) Close() error { return v.reader.close() }
+
+func (v ActionView) Get(id string) (ActionRecord, bool, error) {
+	return v.GetContext(context.Background(), id)
+}
+
+func (v ActionView) GetContext(ctx context.Context, id string) (ActionRecord, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return ActionRecord{}, false, err
+	}
+	if v.reader != nil {
+		row, found, err := v.reader.get(ctx, id)
+		if err != nil || !found {
+			return ActionRecord{}, found, err
+		}
+		return actionRecord(actionItem{monitorID: row.MonitorID, action: row.Action}, v.session), true, nil
+	}
 	if v.tree == nil {
-		return ActionRecord{}, false
+		return ActionRecord{}, false, nil
 	}
 	item, ok := v.tree.Get(actionItem{key: id})
 	if !ok {
-		return ActionRecord{}, false
+		return ActionRecord{}, false, nil
 	}
-	return actionRecord(item, v.session), true
+	return actionRecord(item, v.session), true, nil
 }
 func (v ActionView) Page(after string, limit int) ([]ActionRecord, string, error) {
 	return v.page("", after, limit)
@@ -244,6 +295,30 @@ func (v ActionView) PageByMonitor(id, after string, limit int) ([]ActionRecord, 
 	return v.page(id, after, limit)
 }
 func (v ActionView) page(id, after string, limit int) ([]ActionRecord, string, error) {
+	return v.PageContext(context.Background(), id, after, limit)
+}
+
+func (v ActionView) PageContext(ctx context.Context, id, after string, limit int) ([]ActionRecord, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if id != "" && !catalogIdentifier(id, 256) {
+		return nil, "", errors.New("invalid action monitor")
+	}
+	if v.reader != nil {
+		rows, next, err := v.reader.page(ctx, id, after, limit)
+		if err != nil {
+			return nil, "", err
+		}
+		out := make([]ActionRecord, 0, len(rows))
+		for _, row := range rows {
+			if err := ctx.Err(); err != nil {
+				return nil, "", err
+			}
+			out = append(out, actionRecord(actionItem{monitorID: row.MonitorID, action: row.Action}, v.session))
+		}
+		return out, next, nil
+	}
 	if v.tree == nil || limit < 1 || limit > 500 || (after != "" && !catalogIdentifier(after, 256)) {
 		return nil, "", errors.New("invalid action page")
 	}
@@ -255,6 +330,9 @@ func (v ActionView) page(id, after string, limit int) ([]ActionRecord, string, e
 	rows := make([]ActionRecord, 0, limit)
 	next := ""
 	tree.AscendGreaterOrEqual(actionItem{key: start}, func(item actionItem) bool {
+		if ctx.Err() != nil {
+			return false
+		}
 		if prefix != "" && !strings.HasPrefix(item.key, prefix) {
 			return false
 		}
@@ -268,5 +346,5 @@ func (v ActionView) page(id, after string, limit int) ([]ActionRecord, string, e
 		rows = append(rows, actionRecord(item, v.session))
 		return true
 	})
-	return rows, next, nil
+	return rows, next, ctx.Err()
 }

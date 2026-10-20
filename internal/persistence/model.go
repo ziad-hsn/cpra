@@ -96,6 +96,8 @@ type Action struct {
 }
 
 type Monitor struct {
+	InstallationID             string               `json:"installation_id,omitempty"`
+	retainedActions            map[string]Action    // Transition-local final records removed from the execution projection.
 	Notifications              *NotificationState   `json:"notifications,omitempty"`
 	ActionVersion              int                  `json:"action_version,omitempty"`
 	ProviderCorrelationVersion int                  `json:"provider_correlation_version,omitempty"`
@@ -172,6 +174,7 @@ type Monitor struct {
 }
 
 func (m Monitor) Clone() Monitor {
+	m.retainedActions = maps.Clone(m.retainedActions)
 	m.Notifications = m.Notifications.clone()
 	m.IgnoreIncidents = append([]time.Time(nil), m.IgnoreIncidents...)
 	m.ManualRequests = append([]time.Time(nil), m.ManualRequests...)
@@ -187,6 +190,7 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	InstallationID       string                    `json:"installation_id,omitempty"`
 	NoticeRevision       string                    `json:"notice_revision,omitempty"`
 	Failure              FailureDiagnostic         `json:"failure,omitzero"`
 	RetryDelay           time.Duration             `json:"retry_delay,omitzero"`
@@ -292,6 +296,12 @@ func validateCommand(c Command) error {
 	}
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if c.Kind == "installation" {
+		return validateInstallationCommand(c)
+	}
+	if c.InstallationID != "" {
+		return errInstallationIdentity
 	}
 	if c.RetryDelay < 0 || c.RetryDelay > 24*time.Hour || c.RetryDelay != 0 && (c.Kind != "result" || !c.Retryable || c.Outcome == "success") {
 		return ErrNotificationIdentity

@@ -233,7 +233,7 @@ func (m *managementHTTP) releaseOperationReservation(reservation *operationSnaps
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	m.releaseOperationReservationLocked(reservation)
 }
 func (m *managementHTTP) releaseOperationReservationLocked(reservation *operationSnapshotReservation) {
@@ -280,7 +280,7 @@ func (m *managementHTTP) readOperations(ctx context.Context, query url.Values, a
 		return read, err
 	}
 	err = func() error {
-		defer m.mu.Unlock()
+		defer m.unlockSnapshots()
 		if !m.cursorReady {
 			return management.ErrUnavailable
 		}
@@ -373,7 +373,7 @@ func (m *managementHTTP) publishOperationPage(ctx context.Context, read operatio
 	if err := m.lockSnapshots(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	now := m.now().UTC()
 	if now.Before(read.observed) || now.Before(read.entry.created) {
 		return management.ErrUnavailable

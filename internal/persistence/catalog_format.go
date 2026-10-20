@@ -53,6 +53,9 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.Kind == "installation" || c.InstallationID != "" {
+		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.NoticeRevision != "" {
 		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
 	}

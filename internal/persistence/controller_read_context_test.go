@@ -236,7 +236,11 @@ func TestControllerContextActionReadMatchesIndexedAndInitialImages(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, ok := wantView.Get(a.ID)
+	defer wantView.Close()
+	want, ok, err := wantView.Get(a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok {
 		t.Fatal("missing fixture action")
 	}

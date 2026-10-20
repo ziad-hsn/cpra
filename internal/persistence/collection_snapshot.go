@@ -113,6 +113,9 @@ func validateCollectionRows(i image, view *collectionLedgerView) error {
 	if view == nil {
 		return ErrCollectionUnavailable
 	}
+	if err := validateActionStorageRows(i, view); err != nil {
+		return err
+	}
 	type progress struct {
 		count  uint64
 		bytes  int64
@@ -258,6 +261,18 @@ func writeCollectionSnapshotRows(w io.Writer, version int, view *collectionLedge
 			return err
 		}
 	}
+	view.mu.Lock()
+	progress, err := view.actionProgress()
+	view.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	if progress.Sequence != 0 {
+		if !actionStorageFormat(version) {
+			return errActionLedger
+		}
+		return writeActionLedger(w, view)
+	}
 	return nil
 }
 
@@ -340,7 +355,7 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	if delimiter, err := remainder.ReadByte(); err != nil || delimiter != '\n' {
 		return i, nil, ErrCollectionInvalid
 	}
-	if len(i.Collections) == 0 {
+	if len(i.Collections) == 0 && (i.ActionStorage == nil || i.ActionStorage.Sequence == 0) {
 		ledger, err := decodeEmptyCollectionSnapshot(remainder, i)
 		if ledger != nil && directory != "" {
 			err = errors.Join(err, ledger.Close())
@@ -384,6 +399,11 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 			}
 		}
 		if err := importCollectionExecutionLedgerWithRetirement(remainder, ledger, offsets); err != nil {
+			return i, ledger, err
+		}
+	}
+	if i.ActionStorage != nil && i.ActionStorage.Sequence != 0 {
+		if _, err := importActionLedger(remainder, ledger); err != nil {
 			return i, ledger, err
 		}
 	}

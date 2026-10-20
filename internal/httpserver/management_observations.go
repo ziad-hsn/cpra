@@ -476,7 +476,7 @@ func (s *Server) observationPage(ctx context.Context, m *managementHTTP, query u
 	if err := m.lockSnapshots(ctx); err != nil {
 		return observationList{}, err
 	}
-	defer m.mu.Unlock()
+	defer m.unlockSnapshots()
 	if !m.cursorReady {
 		return observationList{}, management.ErrUnavailable
 	}

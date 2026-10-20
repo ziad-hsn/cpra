@@ -41,6 +41,14 @@ func TestCollectionSnapshotRestartWithoutOperations(t *testing.T) {
 			}
 			assertNoLedger := func() {
 				t.Helper()
+				if name == "monitor" {
+					// Retained actions now share the Store-owned ledger even when
+					// the installation has never uploaded a collection.
+					if s.fsm.collections == nil || s.fsm.image.ActionStorage == nil || s.fsm.image.ActionStorage.Sequence == 0 {
+						t.Fatal("action-only ledger missing")
+					}
+					return
+				}
 				if _, err := os.Lstat(filepath.Join(config.Storage.Directory, "collections")); !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("store without collection operations created a disk ledger: %v", err)
 				}

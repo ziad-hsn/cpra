@@ -214,6 +214,7 @@ func (s *Server) StopContext(ctx context.Context) error {
 	}
 	admissionErr := s.StopAdmission(ctx)
 	if s.srv == nil {
+		s.managementHTTP.closeSnapshots()
 		return errors.Join(admissionErr, s.stopExtensions(ctx))
 	}
 	s.stopHistorySampler()
@@ -223,6 +224,7 @@ func (s *Server) StopContext(ctx context.Context) error {
 		controller.SystemLogger.Warn("Web server shutdown: %v", err)
 	}
 	s.wg.Wait()
+	s.managementHTTP.closeSnapshots()
 	err = errors.Join(admissionErr, err, s.stopExtensions(ctx))
 	if err == nil {
 		controller.SystemLogger.Info("Web server stopped")
@@ -250,6 +252,9 @@ func (s *Server) startHistorySampler() {
 				select {
 				case <-ticker.C:
 					s.recordHistory()
+					if s.managementHTTP != nil {
+						s.managementHTTP.expireSnapshots()
+					}
 				case <-stop:
 					return
 				}

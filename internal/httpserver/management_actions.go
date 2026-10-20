@@ -131,6 +131,7 @@ func (m *managementHTTP) handleActions(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 			entry.actions = view
+			entry.actionOwner = &view
 		}
 		items, after, err := entry.actions.Page(ctx, entry.monitorID, read.cursor.After, entry.limit)
 		if err != nil {

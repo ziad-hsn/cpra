@@ -152,32 +152,8 @@ func validateNotificationIdentity(m Monitor, version int) error {
 		return ErrNotificationIdentity
 	}
 	for _, a := range m.Actions {
-		if err := a.Cause.validate(version); err != nil {
+		if err := validateNotificationAction(a, version, m.NotificationVersion); err != nil {
 			return err
-		}
-		if err := a.Failure.validate(version); err != nil {
-			return err
-		}
-		if a.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(a.NotificationCorrelation, 256)) {
-			return ErrNotificationIdentity
-		}
-		hasIdentity := a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || !a.QueuedAt.IsZero() || !a.Deadline.IsZero()
-		if !hasIdentity {
-			continue // Retained pre-migration outcomes keep their original evidence.
-		}
-		if a.Kind == "intervention" && lifecycleStorageFormat(version) {
-			if a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || a.NotificationCorrelation != "" ||
-				a.QueuedAt.IsZero() || a.QueuedAt.After(a.NotBefore) || a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 ||
-				!a.Deadline.After(a.NotBefore) || a.Deadline.Sub(a.NotBefore) > 24*time.Hour || a.Deadline.Year() > 9999 {
-				return ErrNotificationIdentity
-			}
-			continue
-		}
-		if !deliveryStorageFormat(version) || m.NotificationVersion != DeliveryFormatVersion || a.Kind != "code" ||
-			!catalogIdentifier(a.DeliveryID, 256) || !catalogIdentifier(a.NotificationEpisode, 256) || !catalogIdentifier(a.EndpointID, 256) ||
-			!a.QueuedAt.IsZero() && (a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 || a.QueuedAt.After(a.NotBefore)) ||
-			!a.Deadline.IsZero() && (a.Deadline.Year() < 1 || a.Deadline.Year() > 9999 || !a.Deadline.After(a.NotBefore) && a.State == Started) {
-			return ErrNotificationIdentity
 		}
 	}
 	return nil
@@ -205,4 +181,35 @@ func notificationEndpointIdentity(m Monitor, color string, endpoint int) string 
 	// immutable color-specific destination list. No target or credential enters
 	// this identity or the Raft record.
 	return identity(fmt.Sprintf("endpoint/%s/%s/%s/%s/%d", m.ID, m.incarnationIdentity(), m.Revision, color, endpoint))
+}
+
+func validateNotificationAction(a Action, version, notificationVersion int) error {
+	if err := a.Cause.validate(version); err != nil {
+		return err
+	}
+	if err := a.Failure.validate(version); err != nil {
+		return err
+	}
+	if a.NotificationCorrelation != "" && (!deliveryStorageFormat(version) || !catalogIdentifier(a.NotificationCorrelation, 256)) {
+		return ErrNotificationIdentity
+	}
+	hasIdentity := a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || !a.QueuedAt.IsZero() || !a.Deadline.IsZero()
+	if !hasIdentity {
+		return nil // Retained pre-migration outcomes keep their original evidence.
+	}
+	if a.Kind == "intervention" && lifecycleStorageFormat(version) {
+		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || a.NotificationCorrelation != "" ||
+			a.QueuedAt.IsZero() || a.QueuedAt.After(a.NotBefore) || a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 ||
+			!a.Deadline.After(a.NotBefore) || a.Deadline.Sub(a.NotBefore) > 24*time.Hour || a.Deadline.Year() > 9999 {
+			return ErrNotificationIdentity
+		}
+		return nil
+	}
+	if !deliveryStorageFormat(version) || notificationVersion != DeliveryFormatVersion || a.Kind != "code" ||
+		!catalogIdentifier(a.DeliveryID, 256) || !catalogIdentifier(a.NotificationEpisode, 256) || !catalogIdentifier(a.EndpointID, 256) ||
+		!a.QueuedAt.IsZero() && (a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 || a.QueuedAt.After(a.NotBefore)) ||
+		!a.Deadline.IsZero() && (a.Deadline.Year() < 1 || a.Deadline.Year() > 9999 || !a.Deadline.After(a.NotBefore) && a.State == Started) {
+		return ErrNotificationIdentity
+	}
+	return nil
 }

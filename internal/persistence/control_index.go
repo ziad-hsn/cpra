@@ -98,6 +98,8 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 // installMonitor runs only in Apply. Trees contain immutable scalar projections;
 // readers never walk mutable action maps or scan the fleet for an incident page.
 func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
+	f.recordActionWrites(previous, m)
+	m.retainedActions = nil
 	f.image.Version = joinStorageFormat(f.image.Version, policyMinimumFormat(m.Policy))
 	f.image.Version = joinStorageFormat(f.image.Version, recoveryNotificationPolicyFormat(m.Policy))
 	preserveOwnerObservation(previous, &m)

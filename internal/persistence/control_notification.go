@@ -21,7 +21,7 @@ func (m Monitor) ControlNotification(a Action) bool {
 }
 
 func (m *Monitor) queueEnabledNotice(at time.Time, emit func(string, *Action)) {
-	m.EnabledControl = identity(fmt.Sprintf("enabled/%s/%s/%s/%t/%s", m.ID, m.incarnationIdentity(), m.Revision, m.Policy.Enabled, at.Format(time.RFC3339Nano)))
+	m.EnabledControl = m.namespacedIdentity(identity(fmt.Sprintf("enabled/%s/%s/%s/%t/%s", m.ID, m.incarnationIdentity(), m.Revision, m.Policy.Enabled, at.Format(time.RFC3339Nano))))
 	if m.snoozed(at) {
 		return
 	}

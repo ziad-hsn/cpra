@@ -181,8 +181,8 @@ func TestWorkerProductionDrainRetainsResultsAndEvidence(t *testing.T) {
 				t.Fatal("late evidence changed original outcome")
 			}
 			if category != "check" {
-				monitor, _ := f.store.Get(a.MonitorID)
-				if monitor.Actions[after.Intent.ActionID].State != persistence.Unknown {
+				action, found, err := f.store.ActionContext(t.Context(), after.Intent.ActionID)
+				if err != nil || !found || action.MonitorID != a.MonitorID || action.State != persistence.Unknown || !action.Held {
 					t.Fatal("drain or late evidence released uncertain action")
 				}
 			}
@@ -233,8 +233,14 @@ func TestWorkerProductionDrainCommitsKnownOutcomes(t *testing.T) {
 			if record.Result == nil || record.Result.Input.Status != status || record.Result.Receipt.ReceiptID != receipt.ReceiptID {
 				t.Fatal("completion reply preceded the durable result")
 			}
-			if category == "check" && (monitor.LastOutcome != "success" || monitor.TotalChecks != 1) || category != "check" && monitor.Actions[record.Intent.ActionID].State != persistence.Succeeded {
+			if category == "check" && (monitor.LastOutcome != "success" || monitor.TotalChecks != 1) {
 				t.Fatal("committed completion did not update monitor/action state")
+			}
+			if category != "check" {
+				action, found, err := f.store.ActionContext(t.Context(), record.Intent.ActionID)
+				if err != nil || !found || action.MonitorID != a.MonitorID || action.State != persistence.Succeeded || action.Held {
+					t.Fatal("committed completion did not retain its successful action outcome")
+				}
 			}
 		})
 	}

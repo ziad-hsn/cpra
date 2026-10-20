@@ -440,3 +440,36 @@ On `3388789`, 712 release-script tests, 47 documentation tests, private source
 synchronization and a strict 73-page site check (18,549 links/assets) passed.
 Those results identify that commit; they are not automatically attributed to the
 next freeze. The interrupted application matrix is retained as incomplete.
+
+The next run at `2b5d934` exposed six file-mode A2A restart checks still reading
+retained actions from `/api/v1/state`. The helper now reads the bounded v2 action
+list, checks the original monitor incarnation and execution revision, and retains
+its checks for encrypted connection recovery, held outcomes, credential exclusion
+and no resending or redirection. Two worker drain cases had the same projection
+assumption; their assertions now inspect the indexed record and its actual hold.
+`worker-drain-ledger-before-1` preserves the four action-category failures;
+`indexed-action-fixtures-after-2` passes the corrected A2A and worker cases under
+the race detector. The public API reference distinguishes current execution state
+from retained outcomes. These corrections change tests and documentation, not
+production execution or storage formats.
+
+The interrupted matrix is retained as incomplete. Its recorded cleanup succeeded.
+Private runner checks now cover cancellation during accounting, process discovery,
+initial ownership, repeated signals during cleanup, and fixture assertion failure.
+`signal-checks-2` passes all five real-process scenarios; separate source/evidence
+review found no remaining scoped cleanup defect. Only two identified, inactive Go
+build directories were removed after verifying no live process or descriptor used
+them; original logs and failing fixture evidence remain available.
+
+Independent source review found the indexed-action test changes preserve the
+original safety assertions. Its noted v1 redaction coverage boundary is covered
+separately by `TestStateRedactsActiveAgentConnection`: a committed started action
+retains its sealed connection internally, while the authenticated state response
+omits it. `active-agent-state-redaction-1` passes under the race detector. This
+check invokes no provider and does not poll the current projection for historical
+outcomes.
+The added redaction test's partial-start cleanup was corrected after independent
+review. `active-agent-state-redaction-2` passes; the reviewer closed that finding.
+`http-ledger-regression-1` passes the broader tagged HTTP-server suite under the
+race detector (300.5 seconds). These focused results precede the next frozen
+candidate; they do not replace its full matrix or required browser campaigns.

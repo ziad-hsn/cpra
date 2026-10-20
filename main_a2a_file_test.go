@@ -23,6 +23,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 func TestMainA2AFileProcess(t *testing.T) {
@@ -144,14 +145,14 @@ func startAgentFileProcess(t *testing.T, f *mainManagementFixture, expectReady b
 	}
 }
 
-func fileAgentAction(t *testing.T, f *mainManagementFixture, state string) persistence.Action {
+func fileAgentAction(t *testing.T, f *mainManagementFixture, state string) api.Action {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 12*time.Second)
 	defer cancel()
 	client := &http.Client{Timeout: time.Second}
 	defer client.CloseIdleConnections()
 	for {
-		req, _ := http.NewRequestWithContext(ctx, "GET", "http://"+f.options.webAddr+"/api/v1/state?monitor_id=agent-monitor", nil)
+		req, _ := http.NewRequestWithContext(ctx, "GET", "http://"+f.options.webAddr+"/api/v2/actions?monitorID=agent-monitor", nil)
 		req.Header.Set("Authorization", "Bearer "+startupReaderToken)
 		response, err := client.Do(req)
 		if err != nil {
@@ -162,17 +163,21 @@ func fileAgentAction(t *testing.T, f *mainManagementFixture, state string) persi
 		if err != nil || response.StatusCode != http.StatusOK {
 			t.Fatal("file-only action request failed", response.StatusCode, err)
 		}
-		if bytes.Contains(raw, []byte("agent_connection")) || bytes.Contains(raw, []byte("file-agent-private-token")) {
+		if bytes.Contains(raw, []byte("agent_connection")) || bytes.Contains(raw, []byte("agentConnection")) || bytes.Contains(raw, []byte("file-agent-private-token")) {
 			t.Fatal("read-only state exposed its internal connection")
 		}
-		var body struct {
-			Actions []persistence.Action `json:"actions"`
-		}
+		var body api.ActionList
 		if err := json.Unmarshal(raw, &body); err != nil {
 			t.Fatal(err)
 		}
-		for _, action := range body.Actions {
-			if action.State == persistence.Unknown && action.AgentReceipt != nil && action.AgentReceipt.State == state {
+		if body.NextCursor != "" {
+			t.Fatal("single-action fixture unexpectedly requires pagination")
+		}
+		for _, action := range body.Items {
+			if action.State == string(persistence.Unknown) && action.AgentReceipt != nil && action.AgentReceipt.State != nil && *action.AgentReceipt.State == state {
+				if action.MonitorID != "agent-monitor" || action.IncarnationUID == "" || action.ExecutionRevision == "" {
+					t.Fatal("retained action lacks its original monitor and configuration identity")
+				}
 				return action
 			}
 		}
@@ -329,7 +334,7 @@ func TestMainA2AFileRestartPreservesOriginalConnection(t *testing.T) {
 				complete.Store(true)
 				restarted := startAgentFileProcess(t, f, true)
 				observed := fileAgentAction(t, f, "TASK_STATE_COMPLETED")
-				if observed.ID != original.ID || observed.Revision != original.Revision || !observed.Held() || observed.Review != nil || sends.Load() != 1 || reads.Load() == 0 || replacementCalls.Load() != 0 {
+				if observed.ID != original.ID || observed.ExecutionRevision != original.ExecutionRevision || observed.IncarnationUID != original.IncarnationUID || !observed.Held || observed.Review != nil || sends.Load() != 1 || reads.Load() == 0 || replacementCalls.Load() != 0 {
 					t.Fatal("restart repeated, redirected, lost or automatically resolved original work")
 				}
 				restarted.stop(t, false)

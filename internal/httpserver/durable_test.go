@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -14,7 +16,71 @@ import (
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
+	"github.com/ziad-hsn/cpra/internal/secureconfig"
 )
+
+func TestStateRedactsActiveAgentConnection(t *testing.T) {
+	f := newManagementFixture(t, true)
+	_, monitor, guard := configureControlMonitor(t, f, "agent")
+	monitor = controlPulse(t, f, monitor, guard, "failure")
+	var action persistence.Action
+	for _, current := range monitor.Actions {
+		if current.Kind == "code" {
+			action = current
+		}
+	}
+	if action.ID == "" {
+		t.Fatal("notification intent missing")
+	}
+	wrapper, err := secureconfig.NewLocalWrapper(bytes.Repeat([]byte{73}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealer, err := secureconfig.NewSealer(wrapper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := f.server.cfg.Store
+	payload, err := sealer.Seal(t.Context(), persistence.AgentConnectionBinding(store.Status().NodeID, monitor.ID, action), []byte(`{"token":"state-redaction-private-token"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handle, err := store.BeginLocalAction(t.Context(), persistence.Command{Kind: "start", MonitorID: monitor.ID, Revision: monitor.Revision,
+		ActionID: action.ID, Guard: &guard, Driver: "a2a", At: time.Now().UTC(),
+		AgentConnection: &persistence.AgentConnection{CatalogUID: action.CatalogUID, Payload: payload}})
+	if handle != nil {
+		t.Cleanup(func() {
+			if err := handle.Finish(context.Background()); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, raw := f.request(t, http.MethodGet, "/api/v1/state?monitor_id=agent", managementReaderToken, nil, nil)
+	if response.StatusCode != http.StatusOK {
+		t.Fatal("current execution state unavailable", response.StatusCode)
+	}
+	var body struct {
+		Actions []persistence.Action `json:"actions"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Actions) != 1 || body.Actions[0].ID != action.ID || body.Actions[0].State != persistence.Started || body.Actions[0].AgentConnection != nil {
+		t.Fatal("current state omitted the active action or exposed its connection")
+	}
+	for _, forbidden := range []string{"agent_connection", "agentConnection", "ciphertext", "state-redaction-private-token"} {
+		if bytes.Contains(raw, []byte(forbidden)) {
+			t.Fatal("current state exposed private agent connection data")
+		}
+	}
+	retained, found, err := store.ActionContext(t.Context(), action.ID)
+	if err != nil || !found || retained.AgentConnection == nil || retained.State != persistence.Started {
+		t.Fatal("observation changed the authoritative active connection")
+	}
+}
 
 func TestDurableAPIsAuthenticateAndRemainReadOnly(t *testing.T) {
 	c := runtimeconfig.Default()

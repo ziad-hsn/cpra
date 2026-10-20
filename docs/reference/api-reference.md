@@ -35,7 +35,7 @@ Use `cpractl --token-file` and the TLS settings in [management startup](../manag
 | GET | `/api/v1/config` | Public runtime settings. |
 | GET | `/api/v1/history` | Retained monitor events; accepts `monitor_id`, `limit` (1–500, default 100), and an opaque `cursor`. |
 | GET | `/api/v1/slo` | Committed check and recovery measurements. |
-| GET | `/api/v1/state` | Storage health, process/storage usage, and optional per-monitor revision and action states via `monitor_id`. |
+| GET | `/api/v1/state` | Storage health, process/storage usage, and optional per-monitor revision and current execution states via `monitor_id`. Retained action outcomes are available through the paginated `/api/v2/actions` endpoint in both access modes. |
 | GET | `/metrics` | Prometheus text exposition. |
 
 ## Monitor filtering

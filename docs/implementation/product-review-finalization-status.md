@@ -896,3 +896,22 @@ candidate's affected matrix.
 
 The same review corrected N39's inventory wording: `IDEA.md` is deliberately
 retained authored source, distinct from ignored `.idea/` editor output.
+
+## Historical JobType snapshot fixture correction
+
+The complete combined-driver race run at `72b69bc` finished all 32 application
+packages. Its retained output contains 7,051 passing test/subtest entries, 25
+skipped entries and one failing historical snapshot assertion. The overall run
+is failed; skipped browser and load campaigns still require separate execution.
+
+That fixture deliberately omits current startup migration and commits a format-16
+JobType operation. It now checks both the original and decoded image version and
+the format-16 snapshot header. Existing ledger-byte, collection-state, JobType-state
+and row-validation checks remain unchanged. The ordinary-open test continues to
+require format 45. No production behavior or storage format changes.
+
+`jobtype-snapshot-combined-after-1` and `jobtype-snapshot-external-after-1` pass both
+tests together under Go 1.27.2 with race detection. Independent review found no
+other mismatched historical expectation among the snapshot assertions changed
+alongside this one. These focused working-tree checks retain their original
+scope; the updated frozen candidate's affected matrix remains required.

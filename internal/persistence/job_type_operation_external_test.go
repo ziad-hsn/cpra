@@ -562,8 +562,13 @@ func TestJobTypeOperationSnapshotPreservesCollectionSections(t *testing.T) {
 	}
 	c, r := reserveJobType(t, s, jobTypeFixture(t, s, "probe"))
 	committed := commitJobTypeOperation(t, s, c, r)
+	// The replay fixture omits current startup migration. Its reserved JobType
+	// operation requires format 16; ordinary Open is covered separately.
+	if s.fsm.image.Version != JobTypeOperationFormatVersion {
+		t.Fatalf("historical image format = %d, want %d", s.fsm.image.Version, JobTypeOperationFormatVersion)
+	}
 	blob := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(blob, []byte(actionWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(blob, []byte(jobTypeOperationSnapshotMagic)) {
 		t.Fatal("format16 snapshot framing missing")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(blob), "")
@@ -571,6 +576,9 @@ func TestJobTypeOperationSnapshotPreservesCollectionSections(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
+	if i.Version != JobTypeOperationFormatVersion {
+		t.Fatalf("decoded historical format = %d, want %d", i.Version, JobTypeOperationFormatVersion)
+	}
 	after, err := ledger.Bytes()
 	if err != nil || before != after || !reflect.DeepEqual(i.Collections[head.ID], head) || !reflect.DeepEqual(i.JobTypes.Records["probe"], committed.State) {
 		t.Fatal("format16 lost an older source or execution namespace", err)

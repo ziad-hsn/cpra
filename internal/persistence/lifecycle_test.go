@@ -144,7 +144,7 @@ func TestRestartInterventionRequiresFreshObservation(t *testing.T) {
 				t.Fatal("restored recovery started without a new observation")
 			}
 			raw := captureSnapshotBytes(t, s.fsm)
-			if !bytes.HasPrefix(raw, []byte(lifecycleSnapshotMagic)) {
+			if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
 				t.Fatal("restart barrier lost its format")
 			}
 			if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(raw))); err != nil {
@@ -171,6 +171,7 @@ func TestRestartInterventionRequiresFreshObservation(t *testing.T) {
 
 func TestLifecycleFieldsRequireNewFormat(t *testing.T) {
 	m := configuredPolicyMonitor(t, lifecyclePolicy())
+	m.ActionVersion = 0 // Exercise the supported format-42 contract independently.
 	c := Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()}
 	if commandMinimumFormat(c) != LifecycleFormatVersion {
 		t.Fatal("lifecycle state escaped version boundary")

@@ -53,7 +53,7 @@ func (i *InterventionWebhookJob) Execute() (result Result) {
 	ctx, cancel := operationContext(i.Context(), i.Timeout)
 	defer cancel()
 	if err := validateTargetURL(i.URL); err != nil {
-		result.Err = err
+		result.Err = noEffect(err, false)
 		return
 	}
 	method := i.Method
@@ -62,15 +62,15 @@ func (i *InterventionWebhookJob) Execute() (result Result) {
 	}
 	req, err := http.NewRequestWithContext(ctx, method, i.URL, strings.NewReader(i.Body))
 	if err != nil {
-		result.Err = err
+		result.Err = noEffect(err, false)
 		return
 	}
 	for k, v := range i.Headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := effectHTTPClient(i.Timeout).Do(req)
+	resp, err := doEffect(effectHTTPClient(i.Timeout), req)
 	if err != nil {
-		result.Err = fmt.Errorf("webhook outcome unknown; reconcile target before retry: %w", err)
+		result.Err = fmt.Errorf("webhook request failed: %w", err)
 		return
 	}
 	_ = resp.Body.Close()

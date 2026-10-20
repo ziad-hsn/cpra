@@ -1036,17 +1036,40 @@ func (i *InterventionDockerJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
 	budget, err := dockerOperationBudget(i.Timeout, i.OperationTimeout)
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: err}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(err, false)}
 	}
 	ctx, cancel := operationContext(i.Context(), budget)
 	defer cancel()
 
 	payload := map[string]interface{}{"type": "intervention"}
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation(), func(c *client.Client) error {
+		// Configure before the SDK wraps its transport for tracing and captures
+		// the TLS scheme. Keep its platform-specific daemon dialer and roots.
+		h := c.HTTPClient()
+		tr, ok := h.Transport.(*http.Transport)
+		if !ok {
+			return errors.New("unsupported Docker HTTP transport")
+		}
+		tr = tr.Clone()
+		tr.DisableKeepAlives = true
+		tr.DialContext = effectDial(tr.DialContext)
+		h.Transport = tr
+		h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		return client.WithHTTPClient(h)(c)
+	})
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to create docker client: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("failed to create docker client: %w", err), false), Payload: payload}
 	}
 	defer func() { _ = cli.Close() }()
+	// Preserve Docker's Unix/named-pipe/TLS dialer, but keep effect execution
+	// independent of probe connections and expose only proven pre-send failures.
+	httpClient := cli.HTTPClient()
+	evidence := &effectRecorder{effectTransport: effectTransport{httpClient.Transport}}
+	httpClient.Transport = evidence
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if err := client.WithHTTPClient(httpClient)(cli); err != nil {
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(err, false), Payload: payload}
+	}
 
 	var lastErr error
 	attempts := 1
@@ -1068,7 +1091,7 @@ func (i *InterventionDockerJob) Execute() (result Result) {
 		if err == nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: nil, Payload: payload}
 		}
-		lastErr = err
+		lastErr = evidence.restore(err)
 	}
 	return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("docker intervention on '%s' failed after %d attempt(s): %w", i.Container, attempts, lastErr), Payload: payload}
 }
@@ -1147,9 +1170,13 @@ func (c *CodeLogJob) Execute() (result Result) {
 		var err error
 		f, err = c.Log.open(c.File)
 		if err != nil {
-			return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
+			return Result{ID: c.ID, Ent: c.Entity, Err: noEffect(err, false), Payload: payload}
 		}
-		defer func() { _ = f.Close() }()
+		defer func() {
+			if err := f.Close(); err != nil && result.Err == nil {
+				result.Err = err
+			}
+		}()
 	}
 
 	now := time.Now().UTC()
@@ -1181,9 +1208,12 @@ func (c *CodeLogJob) Execute() (result Result) {
 
 	line, err := json.Marshal(entry)
 	if err != nil {
-		return Result{ID: c.ID, Ent: c.Entity, Err: fmt.Errorf("failed to marshal log entry: %w", err), Payload: payload}
+		return Result{ID: c.ID, Ent: c.Entity, Err: noEffect(fmt.Errorf("failed to marshal log entry: %w", err), false), Payload: payload}
 	}
 
+	if err := c.Context().Err(); err != nil {
+		return Result{ID: c.ID, Ent: c.Entity, Err: noEffect(err, false), Payload: payload}
+	}
 	line = append(line, '\n')
 	if _, err = f.Write(line); err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: fmt.Errorf("failed to write log entry: %w", err), Payload: payload}

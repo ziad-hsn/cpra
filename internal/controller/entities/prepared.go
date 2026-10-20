@@ -63,6 +63,20 @@ func (p *PreparedMonitor) NotificationEndpointIDs(color string) []string {
 	}
 	return slices.Clone(p.bundle.codes.Configs[color].EndpointIDs)
 }
+
+// NotificationTimeouts exposes only immutable budgets, never provider settings.
+func (p *PreparedMonitor) NotificationTimeouts(color string) []time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle == nil {
+		return nil
+	}
+	budgets := make([]time.Duration, 0, len(p.bundle.jobs.CodeJobs[color]))
+	for _, job := range p.bundle.jobs.CodeJobs[color] {
+		budgets = append(budgets, jobs.NotificationBudget(job))
+	}
+	return budgets
+}
 func (p *PreparedMonitor) String() string   { return "PreparedMonitor{private configuration}" }
 func (p *PreparedMonitor) GoString() string { return p.String() }
 func (p *PreparedMonitor) MarshalJSON() ([]byte, error) {

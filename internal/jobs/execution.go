@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 // ActionExecution belongs to one committed start. The owner supplies fresh
@@ -114,6 +115,18 @@ func NotificationBudget(job Job) time.Duration {
 	return 45 * time.Second
 }
 
+// NotificationConfigBudget is pure and does not construct a provider client.
+// External workers select their immutable JobType budget in management.
+func NotificationConfigBudget(config manifest.CodeNotification) time.Duration {
+	if agent, ok := config.(*manifest.CodeNotificationA2A); ok {
+		if agent.Timeout > 0 {
+			return agent.Timeout
+		}
+		return time.Minute
+	}
+	return 45 * time.Second
+}
+
 func NewDispatch(job Job, ent ecs.Entity, kind, color string, generation uint64, endpoint int) *Dispatch {
 	d := &Dispatch{ProviderCorrelationVersion: 1, Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
 	if agentJob(d.Job) != nil {
@@ -175,6 +188,11 @@ func (d *Dispatch) Execute() (r Result) {
 		return Result{Err: errA2AActionRequired}
 	}
 	started = time.Now()
+	// This interval begins at the granted execution boundary. A rejected final
+	// deadline check still has a correlated result proving no provider invocation.
+	if err := ctx.Err(); err != nil {
+		return Result{Err: noEffect(err, false)}
+	}
 	if isAgent {
 		return agent.executeAction(ctx, d.agentAction(), execution.RecordAgentReceipt)
 	}

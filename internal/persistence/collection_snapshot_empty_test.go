@@ -102,7 +102,7 @@ func TestEmptyCollectionSnapshotRequiresCompleteFraming(t *testing.T) {
 	s := openCatalogMemory(t)
 	configure(t, s)
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(lifecycleSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
 		t.Fatal("fixture did not use the current monitor format")
 	}
 	for _, memory := range []bool{false, true} {
@@ -119,7 +119,7 @@ func TestEmptyCollectionSnapshotRequiresCompleteFraming(t *testing.T) {
 			if ledger != nil {
 				defer ledger.Close()
 			}
-			if err != nil || decoded.Version != LifecycleFormatVersion || (ledger != nil) != memory {
+			if err != nil || decoded.Version != ActionFormatVersion || (ledger != nil) != memory {
 				t.Fatal("empty snapshot did not preserve its storage mode", err)
 			}
 			if !memory {

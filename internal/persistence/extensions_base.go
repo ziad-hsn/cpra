@@ -13,7 +13,7 @@ type storeExtensions struct{}
 
 // LatestFormatVersion is the highest application storage format supported by
 // this build. Optional external state is deliberately unreadable here.
-const LatestFormatVersion = LifecycleFormatVersion
+const LatestFormatVersion = ActionFormatVersion
 
 func joinStorageFormat(a, b int) int { return max(a, b) }
 

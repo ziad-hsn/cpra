@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -121,6 +122,35 @@ func TestWorkerResultOriginalReceiptAllCategories(t *testing.T) {
 	}
 }
 
+func TestWorkerRecoveryRejectedRetryPreservesBudgetAfterSnapshot(t *testing.T) {
+	s, authority, _, input := workerResultFixture(t, "recovery", "rejected")
+	execution, _, _ := s.WorkerExecution(t.Context(), input.ExecutionID)
+	m, _ := s.Get(execution.Intent.MonitorID)
+	first := m.Actions[execution.Intent.ActionID]
+	config := m.Clone()
+	config.Policy.RecoveryMaxAttempts = 2
+	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &config, Guard: &execution.Intent.Guard, At: time.Now().UTC()})
+	if _, err := s.CommitWorkerResult(t.Context(), authority, input); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = s.Get(m.ID)
+	if a := m.Actions[first.ID]; a.State != Failed || !a.Retryable || !a.Deadline.Equal(first.Deadline) {
+		t.Fatal("worker rejection lost its positive retry evidence or deadline")
+	}
+	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(captureSnapshotBytes(t, s.fsm)))); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = s.Get(m.ID)
+	r := submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1, At: time.Now().UTC(), Outcome: "failure", Guard: &execution.Intent.Guard})[0]
+	if r.Err != nil || r.Monitor == nil {
+		t.Fatal(r.Err)
+	}
+	next := interventionAction(t, *r.Monitor)
+	if next.State != Queued || next.Attempt != 2 || next.ID == first.ID || !next.QueuedAt.Equal(first.QueuedAt) || !next.Deadline.Equal(first.Deadline) {
+		t.Fatal("restored worker rejection did not continue within the original execution budget")
+	}
+}
+
 func TestWorkerResultConcurrentDeliveryAndOwnership(t *testing.T) {
 	s, a, _, input := workerResultFixture(t, "recovery", "completed")
 	for name, change := range map[string]func(*WorkerAuthority, *WorkerResultInput){
@@ -231,7 +261,7 @@ func TestWorkerResultReservedCapacityAndSnapshotIsolation(t *testing.T) {
 	if err = snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(lifecycleWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-worker-result-canary")) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(actionWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-worker-result-canary")) {
 		t.Fatal("format or plaintext leak")
 	}
 	decoded, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -289,7 +319,7 @@ func TestWorkerResultCommandBoundsAndFormat(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
 			t.Fatal("result format gate", version, err)
 		}
 	}

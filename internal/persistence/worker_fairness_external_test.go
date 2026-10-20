@@ -134,7 +134,7 @@ func TestWorkerOfferSelectionReplay(t *testing.T) {
 				t.Fatal("retry replaced a committed assignment", err)
 			}
 			snapshot := captureSnapshotBytes(t, s.fsm)
-			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(lifecycleWorkerSnapshotMagic)) {
+			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(actionWorkerSnapshotMagic)) {
 				t.Fatal("queue snapshot did not carry its format")
 			}
 			if err := replayed.Restore(io.NopCloser(bytes.NewReader(snapshot))); err != nil {
@@ -157,7 +157,7 @@ func TestWorkerOfferSelectionFormat(t *testing.T) {
 	for version := 1; version <= WorkerQueueFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
 			t.Fatalf("selection format %d: %v", version, err)
 		}
 	}

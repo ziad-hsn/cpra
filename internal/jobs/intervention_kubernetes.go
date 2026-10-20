@@ -5,12 +5,14 @@ package jobs
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -69,23 +71,36 @@ func (i *InterventionKubernetesJob) Execute() (result Result) {
 	payload := map[string]interface{}{"type": "intervention", "driver": "kubernetes"}
 	cfg, err := i.restConfig()
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to build kubeconfig: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("failed to build kubeconfig: %w", err), false), Payload: payload}
 	}
 	if cfg.ExecProvider != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("kubernetes exec credential providers cannot honor recovery deadlines; use token, certificate, or in-cluster credentials"), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("kubernetes exec credential providers cannot honor recovery deadlines; use token, certificate, or in-cluster credentials"), false), Payload: payload}
+	}
+	cfg.Dial = effectDial(cfg.Dial)
+	cfg.NextProtos = []string{"http/1.1"}
+	cfg.WrapTransport = func(next http.RoundTripper) http.RoundTripper {
+		if tr, ok := next.(*http.Transport); ok {
+			copy := tr.Clone()
+			copy.DisableKeepAlives = true
+			next = copy
+		}
+		return effectTransport{next}
 	}
 	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to create kubernetes client: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("failed to create kubernetes client: %w", err), false), Payload: payload}
 	}
 
 	if i.Kind != "deployment" {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("unsupported kubernetes kind %q (only deployment is supported)", i.Kind), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("unsupported kubernetes kind %q (only deployment is supported)", i.Kind), false), Payload: payload}
 	}
-	deployments := clientset.AppsV1().Deployments(i.Namespace)
+	// The typed helpers default to retrying Retry-After responses, including
+	// mutations returning 5xx. One committed action permits only one request.
+	client := clientset.AppsV1().RESTClient()
 	if i.Replicas != nil {
 		scale := &autoscalingv1.Scale{Spec: autoscalingv1.ScaleSpec{Replicas: int32(*i.Replicas)}}
-		_, err = deployments.UpdateScale(ctx, i.Name, scale, metav1.UpdateOptions{})
+		err = client.Put().Namespace(i.Namespace).Resource("deployments").Name(i.Name).SubResource("scale").
+			VersionedParams(&metav1.UpdateOptions{}, scheme.ParameterCodec).Body(scale).MaxRetries(0).Do(ctx).Error()
 	} else {
 		// Rollout restart: patch the restartedAt pod-template annotation.
 		patch := map[string]interface{}{
@@ -103,7 +118,8 @@ func (i *InterventionKubernetesJob) Execute() (result Result) {
 		if merr != nil {
 			return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to marshal restart patch: %w", merr), Payload: payload}
 		}
-		_, err = deployments.Patch(ctx, i.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+		err = client.Patch(types.StrategicMergePatchType).Namespace(i.Namespace).Resource("deployments").Name(i.Name).
+			VersionedParams(&metav1.PatchOptions{}, scheme.ParameterCodec).Body(data).MaxRetries(0).Do(ctx).Error()
 	}
 	if err != nil {
 		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("kubernetes intervention failed: %w", err), Payload: payload}

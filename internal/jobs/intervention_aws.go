@@ -4,8 +4,10 @@ package jobs
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/google/uuid"
@@ -49,15 +51,30 @@ func (i *InterventionAWSJob) Execute() (result Result) {
 	payload := map[string]interface{}{"type": "intervention", "driver": "aws"}
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(i.Region))
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to load aws config: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("failed to load aws config: %w", err), false), Payload: payload}
 	}
-	client := ec2.NewFromConfig(cfg, func(o *ec2.Options) { o.RetryMaxAttempts = 1 })
+	builder, ok := cfg.HTTPClient.(*awshttp.BuildableClient)
+	if cfg.HTTPClient == nil {
+		builder, ok = awshttp.NewBuildableClient(), true
+	}
+	if !ok {
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("unsupported AWS HTTP transport"), false), Payload: payload}
+	}
+	transport := builder.GetTransport()
+	transport.DisableKeepAlives = true
+	transport.DialContext = effectDial(transport.DialContext)
+	httpClient := &http.Client{Timeout: builder.GetTimeout(), Transport: effectTransport{transport}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	defer httpClient.CloseIdleConnections()
+	client := ec2.NewFromConfig(cfg, func(o *ec2.Options) {
+		o.RetryMaxAttempts = 1
+		o.HTTPClient = httpClient
+	})
 
 	switch i.Operation {
 	case "reboot-instance":
 		_, err = client.RebootInstances(ctx, &ec2.RebootInstancesInput{InstanceIds: []string{i.InstanceID}})
 	default:
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("unsupported aws operation %q", i.Operation), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("unsupported aws operation %q", i.Operation), false), Payload: payload}
 	}
 	if err != nil {
 		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("aws intervention failed: %w", err), Payload: payload}

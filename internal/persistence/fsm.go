@@ -43,7 +43,7 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
-		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion || batch.Version == ActionFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
 			return batch, errors.New("optional commands require their own storage format")
 		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
@@ -158,7 +158,7 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.At.After(at) {
 			at = c.At
 		}
-		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion {
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion || f.image.Version == ActionFormatVersion {
 			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
 		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
@@ -549,7 +549,7 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 		}
 		for _, action := range m.Actions {
 			if action.LateEvidence != nil {
-				if err := action.LateEvidence.validate(action); err != nil {
+				if err := action.LateEvidence.validateAtFormat(action, i.Version); err != nil {
 					return i, err
 				}
 			}

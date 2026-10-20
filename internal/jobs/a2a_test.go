@@ -120,7 +120,7 @@ func TestA2AConnectionValidation(t *testing.T) {
 	if client.http.Timeout != 10*time.Second || client.http.Jar != nil {
 		t.Fatal("unbounded timeout or ambient cookies")
 	}
-	transport := client.http.Transport.(*http.Transport)
+	transport := client.http.Transport.(effectTransport).RoundTripper.(*http.Transport)
 	if !transport.DisableKeepAlives || transport.Proxy != nil || transport.TLSClientConfig.InsecureSkipVerify || transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
 		t.Fatal("unsafe A2A transport settings")
 	}

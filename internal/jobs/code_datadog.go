@@ -84,7 +84,7 @@ func (c *CodeDatadogJob) Execute() (result Result) {
 	if c.AppKey != "" {
 		req.Header.Set("DD-APPLICATION-KEY", c.AppKey)
 	}
-	resp, err := effectHTTPClient(10 * time.Second).Do(req)
+	resp, err := doEffect(effectHTTPClient(10*time.Second), req)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

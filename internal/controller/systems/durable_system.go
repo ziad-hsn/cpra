@@ -161,6 +161,12 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 			for color, c := range cc.Configs {
 				if c.Dispatch {
 					policy.Endpoints[color] = len(js.CodeJobs[color])
+					if policy.NotificationTimeouts == nil {
+						policy.NotificationTimeouts = make(map[string][]time.Duration)
+					}
+					for _, job := range js.CodeJobs[color] {
+						policy.NotificationTimeouts[color] = append(policy.NotificationTimeouts[color], jobs.NotificationBudget(job))
+					}
 					if len(c.EndpointIDs) != 0 {
 						if policy.NotificationEndpointIDs == nil {
 							policy.NotificationEndpointIDs = make(map[string][]string)
@@ -568,9 +574,7 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 					if r.Err != nil {
 						outcome = "failure"
 					}
-					var rejection *jobs.DeliveryError
-					definite := errors.As(r.Err, &rejection) || r.Type == "intervention" && errors.Is(r.Err, jobs.ErrInterventionRejected)
-					if r.Err != nil && !definite {
+					if jobs.ClassifyEffect(r.Err).Outcome == jobs.EffectUnknown {
 						s.releaseResult(r)
 						continue
 					} // No additional known outcome beyond the retained unknown marker.
@@ -628,13 +632,12 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 			if s.pending[state.MonitorID] {
 				c.Generation++
 			}
-			var rejection *jobs.DeliveryError
-			definite := errors.As(r.Err, &rejection) || r.Type == "intervention" && errors.Is(r.Err, jobs.ErrInterventionRejected)
-			c.Retryable = rejection != nil && rejection.Retryable
+			effect := jobs.ClassifyEffect(r.Err)
+			c.Retryable = effect.Retryable
 			if c.Retryable {
-				c.RetryDelay = rejection.RetryAfter
+				c.RetryDelay = effect.RetryAfter
 			}
-			c.Ambiguous = r.Err != nil && !definite
+			c.Ambiguous = effect.Outcome == jobs.EffectUnknown
 		}
 		commands = append(commands, c)
 		accepted = append(accepted, r)
@@ -1039,7 +1042,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			if a.Kind == "code" || a.Kind == "intervention" {
 				d.Deadline = a.Deadline
 				if d.Deadline.IsZero() && a.Kind == "code" {
-					d.Deadline = now.Add(jobs.NotificationBudget(d.Job))
+					d.Deadline = a.QueuedAt.Add(jobs.NotificationBudget(d.Job))
 				} else if !d.Deadline.IsZero() && !now.Before(d.Deadline) {
 					// Let the start guard commit cancellation of expired queued
 					// work. An already-expired context would skip that guard.

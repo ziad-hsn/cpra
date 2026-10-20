@@ -395,6 +395,13 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 	for color, c := range p.Monitor.Codes {
 		if c.Dispatch {
 			policy.Endpoints[color] = len(p.NotificationTargets[color])
+			if policy.NotificationTimeouts == nil {
+				policy.NotificationTimeouts = make(map[string][]time.Duration)
+			}
+			policy.NotificationTimeouts[color] = update.prepared.NotificationTimeouts(color)
+			if budgets, ok := p.NotificationTimeouts[color]; ok {
+				policy.NotificationTimeouts[color] = slices.Clone(budgets)
+			}
 			if policy.NotificationEndpointIDs == nil {
 				policy.NotificationEndpointIDs = make(map[string][]string)
 			}

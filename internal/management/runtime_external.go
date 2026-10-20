@@ -21,6 +21,14 @@ type runtimePreparationExtensions struct {
 	ExternalBindings []manifest.ExternalRuntimeBinding
 }
 
+func (c *Catalog) notificationBudget(ctx context.Context, config manifest.CodeNotification) (time.Duration, error) {
+	if external, ok := config.(*manifest.ExternalNotificationConfig); ok {
+		j := external.Key.JobType
+		return c.WorkerExecutionTimeout(ctx, persistence.JobTypeReference{JobTypeID: j.JobTypeID, JobTypeUID: j.JobTypeUID, Version: j.Version, Revision: j.Revision, Category: j.Category}, 24*time.Hour)
+	}
+	return jobs.NotificationConfigBudget(config), nil
+}
+
 func (c *Catalog) interventionBudget(ctx context.Context, target manifest.InterventionTarget) (time.Duration, error) {
 	if external, ok := target.(*manifest.ExternalInterventionConfig); ok {
 		j := external.Key.JobType

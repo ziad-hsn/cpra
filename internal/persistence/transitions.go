@@ -9,12 +9,12 @@ import (
 // transition is pure. All timestamps and identities derive from the command
 // and the preceding committed record. No clock, random source or I/O is used.
 func transition(previous Monitor, c Command) Result {
-	return transitionAtFormat(previous, c, LifecycleFormatVersion)
+	return transitionAtFormat(previous, c, ActionFormatVersion)
 }
 
 func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	if c.Kind == "late_result" {
-		return applyLateResult(previous, c)
+		return applyLateResultAtFormat(previous, c, version)
 	}
 	m := previous.Clone()
 	if m.ID != "" && lifecycleStorageFormat(version) {
@@ -46,6 +46,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			e.IncidentID = a.IncidentID
 		}
 		r.Events = append(r.Events, e)
+	}
+	if m.ID != "" && actionStorageFormat(version) {
+		m.upgradeActions(c.At, emit)
 	}
 	if c.Kind == "configure" {
 		enabledChanged := previous.ID != "" && !previous.Removed && previous.Policy.Enabled != c.Config.Policy.Enabled
@@ -122,6 +125,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if lifecycleStorageFormat(version) {
 			m.upgradeLifecycle()
+		}
+		if actionStorageFormat(version) {
+			m.upgradeActions(c.At, emit)
 		}
 		if !m.Policy.Enabled {
 			for _, id := range sortedActions(m.Actions) {
@@ -281,8 +287,12 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				a.State, a.Outcome = Unknown, "external_outcome_unknown"
 			}
 		}
-		if a.ExecutorKind == "agent" && (c.Ambiguous || c.Outcome != "success" || !agentSuccess(a)) {
+		provenAgentRejection := actionStorageFormat(version) && (c.Outcome == "failure" || c.Outcome == "timeout") && !c.Ambiguous && a.AgentReceipt == nil
+		if a.ExecutorKind == "agent" && !provenAgentRejection && (c.Ambiguous || c.Outcome != "success" || !agentSuccess(a)) {
 			a.State, a.Outcome = Unknown, "external_outcome_unknown"
+		}
+		if actionStorageFormat(version) {
+			a.Retryable = a.State == Failed && c.Retryable
 		}
 		m.Actions[a.ID] = a
 		emit("action_"+string(a.State), &a)
@@ -315,8 +325,10 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 			a.State, a.Outcome, a.NotBefore = Queued, "", notificationRetryAt(c, a.Attempt-1)
 			a.Failure = FailureDiagnostic{}
+			a.Retryable = false
 			a.StartedAt, a.FinishedAt, a.ExecutorFinishedAt = time.Time{}, time.Time{}, time.Time{}
 			a.ExecutorKind, a.ExecutorSession = "", ""
+			a.AgentConnection, a.AgentReceipt = nil, nil
 			m.Actions[a.ID] = a
 			emit("action_queued", &a)
 		}
@@ -376,13 +388,13 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.queueColor("yellow", c.At, emit)
 			}
 			if m.PulseFailures >= max(1, m.Policy.Unhealthy) && (!c.Maintenance || m.LifecycleVersion == LifecycleFormatVersion) {
-				if !c.Maintenance && m.mayRetryRecovery() {
+				if !c.Maintenance && m.mayRetryRecovery() && m.recoveryBudgetAvailable(c.At) {
 					if m.recoveryAttempts() > 0 {
 						m.LastInterventionFailure = m.lastRecoveryFailure()
 					}
 					m.InterventionAttempts = m.recoveryAttempts() + 1
 					m.InterventionAttempted = true
-					m.queueAction("intervention", "", 0, m.recoveryDue(c.At), emit)
+					m.queueRecoveryAttempt(m.recoveryDue(c.At), emit)
 				} else if !m.pendingIntervention() || m.LifecycleVersion == LifecycleFormatVersion && !m.pendingCurrentIntervention() {
 					m.openIncident(c.At, emit)
 				}
@@ -600,6 +612,9 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 			}
 		}
 		a.QueuedAt = at
+		if m.ActionVersion == ActionFormatVersion {
+			a.Deadline = at.Add(m.Policy.notificationTimeout(color, endpoint))
+		}
 		a.NotificationCorrelation = m.NotificationCorrelation
 		a.ProviderCorrelationVersion = m.ProviderCorrelationVersion
 		a.DeliveryID, a.NotificationEpisode = id, m.NotificationEpisode

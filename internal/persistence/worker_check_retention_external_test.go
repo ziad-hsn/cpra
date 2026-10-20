@@ -375,7 +375,7 @@ func TestWorkerCheckRetentionPreservesStateAndExpiredPollFence(t *testing.T) {
 		t.Fatal("snapshot validation", err)
 	}
 	encoded := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(encoded, []byte(lifecycleWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(encoded, []byte(actionWorkerSnapshotMagic)) {
 		t.Fatal("snapshot does not preserve the delivery worker format")
 	}
 	if bytes.Contains(encoded, []byte("private-check-parameters")) {
@@ -445,7 +445,7 @@ func TestWorkerCheckRetirementCommandsAndCorruption(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
 			t.Fatal("format gate", version, err)
 		}
 	}

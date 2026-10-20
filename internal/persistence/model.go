@@ -33,18 +33,19 @@ const (
 // Policy is deliberately an allowlist of non-secret decision inputs.
 type Policy struct {
 	policyExtensions
-	AutoIgnore              *AutoIgnorePolicy   `json:"auto_ignore,omitempty"`
-	Interval                time.Duration       `json:"interval"`
-	Unhealthy               int                 `json:"unhealthy"`
-	Healthy                 int                 `json:"healthy"`
-	Intervention            bool                `json:"intervention"`
-	Enabled                 bool                `json:"enabled"`
-	Cooldown                time.Duration       `json:"cooldown"`
-	RecoveryBypass          bool                `json:"recovery_bypass"`
-	Endpoints               map[string]int      `json:"endpoints,omitempty"`
-	NotificationEndpointIDs map[string][]string `json:"notification_endpoint_ids,omitempty"`
-	NotificationTriggers    map[string]string   `json:"notification_triggers,omitempty"`
-	RecoveryDriver          string              `json:"recovery_driver,omitempty"`
+	AutoIgnore              *AutoIgnorePolicy          `json:"auto_ignore,omitempty"`
+	Interval                time.Duration              `json:"interval"`
+	Unhealthy               int                        `json:"unhealthy"`
+	Healthy                 int                        `json:"healthy"`
+	Intervention            bool                       `json:"intervention"`
+	Enabled                 bool                       `json:"enabled"`
+	Cooldown                time.Duration              `json:"cooldown"`
+	RecoveryBypass          bool                       `json:"recovery_bypass"`
+	Endpoints               map[string]int             `json:"endpoints,omitempty"`
+	NotificationEndpointIDs map[string][]string        `json:"notification_endpoint_ids,omitempty"`
+	NotificationTimeouts    map[string][]time.Duration `json:"notification_timeouts,omitempty"`
+	NotificationTriggers    map[string]string          `json:"notification_triggers,omitempty"`
+	RecoveryDriver          string                     `json:"recovery_driver,omitempty"`
 	// Zero retains the legacy one-attempt policy; cooldown applies only to a
 	// subsequent attempt after a confirmed recovery failure.
 	RecoveryCooldown    time.Duration       `json:"recovery_cooldown,omitempty"`
@@ -55,6 +56,7 @@ type Policy struct {
 }
 
 type Action struct {
+	Retryable                  bool                `json:"retryable,omitempty"`
 	ProviderCorrelationVersion int                 `json:"provider_correlation_version,omitempty"`
 	Control                    *ControlNotice      `json:"control,omitempty"`
 	FileIncarnation            string              `json:"file_incarnation,omitempty"`
@@ -93,6 +95,7 @@ type Action struct {
 }
 
 type Monitor struct {
+	ActionVersion              int                  `json:"action_version,omitempty"`
 	ProviderCorrelationVersion int                  `json:"provider_correlation_version,omitempty"`
 	EnabledControl             string               `json:"enabled_control,omitempty"`
 	Ignored                    bool                 `json:"ignored,omitempty"`

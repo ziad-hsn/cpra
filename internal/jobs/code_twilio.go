@@ -69,7 +69,7 @@ func (c *CodeTwilioJob) Execute() (result Result) {
 	}
 	req.SetBasicAuth(c.AccountSID, c.AuthToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := GetHTTPClient(10 * time.Second).Do(req)
+	resp, err := doEffect(effectHTTPClient(10*time.Second), req)
 	if err != nil {
 		return Result{ID: c.ID, Ent: c.Entity, Err: err, Payload: payload}
 	}

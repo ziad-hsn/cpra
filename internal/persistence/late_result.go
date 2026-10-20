@@ -31,7 +31,12 @@ func validateLateResult(c Command) error {
 }
 
 func (e LateActionEvidence) validate(a Action) error {
-	if a.ExecutorKind == "agent" && (e.Outcome != "accepted" || !agentSuccess(a)) {
+	return e.validateAtFormat(a, ActionFormatVersion)
+}
+
+func (e LateActionEvidence) validateAtFormat(a Action, version int) error {
+	noEffect := actionStorageFormat(version) && e.Outcome == "rejected" && a.AgentReceipt == nil
+	if a.ExecutorKind == "agent" && !noEffect && (e.Outcome != "accepted" || !agentSuccess(a)) {
 		return ErrAgentReceiptConflict
 	}
 	if a.State != Unknown || (a.Kind != "intervention" && a.Kind != "code") || a.StartedAt.IsZero() || e.ExecutionStart.IsZero() ||
@@ -46,6 +51,10 @@ func (e LateActionEvidence) validate(a Action) error {
 // monitor incarnation. Recording evidence must not transfer that action to the
 // current configuration, change incident ownership, or grant another attempt.
 func applyLateResult(previous Monitor, c Command) Result {
+	return applyLateResultAtFormat(previous, c, ActionFormatVersion)
+}
+
+func applyLateResultAtFormat(previous Monitor, c Command, version int) Result {
 	action, ok := previous.Actions[c.ActionID]
 	if previous.ID != c.MonitorID || !ok || action.ID != c.ActionID || action.Revision != c.Revision ||
 		action.State != Unknown || action.StartedAt.IsZero() {
@@ -56,7 +65,7 @@ func applyLateResult(previous Monitor, c Command) Result {
 		outcome = "rejected"
 	}
 	evidence := LateActionEvidence{Outcome: outcome, ExecutionStart: c.ExecutionStart, ExecutionEnd: c.ExecutionEnd, RecordedAt: c.At}
-	if err := evidence.validate(action); err != nil {
+	if err := evidence.validateAtFormat(action, version); err != nil {
 		return Result{Err: err}
 	}
 	if action.LateEvidence != nil && action.LateEvidence.Outcome == outcome {

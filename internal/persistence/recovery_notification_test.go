@@ -34,7 +34,7 @@ func TestRecoveryNotificationWaitsForExhaustedAttempts(t *testing.T) {
 	for attempt := 1; attempt <= 2; attempt++ {
 		a := interventionAction(t, m)
 		m = policyStart(t, m, a, a.NotBefore)
-		m = policyOutcome(t, m, a, a.NotBefore.Add(time.Second), "failure", false)
+		m = policyOutcome(t, m, a, a.NotBefore.Add(time.Second), "failure", false, true)
 		count := 0
 		for _, action := range m.Actions {
 			if action.Kind == "code" {
@@ -56,7 +56,7 @@ func TestRecoveryNotificationWaitsForExhaustedAttempts(t *testing.T) {
 
 func TestRecoveryNotificationUnknownEndpointRemainsHeld(t *testing.T) {
 	m, first := recoveryNotificationFixture(t, NotifyRecoveryFailed)
-	m = policyOutcome(t, m, first, first.StartedAt.Add(time.Second), "failure", false)
+	m = policyOutcome(t, m, first, first.StartedAt.Add(time.Second), "failure", false, true)
 	rows := recoveryNotificationActions(m)
 	for _, a := range rows {
 		m = policyStart(t, m, a, a.NotBefore)
@@ -155,7 +155,7 @@ func TestRecoveryNotificationControlsAndReplay(t *testing.T) {
 func TestRecoveryNotificationReceiptAndEndpointIsolation(t *testing.T) {
 	m, recovery := recoveryNotificationFixture(t, NotifyRecoveryFailed)
 	at := recovery.StartedAt.Add(time.Second)
-	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: recovery.ID, At: at, Outcome: "failure"})
+	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: recovery.ID, At: at, Outcome: "failure", Retryable: true})
 	m = *r.Monitor
 	rows := recoveryNotificationActions(m)
 	if len(rows) != 2 {
@@ -253,7 +253,7 @@ func TestRecoveryNotificationSnapshotAndFormatBoundary(t *testing.T) {
 	config := testMonitor()
 	config.Policy = m.Policy
 	c := Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: policyTime()}
-	if err := validateCommand(c); err != nil || commandWriteFormat(c) != LifecycleFormatVersion || commandMinimumFormat(c) != RecoveryNotificationFormatVersion {
+	if err := validateCommand(c); err != nil || commandWriteFormat(c) != ActionFormatVersion || commandMinimumFormat(c) != RecoveryNotificationFormatVersion {
 		t.Fatal("configuration has no explicit format boundary", err)
 	}
 	raw, _ := json.Marshal(envelope{Version: AgentActionFormatVersion, Commands: []Command{c}})
@@ -271,7 +271,7 @@ func TestRecoveryNotificationSnapshotAndFormatBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != LifecycleFormatVersion || len(recoveryNotificationActions(i.Monitors[m.ID])) != 2 {
+	if i.Version != ActionFormatVersion || len(recoveryNotificationActions(i.Monitors[m.ID])) != 2 {
 		t.Fatal("snapshot lost committed failure notification policy or intents")
 	}
 	for _, row := range recoveryNotificationActions(i.Monitors[m.ID]) {

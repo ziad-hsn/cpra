@@ -48,7 +48,7 @@ func validateRecoveryReviewImage(i image) error {
 				return ErrExecutorUnfenced
 			}
 			if a.ConflictingEvidence != nil {
-				if a.ConflictingEvidence.validate(a) != nil || a.LateEvidence == nil || a.LateEvidence.Outcome == a.ConflictingEvidence.Outcome || a.Review == nil {
+				if a.ConflictingEvidence.validateAtFormat(a, i.Version) != nil || a.LateEvidence == nil || a.LateEvidence.Outcome == a.ConflictingEvidence.Outcome || a.Review == nil {
 					return ErrLateEvidenceConflict
 				}
 			}

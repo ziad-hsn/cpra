@@ -33,6 +33,7 @@ type RuntimePreparation struct {
 	Endpoints             map[string]manifest.Endpoint
 	NotificationGroups    manifest.NotificationGroups
 	NotificationTargets   map[string][]NotificationTarget
+	NotificationTimeouts  map[string][]time.Duration
 	Conditions            []persistence.CatalogCondition
 	CatalogIndex          uint64
 	MonitorUID            string
@@ -421,6 +422,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		}
 	}
 	out.Endpoints, out.NotificationGroups, out.NotificationTargets = map[string]manifest.Endpoint{}, manifest.NotificationGroups{}, map[string][]NotificationTarget{}
+	out.NotificationTimeouts = make(map[string][]time.Duration)
 	if spec.Notifications != nil {
 		monitor.Codes = manifest.Codes{}
 		for color, rule := range *spec.Notifications {
@@ -444,6 +446,11 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 					return RuntimePreparation{}, err
 				}
 				code.Notify, code.Config = resolved.InlineDriver.Type, config.(manifest.CodeNotification)
+				budget, err := c.notificationBudget(ctx, code.Config)
+				if err != nil {
+					return RuntimePreparation{}, err
+				}
+				out.NotificationTimeouts[color] = []time.Duration{budget}
 				out.NotificationTargets[color] = []NotificationTarget{{EndpointID: "$inline/" + monitorID + "/" + color, EndpointUID: resource.Metadata.UID, ResourceVersion: resource.Metadata.ResourceVersion, DriverType: resolved.InlineDriver.Type}}
 			} else if len(resolved.Targets) != 0 {
 				code.NotifyGroup = "cpra-runtime/" + monitorID + "/" + color
@@ -458,6 +465,11 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 						return RuntimePreparation{}, err
 					}
 					out.Endpoints[endpoint.EndpointID] = manifest.Endpoint{Type: driver.Type, Config: config.(manifest.CodeNotification)}
+					budget, err := c.notificationBudget(ctx, config.(manifest.CodeNotification))
+					if err != nil {
+						return RuntimePreparation{}, err
+					}
+					out.NotificationTimeouts[color] = append(out.NotificationTimeouts[color], budget)
 					group = append(group, endpoint.EndpointID)
 				}
 				out.NotificationGroups[code.NotifyGroup] = group

@@ -19,7 +19,7 @@ func TestWorkerScheduleDefaultExclusion(t *testing.T) {
 			}
 		}
 	}
-	if supportedFormat(30) || LatestFormatVersion != LifecycleFormatVersion {
+	if supportedFormat(30) || LatestFormatVersion != ActionFormatVersion {
 		t.Fatal("default format changed")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-30\n{}"), ""); err == nil {

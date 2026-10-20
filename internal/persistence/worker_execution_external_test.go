@@ -56,6 +56,12 @@ func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inli
 		}
 	}
 	guard := CatalogGuard{Conditions: catalogConditions(t, s, keys)}
+	if category == "notification" {
+		monitor.Policy.NotificationTimeouts = map[string][]time.Duration{"red": make([]time.Duration, monitor.Policy.Endpoints["red"])}
+		for n := range monitor.Policy.NotificationTimeouts["red"] {
+			monitor.Policy.NotificationTimeouts["red"][n] = time.Hour
+		}
+	}
 	now := time.Now().UTC()
 	result := submit(t, s, Command{Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision, Config: &monitor, Guard: &guard, At: now})[0]
 	if result.Err != nil || !result.Allowed {
@@ -76,6 +82,7 @@ func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inli
 			if category == "recovery" && a.Kind == "intervention" || category == "notification" && a.Kind == "code" && (inline && a.Endpoint == 0 || !inline && a.Endpoint == 1) {
 				in.ActionID = a.ID
 				in.Scheduled = a.NotBefore
+				in.Deadline = a.Deadline
 				break
 			}
 		}
@@ -177,7 +184,7 @@ func TestWorkerExecutionNotificationOriginalMixedOrdinal(t *testing.T) {
 	if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != LifecycleWorkerFormatVersion {
+	if s.fsm.image.Version != ActionWorkerFormatVersion {
 		t.Fatal("notification policy failed to advance format")
 	}
 	p := m.Policy.Clone()

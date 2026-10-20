@@ -179,6 +179,9 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time, versions
 	if c.SelectionVersion == 1 {
 		f.image.Version = max(f.image.Version, WorkerQueueFormatVersion)
 	}
+	if actionStorageFormat(version) {
+		f.image.Version = joinStorageFormat(f.image.Version, version)
+	}
 	response = record.Response.clone()
 	return Result{Allowed: true, Events: events, resultExtensions: resultExtensions{WorkerPoll: &response}}
 }

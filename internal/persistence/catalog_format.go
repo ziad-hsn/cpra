@@ -31,8 +31,8 @@ func commandWriteFormat(c Command) int {
 		version = joinStorageFormat(version, LifecycleFormatVersion)
 	}
 	switch c.Kind {
-	case "configure", "pulse", "start", "result", "recover", "remove":
-		version = joinStorageFormat(version, LifecycleFormatVersion)
+	case "configure", "pulse", "start", "result", "late_result", "recover", "remove":
+		version = joinStorageFormat(version, ActionFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
@@ -53,6 +53,9 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.Config != nil && requiresActionFormat(*c.Config) {
+		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if collectionProfileV2Command(c) || collectionFieldDiagnosticsCommand(c) {
 		return joinStorageFormat(LifecycleFormatVersion, commandExtensionMinimumFormat(c))
 	}

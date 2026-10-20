@@ -133,7 +133,7 @@ func validateAgentAction(version int, a Action) error {
 		return nil
 	}
 	if !agentActionStorageFormat(version) || (a.Kind != "intervention" && a.Kind != "code") ||
-		(a.State != Started && a.State != Unknown && a.State != Succeeded) {
+		(a.State != Started && a.State != Unknown && a.State != Succeeded && !(actionStorageFormat(version) && a.State == Failed && a.AgentReceipt == nil && !a.FinishedAt.IsZero())) {
 		return ErrAgentActionInvalid
 	}
 	if r := a.AgentReceipt; r != nil && (r.validate() != nil || r.ObservedAt.Before(a.StartedAt)) {

@@ -168,6 +168,9 @@ func (e *a2aHTTPError) Error() string { return fmt.Sprintf("A2A returned HTTP %d
 
 func (c *a2aClient) request(ctx context.Context, method string, target *url.URL, body []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
+		if method == http.MethodPost {
+			return nil, noEffect(err, false)
+		}
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, method, target.String(), bytes.NewReader(body))
@@ -185,8 +188,18 @@ func (c *a2aClient) request(ctx context.Context, method string, target *url.URL,
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	resp, err := c.http.Do(req)
+	var resp *http.Response
+	if method == http.MethodPost {
+		resp, err = doEffect(c.http, req)
+	} else {
+		resp, err = c.http.Do(req)
+	}
 	if err != nil {
+		if method == http.MethodPost {
+			if effect := ClassifyEffect(err); effect.Outcome == EffectNotApplied {
+				return nil, noEffect(errors.New("A2A message was not transmitted"), effect.Retryable)
+			}
+		}
 		return nil, a2aNetworkError(err)
 	}
 	defer func() { _ = resp.Body.Close() }()

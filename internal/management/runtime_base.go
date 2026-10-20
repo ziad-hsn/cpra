@@ -14,6 +14,10 @@ import (
 
 type runtimePreparationExtensions struct{}
 
+func (*Catalog) notificationBudget(_ context.Context, config manifest.CodeNotification) (time.Duration, error) {
+	return jobs.NotificationConfigBudget(config), nil
+}
+
 func (*Catalog) interventionBudget(_ context.Context, target manifest.InterventionTarget) (time.Duration, error) {
 	return jobs.InterventionBudget(target)
 }

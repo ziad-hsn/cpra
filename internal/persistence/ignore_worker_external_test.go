@@ -17,6 +17,7 @@ func TestWorkerHeartbeatControlAndIgnoreRecoveryNotices(t *testing.T) {
 			at := time.Now().UTC()
 			config := m.Clone()
 			config.Policy.Endpoints = map[string]int{color: 1}
+			config.Policy.NotificationTimeouts = map[string][]time.Duration{color: {time.Hour}}
 			config.Policy.Healthy = 1
 			config.Policy.WorkerNotificationSources = map[string][]WorkerNotificationSource{color: {{ID: in.Source.ID, UID: in.SourceUID, Revision: in.SourceRevision}}}
 			m = *submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &config, Guard: &in.Guard, At: at})[0].Monitor
@@ -36,6 +37,7 @@ func TestWorkerHeartbeatControlAndIgnoreRecoveryNotices(t *testing.T) {
 				t.Fatal("fixture must distinguish the notice from the retained incident")
 			}
 			in.ActionID, in.ControlRevision, in.Scheduled = action.ID, m.ControlRevision, action.NotBefore
+			in.Deadline = action.Deadline
 			if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 				t.Fatal("notice admission", err)
 			}

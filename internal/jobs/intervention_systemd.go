@@ -49,7 +49,7 @@ func (i *InterventionSystemdJob) Execute() (result Result) {
 	payload := map[string]interface{}{"type": "intervention", "driver": "systemd"}
 	conn, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
-		return Result{ID: i.ID, Ent: i.Entity, Err: fmt.Errorf("failed to connect to systemd: %w", err), Payload: payload}
+		return Result{ID: i.ID, Ent: i.Entity, Err: noEffect(fmt.Errorf("failed to connect to systemd: %w", err), transientBeforeEffect(err)), Payload: payload}
 	}
 	defer conn.Close()
 

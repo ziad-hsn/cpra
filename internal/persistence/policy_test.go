@@ -55,9 +55,10 @@ func policyStart(t *testing.T, m Monitor, action Action, at time.Time) Monitor {
 	return *r.Monitor
 }
 
-func policyOutcome(t *testing.T, m Monitor, action Action, at time.Time, outcome string, ambiguous bool) Monitor {
+func policyOutcome(t *testing.T, m Monitor, action Action, at time.Time, outcome string, ambiguous bool, retryable ...bool) Monitor {
 	t.Helper()
-	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: at, Outcome: outcome, Ambiguous: ambiguous})
+	retry := len(retryable) == 1 && retryable[0]
+	r := transition(m, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: at, Outcome: outcome, Ambiguous: ambiguous, Retryable: retry})
 	if r.Monitor == nil {
 		t.Fatal("known action result was rejected")
 	}
@@ -67,6 +68,7 @@ func policyOutcome(t *testing.T, m Monitor, action Action, at time.Time, outcome
 func TestPolicyRecoveryBoundAndCooldown(t *testing.T) {
 	p := testMonitor().Policy
 	p.Intervention, p.RecoveryMaxAttempts, p.RecoveryCooldown = true, 2, time.Minute
+	p.RecoveryTimeout = 2 * time.Minute
 	m := configuredPolicyMonitor(t, p)
 	firstAt := policyTime().Add(time.Second)
 	m = policyPulse(t, m, firstAt, "failure")
@@ -76,7 +78,7 @@ func TestPolicyRecoveryBoundAndCooldown(t *testing.T) {
 	}
 	m = policyStart(t, m, first, firstAt)
 	failedAt := firstAt.Add(time.Second)
-	m = policyOutcome(t, m, first, failedAt, "failure", false)
+	m = policyOutcome(t, m, first, failedAt, "failure", false, true)
 	m = policyPulse(t, m, failedAt.Add(time.Second), "failure")
 	second := interventionAction(t, m)
 	if second.ID == first.ID || second.Attempt != 2 || m.InterventionAttempts != 2 || second.NotBefore != failedAt.Add(time.Minute) {
@@ -158,10 +160,15 @@ func TestPolicyLegacyRecoveryBudgetAndFailureEvidence(t *testing.T) {
 		t.Fatal("legacy zero policy became unlimited recovery")
 	}
 	before.Policy.RecoveryMaxAttempts, before.Policy.RecoveryCooldown = 2, 5*time.Minute
-	m = policyPulse(t, before, a.NotBefore.Add(time.Minute), "failure")
+	command := Command{Kind: "pulse", MonitorID: before.ID, Revision: before.Revision, Generation: before.Generation + 1, At: a.NotBefore.Add(time.Minute), Outcome: "failure"}
+	m = *transitionAtFormat(before, command, FormatVersion).Monitor
 	next := interventionAction(t, m)
 	if next.Attempt != 2 || next.NotBefore != a.NotBefore.Add(time.Second+5*time.Minute) || m.LastInterventionFailure != a.NotBefore.Add(time.Second) {
 		t.Fatal("legacy confirmed failure lost its prior attempt/cooldown", next)
+	}
+	m = *transition(before, command).Monitor
+	if current := interventionAction(t, m); current.ID != a.ID || current.State != Failed || current.Retryable || !current.Deadline.IsZero() {
+		t.Fatal("migration invented retry permission or an original execution budget")
 	}
 }
 
@@ -213,9 +220,12 @@ func TestPolicyQueuedStartRechecksChangedRecoveryOptions(t *testing.T) {
 	m := policyPulse(t, configuredPolicyMonitor(t, p), policyTime().Add(time.Second), "failure")
 	a := interventionAction(t, m)
 	m = policyStart(t, m, a, a.NotBefore)
-	m = policyOutcome(t, m, a, a.NotBefore.Add(time.Second), "failure", false)
+	m = policyOutcome(t, m, a, a.NotBefore.Add(time.Second), "failure", false, true)
 	m = policyPulse(t, m, a.NotBefore.Add(2*time.Second), "failure")
 	second := interventionAction(t, m)
+	if second.State != Queued || second.ID == a.ID {
+		t.Fatal("fixture did not admit a fresh retry")
+	}
 	for _, scenario := range []string{"lower limit", "longer cooldown", "intervention disabled"} {
 		t.Run(scenario, func(t *testing.T) {
 			config := m.Clone()
@@ -340,6 +350,7 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	base := time.Now().UTC()
 	m := testMonitor()
 	m.Policy.Intervention, m.Policy.RecoveryMaxAttempts, m.Policy.RecoveryCooldown = true, 2, time.Hour
+	m.Policy.RecoveryTimeout = 2 * time.Hour
 	m.Policy.Maintenance = []MaintenanceWindow{{Start: base.Add(10 * time.Minute), End: base.Add(20 * time.Minute)}}
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: base})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, At: base.Add(time.Second), Outcome: "failure"})
@@ -347,10 +358,13 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	a := interventionAction(t, m)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore})
 	failedAt := a.NotBefore.Add(time.Second)
-	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: failedAt, Outcome: "failure"})
+	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: failedAt, Outcome: "failure", Retryable: true})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 2, At: failedAt.Add(time.Second), Outcome: "failure"})
 	m, _ = s.Get(m.ID)
 	second := interventionAction(t, m)
+	if second.ID == a.ID || second.State != Queued || !second.Deadline.Equal(a.Deadline) {
+		t.Fatal("confirmed rejection did not queue a retry within the original budget")
+	}
 	if err := s.Snapshot(); err != nil {
 		t.Fatal(err)
 	}

@@ -127,11 +127,11 @@ func (c *CodeOpsgenieJob) opsgenieRequest(ctx context.Context, method, target st
 	}
 	request, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, noEffect(err, false)
 	}
 	request.Header.Set("Authorization", "GenieKey "+c.APIKey)
 	request.Header.Set("Content-Type", "application/json")
-	response, err := effectHTTPClient(10 * time.Second).Do(request)
+	response, err := doEffect(effectHTTPClient(10*time.Second), request)
 	if err != nil {
 		return 0, nil, err
 	}

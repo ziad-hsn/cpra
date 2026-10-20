@@ -12,7 +12,7 @@ const LifecycleFormatVersion = 42
 const lifecycleSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-42\n"
 
 func lifecycleStorageFormat(version int) bool {
-	return version == LifecycleFormatVersion || version == 43 && externalStorageFormat(version)
+	return version == LifecycleFormatVersion || actionStorageFormat(version) || version == 43 && externalStorageFormat(version)
 }
 
 func requiresLifecycleFormat(m Monitor) bool {
@@ -66,6 +66,9 @@ func (m *Monitor) upgradeLifecycle() {
 }
 
 func validateLifecycle(m Monitor, version int) error {
+	if err := validateActionFormat(m, version); err != nil {
+		return err
+	}
 	if !requiresLifecycleFormat(m) {
 		return nil
 	}

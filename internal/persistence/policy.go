@@ -29,6 +29,10 @@ func (p Policy) Clone() Policy {
 		p.NotificationEndpointIDs[color] = slices.Clone(ids)
 	}
 	p.NotificationTriggers = maps.Clone(p.NotificationTriggers)
+	p.NotificationTimeouts = maps.Clone(p.NotificationTimeouts)
+	for color, values := range p.NotificationTimeouts {
+		p.NotificationTimeouts[color] = slices.Clone(values)
+	}
 	p.Maintenance = slices.Clone(p.Maintenance)
 	return p
 }
@@ -60,6 +64,16 @@ func (p Policy) Validate() error {
 		}
 		for _, id := range ids {
 			if !catalogIdentifier(id, 256) {
+				return ErrNotificationIdentity
+			}
+		}
+	}
+	for color, values := range p.NotificationTimeouts {
+		if len(values) != p.Endpoints[color] {
+			return ErrNotificationIdentity
+		}
+		for _, budget := range values {
+			if budget <= 0 || budget > 24*time.Hour {
 				return ErrNotificationIdentity
 			}
 		}
@@ -112,7 +126,8 @@ func (m Monitor) mayRetryRecovery() bool {
 	// Only a confirmed failure of the latest incident attempt permits an
 	// automatic retry. Operator assertions never manufacture provider facts.
 	a, ok := m.latestRecovery()
-	return ok && a.State == Failed && !a.FinishedAt.IsZero()
+	return ok && a.State == Failed && !a.FinishedAt.IsZero() &&
+		(m.ActionVersion != ActionFormatVersion || a.Retryable)
 }
 
 func (m Monitor) recoveryDue(at time.Time) time.Time {

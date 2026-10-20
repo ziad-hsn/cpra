@@ -408,10 +408,23 @@ Provider processing success does not prove a human received the notification.
 - Email uses an SMTP relay with STARTTLS. Username/password SMTP authentication is not implemented.
 - Teams uses a Workflow incoming webhook.
 - Pushover emergency priority needs `retry` and `expire` in seconds, defaulting to 60 and 1800.
-- HTTP notification server/gateway errors and timeouts leave the external outcome
-  unknown and held; they are not automatically replayed. Only confirmed retryable
-  rejection permits another controller-owned attempt, up to three attempts.
-  Acceptance does not confirm a human received the alert.
+- HTTP notification server/gateway errors, partial transmission and lost replies
+  leave the external outcome unknown and held. Connection refusal before sending,
+  certificate rejection during the handshake, and local file rejection before
+  writing are definite no-effect failures. Only a confirmed transient rejection
+  or no-effect failure permits another controller-owned attempt, up to three
+  attempts. Bad local configuration and trust failures need correction. Provider
+  acceptance does not confirm a human received the alert.
+- Ordinary notifications receive one 45-second budget when their intent is
+  committed. Each HTTP call is bounded by ten seconds and the remaining budget.
+  Retry, queue delay and restart never renew that budget; expired queued work
+  cannot start. Agent and external-worker notifications retain their configured
+  overall budgets. During storage upgrade, an old queued notification lacking a
+  recorded original deadline is canceled instead of acquiring a new budget.
+- `intervention.max_attempts` caps confirmed attempts within the original
+  recovery budget. It cannot authorize replay of an unknown external effect.
+  A separately authorized manual recovery has a new budget and still requires
+  the existing review, health and executor-fencing conditions.
 - Intervention completion reports “health verification pending.” A recovered
   health notification requires the configured successful-check threshold.
 

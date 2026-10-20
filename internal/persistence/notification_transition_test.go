@@ -58,7 +58,7 @@ func notificationTransitionFixtureAtFormat(t *testing.T, unfinished ActionState,
 func TestDeliveredNotificationSurvivesAnotherFailedCheck(t *testing.T) {
 	for _, unfinished := range []ActionState{Queued, Started, Unknown} {
 		t.Run(string(unfinished), func(t *testing.T) {
-			m, delivered, pending := notificationTransitionFixture(t, unfinished)
+			m, delivered, pending := notificationTransitionFixtureAtFormat(t, unfinished, ActionFormatVersion)
 			at := policyTime().Add(time.Second)
 			r := transition(m, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision,
 				Generation: m.Generation + 1, At: at.Add(250 * time.Millisecond), Outcome: "failure"})
@@ -126,14 +126,14 @@ func TestNotificationSnapshotThenNewObservation(t *testing.T) {
 	s.fsm.image.Monitors[m.ID] = m.Clone()
 	c := Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1,
 		At: policyTime().Add(1250 * time.Millisecond), Outcome: "failure"}
-	if commandWriteFormat(c) != LifecycleFormatVersion || commandMinimumFormat(c) != FormatVersion {
+	if commandWriteFormat(c) != ActionFormatVersion || commandMinimumFormat(c) != FormatVersion {
 		t.Fatal("new writer policy changed the historical reader minimum")
 	}
 	if r := submit(t, s, c)[0]; r.Err != nil {
 		t.Fatal(r.Err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(lifecycleSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
 		t.Fatal("snapshot did not preserve notification semantics")
 	}
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(raw))); err != nil {

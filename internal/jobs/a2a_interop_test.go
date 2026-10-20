@@ -74,9 +74,9 @@ func TestA2AUpstreamServer(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				transport := client.http.Transport.(*http.Transport).Clone()
+				transport := client.http.Transport.(effectTransport).RoundTripper.(*http.Transport).Clone()
 				transport.TLSClientConfig.RootCAs = roots
-				client.http.Transport = transport
+				client.http.Transport = effectTransport{transport}
 				t.Cleanup(transport.CloseIdleConnections)
 				identity := "committed-action-" + scenario
 				var receipt A2AReceipt

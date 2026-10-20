@@ -47,7 +47,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(record, repeated) {
 		t.Fatal("admission replay changed the original notification", err)
 	}
-	if s.fsm.image.Version != LifecycleWorkerFormatVersion {
+	if s.fsm.image.Version != ActionWorkerFormatVersion {
 		t.Fatal("inline source did not advance the storage format")
 	}
 	snap, err := s.fsm.Snapshot()
@@ -59,7 +59,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 	if err = snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(lifecycleWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(actionWorkerSnapshotMagic)) || bytes.Contains(sink.Bytes(), []byte("private-execution-parameters-canary")) {
 		t.Fatal("snapshot format or secrecy changed")
 	}
 	saved, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
@@ -84,7 +84,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 	for version := WorkerExecutionFormatVersion; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
 			t.Fatal("inline command format", version, err)
 		}
 	}
@@ -159,7 +159,7 @@ func TestWorkerNotificationPolicyKindsAndEndpointEncoding(t *testing.T) {
 	in, _ := inlineNotificationFixture(t, s)
 	m, _ := s.Get(in.MonitorID)
 	command := Command{Kind: "configure", Config: &m}
-	if commandWriteFormat(command) != LifecycleWorkerFormatVersion {
+	if commandWriteFormat(command) != ActionWorkerFormatVersion {
 		t.Fatal("configuration failed to stamp inline source format")
 	}
 	for _, kind := range []string{"Credential", "JobType", "monitor", "*"} {

@@ -280,7 +280,7 @@ func TestNotificationIdentitySnapshotRejectsOldFormat(t *testing.T) {
 	submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, At: policyTime()})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 1, Outcome: "failure", At: policyTime().Add(time.Second)})
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(lifecycleSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
 		t.Fatal("snapshot did not record its new storage boundary")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")

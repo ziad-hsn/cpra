@@ -74,8 +74,11 @@ func TestWorkerFinalizationAutomaticTimerSDKAndRestart(t *testing.T) {
 			if current.TotalChecks != before.TotalChecks || current.LastOutcome != before.LastOutcome || current.IncidentID != before.IncidentID {
 				t.Fatal("missing/late report changed health")
 			}
-			if category != "check" && current.Actions[retained.Intent.ActionID].State != persistence.Unknown {
-				t.Fatal("uncertain action was not held")
+			if category != "check" {
+				action, exists, err := f.store.ActionContext(t.Context(), retained.Intent.ActionID)
+				if err != nil || !exists || action.MonitorID != current.ID || action.State != persistence.Unknown || !action.Held {
+					t.Fatal("uncertain action was not held", err)
+				}
 			}
 			if err := f.handler.catalog.Verify(t.Context()); err != nil {
 				t.Fatal("finalized evidence authentication", err)

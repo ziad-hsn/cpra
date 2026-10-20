@@ -80,7 +80,9 @@ func (f *machine) recordReviewWork(previous Monitor, m *Monitor, at time.Time) {
 	changed := previous.ReviewAssessmentKey != reviewStateKey(*m, at)
 	if !changed {
 		for id, row := range f.actionWrites {
-			if row.MonitorID != m.ID || row.Action.Kind != "intervention" {
+			intervention := row.Action.Kind == "intervention"
+			replacedNotice := row.Action.Kind == "code" && row.Action.ReviewNotice != nil && row.Action.State == Cancelled && row.Action.Outcome == "worker_notification_changed"
+			if row.MonitorID != m.ID || !intervention && !replacedNotice {
 				continue
 			}
 			old, ok, err := f.actionForMonitor(previous, id)
@@ -105,13 +107,20 @@ func (f *machine) recordReviewWork(previous Monitor, m *Monitor, at time.Time) {
 				}
 				old, ok = r.Action, present
 			}
-			if !ok || old.Held() != row.Action.Held() || !reflect.DeepEqual(old.Review, row.Action.Review) {
-				if source != "" {
+			if !ok || intervention && (old.Held() != row.Action.Held() || !reflect.DeepEqual(old.Review, row.Action.Review)) || replacedNotice && (old.State != Cancelled || old.Outcome != row.Action.Outcome) {
+				actionID := id
+				if replacedNotice {
+					// Retiring an ungranted stale worker message must reassess its
+					// condition even if health has not changed again. The replacement
+					// still inherits the original delivery deadline.
+					actionID = row.Action.ReviewNotice.ActionID
+				}
+				if source != "" && source != actionID {
 					changed = true
 					source = ""
 					break
 				}
-				source = id
+				source = actionID
 			}
 		}
 	}
@@ -242,7 +251,9 @@ func (f *machine) assessmentInput(fact reviewFact, alert ReviewAlert) (Monitor, 
 				return m, e
 			}
 			if ok {
-				m.Actions[key] = a
+				// Assessment can revise an unstarted notice. Detach its payload so
+				// comparison with the current projection still detects that write.
+				m.Actions[key] = a.Clone()
 			}
 		}
 	}

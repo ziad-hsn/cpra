@@ -346,9 +346,9 @@ func verifyWorkerCapacityQueue(t *testing.T, fixture *mainManagementFixture, id,
 			terminal, ok := execution.TerminalReceipt()
 			found = ok && terminal.ReceiptID == receiptID && execution.Result != nil && (execution.Result.Input.Status == "unknown") == unknown
 			if unknown {
-				monitor, exists := store.Get(execution.Intent.MonitorID)
-				if !exists || monitor.Actions[execution.Intent.ActionID].State != persistence.Unknown {
-					t.Fatal("server did not hold the unknown incident action")
+				action, exists, err := store.ActionContext(t.Context(), execution.Intent.ActionID)
+				if err != nil || !exists || action.MonitorID != execution.Intent.MonitorID || action.State != persistence.Unknown || !action.Held {
+					t.Fatal("server did not hold the unknown incident action", err)
 				}
 			}
 			continue

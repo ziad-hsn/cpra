@@ -4,11 +4,53 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
+
+func TestReviewAssessmentDetachesCurrentDelivery(t *testing.T) {
+	for _, disk := range []bool{false, true} {
+		t.Run(fmt.Sprint(disk), func(t *testing.T) {
+			ledger := newLedgerTest(t, disk, 1<<20)
+			m, _, at := unknownRecoveryWithBlue(t)
+			opening := notificationByColor(t, m, "blue", Queued)
+			m = policyStart(t, m, opening, at.Add(time.Millisecond))
+			m = policyOutcome(t, m, opening, at.Add(2*time.Millisecond), "success", false)
+			m = policyPulse(t, m, at.Add(time.Second), "success")
+			m = policyPulse(t, m, at.Add(2*time.Second), "success")
+			closure := notificationByColor(t, m, "blue", Queued).Clone()
+			policy := testReviewPolicy(t, ledger, &m)
+			var rows []actionLedgerRow
+			for _, a := range m.Actions {
+				rows = append(rows, actionLedgerRow{MonitorID: m.ID, Action: a})
+			}
+			if _, err := ledger.CommitActionState(actionLedgerPosition{Index: 1}, rows, policy); err != nil {
+				t.Fatal(err)
+			}
+			before := m.Clone()
+			f := machine{collections: ledger, image: image{Monitors: map[string]Monitor{m.ID: m}, ActionStorage: &actionStorageState{Sequence: 1}}}
+			observed := m.Clone()
+			observed.LastOutcome = "failure"
+			fact := reviewFact{PolicyID: m.ReviewPolicyID, Fence: 1, At: at.Add(3 * time.Second), Context: reviewContext(observed, at.Add(3*time.Second))}
+			alert := m.Notifications.ReviewAlerts[closure.ReviewNotice.AlertID]
+			input, err := f.assessmentInput(fact, alert)
+			if err != nil {
+				t.Fatal(err)
+			}
+			input.assessReviewAlert(alert, fact.At, func(string, *Action) {})
+			updated := input.Actions[closure.ID]
+			if updated.ReviewNotice.Health != "unhealthy" || !updated.Deadline.Equal(closure.Deadline) {
+				t.Fatal("assessment lost current health or original deadline")
+			}
+			if !reflect.DeepEqual(f.image.Monitors[m.ID], before) {
+				t.Fatal("assessment mutated the authoritative projection before installation")
+			}
+		})
+	}
+}
 
 func TestReviewAssessmentRejectsReboundHistoricalRevision(t *testing.T) {
 	for _, disk := range []bool{false, true} {

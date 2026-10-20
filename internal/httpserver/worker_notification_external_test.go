@@ -48,13 +48,13 @@ func TestWorkerNotificationProductionReceiptAndUnknown(t *testing.T) {
 					t.Fatal("terminal notification received another executable grant", err)
 				}
 			}
-			monitor, _ := f.store.Get(record.Intent.MonitorID)
+			action, exists, err := f.store.ActionContext(t.Context(), record.Intent.ActionID)
 			want := persistence.Succeeded
 			if status == "unknown" {
 				want = persistence.Unknown
 			}
-			if monitor.Actions[record.Intent.ActionID].State != want {
-				t.Fatal("result did not update original action", monitor.Actions[record.Intent.ActionID].State)
+			if err != nil || !exists || action.MonitorID != record.Intent.MonitorID || action.State != want || action.Held != (status == "unknown") {
+				t.Fatal("result did not update original action", action.State, err)
 			}
 		})
 	}
@@ -116,16 +116,24 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				}
 				return saved
 			}
-			m := pulse("success")
-			var closure persistence.Action
-			for _, a := range m.Actions {
-				if a.ReviewNotice != nil && a.ReviewNotice.Phase == "close" && a.State == persistence.Queued {
-					closure = a
+			waitClosure := func(previous string) (persistence.Monitor, persistence.Action) {
+				t.Helper()
+				deadline := time.Now().Add(2 * time.Second)
+				for {
+					m, _ := f.store.Get(record.Intent.MonitorID)
+					for _, a := range m.Actions {
+						if a.ID != previous && a.ReviewNotice != nil && a.ReviewNotice.AlertID == record.Intent.Notification.Review.AlertID && a.ReviewNotice.Phase == "close" && a.State == persistence.Queued {
+							return m, a
+						}
+					}
+					if time.Now().After(deadline) {
+						t.Fatal("store maintenance did not admit the matching review closure")
+					}
+					time.Sleep(10 * time.Millisecond)
 				}
 			}
-			if closure.ID == "" {
-				t.Fatal("no verified-health closure")
-			}
+			pulse("success")
+			m, closure := waitClosure("")
 			old := prepare(m, closure)
 			var oldOffer api.Assignment
 			if offered {
@@ -135,7 +143,22 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				}
 				oldOffer = batch.Items[0]
 			}
-			m = pulse("failure")
+			pulse("failure")
+			assessmentDeadline := time.Now().Add(2 * time.Second)
+			for {
+				current, _ := f.store.Get(record.Intent.MonitorID)
+				updated, ok := current.Actions[closure.ID]
+				if ok && updated.ReviewNotice != nil && updated.ReviewNotice.Health == "unhealthy" {
+					if updated.State != persistence.Queued || updated.ReviewNotice.AlertID != closure.ReviewNotice.AlertID || updated.ReviewNotice.Phase != "close" || !updated.Deadline.Equal(closure.Deadline) {
+						t.Fatal("closure assessment changed original identity or budget")
+					}
+					break
+				}
+				if time.Now().After(assessmentDeadline) {
+					t.Fatal("store maintenance did not update the original closure's health")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
 			if _, err := f.store.FinalizeWorkerExecutions(t.Context(), time.Now().UTC(), 128); err != nil {
 				t.Fatal("retire stale closure", err)
 			}
@@ -149,9 +172,7 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 					t.Fatal("old message received execution grant", err)
 				}
 			}
-			m, _ = f.store.Get(m.ID)
-			alert := m.Notifications.ReviewAlerts[closure.ReviewNotice.AlertID]
-			replacement := m.Actions[alert.ClosingDelivery]
+			m, replacement := waitClosure(closure.ID)
 			if replacement.ID == closure.ID || !replacement.Deadline.Equal(closure.Deadline) {
 				t.Fatal("replacement changed original budget")
 			}
@@ -163,6 +184,10 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 			grant, err := client.Start(t.Context(), startWorkerOffer(batch.Items[0], api.StartModeBegin))
 			if err != nil || grant.Disposition != api.StartDispositionGranted || !grant.Deadline.Equal(closure.Deadline) {
 				t.Fatal("replacement did not retain authorized deadline", err)
+			}
+			underlying, exists, err := f.store.ActionContext(t.Context(), closure.ReviewNotice.ActionID)
+			if err != nil || !exists || underlying.State != persistence.Unknown || !underlying.Held {
+				t.Fatal("notification replacement changed the unknown intervention hold", err)
 			}
 		})
 	}

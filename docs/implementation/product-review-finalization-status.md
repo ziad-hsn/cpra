@@ -413,3 +413,30 @@ The ticket/finding table references these scoped checks and the preceding
 checkpoints. B3 and N41 require repository-administration capability that is not
 configured here. Native platform, provider-account, distribution and large-fleet
 qualification remain open; no artifact or documentation release is published.
+
+## Matrix findings after the first freeze
+
+The first frozen run at `3388789` was stopped after its A2A integration tests
+exposed stale fixture expectations. A proven permanent Docker rejection no longer
+consumes a second automatic attempt. Exhaustion cases now configure one attempt;
+separate two-attempt permanent-rejection cases assert one Docker call and no
+agent escalation. The focused race run passes. Terminal worker assertions read
+the indexed action record rather than assuming history remains in the operational
+monitor projection.
+
+The worker blue-closure check then reproduced two production defects: assessment
+shared a mutable notice pointer with the current action, and retiring an ungranted
+obsolete worker message did not enqueue another assessment. The repairs detach
+the assessment payload and schedule reconciliation for the original intervention
+identity. `review-assessment-alias-before-1` and
+`review-closure-detachment-after-1` preserve the separate failures;
+`review-closure-detachment-after-2` passes both the memory/disk immutability
+regression and the real HTTP worker cases under the race detector. The replacement
+retains its original deadline, the old offer receives no grant, and the unknown
+intervention remains held. The final matrix must run against the subsequent
+frozen commit.
+
+On `3388789`, 712 release-script tests, 47 documentation tests, private source
+synchronization and a strict 73-page site check (18,549 links/assets) passed.
+Those results identify that commit; they are not automatically attributed to the
+next freeze. The interrupted application matrix is retained as incomplete.

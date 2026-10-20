@@ -71,6 +71,9 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 	guard := persistence.CatalogGuard{Conditions: []persistence.CatalogCondition{{Key: root.Key, UID: root.UID, Revision: root.Revision}}}
 	monitor := persistence.Monitor{ID: root.Key.ID, Revision: uuid.NewString(), Policy: persistence.Policy{
 		Enabled: true, Interval: time.Minute, Healthy: 1, Unhealthy: 1, Intervention: category == "recovery", RecoveryBypass: true}}
+	if category == "recovery" || color == "blue" {
+		monitor.Policy.RecoveryTimeout = 5 * time.Second
+	}
 	if category == "notification" {
 		monitor.Policy.Endpoints = map[string]int{color: 1}
 		monitor.Policy.NotificationTimeouts = map[string][]time.Duration{color: {5 * time.Second}}
@@ -116,7 +119,21 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 			}
 			break
 		}
-		monitor, _ = f.store.Get(monitor.ID)
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			monitor, _ = f.store.Get(monitor.ID)
+			ready := false
+			for _, action := range monitor.Actions {
+				ready = ready || action.Kind == "code" && action.Color == "blue" && action.State == persistence.Queued
+			}
+			if ready {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("store maintenance did not admit the review notification")
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 	in := persistence.WorkerExecutionIntent{ID: uuid.NewString(), Revision: uuid.NewString(), MonitorID: monitor.ID, MonitorUID: monitor.CatalogUID,
 		MonitorRevision: monitor.Revision, ControlRevision: monitor.ControlRevision, Category: category, Source: source.Key, SourceUID: source.UID,

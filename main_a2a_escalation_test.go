@@ -22,18 +22,25 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 	for _, tc := range []struct {
 		source, name, trigger string
 		dockerStatus          int
+		maxAttempts           int
 		agentLost, heal       bool
 	}{
-		{"api", "exhausted", "recovery_exhausted", 404, false, false},
-		{"manifest", "exhausted", "recovery_exhausted", 404, false, false},
-		{"api", "first-attempt", "recovery_failed", 404, false, true},
-		{"api", "docker-server-error", "recovery_exhausted", 500, false, false},
-		{"api", "docker-lost-reply", "recovery_exhausted", 0, false, false},
-		{"api", "agent-lost-reply", "recovery_exhausted", 404, true, false},
+		{"api", "exhausted", "recovery_exhausted", 404, 1, false, false},
+		{"manifest", "exhausted", "recovery_exhausted", 404, 1, false, false},
+		{"api", "permanent-rejection", "recovery_exhausted", 404, 2, false, false},
+		{"manifest", "permanent-rejection", "recovery_exhausted", 404, 2, false, false},
+		{"api", "first-attempt", "recovery_failed", 404, 2, false, true},
+		{"api", "docker-server-error", "recovery_exhausted", 500, 2, false, false},
+		{"api", "docker-lost-reply", "recovery_exhausted", 0, 2, false, false},
+		{"api", "agent-lost-reply", "recovery_exhausted", 404, 1, true, false},
 	} {
 		t.Run(tc.source+"/"+tc.name, func(t *testing.T) {
 			fixture := newMainManagementFixture(t)
 			ctx := context.Background()
+			// A permanent Docker rejection cannot consume unused retry capacity.
+			// Exhaustion requires reaching the configured attempt limit; the
+			// recovery_failed trigger can notify on the first definite failure.
+			expectNotification := tc.dockerStatus == 404 && (tc.maxAttempts == 1 || tc.trigger == "recovery_failed")
 			var restarts, messages, checks atomic.Int32
 			var healthy atomic.Bool
 			investigationStarted := make(chan struct{})
@@ -122,7 +129,7 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 			}))
 			defer target.Close()
 			if tc.source == "manifest" {
-				body := map[string]any{"monitors": []any{map[string]any{"id": "escalation", "name": "Escalation", "enabled": false, "pulse_check": map[string]any{"type": "http", "interval": "250ms", "timeout": "1s", "unhealthy_threshold": 1, "healthy_threshold": 1, "config": map[string]any{"url": target.URL}}, "intervention": map[string]any{"action": "docker", "max_attempts": 2, "target": map[string]any{"container": "designated-test", "timeout": "1s"}}, "codes": map[string]any{"red": map[string]any{"trigger": tc.trigger, "notify": "a2a", "config": map[string]any{"url": agent.URL, "token": "isolated-agent-token", "allow_insecure_http": true, "timeout": "2s"}}}}}}
+				body := map[string]any{"monitors": []any{map[string]any{"id": "escalation", "name": "Escalation", "enabled": false, "pulse_check": map[string]any{"type": "http", "interval": "250ms", "timeout": "1s", "unhealthy_threshold": 1, "healthy_threshold": 1, "config": map[string]any{"url": target.URL}}, "intervention": map[string]any{"action": "docker", "max_attempts": tc.maxAttempts, "target": map[string]any{"container": "designated-test", "timeout": "1s"}}, "codes": map[string]any{"red": map[string]any{"trigger": tc.trigger, "notify": "a2a", "config": map[string]any{"url": agent.URL, "token": "isolated-agent-token", "allow_insecure_http": true, "timeout": "2s"}}}}}}
 				raw, _ := json.Marshal(body)
 				if err := os.WriteFile(fixture.options.manifest, raw, 0600); err != nil {
 					t.Fatal(err)
@@ -143,7 +150,7 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 				}
 				waitMainOperation(t, client, endpoint.OperationID)
 				check, _ := json.Marshal(api.PulseHTTPConfig{URL: api.Pointer(target.URL)})
-				spec := api.MonitorSpec{Enabled: api.Pointer(false), Check: api.CheckSpec{Interval: "250ms", Timeout: "1s", UnhealthyThreshold: api.Pointer(int64(1)), HealthyThreshold: api.Pointer(int64(1)), Driver: api.DriverConfig{Type: "http", Config: check}}, Recovery: &api.RecoverySpec{MaxAttempts: api.Pointer(int64(2)), Driver: api.DriverConfig{Type: "docker", Config: json.RawMessage(`{"container":"designated-test","timeout":"1s"}`)}}, Notifications: api.Pointer(map[string]api.AlertRule{"red": {Trigger: api.Pointer(api.AlertRuleTrigger(tc.trigger)), EndpointRefs: api.Pointer([]string{"investigator"})}})}
+				spec := api.MonitorSpec{Enabled: api.Pointer(false), Check: api.CheckSpec{Interval: "250ms", Timeout: "1s", UnhealthyThreshold: api.Pointer(int64(1)), HealthyThreshold: api.Pointer(int64(1)), Driver: api.DriverConfig{Type: "http", Config: check}}, Recovery: &api.RecoverySpec{MaxAttempts: api.Pointer(int64(tc.maxAttempts)), Driver: api.DriverConfig{Type: "docker", Config: json.RawMessage(`{"container":"designated-test","timeout":"1s"}`)}}, Notifications: api.Pointer(map[string]api.AlertRule{"red": {Trigger: api.Pointer(api.AlertRuleTrigger(tc.trigger)), EndpointRefs: api.Pointer([]string{"investigator"})}})}
 				if tc.heal {
 					spec.Check.Timeout = "10s"
 				}
@@ -193,7 +200,10 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 					if tc.dockerStatus != 404 && event.ActionKind == "intervention" && event.Kind == "action_unknown" {
 						terminal = event
 					}
-					if tc.dockerStatus == 404 && event.ActionKind == "code" && ((!tc.agentLost && event.Kind == "action_succeeded") || (tc.agentLost && event.Kind == "action_unknown")) {
+					if expectNotification && event.ActionKind == "code" && ((!tc.agentLost && event.Kind == "action_succeeded") || (tc.agentLost && event.Kind == "action_unknown")) {
+						terminal = event
+					}
+					if tc.dockerStatus == 404 && !expectNotification && event.ActionKind == "intervention" && event.Kind == "action_failed" {
 						terminal = event
 					}
 				}
@@ -209,7 +219,7 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tc.dockerStatus == 404 {
+			if expectNotification {
 				var sent map[string]any
 				select {
 				case sent = <-received:
@@ -217,14 +227,14 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 					t.Fatal("no independently received notification")
 				}
 				failure, ok := sent["recoveryFailure"].(map[string]any)
-				wantAttempt := 2
+				wantAttempt := tc.maxAttempts
 				if tc.heal {
 					wantAttempt = 1
 					if restarts.Load() != 1 {
 						t.Fatal("early escalation waited for or repeated a second recovery")
 					}
 				}
-				if !ok || len(failure) != 7 || failure["driver"] != "docker" || failure["outcome"] != "failure" || failure["trigger"] != tc.trigger || failure["attempt"] != float64(wantAttempt) || failure["maxAttempts"] != float64(2) || failure["actionId"] == "" {
+				if !ok || len(failure) != 7 || failure["driver"] != "docker" || failure["outcome"] != "failure" || failure["trigger"] != tc.trigger || failure["attempt"] != float64(wantAttempt) || failure["maxAttempts"] != float64(tc.maxAttempts) || failure["actionId"] == "" {
 					t.Fatal("incorrect or unsafe agent failure context", failure)
 				}
 				if terminal.RecoveryFailure == nil || action.Data.RecoveryFailure == nil || terminal.RecoveryFailure.ActionID != failure["actionId"] || action.Data.RecoveryFailure.ActionID != failure["actionId"] || terminal.IncidentID != sent["incidentId"] || messages.Load() != 1 {
@@ -232,6 +242,10 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 				}
 				if tc.agentLost && (!action.Data.Held || action.Data.State != "unknown") {
 					t.Fatal("lost notification reply was not held")
+				}
+			} else if tc.dockerStatus == 404 {
+				if messages.Load() != 0 || restarts.Load() != 1 || action.Data.Held || action.Data.State != "failed" || action.Data.RecoveryFailure != nil {
+					t.Fatal("permanent rejection retried, escalated as exhausted, or became unknown")
 				}
 			} else if messages.Load() != 0 || restarts.Load() != 1 || !action.Data.Held || action.Data.RecoveryFailure != nil {
 				t.Fatal("unknown recovery triggered or repeated an external action")
@@ -249,10 +263,20 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 				time.Sleep(25 * time.Millisecond)
 			}
 			recovered, err := restarted.Actions.Get(ctx, terminal.ActionID)
-			if err != nil || checks.Load() < beforeChecks+3 || restarts.Load() != beforeRestarts || messages.Load() != beforeMessages || recovered.Data.Held != action.Data.Held {
+			if err != nil || checks.Load() < beforeChecks+3 || restarts.Load() != beforeRestarts || messages.Load() != beforeMessages || recovered.Data.Held != action.Data.Held || recovered.Data.State != action.Data.State {
 				t.Fatal("restart repeated completed/unknown work or lost its hold", err)
 			}
 			stopRestarted()
+			wantMessages := int32(0)
+			if expectNotification {
+				wantMessages = 1
+			}
+			if restarts.Load() != 1 || messages.Load() != wantMessages {
+				t.Fatal("shutdown or restart repeated an external operation", restarts.Load(), messages.Load())
+			}
+			if tc.dockerStatus == 404 && !expectNotification && (recovered.Data.State != "failed" || recovered.Data.Held) {
+				t.Fatal("restart changed the permanent rejection outcome")
+			}
 		})
 	}
 }

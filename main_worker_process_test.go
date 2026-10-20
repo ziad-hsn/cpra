@@ -639,13 +639,13 @@ func runWorkerProcessCase(t *testing.T, binary, category, mode string) {
 		}
 	}
 	if category != "check" {
-		monitor, exists := store.Get(record.Intent.MonitorID)
+		action, exists, err := store.ActionContext(t.Context(), record.Intent.ActionID)
 		wantAction := persistence.Succeeded
 		if wantUnknown != 0 {
 			wantAction = persistence.Unknown
 		}
-		if !exists || monitor.Actions[record.Intent.ActionID].State != wantAction {
-			t.Fatal("committed result did not preserve the expected incident action state")
+		if err != nil || !exists || action.MonitorID != record.Intent.MonitorID || action.State != wantAction || action.Held != (wantUnknown != 0) {
+			t.Fatal("committed result did not preserve the expected incident action state", err)
 		}
 	}
 	effectsMu.Lock()

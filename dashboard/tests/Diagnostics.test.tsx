@@ -5,6 +5,7 @@ import { QueueDiagnostics, PoolDiagnostics } from '../src/components/QueueDiagno
 import { DurableStatus } from '../src/components/DurableStatus';
 import { api } from '../src/api/client';
 import type { QueueStats, SLOResponse, WorkerPoolStats } from '../src/api/types';
+import { formatDateTime } from '../src/lib/format';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const queue: QueueStats = { queue_depth: 120, capacity: 100, last_enqueue: '', last_dequeue: '', avg_queue_time: 25_000_000, max_queue_time: 300_000_000, dequeued: 20, enqueued: 140, dropped: 5,
@@ -93,11 +94,37 @@ it('shows all three latency distributions, exact attainment counts and recovery 
   expect(table).toHaveTextContent('(980 met)');
   expect(table).toHaveTextContent('10 / 5 / 10 / 20');
   expect(table).toHaveTextContent('Target execution is too slow');
-  expect(screen.getByText(/Reported coverage gap/)).toHaveTextContent('2026-09-13T23:56:00Z');
+  expect(screen.getByText(/Reported coverage gap/)).toHaveTextContent(formatDateTime(data.gap_start));
+  expect(screen.getByText(/Reported coverage gap/)).toHaveTextContent(formatDateTime(data.gap_end));
   expect(screen.getByText(/histogram estimates/)).toHaveTextContent('do not constitute an SLA guarantee');
   const pauses = screen.getByRole('list', { name: 'Intentional monitoring pauses' });
   expect(pauses).toHaveTextContent('Not reported currently paused');
   expect(pauses).toHaveTextContent('Not reported of pause time');
+  client.clear();
+});
+
+it.each([
+  [undefined, undefined, false],
+  ['0001-01-01T00:00:00Z', '0001-01-01T00:00:00Z', false],
+  ['invalid', 'invalid', false],
+  [undefined, '2026-09-13T23:56:00Z', true],
+  ['2026-09-13T23:55:00Z', undefined, true],
+  ['0001-01-01T00:00:00Z', '2026-09-13T23:56:00Z', true],
+] as const)('shows only known recovery-gap boundaries: %s / %s', async (start, end, visible) => {
+  vi.spyOn(api, 'getSLO').mockResolvedValue({ generated: '2026-09-14T00:00:00Z', window_seconds: 300,
+    queue_target_ms: 250, result_target_ms: 5000, coverage_complete: false, gap_start: start, gap_end: end, reports: [] });
+  vi.spyOn(api, 'getState').mockResolvedValue({ storage: { mode: 'raft', ready: true, committed_index: 1, commit_latency_ms: 0, snapshot_duration_ms: 0 }, actions: [] });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><DurableStatus /></QueryClientProvider>);
+  expect(await screen.findByText(/incomplete coverage because of startup/)).toBeInTheDocument();
+  const gap = screen.queryByText(/Reported coverage gap/);
+  if (visible) {
+    expect(gap).toHaveTextContent(formatDateTime(start) === '—' ? 'Start not reported' : formatDateTime(start));
+    expect(gap).toHaveTextContent(formatDateTime(end) === '—' ? 'End not reported' : formatDateTime(end));
+  } else {
+    expect(gap).not.toBeInTheDocument();
+  }
+  expect(document.body.textContent).not.toMatch(/0001-01-01|Invalid Date/);
   client.clear();
 });
 

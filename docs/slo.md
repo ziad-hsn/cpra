@@ -21,6 +21,11 @@ seconds; the interval after its last persisted watermark is identified as a
 recovery gap. It is not reconstructed by inventing observations. Per-monitor
 historical percentiles and raw successful check records are not retained.
 
+Gap boundaries are included only when recorded. Startup can have incomplete
+coverage without a recovery gap; it does not produce a date range. API timestamps
+use UTC, and the dashboard presents known boundaries in local time with the time
+zone. A partially known range identifies its missing endpoint as not reported.
+
 Erlang C with the Allen–Cunneen variability adjustment remains the initial worker
 capacity recommendation. Feedback uses a 30-second window evaluated every five
 seconds, at least 1,000 observations, and real queued work before reacting to a

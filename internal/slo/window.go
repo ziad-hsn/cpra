@@ -265,8 +265,8 @@ type View struct {
 	QueueTargetMS    float64   `json:"queue_target_ms"`
 	ResultTargetMS   float64   `json:"result_target_ms"`
 	CoverageComplete bool      `json:"coverage_complete"`
-	GapStart         time.Time `json:"gap_start,omitempty"`
-	GapEnd           time.Time `json:"gap_end,omitempty"`
+	GapStart         time.Time `json:"gap_start,omitzero"`
+	GapEnd           time.Time `json:"gap_end,omitzero"`
 	Reports          []Report  `json:"reports"`
 }
 
@@ -284,7 +284,7 @@ func (r *Recorder) ViewContext(ctx context.Context, at time.Time, duration time.
 	defer r.mu.Unlock()
 	r.flushPauses(at)
 	s := r.state
-	v := View{Generated: at, WindowSeconds: int(duration.Seconds()), QueueTargetMS: float64(s.QueueTarget) / float64(time.Millisecond), ResultTargetMS: float64(s.ResultTarget) / float64(time.Millisecond), GapStart: s.GapStart, GapEnd: s.GapEnd, Reports: []Report{}}
+	v := View{Generated: at.UTC(), WindowSeconds: int(duration.Seconds()), QueueTargetMS: float64(s.QueueTarget) / float64(time.Millisecond), ResultTargetMS: float64(s.ResultTarget) / float64(time.Millisecond), GapStart: s.GapStart.UTC(), GapEnd: s.GapEnd.UTC(), Reports: []Report{}}
 	v.CoverageComplete = !s.Started.After(at.Add(-duration)) && !s.GapEnd.After(at.Add(-duration))
 	epoch := at.UnixNano() / int64(SlotDuration)
 	slots := int64(duration / SlotDuration)

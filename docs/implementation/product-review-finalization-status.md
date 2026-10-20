@@ -619,3 +619,45 @@ evidence, source artifacts and other worktrees remain unchanged. The system's
 pre-existing non-dumpable user-session services were identified separately from
 the inspected task builders; cleanup does not claim access to their protected
 process details.
+
+### SLO observation correction after `52c2ae1`
+
+The completed private static, generation, frontend, documentation, archive-consumer,
+provider-fixture and four browser campaigns retain source identity `52c2ae1`.
+The corrected 20-command newcomer walkthrough also passed against that commit's
+hash-matched executables. Its first attempt mistakenly treated a pending incident
+as already open; the corrected helper waits for the same incident to open before
+restoring the target and then waits for closure. The failed attempt is retained.
+
+Inspecting the real-network scheduling telemetry exposed a remaining N47 defect:
+the dashboard's v1 SLO endpoint emitted year-one gap boundaries, although the v2
+mapping already omitted them. The late-HTTP sequence was stopped before source
+editing, with owned-process cleanup confirmed. Its interrupted result remains
+incomplete. The two completed 90-second scenarios retain their original progress
+results and aggregate latency-target failures; they do not qualify a later commit.
+
+The observation view now omits absent gap timestamps and projects known times to
+UTC without rewriting persisted state. The dashboard uses its existing local-time
+formatter, suppresses invented ranges and identifies a missing endpoint in a
+partially known range. Coverage, counters, histogram arithmetic, snapshot encoding
+and formats 44/45 are unchanged. Fresh, restored, partial and offset-input Go
+regressions reproduce the defect before the repair and pass afterward. The v1
+authenticated handler assertion covers the actual dashboard route. Go 1.26's full
+SLO package and focused Go 1.27.2 race checks pass; the rebuilt dashboard passes
+types, lint and all 600 tests. Independent source review closed the correction.
+`slo-gap-browser-after-1` passes the actual recovery-review browser scenario with
+race instrumentation, including UTC/absence checks on the response and rendered
+SLO panel. Restored and partial boundaries are covered by the Go and component
+cases. The complete new frozen checks remain required.
+
+The independent scheduling review also corrects earlier wording in this record:
+the action fixture exercises six healthy actions sharing one healthy destination
+alongside one stalled destination, separately for notification and intervention
+pools. It does not establish six independent healthy destination flows. Scenario
+pass flags assert progress; retained telemetry must separately establish sampled
+capacity bounds and measurement availability. Aggregate SLO misses remain visible.
+
+A fresh public GitHub API readback on 20 October reports private vulnerability
+reporting disabled; GitHub still detects no security policy on the default branch.
+The candidate's policy is not published by these private checks. Repository
+administration remains an external gate.

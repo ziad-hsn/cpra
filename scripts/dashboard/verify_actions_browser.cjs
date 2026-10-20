@@ -232,9 +232,10 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(reads.slice(observationsStart).every(path => !/^\/api\/v1\/monitors\/[^/]+$/.test(path)), 'stable-ID observation fell back to numeric detail');
     checkpoints.push('reader lists the actual latest incident with bounded snapshot metadata and returns to its stable-ID monitor');
 
-    const [stateResponse, readinessResponse] = await Promise.all([
+    const [stateResponse, readinessResponse, sloResponse] = await Promise.all([
       page.waitForResponse(response => new URL(response.url()).origin === origin && new URL(response.url()).pathname === '/api/v2/state'),
       page.waitForResponse(response => new URL(response.url()).origin === origin && new URL(response.url()).pathname === '/api/v2/readyz'),
+      observedJSONResponse(url => url.origin === origin && url.pathname === '/api/v1/slo', 'SLO observation'),
       page.getByRole('link', { name: 'System Health', exact: true }).click(),
     ]);
     check(stateResponse.ok() && readinessResponse.ok(), 'runtime observation endpoints failed for reader');
@@ -247,6 +248,20 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(await runtimeRegion.locator('dt').filter({ hasText: /^Storage availability$/ }).evaluate(element => element.nextElementSibling?.textContent) === 'Available', 'runtime panel lost storage availability');
     check(await runtimeRegion.locator('dt').filter({ hasText: /^Controller initialization and progress$/ }).evaluate(element => element.nextElementSibling?.textContent) === 'Ready', 'runtime panel lost controller readiness');
     checkpoints.push('actual state and readiness endpoints report usable Raft and controller progress despite the failed monitored target');
+    check(sloResponse.status === 200 && sloResponse.body.generated.endsWith('Z'), 'SLO observations did not report UTC generation time');
+    for (const field of ['gap_start', 'gap_end']) {
+      if (Object.hasOwn(sloResponse.body, field)) {
+        const value = sloResponse.body[field];
+        check(typeof value === 'string' && value.endsWith('Z') && !value.startsWith('0001-01-01'), 'SLO observations manufactured or misformatted a gap boundary');
+      }
+    }
+    const latencyRegion = page.getByRole('region', { name: 'Persistence and latency targets', exact: true });
+    await latencyRegion.getByText(/Measured .*second health-check window/).waitFor();
+    check(!(await latencyRegion.textContent()).includes('0001-01-01'), 'zero recovery-gap timestamps reached the dashboard');
+    if (!sloResponse.body.gap_start && !sloResponse.body.gap_end) {
+      check(await latencyRegion.getByText(/Reported coverage gap/).count() === 0, 'fresh SLO view displayed an invented recovery gap');
+    }
+    checkpoints.push('actual dashboard SLO observations omit absent recovery boundaries and use UTC wire timestamps');
 
     await page.getByRole('link', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'View metrics', exact: true }).waitFor();

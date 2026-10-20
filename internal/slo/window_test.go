@@ -1,9 +1,53 @@
 package slo
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+func TestViewJSONReportsOnlyRecordedUTCGaps(t *testing.T) {
+	at := time.Date(2026, 10, 20, 12, 0, 0, 0, time.FixedZone("operator", 3*60*60))
+	for _, name := range []string{"startup", "restored", "unknown_start"} {
+		t.Run(name, func(t *testing.T) {
+			recorder := New(at, 250*time.Millisecond, 5*time.Second)
+			want := map[string]string{"generated": at.Add(11 * time.Second).UTC().Format(time.RFC3339Nano)}
+			if name != "startup" {
+				state := recorder.Snapshot(at.Add(time.Second))
+				if name == "unknown_start" {
+					state.Persisted = time.Time{}
+				} else {
+					want["gap_start"] = state.Persisted.UTC().Format(time.RFC3339Nano)
+				}
+				recorder.Restore(state, at.Add(10*time.Second))
+				want["gap_end"] = at.Add(10 * time.Second).UTC().Format(time.RFC3339Nano)
+			}
+			view := recorder.View(at.Add(11*time.Second), 5*time.Minute, 1)
+			if view.CoverageComplete {
+				t.Fatal("startup or recovery must retain incomplete coverage")
+			}
+			encoded, err := json.Marshal(view)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(encoded, &fields); err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range []string{"generated", "gap_start", "gap_end"} {
+				value, present := fields[field]
+				expected, recorded := want[field]
+				if present != recorded {
+					t.Errorf("%s availability = %t, want %t", field, present, recorded)
+					continue
+				}
+				if recorded && string(value) != `"`+expected+`"` {
+					t.Errorf("%s = %s, want UTC %q", field, value, expected)
+				}
+			}
+		})
+	}
+}
 
 func TestPercentilesAndExactAttainment(t *testing.T) {
 	if len(bounds) >= BucketCount {

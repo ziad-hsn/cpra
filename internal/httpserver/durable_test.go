@@ -109,6 +109,9 @@ func TestDurableAPIsAuthenticateAndRemainReadOnly(t *testing.T) {
 			if w.Code != expected {
 				t.Fatal(path, w.Code, w.Body.String())
 			}
+			if auth && path == "/api/v1/slo" && (strings.Contains(w.Body.String(), `"gap_start"`) || strings.Contains(w.Body.String(), `"gap_end"`)) {
+				t.Fatal("fresh dashboard observations manufactured a recovery gap", w.Body.String())
+			}
 		}
 		r := httptest.NewRequest("POST", path, nil)
 		r.Header.Set("Authorization", "Bearer secret-for-test-01234567890123456789012345678901")

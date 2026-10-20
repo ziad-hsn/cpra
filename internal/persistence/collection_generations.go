@@ -301,17 +301,24 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 		return nil
 	}
 	started := time.Now()
+	deadline := started.Add(25 * time.Millisecond)
 	if !g.mu.TryLock() {
 		return nil
 	}
 	defer g.mu.Unlock()
+	// Discovery and sampling remain strictly cooperative. Retirement receives the
+	// original lifecycle context and this same deadline, so an admitted bounded
+	// durability/unlink unit can finish without disguising shutdown cancellation.
+	budgetContext, cancelBudget := context.WithDeadline(ctx, deadline)
+	defer cancelBudget()
 	condition := ""
+	transitioned := false
 	g.retirementPublicationError = nil
 	defer func() {
 		// One generation at most, outside controller/FSM ownership. File calls
 		// are cooperative; their time is included in the observed step duration.
-		if ctx.Err() == nil && time.Since(started) < 25*time.Millisecond {
-			g.sampleUsage(ctx)
+		if err == nil && !transitioned && budgetContext.Err() == nil && time.Now().Before(deadline) {
+			g.sampleUsage(budgetContext)
 		}
 		if errors.Is(err, errCollectionGCUnavailable) {
 			condition, err = "unavailable", nil
@@ -330,6 +337,9 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 	if g.closed {
 		return errCollectionLedgerClosed
 	}
+	if err := budgetContext.Err(); err != nil {
+		return err
+	}
 	if active := g.active.Load(); active != nil && !active.closedNative.Load() {
 		if err := g.publishLocked(active); err != nil {
 			return err
@@ -337,6 +347,9 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 	}
 	if g.catalog.Current == "" {
 		return nil
+	}
+	if err := budgetContext.Err(); err != nil {
+		return err
 	}
 	if g.retirement == nil {
 		if err := g.openRetirement(); err != nil {
@@ -347,7 +360,7 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 		// An admitted retirement has its own complete eligibility proof. Finish
 		// one transition before scanning for more work, so directory discovery
 		// cannot consume its budget or block it on an unrelated incomplete file.
-		step, err := g.retirement.Step(ctx, g.pending)
+		step, err := g.retirement.step(ctx, g.pending, deadline)
 		if g.retirementPublicationError != nil {
 			return g.retirementPublicationError
 		}
@@ -355,6 +368,7 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 			return err
 		}
 		if step.Phase != "idle" {
+			transitioned = true
 			g.pending = step.Generation
 			g.catalog.UnlinkedBytes += step.UnlinkedBytes
 			if step.Phase == "complete" {
@@ -362,6 +376,9 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 			}
 			return g.save()
 		}
+	}
+	if err := budgetContext.Err(); err != nil {
+		return err
 	}
 	if g.scan == nil {
 		g.scan, err = g.retirement.root.Open(".")
@@ -379,7 +396,7 @@ func (g *collectionGenerations) maintain(ctx context.Context) (err error) {
 	}
 	completedBefore := len(g.catalog.Completed)
 	for _, name := range names {
-		if err := ctx.Err(); err != nil {
+		if err := budgetContext.Err(); err != nil {
 			return err
 		}
 		if !collectionGCName(name) {

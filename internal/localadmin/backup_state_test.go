@@ -17,6 +17,13 @@ import (
 )
 
 func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
+	// The fixture commits only built-in state, even when the binary can also
+	// read external-worker formats. Capability alone must not upgrade a store.
+	testStoppedBackupStateFormat(t, persistence.ActionFormatVersion, nil)
+}
+
+func testStoppedBackupStateFormat(t *testing.T, wantFormat int, commitOptional func(*testing.T, *persistence.Store)) {
+	t.Helper()
 	for _, phase := range []string{"log-only", "snapshot", "snapshot-and-newer-log"} {
 		t.Run(phase, func(t *testing.T) {
 			root := t.TempDir()
@@ -42,6 +49,9 @@ func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
 				Principals: []persistence.AuthenticationPrincipal{{ID: "oncall", Role: "operator", TokenSHA256: hex.EncodeToString(verifier[:])}}}); err != nil {
 				t.Fatal(err)
 			}
+			if commitOptional != nil {
+				commitOptional(t, store)
+			}
 			if phase == "snapshot" {
 				if err := store.Snapshot(); err != nil {
 					t.Fatal(err)
@@ -65,8 +75,8 @@ func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
 			if err := json.Unmarshal(data, &manifest); err != nil {
 				t.Fatal(err)
 			}
-			if manifest.StateFormat != persistence.LatestFormatVersion {
-				t.Fatalf("backup does not identify committed state: state_format=%d, want %d (storage container format=%d)", manifest.StateFormat, persistence.LatestFormatVersion, manifest.StorageFormat)
+			if manifest.StateFormat != wantFormat {
+				t.Fatalf("backup does not identify committed state: state_format=%d, want %d (storage container format=%d)", manifest.StateFormat, wantFormat, manifest.StorageFormat)
 			}
 			original, err := readBackupManifest(filepath.Join(backup, "BACKUP.json"))
 			if err != nil {

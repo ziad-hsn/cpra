@@ -98,7 +98,8 @@ func newCollectionRetirement(directory string, guard collectionGCGuard) (_ *coll
 	if err != nil {
 		return nil, err
 	}
-	return &collectionRetirement{root: root, dir: dir, identity: identity, guard: guard}, nil
+	return &collectionRetirement{root: root, dir: dir, identity: identity, guard: guard,
+		clock: time.Now, checkpoint: collectionGCDirectoryCheckpoint}, nil
 }
 
 func collectionGCRead(root *os.Root, name string, mount collectionGCIdentity) ([]byte, os.FileInfo, collectionGCIdentity, error) {
@@ -273,11 +274,11 @@ func (r *collectionRetirement) openCandidate(name string, interrupted bool) (_ *
 	return candidate, nil
 }
 
-func collectionGCBefore(ctx context.Context, deadline time.Time) error {
+func (r *collectionRetirement) checkBudget(ctx context.Context, deadline time.Time) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if time.Now().After(deadline) {
+	if r.clock().After(deadline) {
 		return errCollectionGCBudget
 	}
 	return nil
@@ -286,13 +287,22 @@ func collectionGCBefore(ctx context.Context, deadline time.Time) error {
 // Step admits one retirement intent or unlinks at most one expected entry. It
 // never scans the collection root or recursively deletes. candidate is required
 // for admission and may be empty to resume an existing intent. Filesystem calls
-// (especially Sync/Remove) cannot be forcibly canceled; context/budget checks are
-// cooperative boundaries before work and immediately before each mutation.
+// cannot be forcibly canceled. The budget gates admission of a fixed-size
+// durability/unlink unit; caller cancellation is checked before each mutation.
+// An admitted unit finishes its mandatory checkpoint even after budget expiry.
 func (r *collectionRetirement) Step(ctx context.Context, candidate string) (result collectionGCStep, err error) {
 	if r == nil || ctx == nil {
 		return result, errCollectionGCBlocked
 	}
-	deadline := time.Now().Add(25 * time.Millisecond)
+	return r.step(ctx, candidate, r.clock().Add(25*time.Millisecond))
+}
+
+// step shares the owner's original maintenance deadline; opening or publication
+// earlier in the same turn cannot grant a fresh work budget.
+func (r *collectionRetirement) step(ctx context.Context, candidate string, deadline time.Time) (result collectionGCStep, err error) {
+	if r == nil || ctx == nil {
+		return result, errCollectionGCBlocked
+	}
 	if !r.mu.TryLock() {
 		return result, errCollectionGCBudget
 	}
@@ -300,7 +310,7 @@ func (r *collectionRetirement) Step(ctx context.Context, candidate string) (resu
 	if r.closed {
 		return result, errCollectionGCUnavailable
 	}
-	if err = collectionGCBefore(ctx, deadline); err != nil {
+	if err = r.checkBudget(ctx, deadline); err != nil {
 		return result, err
 	}
 	called := false
@@ -368,7 +378,7 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 		if keep == name {
 			return result, errCollectionGCBlocked
 		}
-		if err := collectionGCBefore(ctx, deadline); err != nil {
+		if err := r.checkBudget(ctx, deadline); err != nil {
 			return result, err
 		}
 		known, err := r.openCandidate(keep, false)
@@ -401,7 +411,7 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 		}
 		intent = &collectionGCIntent{Version: 1, StoreID: p.StoreID, NodeID: p.NodeID, Generation: name, Root: r.identity,
 			Directory: entry.identity, Database: entry.database, Marker: entry.marker, MarkerDigest: entry.markerHash}
-		if err := collectionGCBefore(ctx, deadline); err != nil {
+		if err := r.checkBudget(ctx, deadline); err != nil {
 			return result, err
 		}
 		if err := r.publishIntent(intent); err != nil {
@@ -414,15 +424,24 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 		entry.markerInfo != nil && (entry.marker != intent.Marker || entry.markerHash != intent.MarkerDigest) {
 		return result, errCollectionGCBlocked
 	}
+	if err := r.checkBudget(ctx, deadline); err != nil {
+		return result, err
+	}
 	// An earlier call may have written all bytes then failed its final sync.
 	// Re-establish the external intent durably before every destructive transition.
+	// Sync and one unlink form one admitted unit. Expiring the cooperative budget
+	// between them would repeat successful syncs forever on a consistently slow
+	// filesystem. Genuine cancellation and fresh identity checks still veto unlink.
 	if _, err := r.syncIntent(intentRaw); err != nil {
 		return result, err
 	}
-	if err := collectionGCDirectoryCheckpoint(entry.dir); err != nil {
+	if err := ctx.Err(); err != nil {
 		return result, err
 	}
-	if err := collectionGCBefore(ctx, deadline); err != nil {
+	if err := r.checkpoint(entry.dir); err != nil {
+		return result, err
+	}
+	if err := ctx.Err(); err != nil {
 		return result, err
 	}
 	leaf := "ledger.db"
@@ -439,22 +458,28 @@ func (r *collectionRetirement) stepProtected(ctx context.Context, deadline time.
 		if leaf == "generation.json" {
 			identity = entry.marker
 		}
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
 		if err := collectionGCRemove(entry.root, entry.dir, leaf, identity, false); err != nil {
 			return result, err
 		}
 		result.UnlinkedBytes, result.Phase = info.Size(), "removed-"+leaf
-		return result, collectionGCDirectoryCheckpoint(entry.dir)
+		return result, r.checkpoint(entry.dir)
 	}
 	current, err := r.root.Lstat(name)
 	anchored, statErr := entry.dir.Stat()
 	if err != nil || statErr != nil || !os.SameFile(current, anchored) {
 		return result, errCollectionGCBlocked
 	}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 	if err = collectionGCRemove(r.root, r.dir, name, entry.identity, true); err != nil {
 		return result, err
 	}
 	result.Phase = "removed-directory"
-	return result, collectionGCDirectoryCheckpoint(r.dir)
+	return result, r.checkpoint(r.dir)
 }
 
 func (r *collectionRetirement) publishIntent(intent *collectionGCIntent) error {
@@ -479,15 +504,18 @@ func (r *collectionRetirement) syncIntent(expected []byte) (collectionGCIdentity
 		_ = file.Close()
 		return collectionGCIdentity{}, errCollectionGCBlocked
 	}
-	return identity, errors.Join(file.Sync(), file.Close(), collectionGCDirectoryCheckpoint(r.dir))
+	return identity, errors.Join(file.Sync(), file.Close(), r.checkpoint(r.dir))
 }
 
 func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.Time, result collectionGCStep, intentRaw []byte, protection collectionGCProtection) (collectionGCStep, error) {
+	if err := r.checkBudget(ctx, deadline); err != nil {
+		return result, err
+	}
 	intentIdentity, err := r.syncIntent(intentRaw)
 	if err != nil {
 		return result, err
 	}
-	if err := collectionGCBefore(ctx, deadline); err != nil {
+	if err := ctx.Err(); err != nil {
 		return result, err
 	}
 	if protection.RecordRetired != nil {
@@ -495,16 +523,19 @@ func (r *collectionRetirement) finishIntent(ctx context.Context, deadline time.T
 			return result, err
 		}
 	}
-	if err := collectionGCBefore(ctx, deadline); err != nil {
+	if err := ctx.Err(); err != nil {
 		return result, err
 	}
 	currentRaw, _, identity, err := collectionGCRead(r.root, collectionGCIntentName, r.identity)
 	if err != nil || identity != intentIdentity || !bytes.Equal(currentRaw, intentRaw) {
 		return result, errCollectionGCBlocked
 	}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 	if err := collectionGCRemove(r.root, r.dir, collectionGCIntentName, intentIdentity, false); err != nil {
 		return result, err
 	}
 	result.Phase = "complete"
-	return result, collectionGCDirectoryCheckpoint(r.dir)
+	return result, r.checkpoint(r.dir)
 }

@@ -266,6 +266,14 @@ including `identity.json`, `raft.db`, `snapshots/`, and `history/` (catalog and 
 retained segments), together with `collections/` and its generation metadata.
 That Store-owned generation also contains retained action and review evidence;
 copying only the Raft database or snapshots is insufficient. Preserve permissions.
+Background generation cleanup retains the current and previous completed
+generations and any pinned readers. Each turn admits at most one bounded
+retirement transition under a 25 ms cooperative work allowance. A slow disk flush
+can finish later; the state endpoint reports the full step duration and
+`budget_exceeded`. This observation does not by itself mean storage has failed.
+Shutdown cancels cleanup and waits for its current filesystem operation and any
+required post-deletion checkpoint before releasing ownership. Unverifiable or
+unexpected files remain preserved for inspection.
 Keep the matching monitor manifest,
 runtime configuration, credential configuration and binary version separately.
 Credentials should remain in their existing secret-management arrangement.

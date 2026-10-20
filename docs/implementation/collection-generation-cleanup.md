@@ -1,6 +1,19 @@
 # Collection generation cleanup: implementation handoff
 
-**Current follow-up, 14 October 2026:** Store integration, native identity checks
+**Follow-up, 20 October 2026:** Slow successful preparation could repeatedly
+exhaust the cooperative budget immediately before unlink, leaving an admitted
+retirement unable to progress. The owner now passes its original deadline into
+retirement. After fresh eligibility checks, that deadline admits one bounded
+sync/unlink/checkpoint unit. True caller or shutdown cancellation still vetoes
+unlink; the elapsed budget does not force successful preparation to repeat
+indefinitely. No completed durability proof is reused across turns; this
+correction retains no additional native handles between turns.
+Focused Linux race tests cover each transition, the real background owner,
+shutdown ownership and observed overruns. The final source matrix and native
+macOS/Windows checks for this correction remain separate. See the
+[current verification record](product-review-finalization-status.md).
+
+**Follow-up, 14 October 2026:** Store integration, native identity checks
 for Linux/APFS/NTFS, bounded allocation observations and authenticated restore
 of an interrupted retirement are implemented. The maintenance-order regression
 and focused restore proof cases pass on Linux and natively on Windows x64/local
@@ -133,13 +146,26 @@ Initial budgets per maintenance step:
 | Active retirement intents | 1 |
 | Retirement state transitions | 1 |
 | Candidate file or directory unlinks | 1 |
-| Cooperative work budget | 25 ms |
+| Cooperative work budget before admission of a transition | 25 ms |
 
-Stop at the first applicable bound. Filesystem calls, especially sync/unlink,
-cannot be promised to finish within 25 ms; run them outside controller/Raft
-execution and account for elapsed time. Schedule the next step after one second
-while there is actionable work, and after 60 seconds when idle or blocked.
-Cancellation closes scan handles after the current filesystem call returns.
+Use one deadline from the start of the owner turn; publication and opening do
+not renew it. Stop discovery at the first applicable bound. After fresh
+eligibility checks, check the deadline before admitting one fixed-size
+durability/unlink unit. That unit re-synchronizes the intent, checks the exact
+target, performs at most one unlink and finishes its mandatory checkpoint.
+Finalization additionally publishes the retirement catalog before rechecking
+and removing the intent. Filesystem calls cannot be promised to finish within
+25 ms; perform them outside controller/Raft execution and report the full
+duration as `budget_exceeded` when an admitted unit overruns. This is a
+cooperative scheduling boundary, not filesystem atomicity or a hard deadline.
+
+Real caller/shutdown cancellation is still checked between preparation calls
+and before mutation. Cancellation after unlink cannot skip the required
+checkpoint. Store shutdown requests cancellation, drains maintenance and only
+then releases its storage ownership. Discovery and usage sampling retain the
+original deadline-bound child context; retirement uses the lifecycle context
+and separate admission deadline. The current Store runs one maintenance turn
+per second. No transition is followed by more discovery or usage sampling.
 
 An existing admitted retirement gets one transition before discovery scans.
 Successful transition work returns after its catalog/accounting checkpoint;

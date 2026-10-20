@@ -52,6 +52,8 @@ type Store struct {
 	installationID        string
 	installationReady     bool
 	collectionGenerations *collectionGenerations
+	maintenanceContext    context.Context
+	cancelMaintenance     context.CancelFunc
 	storeExtensions
 	administrative  bool
 	opening         bool
@@ -209,6 +211,7 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 		_ = s.Close()
 		return nil, err
 	}
+	s.maintenanceContext, s.cancelMaintenance = context.WithCancel(context.Background())
 	s.background.Add(1)
 	go s.maintain()
 	recovered, err := s.Submit(ctx, []Command{{Kind: "recover", At: time.Now().UTC()}})
@@ -738,9 +741,10 @@ func (s *Store) maintain() {
 				s.MarkUnavailable(err)
 			}
 		case <-collectionTicker.C:
-			gcContext, gcCancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
-			gcErr := s.collectionGenerations.maintain(gcContext)
-			gcCancel()
+			gcErr := s.collectionGenerations.maintain(s.maintenanceContext)
+			if s.maintenanceContext.Err() != nil {
+				return
+			}
 			if gcErr != nil {
 				s.MarkUnavailable(gcErr)
 			}
@@ -782,6 +786,9 @@ func (s *Store) Close() error {
 	s.closeOnce.Do(func() {
 		s.admissionMu.Lock()
 		close(s.stop)
+		if s.cancelMaintenance != nil {
+			s.cancelMaintenance()
+		}
 		s.admissionMu.Unlock()
 		<-s.done
 		s.background.Wait()

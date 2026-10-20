@@ -805,3 +805,67 @@ The checksum correction requires a new frozen candidate. Full archive-consumer
 verification precedes the remaining matrices so workspace resolution cannot hide
 this distribution mismatch. The collection contention result and external
 native-platform/provider/packaging/security-administration gates remain visible.
+
+### Collection retirement preparation and owner cancellation after `0bbcb4f`
+
+Further source review established a repeatable no-progress schedule: successful
+intent/directory synchronization could consume the 25 ms budget, causing the
+next unlink to be rejected on every turn. Missing-directory finalization had the
+same boundary. `cleanup-preparation-starvation-before-1` retains failing native
+fixtures for those two phases on Go 1.27.2/Linux amd64 with race instrumentation.
+The source defect is consistent with the earlier contended backup failure, but
+that old run has no phase timings and is not attributed to this cause.
+
+The correction retains one deadline from the owner's turn and checks it before
+admitting one bounded durability/unlink/checkpoint unit. Successful synchronization
+is not cached across turns. Fresh native identities, ownership, selection, pins,
+intent bytes, synchronous writes and the one-unlink limit remain mandatory. True
+caller/shutdown cancellation can still veto mutation; a completed unlink still
+receives its required checkpoint. Store maintenance uses its lifecycle context,
+and shutdown cancels and joins it before releasing exclusive storage ownership.
+Discovery and sampling retain their original deadline; successful retirement
+transitions return without further scanning or sampling. An overrun is observed,
+not described as a hard 25 ms bound or an atomic filesystem transaction.
+
+`cleanup-preparation-starvation-after-2` passes the focused primitive race tests.
+`cleanup-owner-budget-after-1` also passes owner, real background, shutdown,
+restart, snapshot, native-identity, protected-generation and interrupted-process
+regressions. The persistence package takes 28.892 seconds. The background fixture
+retires one generation, accounts for exactly 16,805,965 apparent bytes, retains
+the current/previous ledgers and committed input, and stays ready. Its final
+observed step takes 115.488 ms, with `budget_exceeded` reported. Apparent unlinked
+bytes are not measured physical free space. The subsequent test refinement
+requires the held-lock failure specifically and avoids holding the owner mutex
+across a collection read; its follow-up checks remain separately recorded.
+
+The ongoing all-built-in-driver matrix at `0bbcb4f` was deliberately stopped
+before editing. Its guard confirms interruption, unchanged source and completed
+owned-process cleanup; it is incomplete. The completed default matrix and four
+browser campaigns retain their original source identity. This correction needs
+a new frozen candidate and affected checks. No storage format, command envelope,
+SDK/worker archive payload or publication state changes in this repair.
+
+The tagged follow-up `cleanup-owner-tagged-backup-after-2` passes the persistence
+regressions and both collection backup/restore scenarios, but the complete
+invocation fails an unrelated backup-format assertion. That fixture committed
+only built-in state and incorrectly expected the binary's maximum supported
+format. The committed state correctly remains format 44, including in a tagged
+binary; committing optional JobType state requires format 45. Production format
+selection, backup inspection and restoration are unchanged.
+
+The corrected fixtures explicitly exercise both formats through log-only,
+snapshot-only and snapshot-plus-newer-log recovery. They retain authenticated
+manifest tampering, unsupported-format, restore-authority-reset and unchanged
+backup assertions. `cleanup-backup-format-after-1` passes both fixtures together
+with the owner/background/shutdown race regressions in the tagged build. Package
+times are 10.252 seconds for persistence and 10.840 seconds for local administration;
+the guard takes 68.489 seconds with a sampled peak of 4,407,320,576 task bytes.
+The background case again retires exactly 16,805,965 apparent bytes and reports
+its 110.183 ms final step honestly. `cleanup-backup-format-base-after-1` separately
+passes the shared fixture in an untagged race build, taking 5.843 package seconds.
+
+Independent source reviews close the cleanup correction and the backup-fixture
+correction without remaining findings in those scopes. The reviewers did not
+execute tests; the recorded invocations supply the separate execution evidence.
+These focused checks are private development evidence and do not replace the
+new frozen candidate's affected matrix or native-platform qualification.

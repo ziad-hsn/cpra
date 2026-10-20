@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -64,12 +65,14 @@ type collectionGCIdentity struct {
 }
 
 type collectionRetirement struct {
-	mu       sync.Mutex
-	root     *os.Root
-	dir      *os.File
-	identity collectionGCIdentity
-	guard    collectionGCGuard
-	closed   bool
+	mu         sync.Mutex
+	root       *os.Root
+	dir        *os.File
+	identity   collectionGCIdentity
+	guard      collectionGCGuard
+	closed     bool
+	clock      func() time.Time
+	checkpoint func(*os.File) error
 }
 
 func (r *collectionRetirement) Close() error {

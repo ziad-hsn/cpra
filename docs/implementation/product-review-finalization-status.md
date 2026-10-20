@@ -473,3 +473,36 @@ review. `active-agent-state-redaction-2` passes; the reviewer closed that findin
 `http-ledger-regression-1` passes the broader tagged HTTP-server suite under the
 race detector (300.5 seconds). These focused results precede the next frozen
 candidate; they do not replace its full matrix or required browser campaigns.
+
+### Frozen fixture corrections after `c673d0b`
+
+The next matrix exposed two test defects. The queue UTC test changed the global
+`time.Local` pointer while the worker library's background timers could read it.
+The two-test reproduction fails on both Go 1.26.0 and 1.27.2. A signal trace
+locates the observed crash in the race detector's symbolization callback; the
+exact runtime failure remains separate from the confirmed unsafe fixture write.
+The corrected test compares location identities without modifying global time
+configuration. A three-pass full queue race run with that correction passes;
+an isolated mutation removing UTC conversion still fails the timestamp checks.
+Original failures, traces and the deliberately failing mutation are retained.
+
+The collection preflight fixture also used an absolute notification filename
+under its private configuration directory. It now configures a separate log root
+and submits only a relative filename. Its unchanged-resource, operation identity,
+zero provider call, no file creation, restart and secret-exclusion checks remain;
+the response privacy assertion also covers the actual relative input value.
+The corrected real-application preflight passes with race instrumentation.
+Independent reviewers confirmed both corrections and their retained assertions.
+
+The `c673d0b` matrix is incomplete, with both original failures recorded. It was
+stopped before the remaining persistence package finished, and cleanup completed
+without a recorded error or surviving test process. Its static dashboard,
+generation, documentation and private archive-consumer checks passed. The Linux
+source vulnerability scan found no imported or called vulnerable package in all
+seven variants; the built-in variants retain the dependency-only OpenPGP advisory
+GO-2026-5932, whose packages are absent from their dependency inventories. These
+results are scoped to that commit and do not replace the corrected final matrix.
+
+`fixture-repairs-go1272-after-1` and `fixture-repairs-go1260-after-1` pass the
+actual checkout's corrected preflight, UTC and subprocess tests with the race
+detector. The reviewed diff changes only these two tests and this status record.

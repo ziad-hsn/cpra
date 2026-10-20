@@ -23,6 +23,11 @@ import (
 // process-crash, production-provider or large-collection qualification.
 func TestMainManagementCollectionPreflightDoesNotActivate(t *testing.T) {
 	fixture := newMainManagementFixture(t)
+	fixture.settings.Notifications.LogDirectory = filepath.Join(filepath.Dir(fixture.settings.Storage.Directory), "notification-output")
+	if err := os.Mkdir(fixture.settings.Notifications.LogDirectory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeMainRuntime(t, fixture.options.runtimeFile, fixture.settings)
 	var providerCalls atomic.Int64
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		providerCalls.Add(1)
@@ -48,8 +53,9 @@ func TestMainManagementCollectionPreflightDoesNotActivate(t *testing.T) {
 	private := filepath.Dir(fixture.options.runtimeFile)
 	secretMarker := "private-preflight-target-never-persisted"
 	secret := target.URL + "/" + secretMarker
-	logPath := filepath.Join(private, "notification-must-not-run.log")
-	logConfig, _ := json.Marshal(map[string]string{"file": logPath})
+	logName := "notification-must-not-run.log"
+	logPath := filepath.Join(fixture.settings.Notifications.LogDirectory, logName)
+	logConfig, _ := json.Marshal(map[string]string{"file": logName})
 	candidate := created.Data
 	candidate.Metadata.Name = api.Pointer("Proposed enabled service")
 	candidate.Spec.Enabled = api.Pointer(true)
@@ -109,7 +115,7 @@ func TestMainManagementCollectionPreflightDoesNotActivate(t *testing.T) {
 		}
 	}
 	raw, _ := json.Marshal(preflight)
-	for _, privateValue := range []string{secretMarker, target.URL, logPath, "private-source-", "identityKey", "sourceFingerprint"} {
+	for _, privateValue := range []string{secretMarker, target.URL, logPath, logName, "private-source-", "identityKey", "sourceFingerprint"} {
 		if bytes.Contains(raw, []byte(privateValue)) {
 			t.Fatal("preflight leaked private input")
 		}

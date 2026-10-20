@@ -8,9 +8,8 @@ import (
 )
 
 func TestStatsTimesAreUTCAndAbsentBeforeObservation(t *testing.T) {
-	previous := time.Local
-	time.Local = time.FixedZone("fixture", 5*60*60+30*60)
-	t.Cleanup(func() { time.Local = previous })
+	// Compare location identities without changing time.Local: background pool
+	// timers also read it, and Local and UTC are distinct even in a UTC zone.
 	for _, kind := range []string{"adaptive", "workiva", "hybrid", "fair"} {
 		t.Run(kind, func(t *testing.T) {
 			var q Queue

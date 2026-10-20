@@ -1073,11 +1073,11 @@ Helm creates one StatefulSet owner with retained storage; maintenance selects ze
 
 Qualification must exercise both Helm 3 and 4, including a 3-to-4 upgrade. The release gate requires real RWOP contention evidence on the selected CSI fixture, in addition to chart rendering. An RWO local-path test remains useful but cannot pass the default RWOP gate. A test CSI hostpath driver is not production storage certification; record and retest the actual filesystem/storage class/CSI stack before claiming it.
 
-Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
+Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments, and the complete Store-owned generations with their catalog, recovery progress and retained-action ledger. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
-Default builds support application storage formats **1–14, 31, 33, 35, 38, 40 and 42**. The
+Default builds support application storage formats **1–14, 31, 33, 35, 38, 40, 42 and 44**. The
 private `externaljobs` build additionally supports worker formats **15–30, 32,
-34, 36, 37, 39, 41 and 43**. [A2A driver settings](reference/jobs-reference.md) use common format
+34, 36, 37, 39, 41, 43 and 45**. [A2A driver settings](reference/jobs-reference.md) use common format
 31, recovery-failure notifications use 33, and retained agent connections use
 35. Combining those features with optional worker state requires formats 32,
 34 and 36 respectively; committed-order worker assignment uses 37. State-change
@@ -1086,7 +1086,10 @@ notification admission introduced common format 38 and combined worker format
 40 for notification identity, diagnostics and deadlines; combining this state
 with optional worker state requires format 41. Episode starts, Ignore state,
 control-transition notices and TLS policy use common format 42 and combined
-worker format 43. Supported historical envelopes
+worker format 43. Retained actions, review assertions and blue-notification
+assessments use the indexed ledger in common format 44 and combined worker
+format 45. See [persistence and recovery](durability.md) for migration and
+complete stopped-backup requirements. Supported historical envelopes
 retain their original notification semantics. The higher
 common formats do not make worker formats readable by default builds. The
 release metadata must record the

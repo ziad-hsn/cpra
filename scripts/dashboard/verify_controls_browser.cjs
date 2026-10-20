@@ -19,7 +19,13 @@ function check(value, message) { if (!value) throw new Error(message); }
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const writes = [];
-    page.on('request', request => { if (request.url().startsWith(origin + '/api/v2/') && request.method() !== 'GET') writes.push({ method: request.method(), path: new URL(request.url()).pathname }); });
+    page.on('request', request => {
+      if (request.url().startsWith(origin + '/api/v2/') && request.method() !== 'GET') {
+        const body = request.postDataJSON();
+        writes.push({ method: request.method(), path: new URL(request.url()).pathname,
+          precondition: request.headers()['if-match'], revision: body?.revision, reason: body?.reason });
+      }
+    });
     async function signIn(token = operator) {
       await page.getByRole('heading', { name: 'Sign in to CPRa' }).waitFor();
       await page.getByLabel('Bearer token').fill(token);
@@ -133,6 +139,38 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(await page.getByRole('dialog').count() === 0, 'navigation retained previous control draft');
     checks.push('navigation discards the previous monitor control draft');
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    const beforeMobile = await api('/api/v2/monitors/browser-controls');
+    const writesBeforeMobile = writes.length;
+    const mobileReason = 'Pause checks from the mobile operator session';
+    await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+    const mobileDialog = page.getByRole('dialog', { name: 'Snooze', exact: true });
+    check(await mobileDialog.getByRole('button', { name: 'Snooze', exact: true }).isDisabled(), 'mobile snooze accepted an empty reason');
+    await mobileDialog.getByLabel('Reason', { exact: true }).fill(mobileReason);
+    await mobileDialog.getByLabel('Duration').fill('5m');
+    await auditAccessibility(page, 'mobile-reasoned-snooze', accessibility);
+    check(await mobileDialog.evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'mobile control dialog clips horizontally');
+    await mobileDialog.getByRole('button', { name: 'Snooze', exact: true }).click();
+    await mobileDialog.waitFor({ state: 'hidden' });
+    await applied();
+    const mobileWrite = writes.at(-1);
+    check(writes.length === writesBeforeMobile + 1 && mobileWrite.method === 'POST' &&
+      mobileWrite.path === '/api/v2/monitors/browser-controls/snooze' &&
+      mobileWrite.precondition === `"${beforeMobile.status.controlRevision}"` &&
+      mobileWrite.revision === beforeMobile.status.controlRevision && mobileWrite.reason === mobileReason,
+    'mobile snooze lost its exact revision, reason or single-write boundary');
+    const mobileState = await api('/api/v2/monitors/browser-controls');
+    check(Date.parse(mobileState.status.snoozedUntil) > Date.now() &&
+      mobileState.status.controlRevision !== beforeMobile.status.controlRevision && mobileState.spec.enabled === true,
+    'mobile snooze did not change the committed control state');
+    await page.getByRole('cell', { name: mobileReason, exact: true }).waitFor();
+    const mobilePaused = await targetCount();
+    await page.waitForTimeout(700);
+    check(await targetCount() === mobilePaused, 'checks continued after applied mobile snooze');
+    await control('End snooze');
+    check(writes.length === writesBeforeMobile + 2, 'mobile unsnooze retried a mutation');
+    checks.push('mobile reasoned conditional snooze records its audit reason and pauses actual checks with one write; explicit unsnooze completes');
+
     await page.reload();
     await signIn(reader);
     await page.getByRole('heading', { name: 'Monitor controls' }).waitFor();
@@ -140,7 +178,7 @@ function check(value, message) { if (!value) throw new Error(message); }
     const storage = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }));
     check(!storage.includes(operator) && !storage.includes(reader), 'token persisted in browser storage');
     check(errors.length === 0, `uncaught browser errors: ${JSON.stringify(errors)}`);
-    check(writes.length === 10, `expected ten explicit control writes, got ${writes.length}`);
+    check(writes.length === 12, `expected twelve explicit control writes, got ${writes.length}`);
     checks.push('reader remains observational; no token storage, hidden retries or page errors');
     console.log(JSON.stringify({ scope: 'normal main startup, embedded SPA, TLS, encrypted Raft, owner loop, actual local HTTP target', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checks, writes, accessibility }, null, 2));
     await context.close();

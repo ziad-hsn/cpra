@@ -550,3 +550,41 @@ The corrected source requires a new freeze and final affected matrix. No result
 above qualifies publication. Only the inactive, task-owned Go compiler temporary
 directory from the interrupted run was removed after checking process mappings
 and open descriptors; logs and failing evidence remain retained.
+
+### Final acceptance-coverage corrections after `39d5d86`
+
+The release guide now agrees with the durability reference on formats 44/45,
+retained actions and the complete generation/catalog backup inventory.
+The real-server control scenario additionally performs mobile Snooze/Unsnooze
+at 390×844, asserting the required reason, exact revision precondition, one
+request per write, committed control state, audit history and actual check pause.
+`browser-mobile-write-after-1` passes under Go 1.27.2 race instrumentation
+(79.4 seconds). Existing reader, navigation and draft-discard assertions remain.
+Independent source review closed the additions; this focused run is separate
+from the complete frozen browser matrix.
+
+`TestNotificationRefusedReceiverRecoversThroughOwnerRetry` exercises an actual
+refused TCP connection, the committed controller start/result paths and the
+owner's retained retry schedule. The same reserved socket then accepts HTTP:
+two dispatches produce exactly one POST, preserve the delivery identity and
+original deadline, and admit no third action after further unhealthy checks.
+Duplicate result submission is idempotent. `notification-refusal-owner-after-1`
+passes under the race detector; independent source and output review closed this
+previously missing combined scenario. Its Store is memory-backed; separate
+restart, snapshot and disk tests retain their own evidence scopes.
+
+The concurrent `39d5d86` matrix, browser and release-script checks reached the
+6 GiB scratch guard and were terminated with successful owned-process cleanup.
+They are incomplete, not passing or reproduced application failures. Subsequent
+heavy campaigns run sequentially. Only inactive compiler directories and two
+superseded task binaries plus the old queue diagnostic executable were removed;
+their paths/sizes and binary hashes are recorded with the cleanup evidence.
+The original logs and failing baseline records remain retained.
+
+The private newcomer runner now includes actual target shutdown/rebind and
+incident opening/closure with the documented 30-second cadence and thresholds.
+It still requires execution against newly built, hash-matched candidate binaries.
+Final evidence must not attribute a binary to HEAD merely because the runner
+records HEAD. Likewise, the 0/500/5,000 action-growth test proves bounded hot-path
+work using failed/rejected actions; unknown/review/blue and authenticated restore
+semantics are separate smaller tests, not that entire scale/lifecycle combination.

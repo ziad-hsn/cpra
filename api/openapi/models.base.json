@@ -1201,7 +1201,18 @@
             "type": "object",
             "additionalProperties": {
               "$ref": "#/components/schemas/AlertRule"
-            }
+            },
+            "propertyNames": {
+              "enum": [
+                "yellow",
+                "red",
+                "cyan",
+                "green",
+                "gray",
+                "blue"
+              ]
+            },
+            "description": "Explicit per-color destinations. Blue reports an uncertain recovery requiring review and never inherits red destinations."
           },
           "maintenance": {
             "type": "array",
@@ -1328,6 +1339,14 @@
             "type": "integer",
             "format": "int64",
             "description": "Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome."
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "description": "Non-fatal configuration advisories. They do not change observed service health."
           }
         },
         "required": [],
@@ -1702,6 +1721,27 @@
           },
           "cause": {
             "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "reviewNotice": {
+            "$ref": "#/components/schemas/ReviewNotice"
+          },
+          "color": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "deliveryID": {
+            "type": "string",
+            "x-go-name": "DeliveryID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "endpointID": {
+            "type": "string",
+            "x-go-name": "EndpointID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "notificationEpisode": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
           }
         },
         "required": [
@@ -2128,6 +2168,14 @@
             "minimum": 0,
             "maximum": 10000000,
             "description": "Declared frozen collection size. Required by collection protocol receipts; absent for non-collection operations. Null is unsupported."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Advisory findings; they do not invalidate a configuration."
           }
         },
         "required": [
@@ -3078,6 +3126,13 @@
               }
             },
             "description": "Supported operations by resource; availability does not grant authorization.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "notificationColors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "x-go-type-skip-optional-pointer": true
           }
         },
@@ -5067,6 +5122,37 @@
           "items",
           "snapshot",
           "generatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewNotice": {
+        "type": "object",
+        "description": "A review-needed notification condition. Its closure does not resolve the underlying uncertain action.",
+        "properties": {
+          "alertID": {
+            "type": "string",
+            "x-go-name": "AlertID"
+          },
+          "actionID": {
+            "type": "string",
+            "x-go-name": "ActionID"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "health": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "alertID",
+          "actionID",
+          "phase",
+          "health"
         ],
         "additionalProperties": false
       }

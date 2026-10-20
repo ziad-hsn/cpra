@@ -3,6 +3,7 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -48,7 +49,7 @@ func truncateNotification(text string, limit int) string {
 	return text
 }
 
-func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message string) error {
+func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message string, identities ...notificationIdentity) error {
 	if strings.ContainsAny(cfg.Subject, "\r\n") {
 		return noEffect(fmt.Errorf("email subject contains a newline"), false)
 	}
@@ -99,7 +100,19 @@ func sendEmail(ctx context.Context, cfg manifest.CodeNotificationEmail, message 
 	if subject == "" {
 		subject = "CPRa monitoring alert"
 	}
-	text := "From: " + from.String() + "\r\nTo: " + strings.Join(to, ", ") + "\r\nSubject: " + mime.QEncoding.Encode("UTF-8", subject) + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + message
+	at, delivery := time.Now().UTC(), ""
+	if len(identities) == 1 {
+		if !identities[0].At.IsZero() {
+			at = identities[0].At.UTC()
+		}
+		delivery = identities[0].DeliveryID
+	}
+	if delivery == "" {
+		delivery = at.Format(time.RFC3339Nano) + cfg.From + cfg.To + message
+	}
+	messageID := fmt.Sprintf("<%x@cpra.invalid>", sha256.Sum256([]byte(delivery)))
+	text := "From: " + from.String() + "\r\nTo: " + strings.Join(to, ", ") + "\r\nSubject: " + mime.QEncoding.Encode("UTF-8", subject) +
+		"\r\nDate: " + at.Format(time.RFC1123Z) + "\r\nMessage-ID: " + messageID + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + message
 	if _, err := out.Write([]byte(text)); err != nil {
 		return err
 	}

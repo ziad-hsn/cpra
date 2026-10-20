@@ -116,7 +116,7 @@ def generate():
     if not all(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9]*", name) and isinstance(value, str) and 0 < len(value) < 256 for name, value in messages.items()):
         raise ValueError("Invalid validation message catalog")
     lines.append("\nexport const validationMessages: Readonly<Record<string, string>> = " + json.dumps(messages, indent=2, sort_keys=True) + ";")
-    field_names = {"pulsecheck", "intervention", "codes", "notify", "notifygroup", "notificationgroups", "endpoints", "monitors", "red", "yellow", "green", "cyan", "gray"}
+    field_names = {"pulsecheck", "intervention", "codes", "notify", "notifygroup", "notificationgroups", "endpoints", "monitors", "red", "yellow", "green", "cyan", "gray", "blue"}
 
     def collect_fields(value):
         if isinstance(value, dict):
@@ -129,6 +129,7 @@ def generate():
 
     collect_fields(schemas)
     lines.append("\nexport const validationFieldNames = new Set<string>(" + json.dumps(sorted(field_names)) + ");")
+    lines.append("\nexport const notificationColors = " + json.dumps(schemas["MonitorSpec"]["properties"]["notifications"]["propertyNames"]["enum"]) + " as const;")
     operations = {}
     for item in json.loads(operation_path.read_text()):
         if item["buildTag"]:

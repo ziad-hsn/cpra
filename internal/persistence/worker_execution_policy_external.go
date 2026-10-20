@@ -67,12 +67,12 @@ func clonePolicyExtensions(p Policy) policyExtensions {
 	return out
 }
 func validatePolicyExtensions(p Policy) error {
-	if len(p.WorkerNotificationSources) > 5 {
+	if len(p.WorkerNotificationSources) > 6 {
 		return ErrWorkerExecutionInvalid
 	}
 	total := 0
 	for color, sources := range p.WorkerNotificationSources {
-		if color != "red" && color != "yellow" && color != "green" && color != "cyan" && color != "gray" {
+		if color != "red" && color != "yellow" && color != "green" && color != "cyan" && color != "gray" && color != "blue" {
 			return ErrWorkerExecutionInvalid
 		}
 		if len(sources) == 0 || len(sources) != p.Endpoints[color] || len(sources) > 10000 {

@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
+import type { CpraCode } from '../theme/tokens';
 
 interface KpiTileProps {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   loading?: boolean;
-  code?: 'red' | 'yellow' | 'green' | 'cyan' | 'gray';
+  code?: CpraCode;
   icon?: IconName;
   trend?: { dir: 'up' | 'down' | 'flat'; label: string };
 }
@@ -17,6 +18,7 @@ const ACCENT: Record<NonNullable<KpiTileProps['code']>, string> = {
   green: 'var(--status-operational)',
   cyan: 'var(--status-info)',
   gray: 'var(--status-disabled)',
+  blue: 'var(--status-review)',
 };
 
 export function KpiTile({ label, value, sub, loading, code, icon, trend }: KpiTileProps) {

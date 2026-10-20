@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"time"
 )
@@ -83,6 +84,25 @@ func workerFinalizationReason(r WorkerExecutionRecord, owner string, at time.Tim
 	return ""
 }
 
+func (f *machine) workerFinalizationReason(r WorkerExecutionRecord, owner string, at time.Time) string {
+	if reason := workerFinalizationReason(r, owner, at); reason != "" {
+		return reason
+	}
+	if _, terminal := r.TerminalReceipt(); terminal || r.Intent.Notification == nil || at.Before(r.CreatedAt) || !at.Before(r.Intent.Deadline) || r.OwnerEpoch != owner {
+		return ""
+	}
+	if l := r.Lifecycle; l != nil && (l.GrantID != "" || !l.StartedAt.IsZero() || l.Heartbeat != nil || at.Before(l.UpdatedAt)) {
+		return ""
+	}
+	m, exists := f.image.Monitors[r.Intent.MonitorID]
+	a, ok := m.Actions[r.Intent.ActionID]
+	if exists && ok && actionStorageFormat(m.ActionVersion) && a.State == Queued && a.ReviewNotice != nil &&
+		a.CatalogUID == r.Intent.MonitorUID && a.Revision == r.Intent.MonitorRevision && !reflect.DeepEqual(r.Intent.Notification, NotificationForWorker(a)) {
+		return "notification_changed"
+	}
+	return ""
+}
+
 func workerFinalizationReceipt(r WorkerExecutionRecord, index uint64) WorkerReceipt {
 	receipt := WorkerReceipt{ExecutionID: r.Intent.ID, Disposition: "finalized",
 		ReceiptID: identity(fmt.Sprintf("cpra/worker/finalization/v1\x00%s\x00%s\x00%d", r.Intent.ID, r.Intent.Revision, index))}
@@ -121,7 +141,7 @@ func (f *machine) applyWorkerFinalization(c WorkerFinalizeCommand, at time.Time,
 	if _, terminal := old.TerminalReceipt(); terminal {
 		return Result{Allowed: true}
 	}
-	reason := workerFinalizationReason(old, c.OwnerEpoch, at)
+	reason := f.workerFinalizationReason(old, c.OwnerEpoch, at)
 	if reason == "" {
 		return Result{Err: ErrWorkerExecutionConflict}
 	}
@@ -197,13 +217,22 @@ func (f *machine) workerFinalizationTransition(r WorkerExecutionRecord, at time.
 			return nil, nil
 		}
 		a.State, a.Outcome = Cancelled, "worker_not_started"
+		if actionStorageFormat(previous.ActionVersion) && a.Kind == "code" {
+			if !at.Before(a.Deadline) {
+				a.Outcome = "notification_deadline"
+			} else if in.Notification != nil && !reflect.DeepEqual(in.Notification, NotificationForWorker(a)) {
+				a.Outcome = "worker_notification_changed"
+			}
+		}
 	}
 	a.FinishedAt = at
 	m := previous.Clone()
 	m.Actions[a.ID] = a
+	m.recordNotificationCancellation(a)
 	event := Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, Revision: a.Revision, At: at,
 		Type: typeName, IncidentID: a.IncidentID, ActionID: a.ID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome}
-	return &m, []Event{event}
+	events := append([]Event{event}, m.assessReviewAlertEvents(at)...)
+	return &m, events
 }
 
 func validateWorkerFinalization(i image, r WorkerExecutionRecord) error {
@@ -240,6 +269,11 @@ func validateWorkerFinalization(i image, r WorkerExecutionRecord) error {
 		if v.OwnerEpoch != r.OwnerEpoch || r.Lifecycle == nil || r.Lifecycle.GrantID != "" || !v.RecordedAt.Before(r.Intent.Deadline) {
 			return ErrWorkerExecutionInvalid
 		}
+	case "notification_changed":
+		if !actionStorageFormat(i.Version) || r.Intent.Notification == nil || r.Intent.Notification.Review == nil || v.OwnerEpoch != r.OwnerEpoch || !v.RecordedAt.Before(r.Intent.Deadline) ||
+			r.Lifecycle != nil && (r.Lifecycle.GrantID != "" || !r.Lifecycle.StartedAt.IsZero() || r.Lifecycle.Heartbeat != nil) {
+			return ErrWorkerExecutionInvalid
+		}
 	default:
 		return ErrWorkerExecutionInvalid
 	}
@@ -272,7 +306,7 @@ func (s *Store) FinalizeWorkerExecutions(ctx context.Context, at time.Time, limi
 				unlock()
 				return 0, err
 			}
-			if _, terminal := record.TerminalReceipt(); !terminal && workerFinalizationReason(record, s.executorSession, at) != "" {
+			if _, terminal := record.TerminalReceipt(); !terminal && s.fsm.workerFinalizationReason(record, s.executorSession, at) != "" {
 				ids = append(ids, id)
 			}
 		}

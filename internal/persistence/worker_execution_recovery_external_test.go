@@ -295,11 +295,11 @@ func TestWorkerExecutionFrozenDigestProjection(t *testing.T) {
 		t.Fatalf("frozen v1 digest changed: %s", got)
 	}
 	live, frozen := reflect.TypeFor[WorkerExecutionIntent](), reflect.TypeFor[workerExecutionIntentDigestV1]()
-	if live.NumField() != frozen.NumField()+1 || live.Field(0).Name != "Schedule" || live.Field(0).Type != reflect.TypeFor[*WorkerScheduleTicket]() || live.Field(0).Tag != `json:"schedule,omitempty"` {
+	if live.NumField() != frozen.NumField()+2 || live.Field(0).Name != "Notification" || live.Field(0).Type != reflect.TypeFor[*WorkerNotification]() || live.Field(0).Tag != `json:"notification,omitempty"` || live.Field(1).Name != "Schedule" || live.Field(1).Type != reflect.TypeFor[*WorkerScheduleTicket]() || live.Field(1).Tag != `json:"schedule,omitempty"` {
 		t.Fatal("new intent field requires explicit identity review")
 	}
 	for n := 0; n < frozen.NumField(); n++ {
-		a, b := live.Field(n+1), frozen.Field(n)
+		a, b := live.Field(n+2), frozen.Field(n)
 		if a.Name != b.Name || a.Type != b.Type || a.Tag != b.Tag {
 			t.Fatal("intent projection not reviewed", a.Name)
 		}
@@ -316,8 +316,9 @@ func TestWorkerExecutionFrozenDigestProjection(t *testing.T) {
 	}
 	in.Schedule = &WorkerScheduleTicket{OwnerEpoch: "owner", Epoch: workerSLOEpoch(at), Sequence: 4}
 	v2 := workerExecutionDigest(in)
-	if v2 == expected || v2 != workerExecutionDigest(in.Clone()) {
-		t.Fatal("schedule digest is not distinct and deterministic")
+	const expectedV2 = "e0608792a7b79c0458c2c2827d7a53fe4041f60dc6bc2c7207e768cf3da32643"
+	if v2 != expectedV2 || v2 != workerExecutionDigest(in.Clone()) {
+		t.Fatal("frozen v2 schedule digest changed", v2)
 	}
 	in.Schedule.Sequence++
 	if workerExecutionDigest(in) == v2 {

@@ -56,6 +56,7 @@ type Policy struct {
 }
 
 type Action struct {
+	ReviewNotice               *ReviewNotice       `json:"review_notice,omitempty"`
 	Retryable                  bool                `json:"retryable,omitempty"`
 	ProviderCorrelationVersion int                 `json:"provider_correlation_version,omitempty"`
 	Control                    *ControlNotice      `json:"control,omitempty"`
@@ -95,6 +96,7 @@ type Action struct {
 }
 
 type Monitor struct {
+	Notifications              *NotificationState   `json:"notifications,omitempty"`
 	ActionVersion              int                  `json:"action_version,omitempty"`
 	ProviderCorrelationVersion int                  `json:"provider_correlation_version,omitempty"`
 	EnabledControl             string               `json:"enabled_control,omitempty"`
@@ -170,6 +172,7 @@ type Monitor struct {
 }
 
 func (m Monitor) Clone() Monitor {
+	m.Notifications = m.Notifications.clone()
 	m.IgnoreIncidents = append([]time.Time(nil), m.IgnoreIncidents...)
 	m.ManualRequests = append([]time.Time(nil), m.ManualRequests...)
 	m.Policy = m.Policy.Clone()
@@ -184,6 +187,7 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	NoticeRevision       string                    `json:"notice_revision,omitempty"`
 	Failure              FailureDiagnostic         `json:"failure,omitzero"`
 	RetryDelay           time.Duration             `json:"retry_delay,omitzero"`
 	ActionDeadline       time.Time                 `json:"action_deadline,omitzero"`
@@ -225,6 +229,7 @@ type Command struct {
 }
 
 type Event struct {
+	ReviewNotice               *ReviewNotice                `json:"review_notice,omitempty"`
 	Control                    *ControlNotice               `json:"control,omitempty"`
 	FileIncarnation            string                       `json:"file_incarnation,omitempty"`
 	Cause                      FailureDiagnostic            `json:"cause,omitzero"`
@@ -282,6 +287,9 @@ func identity(parts string) string {
 }
 
 func validateCommand(c Command) error {
+	if c.NoticeRevision != "" && (c.Kind != "start" || !catalogIdentifier(c.NoticeRevision, 256)) {
+		return ErrNotificationIdentity
+	}
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
 	}

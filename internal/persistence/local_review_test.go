@@ -117,7 +117,7 @@ func TestStoppedReviewDoesNotFenceRemoteExecution(t *testing.T) {
 			c := reviewCommand(m, a, "remote-review", "accepted", time.Now().UTC().Add(time.Minute))
 			c.Kind, c.ExecutorSession = "local_action_review", "stopped-owner"
 			before := s.fsm.image.LocalExecutorSession
-			r := s.fsm.applyLocalActionReview(c, s.fsm.image.Index+1)
+			r := s.fsm.applyLocalActionReview(c, s.fsm.image.Index+1, ActionFormatVersion)
 			if !errors.Is(r.Err, ErrExecutorUnfenced) || s.fsm.image.LocalExecutorSession != before || s.fsm.image.Monitors[m.ID].Actions[a.ID].Review != nil {
 				t.Fatal("exclusive filesystem ownership was treated as remote fencing", r.Err)
 			}

@@ -48,7 +48,7 @@ func interventionAction(t *testing.T, m Monitor) Action {
 
 func policyStart(t *testing.T, m Monitor, action Action, at time.Time) Monitor {
 	t.Helper()
-	r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: at})
+	r := transition(m, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: action.ID, At: at, NoticeRevision: ActionNoticeRevision(action)})
 	if !r.Allowed || r.Monitor == nil {
 		t.Fatal("eligible start was rejected")
 	}

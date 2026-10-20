@@ -33,9 +33,13 @@ func queueWorkerHTTPAction(t *testing.T, f *workerSessionFixture, category strin
 	return queueWorkerHTTPActionSource(t, f, category, false)
 }
 
-func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category string, inline bool) persistence.WorkerExecutionRecord {
+func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category string, inline bool, review ...bool) persistence.WorkerExecutionRecord {
 	t.Helper()
 	ctx, at := t.Context(), time.Now().UTC()
+	color := "red"
+	if len(review) == 1 && review[0] {
+		color = "blue"
+	}
 	job, ok, err := f.store.JobType(ctx, "session-check")
 	if err != nil || !ok {
 		t.Fatal(err)
@@ -48,12 +52,12 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 	if category == "recovery" {
 		spec.Recovery = &api.RecoverySpec{Driver: driver}
 	} else if inline {
-		rules := map[string]api.AlertRule{"red": {Driver: &driver}}
+		rules := map[string]api.AlertRule{color: {Driver: &driver}}
 		spec.Notifications = &rules
 	} else {
 		endpoint = commitWorkerHTTPResource(t, f, persistence.CatalogKey{Kind: "NotificationEndpoint", ID: "endpoint-one"}, driver, nil, []persistence.JobTypeReference{ref})
 		ids := []string{endpoint.Key.ID}
-		rules := map[string]api.AlertRule{"red": {EndpointRefs: &ids}}
+		rules := map[string]api.AlertRule{color: {EndpointRefs: &ids}}
 		spec.Notifications = &rules
 	}
 	var refs []persistence.CatalogKey
@@ -68,14 +72,18 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 	monitor := persistence.Monitor{ID: root.Key.ID, Revision: uuid.NewString(), Policy: persistence.Policy{
 		Enabled: true, Interval: time.Minute, Healthy: 1, Unhealthy: 1, Intervention: category == "recovery", RecoveryBypass: true}}
 	if category == "notification" {
-		monitor.Policy.Endpoints = map[string]int{"red": 1}
+		monitor.Policy.Endpoints = map[string]int{color: 1}
+		monitor.Policy.NotificationTimeouts = map[string][]time.Duration{color: {5 * time.Second}}
+		if color == "blue" {
+			monitor.Policy.Intervention = true
+		}
 		pin := persistence.WorkerNotificationSource{Kind: "Monitor", ID: root.Key.ID, UID: root.UID, Revision: root.Revision}
 		if !inline {
 			source = endpoint
 			guard.Conditions = append(guard.Conditions, persistence.CatalogCondition{Key: endpoint.Key, UID: endpoint.UID, Revision: endpoint.Revision})
 			pin = persistence.WorkerNotificationSource{ID: endpoint.Key.ID, UID: endpoint.UID, Revision: endpoint.Revision}
 		}
-		monitor.Policy.WorkerNotificationSources = map[string][]persistence.WorkerNotificationSource{"red": {pin}}
+		monitor.Policy.WorkerNotificationSources = map[string][]persistence.WorkerNotificationSource{color: {pin}}
 	}
 	for _, command := range []persistence.Command{
 		{Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision, At: at, Config: &monitor, Guard: &guard},
@@ -87,6 +95,29 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 		}
 	}
 	monitor, _ = f.store.Get(monitor.ID)
+	if color == "blue" {
+		for _, a := range monitor.Actions {
+			if a.Kind != "intervention" {
+				continue
+			}
+			handle, err := f.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitor.ID, Revision: monitor.Revision, ActionID: a.ID, Guard: &guard, At: time.Now().UTC()})
+			if handle != nil {
+				t.Cleanup(func() { _ = handle.Finish(context.Background()) })
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			results, err := f.store.Submit(ctx, []persistence.Command{{Kind: "result", MonitorID: monitor.ID, Revision: monitor.Revision, ActionID: a.ID, Outcome: "failure", Ambiguous: true, At: time.Now().UTC()}})
+			if err != nil || results[0].Err != nil {
+				t.Fatal("uncertain recovery fixture", err, results)
+			}
+			if err = handle.Finish(ctx); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+		monitor, _ = f.store.Get(monitor.ID)
+	}
 	in := persistence.WorkerExecutionIntent{ID: uuid.NewString(), Revision: uuid.NewString(), MonitorID: monitor.ID, MonitorUID: monitor.CatalogUID,
 		MonitorRevision: monitor.Revision, ControlRevision: monitor.ControlRevision, Category: category, Source: source.Key, SourceUID: source.UID,
 		SourceRevision: source.Revision, JobType: ref, Guard: guard, Scheduled: at, Deadline: at.Add(5 * time.Second)}
@@ -94,6 +125,7 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 		if category == "recovery" && action.Kind == "intervention" || category == "notification" && action.Kind == "code" {
 			in.ActionID = action.ID
 			in.Scheduled = action.NotBefore
+			in.Deadline = action.Deadline
 			break
 		}
 	}

@@ -13,6 +13,8 @@
   --status-degraded: var(--cpra-warning);
   --status-operational: var(--cpra-success);
   --status-info: var(--cpra-info);
+  --status-review: var(--cpra-review);
+  --status-bg-review: color-mix(in srgb, var(--status-review) 8%, var(--cpra-surface));
   --status-disabled: var(--cpra-muted);
   --status-unknown: var(--cpra-muted);
   --status-bg-critical: color-mix(in srgb, var(--status-critical) 8%, var(--cpra-surface));

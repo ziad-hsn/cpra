@@ -11,6 +11,10 @@ import (
 )
 
 func (a Action) Clone() Action {
+	if a.ReviewNotice != nil {
+		v := *a.ReviewNotice
+		a.ReviewNotice = &v
+	}
 	if a.Control != nil {
 		v := *a.Control
 		a.Control = &v
@@ -53,6 +57,10 @@ func ActionReviewRevision(a Action) string {
 	return identity("action-observation/" + string(data))
 }
 func (e Event) Clone() Event {
+	if e.ReviewNotice != nil {
+		copy := *e.ReviewNotice
+		e.ReviewNotice = &copy
+	}
 	if e.Control != nil {
 		v := *e.Control
 		e.Control = &v

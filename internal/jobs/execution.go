@@ -47,10 +47,30 @@ func (e *Execution) notificationMessage(message string) string {
 	if e.controlNotice != "" {
 		return e.controlNotice
 	}
+	if n := e.notification.Review; n != nil {
+		message = "Recovery outcome unknown — operator review required."
+		if n.Phase == "close" {
+			message = "Health recovered; earlier recovery outcome remains unknown."
+			if n.Health != "healthy" {
+				message = "The earlier outage recovered; its recovery action outcome remains unknown. Current service health: " + n.Health + "."
+			}
+			if n.Reason == "action_reviewed" {
+				message = "Recovery action reviewed; review-needed alert closed. Observed service health: " + n.Health + "."
+			}
+		}
+		message += "\nMonitor: " + e.notification.MonitorID + "\nIncident: " + e.notification.IncidentID + "\nRecovery action: " + n.ActionID + "\nReview alert: " + n.AlertID
+	}
+	if failure := e.notification.RecoveryFailure; failure != nil {
+		message += fmt.Sprintf("\nRecovery attempt %d of %d failed. Recovery action: %s.", failure.Attempt, failure.MaxAttempts, failure.ActionID)
+	}
 	if e.failureCode != "" && e.failureMessage != "" {
 		return message + "\nCause: " + e.failureCode + " — " + e.failureMessage
 	}
 	return message
+}
+
+func (e *Execution) resolvesNotification(color string) bool {
+	return color == "green" || color == "blue" && e.notification.Review != nil && e.notification.Review.Phase == "close"
 }
 
 func (e *Execution) SetContext(ctx context.Context) { e.parent = ctx }
@@ -71,6 +91,7 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
+	ReviewNotification                              *ReviewNotification
 	ProviderCorrelationVersion                      int
 	NotificationLog                                 *NotificationLog
 	ControlChanged                                  bool
@@ -235,6 +256,10 @@ func (d *Dispatch) Copy() Job {
 	if d.RecoveryFailure != nil {
 		failure := *d.RecoveryFailure
 		c.RecoveryFailure = &failure
+	}
+	if d.ReviewNotification != nil {
+		notice := *d.ReviewNotification
+		c.ReviewNotification = &notice
 	}
 	return &c
 }

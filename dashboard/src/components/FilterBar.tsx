@@ -47,6 +47,7 @@ export function FilterBar({ filters, onChange, pulseTypes = [] }: { filters: Fil
         <option value="green">Green</option>
         <option value="cyan">Cyan</option>
         <option value="gray">Gray</option>
+        <option value="blue">Blue — recovery review</option>
       </select>
     </div>
   );

@@ -14,7 +14,8 @@
     "success": "#18704A",
     "danger": "#BD223C",
     "warning": "#965B00",
-    "info": "#156E96"
+    "info": "#156E96",
+    "review": "#315DD8"
   },
   "dark": {
     "canvas": "#15181D",
@@ -31,6 +32,7 @@
     "success": "#6BC69C",
     "danger": "#FF8E9D",
     "warning": "#EFC46D",
-    "info": "#84C7EF"
+    "info": "#84C7EF",
+    "review": "#A0B7FF"
   }
 }

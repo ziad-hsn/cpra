@@ -63,12 +63,26 @@
           "cause": {
             "$ref": "#/components/schemas/FailureDiagnostic"
           },
+          "color": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
           "conflictingEvidence": {
             "$ref": "#/components/schemas/ActionEvidence"
           },
           "createdAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "deliveryID": {
+            "type": "string",
+            "x-go-name": "DeliveryID",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "endpointID": {
+            "type": "string",
+            "x-go-name": "EndpointID",
+            "x-go-type-skip-optional-pointer": true
           },
           "executionID": {
             "type": "string",
@@ -118,6 +132,10 @@
             "x-go-name": "MonitorID",
             "x-go-type-skip-optional-pointer": true
           },
+          "notificationEpisode": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
           "outcome": {
             "description": "Recorded provider outcome classification, unchanged by operator review.",
             "type": "string",
@@ -137,6 +155,9 @@
           },
           "review": {
             "$ref": "#/components/schemas/ActionReview"
+          },
+          "reviewNotice": {
+            "$ref": "#/components/schemas/ReviewNotice"
           },
           "reviewRevision": {
             "description": "Opaque action observation version required for a conditional operator review.",
@@ -558,6 +579,13 @@
               "type": "array"
             },
             "type": "object"
+          },
+          "notificationColors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-go-type-skip-optional-pointer": true
           },
           "patchTypes": {
             "items": {
@@ -2738,6 +2766,17 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/AlertRule"
             },
+            "description": "Explicit per-color destinations. Blue reports an uncertain recovery requiring review and never inherits red destinations.",
+            "propertyNames": {
+              "enum": [
+                "yellow",
+                "red",
+                "cyan",
+                "green",
+                "gray",
+                "blue"
+              ]
+            },
             "type": "object"
           },
           "recovery": {
@@ -2836,6 +2875,14 @@
           "unknownActions": {
             "format": "int64",
             "type": "integer"
+          },
+          "warnings": {
+            "description": "Non-fatal configuration advisories. They do not change observed service health.",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "maxItems": 100,
+            "type": "array"
           }
         },
         "required": [],
@@ -3404,6 +3451,14 @@
           },
           "valid": {
             "type": "boolean"
+          },
+          "warnings": {
+            "description": "Advisory findings; they do not invalidate a configuration.",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array",
+            "x-go-type-skip-optional-pointer": true
           }
         },
         "required": [
@@ -4373,6 +4428,37 @@
           "kind",
           "metadata",
           "spec"
+        ],
+        "type": "object"
+      },
+      "ReviewNotice": {
+        "additionalProperties": false,
+        "description": "A review-needed notification condition. Its closure does not resolve the underlying uncertain action.",
+        "properties": {
+          "actionID": {
+            "type": "string",
+            "x-go-name": "ActionID"
+          },
+          "alertID": {
+            "type": "string",
+            "x-go-name": "AlertID"
+          },
+          "health": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          }
+        },
+        "required": [
+          "alertID",
+          "actionID",
+          "phase",
+          "health"
         ],
         "type": "object"
       },

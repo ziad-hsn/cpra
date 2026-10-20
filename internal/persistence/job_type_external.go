@@ -416,6 +416,9 @@ func hasCommandExtensions(c Command) bool {
 	return c.WorkerSchedule != nil || c.WorkerExpire != nil || c.WorkerCheckAllocate != nil || c.WorkerCheckRetire != nil || c.WorkerRequeue != nil || c.WorkerObservation != nil || c.WorkerFinalize != nil || c.WorkerEvidence != nil || c.WorkerHeartbeat != nil || c.WorkerResult != nil || c.WorkerStart != nil || c.WorkerExecution != nil || c.JobType != nil || c.JobTypeAllocation != nil || c.WorkerPolicy != nil || c.WorkerSession != nil
 }
 func commandExtensionMinimumFormat(c Command) int {
+	if c.WorkerExecution != nil && c.WorkerExecution.Intent.Notification != nil {
+		return 45
+	}
 	if c.WorkerSession != nil && c.WorkerSession.SelectionVersion == 2 || c.WorkerStart != nil && c.WorkerStart.Maintenance != nil || c.WorkerResult != nil && c.WorkerResult.Maintenance != nil || c.WorkerHeartbeat != nil && c.WorkerHeartbeat.Maintenance != nil {
 		return LifecycleWorkerFormatVersion
 	}

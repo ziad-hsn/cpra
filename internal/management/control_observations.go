@@ -112,6 +112,9 @@ func (c *Catalog) observedResource(ctx context.Context, resource api.Resource) (
 		return resource, nil
 	}
 	status := api.MonitorStatus{Health: "unknown", LastCheckLatencyMS: api.Measurement{Available: false, Reason: "configurationPending"}}
+	if warnings := api.ResourceWarnings(resource); len(warnings) > 0 {
+		status.Warnings = &warnings
+	}
 	current, ok, err := c.store.MonitorStatusContext(ctx, resource.Metadata.ID)
 	if err != nil {
 		return api.Resource{}, err

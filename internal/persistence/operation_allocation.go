@@ -132,7 +132,7 @@ func operationTarget(c Command) (Command, OperationReceipt, string, error) {
 }
 func operationDigest(c Command) (OperationReservation, string, error) {
 	if hasCommandExtensions(c) || c.AgentReceipt != nil || c.AgentConnection != nil || c.AgentObservation != nil ||
-		c.Failure != (FailureDiagnostic{}) || c.RetryDelay != 0 || !c.ActionDeadline.IsZero() {
+		c.Failure != (FailureDiagnostic{}) || c.RetryDelay != 0 || !c.ActionDeadline.IsZero() || c.NoticeRevision != "" {
 		return OperationReservation{}, "", ErrOperationReservation
 	}
 	normalized, r, id, err := operationTarget(c)
@@ -288,9 +288,9 @@ func (f *machine) applyManagementTarget(c Command, index uint64, format int) Res
 		}
 		return r
 	case "control":
-		return f.applyControl(c.MonitorID, *c.Control, c.At, index)
+		return f.applyControl(c.MonitorID, *c.Control, c.At, index, format)
 	default:
-		return f.applyRecoveryReview(c, index)
+		return f.applyRecoveryReview(c, index, format)
 	}
 }
 func (f *machine) applyOperationTarget(c Command, index uint64, format int) Result {

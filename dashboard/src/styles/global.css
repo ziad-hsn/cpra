@@ -279,6 +279,7 @@ a:hover { color: var(--accent-bright); }
 .code-badge.green { color: var(--status-operational); background: var(--status-bg-operational); border-color: var(--status-border-operational); }
 .code-badge.cyan { color: var(--status-info); background: var(--status-bg-info); border-color: var(--status-border-info); }
 .code-badge.gray { color: var(--status-disabled); background: var(--status-bg-disabled); border-color: var(--status-border-disabled); }
+.code-badge.blue { color: var(--status-review); background: var(--status-bg-review); border-color: var(--cpra-border); }
 
 /* ---------- Cooldown pill ---------- */
 .cooldown-pill {

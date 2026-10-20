@@ -36,13 +36,20 @@ func workerAssignmentIdentity(in persistence.WorkerExecutionIntent) (string, err
 		in.Category, in.ActionID, in.Generation, in.Source, in.SourceUID, in.SourceRevision,
 		in.JobType, in.Guard, in.Scheduled, in.Deadline}
 	h := sha256.New()
-	if in.Schedule == nil {
+	if in.Notification != nil {
+		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v3\x00"))
+	} else if in.Schedule == nil {
 		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v1\x00"))
 	} else {
 		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v2\x00"))
 	}
 	if err := json.NewEncoder(h).Encode(value); err != nil {
 		return "", persistence.ErrWorkerExecutionInvalid
+	}
+	if in.Notification != nil {
+		if err := json.NewEncoder(h).Encode(in.Notification); err != nil {
+			return "", persistence.ErrWorkerExecutionInvalid
+		}
 	}
 	if in.Schedule != nil {
 		// Keep the versioned identity independent of future live ticket fields.
@@ -94,17 +101,23 @@ func (c *Catalog) PrepareWorkerExecution(ctx context.Context, intent persistence
 	if err := c.readyContext(ctx); err != nil {
 		return fail(err)
 	}
-	if intent.Category == "notification" && monitorSource {
+	if intent.Notification != nil {
+		return fail(persistence.ErrWorkerExecutionInvalid)
+	}
+	if intent.Category == "notification" {
 		monitor, ok, err := c.store.GetContext(ctx, intent.MonitorID)
 		if err != nil {
 			return fail(workerPreparationError(ctx, err))
 		}
 		action, exists := monitor.Actions[intent.ActionID]
-		if !ok || monitor.Removed || monitor.CatalogUID != intent.MonitorUID || monitor.Revision != intent.MonitorRevision || monitor.CatalogRevision != intent.SourceRevision ||
+		if !ok || monitor.Removed || monitor.CatalogUID != intent.MonitorUID || monitor.Revision != intent.MonitorRevision || monitorSource && monitor.CatalogRevision != intent.SourceRevision ||
 			!exists || action.Kind != "code" || action.State != persistence.Queued || action.CatalogUID != intent.MonitorUID || action.Revision != intent.MonitorRevision || !action.NotBefore.Equal(intent.Scheduled) {
 			return fail(persistence.ErrWorkerExecutionConflict)
 		}
-		slot = "notifications." + action.Color
+		if monitorSource {
+			slot = "notifications." + action.Color
+		}
+		intent.Notification = persistence.NotificationForWorker(action)
 	}
 	intent = intent.Clone()
 	view, err := c.store.CatalogSnapshotContext(ctx)

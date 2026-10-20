@@ -44,7 +44,7 @@ export default function Overview() {
     { label: 'Disabled', value: byStatus.disabled ?? 0, color: 'var(--status-disabled)' },
   ];
 
-  const codeEntries = (['red', 'yellow', 'green', 'cyan', 'gray'] as const).map((c) => ({
+  const codeEntries = (['red', 'yellow', 'green', 'cyan', 'gray', 'blue'] as const).map((c) => ({
     code: c, value: overview?.by_code?.[c] ?? 0, color: CODE_COLORS[c],
   }));
   const maxCode = Math.max(...codeEntries.map((s) => s.value), 1);

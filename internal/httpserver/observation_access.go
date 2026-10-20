@@ -55,6 +55,7 @@ func (m *managementHTTP) registerObservationDiscovery(mux *http.ServeMux) {
 			Resources: []string{"Version", "Schema", "Incident", "Event", "Action", "MonitorObservation"}, ResourceOperations: map[string][]string{
 				"MonitorObservation": {"ListMonitorObservations", "GetMonitorObservation"}, "Version": {"GetVersion"}, "Schema": {"ExplainResource"}, "Incident": {"ListIncidents", "GetIncident"}, "Event": {"GetHistory"}, "Action": {"ListActions", "GetAction"},
 			}}
+		result.NotificationColors = []string{"yellow", "red", "cyan", "green", "gray", "blue"}
 		for _, capability := range jobs.Capabilities() {
 			if capability.Available {
 				result.Drivers[capability.Kind] = append(result.Drivers[capability.Kind], capability.Driver)

@@ -464,10 +464,13 @@ type Action struct {
 
 	// Cause Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	Cause *FailureDiagnostic `json:"cause,omitempty"`
+	Color string             `json:"color,omitempty"`
 
 	// ConflictingEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
+	DeliveryID          string          `json:"deliveryID,omitempty"`
+	EndpointID          string          `json:"endpointID,omitempty"`
 	ExecutionID         string          `json:"executionID,omitempty"`
 	ExecutionRevision   string          `json:"executionRevision,omitempty"`
 
@@ -485,8 +488,9 @@ type Action struct {
 	Kind           string `json:"kind,omitempty"`
 
 	// LateEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
-	LateEvidence *ActionEvidence `json:"lateEvidence,omitempty"`
-	MonitorID    string          `json:"monitorID,omitempty"`
+	LateEvidence        *ActionEvidence `json:"lateEvidence,omitempty"`
+	MonitorID           string          `json:"monitorID,omitempty"`
+	NotificationEpisode string          `json:"notificationEpisode,omitempty"`
 
 	// Outcome Recorded provider outcome classification, unchanged by operator review.
 	Outcome   string `json:"outcome,omitempty"`
@@ -496,6 +500,9 @@ type Action struct {
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
 	Review          *ActionReview    `json:"review,omitempty"`
+
+	// ReviewNotice A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
+	ReviewNotice *ReviewNotice `json:"reviewNotice,omitempty"`
 
 	// ReviewRevision Opaque action observation version required for a conditional operator review.
 	ReviewRevision string     `json:"reviewRevision,omitempty"`
@@ -641,21 +648,24 @@ type ApplyResult struct {
 
 // Assignment defines model for Assignment.
 type Assignment struct {
-	CredentialProfile string          `json:"credentialProfile"`
-	Deadline          time.Time       `json:"deadline"`
-	ExecutionID       string          `json:"executionID"`
-	ExecutionRevision string          `json:"executionRevision"`
-	IncarnationUID    string          `json:"incarnationUID"`
-	JobTypeID         string          `json:"jobTypeID"`
-	JobTypeUID        string          `json:"jobTypeUID"`
-	JobTypeVersion    string          `json:"jobTypeVersion"`
-	Kind              string          `json:"kind"`
-	LeaseID           string          `json:"leaseID"`
-	MonitorID         string          `json:"monitorID"`
-	Parameters        json.RawMessage `json:"parameters"`
-	ServerID          string          `json:"serverID"`
-	SessionID         string          `json:"sessionID"`
-	WorkerUID         string          `json:"workerUID"`
+	CredentialProfile string    `json:"credentialProfile"`
+	Deadline          time.Time `json:"deadline"`
+	ExecutionID       string    `json:"executionID"`
+	ExecutionRevision string    `json:"executionRevision"`
+	IncarnationUID    string    `json:"incarnationUID"`
+	JobTypeID         string    `json:"jobTypeID"`
+	JobTypeUID        string    `json:"jobTypeUID"`
+	JobTypeVersion    string    `json:"jobTypeVersion"`
+	Kind              string    `json:"kind"`
+	LeaseID           string    `json:"leaseID"`
+	MonitorID         string    `json:"monitorID"`
+
+	// Notification Committed notification context, separate from operator parameters. No provider credential is supplied.
+	Notification *WorkerNotification `json:"notification,omitempty"`
+	Parameters   json.RawMessage     `json:"parameters"`
+	ServerID     string              `json:"serverID"`
+	SessionID    string              `json:"sessionID"`
+	WorkerUID    string              `json:"workerUID"`
 }
 
 // Assignments defines model for Assignments.
@@ -679,9 +689,10 @@ type AutoIgnore struct {
 
 // Capabilities defines model for Capabilities.
 type Capabilities struct {
-	APIVersions []string            `json:"apiVersions"`
-	Drivers     map[string][]string `json:"drivers"`
-	PatchTypes  []string            `json:"patchTypes"`
+	APIVersions        []string            `json:"apiVersions"`
+	Drivers            map[string][]string `json:"drivers"`
+	NotificationColors []string            `json:"notificationColors,omitempty"`
+	PatchTypes         []string            `json:"patchTypes"`
 
 	// ResourceOperations Supported operations by resource; availability does not grant authorization.
 	ResourceOperations map[string][]string `json:"resourceOperations,omitempty"`
@@ -1523,14 +1534,16 @@ type MonitorObservationList struct {
 // MonitorSpec defines model for MonitorSpec.
 type MonitorSpec struct {
 	// AutoIgnore Suppress ordinary actions after this many distinct threshold-reaching outages in the rolling window. Both values are required.
-	AutoIgnore            *AutoIgnore           `json:"autoIgnore,omitempty"`
-	Check                 CheckSpec             `json:"check"`
-	Enabled               *bool                 `json:"enabled,omitempty"`
-	Maintenance           *[]MaintenanceWindow  `json:"maintenance,omitempty"`
-	NotificationGroupRefs *[]string             `json:"notificationGroupRefs,omitempty"`
-	Notifications         *map[string]AlertRule `json:"notifications,omitempty"`
-	Recovery              *RecoverySpec         `json:"recovery,omitempty"`
-	Tags                  *[]string             `json:"tags,omitempty"`
+	AutoIgnore            *AutoIgnore          `json:"autoIgnore,omitempty"`
+	Check                 CheckSpec            `json:"check"`
+	Enabled               *bool                `json:"enabled,omitempty"`
+	Maintenance           *[]MaintenanceWindow `json:"maintenance,omitempty"`
+	NotificationGroupRefs *[]string            `json:"notificationGroupRefs,omitempty"`
+
+	// Notifications Explicit per-color destinations. Blue reports an uncertain recovery requiring review and never inherits red destinations.
+	Notifications *map[string]AlertRule `json:"notifications,omitempty"`
+	Recovery      *RecoverySpec         `json:"recovery,omitempty"`
+	Tags          *[]string             `json:"tags,omitempty"`
 }
 
 // MonitorStatus defines model for MonitorStatus.
@@ -1556,6 +1569,9 @@ type MonitorStatus struct {
 	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty"`
 	StatusRevision     string             `json:"statusRevision,omitempty"`
 	UnknownActions     *int64             `json:"unknownActions,omitempty"`
+
+	// Warnings Non-fatal configuration advisories. They do not change observed service health.
+	Warnings *[]FieldError `json:"warnings,omitempty"`
 }
 
 // NotificationEndpoint defines model for NotificationEndpoint.
@@ -1760,6 +1776,9 @@ type Preflight struct {
 	ItemCount *int64        `json:"itemCount,omitempty"`
 	Items     []ApplyResult `json:"items,omitempty"`
 	Valid     bool          `json:"valid"`
+
+	// Warnings Advisory findings; they do not invalidate a configuration.
+	Warnings []FieldError `json:"warnings,omitempty"`
 }
 
 // PreflightIdentityFormat Present for collection protocol receipts; the caller must recognize it before uploading, validating or activating.
@@ -2122,6 +2141,15 @@ type Resource struct {
 	Status     json.RawMessage `json:"status,omitempty"`
 }
 
+// ReviewNotice A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
+type ReviewNotice struct {
+	ActionID string `json:"actionID"`
+	AlertID  string `json:"alertID"`
+	Health   string `json:"health"`
+	Phase    string `json:"phase"`
+	Reason   string `json:"reason,omitempty"`
+}
+
 // RuntimeConfig defines model for RuntimeConfig.
 type RuntimeConfig struct {
 	Available bool `json:"available"`
@@ -2353,6 +2381,20 @@ type WorkerCapability struct {
 	JobTypeID string `json:"jobTypeID"`
 	Kind      string `json:"kind"`
 	Version   string `json:"version"`
+}
+
+// WorkerNotification Committed notification context, separate from operator parameters. No provider credential is supplied.
+type WorkerNotification struct {
+	At            time.Time `json:"at"`
+	Color         string    `json:"color"`
+	CorrelationID string    `json:"correlationID"`
+	DeliveryID    string    `json:"deliveryID"`
+	EndpointID    string    `json:"endpointID"`
+	Format        int64     `json:"format"`
+	IncidentID    string    `json:"incidentID,omitempty"`
+
+	// Review A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
+	Review *ReviewNotice `json:"review,omitempty"`
 }
 
 // WorkerObservation defines model for WorkerObservation.

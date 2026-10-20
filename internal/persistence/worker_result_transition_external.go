@@ -11,6 +11,9 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		decision = decisions[0]
 	}
 	maintenance := lifecycleStorageFormat(version) && (!decision.matches(in, at) || decision.Active || f.checkCatalogGuard(in.MonitorID, &in.Guard) != nil)
+	if actionStorageFormat(version) && in.Category == "check" && decision != nil {
+		maintenance = maintenance || decision.SinceQueued
+	}
 	previous, exists := f.image.Monitors[in.MonitorID]
 	current := exists && !previous.Removed && previous.CatalogUID == in.MonitorUID && previous.Revision == in.MonitorRevision
 	inTime := l.OwnerEpoch == f.image.LocalExecutorSession && l.Phase == "started" && at.Before(in.Deadline)
@@ -60,7 +63,8 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		event := Event{MonitorID: m.ID, CatalogUID: action.CatalogUID, Revision: action.Revision, At: at,
 			Type: "action_unknown", IncidentID: action.IncidentID, ActionID: action.ID, Kind: action.Kind,
 			Color: action.Color, Endpoint: action.Endpoint, Outcome: action.Outcome}
-		return &m, []Event{event}, false, false, true
+		events := append([]Event{event}, m.assessReviewAlertEvents(at)...)
+		return &m, events, false, false, true
 	}
 	outcome := "success"
 	if input.Status == "rejected" || input.Status == "unknown" {

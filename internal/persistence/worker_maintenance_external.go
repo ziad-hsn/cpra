@@ -72,7 +72,7 @@ func (f *machine) workerMaintenanceCancellation(d *WorkerMaintenanceDecision, in
 		return nil, nil
 	}
 	r := transitionAtFormat(previous, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
-		ActionID: in.ActionID, At: at, Maintenance: true}, version)
+		ActionID: in.ActionID, At: at, Maintenance: true, NoticeRevision: ActionNoticeRevision(a)}, version)
 	return r.Monitor, r.Events
 }
 
@@ -95,7 +95,11 @@ func (f *machine) workerMaintenanceInput(id string) (workerMaintenanceInput, boo
 	in.Guard = in.Guard.Clone()
 	in.Schedule = nil
 	in.Payload = secureconfig.Envelope{}
-	return workerMaintenanceInput{intent: in, policy: m.Policy.Clone(), queued: m.Actions[in.ActionID].QueuedAt}, true
+	queued := m.Actions[in.ActionID].QueuedAt
+	if in.Category == "check" && r.Lifecycle != nil {
+		queued = r.Lifecycle.StartedAt
+	}
+	return workerMaintenanceInput{intent: in, policy: m.Policy.Clone(), queued: queued}, true
 }
 
 func prepareWorkerMaintenance(ctx context.Context, in workerMaintenanceInput, at time.Time, evaluators []WorkerMaintenanceEvaluator) (*WorkerMaintenanceDecision, error) {

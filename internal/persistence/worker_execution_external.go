@@ -35,6 +35,7 @@ var (
 // only a sealed, validated assignment; no provider secrets or executable object
 // may be supplied in identity fields. Admission does not grant invocation.
 type WorkerExecutionIntent struct {
+	Notification    *WorkerNotification   `json:"notification,omitempty"`
 	Schedule        *WorkerScheduleTicket `json:"schedule,omitempty"`
 	ID              string                `json:"id"`
 	Revision        string                `json:"revision"`
@@ -56,6 +57,7 @@ type WorkerExecutionIntent struct {
 }
 
 func (i WorkerExecutionIntent) Clone() WorkerExecutionIntent {
+	i.Notification = i.Notification.clone()
 	if i.Schedule != nil {
 		copy := *i.Schedule
 		i.Schedule = &copy
@@ -72,6 +74,9 @@ func (i WorkerExecutionIntent) Binding(storeID string) secureconfig.Binding {
 func (i WorkerExecutionIntent) Validate() error { return i.validate() }
 
 func (i WorkerExecutionIntent) validate() error {
+	if !i.Notification.valid() || i.Notification != nil && i.Category != "notification" {
+		return ErrWorkerExecutionInvalid
+	}
 	if i.Schedule != nil && (i.Category != "check" || !i.Schedule.valid(i.Scheduled)) {
 		return ErrWorkerExecutionInvalid
 	}
@@ -106,6 +111,9 @@ func (i WorkerExecutionIntent) validate() error {
 }
 
 func (i WorkerExecutionIntent) minimumFormat() int {
+	if i.Notification != nil {
+		return 45
+	}
 	if i.Schedule != nil {
 		return WorkerScheduleFormatVersion
 	}
@@ -219,6 +227,13 @@ func workerExecutionDigest(i WorkerExecutionIntent) string {
 		Scheduled: i.Scheduled, Deadline: i.Deadline, Payload: i.Payload,
 	}
 	raw, _ := json.Marshal(projection)
+	if i.Notification != nil {
+		value, _ := json.Marshal(struct {
+			Intent       workerExecutionIntentDigestV1 `json:"intent"`
+			Notification *WorkerNotification           `json:"notification"`
+		}{projection, i.Notification})
+		return identity("cpra/worker/execution-intent/v3\x00" + string(value))
+	}
 	if i.Schedule != nil {
 		value, _ := json.Marshal(struct {
 			Intent   workerExecutionIntentDigestV1 `json:"intent"`

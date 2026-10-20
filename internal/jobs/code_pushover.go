@@ -49,7 +49,7 @@ func newCodePushoverJob(cfg *manifest.CodeNotificationPushover, monitor, color, 
 		priority = 0
 	}
 	for name, value := range cfg.PriorityByColor {
-		if (name != "yellow" && name != "red" && name != "cyan" && name != "green" && name != "gray") || value < -2 || value > 2 {
+		if (name != "yellow" && name != "red" && name != "cyan" && name != "green" && name != "gray" && name != "blue") || value < -2 || value > 2 {
 			return nil, fmt.Errorf("Pushover per-color priorities require supported colors and values -2..2")
 		}
 		if name == color {
@@ -95,13 +95,17 @@ func (c *CodePushoverJob) Execute() (result Result) {
 	form.Set("token", c.AppToken)
 	form.Set("user", c.UserKey)
 	form.Set("message", c.notificationMessage(c.Message))
+	priority := c.Priority
+	if c.Color == "blue" && c.resolvesNotification(c.Color) {
+		priority = 0
+	}
 	if c.Title != "" {
 		form.Set("title", c.Title)
 	}
-	if c.Priority != 0 {
-		form.Set("priority", strconv.Itoa(c.Priority))
+	if priority != 0 {
+		form.Set("priority", strconv.Itoa(priority))
 	}
-	if c.Priority == 2 {
+	if priority == 2 {
 		form.Set("retry", strconv.Itoa(c.Retry))
 		form.Set("expire", strconv.Itoa(c.Expire))
 	}

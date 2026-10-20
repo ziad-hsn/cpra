@@ -10,7 +10,7 @@ are pending unless explicitly updated with current evidence.
 | Ticket | Status | Evidence/review |
 | --- | --- | --- |
 | 1 Effect classification and deadlines | Implemented; focused checks passed | Independent source review found no remaining blocker; final matrix pending |
-| 2 Episode eligibility, Ignore and blue | Pending | Pending |
+| 2 Episode eligibility, Ignore and blue | Implemented; focused checks and independent source review passed | Base/tagged lifecycle and worker checks, real Raft snapshots, dashboard checks; frozen matrix pending |
 | 3 Retained action ledger and formats 44/45 | Pending | Pending |
 | 4 Configuration and CLI diagnostics | Pending | Pending |
 | 5 Reservations and destination fairness | Pending | Pending |
@@ -144,3 +144,40 @@ These are development checks, not frozen-candidate or provider-account evidence.
 
 The full application/module, minimum-compiler, race, browser and documentation
 matrices still belong to the final frozen candidate, after tickets 2–7.
+
+## Ticket 2 development checkpoint
+
+The current episode is reassessed after suppression instead of tying eligibility
+only to incident creation. Maintenance-only outages do not count for automatic
+Ignore, and healthy manual Ignore requires a subsequent qualifying outage.
+Blue uses explicitly configured destinations and an independent review condition;
+health closure leaves the intervention's unknown outcome and hold unchanged.
+Prepared messages and external assignments are fenced against a changed closure
+meaning. Retiring an ungranted stale assignment yields a terminal old start and a
+replacement with the original remaining deadline, never a renewed budget.
+
+- `blue-base-contracts-10`: matching focused base persistence, management, HTTP,
+  controller, jobs and SDK API checks passed.
+- `blue-contracts-9`: focused tagged persistence, management, HTTP, controller,
+  jobs, SDK API and worker tests passed. Includes fixed historical worker identity
+  projections and local provider blue correlation, email Date/Message-ID checks.
+- `blue-protocol-snapshot-8`: real HTTP worker preparation, offer, terminal start,
+  replacement grant, authenticated-context rejection, and real Raft blue
+  snapshot/restart tests passed. Local fixtures do not prove provider accounts.
+- `blue-dashboard-2`: exact Node 24.21.0/pnpm 11.22.0 build, type check, lint and
+  all 567 frontend tests passed. The failed `blue-dashboard-1` record is retained:
+  the new fixture needed to await capabilities, and old collection fixtures had
+  expired on the wall clock. The corrected tests freeze their intended clock;
+  production expiry and conditional-write guards are unchanged.
+- Canonical contracts and SDK/dashboard outputs were regenerated. Blue has a
+  separate text label and review icon; cyan says health verification pending.
+
+Independent reviewer `notification_eligibility_review` found no remaining safety
+blocker in the final ticket-2 source. Review was read-only; no tests were run by
+that agent. The provider-event identity finding, worker stale-context finding and
+old-format digest gap were repaired and covered by the checks above.
+
+Ticket 3 still must remove retained actions and old review conditions from the
+hot monitor projection. Ticket 6 still includes real-server browser coverage and
+the broader observation, error, offline and layout repairs. These development
+checks do not close either ticket or qualify a public release.

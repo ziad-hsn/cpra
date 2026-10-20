@@ -169,6 +169,7 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 			if r.Intent.Category != "check" {
 				previous := f.image.Monitors[r.Intent.MonitorID]
 				command := Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
+				command.NoticeRevision = ActionNoticeRevision(previous.Actions[r.Intent.ActionID])
 				if lifecycleStorageFormat(version) {
 					command.Maintenance = c.Maintenance.Active || r.Intent.Category == "notification" && c.Maintenance.SinceQueued
 				}
@@ -234,6 +235,7 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 		state.replaceRecord(r)
 		state.EncodedBytes += newCost - oldCost
 		if monitor != nil {
+			events = append(events, monitor.assessReviewAlertEvents(at)...)
 			previous := f.image.Monitors[monitor.ID]
 			events = append(events, f.installMonitor(previous, *monitor, at)...)
 			f.publishWorkerMonitor(previous, *monitor)

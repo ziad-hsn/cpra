@@ -1,0 +1,1 @@
+const E={red:"CRITICAL",yellow:"DEGRADED",green:"RECOVERED",cyan:"HEALTH VERIFICATION PENDING",gray:"ENABLED / DISABLED",blue:"RECOVERY REVIEW REQUIRED"},I={degraded:"DEGRADED",up:"OPERATIONAL",down:"CRITICAL",verifying:"VERIFYING",incident:"INCIDENT",disabled:"DISABLED",unknown:"UNKNOWN"};export{E as C,I as S};

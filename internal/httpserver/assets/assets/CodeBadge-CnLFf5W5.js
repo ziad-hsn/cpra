@@ -1,0 +1,1 @@
+import{j as a,I as n}from"./index-Dzpjtnnk.js";import{C as r}from"./tokens-D5C0F1O5.js";function m({code:s,label:t}){const e=t??r[s];return a.jsxs("span",{className:"code-badge "+s,"aria-label":e,children:[s==="blue"?a.jsx(n,{name:"person",size:13}):s==="cyan"?a.jsx(n,{name:"clock",size:13}):a.jsx("span",{className:"status-dot","aria-hidden":"true"}),e]})}export{m as C};

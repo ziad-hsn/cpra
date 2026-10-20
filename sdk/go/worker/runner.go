@@ -302,7 +302,7 @@ func (r *Runner) poll(ctx context.Context, capabilities []api.WorkerCapability, 
 			detached := *batch
 			detached.Items = append([]api.Assignment(nil), batch.Items...)
 			for i := range detached.Items {
-				detached.Items[i].Parameters = append([]byte(nil), batch.Items[i].Parameters...)
+				detached.Items[i] = cloneAssignment(batch.Items[i])
 			}
 			admitted := make(chan struct{})
 			select {
@@ -422,7 +422,7 @@ func (r *Runner) execute(ctx context.Context, a api.Assignment, h Handler, fail 
 		r.heartbeat(heartbeatCtx, a, start.GrantID, cancel, fail)
 	}()
 	job := Job{Assignment: a, Credentials: credentials}
-	job.Assignment.Parameters = append([]byte(nil), a.Parameters...)
+	job.Assignment = cloneAssignment(a)
 	outcome, handlerErr := invoke(execCtx, h, job)
 	stopHeartbeat()
 	<-heartbeatDone

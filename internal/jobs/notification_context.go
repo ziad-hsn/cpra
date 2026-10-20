@@ -10,14 +10,24 @@ import (
 // notificationIdentity contains committed identifiers and event time. Retries
 // retain these values; no provider secret or resolved target is included.
 type notificationIdentity struct {
-	MonitorID     string    `json:"monitor_id,omitempty"`
-	IncarnationID string    `json:"incarnation_id,omitempty"`
-	IncidentID    string    `json:"incident_id,omitempty"`
-	EpisodeID     string    `json:"episode_id,omitempty"`
-	ActionID      string    `json:"action_id,omitempty"`
-	DeliveryID    string    `json:"delivery_id,omitempty"`
-	EndpointID    string    `json:"endpoint_id,omitempty"`
-	At            time.Time `json:"at,omitzero"`
+	RecoveryFailure *RecoveryFailure    `json:"recovery_failure,omitempty"`
+	Review          *ReviewNotification `json:"review,omitempty"`
+	MonitorID       string              `json:"monitor_id,omitempty"`
+	IncarnationID   string              `json:"incarnation_id,omitempty"`
+	IncidentID      string              `json:"incident_id,omitempty"`
+	EpisodeID       string              `json:"episode_id,omitempty"`
+	ActionID        string              `json:"action_id,omitempty"`
+	DeliveryID      string              `json:"delivery_id,omitempty"`
+	EndpointID      string              `json:"endpoint_id,omitempty"`
+	At              time.Time           `json:"at,omitzero"`
+}
+
+type ReviewNotification struct {
+	AlertID  string `json:"alert_id"`
+	ActionID string `json:"action_id"`
+	Phase    string `json:"phase"`
+	Reason   string `json:"reason,omitempty"`
+	Health   string `json:"health"`
 }
 
 type notificationEnvelope struct {
@@ -55,7 +65,9 @@ func bindNotificationContext(job Job, dispatch *Dispatch) {
 	for wrapped, depth := job, 0; depth < 8; depth++ {
 		if target, ok := wrapped.(interface{ SetNotificationIdentity(notificationIdentity) }); ok {
 			target.SetNotificationIdentity(notificationIdentity{
-				MonitorID: dispatch.MonitorID, IncarnationID: incarnation,
+				RecoveryFailure: dispatch.RecoveryFailure,
+				Review:          dispatch.ReviewNotification,
+				MonitorID:       dispatch.MonitorID, IncarnationID: incarnation,
 				IncidentID: dispatch.IncidentID, EpisodeID: dispatch.NotificationCorrelation,
 				ActionID: dispatch.ActionID, DeliveryID: dispatch.DeliveryID,
 				EndpointID: dispatch.EndpointID, At: dispatch.NotificationAt.UTC(),

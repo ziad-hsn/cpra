@@ -308,7 +308,7 @@ func Pointer[T any](value T) *T { return &value }
 // Do not include arbitrary notification-map keys in a diagnostic path.
 func notificationField(color string) string {
 	switch color {
-	case "red", "yellow", "green", "cyan", "gray":
+	case "red", "yellow", "green", "cyan", "gray", "blue":
 		return "spec.notifications." + color
 	}
 	return "spec.notifications"

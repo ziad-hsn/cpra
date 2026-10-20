@@ -31,7 +31,7 @@ func commandWriteFormat(c Command) int {
 		version = joinStorageFormat(version, LifecycleFormatVersion)
 	}
 	switch c.Kind {
-	case "configure", "pulse", "start", "result", "late_result", "recover", "remove":
+	case "configure", "pulse", "start", "result", "late_result", "recover", "remove", "control", "action_review", "local_action_review":
 		version = joinStorageFormat(version, ActionFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
@@ -53,6 +53,9 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.NoticeRevision != "" {
+		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.Config != nil && requiresActionFormat(*c.Config) {
 		return joinStorageFormat(ActionFormatVersion, commandExtensionMinimumFormat(c))
 	}

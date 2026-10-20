@@ -157,6 +157,7 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 			return
 		}
 		result := api.Capabilities{APIVersions: []string{"v1", "v2"}, Drivers: map[string][]string{"check": {}, "recovery": {}, "notification": {}}, Resources: []string{}, PatchTypes: []string{"application/merge-patch+json"}, ResourceOperations: map[string][]string{}}
+		result.NotificationColors = []string{"yellow", "red", "cyan", "green", "gray", "blue"}
 		result.Resources = append(result.Resources, "Version", "Schema", "MonitorObservation")
 		result.ResourceOperations["MonitorObservation"] = []string{"ListMonitorObservations", "GetMonitorObservation"}
 		result.ResourceOperations["Version"] = []string{"GetVersion"}

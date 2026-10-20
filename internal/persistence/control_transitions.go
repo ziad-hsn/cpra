@@ -30,6 +30,11 @@ func (m *Monitor) beginIncident(at time.Time) {
 		return
 	}
 	m.IncidentSequence++
+	if m.Notifications != nil {
+		m.Notifications.OutsideFailures = 0
+		m.Notifications.QualifiedIncident = ""
+		m.Notifications.MaintenanceOutage = false
+	}
 	m.IncidentID = identity(fmt.Sprintf("incident/%s/%s/%d", m.ID, m.incarnationIdentity(), m.IncidentSequence))
 	m.IncidentRevision = identity("triage/" + m.IncidentID)
 	m.IncidentOpenedAt, m.IncidentClosedAt = at, time.Time{}
@@ -51,7 +56,7 @@ func (m Monitor) notificationIncident() string {
 	return ""
 }
 
-func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index uint64) Result {
+func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index uint64, version int) Result {
 	previous, ok := f.image.Monitors[id]
 	current, retained := f.image.Catalog[(CatalogKey{Kind: "Monitor", ID: id}).indexKey()]
 	if !ok || previous.Removed || !retained || current.Removed || previous.CatalogUID != c.MonitorUID || current.UID != c.MonitorUID {
@@ -93,6 +98,10 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
 		}
 		events = append(events, e)
+	}
+	if actionStorageFormat(version) {
+		m.upgradeActions(at, emit)
+		f.image.Version = joinStorageFormat(f.image.Version, version)
 	}
 	switch c.Action {
 	case "ignore":

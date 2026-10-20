@@ -52,7 +52,7 @@ func (c *Catalog) WorkerAssignments(ctx context.Context, authority persistence.W
 			SessionID: response.SessionID, ExecutionID: in.ID, ExecutionRevision: in.Revision,
 			LeaseID: offer.LeaseID, Deadline: in.Deadline, MonitorID: in.MonitorID, IncarnationUID: in.MonitorUID,
 			JobTypeID: in.JobType.JobTypeID, JobTypeUID: in.JobType.JobTypeUID, JobTypeVersion: in.JobType.Version,
-			Kind: in.Category, Parameters: descriptor.Parameters(), CredentialProfile: descriptor.CredentialProfile()})
+			Kind: in.Category, Parameters: descriptor.Parameters(), CredentialProfile: descriptor.CredentialProfile(), Notification: workerNotification(in.Notification)})
 	}
 	encoded, err := json.Marshal(out)
 	encodedBytes := len(encoded)
@@ -70,4 +70,15 @@ func (c *Catalog) WorkerAssignments(ctx context.Context, authority persistence.W
 	}
 	succeeded = true
 	return out, nil
+}
+
+func workerNotification(n *persistence.WorkerNotification) *api.WorkerNotification {
+	if n == nil {
+		return nil
+	}
+	out := &api.WorkerNotification{Format: int64(n.Format), Color: n.Color, DeliveryID: n.DeliveryID, EndpointID: n.EndpointID, IncidentID: n.IncidentID, CorrelationID: n.CorrelationID, At: n.At.UTC()}
+	if n.Review != nil {
+		out.Review = &api.ReviewNotice{AlertID: n.Review.AlertID, ActionID: n.Review.ActionID, Phase: n.Review.Phase, Reason: n.Review.Reason, Health: n.Review.Health}
+	}
+	return out
 }

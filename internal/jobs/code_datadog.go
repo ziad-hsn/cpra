@@ -99,7 +99,7 @@ func datadogAlertType(color string) string {
 	switch color {
 	case "red":
 		return "error"
-	case "yellow":
+	case "yellow", "blue":
 		return "warning"
 	case "green":
 		return "success"

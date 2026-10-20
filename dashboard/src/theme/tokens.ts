@@ -1,12 +1,14 @@
 /** CPRA code color → status label mapping (color always paired with text label). */
-export type CpraCode = 'red' | 'yellow' | 'green' | 'cyan' | 'gray';
+import { notificationColors } from '../api/generated';
+export type CpraCode = typeof notificationColors[number];
 
 export const CODE_LABELS: Record<CpraCode, string> = {
   red: 'CRITICAL',
   yellow: 'DEGRADED',
   green: 'RECOVERED',
-  cyan: 'RESTORED',
-  gray: 'MAINTENANCE',
+  cyan: 'HEALTH VERIFICATION PENDING',
+  gray: 'ENABLED / DISABLED',
+  blue: 'RECOVERY REVIEW REQUIRED',
 };
 
 /** Map a monitor status string to a CPRA code (for coloring). */

@@ -43,7 +43,7 @@ func (m Monitor) validateIgnore() error {
 
 func (m *Monitor) countIgnoreIncident(at time.Time, emit func(string, *Action)) {
 	p := m.Policy.AutoIgnore
-	if m.LifecycleVersion != LifecycleFormatVersion || p == nil || m.Ignored || m.IgnoreCountedIncident == m.IncidentID {
+	if m.LifecycleVersion != LifecycleFormatVersion || p == nil || m.Ignored || m.IgnoreCountedIncident == m.IncidentID || !m.outageQualified() || m.Notifications != nil && m.NotificationMaintenance {
 		return
 	}
 	m.IgnoreCountedIncident = m.IncidentID
@@ -78,6 +78,12 @@ func (m Monitor) pendingAutomaticIgnore(at time.Time) bool {
 func (m *Monitor) enterIgnore(at time.Time, actor, cause, reason string, emit func(string, *Action)) {
 	m.Ignored, m.IgnoredAt, m.IgnoredBy = true, at, actor
 	m.IgnoreCause, m.IgnoreReason, m.IgnoreHealthyChecks = cause, reason, 0
+	if m.Notifications != nil {
+		m.Notifications.IgnoreOutage = ""
+		if m.outageQualified() && m.Recovering && m.IncidentClosedAt.IsZero() {
+			m.Notifications.IgnoreOutage = m.IncidentID
+		}
+	}
 	m.ControlRevision = identity("ignore/" + m.ControlRevision + "/" + m.IncidentID)
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
@@ -95,6 +101,9 @@ func (m *Monitor) leaveIgnore(at time.Time, recovered bool, emit func(string, *A
 	m.Ignored, m.IgnoredAt, m.IgnoredBy = false, time.Time{}, ""
 	m.IgnoreCause, m.IgnoreReason, m.IgnoreHealthyChecks = "", "", 0
 	m.IgnoreIncidents, m.IgnoreCountedIncident = nil, ""
+	if m.Notifications != nil {
+		m.Notifications.IgnoreOutage = ""
+	}
 	m.ControlRevision = identity("unignore/" + previous)
 	emit("monitor_unignored", nil)
 	if recovered {
@@ -106,7 +115,7 @@ func (m *Monitor) leaveIgnore(at time.Time, recovered bool, emit func(string, *A
 }
 
 func (m *Monitor) observeIgnoreRecovery(c Command, emit func(string, *Action)) {
-	if !m.Ignored {
+	if !m.Ignored || m.Notifications != nil && m.Notifications.IgnoreOutage == "" {
 		return
 	}
 	if c.Outcome != "success" || c.Warning {

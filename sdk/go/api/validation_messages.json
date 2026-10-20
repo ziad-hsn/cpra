@@ -60,7 +60,7 @@
   "nodeLimit": "configuration nesting or alias expansion exceeds its limit",
   "nonemptyReferences": "at least one notification destination reference is required",
   "nonnegativeDuration": "a nonnegative Go duration string is required",
-  "notificationColor": "notification colors must be red, yellow, cyan, green or gray",
+  "notificationColor": "notification colors must be red, yellow, cyan, green, gray or blue",
   "notificationDestination": "select one supported notification destination form",
   "notificationDestinationConflict": "a notification group cannot be combined with inline notification settings",
   "notificationTrigger": "notification trigger is unsupported or requires red with a recovery action",
@@ -88,5 +88,6 @@
   "unsupportedDriver": "this driver is not supported by the selected build",
   "unsupportedVersion": "apiVersion must be cpra.io/v2",
   "victoropsDestination": "supply a URL or both the REST endpoint key and routing key",
-  "victoropsMessageType": "message type must be CRITICAL, WARNING, ACKNOWLEDGEMENT, INFO or RECOVERY"
+  "victoropsMessageType": "message type must be CRITICAL, WARNING, ACKNOWLEDGEMENT, INFO or RECOVERY",
+  "unknownRecoveryDestination": "Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review."
 }

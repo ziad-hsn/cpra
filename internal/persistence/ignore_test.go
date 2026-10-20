@@ -163,7 +163,9 @@ func TestIgnoreRecoveryPolicyChangeRestores(t *testing.T) {
 	m, guard := managedControlMonitor(t, s, "ignore-policy")
 	config := m.Clone()
 	config.Policy.Healthy = 5
+	config.Policy.Unhealthy = 1
 	m = *submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &config, Guard: guard, At: policyTime()})[0].Monitor
+	m = controlPulse(t, s, m, guard, policyTime().Add(time.Millisecond), "failure")
 	m = *applyControlRequest(t, s, controlRequest(m, "ignore", "ignore-version", policyTime().Add(time.Second))).Monitor
 	for n := 2; n < 5; n++ {
 		m = controlPulse(t, s, m, guard, policyTime().Add(time.Duration(n)*time.Second), "success")

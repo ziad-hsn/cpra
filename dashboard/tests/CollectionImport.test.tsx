@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Node TextEncoder supplies host buffers; align this DOM fixture's typed-array
 // constructors with it. Production Worker transfers use the receiving realm.
 vi.hoisted(() => { const encoded = new TextEncoder().encode(''); vi.stubGlobal('Uint8Array', encoded.constructor); vi.stubGlobal('ArrayBuffer', encoded.buffer.constructor); });
@@ -17,6 +17,10 @@ const makeBody = (value: unknown, next?: number) => new PrivateCollectionBody(en
 const identity = { identityFormat: collectionIdentityFormat, contentDigest: 'a'.repeat(64), itemCount: 1 };
 const summary: WorkerCollectionSummary = { ...identity, sourceCount: 1, sourceBytes: 64, normalizedBytes: 64, preflightAvailable: true };
 const steps = ['PrepareCollection', 'CreateOperation', 'UploadOperation', 'ValidateOperation', 'GetOperationValidation', 'ActivateOperation', 'CancelOperation', 'GetOperation', 'PreflightCollection'];
+
+// The retained validation fixture is valid for 30 days after 20 September.
+// Keep its clock inside that interval; explicit expiry cases supply older dates.
+beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-21T00:00:00Z')));
 
 function frozen(count = 1, coordinates?: { line: number; column: number }) {
   const all = Array.from({ length: count }, (_, index) => ({ ordinal: index + 1, id: `Monitor/monitor-${index + 1}`, source: { token: collectionSourceToken(1), document: index + 1, item: 1 }, bytes: 64, coordinates }));

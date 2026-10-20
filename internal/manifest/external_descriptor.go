@@ -100,7 +100,7 @@ func (k ExternalRuntimeKey) Validate() error {
 			valid = valid && k.JobType.Category == "check"
 		case "recovery":
 			valid = valid && k.JobType.Category == "recovery"
-		case "notifications.red", "notifications.yellow", "notifications.green", "notifications.cyan", "notifications.gray":
+		case "notifications.red", "notifications.yellow", "notifications.green", "notifications.cyan", "notifications.gray", "notifications.blue":
 			valid = valid && k.JobType.Category == "notification"
 		default:
 			valid = false

@@ -289,6 +289,13 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 			Action:    "Review the recorded monitor control change",
 			NextSteps: "Use health observations to assess the monitored service",
 		}
+	case "blue":
+		return codeAlertTemplate{
+			Title: "RECOVERY REVIEW REQUIRED", Status: "RECOVERY_OUTCOME_UNKNOWN", Severity: "warning",
+			Summary:   "Recovery outcome unknown — operator review required",
+			Action:    "Review the original action and its evidence before permitting another intervention",
+			NextSteps: "Health observations continue; health recovery does not prove the intervention outcome",
+		}
 	default:
 		return codeAlertTemplate{
 			Title:     "STATUS UPDATE",
@@ -1147,11 +1154,15 @@ type CodeLogJob struct {
 
 func (c *CodeLogJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
+	status, summary, severity := c.Status, c.Summary, c.Severity
+	if c.Color == "blue" && c.resolvesNotification(c.Color) {
+		status, summary, severity = "RECOVERY_REVIEW_CLOSED", "Review-needed alert closed; see recorded health and action outcome.", "info"
+	}
 	payload := map[string]interface{}{
 		"type":     "code",
 		"color":    c.Color,
-		"severity": c.Severity,
-		"status":   c.Status,
+		"severity": severity,
+		"status":   status,
 	}
 
 	// Build message on-demand
@@ -1181,6 +1192,7 @@ func (c *CodeLogJob) Execute() (result Result) {
 
 	now := time.Now().UTC()
 	entry := struct {
+		notificationIdentity
 		Timestamp string `json:"timestamp"`
 		Type      string `json:"type"`
 		Monitor   string `json:"monitor"`
@@ -1193,17 +1205,18 @@ func (c *CodeLogJob) Execute() (result Result) {
 		NextSteps string `json:"next_steps,omitempty"`
 		Message   string `json:"message,omitempty"`
 	}{
-		Timestamp: now.Format(time.RFC3339Nano),
-		Type:      "code",
-		Monitor:   c.Monitor,
-		JobID:     c.ID.String(),
-		Color:     c.Color,
-		Status:    c.Status,
-		Severity:  c.Severity,
-		Summary:   c.Summary,
-		Action:    c.Action,
-		NextSteps: c.NextSteps,
-		Message:   message,
+		notificationIdentity: c.notification,
+		Timestamp:            now.Format(time.RFC3339Nano),
+		Type:                 "code",
+		Monitor:              c.Monitor,
+		JobID:                c.ID.String(),
+		Color:                c.Color,
+		Status:               status,
+		Severity:             severity,
+		Summary:              summary,
+		Action:               c.Action,
+		NextSteps:            c.NextSteps,
+		Message:              message,
 	}
 
 	line, err := json.Marshal(entry)
@@ -1257,7 +1270,7 @@ func (c *CodePagerDutyJob) Execute() (result Result) {
 		return
 	}
 	action := "trigger"
-	if c.Color == "green" {
+	if c.resolvesNotification(c.Color) {
 		action = "resolve"
 	}
 	key := c.CorrelationKey
@@ -1327,8 +1340,11 @@ func (c *CodeEmailJob) Execute() (result Result) {
 	config := c.Config
 	if config.Subject == "" {
 		config.Subject = "CPRa " + codeAlertTemplateFor(c.Color).Title + ": " + c.Monitor
+		if c.Color == "blue" && c.resolvesNotification(c.Color) {
+			config.Subject = "CPRa RECOVERY REVIEW UPDATE: " + c.Monitor
+		}
 	}
-	result.Err = sendEmail(ctx, config, c.notificationMessage(c.Message))
+	result.Err = sendEmail(ctx, config, c.notificationMessage(c.Message), c.notification)
 	return
 }
 

@@ -127,11 +127,11 @@ func validateRecoveryReviewCommand(c Command) error {
 	return nil
 }
 
-func (f *machine) applyRecoveryReview(c Command, index uint64) Result {
+func (f *machine) applyRecoveryReview(c Command, index uint64, version int) Result {
 	if c.Kind == "manual_recovery" {
 		return f.applyManualRecovery(c, index)
 	}
-	return f.applyActionReview(c, index)
+	return f.applyActionReview(c, index, version)
 }
 func (m Monitor) observedUnhealthy() bool {
 	return !m.LastCheck.IsZero() && (m.LastOutcome == "failure" || m.LastOutcome == "timeout")
@@ -225,7 +225,7 @@ func (f *machine) addActionReceipt(r OperationReceipt) {
 	f.putOperation(r)
 	f.image.Version = max(f.image.Version, CatalogFormatVersion)
 }
-func (f *machine) applyActionReview(c Command, index uint64) Result {
+func (f *machine) applyActionReview(c Command, index uint64, version int) Result {
 	r := c.ActionReview
 	previous, ok := f.image.Monitors[c.MonitorID]
 	a, exists := previous.Actions[r.ActionID]
@@ -253,7 +253,19 @@ func (f *machine) applyActionReview(c Command, index uint64) Result {
 	a = a.Clone()
 	a.Review = &ActionReview{Revision: r.Revision, Resolution: r.Resolution, Actor: r.Actor, At: c.At, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...)}
 	m.Actions[a.ID] = a
-	events := f.installMonitor(previous, m, c.At)
+	var events []Event
+	if actionStorageFormat(version) {
+		m.assessReviewAlerts(c.At, func(kind string, action *Action) {
+			e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, FileIncarnation: m.FileIncarnation, Revision: m.Revision, At: c.At, Type: kind, Actor: r.Actor, Reason: r.Reason}
+			if action != nil {
+				e.CatalogUID, e.FileIncarnation, e.Revision = action.CatalogUID, action.FileIncarnation, action.Revision
+				e.ActionID, e.IncidentID, e.Kind, e.Color, e.Endpoint = action.ID, action.IncidentID, action.Kind, action.Color, action.Endpoint
+				e.ReviewNotice, e.DeliveryID, e.NotificationEpisode, e.EndpointID = action.ReviewNotice, action.DeliveryID, action.NotificationEpisode, action.EndpointID
+			}
+			events = append(events, e)
+		})
+	}
+	events = append(events, f.installMonitor(previous, m, c.At)...)
 	events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, At: c.At, Type: "action_reviewed", ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint, Actor: r.Actor, Reason: r.Reason, Note: r.Note, EvidenceRefs: append([]string(nil), r.EvidenceRefs...), Outcome: r.Resolution})
 	// Historical actions retain their original UID even after public ID reuse.
 	generation := f.image.Catalog[(CatalogKey{Kind: "Monitor", ID: m.ID}).indexKey()].Generation

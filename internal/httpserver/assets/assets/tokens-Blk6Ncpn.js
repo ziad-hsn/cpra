@@ -1,1 +1,0 @@
-const E={red:"CRITICAL",yellow:"DEGRADED",green:"RECOVERED",cyan:"RESTORED",gray:"MAINTENANCE"},A={degraded:"DEGRADED",up:"OPERATIONAL",down:"CRITICAL",verifying:"VERIFYING",incident:"INCIDENT",disabled:"DISABLED",unknown:"UNKNOWN"};export{E as C,A as S};

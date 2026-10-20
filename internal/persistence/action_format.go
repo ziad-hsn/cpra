@@ -15,11 +15,11 @@ func actionStorageFormat(version int) bool {
 }
 
 func requiresActionFormat(m Monitor) bool {
-	if m.ActionVersion != 0 || len(m.Policy.NotificationTimeouts) != 0 {
+	if m.ActionVersion != 0 || m.Notifications != nil || len(m.Policy.NotificationTimeouts) != 0 {
 		return true
 	}
 	for _, a := range m.Actions {
-		if a.Retryable {
+		if a.Retryable || a.ReviewNotice != nil {
 			return true
 		}
 	}
@@ -27,6 +27,7 @@ func requiresActionFormat(m Monitor) bool {
 }
 
 func (m *Monitor) upgradeActions(at time.Time, emit func(string, *Action)) {
+	m.upgradeNotificationState()
 	if m.ActionVersion == ActionFormatVersion {
 		return
 	}
@@ -42,6 +43,9 @@ func (m *Monitor) upgradeActions(at time.Time, emit func(string, *Action)) {
 }
 
 func validateActionFormat(m Monitor, version int) error {
+	if err := validateNotificationState(m, version); err != nil {
+		return err
+	}
 	if !requiresActionFormat(m) {
 		return nil
 	}
@@ -49,6 +53,18 @@ func validateActionFormat(m Monitor, version int) error {
 		return errors.New("invalid action storage version")
 	}
 	for _, a := range m.Actions {
+		if err := validateReviewNotice(a, version); err != nil {
+			return err
+		}
+		if a.ReviewNotice != nil {
+			if m.Notifications == nil {
+				return errors.New("review notification has no alert state")
+			}
+			alert, ok := m.Notifications.ReviewAlerts[a.ReviewNotice.AlertID]
+			if !ok || alert.ActionID != a.ReviewNotice.ActionID {
+				return errors.New("review notification has no matching alert")
+			}
+		}
 		if a.Retryable && (a.State != Failed || a.FinishedAt.IsZero()) {
 			return errors.New("retry permission requires a confirmed failed action")
 		}

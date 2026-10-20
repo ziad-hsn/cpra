@@ -268,7 +268,7 @@ func ValidateDriverSettings(category string, driver DriverConfig) error {
 			var overrides map[string]int
 			_ = json.Unmarshal(fields["priorityByColor"], &overrides)
 			for color, value := range overrides {
-				if !slices.Contains([]string{"yellow", "red", "cyan", "green", "gray"}, color) || value < -2 || value > 2 {
+				if !slices.Contains([]string{"yellow", "red", "cyan", "green", "gray", "blue"}, color) || value < -2 || value > 2 {
 					return InvalidField("config.priorityByColor", "pushoverColorPriority")
 				}
 				emergency = emergency || value == 2

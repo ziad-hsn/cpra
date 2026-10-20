@@ -73,9 +73,12 @@ func (m *Monitor) changeNotificationEpisode(episode string, at time.Time, emit f
 	}
 	m.NotificationEpisode = episode
 	m.Cooldowns = nil
+	if m.Notifications != nil {
+		m.Notifications.Deliveries = nil
+	}
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) && a.NotificationEpisode != episode {
+		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) && a.ReviewNotice == nil && a.NotificationEpisode != episode {
 			m.cancelNotification(a, "notification_superseded", at, emit)
 		}
 	}
@@ -83,6 +86,7 @@ func (m *Monitor) changeNotificationEpisode(episode string, at time.Time, emit f
 
 func (m *Monitor) cancelNotification(a Action, cause string, at time.Time, emit func(string, *Action)) {
 	a.State, a.Outcome, a.FinishedAt = Cancelled, cause, at
+	m.recordNotificationCancellation(a)
 	m.Actions[a.ID] = a
 	emit("action_cancelled", &a)
 }
@@ -101,6 +105,9 @@ func (m *Monitor) suppressMaintenanceNotifications(at time.Time, emit func(strin
 }
 
 func (m Monitor) notificationEligible(a Action) bool {
+	if a.ReviewNotice != nil {
+		return m.reviewNoticeEligible(a)
+	}
 	if m.ControlNotification(a) {
 		return true
 	}

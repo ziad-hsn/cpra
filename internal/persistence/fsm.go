@@ -283,7 +283,7 @@ func (f *machine) Apply(log *raft.Log) any {
 			continue
 		}
 		if c.Kind == "local_action_review" {
-			r := f.applyLocalActionReview(c, log.Index)
+			r := f.applyLocalActionReview(c, log.Index, batch.Version)
 			results = append(results, r)
 			events = append(events, r.Events...)
 			continue

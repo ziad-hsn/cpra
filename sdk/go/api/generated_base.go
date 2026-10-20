@@ -395,10 +395,13 @@ type Action struct {
 
 	// Cause Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	Cause *FailureDiagnostic `json:"cause,omitempty"`
+	Color string             `json:"color,omitempty"`
 
 	// ConflictingEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
+	DeliveryID          string          `json:"deliveryID,omitempty"`
+	EndpointID          string          `json:"endpointID,omitempty"`
 	ExecutionID         string          `json:"executionID,omitempty"`
 	ExecutionRevision   string          `json:"executionRevision,omitempty"`
 
@@ -416,8 +419,9 @@ type Action struct {
 	Kind           string `json:"kind,omitempty"`
 
 	// LateEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
-	LateEvidence *ActionEvidence `json:"lateEvidence,omitempty"`
-	MonitorID    string          `json:"monitorID,omitempty"`
+	LateEvidence        *ActionEvidence `json:"lateEvidence,omitempty"`
+	MonitorID           string          `json:"monitorID,omitempty"`
+	NotificationEpisode string          `json:"notificationEpisode,omitempty"`
 
 	// Outcome Recorded provider outcome classification, unchanged by operator review.
 	Outcome   string `json:"outcome,omitempty"`
@@ -427,6 +431,9 @@ type Action struct {
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
 	Review          *ActionReview    `json:"review,omitempty"`
+
+	// ReviewNotice A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
+	ReviewNotice *ReviewNotice `json:"reviewNotice,omitempty"`
 
 	// ReviewRevision Opaque action observation version required for a conditional operator review.
 	ReviewRevision string     `json:"reviewRevision,omitempty"`
@@ -580,9 +587,10 @@ type AutoIgnore struct {
 
 // Capabilities defines model for Capabilities.
 type Capabilities struct {
-	APIVersions []string            `json:"apiVersions"`
-	Drivers     map[string][]string `json:"drivers"`
-	PatchTypes  []string            `json:"patchTypes"`
+	APIVersions        []string            `json:"apiVersions"`
+	Drivers            map[string][]string `json:"drivers"`
+	NotificationColors []string            `json:"notificationColors,omitempty"`
+	PatchTypes         []string            `json:"patchTypes"`
 
 	// ResourceOperations Supported operations by resource; availability does not grant authorization.
 	ResourceOperations map[string][]string `json:"resourceOperations,omitempty"`
@@ -1357,14 +1365,16 @@ type MonitorObservationList struct {
 // MonitorSpec defines model for MonitorSpec.
 type MonitorSpec struct {
 	// AutoIgnore Suppress ordinary actions after this many distinct threshold-reaching outages in the rolling window. Both values are required.
-	AutoIgnore            *AutoIgnore           `json:"autoIgnore,omitempty"`
-	Check                 CheckSpec             `json:"check"`
-	Enabled               *bool                 `json:"enabled,omitempty"`
-	Maintenance           *[]MaintenanceWindow  `json:"maintenance,omitempty"`
-	NotificationGroupRefs *[]string             `json:"notificationGroupRefs,omitempty"`
-	Notifications         *map[string]AlertRule `json:"notifications,omitempty"`
-	Recovery              *RecoverySpec         `json:"recovery,omitempty"`
-	Tags                  *[]string             `json:"tags,omitempty"`
+	AutoIgnore            *AutoIgnore          `json:"autoIgnore,omitempty"`
+	Check                 CheckSpec            `json:"check"`
+	Enabled               *bool                `json:"enabled,omitempty"`
+	Maintenance           *[]MaintenanceWindow `json:"maintenance,omitempty"`
+	NotificationGroupRefs *[]string            `json:"notificationGroupRefs,omitempty"`
+
+	// Notifications Explicit per-color destinations. Blue reports an uncertain recovery requiring review and never inherits red destinations.
+	Notifications *map[string]AlertRule `json:"notifications,omitempty"`
+	Recovery      *RecoverySpec         `json:"recovery,omitempty"`
+	Tags          *[]string             `json:"tags,omitempty"`
 }
 
 // MonitorStatus defines model for MonitorStatus.
@@ -1390,6 +1400,9 @@ type MonitorStatus struct {
 	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty"`
 	StatusRevision     string             `json:"statusRevision,omitempty"`
 	UnknownActions     *int64             `json:"unknownActions,omitempty"`
+
+	// Warnings Non-fatal configuration advisories. They do not change observed service health.
+	Warnings *[]FieldError `json:"warnings,omitempty"`
 }
 
 // NotificationEndpoint defines model for NotificationEndpoint.
@@ -1566,6 +1579,9 @@ type Preflight struct {
 	ItemCount *int64        `json:"itemCount,omitempty"`
 	Items     []ApplyResult `json:"items,omitempty"`
 	Valid     bool          `json:"valid"`
+
+	// Warnings Advisory findings; they do not invalidate a configuration.
+	Warnings []FieldError `json:"warnings,omitempty"`
 }
 
 // PreflightIdentityFormat Present for collection protocol receipts; the caller must recognize it before uploading, validating or activating.
@@ -1914,6 +1930,15 @@ type Resource struct {
 	Metadata   Metadata        `json:"metadata"`
 	Spec       json.RawMessage `json:"spec"`
 	Status     json.RawMessage `json:"status,omitempty"`
+}
+
+// ReviewNotice A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
+type ReviewNotice struct {
+	ActionID string `json:"actionID"`
+	AlertID  string `json:"alertID"`
+	Health   string `json:"health"`
+	Phase    string `json:"phase"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 // RuntimeConfig defines model for RuntimeConfig.

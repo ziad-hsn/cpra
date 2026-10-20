@@ -274,6 +274,12 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 			return result, managementFailure(403, "forbidden", "Preflight requires read and write access to every submitted resource kind.")
 		}
 		inputs[i] = management.CollectionInput{Resource: resource, SourceID: item.Source, ItemID: fmt.Sprintf("item.%020d", item.Ordinal)}
+		if len(result.Warnings) < 100 {
+			for _, warning := range api.ResourceWarnings(resource) {
+				warning.Field = fmt.Sprintf("items[%d].resource.%s", i, warning.Field)
+				result.Warnings = append(result.Warnings, warning)
+			}
+		}
 	}
 	if len(result.Errors) > 0 {
 		return result, nil

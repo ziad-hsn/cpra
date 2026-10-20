@@ -87,17 +87,18 @@ func A2AConnection(job Job) (A2AConfig, bool) {
 // agentAction is an allowlist of committed incident context, not a manifest or
 // an instruction assembled from provider error messages or agent output.
 type agentAction struct {
-	Failure         *agentFailure    `json:"failure,omitempty"`
-	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
-	SchemaVersion   string           `json:"schemaVersion"`
-	MonitorID       string           `json:"monitorId"`
-	MonitorUID      string           `json:"monitorUid,omitempty"`
-	Revision        string           `json:"configurationRevision"`
-	IncidentID      string           `json:"incidentId,omitempty"`
-	ActionID        string           `json:"actionId"`
-	Role            string           `json:"role"`
-	Color           string           `json:"color,omitempty"`
-	Attempt         int              `json:"attempt"`
+	Notification    *notificationIdentity `json:"notification,omitempty"`
+	Failure         *agentFailure         `json:"failure,omitempty"`
+	RecoveryFailure *RecoveryFailure      `json:"recoveryFailure,omitempty"`
+	SchemaVersion   string                `json:"schemaVersion"`
+	MonitorID       string                `json:"monitorId"`
+	MonitorUID      string                `json:"monitorUid,omitempty"`
+	Revision        string                `json:"configurationRevision"`
+	IncidentID      string                `json:"incidentId,omitempty"`
+	ActionID        string                `json:"actionId"`
+	Role            string                `json:"role"`
+	Color           string                `json:"color,omitempty"`
+	Attempt         int                   `json:"attempt"`
 }
 
 type agentFailure struct {
@@ -115,6 +116,13 @@ func (d *Dispatch) agentAction() agentAction {
 	if d.Kind == "code" && d.FailureCode != "" {
 		action.Failure = &agentFailure{Code: d.FailureCode, Message: d.FailureMessage}
 	}
+	if d.Kind == "code" {
+		action.Notification = &notificationIdentity{MonitorID: d.MonitorID, IncarnationID: d.CatalogUID, IncidentID: d.IncidentID, EpisodeID: d.NotificationCorrelation,
+			ActionID: d.ActionID, DeliveryID: d.DeliveryID, EndpointID: d.EndpointID, At: d.NotificationAt.UTC(), Review: d.ReviewNotification}
+		if action.Notification.IncarnationID == "" {
+			action.Notification.IncarnationID = d.FileIncarnation
+		}
+	}
 	return action
 }
 
@@ -128,7 +136,27 @@ func (j *A2AJob) validAction(action agentAction) bool {
 			return false
 		}
 	}
-	if action.Color != "" && action.Color != "red" && action.Color != "yellow" && action.Color != "green" && action.Color != "cyan" {
+	if action.Color != "" && action.Color != "red" && action.Color != "yellow" && action.Color != "green" && action.Color != "cyan" && action.Color != "blue" && action.Color != "gray" {
+		return false
+	}
+	if n := action.Notification; n != nil {
+		if action.Role != "notification" || n.MonitorID != action.MonitorID || n.ActionID != action.ActionID || n.IncidentID != action.IncidentID {
+			return false
+		}
+		for _, id := range []string{n.IncarnationID, n.DeliveryID, n.EndpointID, n.EpisodeID} {
+			if id != "" && !validA2AIdentity(id) {
+				return false
+			}
+		}
+		if review := n.Review; review != nil {
+			if action.Color != "blue" || !validA2AIdentity(review.AlertID) || !validA2AIdentity(review.ActionID) || review.ActionID == action.ActionID || review.AlertID != n.EpisodeID ||
+				(review.Phase != "open" && review.Phase != "close") || (review.Health != "healthy" && review.Health != "unhealthy" && review.Health != "unknown") ||
+				(review.Phase == "open" && review.Reason != "" || review.Phase == "close" && review.Reason != "health_recovered" && review.Reason != "action_reviewed") {
+				return false
+			}
+		}
+	}
+	if action.Color == "blue" && (action.Notification == nil || action.Notification.Review == nil || action.Notification.DeliveryID == "" || action.Notification.EndpointID == "" || action.Notification.At.IsZero()) {
 		return false
 	}
 	if failure := action.Failure; failure != nil {

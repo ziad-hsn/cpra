@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
@@ -230,7 +231,7 @@ func (f *machine) checkWorkerExecution(in WorkerExecutionIntent, at time.Time) e
 	if err := f.checkWorkerActionIdentity(in); err != nil {
 		return err
 	}
-	result := transitionAtFormat(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at}, f.image.Version)
+	result := transitionAtFormat(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at, NoticeRevision: ActionNoticeRevision(m.Actions[in.ActionID])}, f.image.Version)
 	if !result.Allowed || result.Err != nil {
 		return ErrWorkerExecutionConflict
 	}
@@ -246,6 +247,12 @@ func (f *machine) checkWorkerActionIdentity(in WorkerExecutionIntent) error {
 	kind := "intervention"
 	if in.Category == "notification" {
 		kind = "code"
+		if action.ReviewNotice != nil && in.Notification == nil {
+			return ErrWorkerExecutionConflict
+		}
+		if in.Notification != nil && !reflect.DeepEqual(in.Notification, NotificationForWorker(action)) {
+			return ErrWorkerExecutionConflict
+		}
 		sources := m.Policy.WorkerNotificationSources[action.Color]
 		if action.Endpoint < 0 || action.Endpoint >= len(sources) || !sources[action.Endpoint].matches(in) {
 			return ErrWorkerExecutionConflict

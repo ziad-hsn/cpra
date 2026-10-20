@@ -31,7 +31,7 @@ function LegacyAlerts() {
   const yellowCount = incidents.filter((m) => m.pending_code === 'yellow').length;
   const greenCount = incidents.filter((m) => m.pending_code === 'green').length;
 
-  const validCodes: CpraCode[] = ['red', 'yellow', 'green', 'cyan', 'gray'];
+  const validCodes: CpraCode[] = ['red', 'yellow', 'green', 'cyan', 'gray', 'blue'];
   const isValidCode = (c: string | null | undefined): c is CpraCode =>
     !!c && (validCodes as string[]).includes(c);
 

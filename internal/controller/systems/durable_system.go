@@ -617,6 +617,9 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 			outcome = "timeout"
 		}
 		c := persistence.Command{Kind: "pulse", MonitorID: r.MonitorID, Revision: r.Revision, At: now, Generation: r.Generation, CheckControlRevision: r.CheckControlRevision, Outcome: outcome, Scheduled: r.Scheduled, ExecutionStart: r.ExecutionStart, ExecutionEnd: r.ExecutionEnd, Warning: r.Warning != "", Maintenance: manifest.InMaintenance(state.Maintenance, now), Driver: r.Driver}
+		if r.Type == "pulse" && !r.ExecutionStart.IsZero() {
+			c.Maintenance = c.Maintenance || manifest.MaintenanceBetween(state.Maintenance, r.ExecutionStart, now)
+		}
 		c.Failure = persistence.NewFailureDiagnostic(jobs.FailureCode(r.Err))
 		detail := jobs.FailureDetails(r.Err)
 		c.Failure.HTTPStatus, c.Failure.GRPCStatus, c.Failure.GRPCCode = detail.HTTPStatus, detail.GRPCStatus, detail.GRPCCode
@@ -1032,6 +1035,9 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d.DeliveryID, d.EndpointID = a.DeliveryID, a.EndpointID
 			d.NotificationCorrelation = a.NotificationCorrelation
 			d.ProviderCorrelationVersion = a.ProviderCorrelationVersion
+			if n := a.ReviewNotice; n != nil {
+				d.ReviewNotification = &jobs.ReviewNotification{AlertID: n.AlertID, ActionID: n.ActionID, Phase: n.Phase, Reason: n.Reason, Health: n.Health}
+			}
 			if a.Control != nil {
 				d.ControlChanged, d.ControlEnabled, d.ControlAt = true, a.Control.Enabled, a.Control.At
 			}
@@ -1092,7 +1098,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 						return jobs.ActionExecution{}, err
 					}
 				}
-				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: at, Guard: guard, AgentConnection: connection, ActionDeadline: d.Deadline, Maintenance: inMaintenance})
+				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: at, Guard: guard, AgentConnection: connection, ActionDeadline: d.Deadline, Maintenance: inMaintenance, NoticeRevision: persistence.ActionNoticeRevision(originalAction.Action)})
 				if handle == nil {
 					return jobs.ActionExecution{}, err
 				}

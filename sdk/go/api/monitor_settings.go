@@ -46,7 +46,7 @@ func ValidateMonitorSettings(spec MonitorSpec) error {
 	}
 	if spec.Notifications != nil {
 		for color := range *spec.Notifications {
-			if !slices.Contains([]string{"red", "yellow", "cyan", "green", "gray"}, color) {
+			if !slices.Contains([]string{"red", "yellow", "cyan", "green", "gray", "blue"}, color) {
 				return InvalidField("notifications", "notificationColor")
 			}
 		}

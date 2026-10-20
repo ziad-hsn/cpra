@@ -106,6 +106,7 @@ func (f *machine) applyWorkerExpiry(c WorkerExpireCommand, at time.Time) Result 
 	a.State, a.Outcome, a.FinishedAt = Cancelled, "worker_admission_expired", at
 	m := previous.Clone()
 	m.Actions[a.ID] = a
+	m.recordNotificationCancellation(a)
 	events := []Event{{MonitorID: m.ID, CatalogUID: a.CatalogUID, Revision: a.Revision, At: at,
 		Type: "action_cancelled", IncidentID: a.IncidentID, ActionID: a.ID, Kind: a.Kind,
 		Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome}}

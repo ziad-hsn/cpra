@@ -14,6 +14,19 @@ import (
 func validText(text string, limit int) bool {
 	return len(text) <= limit && utf8.ValidString(text) && !strings.ContainsAny(text, "\x00\r\n")
 }
+
+func cloneAssignment(a api.Assignment) api.Assignment {
+	a.Parameters = append([]byte(nil), a.Parameters...)
+	if a.Notification != nil {
+		n := *a.Notification
+		if n.Review != nil {
+			review := *n.Review
+			n.Review = &review
+		}
+		a.Notification = &n
+	}
+	return a
+}
 func validID(id string) bool          { return id != "" && validText(id, 256) }
 func validDeadline(at time.Time) bool { return !at.IsZero() && at.Year() >= 1 && at.Year() <= 9999 }
 func validEvidence(diagnostic string, evidence []string) bool {
@@ -42,6 +55,26 @@ func validateAssignment(a api.Assignment, server, worker, session string) error 
 	}
 	if len(a.Parameters) > 128<<10 || !json.Valid(a.Parameters) {
 		return ErrIdentity
+	}
+	if n := a.Notification; n != nil {
+		if a.Kind != "notification" || n.Format != 1 || !validID(n.DeliveryID) || !validID(n.EndpointID) || !validID(n.CorrelationID) || n.IncidentID != "" && !validID(n.IncidentID) || !validDeadline(n.At) {
+			return ErrIdentity
+		}
+		switch n.Color {
+		case "red", "yellow", "green", "cyan", "gray", "blue":
+		default:
+			return ErrIdentity
+		}
+		if n.Review != nil {
+			r := n.Review
+			if n.Color != "blue" || !validID(r.AlertID) || !validID(r.ActionID) || r.AlertID != n.CorrelationID ||
+				(r.Phase != "open" && r.Phase != "close") || (r.Health != "healthy" && r.Health != "unhealthy" && r.Health != "unknown") ||
+				(r.Phase == "open" && r.Reason != "" || r.Phase == "close" && r.Reason != "health_recovered" && r.Reason != "action_reviewed") {
+				return ErrIdentity
+			}
+		} else if n.Color == "blue" {
+			return ErrIdentity
+		}
 	}
 	return nil
 }

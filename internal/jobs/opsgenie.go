@@ -27,12 +27,12 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 	priority := "P5"
 	if c.Color == "red" {
 		priority = "P1"
-	} else if c.Color == "yellow" {
+	} else if c.Color == "yellow" || c.Color == "blue" {
 		priority = "P3"
 	}
 	data := map[string]string{"message": truncateNotification(c.notificationMessage(c.Message), 130), "description": truncateNotification(c.notificationMessage(c.Message), 15000), "alias": alias, "priority": priority}
 	target := base
-	if c.Color == "green" {
+	if c.resolvesNotification(c.Color) {
 		if c.CorrelationKey == "" {
 			return &DeliveryError{Status: http.StatusBadRequest}
 		}

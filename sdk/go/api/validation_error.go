@@ -135,7 +135,7 @@ var validationFields = sync.OnceValue(func() map[string]bool {
 		}
 	}
 	visit(schema)
-	for _, name := range []string{"pulse_check", "intervention", "codes", "notify", "notify_group", "notification_groups", "endpoints", "monitors", "red", "yellow", "green", "cyan", "gray"} {
+	for _, name := range []string{"pulse_check", "intervention", "codes", "notify", "notify_group", "notification_groups", "endpoints", "monitors", "red", "yellow", "green", "cyan", "gray", "blue"} {
 		fields[fieldKey(name)] = true
 	}
 	return fields

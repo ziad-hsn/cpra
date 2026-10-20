@@ -39,7 +39,7 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 		switch c.Color {
 		case "red":
 			messageType = "CRITICAL"
-		case "yellow":
+		case "yellow", "blue":
 			messageType = "WARNING"
 		case "green":
 			messageType = "RECOVERY"
@@ -49,7 +49,7 @@ func (c *CodeVictorOpsJob) Execute() (result Result) {
 	}
 	// A shared endpoint's trigger override must never turn verified recovery or
 	// a control notice into a new incident. Cyan is completion, not recovery.
-	if c.Color == "green" {
+	if c.resolvesNotification(c.Color) {
 		messageType = "RECOVERY"
 	}
 	if c.Color == "cyan" || c.Color == "gray" {

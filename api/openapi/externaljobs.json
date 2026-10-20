@@ -267,6 +267,9 @@
           "minLength": 1,
           "maxLength": 256,
           "x-go-name": "JobTypeUID"
+        },
+        "notification": {
+          "$ref": "#/components/schemas/WorkerNotification"
         }
       },
       "required": [
@@ -809,6 +812,52 @@
         "ReceiptDispositionFinalized",
         "ReceiptDispositionUnknown"
       ]
+    },
+    "WorkerNotification": {
+      "type": "object",
+      "description": "Committed notification context, separate from operator parameters. No provider credential is supplied.",
+      "properties": {
+        "format": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "color": {
+          "type": "string"
+        },
+        "deliveryID": {
+          "type": "string",
+          "x-go-name": "DeliveryID"
+        },
+        "endpointID": {
+          "type": "string",
+          "x-go-name": "EndpointID"
+        },
+        "incidentID": {
+          "type": "string",
+          "x-go-name": "IncidentID",
+          "x-go-type-skip-optional-pointer": true
+        },
+        "correlationID": {
+          "type": "string",
+          "x-go-name": "CorrelationID"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "review": {
+          "$ref": "#/components/schemas/ReviewNotice"
+        }
+      },
+      "required": [
+        "format",
+        "color",
+        "deliveryID",
+        "endpointID",
+        "correlationID",
+        "at"
+      ],
+      "additionalProperties": false
     }
   },
   "paths": {

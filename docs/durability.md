@@ -80,6 +80,42 @@ started marker is committed, including if the window began while it waited.
 Known outcomes of actions already started are still recorded. This preserves
 the existing periodic-maintenance behavior; it differs from snoozing checks.
 
+After maintenance or Unignore, fresh observations reassess the current outage.
+An outage that recovered while notifications were suppressed does not release
+old queued alerts. An outage first established during maintenance must reach the
+unhealthy threshold again outside maintenance before it counts for automatic
+Ignore or admits an outage notification. Each qualifying outage counts once.
+Ignore entered while healthy stays in effect until a subsequent qualifying
+outage passes the healthy threshold, or an operator selects Unignore. Successful
+checks alone do not manufacture a recovery or a green notification.
+
+## Recovery review notifications
+
+Blue means **Recovery outcome unknown — operator review required**. Configure
+blue destinations explicitly in a monitor's notification rules. CPRa does not
+inherit red destinations. A monitor with recovery but no enabled blue destination
+remains valid; preflight and monitor configuration views warn about that gap.
+
+Blue has its own correlation for the blocking action, outage episode and
+destination. After the healthy threshold, its closure reports **Health recovered;
+earlier recovery outcome remains unknown**. The underlying action remains unknown
+and held. A later outage can produce another blue notification if that action
+still blocks recovery. A conclusive audited review may also close the review
+condition, with the actual current health stated separately.
+
+Opening and closing blue deliveries follow normal suppression rules. Gray's
+enabled/disabled transition exception does not apply to blue. A suppressed or
+unsuccessful closure is not proof that the external provider resolved an alert.
+PagerDuty resolution uses the original correlation and destination; asynchronous
+providers retain their acceptance/completion distinction. Email, chat, log and
+webhook destinations receive a closure update when no resolve operation exists.
+
+Normal green requires an actual earlier yellow, red or cyan start in the same
+episode. A canceled unsent alert is not exposure. Ignore recovery retains its
+explicit green exception. Cyan reports **Health verification pending**, not
+restored health. Notification retries preserve the original logical delivery
+identity and overall deadline; expired queued work cannot acquire a fresh budget.
+
 After an interruption, a committed started action becomes unknown. This includes
 the narrow interval after its started marker but before a provider call. CPRa
 continues health checks and holds those actions. Snapshot restoration and log

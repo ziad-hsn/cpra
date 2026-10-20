@@ -32,6 +32,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			e.Actor, e.Reason, e.ControlRevision = "system", "verified_recovery", m.ControlRevision
 		}
 		if a != nil {
+			e.ReviewNotice = a.ReviewNotice
 			e.Control = a.Control
 			e.Failure, e.Cause = a.Failure, a.Cause
 			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
@@ -94,6 +95,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 					emit("incident_closed_configuration_removed", nil)
 				}
 				actions, sequence, manualRequests := m.Actions, m.Sequence, m.ManualRequests
+				notifications := m.Notifications
 				incarnation := m.FileIncarnation
 				m = c.Config.Clone()
 				if lifecycleStorageFormat(version) && m.CatalogUID == "" {
@@ -101,6 +103,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				}
 				m.Actions, m.Sequence, m.NextCheck = actions, sequence, c.At
 				m.ManualRequests = manualRequests
+				if notifications != nil {
+					m.Notifications = &NotificationState{ReviewAlerts: notifications.ReviewAlerts}
+				}
 				m.Cooldowns = make(map[string]time.Time)
 			}
 			m.Name, m.Removed, m.CatalogRevision = c.Config.Name, false, c.Config.CatalogRevision
@@ -113,6 +118,10 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 			if m.Policy.Healthy != c.Config.Policy.Healthy {
 				m.IgnoreHealthyChecks = 0
+			}
+			if m.Notifications != nil && m.Policy.Unhealthy != c.Config.Policy.Unhealthy {
+				m.Notifications.OutsideFailures = 0
+				m.Notifications.QualifiedIncident = ""
 			}
 			m.Policy = c.Config.Policy.Clone()
 		}
@@ -128,6 +137,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if actionStorageFormat(version) {
 			m.upgradeActions(c.At, emit)
+			m.pruneNotificationState()
 		}
 		if !m.Policy.Enabled {
 			for _, id := range sortedActions(m.Actions) {
@@ -203,6 +213,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			return Result{}
 		}
 		if c.Kind == "start" {
+			if actionStorageFormat(version) && c.NoticeRevision != ActionNoticeRevision(a) {
+				return Result{}
+			}
 			controlNotice := m.ControlNotification(a)
 			if lifecycleStorageFormat(version) && a.Kind == "intervention" && a.State == Queued {
 				if a.Deadline.IsZero() || !c.At.Before(a.Deadline) {
@@ -248,6 +261,8 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				return Result{}
 			}
 			a.State, a.StartedAt = Started, c.At
+			m.recordNotificationStart(a)
+			m.recordReviewNoticeStart(a)
 			if m.LifecycleVersion == LifecycleFormatVersion && a.Kind == "code" &&
 				(a.Color == "yellow" || a.Color == "red" || a.Color == "cyan") {
 				m.NotificationAttempted = a.NotificationCorrelation
@@ -313,6 +328,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.openIncident(c.At, emit)
 				m.queueRecoveryFailure(a, c.At, emit)
 			}
+			m.assessReviewAlerts(c.At, emit)
 		} else if a.State == Failed && c.Retryable && a.Attempt < 3 && !m.snoozed(c.At) &&
 			(m.ControlNotification(a) || m.Policy.Enabled && !m.Ignored && !m.suppressedNotification(a)) &&
 			(m.NotificationVersion != DeliveryFormatVersion || m.notificationEligible(a) && (m.ControlNotification(a) || !m.Policy.InMaintenance(c.At) && !m.NotificationMaintenance) && notificationRetryAt(c, a.Attempt).Before(a.Deadline)) {
@@ -339,6 +355,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		return Result{}
 	}
 	c.Maintenance = c.Maintenance || m.Policy.InMaintenance(c.At)
+	if actionStorageFormat(version) && !c.ExecutionStart.IsZero() {
+		c.Maintenance = c.Maintenance || m.Policy.MaintenanceBetween(c.ExecutionStart, c.At)
+	}
 	if m.NotificationVersion == DeliveryFormatVersion {
 		m.NotificationMaintenance = c.Maintenance
 		if c.Maintenance {
@@ -376,10 +395,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.changeNotificationEpisode(identity("outage/"+m.IncidentID), c.At, emit)
 		m.ConsecutiveFailures++
 		m.PulseFailures++
+		m.observeOutageQualification(c)
+		m.Recovering, m.Warning, m.RecoveryStreak = true, false, 0
 		if m.ConsecutiveFailures >= max(1, m.Policy.Unhealthy) {
 			m.countIgnoreIncident(c.At, emit)
 		}
-		m.Recovering, m.Warning, m.RecoveryStreak = true, false, 0
 		if m.VerifyRemaining > 0 && c.Generation > m.VerificationAfter {
 			m.VerifyRemaining = 0
 			m.openIncident(c.At, emit)
@@ -388,7 +408,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.queueColor("yellow", c.At, emit)
 			}
 			if m.PulseFailures >= max(1, m.Policy.Unhealthy) && (!c.Maintenance || m.LifecycleVersion == LifecycleFormatVersion) {
-				if !c.Maintenance && m.mayRetryRecovery() && m.recoveryBudgetAvailable(c.At) {
+				if !c.Maintenance && !m.awaitingOutsideConfirmation() && m.mayRetryRecovery() && m.recoveryBudgetAvailable(c.At) {
 					if m.recoveryAttempts() > 0 {
 						m.LastInterventionFailure = m.lastRecoveryFailure()
 					}
@@ -403,6 +423,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 	} else {
 		m.ConsecutiveFailures, m.PulseFailures = 0, 0
+		if m.Notifications != nil {
+			m.Notifications.OutsideFailures = 0
+		}
 		m.LastSuccess = c.At
 		if m.Warning && !previousWarning {
 			if !m.Recovering && !m.Incident {
@@ -447,7 +470,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 		}
 	}
+	if m.Notifications != nil && c.Outcome != "success" && !c.Maintenance && m.outageQualified() && m.Incident && m.VerifyRemaining == 0 && !m.pendingCurrentIntervention() {
+		m.queueColor("red", c.At, emit)
+	}
 	m.observeIgnoreRecovery(c, emit)
+	m.assessReviewAlerts(c.At, emit)
 	next := c.Scheduled.Add(m.Policy.Interval)
 	if c.Scheduled.IsZero() {
 		next = c.At.Add(m.Policy.Interval)
@@ -511,6 +538,9 @@ func (m *Monitor) recovered(at time.Time, emit func(string, *Action)) {
 	}
 	m.Incident, m.Recovering, m.InterventionAttempted, m.RecoveryStreak = false, false, false, 0
 	m.InterventionAttempts, m.LastInterventionFailure = 0, time.Time{}
+	if m.Notifications != nil {
+		m.Notifications.MaintenanceOutage = false
+	}
 	m.changeNotificationEpisode(identity("recovered/"+m.IncidentID), at, emit)
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
@@ -532,11 +562,18 @@ func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Acti
 	if m.Policy.NotificationTriggers[color] != "" {
 		return
 	}
+	if m.Notifications != nil && color == "red" && m.Policy.RecoveryDriver != "" {
+		if a, ok := m.latestRecovery(); ok && a.State == Failed {
+			failure := RecoveryFailure{ActionID: a.ID, Driver: m.Policy.RecoveryDriver, Attempt: a.Attempt, MaxAttempts: m.Policy.recoveryLimit(), Trigger: NotifyRecoveryFailed, FailedAt: a.FinishedAt}
+			m.queueNotification(color, at, &failure, emit)
+			return
+		}
+	}
 	m.queueNotification(color, at, nil, emit)
 }
 
 func (m *Monitor) queueNotification(color string, at time.Time, failure *RecoveryFailure, emit func(string, *Action)) {
-	if m.Ignored || m.pendingAutomaticIgnore(at) || !m.Policy.Enabled || m.snoozed(at) || (m.Dismissed && m.notificationIncident() != "") ||
+	if m.Ignored || m.pendingAutomaticIgnore(at) || m.awaitingOutsideConfirmation() || !m.Policy.Enabled || m.snoozed(at) || (m.Dismissed && m.notificationIncident() != "") ||
 		m.NotificationVersion == DeliveryFormatVersion && (m.NotificationMaintenance || m.Policy.InMaintenance(at)) {
 		return
 	}
@@ -548,19 +585,24 @@ func (m *Monitor) queueNotification(color string, at time.Time, failure *Recover
 		return
 	}
 	due := at
-	if last := m.Cooldowns[color]; !(color == "green" && m.Policy.RecoveryBypass) && due.Before(last.Add(m.Policy.Cooldown)) {
+	if last := m.Cooldowns[color]; m.Notifications == nil && !(color == "green" && m.Policy.RecoveryBypass) && due.Before(last.Add(m.Policy.Cooldown)) {
 		if m.NotificationVersion == DeliveryFormatVersion {
 			return // Suppress the repeat; never release it after its episode ends.
 		}
 		due = last.Add(m.Policy.Cooldown)
 	}
 	for n := 0; n < count; n++ {
+		if m.deliveryStarted(color, n, failure) || m.deliveryCooling(color, n, at) {
+			continue
+		}
 		m.queueActionWithFailure("code", color, n, due, failure, emit)
 	}
-	if m.Cooldowns == nil {
-		m.Cooldowns = make(map[string]time.Time)
+	if m.Notifications == nil {
+		if m.Cooldowns == nil {
+			m.Cooldowns = make(map[string]time.Time)
+		}
+		m.Cooldowns[color] = due
 	}
-	m.Cooldowns[color] = due
 }
 
 func (m *Monitor) queueAction(kind, color string, endpoint int, at time.Time, emit func(string, *Action)) {

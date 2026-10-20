@@ -42,7 +42,7 @@ func (s *Store) ReviewStoppedAction(ctx context.Context, c Command) (Result, err
 	return results[0], results[0].Err
 }
 
-func (f *machine) applyLocalActionReview(c Command, index uint64) Result {
+func (f *machine) applyLocalActionReview(c Command, index uint64, version int) Result {
 	previous, ok := f.image.Monitors[c.MonitorID]
 	a, found := previous.Actions[c.ActionReview.ActionID]
 	if !ok || !found || actionMonitorIdentity(c.MonitorID, a) != c.ActionReview.MonitorUID ||
@@ -69,7 +69,7 @@ func (f *machine) applyLocalActionReview(c Command, index uint64) Result {
 	oldSession := f.image.LocalExecutorSession
 	f.image.LocalExecutorSession = c.ExecutorSession
 	f.image.Monitors[m.ID] = m
-	r := f.applyActionReview(c, index)
+	r := f.applyActionReview(c, index, version)
 	if r.Err != nil || !r.Allowed {
 		f.image.LocalExecutorSession = oldSession
 		f.image.Monitors[m.ID] = previous

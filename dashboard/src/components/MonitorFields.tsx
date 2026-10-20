@@ -84,7 +84,8 @@ export function MonitorFields({ spec: raw, onChange, readOnly = false }: { spec:
         </div><p className="muted">Saving configuration does not immediately invoke recovery. The controller uses incident eligibility and the configured limits.</p></> : <p className="muted">Recovery is not configured.</p>}
     </fieldset>
     <fieldset className="management-field"><legend>Code notifications</legend>
-      <p className="muted">Each Code selects an actual notification driver. Recipients and a group supply matching destinations; they are separate from dashboard identities.</p>
+      <p className="muted">Each notification selects a driver and destinations. Blue reports an uncertain recovery for operator review, and closes after verified health recovery without releasing the action hold.</p>
+      {recovery && (!rules.blue || record(rules.blue).dispatch === false) && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
       {Object.entries(rules).map(([color, rule]) => <CodeFields key={color} color={color} rule={record(rule) as AlertRule} readOnly={readOnly}
         onChange={next => update('notifications', setField(rules, color, next))} />)}
       {!Object.keys(rules).length && <p className="muted">No Code notifications configured.</p>}
@@ -201,6 +202,7 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
     <p>Observed health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
     {status?.ignored && <p>Ignored by {status.ignoredBy || 'Unavailable'} since {formatDateTime(status.ignoredAt ?? '')}. {status.ignoreReason} Health observations continue.</p>}
     <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
+    {status?.warnings?.some(warning => warning.reason === 'unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>
     <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown provider outcomes: {status?.unknownActions ?? 'Unavailable'} · Actions needing review: {status?.actionsNeedingReview ?? 'Unavailable'}</p>

@@ -125,7 +125,17 @@ class BrowserEvidenceTests(unittest.TestCase):
         self.assertFalse(report['release_gate_passed'])
         self.assertEqual(report['release_identity'], release.evidence_identity(self.manifest))
         self.assertEqual(len(report['reports']), 4)
-        self.assertEqual(len(report['input_sha256']), 60)
+        # Each campaign retains its report, source inventory, two logs and images.
+        self.assertEqual(len(report['input_sha256']), 4 * (4 + len(browser_evidence.SCREENSHOTS)))
+
+    def test_campaign_and_release_reader_require_the_same_tests_and_screenshots(self):
+        producer = browser_record.browser_campaign
+        self.assertEqual(
+            [(package, tuple(names)) for package, names in producer.TESTS.items()],
+            list(browser_evidence.TESTS.items()),
+        )
+        self.assertEqual(len(producer.SCREENSHOTS), len(set(producer.SCREENSHOTS)))
+        self.assertEqual(set(producer.SCREENSHOTS), browser_evidence.SCREENSHOTS)
 
     def test_archive_producer_inventory_matches_reader_and_tracks_dashboard_notices(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -588,3 +588,34 @@ Final evidence must not attribute a binary to HEAD merely because the runner
 records HEAD. Likewise, the 0/500/5,000 action-growth test proves bounded hot-path
 work using failed/rejected actions; unknown/review/blue and authenticated restore
 semantics are separate smaller tests, not that entire scale/lifecycle combination.
+
+### Browser evidence inventory correction after `b6e86dc`
+
+The default application matrix at `b6e86dc` completed module verification, vet
+and race tests across 32 packages, with 5,752 passing test cases. Its 16 skipped
+entries are separately invoked browser tests and subprocess helpers; they are
+not evidence of browser execution. The following optional-driver vet reached the
+scratch reserve and was stopped with successful owned-process cleanup. That
+matrix is incomplete, not an application failure. Subsequent heavy variants run
+separately with task-owned compiler cache cleanup between them.
+
+The browser campaign had nine required tests and 18 screenshots, while the release
+reader still required eight and 11. The reader now requires the complete current
+inventory. A parity regression compares ordered test selection, the exact image
+set and duplicate image names. All 25 focused reader tests pass; independent
+source review confirmed missing/skipped coverage, missing screenshots, tampered
+inputs and incompatible source identities still fail. This correction also makes
+the notification browser test a recognized companion in the Go matrix reader.
+The completed Go outputs retain their original source identity and are not
+relabeled as results for the next frozen candidate.
+
+`browser-inventory-release-regression-1` passes all 715 release-tool regressions
+with this correction (202.5 seconds). This is development evidence; the frozen
+run must still execute the browser campaigns and their retained-input readers.
+
+Only the inactive task-owned compiler cache and abandoned compiler temporary
+directories were removed. Cleanup records retain directory identities and sizes;
+evidence, source artifacts and other worktrees remain unchanged. The system's
+pre-existing non-dumpable user-session services were identified separately from
+the inspected task builders; cleanup does not claim access to their protected
+process details.

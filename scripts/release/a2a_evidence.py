@@ -135,7 +135,8 @@ def reference_results(manifest, report, artifacts, remember):
         remember(record, artifacts / 'a2a-source' / Path(name).name, manifest['source_files'].get(name, {}).get('sha256'))
     module = build.worker.bounded_text(artifacts / 'a2a-source/go.mod')
     require(re.search(r'(?m)^module ' + re.escape(REFERENCE_MODULE) + r'[ \t]*$', module)
-            and re.search(r'(?m)^go 1\.26\.0[ \t]*$', module)
+            and re.search(r'(?m)^go ' + re.escape(build.RECIPE['minimum_go_version'].removeprefix('go'))
+                          + r'[ \t]*$', module)
             and re.search(r'(?m)^(?:require[ \t]+|[ \t]+)' + re.escape(REFERENCE_SDK)
                           + r'[ \t]+' + re.escape(REFERENCE_VERSION) + r'[ \t]*$', module),
             'upstream SDK or module requirement differs')

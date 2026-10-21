@@ -268,6 +268,27 @@ class A2AEvidenceTests(unittest.TestCase):
         self.reports[0]['a2a_reference'] = original
         self.save()
 
+    def test_reference_module_requires_the_exact_recipe_minimum(self):
+        name = a2a.REFERENCE_DIRECTORY + '/go.mod'
+        original = self.sources[name]
+        minimum = release.RECIPE['minimum_go_version'].removeprefix('go')
+        for directive in ('1.26.0', '1.27.0', minimum.replace('.', 'x'), ''):
+            with self.subTest(directive=directive):
+                replacement = ('go ' + directive).encode() if directive else b''
+                changed = re.sub(rb'(?m)^go[^\S\n]+[^\n]+$', replacement, original)
+                self.assertNotEqual(changed, original)
+                checksum = build_fixtures.worker_fixtures.sdk_fixtures.sha(changed)
+                self.manifest['source_files'][name]['sha256'] = checksum
+                for path, report in zip(self.paths, self.reports):
+                    payload = path.with_name(path.stem + '.artifacts') / 'a2a-source/go.mod'
+                    payload.write_bytes(changed)
+                    record = build_campaign.fingerprint(payload, self.root)
+                    self.assertEqual(record['sha256'], checksum)
+                    report['a2a_reference']['source_files'][name] = record
+                self.save()
+                with self.assertRaisesRegex(ValueError, 'upstream SDK or module requirement differs'):
+                    self.verify()
+
     def test_changed_binary_source_payload_alias_and_missing_output_are_rejected(self):
         artifacts = self.paths[0].with_name(self.paths[0].stem + '.artifacts')
         for path in (artifacts / 'a2a-agent', artifacts / 'a2a-source/main.go', artifacts / 'a2a-reference-modules-stdout.log'):

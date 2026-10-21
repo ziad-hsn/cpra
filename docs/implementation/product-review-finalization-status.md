@@ -956,3 +956,18 @@ affected verification. The separate module-only OpenPGP advisory remains
 recorded. Source publication, native platform/service qualification, provider
 accounts and larger comparative qualification remain open. No publication,
 million-monitor campaign or 24-hour run was added.
+
+## Compiler requirement in A2A evidence
+
+The frozen release-tool suite at `7cd3435` ran 717 tests and failed with 14
+assertion failures and nine errors. Its A2A reader still required the literal
+`go 1.26.0` directive, rejecting the patched reference module before later
+evidence checks. That failed result remains retained.
+
+The reader now requires the exact escaped minimum from the release recipe.
+Source fingerprints, upstream SDK identity, executable compiler, dependency
+checksums and evidence boundaries remain enforced. A new regression supplies
+fingerprint-consistent older, newer-minor, missing and malformed directives and
+requires rejection. All 16 focused A2A and qualification integration tests pass;
+this working-tree result does not replace the next frozen suite. Application
+behavior, generated assets and storage formats are unchanged by this correction.

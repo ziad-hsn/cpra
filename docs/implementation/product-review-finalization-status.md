@@ -971,3 +971,31 @@ fingerprint-consistent older, newer-minor, missing and malformed directives and
 requires rejection. All 16 focused A2A and qualification integration tests pass;
 this working-tree result does not replace the next frozen suite. Application
 behavior, generated assets and storage formats are unchanged by this correction.
+
+## Dashboard development-tool security patch — 21 October 2026
+
+The frontend audit at `e568465` failed on three editor-launch advisories in
+Vite 6.4.3: [Windows argument escaping](https://github.com/advisories/GHSA-698v-4r3x-3vcv),
+[editor argument interpretation](https://github.com/advisories/GHSA-r825-w8mm-5pxw)
+and [Windows path validation](https://github.com/advisories/GHSA-587h-7wmj-h5pm).
+The retained audit reports two moderate and one high finding. These concern
+development tooling; the audit does not demonstrate exploitation of CPRa's
+embedded dashboard.
+
+The patch updates Vite to the upstream-fixed 6.4.4 release. Its lockfile also
+updates the resolved build dependencies Rollup, PostCSS and Nano ID within their
+existing supported ranges. The dashboard, generated input manifest and dependency
+notices must be regenerated and verified together. Runtime Go code, module
+requirements and storage formats are unchanged.
+
+The completed `e568465` checks retain their original identities, including both
+Go 1.27.3 browser campaigns and the local HTTP connection-reuse regression.
+The failed frontend audit remains failed. The changed build inputs require
+independent review, a new frozen source and affected verification; no release
+or provider qualification is inferred from this patch.
+
+The working-tree rebuild passed all 600 frontend tests, type checks and lint.
+All 44 recorded outputs, including embedded assets and notices, are unchanged;
+only the package and lockfile input hashes changed in the build manifest. The
+updated dependency audit reports no advisories. These development checks do not
+replace the next frozen verification.

@@ -12,7 +12,8 @@ or native platform has been qualified. Use matching source, metadata and guides.
 
 ## Build from source
 
-Use Go 1.26 or later, Make and Python 3 in the selected checkout:
+Use Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release), Make and
+Python 3 in the selected checkout. See [compiler compatibility](../versions.md).
 
 ~~~sh
 make

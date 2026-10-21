@@ -81,7 +81,7 @@ class ModuleStagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); source = root / 'source'; source.mkdir()
             module = module_archive.CORE; version = 'v0.2.0'
-            original = ('module ' + module + '\n\ngo 1.26.0\n').encode()
+            original = ('module ' + module + '\n\ngo 1.26.10\n').encode()
             (source / 'go.mod').write_bytes(original)
 
             def archiver_fixture(args, **kwargs):

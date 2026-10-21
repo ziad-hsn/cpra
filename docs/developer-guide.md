@@ -10,7 +10,7 @@ qualification gates.
 
 # Development guide
 
-CPRa preserves Go 1.26 source compatibility. The release recipe pins Go 1.27.2;
+Every CPRa module requires Go 1.26.10. The release recipe pins Go 1.27.3;
 minimum-version tests are a separate check. Before nested-module publication,
 Make uses a command-local workspace for the application, SDK and worker modules.
 That workspace supports development; it does not prove public module downloads
@@ -42,7 +42,10 @@ execution libraries. Preserve the build-tag boundary for external jobs.
 
 ## Workspace and tools
 
-Install Go 1.26 or newer, Make and Python 3. The recorded compiler is Go 1.27.2;
+Install Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release), Make and
+Python 3. Go 1.27.0–1.27.2 remain affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), despite satisfying the
+module minimum. The recorded compiler is Go 1.27.3;
 frontend builds use Node 24.21.0 and pnpm 11.22.0. Native race tests need a C
 compiler. Ordinary builds use the committed dashboard assets.
 

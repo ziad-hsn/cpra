@@ -6,7 +6,7 @@
     "api/openapi/models.base.json": "9ce979277d811fed75a48594703a63eee4edd37f7472949837d9030f8ebac95f",
     "api/openapi/operations.json": "fc74b3a25e1d33f72793c54dab5d677e080b4b2f2e207b554c482b343bfa5833",
     "tools/sdkgen/generate.py": "8f3f93f9ece0617fd4ffa36ce9c873677605e9d215c6530512669caf0fe3cf03",
-    "tools/sdkgen/go.mod": "293c97b6a3ef5ffe5fe3309f5411c7666e7f656ee8769adc93080f6039aac00d",
+    "tools/sdkgen/go.mod": "6494c843e170d95c1fa34818bcd079b083268d51753d9baabf724d44b36e3be8",
     "tools/sdkgen/go.sum": "380f4e9569dcabced6790bc6fac01135aa01476451341d456ed984b8455338ba"
   },
   "outputs": {

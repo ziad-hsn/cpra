@@ -879,18 +879,18 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual((stage / 'distribution' / report.name).read_bytes(), report.read_bytes())
         self.assertFalse((stage / 'distribution' / 'unselected.log').exists())
         self.assertFalse((stage / 'distribution' / 'sdk-consumer-evidence.json').exists())
-        self.assertIn('sdk-consumer-go1.26.0/consumer-go1.26.0.json', config['components']['sdk']['consumers'][0])
-        self.assertIn('worker-evidence-go1.26.0/worker-go1.26.0.json',
+        self.assertIn('sdk-consumer-go1.26.10/consumer-go1.26.10.json', config['components']['sdk']['consumers'][0])
+        self.assertIn('worker-evidence-go1.26.10/worker-go1.26.10.json',
                       config['components']['external_worker']['campaigns'][0])
-        self.assertIn('build-evidence-go1.26.0/build-go1.26.0.json',
+        self.assertIn('build-evidence-go1.26.10/build-go1.26.10.json',
                       config['components']['build_matrix']['campaigns'][0])
         self.assertEqual(config['components']['management'], config['components']['build_matrix'])
         self.assertEqual(config['components']['a2a'], config['components']['build_matrix'])
         self.assertEqual(len(config['components']['browser']['campaigns']), 4)
         self.assertEqual(config['components']['accessibility']['campaigns'], config['components']['browser']['campaigns'])
-        self.assertIn('browser-evidence-go1.26.0-default/browser-go1.26.0-default.json',
+        self.assertIn('browser-evidence-go1.26.10-default/browser-go1.26.10-default.json',
                       config['components']['browser']['campaigns'][0])
-        self.assertFalse((stage / 'distribution' / 'worker-go1.26.0.json').exists())
+        self.assertFalse((stage / 'distribution' / 'worker-go1.26.10.json').exists())
         self.assertEqual((stage / 'distribution' / 'RELEASE.json').read_bytes(), (assets / 'RELEASE.json').read_bytes())
         inputs.unchanged()
 

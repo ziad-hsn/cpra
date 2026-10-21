@@ -7,7 +7,7 @@
     ],
     "name": "github.com/ziad-hsn/cpra/sdk/go",
     "scope": "dashboard-wasm",
-    "source_sha256": "6cee180ce488a2b672b7da5b6570e499a1dd1ce3b16889363f0ad21099c00440",
+    "source_sha256": "235f13a75d524a9ec6d32d8d381f1da6f29d26a51dd579ebe3e83b2957e86919",
     "version": "source"
   },
   {
@@ -61,7 +61,7 @@
     "scope": "dashboard-wasm",
     "sha256": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
     "source_file": "dashboard/src/import/generated/wasm_exec.js",
-    "source_identity": "go1.27.2",
-    "version": "go1.27.2"
+    "source_identity": "go1.27.3",
+    "version": "go1.27.3"
   }
 ]

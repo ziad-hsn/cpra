@@ -144,8 +144,8 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/yosssi/ace v0.0.5 h1:tUkIP/BLdKqrlrPwcmH0shwEEhTRHoGnc1wFIWmaBUA=
 github.com/yosssi/ace v0.0.5/go.mod h1:ALfIzm2vT7t5ZE7uoIZqF3TQ7SAOyupFZnkrF5id+K0=
-github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1 h1:XDQRmPg9Dnu4AYNSfGI+Pw7ch6soP918PX3yDo8FROk=
-github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1/go.mod h1:6v/hzX0u7rNgfnMDXwlIeJsTp2CzrK8aM3bAN82ekpo=
+github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1 h1:c2dR9Zd09pPKkABjPg2JdlVo7sKfqKcvUuvJ0879/7w=
+github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1/go.mod h1:8zjD6+usJ56FH6nou7BLxr9BlHq8zdyfomc1PzI7Vj4=
 go.etcd.io/bbolt v1.4.3 h1:dEadXpI6G79deX5prL3QRNP6JB8UxVkqo4UPnHaNXJo=
 go.etcd.io/bbolt v1.4.3/go.mod h1:tKQlpPaYCVFctUIgFKFnAlvbmB3tpy1vkTnDWohtc0E=
 go.etcd.io/gofail v0.2.0 h1:p19drv16FKK345a09a1iubchlw/vmRuksmRzgBIGjcA=

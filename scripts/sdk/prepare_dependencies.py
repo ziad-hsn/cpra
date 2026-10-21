@@ -142,7 +142,7 @@ def run_go(go, source, args, env, out, name, commands, timeout=900):
 
 def module_contract(metadata, module, sdk_version=None, worker_version=None):
     if not isinstance(metadata, dict) or metadata.get('Module', {}).get('Path') != module \
-            or metadata.get('Go') != '1.26.0':
+            or metadata.get('Go') != '1.26.10':
         raise ValueError('Module path or Go compatibility changed: ' + module)
     if metadata.get('Replace') or metadata.get('Exclude') or metadata.get('Toolchain'):
         raise ValueError('Preparation forbids replace, exclude and toolchain directives')
@@ -372,7 +372,7 @@ def prepare(go, out, worker_version, root=ROOT, *, refresh_sdk_checksum=False):
             run(source / relative, ['list', '-mod=readonly', '-m', '-json', 'all'], 'module-graph-' + str(index))
         consumer = out / 'consumer'
         consumer.mkdir()
-        (consumer / 'go.mod').write_text('module cpra.invalid/dependency-consumer\n\ngo 1.26.0\n')
+        (consumer / 'go.mod').write_text('module cpra.invalid/dependency-consumer\n\ngo 1.26.10\n')
         raw = run(consumer, ['mod', 'download', '-json', CORE + '@' + sdk_version,
                              WORKER + '@' + worker_version], 'private-module-download')
         decoder, rows, remainder = json.JSONDecoder(), [], raw.lstrip()

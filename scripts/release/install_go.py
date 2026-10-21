@@ -15,7 +15,7 @@ import zipfile
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', default='go1.27.2')
+    parser.add_argument('--version', default='go1.27.3')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     pins = json.loads(Path(__file__).with_name('toolchains.json').read_text())

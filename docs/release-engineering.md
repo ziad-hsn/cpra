@@ -750,7 +750,12 @@ execution and real signature/readback qualification remain open.
 
 ## Source and build identity
 
-The canonical module is `github.com/ziad-hsn/cpra`. All repository modules declare the same `go 1.26.0` minimum; official binaries use **Go 1.27.2**. A separate minimum-compiler job tests Go 1.26.0. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
+The canonical module is `github.com/ziad-hsn/cpra`. All repository modules declare the same `go 1.26.10` minimum; official binaries use **Go 1.27.3**. A separate minimum-compiler job tests Go 1.26.10. Source compatibility does not extend Go's upstream security-support period. Compiler upgrades require review of the recipe, recorded archive checksums and compatibility results. See the [Go release policy](https://go.dev/doc/devel/release#policy).
+
+Use a patched compiler: Go 1.26.10 or later in the 1.26 series, or Go 1.27.3 or
+later in the 1.27 series. Go 1.27.0–1.27.2 satisfy the module directive but are
+affected by [GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json). The directive
+is a minimum-version requirement, not a denylist of vulnerable compiler releases.
 
 `scripts/release/recipe.json` is the build contract and `.goreleaser.yaml` matches it. Its `minimum_go_version` selects the common compatibility compiler for the application, SDK, worker and verification readers. The release recipe uses:
 
@@ -979,7 +984,7 @@ Benchmark preparation can select `/absolute/new/cpra-dependencies/modules` with
 
 Private release build, native-platform and compiler-compatibility jobs each prepare
 their cache from the frozen source archive. Compatibility preparation uses the
-release compiler before selecting Go 1.26 or the release compiler for application,
+release compiler before selecting Go 1.26.10 or the release compiler for application,
 SDK and worker tests. Jobs export only the cache paths; the public proxy/checksum
 settings and `GOWORK=off` remain in effect. Preparation reports and proposed
 module-file changes are retained privately even when preparation fails.
@@ -995,7 +1000,7 @@ application release.
 The release builder needs Python 3.12+, the selected Go distribution, and the checksum-pinned GoReleaser OSS/nFPM tools. Node/pnpm are needed only to verify the committed dashboard, not to rebuild a shipped source archive.
 
 ```sh
-python3 scripts/release/install_go.py --version go1.27.2 --out /absolute/new/go
+python3 scripts/release/install_go.py --version go1.27.3 --out /absolute/new/go
 export PATH=/absolute/new/go/bin:$PATH
 python3 scripts/release/install_tools.py
 python3 scripts/release/dashboard_build.py --check

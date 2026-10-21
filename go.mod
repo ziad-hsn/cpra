@@ -1,6 +1,6 @@
 module github.com/ziad-hsn/cpra
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/Workiva/go-datastructures v1.1.6

@@ -7,7 +7,10 @@ out of reports; vulnerabilities follow [SECURITY.md](SECURITY.md).
 
 ## Development
 
-Use Go 1.26 or newer for source compatibility. Official artifacts use the exact
+Use Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release). Go
+1.27.0–1.27.2 are affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), even though they satisfy
+the common `go 1.26.10` module minimum. Official artifacts use the exact
 compiler and build recipe in `scripts/release/recipe.json`. The dashboard uses
 the pinned Node and pnpm versions in the same file. Do not change dependencies
 or generated files just to make an unrelated change pass.

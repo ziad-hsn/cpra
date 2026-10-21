@@ -39,7 +39,7 @@ class SDKEvidenceTests(unittest.TestCase):
         for module, relative in sdk_evidence.MODULE_ROOTS.items():
             contents = {name: ('fixture input: ' + module + '/' + name + '\n').encode()
                         for name in sdk_evidence.documentation_inputs(module)}
-            contents['go.mod'] = ('module ' + module + '\n\ngo 1.26.0\n' +
+            contents['go.mod'] = ('module ' + module + '\n\ngo 1.26.10\n' +
                                   (f'require {CORE} {self.versions[CORE]}\n' if module == WORKER else '')).encode()
             contents['client.go' if module == CORE else 'runner.go'] = b'package fixture\n'
             if module == WORKER:

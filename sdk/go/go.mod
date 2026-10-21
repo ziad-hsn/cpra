@@ -1,6 +1,6 @@
 module github.com/ziad-hsn/cpra/sdk/go
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/oapi-codegen/runtime v1.6.0

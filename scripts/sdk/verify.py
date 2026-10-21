@@ -249,7 +249,7 @@ def verify_consumers(go: str, artifacts: Path | None, *, published=False, sdk_ve
         report["compiler"] = run([go, "version"], ROOT, env).strip()
         consumer = temp / "consumer"
         consumer.mkdir()
-        (consumer / "go.mod").write_text("module example.com/cpra-sdk-consumer\n\ngo 1.26.0\n\n"
+        (consumer / "go.mod").write_text("module example.com/cpra-sdk-consumer\n\ngo 1.26.10\n\n"
                                          f"require {CORE} {sdk_version}\n")
         (consumer / "main.go").write_bytes((source / "scripts/sdk/testdata/consumer.go").read_bytes())
         run([go, "mod", "tidy"], consumer, env)
@@ -274,7 +274,7 @@ def verify_consumers(go: str, artifacts: Path | None, *, published=False, sdk_ve
                                          'var _ = cpra.NewWorkerClient\nfunc main() {}\n')
         run([go, "build", "-mod=readonly", "."], consumer, env, expected_failure=True)
         run([go, "build", "-mod=readonly", "-tags=externaljobs", "."], consumer, env)
-        (consumer / "go.mod").write_text("module example.com/cpra-sdk-consumer\n\ngo 1.26.0\n\n"
+        (consumer / "go.mod").write_text("module example.com/cpra-sdk-consumer\n\ngo 1.26.10\n\n"
                                          f"require (\n {CORE} {sdk_version}\n {WORKER} {worker_version}\n)\n")
         (consumer / "main.go").write_text('package main\nimport _ "' + WORKER + '"\nfunc main() {}\n')
         run([go, "mod", "tidy"], consumer, env)

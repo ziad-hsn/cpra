@@ -915,3 +915,44 @@ tests together under Go 1.27.2 with race detection. Independent review found no
 other mismatched historical expectation among the snapshot assertions changed
 alongside this one. These focused working-tree checks retain their original
 scope; the updated frozen candidate's affected matrix remains required.
+
+## Compiler security correction — 21 October 2026
+
+The complete Go 1.27.2 combined application, SDK and worker partition at
+`3021ee72d178d000aad57a587ad6e1d81bad043c` passed. Application output records
+7,052 passing test/subtest events and 25 classified skips across 32 packages.
+SDK default and external variants record 1,280 and 1,422 passing events; the
+worker records 141. Those modules have no skipped test cases; the SDK transport
+packages have no test files. Separate reviewers verified the retained guards,
+logs, source inputs and coverage. These results remain bound to that commit
+and compiler, with browser/load companions and other variants still separate.
+
+The subsequent seven-variant vulnerability scan found
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), published in the Go
+advisory database on 21 October. It reports a certificate-verification call path
+in the application and SDK, and an affected import without a reported call in
+the worker. The scan remains a failed security result; no malicious certificate
+was presented or accepted in this evidence. The upstream fixes are Go 1.26.10
+and Go 1.27.3, released on 19 October according to the
+[official release history](https://go.dev/doc/devel/release).
+
+All seven modules now declare Go 1.26.10 and the release recipe pins Go 1.27.3.
+Official distribution checksums, developer-image identity, CI selectors,
+verification expectations and current documentation move together. The module
+minimum alone still permits vulnerable Go 1.27.0–1.27.2, so source-user guidance
+requires the patched versions explicitly. Dated records retain their old pins.
+
+Independent review confirmed the twelve archive pins and developer OCI index,
+and closed the private dependency-checksum correction: eight generated rows in
+three files, with unrelated dependency sums unchanged. Private preparation
+verified the two canonical module archives and all four dependent module graphs;
+it does not establish public module availability. SDK regeneration changed only
+its input record. The rebuilt Go/Wasm parser, dashboard assets and notices use
+Go 1.27.3; dashboard build, type checks, lint and all 600 tests passed. These are
+working-tree development checks, not the new frozen matrix.
+
+The patched compiler and generated inputs require a new source freeze and
+affected verification. The separate module-only OpenPGP advisory remains
+recorded. Source publication, native platform/service qualification, provider
+accounts and larger comparative qualification remain open. No publication,
+million-monitor campaign or 24-hour run was added.

@@ -125,7 +125,7 @@ class ProviderEvidenceTests(unittest.TestCase):
                    lambda: self.build['source_files']['go.mod'].update(sha256='e' * 64),
                    lambda: self.build['release_identity'].update(commit='b' * 40),
                    lambda: self.build['environment'].update(GOWORK='/private/go.work'),
-                   lambda: self.build.update(go_version='go1.26.0'),
+                   lambda: self.build.update(go_version='go1.26.10'),
                    lambda: self.build.update(target='windows_amd64'),
                    lambda: self.build['commands'][3]['command'].insert(2, '-race'),
                    lambda: self.build['commands'][0].update(command=[]),
@@ -153,7 +153,7 @@ class ProviderEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'omits its hash'): self.verify()
 
     def test_report_version_binary_and_duplicate_run_id_are_rejected(self):
-        for key, value in (('version', 'old-version'), ('go_version', 'go1.26.0'), ('binary_sha256', 'e' * 64)):
+        for key, value in (('version', 'old-version'), ('go_version', 'go1.26.10'), ('binary_sha256', 'e' * 64)):
             original = self.campaign[key]
             self.campaign[key] = value
             self.save_campaign()

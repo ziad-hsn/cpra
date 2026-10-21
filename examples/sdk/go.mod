@@ -1,6 +1,6 @@
 module github.com/ziad-hsn/cpra/examples/sdk
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.0

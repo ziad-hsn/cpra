@@ -60,12 +60,14 @@ and exhausted its locally shortened persistence timeout. Corrected focused
 checks and a documented-budget persistence rerun remain separate evidence.
 These results do not establish a final frozen-source release matrix.
 
-The release recipe now uses Go 1.27.2, gRPC 1.83.2 and `x/net v0.60.0` following
-vulnerability scans. All repository Go modules share a Go 1.26.0 minimum.
-Fresh scans across nine application, SDK, worker and example selections report
-no affected imported packages or called symbols. The all-built-in application
-selections retain one module-level advisory for OpenPGP packages they do not
-import. Complete final-source security qualification remains required. Earlier scan records retain their own source identity; later repairs require new scans.
+The release recipe uses Go 1.27.3, gRPC 1.83.2 and `x/net v0.60.0`. All repository
+Go modules share a Go 1.26.10 minimum. The compiler pins include the certificate
+verification correction for [GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json).
+Go 1.27.0–1.27.2 remain affected even though they satisfy the module minimum.
+Final-source security checks must use the patched compilers; earlier clean scans
+predate this advisory. The separate module-level OpenPGP advisory in built-in
+driver dependency graphs remains recorded without an imported package or called
+symbol. Updating the compiler does not resolve that separate disposition.
 
 Publication still requires final source review/freeze, complete compiler/tag
 and vulnerability checks, reproducible packaged artifacts, native platform and

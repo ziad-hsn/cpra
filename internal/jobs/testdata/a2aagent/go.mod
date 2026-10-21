@@ -1,6 +1,6 @@
 module github.com/ziad-hsn/cpra/internal/jobs/testdata/a2aagent
 
-go 1.26.0
+go 1.26.10
 
 require github.com/a2aproject/a2a-go/v2 v2.6.0
 

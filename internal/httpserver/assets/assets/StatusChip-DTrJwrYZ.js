@@ -1,1 +1,0 @@
-import{j as a}from"./index-WuI55FDK.js";import{S as r}from"./tokens-D5C0F1O5.js";function i({status:s,label:t}){const e=t??r[s]??s.toUpperCase();return a.jsxs("span",{className:`status-chip ${s}`,children:[a.jsx("span",{className:"status-dot","aria-hidden":"true"}),e]})}export{i as S};

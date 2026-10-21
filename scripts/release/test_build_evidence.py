@@ -570,7 +570,7 @@ class BuildEvidenceTests(unittest.TestCase):
             self.fail('Go must be available for the native event-format regression')
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / 'go.mod').write_text('module github.com/ziad-hsn/cpra\n\ngo 1.26.0\n')
+            (root / 'go.mod').write_text('module github.com/ziad-hsn/cpra\n\ngo 1.26.10\n')
             (root / 'fixture_test.go').write_text('''package fixture
 import "testing"
 func TestA(t *testing.T) { t.Parallel(); t.Run("sub",func(t *testing.T) {}) }

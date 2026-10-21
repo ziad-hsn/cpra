@@ -29,9 +29,9 @@ class DependencyTests(unittest.TestCase):
     def bundle(self, path):
         manifest = manifest_fixture()
         definitions = {
-            'go.mod': f'module {release.RECIPE["module"]}\n\ngo 1.26.0\nrequire {CORE} {SDK_VERSION}\n',
-            'sdk/go/go.mod': f'module {CORE}\n\ngo 1.26.0\n',
-            'sdk/go/worker/go.mod': f'module {WORKER}\n\ngo 1.26.0\nrequire {CORE} {SDK_VERSION}\n',
+            'go.mod': f'module {release.RECIPE["module"]}\n\ngo 1.26.10\nrequire {CORE} {SDK_VERSION}\n',
+            'sdk/go/go.mod': f'module {CORE}\n\ngo 1.26.10\n',
+            'sdk/go/worker/go.mod': f'module {WORKER}\n\ngo 1.26.10\nrequire {CORE} {SDK_VERSION}\n',
         }
         files = {name: definitions.get(name, 'fixture ' + name).encode() for name in manifest['source_files']}
         manifest['source_files'] = {name: {'mode': '100644', 'sha256': hashlib.sha256(data).hexdigest()}
@@ -115,7 +115,7 @@ class DependencyTests(unittest.TestCase):
             if arguments[:3] == ['mod', 'edit', '-json']:
                 module = next(module for module, relative in dependencies.MODULES.items()
                               if (out / 'source' / relative).resolve() == cwd.resolve())
-                return json.dumps({'Module': {'Path': module}, 'Go': '1.26.0',
+                return json.dumps({'Module': {'Path': module}, 'Go': '1.26.10',
                                    'Require': [] if module == CORE else [{'Path': CORE, 'Version': SDK_VERSION}]})
             if arguments[:3] == ['mod', 'download', '-json'] and arguments[-1] != 'all':
                 for module, record in archives.items():

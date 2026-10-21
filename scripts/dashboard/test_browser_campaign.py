@@ -99,7 +99,7 @@ class RecordedCampaignTests(unittest.TestCase):
         self.root = Path(self.stack.enter_context(tempfile.TemporaryDirectory()))
         for name, value in (
             ('scripts/dashboard/browser/package.json', {'dependencies': {'playwright': '1.56.1'}}),
-            ('scripts/release/recipe.json', {'minimum_go_version': 'go1.26.0', 'go_version': 'go1.27.2',
+            ('scripts/release/recipe.json', {'minimum_go_version': 'go1.26.10', 'go_version': 'go1.27.3',
                                             'frontend': {'node_version': 'v24.21.0'}}),
             ('playwright/package.json', {'version': '1.56.1'}),
         ):
@@ -112,7 +112,7 @@ class RecordedCampaignTests(unittest.TestCase):
                                     node=str(self.root/'node'), go=str(self.root/'go'), browser=str(self.root/'chrome'),
                                     race=True, tags='', timeout='45m')
         self.events = self.results()
-        self.go_version = 'go1.27.2'
+        self.go_version = 'go1.27.3'
         self.raw = None
         self.exit_code = 0
         self.images = True
@@ -176,7 +176,7 @@ class RecordedCampaignTests(unittest.TestCase):
             self.assertEqual((self.root/'report.artifacts').stat().st_mode & 0o777, 0o700)
 
     def test_recorded_minimum_compiler_is_accepted(self):
-        self.go_version = 'go1.26.0'
+        self.go_version = 'go1.26.10'
         self.args.race = False
         self.assertEqual(self.run_campaign()['result'], 'passed')
         self.process.assert_called_once()

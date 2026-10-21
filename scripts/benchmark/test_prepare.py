@@ -30,7 +30,7 @@ class BuildContracts(unittest.TestCase):
 
     def test_compiler_must_match_the_recipe_and_native_linux_target(self):
         info = {'GOVERSION': prepare.RECIPE['go_version'], 'GOHOSTOS': 'linux', 'GOHOSTARCH': 'amd64'}
-        for field, value in (('GOVERSION', 'go1.26.0'), ('GOHOSTOS', 'windows'), ('GOHOSTARCH', '386')):
+        for field, value in (('GOVERSION', 'go1.26.10'), ('GOHOSTOS', 'windows'), ('GOHOSTARCH', '386')):
             with self.subTest(field=field), \
                     patch.object(prepare.subprocess, 'check_output', return_value=json.dumps({**info, field: value})):
                 with self.assertRaises(ValueError):
@@ -59,13 +59,13 @@ class BuildContracts(unittest.TestCase):
     def repository(self, root):
         root.mkdir()
         subprocess.run(['git', 'init', '-q', str(root)], check=True)
-        (root / 'go.mod').write_text('module example.com/benchmark-fixture\n\ngo 1.26.0\n')
+        (root / 'go.mod').write_text('module example.com/benchmark-fixture\n\ngo 1.26.10\n')
         (root / 'go.sum').write_text('')
         (root / 'main.go').write_text('package main\nfunc main() {}\n')
         (root / '.gitignore').write_text('ignored.go\n.env.local\n')
         for suffix in ('sdk/go', 'sdk/go/worker'):
             path = root / suffix; path.mkdir(parents=True, exist_ok=True)
-            (path / 'go.mod').write_text('module ' + prepare.RECIPE['module'] + '/' + suffix + '\n\ngo 1.26.0\n')
+            (path / 'go.mod').write_text('module ' + prepare.RECIPE['module'] + '/' + suffix + '\n\ngo 1.26.10\n')
         return self.commit(root, 'baseline fixture')
 
     def frozen(self, root, commit):
@@ -188,7 +188,7 @@ class BuildContracts(unittest.TestCase):
                 lambda d: d['builds'].append(copy.deepcopy(d['builds'][1])),
                 lambda d: d['builds'][0].update(dirty=True),
                 lambda d: d['builds'][1].update(flags=['-race']),
-                lambda d: d['builds'][0].update(go_version='go1.26.0'),
+                lambda d: d['builds'][0].update(go_version='go1.26.10'),
                 lambda d: d['builds'][1]['environment'].update(GOWORK='/developer/go.work'),
                 lambda d: d['builds'][2].update(commit='e' * 40),
                 lambda d: d['builds'][2].update(source_sha256='f' * 64),

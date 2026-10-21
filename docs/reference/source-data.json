@@ -106,9 +106,9 @@
     },
     {
       "asset": "reference/source/scripts/release/module_publication.py.txt",
-      "bytes": 17313,
+      "bytes": 17314,
       "path": "scripts/release/module_publication.py",
-      "sha256": "a43b80d09c847f4d84ada91af3a6430c71351393bb4e00bdea42c668706637c9"
+      "sha256": "aac5dd8739ff1a1b92487e9f70afa419ae16d741aa0a3d628093d4c71f0c4943"
     },
     {
       "asset": "reference/source/scripts/release/oci_assembly.py.txt",

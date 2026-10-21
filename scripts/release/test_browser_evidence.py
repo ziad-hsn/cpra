@@ -175,7 +175,7 @@ class BrowserEvidenceTests(unittest.TestCase):
             with self.subTest(paths=paths), self.assertRaisesRegex(ValueError, 'four distinct'):
                 browser_evidence.verify_browser_campaigns(self.manifest, paths)
         for mutation in (
-            lambda r: r.update(go='go1.27.2'), lambda r: r.update(tags='redis'),
+            lambda r: r.update(go='go1.27.3'), lambda r: r.update(tags='redis'),
             lambda r: r.update(race=True), lambda r: r.update(race=0),
         ):
             with self.subTest(mutation=mutation):
@@ -286,8 +286,8 @@ class BrowserEvidenceTests(unittest.TestCase):
         self.rewrite_log(event_lines(self.events), served=False)
         with self.assertRaisesRegex(ValueError, 'served dashboard'):
             self.verify()
-        for output in ('dashboard assets index sha256=' + 'a' * 64 + '; compiler=go1.26.0; platform=linux/amd64',
-                       'dashboard assets index sha256=invalid; compiler=go1.26.0; platform=linux/amd64',
+        for output in ('dashboard assets index sha256=' + 'a' * 64 + '; compiler=go1.26.10; platform=linux/amd64',
+                       'dashboard assets index sha256=invalid; compiler=go1.26.10; platform=linux/amd64',
                        'dashboard assets index sha256=' +
                        self.manifest['source_files']['internal/httpserver/assets/index.html']['sha256'] +
                        '; compiler=go9.0.0; platform=linux/amd64'):

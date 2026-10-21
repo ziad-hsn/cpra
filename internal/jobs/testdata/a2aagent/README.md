@@ -4,8 +4,10 @@ This separate-process fixture uses the official
 [`a2a-go/v2` server at v2.6.0](https://github.com/a2aproject/a2a-go/releases/tag/v2.6.0)
 to check CPRa's HTTP+JSON transport and both action roles against another
 implementation. The SDK
-requires Go 1.26 or later. It is a dependency of this test fixture only; CPRa
-uses the shared Go 1.26 minimum and imports no A2A SDK execution libraries.
+requires Go 1.26 or later. This fixture shares CPRa's Go 1.26.10 minimum and
+uses Go 1.27.3 for release-compiler checks. Avoid Go 1.27.0–1.27.2 because of
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json). The upstream SDK is a
+dependency of this test fixture only; CPRa imports no A2A SDK execution libraries.
 
 The fixture binds an ephemeral loopback TLS listener. Its certificate and URL
 are passed to the parent over stdout; the private key remains in the child.
@@ -22,7 +24,7 @@ one invocation and zero cancellation calls for each scenario. The seven cases
 run through the transport, intervention job and notification job separately.
 Notification acceptance is not a task-completion assertion.
 
-From the repository root, with Go 1.27.1 selected:
+From the repository root, with Go 1.27.3 selected:
 
 ```sh
 mkdir -p bin/verification/a2a
@@ -34,7 +36,7 @@ GOWORK="$PWD/bin/verification/a2a/go.work" CPRA_A2A_AGENT="$PWD/bin/verification
 
 The build destination in the fixture directory resolves to the repository's
 `bin/verification/a2a/agent`. The same compiled fixture can be used while running
-the final command with Go 1.26. The `a2ainterop` tag selects tests only: a missing
+the final command with Go 1.26.10. The `a2ainterop` tag selects tests only: a missing
 `CPRA_A2A_AGENT` fails the test instead of skipping it. The ordinary jobs tests
 exercise local wire/error fixtures without this additional module.
 

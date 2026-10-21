@@ -1,6 +1,6 @@
 # CPRa external worker library
 
-This independently versioned Go 1.26 module runs operator-owned Go handlers in a
+This independently versioned Go 1.26.10 module runs operator-owned Go handlers in a
 separate process. Every Go implementation file requires `-tags externaljobs`.
 Importing this package without the tag fails at compile time. The separate SDK
 contains the tagged low-level protocol client; normal SDK applications do not
@@ -25,7 +25,10 @@ notification evidence, including unknown outcomes, remains retained.
 
 ## Add the module to your worker application
 
-Use Go 1.26 or newer. The worker is a library, so create your own executable and
+Use Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release). Go
+1.27.0–1.27.2 remain affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), although the module
+minimum permits them. The worker is a library, so create your own executable and
 add the module with `go get`; importing it does not start a service. Once a
 qualified version is published, replace the placeholders with the exact SDK and
 worker versions listed as compatible in that release:

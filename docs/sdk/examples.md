@@ -4,7 +4,9 @@ Run four small integrations that turn service events into CPRa configuration
 changes, then read the code behind each result.
 
 The examples use a separate Go module so AWS and Kubernetes dependencies stay
-out of the public SDK. Go 1.26 or later is required. Node, Redis, a Kubernetes
+out of the public SDK. Use Go 1.26.10 or Go 1.27.3 (or a newer supported, patched
+release); Go 1.27.0–1.27.2 remain affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json). Node, Redis, a Kubernetes
 cluster, an AWS account, and SMS credentials are unnecessary for the local demos.
 
 These finite demos use local fixtures. Configured modes connect to the actual

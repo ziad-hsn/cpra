@@ -11,7 +11,7 @@ Checks services, sends alerts, and runs the recovery actions you configure.</p>
 <p align="center">
   <a href="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml"><img src="https://github.com/ziad-hsn/cpra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1a262e" alt="MIT license"></a>
-  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26%2B-1a262e" alt="Go 1.26+"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.26.10%2B-1a262e" alt="Go 1.26.10+"></a>
   <a href="https://ziad-hsn.github.io/cpra/"><img src="https://img.shields.io/badge/docs-ziad--hsn.github.io%2Fcpra-8A5A00" alt="Documentation"></a>
 </p>
 
@@ -65,7 +65,10 @@ create your own monitors and notification destinations.
 
 ## Build and run locally
 
-Install Go 1.26 or newer, Make and Python 3. The checkout includes the embedded
+Install Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release), Make and
+Python 3. Go 1.27.0–1.27.2 remain affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), despite satisfying the
+module's minimum-version comparison. The checkout includes the embedded
 dashboard; Node and pnpm are needed only when its build inputs change.
 
 ```sh

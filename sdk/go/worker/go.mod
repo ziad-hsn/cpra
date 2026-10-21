@@ -1,6 +1,6 @@
 module github.com/ziad-hsn/cpra/sdk/go/worker
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1

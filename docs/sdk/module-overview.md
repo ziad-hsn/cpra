@@ -1,7 +1,7 @@
 # CPRa Go SDK
 
 This independently versioned module contains the typed Go client for CPRa.
-It supports Go 1.26 and does not depend on the CPRa application module, controller,
+It requires Go 1.26.10 and does not depend on the CPRa application module, controller,
 Ark, Raft, provider SDKs, or worker execution library.
 
 Use it to create and edit monitors, configure notification recipients and groups,
@@ -22,7 +22,10 @@ support and publication status.
 
 ## Install in your application
 
-Use Go 1.26 or newer. The module path is the import path; the package name at
+Use Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release). Go
+1.27.0–1.27.2 are affected by
+[GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json), although the module's
+minimum-version comparison permits them. The module path is the import path; the package name at
 its root is `cpra`. This is a library, so add it with `go get` inside your own
 module. It does not install the CPRa server or `cpractl`.
 

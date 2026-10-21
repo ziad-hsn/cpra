@@ -1,5 +1,5 @@
 module github.com/ziad-hsn/cpra/tools/sdkgen
 
-go 1.26.0
+go 1.26.10
 
 require github.com/oapi-codegen/oapi-codegen/v2 v2.8.0

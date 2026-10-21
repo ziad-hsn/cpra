@@ -31,8 +31,12 @@ to their actual source inventories. They are not a final frozen-release pass.
 | Drivers | 14 checks, six recovery roles and 15 notification roles across applicable build tags | Fixture contracts, provider acceptance and observed real effects are distinct evidence levels |
 | gRPC | TCP reachability when mode is omitted; explicit verified-TLS unary health mode | Only SERVING succeeds in health mode; it never falls back to TCP |
 | Distributions | Go-install contract, archive/package/image/Compose/Helm recipes and local administration | Native OS/architecture, service, filesystem and deployment matrices remain required |
-| Build compatibility | Common Go 1.26.0 minimum; release compiler Go 1.27.2 | Final-source compiler, driver-tag, vulnerability and reproducibility checks remain required |
+| Build compatibility | Common Go 1.26.10 minimum; release compiler Go 1.27.3 | Final-source compiler, driver-tag, vulnerability and reproducibility checks remain required |
 | Artwork and code | MIT code; CPRa-authored artwork under CC BY 4.0 with attribution | Third-party notices and the separate project-name note remain applicable |
+
+Use Go 1.26.10 or later in the 1.26 series, or Go 1.27.3 or later in the 1.27
+series. The module minimum alone permits Go 1.27.0–1.27.2, which remain affected
+by [GO-2026-6809](https://vuln.go.dev/ID/GO-2026-6809.json).
 
 The [quickstart](tutorials/quickstart.md) uses protected management initialization
 and localhost TLS. Management imports bootstrap manifests once; subsequent

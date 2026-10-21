@@ -19,7 +19,7 @@ class PreparationTests(unittest.TestCase):
         root.mkdir()
         subprocess.run(['git', 'init', '-q', str(root)], check=True)
         (root / '.gitignore').write_text('ignored/\n')
-        (root / 'go.mod').write_text('module cpra.invalid/fixture\n\ngo 1.26.0\n')
+        (root / 'go.mod').write_text('module cpra.invalid/fixture\n\ngo 1.26.10\n')
         (root / 'removed.go').write_text('package fixture\n')
         (root / 'run.sh').write_text('#!/bin/sh\n')
         (root / 'run.sh').chmod(0o755)
@@ -29,7 +29,7 @@ class PreparationTests(unittest.TestCase):
     def test_captures_current_edits_new_files_deletions_and_modes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.repository(directory)
-            (root / 'go.mod').write_text('module cpra.invalid/edited\n\ngo 1.26.0\n')
+            (root / 'go.mod').write_text('module cpra.invalid/edited\n\ngo 1.26.10\n')
             (root / 'removed.go').unlink()
             (root / 'new.go').write_text('package edited\n')
             (root / 'ignored').mkdir()
@@ -80,7 +80,7 @@ class PreparationTests(unittest.TestCase):
                 prepare.proposals(source, before)
 
     def test_module_contract_rejects_version_replacement_and_dependency_cycles(self):
-        base = {'Module': {'Path': prepare.WORKER}, 'Go': '1.26.0',
+        base = {'Module': {'Path': prepare.WORKER}, 'Go': '1.26.10',
                 'Require': [{'Path': prepare.CORE, 'Version': 'v0.1.0-rc.1'}]}
         self.assertEqual(prepare.module_contract(base, prepare.WORKER, 'v0.1.0-rc.1'),
                          {prepare.CORE: 'v0.1.0-rc.1'})
@@ -189,7 +189,7 @@ class PreparationTests(unittest.TestCase):
                 for module, relative in prepare.MODULES.items():
                     path = root / relative
                     path.mkdir(parents=True, exist_ok=True)
-                    (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.26.0\n')
+                    (path / 'go.mod').write_text('module ' + module + '\n\ngo 1.26.10\n')
                     (path / 'go.sum').write_text('leaf fixture\n' if module == prepare.CORE else stale + previous_definition + unrelated)
                     if module == prepare.EXAMPLES:
                         with (path / 'go.sum').open('a') as stream:
@@ -220,7 +220,7 @@ class PreparationTests(unittest.TestCase):
                     if args[:2] == ['mod', 'edit']:
                         module = next(module for module, relative in prepare.MODULES.items()
                                       if path == out / 'source' / relative)
-                        value = {'Module': {'Path': module}, 'Go': '1.26.0',
+                        value = {'Module': {'Path': module}, 'Go': '1.26.10',
                                  'Require': [] if module == prepare.CORE else [{'Path': prepare.CORE, 'Version': version}]}
                         if module == prepare.EXAMPLES:
                             value['Require'].append({'Path': prepare.WORKER, 'Version': version})

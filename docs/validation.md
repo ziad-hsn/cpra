@@ -24,21 +24,21 @@ python3 -B scripts/release/build_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.26.0/bin/go \
+  --go /path/to/go1.26.10/bin/go \
   --security \
-  --a2a-reference-go /path/to/go1.27.2/bin/go \
+  --a2a-reference-go /path/to/go1.27.3/bin/go \
   --out /private/builds/build-minimum.json
 
 GOBIN=/private/security-tools GOWORK=off GOENV=off GOFLAGS= GOTOOLCHAIN=local \
-  /path/to/go1.27.2/bin/go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+  /path/to/go1.27.3/bin/go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
 python3 -B scripts/release/build_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.2/bin/go \
+  --go /path/to/go1.27.3/bin/go \
   --security --govulncheck /private/security-tools/govulncheck \
-  --a2a-reference-go /path/to/go1.27.2/bin/go \
+  --a2a-reference-go /path/to/go1.27.3/bin/go \
   --pnpm /path/to/pinned/pnpm \
   --out /private/builds/build-release.json
 
@@ -100,7 +100,7 @@ evidence. This reader cannot authorize publication or start an endurance run.
 
 The explicit A2A mode builds the upstream SDK reference server with the pinned
 release compiler, while each interoperability test runs with the selected CPRa
-compiler. The reference module requires Go 1.26; it is a separate test process
+compiler. The reference module declares the common Go 1.26.10 minimum; it is a separate test process
 and never enters CPRa's application dependency graph. The recorder keeps
 the original reference sources, module verification and graph, vet output,
 executable, build information, package selection and full jobs-package test
@@ -191,14 +191,14 @@ python3 -B scripts/release/worker_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.26.0/bin/go \
+  --go /path/to/go1.26.10/bin/go \
   --out /private/workers/worker-minimum.json
 
 python3 -B scripts/release/worker_campaign.py \
   --release /private/assets/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.2/bin/go \
+  --go /path/to/go1.27.3/bin/go \
   --out /private/workers/worker-release.json
 
 python3 -B scripts/release/worker_evidence.py \
@@ -306,10 +306,10 @@ browser with `--browser`. The report records its actual version.
 ```sh
 python3 -B scripts/dashboard/asset_manifest.py
 python3 scripts/sdk/workspace.py --output /private/cpra-sdk.work --no-github-env
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --out evidence/local/browser-release-default.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.2/bin/go --node /path/to/pinned/node --tags externaljobs --out evidence/local/browser-release-external.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.0/bin/go --node /path/to/pinned/node --no-race --out evidence/local/browser-minimum-default.json
-GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.0/bin/go --node /path/to/pinned/node --no-race --tags externaljobs --out evidence/local/browser-minimum-external.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.3/bin/go --node /path/to/pinned/node --out evidence/local/browser-release-default.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.27.3/bin/go --node /path/to/pinned/node --tags externaljobs --out evidence/local/browser-release-external.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.10/bin/go --node /path/to/pinned/node --no-race --out evidence/local/browser-minimum-default.json
+GOWORK=/private/cpra-sdk.work python3 -B scripts/dashboard/browser_campaign.py --go /path/to/go1.26.10/bin/go --node /path/to/pinned/node --no-race --tags externaljobs --out evidence/local/browser-minimum-external.json
 ```
 
 The development workspace above is explicit evidence of local source integration.
@@ -328,7 +328,7 @@ python3 -B scripts/release/browser_record.py \
   --release /private/release/RELEASE.json \
   --source-dir /private/dependencies/source \
   --dependencies /private/dependencies \
-  --go /path/to/go1.27.2/bin/go \
+  --go /path/to/go1.27.3/bin/go \
   --node /path/to/pinned/node \
   --module /private/dependencies/source/scripts/dashboard/browser/node_modules/playwright \
   --browser /path/to/installed/chromium \
@@ -562,7 +562,7 @@ or another machine when the prerequisite fails.
 
 Build the baseline commit `a370969b041b399c0778318d8915ce059fd74294` and the candidate
 with identical Go version, build tags and optimized build flags. Preparation uses
-the recorded release recipe, currently Go 1.27.2, with symbols and DWARF retained,
+the recorded release recipe, currently Go 1.27.3, with symbols and DWARF retained,
 PGO disabled, `GOTOOLCHAIN=local` and `GOWORK=off`. Both builds come from committed
 source archives; ignored developer files and workspace settings are excluded.
 The physical-space check runs before archives, downloads or compilation.
@@ -576,7 +576,7 @@ or the wrong compiler. Keep the output and module cache outside the checkout and
 separate from each other.
 
 ```sh
-python3 scripts/benchmark/prepare.py --manifest /path/to/release/RELEASE.json --go /path/to/go1.27.2/bin/go --module-cache /path/to/qualified-module-cache --out /path/to/prepared-builds
+python3 scripts/benchmark/prepare.py --manifest /path/to/release/RELEASE.json --go /path/to/go1.27.3/bin/go --module-cache /path/to/qualified-module-cache --out /path/to/prepared-builds
 ```
 
 The default tag set is the release recipe's built-in drivers. An explicit `--tags`

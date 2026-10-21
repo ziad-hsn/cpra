@@ -25,7 +25,8 @@ worker example is absent from default Go package selection.
 
 ## Run the checks
 
-From the repository root, with Go 1.26 or later on `PATH`:
+From the repository root, with Go 1.26.10 or Go 1.27.3 (or a newer supported,
+patched release) on `PATH`. See [compiler compatibility](../versions.md).
 
 ```sh
 export GOTOOLCHAIN=local

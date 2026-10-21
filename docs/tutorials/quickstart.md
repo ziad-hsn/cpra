@@ -11,7 +11,9 @@ sources. [Versions and availability](../versions.md) distinguishes the current
 implementation from published artifacts. Public module and release versions
 remain gated by qualification and publication.
 
-You need Go 1.26 or later, Make and Python 3. The built dashboard is included;
+You need Go 1.26.10 or Go 1.27.3 (or a newer supported, patched release), Make
+and Python 3. See the [compiler security requirements](../versions.md); Go
+1.27.0–1.27.2 remain affected. The built dashboard is included;
 Node is needed only when changing its sources.
 
 ## 1. Build and initialize

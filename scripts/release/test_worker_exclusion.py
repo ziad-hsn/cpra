@@ -22,7 +22,7 @@ class WorkerExclusionOracleTests(unittest.TestCase):
             def run(command, **options):
                 if command[1] == 'version':
                     self.assertEqual(options['timeout'], 180)
-                    return subprocess.CompletedProcess(command, 0, 'go version go1.27.2 linux/amd64\n', '')
+                    return subprocess.CompletedProcess(command, 0, 'go version go1.27.3 linux/amd64\n', '')
                 self.assertEqual(command[1], 'build')
                 self.assertEqual(options['timeout'], 900)
                 raise subprocess.TimeoutExpired(command, options['timeout'],

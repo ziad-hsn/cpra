@@ -12,7 +12,7 @@ func newLocalBootstrapCommand() *cobra.Command {
 	root := &cobra.Command{Use: "bootstrap", Short: "Inspect or conditionally discard an unadmitted encrypted loading stage while stopped"}
 	for _, discard := range []bool{false, true} {
 		request := localadmin.BootstrapRequest{}
-		use, short := "inspect", "Authenticate the selected stage without changing Raft or activating input"
+		use, short := "inspect", "Authenticate the selected stage without activating input or executing providers"
 		if discard {
 			use, short = "discard", "Audit and discard only the exact unadmitted loading stage"
 		}

@@ -218,6 +218,13 @@ command, logs and scope. These are development checks, not frozen qualification.
   and no local replacement. This is private prepared-archive evidence; a new
   freeze and committed-source verification are still required. No public tag or
   checksum-verification bypass is used.
+- Replacement freeze `6eb7f71` passes the nine frozen static/consumer phases,
+  including the corrected private SDK consumers. Independent handoff review
+  identifies one inaccurate CLI help sentence: stopped bootstrap inspection
+  may advance Raft election metadata, so its guarantee is no input activation
+  or provider execution. The help now states that guarantee. Final behavioral
+  and compiler results will be recorded against the subsequent frozen candidate
+  in the private merge handoff; these earlier passes retain their own revision.
 
 Independent reviewers inspected ticket 4 and ticket 5. Ticket 5 review identified
 and repaired partial-byte cursor reclamation; macOS reader-group rendering now

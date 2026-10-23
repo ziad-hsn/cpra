@@ -225,6 +225,17 @@ command, logs and scope. These are development checks, not frozen qualification.
   or provider execution. The help now states that guarantee. Final behavioral
   and compiler results will be recorded against the subsequent frozen candidate
   in the private merge handoff; these earlier passes retain their own revision.
+- Freeze `b90cfd9` passes all nine static phases. Its required frontend audit
+  finds two moderate Vitest mocker advisories, so that audit remains failed.
+  Vitest is updated to 4.1.12; the production dependency graph and embedded
+  application assets are unchanged. Twelve changed development-package pins
+  match authenticated registry metadata and receive independent review.
+  `oct23-vitest-dashboard-build-1` passes generation, types, lint and 623 tests;
+  `oct23-vitest-audit-1` reports zero advisories across the full dependency graph.
+  An initial install inherited disabled Node TLS verification and is not treated
+  as trusted-origin evidence. Subsequent metadata requests verify TLS and package
+  integrities; the protected frozen install reports cached, up-to-date packages,
+  not a new download. The dependency repair requires a new frozen candidate.
 
 Independent reviewers inspected ticket 4 and ticket 5. Ticket 5 review identified
 and repaired partial-byte cursor reclamation; macOS reader-group rendering now

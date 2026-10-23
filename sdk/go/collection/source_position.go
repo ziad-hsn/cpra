@@ -34,7 +34,16 @@ type SourceError struct {
 	Field    string // Original field spelling when retained safely.
 }
 
-func (e *SourceError) Error() string { return fmt.Sprintf("%s: %s", e.Location, e.Cause) }
+func (e *SourceError) Error() string {
+	if field, ok := api.ValidationFieldError(e.Cause); ok {
+		name := api.SafeValidationField(e.Field)
+		if name == "" {
+			name = field.Field
+		}
+		return fmt.Sprintf("%s: %s: %s", e.Location, name, api.ValidationMessage(field.Reason))
+	}
+	return fmt.Sprintf("%s: %s", e.Location, e.Cause)
+}
 func (e *SourceError) Unwrap() error { return e.Cause }
 
 // ValidationError locates a static validation failure in this item's original

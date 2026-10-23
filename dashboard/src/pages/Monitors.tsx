@@ -75,7 +75,7 @@ export default function Monitors() {
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ height: 'calc(100vh - 280px)', minHeight: 300 }}>
-            <DataTable data={monitors} onRowClick={(id) => navigate(`/monitors/${id}`)} rowHeight={36} />
+            <DataTable data={monitors} onRowClick={(id) => navigate(`/monitors/${id}`)} />
           </div>
         </div>
       )}

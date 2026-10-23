@@ -99,9 +99,20 @@ Documented rate-limit delays are committed with the result and survive restart.
 The next attempt preserves the original logical delivery identity and overall
 deadline. Its delay is the larger of the provider delay and CPRa's existing
 exponential delay; a delay that cannot fit the remaining deadline ends delivery
-without scheduling another attempt. Ordinary HTTP notifications have a
-45-second overall budget and at most three attempts. Each HTTP call is bounded
-by ten seconds or the remaining budget. No driver-level replay layer is added.
+without scheduling another attempt. New ordinary built-in notifications capture
+a 45-second budget at admission and start it at the first committed execution
+start. Waiting for a worker or a serialized destination does not consume that
+budget. At most three attempts share the resulting absolute deadline. Each HTTP
+call is bounded by ten seconds or the remaining budget. An older action keeps
+its already recorded deadline; restart, retry and re-offer never renew it.
+
+A pending condition remains visible while delivery is eligible. Recovery cancels
+an unsent outage opening. An eligible closure for an actually attempted opening
+survives maintenance and keeps the original destination and provider identity.
+If another outage is active when that earlier closure is sent, its message
+distinguishes the earlier recovery from current health. Exhaustion, permanent
+rejection and uncertain outcomes remain visible and do not start another retry
+cycle. No driver-level replay layer is added.
 
 ## Result batching while idle
 

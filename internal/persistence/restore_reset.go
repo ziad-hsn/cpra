@@ -265,6 +265,7 @@ func (f *machine) restoreActions(state *RestoreState) Result {
 			a.FinishedAt = a.StartedAt
 		}
 		m.Actions[item.key] = a
+		m.recordNotificationCondition(a)
 		changed[item.monitorID] = m
 		events = append(events, Event{MonitorID: m.ID, Revision: a.Revision, At: a.FinishedAt, Type: typ,
 			ActionID: a.ID, IncidentID: a.IncidentID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Kind: a.Kind, Color: a.Color, Endpoint: a.Endpoint,

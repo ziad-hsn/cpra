@@ -72,6 +72,9 @@ func managementServiceReader(l installpath.Layout, account string) (*int, string
 }
 
 func nativeSecure(l installpath.Layout, account string) error {
+	if err := checkExistingToken(l, account); err != nil {
+		return err
+	}
 	uid, gid := os.Geteuid(), os.Getegid()
 	var err error
 	if l.Scope == "system" {
@@ -156,7 +159,6 @@ func nativeSecure(l installpath.Layout, account string) error {
 		{l.ConfigDir, configUID, gid, configDirMode, true},
 		{filepath.Join(l.ConfigDir, "monitors.yaml"), configUID, gid, configFileMode, false},
 		{filepath.Join(l.ConfigDir, "runtime.yaml"), configUID, gid, configFileMode, false},
-		{filepath.Join(l.ConfigDir, "auth.token"), configUID, gid, configFileMode, false},
 		{l.BinDir, executableUID, executableGID, executableDirMode, true},
 		{binaryPath(l), executableUID, executableGID, executableFileMode, false},
 		{l.ServiceFile, executableUID, executableGID, serviceFileMode, false},

@@ -49,6 +49,8 @@ spec:
             {{- end }}
             - --token-file
             - /run/secrets/cpra/token
+            - --token-root=/run/secrets/cpra
+            - --token-reader-group=1001
             - --request-timeout
             - 10s
           securityContext:

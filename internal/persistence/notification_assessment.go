@@ -7,23 +7,30 @@ import (
 	"time"
 )
 
-// NotificationState retains the current episode's eligibility independently of
-// retained action evidence. Its size follows configured destinations, not checks.
+// NotificationState retains current delivery eligibility and still-pending
+// closures. Completed action history belongs in the action ledger.
 type NotificationState struct {
-	OutsideFailures   int                      `json:"outside_failures,omitempty"`
-	QualifiedIncident string                   `json:"qualified_incident,omitempty"`
-	MaintenanceOutage bool                     `json:"maintenance_outage,omitempty"`
-	IgnoreOutage      string                   `json:"ignore_outage,omitempty"`
-	Deliveries        map[string]DeliveryState `json:"deliveries,omitempty"`
-	ReviewAlerts      map[string]ReviewAlert   `json:"review_alerts,omitempty"`
+	Version           int                               `json:"version,omitempty"`
+	OutsideFailures   int                               `json:"outside_failures,omitempty"`
+	QualifiedIncident string                            `json:"qualified_incident,omitempty"`
+	MaintenanceOutage bool                              `json:"maintenance_outage,omitempty"`
+	IgnoreOutage      string                            `json:"ignore_outage,omitempty"`
+	Deliveries        map[string]DeliveryState          `json:"deliveries,omitempty"`
+	ReviewAlerts      map[string]ReviewAlert            `json:"review_alerts,omitempty"`
+	Migrations        map[string]DeliveryMigration      `json:"migrations,omitempty"`
+	Resolutions       map[string]NotificationResolution `json:"resolutions,omitempty"`
 }
 
 type DeliveryState struct {
-	Episode   string    `json:"episode"`
-	Condition string    `json:"condition,omitempty"`
-	Started   bool      `json:"started,omitempty"`
-	StartedAt time.Time `json:"started_at,omitzero"`
-	Terminal  bool      `json:"terminal,omitempty"`
+	ActionID  string      `json:"action_id,omitempty"`
+	PendingAt time.Time   `json:"pending_at,omitzero"`
+	State     ActionState `json:"state,omitempty"`
+	Reason    string      `json:"reason,omitempty"`
+	Episode   string      `json:"episode"`
+	Condition string      `json:"condition,omitempty"`
+	Started   bool        `json:"started,omitempty"`
+	StartedAt time.Time   `json:"started_at,omitzero"`
+	Terminal  bool        `json:"terminal,omitempty"`
 }
 
 func (s *NotificationState) clone() *NotificationState {
@@ -33,6 +40,8 @@ func (s *NotificationState) clone() *NotificationState {
 	c := *s
 	c.Deliveries = maps.Clone(s.Deliveries)
 	c.ReviewAlerts = maps.Clone(s.ReviewAlerts)
+	c.Resolutions = maps.Clone(s.Resolutions)
+	c.Migrations = maps.Clone(s.Migrations)
 	for id, alert := range c.ReviewAlerts {
 		if alert.Owner != nil {
 			owner := *alert.Owner
@@ -86,8 +95,17 @@ func (m Monitor) deliveryStarted(color string, endpoint int, failure *RecoveryFa
 	if m.Notifications == nil {
 		return false
 	}
+	if m.migratedOpeningHeld(color, endpoint) {
+		return true
+	}
 	v := m.Notifications.Deliveries[deliverySlot(color, notificationEndpointIdentity(m, color, endpoint))]
-	return (v.Started || v.Terminal) && v.Episode == m.NotificationEpisode && v.Condition == deliveryCondition(failure)
+	terminal := v.Terminal
+	if m.notificationConditionsEnabled() && !v.Started && (v.Reason == "notification_deadline" || v.Reason == "notification_deadline_unrecorded") {
+		// A fresh observation may authorize a new condition after proven unsent
+		// historical expiry. The old action remains canceled and unchanged.
+		terminal = false
+	}
+	return (v.Started || terminal) && v.Episode == m.NotificationEpisode && v.Condition == deliveryCondition(failure)
 }
 
 func (m *Monitor) recordNotificationCancellation(a Action) {
@@ -108,6 +126,10 @@ func (m *Monitor) recordNotificationCancellation(a Action) {
 		d = DeliveryState{Episode: a.NotificationEpisode, Condition: deliveryCondition(a.RecoveryFailure)}
 	}
 	d.Terminal = true
+	if m.notificationConditionsEnabled() {
+		d.ActionID, d.State, d.Reason = a.ID, a.State, a.Outcome
+		d.PendingAt = a.QueuedAt
+	}
 	m.Notifications.Deliveries[slot] = d
 }
 
@@ -184,6 +206,15 @@ func validateNotificationState(m Monitor, version int) error {
 	if s == nil {
 		return nil
 	}
+	if s.Version != 0 && (s.Version != NotificationConditionFormatVersion || !notificationConditionStorageFormat(version)) {
+		return errors.New("invalid notification condition version")
+	}
+	if err := m.validateDeliveryMigrations(version); err != nil {
+		return err
+	}
+	if err := m.validateResolutionConditions(version); err != nil {
+		return err
+	}
 	if !actionStorageFormat(version) || m.ActionVersion != ActionFormatVersion || s.OutsideFailures < 0 || s.OutsideFailures > max(1, m.Policy.Unhealthy) {
 		return errors.New("invalid notification assessment")
 	}
@@ -203,8 +234,13 @@ func validateNotificationState(m Monitor, version int) error {
 	}
 	for slot, d := range s.Deliveries {
 		if !validSlots[slot] || !catalogIdentifier(slot, 512) || !catalogIdentifier(d.Episode, 256) || d.Episode != m.NotificationEpisode || d.Condition != "" && !catalogIdentifier(d.Condition, 256) ||
-			!d.Started && !d.StartedAt.IsZero() || !d.StartedAt.IsZero() && (d.StartedAt.Year() < 1 || d.StartedAt.Year() > 9999) || !d.Started && !d.Terminal {
+			!d.Started && !d.StartedAt.IsZero() || !d.StartedAt.IsZero() && (d.StartedAt.Year() < 1 || d.StartedAt.Year() > 9999) || !d.Started && !d.Terminal && (s.Version == 0 || d.ActionID == "") {
 			return errors.New("invalid notification exposure")
+		}
+		if d.ActionID != "" || !d.PendingAt.IsZero() || d.State != "" || d.Reason != "" {
+			if !m.notificationConditionsEnabled() || !catalogIdentifier(d.ActionID, 256) || d.PendingAt.IsZero() || !validDeliveryState(d.State) || !validNotificationReason(d.Reason) {
+				return errors.New("invalid notification condition")
+			}
 		}
 	}
 	for id, alert := range s.ReviewAlerts {

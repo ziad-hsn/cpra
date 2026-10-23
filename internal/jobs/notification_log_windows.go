@@ -57,7 +57,13 @@ func checkNotificationLogDirectory(file *os.File, private bool) error {
 	if err != nil || !info.IsDir() {
 		return errNotificationLog
 	}
-	return checkNotificationLogACL(windows.Handle(file.Fd()), true, private)
+	if err := checkNotificationLogACL(windows.Handle(file.Fd()), true, private); err != nil {
+		if private {
+			return errNotificationLogDirectoryAccess
+		}
+		return err
+	}
+	return nil
 }
 
 // Windows mode bits do not restrict readers. Verify the opened object's ACL;

@@ -15,10 +15,11 @@ var errActionProjectionPending = errors.New("action storage migration is incompl
 // The marker is committed after replay. Old 44/45 envelopes retain synchronous
 // transition semantics until this cutover, including already logged blue starts.
 type actionProjectionState struct {
-	Version  int                        `json:"version"`
-	Ready    bool                       `json:"ready"`
-	Revision uint64                     `json:"revision"`
-	Current  *actionProjectionMigration `json:"current,omitempty"`
+	Notifications *notificationProjectionMigration `json:"notifications,omitempty"`
+	Version       int                              `json:"version"`
+	Ready         bool                             `json:"ready"`
+	Revision      uint64                           `json:"revision"`
+	Current       *actionProjectionMigration       `json:"current,omitempty"`
 }
 type actionProjectionMigration struct {
 	MonitorID   string            `json:"monitor_id"`
@@ -34,6 +35,7 @@ func (s *actionProjectionState) clone() *actionProjectionState {
 		return nil
 	}
 	v := *s
+	v.Notifications = s.Notifications.clone()
 	if s.Current != nil {
 		c := *s.Current
 		c.Summary = c.Summary.clone()
@@ -59,7 +61,7 @@ func validateActionProjectionCommand(c Command) error {
 		if c.MonitorID != "" || c.Generation == 0 {
 			return errActionLedger
 		}
-	case "step":
+	case "step", "notifications":
 		if !catalogIdentifier(c.MonitorID, 256) || c.Generation == 0 {
 			return errActionLedger
 		}
@@ -69,6 +71,9 @@ func validateActionProjectionCommand(c Command) error {
 	return nil
 }
 func (f *machine) applyActionProjection(c Command) Result {
+	if c.Revision == "notifications" {
+		return f.applyNotificationProjection(c)
+	}
 	state := f.image.ActionProjectionState
 	if c.Revision == "begin" {
 		if state == nil {
@@ -277,6 +282,9 @@ func (s *Store) migrateActionProjection(ctx context.Context) error {
 	return submit(Command{Revision: "finish", Generation: revision})
 }
 func validateActionProjectionState(i image) error {
+	if err := validateNotificationProjectionState(i); err != nil {
+		return err
+	}
 	s := i.ActionProjectionState
 	for _, m := range i.Monitors {
 		if m.ActionProjection != nil && s == nil || s != nil && s.Ready && actionStorageFormat(m.ActionVersion) && m.ActionProjection == nil {
@@ -298,6 +306,9 @@ func validateActionProjectionState(i image) error {
 	return nil
 }
 func validateActionProjectionMigration(i image, v *collectionLedgerView) error {
+	if err := validateNotificationProjectionMigration(i, v); err != nil {
+		return err
+	}
 	s := i.ActionProjectionState
 	if s == nil || s.Current == nil {
 		return nil

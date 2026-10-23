@@ -50,6 +50,10 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 		message = "The TLS certificate has reached its configured expiry threshold."
 	case "permission_denied":
 		message = "The operation was denied by local access permissions."
+	case "authentication_failed":
+		message = "The target rejected the configured credentials."
+	case "authorization_failed":
+		message = "The target denied the operation for the configured identity."
 	case "rejected":
 		message = "The provider explicitly rejected the operation."
 	case "job_panicked":
@@ -64,6 +68,10 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 
 func (d FailureDiagnostic) configurationProblem() bool {
 	return d.Code == "ca_file_missing" || d.Code == "ca_file_unreadable" || d.Code == "ca_file_invalid"
+}
+
+func (d FailureDiagnostic) requiresConditionFormat() bool {
+	return d.Code == "authentication_failed" || d.Code == "authorization_failed"
 }
 
 // WithDetails renders protocol fields without accepting message text from a
@@ -97,6 +105,9 @@ func (d FailureDiagnostic) validate(version int) error {
 		return ErrFailureDiagnostic
 	}
 	if d.configurationProblem() && !actionStorageFormat(version) {
+		return ErrFailureDiagnostic
+	}
+	if d.requiresConditionFormat() && !notificationConditionStorageFormat(version) {
 		return ErrFailureDiagnostic
 	}
 	if !d.requiresLifecycleFormat() {

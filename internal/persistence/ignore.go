@@ -110,6 +110,9 @@ func (m *Monitor) leaveIgnore(at time.Time, recovered bool, emit func(string, *A
 		m.changeNotificationEpisode(identity("ignore_recovered/"+previous), at, emit)
 		// This one green reports verified recovery from Ignore even when no
 		// earlier delivery was attempted. Other suppression rules still apply.
+		if m.notificationConditionsEnabled() {
+			m.captureResolutionTargets(m.NotificationCorrelation, "", at, m.ProviderCorrelationVersion)
+		}
 		m.queueColor("green", at, emit)
 	}
 }

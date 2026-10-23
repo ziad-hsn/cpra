@@ -40,7 +40,7 @@ func (c *Catalog) WorkerAssignments(ctx context.Context, authority persistence.W
 		if err != nil {
 			return empty, workerPreparationError(ctx, err)
 		}
-		if !ok || record.Intent.Revision != offer.ExecutionRevision || !record.Intent.Deadline.Equal(offer.Deadline) {
+		if !ok || record.Intent.Revision != offer.ExecutionRevision || !record.AssignmentDeadline().Equal(offer.Deadline) {
 			return empty, persistence.ErrWorkerExecutionConflict
 		}
 		descriptor, err := c.OpenWorkerExecution(ctx, record)
@@ -50,7 +50,7 @@ func (c *Catalog) WorkerAssignments(ctx context.Context, authority persistence.W
 		in := record.Intent
 		out.Items = append(out.Items, api.Assignment{ServerID: response.ServerID, WorkerUID: response.WorkerUID,
 			SessionID: response.SessionID, ExecutionID: in.ID, ExecutionRevision: in.Revision,
-			LeaseID: offer.LeaseID, Deadline: in.Deadline, MonitorID: in.MonitorID, IncarnationUID: in.MonitorUID,
+			LeaseID: offer.LeaseID, Deadline: offer.Deadline, MonitorID: in.MonitorID, IncarnationUID: in.MonitorUID,
 			JobTypeID: in.JobType.JobTypeID, JobTypeUID: in.JobType.JobTypeUID, JobTypeVersion: in.JobType.Version,
 			Kind: in.Category, Parameters: descriptor.Parameters(), CredentialProfile: descriptor.CredentialProfile(), Notification: workerNotification(in.Notification)})
 	}
@@ -77,6 +77,9 @@ func workerNotification(n *persistence.WorkerNotification) *api.WorkerNotificati
 		return nil
 	}
 	out := &api.WorkerNotification{Format: int64(n.Format), Color: n.Color, DeliveryID: n.DeliveryID, EndpointID: n.EndpointID, IncidentID: n.IncidentID, CorrelationID: n.CorrelationID, At: n.At.UTC()}
+	if n.Resolution != nil {
+		out.Resolution = &api.ResolutionNotice{ConditionID: n.Resolution.ConditionID, RecoveredAt: n.Resolution.RecoveredAt.UTC(), Health: api.ResolutionNoticeHealth(n.Resolution.Health)}
+	}
 	if n.Review != nil {
 		out.Review = &api.ReviewNotice{AlertID: n.Review.AlertID, ActionID: n.Review.ActionID, Phase: n.Review.Phase, Reason: n.Review.Reason, Health: n.Review.Health}
 	}

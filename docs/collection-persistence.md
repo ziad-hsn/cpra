@@ -8,9 +8,35 @@ cpra_scope: development
 
 Collections use inactive encrypted staging before they change configuration.
 Uploading and validation do not invoke providers or activate resources. Follow
+[the CLI collection guide](cpractl-management.md),
 [collection preflight](collection-preflight.md) and
-[operation progress](management-operations.md) for the explicit activation and
-continuation steps. A malformed final input cannot partially activate a collection.
+[operation progress](management-operations.md) for input, preview and retained
+results. A malformed final input cannot partially activate a collection.
+
+## Apply and continue the original operation
+
+The management API, Go SDK, CLI and dashboard support inactive upload,
+whole-collection validation, conditional activation and cancellation.
+`cpractl apply` freezes the complete input before creating an operation, uploads bounded
+chunks, waits for its retained validation verdict, then requests activation. The
+dashboard exposes these steps separately. `cpractl diff` and the preflight endpoint
+provide a request-local preview; they do not create a resumable operation.
+
+Activation applies resources in dependency order with their captured conditions.
+It can finish partially when a resource conflicts or a dependency fails. Earlier
+committed changes remain committed; there is no collection-wide rollback or
+implicit pruning. Cancellation stops further admission but does not undo accepted
+resource changes or external effects. Stopping a client or a wait does not cancel
+server work.
+
+After an uncertain response, inspect the original handle. Use
+`cpractl resume operation/ID -f INPUT` to verify the original source bytes and order, finish
+missing uploads and continue eligible validation/activation. `resume-upload`
+recovers only missing input; it does not activate resources. Changed inputs require
+a new operation. A validation interrupted after losing its coordinator cannot be
+recompiled under the same handle; inspect its retained disposition before
+explicitly applying new intent. Already activated work is observed through its
+original receipt, rather than activated again.
 
 ## Committed input and progress
 
@@ -50,9 +76,10 @@ refuses unsafe or unverifiable paths. Work is bounded between filesystem calls;
 a blocked filesystem call cannot be forcibly cancelled by that budget.
 
 Storage accounting distinguishes active, retained, pinned, retired and
-cleanup-blocked bytes. File-only or empty-catalog runs do not need a collection
-ledger. A storage failure stops unsafe admission; CPRa does not delete state,
-switch to memory or automatically reopen it. Stop the owner and repair or restore
+cleanup-blocked bytes. A file-only or empty-catalog run does not allocate a ledger
+solely for unused collection staging; retained action/review records can require
+the same Store-owned ledger. A storage failure stops unsafe admission; CPRa does
+not delete state, switch to memory or automatically reopen it. Stop the owner and repair or restore
 from a validated complete backup.
 
 ## Formats, backup and restore
@@ -77,9 +104,12 @@ or repeat a provider action. Unknown external outcomes stay held for review.
 
 ## Capacity and verification
 
-Initial bounds include 64 retained collection headers, 10 million declared items
-per collection and 1 GiB of logically encoded input/plan data. Allocated database
-space, snapshots, logs and filesystem overhead are additional costs. These bounds
+Staging bounds include 64 retained collection headers, 10 million declared items
+per collection and 1 GiB of logically encoded input/plan data. These are storage
+bounds, not the size of a collection that can be activated: current durable
+validation and activation accept at most **10,000 resources**, with separate
+graph-work and payload limits. Chunked uploads do not bypass those limits.
+Allocated database space, snapshots, logs and filesystem overhead are additional costs. These bounds
 are safety limits, not measured fleet-capacity claims. Native filesystem,
 Windows map growth, cleanup/backup and deployment checks must pass against the
 actual release artifact and storage stack. See [versions and availability](versions.md).

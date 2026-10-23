@@ -119,10 +119,20 @@ destination.
 
 Only proven transient rejection or a proven pre-send failure can authorize another HTTP attempt,
 up to three within the original deadline. Generic server errors remain unknown.
-Ordinary HTTP notifications use a 45-second overall budget; documented delays
-do not extend it. Provider acceptance does not establish observed delivery.
+New ordinary built-in notifications begin a 45-second overall budget at their
+first committed start, after execution capacity is available. Pending queue
+time does not consume it. Attempts and documented delays share that fixed
+deadline; an older action retains its original recorded deadline. Neither a
+restart nor a later observation renews exhausted permission. Provider acceptance
+does not establish observed delivery.
 Cooldown suppresses repeated notifications within one episode. A new outage or
 distinct severity transition receives its first eligible notification promptly.
+
+When recovery occurs during maintenance, an eligible closure remains pending
+until suppression ends. It refers to the original episode and destination.
+If a later outage has begun, the closure describes the earlier recovery and
+the current unhealthy state separately. An unstarted outage opening is canceled
+when its outage recovers; it is not released after maintenance.
 
 ## Blue: recovery outcome unknown
 

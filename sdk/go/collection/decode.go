@@ -8,7 +8,9 @@ import (
 
 // DecodeOptions bounds decoding without writing a plaintext staging file.
 // The identity index retains at most MaxResources entries; only the current
-// document/resource body is decoded at a time. Zero values select the same
+// document/resource body is decoded at a time. MaxBytes independently bounds
+// source bytes and cumulative normalized resource bytes, including alias output.
+// Zero values select the same
 // limits as Freeze. SourceName is a caller-supplied non-secret diagnostic label.
 type DecodeOptions struct {
 	SourceName               string
@@ -67,6 +69,9 @@ func Decode(ctx context.Context, r io.Reader, options DecodeOptions, visit func(
 	}
 	if limited.N == 0 {
 		return fmt.Errorf("source byte limit exceeded")
+	}
+	if err == nil && len(b.inputErrors.Details) != 0 {
+		return &b.inputErrors
 	}
 	return err
 }

@@ -47,6 +47,8 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 			actor = e.Operation.Actor
 		}
 		event := api.Event{ID: e.ID, MonitorID: e.MonitorID, Kind: e.Type, Time: e.At.UTC(), Actor: actor, Reason: e.Reason, Note: e.Note, IncidentID: e.IncidentID, ActionID: e.ActionID, Outcome: e.Outcome, ControlRevision: e.ControlRevision, EvidenceRefs: append([]string(nil), e.EvidenceRefs...)}
+		event.TerminationReason, event.Resolution = e.TerminationReason, resolutionView(e.Resolution)
+		event.ConditionID, event.OpeningActionID = e.ConditionID, e.OpeningActionID
 		event.Failure, event.Cause = failureView(e.Failure), failureView(e.Cause)
 		event.AgentReceipt = agentReceiptView(e.AgentReceipt)
 		event.RecoveryFailure = recoveryFailureView(e.RecoveryFailure)
@@ -55,7 +57,7 @@ func (v HistoryView) Page(ctx context.Context, monitorID, after string, limit in
 		} else {
 			event.Outcome = e.Operation.Outcome
 		}
-		if e.ActionID != "" {
+		if e.ActionID != "" || e.ConditionID != "" {
 			event.ActionKind, event.Color = e.Kind, e.Color
 			if e.Kind == "code" {
 				event.Endpoint = api.Pointer(e.Endpoint)

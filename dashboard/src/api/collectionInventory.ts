@@ -231,9 +231,23 @@ export interface WorkerCollectionSummary {
   readonly sourceBytes: number;
   readonly normalizedBytes: number;
   readonly preflightAvailable: boolean;
+  readonly warningCount?: number;
 }
-export interface WorkerCollectionItemSummary extends CollectionInventoryPosition { readonly bytes: number; readonly coordinates?: SourceCoordinates }
-type WorkerItem = { position: CollectionInventoryPosition; raw: Uint8Array; digest?: Uint8Array; coordinates?: SourceCoordinates };
+export interface CollectionWarning { readonly field: 'spec.notifications.blue'; readonly reason: 'unknownRecoveryDestination' }
+export interface WorkerCollectionItemSummary extends CollectionInventoryPosition { readonly bytes: number; readonly coordinates?: SourceCoordinates; readonly warnings?: readonly CollectionWarning[] }
+type WorkerItem = { position: CollectionInventoryPosition; raw: Uint8Array; digest?: Uint8Array; coordinates?: SourceCoordinates; warnings: readonly CollectionWarning[] };
+// The shared Go validator chooses advisories. Only reviewed metadata leaves the
+// worker; arbitrary messages and resource values never enter preview state.
+function collectionWarnings(value: unknown): readonly CollectionWarning[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 8) throw invalid();
+  let present = false;
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || item.field !== 'spec.notifications.blue' || item.reason !== 'unknownRecoveryDestination') throw invalid();
+    present = true;
+  }
+  return present ? [{ field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' }] : [];
+}
 const workerLimit = () => new Error('Collection preparation exceeds the configured browser import quota.');
 const concatenate = (parts: readonly Uint8Array[], maximum: number): Uint8Array<ArrayBuffer> => {
   const size = parts.reduce((sum, part) => sum + part.byteLength, 0);
@@ -259,6 +273,7 @@ export class WorkerCollectionInventory {
   #sourceBytes = 0;
   #normalizedBytes = 0;
   #diagnosticBytes = 0;
+  #warningCount = 0;
   #closed = false;
   #summary?: WorkerCollectionSummary;
   #preflightBytes = 0;
@@ -300,7 +315,7 @@ export class WorkerCollectionInventory {
     return token;
   }
   /** Takes ownership; the caller must never read or mutate raw after this call. */
-  addItem(raw: Uint8Array, id: string, document: number, item: number, diagnostic?: unknown): void {
+  addItem(raw: Uint8Array, id: string, document: number, item: number, diagnostic?: unknown, advisories?: unknown): void {
     this.#requireOpen();
     if (this.#summary || this.#sources === 0 || !validBytes(raw) || raw.byteLength < 1 || raw.byteLength > workerCollectionLimits.resourceBytes ||
         this.#items.length >= workerCollectionLimits.items || raw.byteLength > workerCollectionLimits.normalizedBytes - this.#normalizedBytes) throw workerLimit();
@@ -318,7 +333,9 @@ export class WorkerCollectionInventory {
       if (size > workerCollectionLimits.diagnosticBytes - this.#diagnosticBytes) coordinates = undefined;
       else this.#diagnosticBytes += size;
     }
-    this.#items.push({ position, raw, coordinates }); this.#identities.add(id); this.#normalizedBytes += raw.byteLength;
+    const warnings = collectionWarnings(advisories);
+    this.#warningCount += warnings.length;
+    this.#items.push({ position, raw, coordinates, warnings }); this.#identities.add(id); this.#normalizedBytes += raw.byteLength;
   }
   async #digest(item: WorkerItem): Promise<Uint8Array<ArrayBuffer>> {
     const position = item.position;
@@ -340,7 +357,7 @@ export class WorkerCollectionInventory {
     if (this.#closed) { digest.fill(0); throw closed(); }
     this.#summary = Object.freeze({ identityFormat: collectionIdentityFormat, contentDigest: hex(digest), itemCount: this.#items.length,
       ...(this.#normalizationProfile ? { normalizationProfile: this.#normalizationProfile } : {}),
-      sourceCount: this.#sources, sourceBytes: this.#sourceBytes, normalizedBytes: this.#normalizedBytes, preflightAvailable: preflightBytes <= workerCollectionLimits.requestBytes });
+      sourceCount: this.#sources, sourceBytes: this.#sourceBytes, normalizedBytes: this.#normalizedBytes, preflightAvailable: preflightBytes <= workerCollectionLimits.requestBytes, warningCount: this.#warningCount });
     digest.fill(0); this.#preflightBytes = preflightBytes;
     for (const bytes of this.#sourceFields) bytes.fill(0);
     this.#sourceFields = [];
@@ -349,7 +366,7 @@ export class WorkerCollectionInventory {
   page(offset: number, limit: number = workerCollectionLimits.pageItems): WorkerCollectionItemSummary[] {
     this.#requireFrozen();
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > this.#items.length || !integer(limit, workerCollectionLimits.pageItems)) throw invalid();
-    return this.#items.slice(offset, offset + limit).map(({ position, raw, coordinates }) => ({ ...position, source: { ...position.source }, bytes: raw.byteLength, ...(coordinates ? { coordinates: sourceCoordinates(coordinates) } : {}) }));
+    return this.#items.slice(offset, offset + limit).map(({ position, raw, coordinates, warnings }) => ({ ...position, source: { ...position.source }, bytes: raw.byteLength, ...(coordinates ? { coordinates: sourceCoordinates(coordinates) } : {}), ...(warnings.length ? { warnings: warnings.map(value => ({ ...value })) } : {}) }));
   }
   /** Explicit write-only operation-creation JSON; contains the private key. */
   createBody(): Uint8Array<ArrayBuffer> {
@@ -391,6 +408,6 @@ export class WorkerCollectionInventory {
     this.#closed = true; this.#key.fill(0); this.#cryptoKey = undefined; this.#fingerprint?.fill(0);
     for (const bytes of this.#sourceFields) bytes.fill(0);
     for (const item of this.#items) { item.raw.fill(0); item.digest?.fill(0); }
-    this.#sourceFields = []; this.#items = []; this.#identities.clear();
+    this.#sourceFields = []; this.#items = []; this.#identities.clear(); this.#warningCount = 0;
   }
 }

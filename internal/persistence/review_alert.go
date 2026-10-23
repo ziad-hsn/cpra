@@ -51,6 +51,10 @@ type ReviewNotice struct {
 // start boundary. Changing unstarted closure wording cannot authorize a stale
 // copy already waiting in a local queue or external worker assignment.
 func ActionNoticeRevision(a Action) string {
+	if a.Resolution != nil {
+		value, _ := json.Marshal(a.Resolution)
+		return identity("notification-resolution/v1/" + string(value))
+	}
 	if a.ReviewNotice == nil {
 		return ""
 	}
@@ -67,6 +71,15 @@ func (m Monitor) observedHealth() string {
 		return "unhealthy"
 	}
 	return "healthy"
+}
+
+// notificationHealth describes current availability without rewriting the last
+// target observation. Older envelopes retain their original notice semantics.
+func (m Monitor) notificationHealth() string {
+	if m.notificationConditionsEnabled() && m.ConfigurationProblem.Code != "" {
+		return "unknown"
+	}
+	return m.observedHealth()
 }
 
 func (m Monitor) notificationsSuppressed(at time.Time) bool {
@@ -103,9 +116,9 @@ func (m *Monitor) assessReviewAlerts(at time.Time, emit func(string, *Action)) {
 					s.ReviewAlerts = make(map[string]ReviewAlert)
 				}
 				s.ReviewAlerts[key] = ReviewAlert{ID: key, ActionID: a.ID, IncidentID: m.IncidentID, Revision: m.Revision,
-					EndpointID: endpointID, Endpoint: endpoint, OpenedAt: at, Health: m.observedHealth(), ProviderCorrelationVersion: 1}
+					EndpointID: endpointID, Endpoint: endpoint, OpenedAt: at, Health: m.notificationHealth(), ProviderCorrelationVersion: 1}
 				emit("review_alert_opened", &Action{ID: a.ID, Kind: "intervention", CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, IncidentID: m.IncidentID,
-					ReviewNotice: &ReviewNotice{AlertID: key, ActionID: a.ID, Phase: "open", Health: m.observedHealth()}})
+					ReviewNotice: &ReviewNotice{AlertID: key, ActionID: a.ID, Phase: "open", Health: m.notificationHealth()}})
 			}
 		}
 	}
@@ -143,7 +156,7 @@ func (m *Monitor) assessReviewAlert(alert ReviewAlert, at time.Time, emit func(s
 		alert.ClosedAt, alert.CloseReason, alert.ClosingDelivery = time.Time{}, "", ""
 	}
 	if alert.ClosedAt.IsZero() && (reviewed || recovered) {
-		alert.ClosedAt, alert.Health = at, m.observedHealth()
+		alert.ClosedAt, alert.Health = at, m.notificationHealth()
 		alert.CloseReason = "health_recovered"
 		if reviewed {
 			alert.CloseReason = "action_reviewed"
@@ -157,14 +170,21 @@ func (m *Monitor) assessReviewAlert(alert ReviewAlert, at time.Time, emit func(s
 	phase := "open"
 	if !alert.ClosedAt.IsZero() {
 		phase = "close"
-		if !alert.ClosingStarted {
-			alert.Health = m.observedHealth()
+		closing, queued := m.reviewDelivery(alert.ClosingDelivery)
+		queued = queued && closing.State == Queued
+		// A queued retry follows a proven no-effect rejection. Its original
+		// deadline and delivery remain fixed, while current-health wording can
+		// advance before the next start. Started/unknown attempts stay frozen.
+		refresh := !alert.ClosingStarted || m.notificationConditionsEnabled() && queued && closing.Attempt > 1
+		if refresh {
+			alert.Health = m.notificationHealth()
 			if !reviewed && !alert.RecoveredAt.IsZero() {
 				alert.CloseReason = "health_recovered"
 			}
 			// Revise only an unstarted payload. Its delivery identity and original
 			// deadline remain unchanged, including when observations advance.
-			if closing, ok := m.reviewDelivery(alert.ClosingDelivery); ok && closing.State == Queued {
+			if queued {
+				closing = closing.Clone()
 				closing.ReviewNotice.Health, closing.ReviewNotice.Reason = alert.Health, alert.CloseReason
 				m.Actions[closing.ID] = closing
 			}
@@ -201,10 +221,12 @@ func (m *Monitor) queueReviewNotice(alert *ReviewAlert, phase string, at time.Ti
 		case "worker_notification_changed":
 			// No start grant was issued for the obsolete message. A replacement
 			// can use only the remaining authorization, never a fresh budget.
-			if old.Deadline.IsZero() || !at.Before(old.Deadline) {
-				return
+			if old.ExecutionBudget == 0 || !old.Deadline.IsZero() {
+				if old.Deadline.IsZero() || !at.Before(old.Deadline) {
+					return
+				}
+				originalDeadline = old.Deadline
 			}
-			originalDeadline = old.Deadline
 		default:
 			return // Expiry/rejection does not create a fresh execution budget.
 		}
@@ -222,11 +244,14 @@ func (m *Monitor) queueReviewNotice(alert *ReviewAlert, phase string, at time.Ti
 	if budget, ok := m.reviewTimeouts[alert.Endpoint]; ok {
 		a.Deadline = at.Add(budget)
 	}
+	if m.notificationConditionsEnabled() {
+		a.ExecutionBudget, a.Deadline = a.Deadline.Sub(at), time.Time{}
+	}
 	if alert.Owner != nil {
 		a.CatalogUID, a.FileIncarnation = alert.Owner.CatalogUID, alert.Owner.FileIncarnation
 	}
 	if !originalDeadline.IsZero() {
-		a.Deadline = originalDeadline
+		a.Deadline, a.ExecutionBudget = originalDeadline, 0
 	}
 	if phase == "open" {
 		alert.OpeningDelivery = id
@@ -302,7 +327,7 @@ func (m Monitor) reviewNoticeEligible(a Action) bool {
 		underlying, exists := m.Actions[alert.ActionID]
 		return exists && underlying.Held() && m.OwnsAction(underlying) && alert.ClosedAt.IsZero() && alert.IncidentID == m.IncidentID && m.Recovering && m.outageQualified()
 	}
-	if alert.ClosedAt.IsZero() || !alert.OpeningStarted || a.ReviewNotice.Health != m.observedHealth() || a.ReviewNotice.Reason != alert.CloseReason {
+	if alert.ClosedAt.IsZero() || !alert.OpeningStarted || a.ReviewNotice.Health != m.notificationHealth() || a.ReviewNotice.Reason != alert.CloseReason {
 		return false
 	}
 	if a.ReviewNotice.Reason == "health_recovered" {

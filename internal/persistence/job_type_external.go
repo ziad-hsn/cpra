@@ -25,7 +25,9 @@ const NotificationWorkerFormatVersion = 39
 const DeliveryWorkerFormatVersion = 41
 const LifecycleWorkerFormatVersion = 43
 const ActionWorkerFormatVersion = 45
-const LatestFormatVersion = ActionWorkerFormatVersion
+const WorkerNotificationConditionFormatVersion = 47
+const LatestFormatVersion = WorkerNotificationConditionFormatVersion
+const workerNotificationConditionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-47\n"
 const actionWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-45\n"
 const lifecycleWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-43\n"
 const deliveryWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-41\n"
@@ -38,6 +40,9 @@ const jobTypeSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-15\n"
 // Format 31 is readable without externaljobs. Combining it with any optional
 // state uses a distinct format so a default binary cannot discard worker data.
 func joinStorageFormat(a, b int) int {
+	if max(a, b) == NotificationConditionFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return WorkerNotificationConditionFormatVersion
+	}
 	if max(a, b) == ActionFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
 		return ActionWorkerFormatVersion
 	}
@@ -416,6 +421,9 @@ func hasCommandExtensions(c Command) bool {
 	return c.WorkerSchedule != nil || c.WorkerExpire != nil || c.WorkerCheckAllocate != nil || c.WorkerCheckRetire != nil || c.WorkerRequeue != nil || c.WorkerObservation != nil || c.WorkerFinalize != nil || c.WorkerEvidence != nil || c.WorkerHeartbeat != nil || c.WorkerResult != nil || c.WorkerStart != nil || c.WorkerExecution != nil || c.JobType != nil || c.JobTypeAllocation != nil || c.WorkerPolicy != nil || c.WorkerSession != nil
 }
 func commandExtensionMinimumFormat(c Command) int {
+	if c.WorkerExecution != nil && c.WorkerExecution.Intent.minimumFormat() == WorkerNotificationConditionFormatVersion {
+		return WorkerNotificationConditionFormatVersion
+	}
 	if c.WorkerExecution != nil && c.WorkerExecution.Intent.Notification != nil {
 		return 45
 	}
@@ -487,6 +495,9 @@ func commandExtensionMinimumFormat(c Command) int {
 	return FormatVersion
 }
 func externalStorageFormat(version int) bool {
+	if version == WorkerNotificationConditionFormatVersion {
+		return true
+	}
 	if version == ActionWorkerFormatVersion {
 		return true
 	}
@@ -510,11 +521,14 @@ func externalStorageFormat(version int) bool {
 func commandExtensionWriteFormat(c Command) int {
 	version := commandExtensionMinimumFormat(c)
 	if c.Kind == "worker_result" || c.Kind == "worker_start" || c.Kind == "worker_poll" || c.Kind == "worker_heartbeat" {
-		return joinStorageFormat(version, ActionFormatVersion)
+		return joinStorageFormat(version, NotificationConditionFormatVersion)
 	}
 	return version
 }
 func externalSnapshotMagic(version int) string {
+	if version == WorkerNotificationConditionFormatVersion {
+		return workerNotificationConditionSnapshotMagic
+	}
 	if version == ActionWorkerFormatVersion {
 		return actionWorkerSnapshotMagic
 	}
@@ -590,6 +604,9 @@ func externalSnapshotMagic(version int) string {
 	return ""
 }
 func externalSnapshotVersion(prefix []byte) (int, int) {
+	if bytes.HasPrefix(prefix, []byte(workerNotificationConditionSnapshotMagic)) {
+		return WorkerNotificationConditionFormatVersion, len(workerNotificationConditionSnapshotMagic)
+	}
 	if bytes.HasPrefix(prefix, []byte(actionWorkerSnapshotMagic)) {
 		return ActionWorkerFormatVersion, len(actionWorkerSnapshotMagic)
 	}
@@ -727,7 +744,7 @@ func sameJobTypeSelectors(a, b JobTypeVersion) bool {
 }
 
 func validateImageExtensions(i image) error {
-	if i.Version == AgentActionFormatVersion || i.Version == RecoveryNotificationFormatVersion || i.Version == AgentObservationFormatVersion || i.Version == NotificationFormatVersion || i.Version == DeliveryFormatVersion || i.Version == LifecycleFormatVersion || i.Version == ActionFormatVersion {
+	if i.Version == AgentActionFormatVersion || i.Version == RecoveryNotificationFormatVersion || i.Version == AgentObservationFormatVersion || i.Version == NotificationFormatVersion || i.Version == DeliveryFormatVersion || i.Version == LifecycleFormatVersion || i.Version == ActionFormatVersion || i.Version == NotificationConditionFormatVersion {
 		if i.imageExtensions != (imageExtensions{}) {
 			return ErrJobTypeInvalid
 		}

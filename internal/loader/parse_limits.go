@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/ziad-hsn/cpra/internal/manifest"
 )
 
 func normalizedParseConfig(c ParseConfig) ParseConfig {
@@ -23,7 +25,26 @@ func normalizedParseConfig(c ParseConfig) ParseConfig {
 	if c.MaxExpandedBytes <= 0 {
 		c.MaxExpandedBytes = c.MaxMemory
 	}
+	if c.MaxBatchBytes <= 0 || c.MaxBatchBytes > 4<<20 {
+		c.MaxBatchBytes = 4 << 20
+	}
 	return c
+}
+
+// Measure the decoded representation, not the compact source or alias token.
+// Only one temporary encoding is held at a time. This bounds payload retention,
+// not total Go heap: parser syntax, indexes and shared metadata have own limits.
+func decodedMonitorBytes(monitor manifest.Monitor, limit int64) (int64, error) {
+	raw, err := json.Marshal(monitor)
+	if err != nil {
+		return 0, fmt.Errorf("decoded monitor cannot be encoded")
+	}
+	size := int64(len(raw))
+	clear(raw)
+	if size > limit {
+		return 0, fmt.Errorf("decoded monitor exceeds batch byte limit")
+	}
+	return size, nil
 }
 
 // boundedReader caps decompressed input and checks cancellation on every read.

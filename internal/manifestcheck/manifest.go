@@ -5,14 +5,15 @@ package manifestcheck
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/loader"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
-	"strings"
 )
 
-func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable, notificationLogEnabled bool) error {
+func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable, notificationLogEnabled bool, warnings ...func(api.FieldError)) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	config := loader.ParseConfig{BatchSize: 1000, MaxMemory: 1 << 30}
@@ -80,6 +81,17 @@ func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable,
 						}
 						if err := jobs.ValidateDriver("notification", batch.Endpoints[name].Type); err != nil {
 							return err
+						}
+					}
+				}
+				if m.Intervention.Action != "" {
+					blue, exists := m.Codes["blue"]
+					if !exists || !blue.Dispatch || blue.Notify == "" && len(batch.NotificationGroups[blue.NotifyGroup]) == 0 {
+						warning := api.FieldError{Field: fmt.Sprintf("monitors[%d].codes.blue", len(ids)-1), Reason: "unknownRecoveryDestination", Message: api.ValidationMessage("unknownRecoveryDestination")}
+						for _, report := range warnings {
+							if report != nil {
+								report(warning)
+							}
 						}
 					}
 				}

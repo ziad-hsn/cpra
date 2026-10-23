@@ -71,12 +71,15 @@ func newIncidentSystem(t *testing.T, world *ecs.World, intervention, notificatio
 func applyIncidentPulse(t *testing.T, system *DurableSystem, ent ecs.Entity, result jobs.Result) persistence.Monitor {
 	t.Helper()
 	state := system.states.Get(ent)
+	monitorID := state.MonitorID
 	result.Ent, result.Type = ent, "pulse"
 	result.MonitorID, result.Revision, result.Generation = state.MonitorID, state.Revision, state.PulseGeneration+1
 	if !system.commitResults([]jobs.Result{result}) || system.lastError != nil {
 		t.Fatal("observation did not commit", system.lastError)
 	}
-	monitor, ok := system.store.Get(state.MonitorID)
+	// Committing a control transition can move the entity to another archetype.
+	// Do not dereference the old component pointer after commitResults.
+	monitor, ok := system.store.Get(monitorID)
 	if !ok {
 		t.Fatal("committed monitor missing")
 	}

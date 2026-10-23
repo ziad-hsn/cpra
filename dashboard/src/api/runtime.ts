@@ -11,6 +11,9 @@ export interface RuntimeObservation {
   projectionFresh?: boolean;
   projectionAgeMs?: number;
   storage: { available: boolean; mode: string; appliedIndex?: number; commitLatencyMs?: number; snapshotDurationMs?: number; error: boolean;
+    actions?: { observedAt?: string; active?: number; ordinaryRetained?: number; protected?: number; tombstones?: number;
+      activeBytes?: number; ordinaryBytes?: number; protectedBytes?: number; tombstoneBytes?: number; retired?: number; retiredBytes?: number;
+      cleanupBlocked?: number; cleanupBlockedBytes?: number; cleanupCoverage?: string; compactionCondition?: string };
     generations?: { observedAt?: string; active?: number; retained?: number; pinned?: number; retired?: number; unlinkedBytes?: number; stepDurationMs?: number; condition?: string;
       usageCoverage?: string; usageGenerations?: number; usageExpected?: number; usageOldestAt?: string; knownApparentBytes?: number; knownAllocatedBytes?: number } };
 }
@@ -23,6 +26,12 @@ const measurement = (value: unknown) => object(value) && value.available === tru
 const storageMode = (value: unknown) => value === 'raft' ? 'Raft' : value === 'memory' ? 'Memory (not persistent)' : value === 'unavailable' ? 'Unavailable' : 'Unrecognized storage mode';
 const cleanupConditions: Record<string, string> = { unavailable: 'Native cleanup is unavailable on this filesystem or platform.', blocked: 'Cleanup is held. Inspect protected local storage diagnostics.', budget_exhausted: 'Cleanup reached its cooperative step budget and will continue later.', budget_exceeded: 'A filesystem operation exceeded the cleanup step budget.' };
 const usageCoverage: Record<string, string> = { pending: 'Collection file usage has not been sampled yet.', partial: 'Collection file usage covers part of the completed-generation catalog.', complete: 'Collection file usage covers the completed-generation catalog.', unavailable: 'Collection file usage could not be sampled.' };
+const actionCleanupCoverage: Record<string, string> = { last_selection_page: 'Cleanup-blocked counts cover only the last retirement selection page, not every retained action.' };
+const actionCompactionConditions: Record<string, string> = {
+  copying: 'Action storage compaction is copying retained records.', copy_failed: 'Action storage compaction could not finish its copy.',
+  storage_unavailable: 'Action storage is unavailable.', state_changed: 'Action storage changed during compaction; the prepared copy was not published.',
+  publication_failed: 'The compacted action store could not be published.',
+};
 const readinessReasons: Record<string, string> = {
   'Controller initialization or progress is unavailable.': 'Controller initialization or progress is unavailable.',
   'The durable management catalog is unavailable.': 'The durable management catalog is unavailable.',
@@ -49,6 +58,14 @@ export function runtimeView(value: unknown): RuntimeObservation {
   storage.appliedIndex = count(store.appliedIndex);
   storage.commitLatencyMs = measurement(store.commitLatency);
   storage.snapshotDurationMs = measurement(store.snapshotDuration);
+  if (object(store.actions)) {
+    const actions = store.actions;
+    storage.actions = { observedAt: timestamp(actions.observedAt), active: count(actions.active), ordinaryRetained: count(actions.ordinaryRetained),
+      protected: count(actions.protected), tombstones: count(actions.tombstones), activeBytes: count(actions.activeBytes),
+      ordinaryBytes: count(actions.ordinaryBytes), protectedBytes: count(actions.protectedBytes), tombstoneBytes: count(actions.tombstoneBytes),
+      retired: count(actions.retired), retiredBytes: count(actions.retiredBytes), cleanupBlocked: count(actions.cleanupBlocked), cleanupBlockedBytes: count(actions.cleanupBlockedBytes),
+      cleanupCoverage: reason(actions.cleanupCoverage, actionCleanupCoverage), compactionCondition: reason(actions.compactionCondition, actionCompactionConditions) };
+  }
   if (object(store.collectionGenerations) && store.collectionGenerations.available === true) {
     const generations = store.collectionGenerations;
     storage.generations = { observedAt: timestamp(generations.observedAt), active: count(generations.active), retained: count(generations.retained),

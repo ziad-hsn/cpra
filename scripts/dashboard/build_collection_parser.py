@@ -100,7 +100,7 @@ def qualify_normalization(go, node, env, goroot, wasm, temporary):
                                                cwd=ROOT, env=env, text=True, timeout=60))
     fixture_bytes = (ROOT / "sdk/go/collection/testdata/file-base-v3.json").read_bytes()
     fixtures = json.loads(fixture_bytes)
-    if result.get("result") != "passed" or result.get("profile") != "cpra.file.base.v3" or result.get("nativeBuilds") != 2 or result.get("wasmBuilds") != 1 or result.get("fixedCases") != len(fixtures["cases"]) or len(fixtures["cases"]) < 30:
+    if result.get("result") != "passed" or result.get("profile") != "cpra.file.base.v3" or result.get("nativeBuilds") != 2 or result.get("wasmBuilds") != 1 or result.get("fixedCases") != len(fixtures["cases"]) or len(fixtures["cases"]) < 30 or result.get("warningCases") != 4:
         raise ValueError("File normalization qualification did not complete")
     return hashlib.sha256(fixture_bytes).hexdigest()
 

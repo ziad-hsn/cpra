@@ -5,13 +5,14 @@ import { DashboardSession } from '../src/api/session';
 import { SessionBoundary } from '../src/auth/SessionBoundary';
 import { MonitorActions } from '../src/components/MonitorActions';
 import { operationContracts } from '../src/api/generated';
-import { agentReceiptView, recoveryFailureView, actionView, reviewNoticeView } from '../src/api/actions';
+import { agentReceiptView, recoveryFailureView, actionView, reviewNoticeView, resolutionNoticeView } from '../src/api/actions';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function actions(options: { blue?: boolean; blueHealth?: string; blueReason?: string; agent?: boolean; reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
+async function actions(options: { fields?: Record<string, unknown>; blue?: boolean; blueHealth?: string; blueReason?: string; agent?: boolean; reader?: boolean; unfenced?: boolean; conflict?: boolean; lost?: boolean; foreign?: boolean; paged?: boolean; reviewedConflict?: boolean } = {}) {
   const action: Record<string, unknown> = { id: 'execution-1', monitorID: 'checkout', incarnationUID: 'original-monitor-uid', state: 'unknown', kind: 'intervention', reviewRevision: 'observed-1', held: true, executorFenced: !options.unfenced,
     ...(options.reviewedConflict ? { review: { revision: 'review-old', resolution: 'rejected', actor: 'alice', reviewedAt: '2026-09-14T00:00:00Z', reason: 'Provider records checked', note: '<script>not executable</script>', evidenceRefs: ['javascript:alert(1)'], conflict: true } } : {}) };
+  Object.assign(action, options.fields);
   if (options.blue) Object.assign(action, {kind:'code',color:'blue',state:'failed',held:false,deliveryID:'closure-delivery',endpointID:'original-destination',reviewNotice:{alertID:'review-condition',actionID:'unknown-recovery',phase:'close',health:options.blueHealth ?? 'healthy',reason:options.blueReason ?? 'health_recovered',providerBody:'private-body'},deadline:'2026-10-20T00:00:45Z',queuedAt:'2026-10-20T00:00:00Z'});
   if (options.agent) action.agentReceipt = { sequence: '1', taskID: 'agent-task', state: 'TASK_STATE_WORKING', observedAt: '2026-09-30T00:00:00Z', providerOutput: 'private-agent-output', url: 'https://private-agent.test' };
   const writes: { method: string; path: string; match: string | null; body: Record<string, unknown> }[] = [];
@@ -219,3 +220,32 @@ for (const [reason, health] of [['health_recovered','unhealthy'],['health_recove
   expect(writes).toHaveLength(0);
  });
 }
+
+
+it('keeps pre-start waiting separate from its captured execution budget', async () => {
+ await actions({reader: true, fields: {kind: 'code', color: 'red', state: 'queued', held: false, queuedAt: '2026-10-22T10:00:00Z', executionBudget: '45s'}});
+ expect(await screen.findByText(/Captured execution budget: 45s/)).toHaveTextContent('Waiting for first committed start; the execution deadline has not begun.');
+ expect(screen.queryByText(/Execution deadline:/)).not.toBeInTheDocument();
+ expect(screen.getByText(/Execution state: queued/)).toBeInTheDocument();
+});
+
+it('shows an earlier resolution and latest notice health without claiming provider completion', async () => {
+ await actions({reader: true, fields: {kind: 'code', color: 'green', state: 'failed', held: false, terminationReason: 'execution_deadline', resolution: {conditionID: 'original-condition', recoveredAt: '2026-10-22T10:00:00Z', health: 'unhealthy'}}});
+ expect(await screen.findByText(/Earlier outage recovered at/)).toHaveTextContent('Health at this notification: unhealthy.');
+ expect(screen.getByText(/Stopped: Execution deadline reached/)).toHaveTextContent('does not authorize another attempt');
+ expect(screen.getByText(/Closing condition original-condition/)).toHaveTextContent('do not prove that the provider resolved its alert');
+});
+
+it('admits confirmed exhaustion before the attempt limit only for the documented terminal causes', () => {
+ const failure = {actionID: 'restart', driver: 'docker', attempt: 1, maxAttempts: 3, trigger: 'recovery_exhausted', outcome: 'failure', failedAt: '2026-10-22T10:00:00Z'};
+ for (const terminationReason of ['execution_deadline', 'permanent_rejection']) expect(recoveryFailureView({...failure, terminationReason})).toMatchObject({terminationReason});
+ for (const terminationReason of ['attempt_limit', 'unknown', '']) expect(() => recoveryFailureView({...failure, terminationReason})).toThrow();
+});
+
+it('bounds resolution fields and strips data outside the observation contract', () => {
+ const resolution = {conditionID: 'condition', recoveredAt: '2026-10-22T10:00:00Z', health: 'unknown'};
+ expect(resolutionNoticeView({...resolution, providerBody: 'secret'})).toEqual(resolution);
+ for (const patch of [{conditionID: 'bad\nID'}, {recoveredAt: '0001-01-01T00:00:00Z'}, {health: 'assumed'}]) expect(() => resolutionNoticeView({...resolution, ...patch})).toThrow();
+ const action = {id: 'a', monitorID: 'm', state: 'queued', held: false, executorFenced: false};
+ for (const executionBudget of ['0s', '-1s', 'NaN', 'x'.repeat(129)]) expect(() => actionView({...action, executionBudget}, 'm')).toThrow();
+});

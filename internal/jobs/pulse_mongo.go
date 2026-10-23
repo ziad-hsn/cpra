@@ -3,6 +3,7 @@
 package jobs
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
 )
@@ -50,7 +52,7 @@ func newPulseMongoJob(cfg *manifest.PulseMongoConfig, timeout time.Duration, ent
 }
 
 func (p *PulseMongoJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(mongoCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -98,3 +100,28 @@ func (p *PulseMongoJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseMongoJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseMongoJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseMongoJob) IsNil() bool                { return p == nil }
+
+func mongoCheckFailure(err error) error {
+	var server mongo.ServerError
+	var command driver.Error
+	code := 0
+	switch {
+	case errors.As(err, &server):
+		if server.HasErrorCode(18) {
+			code = 18
+		} else if server.HasErrorCode(13) {
+			code = 13
+		}
+	case errors.As(err, &command):
+		// Authentication handshake errors expose the driver's command error
+		// through their unwrap chain before the public CommandError adapter.
+		code = int(command.Code)
+	}
+	switch code {
+	case 18:
+		return &checkAccessError{code: "authentication_failed", cause: err}
+	case 13:
+		return &checkAccessError{code: "authorization_failed", cause: err}
+	}
+	return err
+}

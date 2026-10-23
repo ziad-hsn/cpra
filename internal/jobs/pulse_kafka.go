@@ -3,11 +3,13 @@
 package jobs
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
@@ -45,7 +47,7 @@ func newPulseKafkaJob(cfg *manifest.PulseKafkaConfig, timeout time.Duration, ent
 }
 
 func (p *PulseKafkaJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(kafkaCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -89,3 +91,18 @@ func (p *PulseKafkaJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseKafkaJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseKafkaJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseKafkaJob) IsNil() bool                { return p == nil }
+
+func kafkaCheckFailure(err error) error {
+	var provider *kerr.Error
+	if errors.As(err, &provider) {
+		switch provider.Code {
+		case kerr.SaslAuthenticationFailed.Code:
+			return &checkAccessError{code: "authentication_failed", cause: err}
+		case kerr.TopicAuthorizationFailed.Code, kerr.GroupAuthorizationFailed.Code,
+			kerr.ClusterAuthorizationFailed.Code, kerr.TransactionalIDAuthorizationFailed.Code,
+			kerr.DelegationTokenAuthorizationFailed.Code:
+			return &checkAccessError{code: "authorization_failed", cause: err}
+		}
+	}
+	return err
+}

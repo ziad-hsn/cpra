@@ -89,3 +89,42 @@ func TestFailureDetailsExcludeRemoteText(t *testing.T) {
 		t.Fatal("text parsed into trusted detail")
 	}
 }
+
+func assertCheckAccessFailure(t *testing.T, classify func(error) error, source error, want string) {
+	t.Helper()
+	wrapped := fmt.Errorf("provider call: %w", source)
+	err := SanitizeError(classify(wrapped))
+	if got := FailureCode(err); got != want {
+		t.Fatalf("failure code = %q, want %q", got, want)
+	}
+	if strings.Contains(err.Error(), "private-provider-detail") || len(err.Error()) > 128 {
+		t.Fatal("classified error exposed provider text")
+	}
+	if !errors.Is(err, wrapped) {
+		t.Fatal("runtime typed error identity was lost")
+	}
+	if outcome := ClassifyEffect(err); outcome.Outcome != EffectUnknown || outcome.Retryable {
+		t.Fatal("diagnostic granted external-effect or retry permission")
+	}
+	if FailureDetails(err) != (FailureDetail{}) {
+		t.Fatal("provider text produced public protocol details")
+	}
+}
+
+func TestCheckAccessDiagnosticRetainsCancellationPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		cause error
+		want  string
+	}{
+		{context.Canceled, "cancelled"},
+		{context.DeadlineExceeded, "deadline_exceeded"},
+	} {
+		err := &checkAccessError{code: "authentication_failed", cause: tc.cause}
+		if FailureCode(SanitizeError(err)) != tc.want {
+			t.Fatal("access diagnostic replaced cancellation or deadline")
+		}
+	}
+	if FailureCode(&checkAccessError{code: "unreviewed-provider-code", cause: errors.New("private-provider-detail")}) != "operation_failed" {
+		t.Fatal("unreviewed diagnostic accepted")
+	}
+}

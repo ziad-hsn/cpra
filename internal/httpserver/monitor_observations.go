@@ -2,11 +2,14 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/management"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
@@ -52,6 +55,26 @@ func monitorObservation(row fleetview.MonitorSummary) api.MonitorObservation {
 		LastSuccessfulAt: observedTime(row.LastSuccess), NextCheckAt: observedTime(row.NextCheck),
 		IncidentID: row.IncidentID, CheckAdmission: row.CheckAdmission,
 		ConfigurationProblemAt: observedTime(row.ConfigurationProblemAt),
+		ConfigurationRevision:  row.ConfigurationRevision, ControlRevision: row.ControlRevision,
+		LastObservedHealth: row.LastObservedHealth, LastObservedAt: observedTime(row.LastObservedAt),
+		Availability: api.MonitorAvailability{State: api.MonitorAvailabilityState(row.Availability.State), Reason: row.Availability.Reason, ObservedAt: observedTime(row.Availability.ObservedAt)},
+		Maintenance:  api.Pointer(row.Maintenance), NotificationsSuppressed: api.Pointer(row.NotificationsSuppressed), SuppressionObservedAt: observedTime(row.SuppressionObservedAt),
+		NotificationConditionsTruncated:  row.NotificationConditionsTruncated,
+		NotificationConditionsObservedAt: observedTime(row.NotificationConditionsObservedAt),
+		NotificationConditionsSequence:   row.NotificationConditionsSequence,
+	}
+	out.NotificationConditions = make([]api.NotificationCondition, 0, len(row.NotificationConditions))
+	for _, condition := range row.NotificationConditions {
+		out.NotificationConditions = append(out.NotificationConditions, api.NotificationCondition{
+			ConditionID: condition.ConditionID, Kind: condition.Kind, Color: condition.Color,
+			State: condition.State, Reason: condition.Reason, OriginalActionID: condition.OriginalActionID,
+			PendingAt: observedTime(condition.PendingAt), RecoveredAt: observedTime(condition.RecoveredAt), MigrationReason: condition.MigrationReason,
+		})
+	}
+	for _, reason := range row.ConfigurationWarnings {
+		if reason == "unknownRecoveryDestination" {
+			out.Warnings = append(out.Warnings, api.FieldError{Field: "spec.notifications.blue", Reason: reason, Message: api.ValidationMessage(reason)})
+		}
 	}
 	if row.ConfigurationProblem.Code != "" {
 		out.ConfigurationProblem = &api.FailureDiagnostic{Code: row.ConfigurationProblem.Code, Message: row.ConfigurationProblem.Message}
@@ -75,6 +98,46 @@ func monitorObservation(row fleetview.MonitorSummary) api.MonitorObservation {
 		}
 	}
 	return out
+}
+
+// monitorNotificationConditions performs a single bounded retained read for a
+// detail response. A changing owner leaves the compact projection explicitly
+// incomplete; it is never paired with a sample from a different incarnation.
+func (s *Server) monitorNotificationConditions(ctx context.Context, row fleetview.MonitorSummary) (fleetview.MonitorSummary, error) {
+	row.NotificationConditionsTruncated = true
+	row.NotificationConditionsObservedAt = time.Time{}
+	row.NotificationConditionsSequence = ""
+	if s.cfg.Store == nil {
+		return row, ctx.Err()
+	}
+	view, found, err := s.cfg.Store.NotificationConditionsContext(ctx, row.MonitorID)
+	if errors.Is(err, persistence.ErrNotificationObservationChanged) {
+		return row, ctx.Err()
+	}
+	if err != nil {
+		return row, errors.Join(management.ErrUnavailable, err)
+	}
+	if !found || !notificationConditionsMatchRow(view, row) {
+		return row, ctx.Err()
+	}
+	row.NotificationConditions = make([]fleetview.NotificationCondition, 0, len(view.Items))
+	for _, condition := range view.Items {
+		row.NotificationConditions = append(row.NotificationConditions, fleetview.NotificationCondition{
+			ConditionID: condition.ConditionID, Kind: condition.Kind, Color: condition.Color,
+			State: condition.State, Reason: condition.Reason, OriginalActionID: condition.OriginalActionID,
+			PendingAt: condition.PendingAt.UTC(), RecoveredAt: condition.RecoveredAt.UTC(), MigrationReason: condition.MigrationReason,
+		})
+	}
+	row.NotificationConditionsTruncated = view.Truncated
+	row.NotificationConditionsObservedAt = view.ObservedAt.UTC()
+	row.NotificationConditionsSequence = strconv.FormatUint(view.Sequence, 10)
+	return row, ctx.Err()
+}
+
+func notificationConditionsMatchRow(view persistence.NotificationConditionView, row fleetview.MonitorSummary) bool {
+	return view.IncarnationID == row.IncarnationUID && view.Revision == row.ConfigurationRevision &&
+		view.CatalogRevision == row.CatalogRevision && view.ControlRevision == row.ControlRevision &&
+		view.Generation == row.StateGeneration && view.IncidentID == row.IncidentID && view.IncidentRevision == row.IncidentRevision
 }
 
 func (s *Server) registerMonitorObservations(mux *http.ServeMux, m *managementHTTP) {
@@ -131,6 +194,10 @@ func (s *Server) registerMonitorObservations(mux *http.ServeMux, m *managementHT
 			row, ok := index.GetStable(r.PathValue("id"))
 			if !ok {
 				return managementFailure(404, "notFound", "The monitor observation was not found.")
+			}
+			row, err := s.monitorNotificationConditions(ctx, row)
+			if err != nil {
+				return err
 			}
 			result = monitorObservation(row)
 			return ctx.Err()

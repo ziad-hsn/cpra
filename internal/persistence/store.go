@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,12 +49,16 @@ type reply struct {
 var ErrCommitUnconfirmed = errors.New("durable commit outcome unknown")
 
 type Store struct {
-	installationMu        sync.Mutex
-	installationID        string
-	installationReady     bool
-	collectionGenerations *collectionGenerations
-	maintenanceContext    context.Context
-	cancelMaintenance     context.CancelFunc
+	actionCompaction            *actionCompaction
+	lastActionCompactionAttempt time.Time
+	compactedActions            uint64
+	actionAccounting            atomic.Pointer[ActionStorageAccounting]
+	installationMu              sync.Mutex
+	installationID              string
+	installationReady           bool
+	collectionGenerations       *collectionGenerations
+	maintenanceContext          context.Context
+	cancelMaintenance           context.CancelFunc
 	storeExtensions
 	administrative  bool
 	opening         bool
@@ -87,6 +92,7 @@ type Store struct {
 }
 
 type Status struct {
+	Actions            *ActionStorageAccounting     `json:"actions,omitempty"`
 	Collections        *CollectionStorageAccounting `json:"collections,omitempty"`
 	Mode               string                       `json:"mode"`
 	Ready              bool                         `json:"ready"`
@@ -166,8 +172,12 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 	// Finish the non-executing projection conversion before restore fencing
 	// mutates actions. A stopped administrator may only do this while opening
 	// a restored store; ordinary administrative reads remain non-migrating.
-	if !administrative || s.restoreMarker != nil && s.fsm.image.ActionProjectionState != nil && !s.fsm.image.ActionProjectionState.Ready {
+	if !administrative || s.restoreMarker != nil && requiresProjectionMigration(s.fsm.image) {
 		if err = s.migrateActionProjection(ctx); err != nil {
+			_ = s.Close()
+			return nil, err
+		}
+		if err = s.migrateNotificationConditions(ctx); err != nil {
 			_ = s.Close()
 			return nil, err
 		}
@@ -309,17 +319,7 @@ func (s *Store) openRaft(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("snapshot %s: %w", meta.ID, err)
 		}
-		validationDir, tempErr := os.MkdirTemp(dir, ".collection-snapshot-validation-")
-		if tempErr != nil {
-			_ = reader.Close()
-			return tempErr
-		}
-		_, ledger, decodeErr := decodeSnapshot(reader, validationDir)
-		err = decodeErr
-		if ledger != nil {
-			err = errors.Join(err, ledger.Close())
-		}
-		err = errors.Join(err, os.RemoveAll(validationDir))
+		err = validateSnapshotEnvelope(reader)
 		closeErr := reader.Close()
 		if err != nil || closeErr != nil {
 			return fmt.Errorf("snapshot %s: %w", meta.ID, errors.Join(err, closeErr))
@@ -340,7 +340,7 @@ func (s *Store) openRaft(ctx context.Context) error {
 	c.CommitTimeout = 5 * time.Millisecond
 	c.SnapshotThreshold = math.MaxUint64 // explicit periodic snapshots below
 	c.TrailingLogs = 1000
-	s.raft, err = raft.NewRaft(c, s.fsm, s.log, s.log, snaps, transport)
+	s.raft, err = raft.NewRaft(c, s.fsm, s.log, s.log, newestSnapshotStore{snaps}, transport)
 	if err != nil {
 		return fmt.Errorf("open Raft: %w", err)
 	}
@@ -673,6 +673,10 @@ func (s *Store) StatusContext(ctx context.Context) (Status, error) {
 // Administrative inspection remains available without runtime admission.
 func (s *Store) statusObserved(state controllerHealthState) Status {
 	status := Status{Mode: s.config.Storage.Mode, NodeID: s.nodeID, SingleNode: true, Ready: s.err == nil && !state.failed, CommittedIndex: state.index, CommitLatencyMS: float64(s.lastCommit) / float64(time.Millisecond), SnapshotDurationMS: float64(s.lastSnapshot) / float64(time.Millisecond)}
+	if current := s.actionAccounting.Load(); current != nil {
+		copy := *current
+		status.Actions = &copy
+	}
 	if s.collectionGenerations != nil {
 		accounting := s.collectionGenerations.accounting()
 		status.Collections = &accounting
@@ -725,6 +729,7 @@ func (s *Store) Snapshot() error {
 
 func (s *Store) maintain() {
 	defer s.background.Done()
+	defer s.stopActionCompaction()
 	ticker := time.NewTicker(s.config.Storage.SnapshotInterval)
 	defer ticker.Stop()
 	collectionTicker := time.NewTicker(time.Second)
@@ -732,10 +737,17 @@ func (s *Store) maintain() {
 	reviewTicker := time.NewTicker(50 * time.Millisecond)
 	defer reviewTicker.Stop()
 	reviewAfter := ""
+	actionAfter := ""
+	actionTicker := time.NewTicker(time.Second)
+	defer actionTicker.Stop()
 	for {
 		select {
 		case <-s.stop:
 			return
+		case <-actionTicker.C:
+			if err := s.maintainActions(time.Now().UTC(), &actionAfter); err != nil {
+				s.MarkUnavailable(err)
+			}
 		case <-reviewTicker.C:
 			if err := s.maintainReviewWork(&reviewAfter); err != nil {
 				s.MarkUnavailable(err)

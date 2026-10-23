@@ -69,7 +69,7 @@ func (f *machine) workerHeartbeatRecord(c WorkerHeartbeatCommand, at time.Time) 
 
 func (f *machine) workerHeartbeatAccepted(a WorkerAuthority, r WorkerExecutionRecord, at time.Time) bool {
 	l := r.Lifecycle
-	if l.Phase != "started" || r.Result != nil || r.Finalization != nil || l.OwnerEpoch != f.image.LocalExecutorSession ||
+	if l.Phase != "started" || r.executionExpired(at) || r.Result != nil || r.Finalization != nil || l.OwnerEpoch != f.image.LocalExecutorSession ||
 		l.Heartbeat != nil && !l.Heartbeat.Accepted || f.checkWorkerExecutionPins(r.Intent, at) != nil ||
 		f.checkWorkerAuthority(a, workerExecutionScope(r.Intent), at) != nil {
 		return false

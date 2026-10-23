@@ -161,6 +161,7 @@ def main():
     def ctl(*args, check=True):
         return run(k + ['exec', 'cpra-fixture-0', '--', '/usr/local/bin/cpractl', *args,
                         '--server', 'http://127.0.0.1:8060', '--allow-insecure-http', '--token-file', '/run/secrets/cpra/token',
+                        '--token-root=/run/secrets/cpra', '--token-reader-group=1001',
                         '--request-timeout', '2s'], check=check, timeout=10)
 
     def history():

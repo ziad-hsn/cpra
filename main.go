@@ -29,11 +29,13 @@ import (
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"github.com/ziad-hsn/cpra/internal/version"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
 type runOptions struct {
 	runtimeFile, manifest, dataDir, webAddr, webCors, webAuth, webAuthFile, pprofAddr string
+	webAuthRoot, webAuthReaderGroup, webAuthReaderSID                                 string
 	debug, pprof, web, ssrfProtect, allowEmpty, validate                              bool
 	shutdownTimeout                                                                   time.Duration
 	webStarted                                                                        func(string)
@@ -54,6 +56,9 @@ func main() {
 	flag.StringVar(&o.webCors, "web.cors", "", "Web API CORS allowlist")
 	flag.StringVar(&o.webAuth, "web.auth", "", "API bearer token (prefer -web.auth-file; defaults to CPRA_AUTH_TOKEN)")
 	flag.StringVar(&o.webAuthFile, "web.auth-file", "", "File containing API authentication token (defaults to CPRA_AUTH_TOKEN_FILE)")
+	flag.StringVar(&o.webAuthRoot, "web.auth-root", "", "Trusted token directory or projected Secret mount (defaults to CPRA_AUTH_TOKEN_ROOT or token directory)")
+	flag.StringVar(&o.webAuthReaderGroup, "web.auth-reader-group", "", "Explicit group name or GID for a root-owned Unix token (CPRA_AUTH_TOKEN_READER_GROUP)")
+	flag.StringVar(&o.webAuthReaderSID, "web.auth-reader-sid", "", "Explicit Windows service SID permitted to read the token (CPRA_AUTH_TOKEN_READER_SID)")
 	flag.BoolVar(&o.ssrfProtect, "ssrf-protect", false, "Reject HTTP targets resolving to private addresses")
 	flag.BoolVar(&o.allowEmpty, "allow-empty", false, "Allow an intentionally empty manifest")
 	flag.BoolVar(&o.validate, "validate", false, "Validate configuration and compiled drivers without opening storage or providers")
@@ -90,7 +95,9 @@ func resolveAuthEnvironment(o *runOptions, flags *flag.FlagSet, getenv func(stri
 		return // Static input validation does not use client authentication defaults.
 	}
 	var tokenSet, fileSet bool
+	selected := make(map[string]bool)
 	flags.Visit(func(f *flag.Flag) {
+		selected[f.Name] = true
 		tokenSet = tokenSet || f.Name == "web.auth"
 		fileSet = fileSet || f.Name == "web.auth-file"
 	})
@@ -99,6 +106,18 @@ func resolveAuthEnvironment(o *runOptions, flags *flag.FlagSet, getenv func(stri
 	}
 	if !fileSet {
 		o.webAuthFile = getenv("CPRA_AUTH_TOKEN_FILE")
+	}
+	for _, setting := range []struct {
+		flag, environment string
+		target            *string
+	}{
+		{"web.auth-root", "CPRA_AUTH_TOKEN_ROOT", &o.webAuthRoot},
+		{"web.auth-reader-group", "CPRA_AUTH_TOKEN_READER_GROUP", &o.webAuthReaderGroup},
+		{"web.auth-reader-sid", "CPRA_AUTH_TOKEN_READER_SID", &o.webAuthReaderSID},
+	} {
+		if !selected[setting.flag] {
+			*setting.target = getenv(setting.environment)
+		}
 	}
 }
 
@@ -167,8 +186,17 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 	if err := jobs.ValidateNotificationLogLocation(settings.Notifications.LogDirectory, protectedLogPaths...); err != nil {
 		return err
 	}
+	var inputWarnings []api.FieldError
+	warningsTruncated := false
+	captureWarning := func(warning api.FieldError) {
+		if len(inputWarnings) < 10 {
+			inputWarnings = append(inputWarnings, warning)
+		} else {
+			warningsTruncated = true
+		}
+	}
 	if !settings.Management.Enabled {
-		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil, settings.Notifications.LogDirectory != ""); err != nil {
+		if err = manifestcheck.Manifest(ctx, o.manifest, o.allowEmpty, settings.Storage.Mode == "memory" || settings.EncryptionSource() != nil, settings.Notifications.LogDirectory != "", captureWarning); err != nil {
 			return fmt.Errorf("manifest validation: %w", err)
 		}
 	}
@@ -184,6 +212,13 @@ func runCPRa(ctx context.Context, o runOptions, ready func()) (resultErr error) 
 			if validation.UnverifiedContractReferences != 0 {
 				fmt.Printf("configuration shape valid; %d stored job contract references require validation during startup or Apply\n", validation.UnverifiedContractReferences)
 			}
+			inputWarnings, warningsTruncated = validation.Warnings, validation.WarningsTruncated
+		}
+		for _, warning := range inputWarnings {
+			fmt.Printf("warning: %s: %s\n", api.SafeValidationField(warning.Field), api.ValidationMessage(warning.Reason))
+		}
+		if warningsTruncated {
+			fmt.Println("additional configuration warnings omitted; inspect individual monitor configurations")
 		}
 		fmt.Println("supplied configuration valid; not applied to an existing catalog. Provider access, persistent storage, committed authentication and stored job contracts were not tested")
 		return nil
@@ -627,25 +662,7 @@ func resolveManagementDirectory(settings *runtimeconfig.Config, override string)
 }
 
 func readLegacyWebToken(path string) ([]byte, error) {
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() {
-		return nil, errors.New("web auth source must be a regular file")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, errors.New("cannot open web auth file")
-	}
-	defer file.Close()
-	info, err = file.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		return nil, errors.New("web auth source must be a regular file")
-	}
-	data, err := io.ReadAll(io.LimitReader(file, 4097))
-	if err != nil || len(data) > 4096 {
-		clear(data)
-		return nil, errors.New("cannot read bounded web auth file")
-	}
-	return data, nil
+	return secureconfig.ReadTokenFile(context.Background(), secureconfig.TokenFileOptions{Path: path, MaxBytes: 4096})
 }
 
 func validateManagementTLS(ctx context.Context, source runtimeconfig.ManagementTLS, directory string) error {
@@ -673,6 +690,7 @@ func managementStartupOptions(settings runtimeconfig.Config, o runOptions) manag
 	options.Catalog.NotificationLogEnabled = settings.Notifications.LogDirectory != ""
 	configureCatalogOptions(&options.Catalog, settings)
 	if o.manifest != "" {
+		options.Decode.SourceName = filepath.Base(o.manifest)
 		options.OpenSource = func(ctx context.Context) (io.ReadCloser, error) {
 			if err := ctx.Err(); err != nil {
 				return nil, err

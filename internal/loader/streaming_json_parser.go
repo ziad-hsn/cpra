@@ -256,46 +256,62 @@ func (p *StreamingJsonParser) streamMonitors(ctx context.Context, batchChan chan
 			return api.InvalidField("monitors", "invalidType")
 		}
 
-		batchID := 0
-		for decoder.More() {
+		batchID, item := 0, 0
+		batch := make([]manifest.Monitor, 0, p.config.BatchSize)
+		sources := make([]MonitorSource, 0, p.config.BatchSize)
+		var batchBytes int64
+		send := func() error {
+			if len(batch) == 0 {
+				return nil
+			}
 			select {
+			case batchChan <- MonitorBatch{Monitors: batch, Sources: sources, BatchID: batchID, DecodedBytes: batchBytes, Endpoints: endpoints, NotificationGroups: groups}:
+				batch = make([]manifest.Monitor, 0, p.config.BatchSize)
+				sources = make([]MonitorSource, 0, p.config.BatchSize)
+				batchID++
+				batchBytes = 0
+				return nil
 			case <-ctx.Done():
 				return ctx.Err()
-			default:
-				batch := make([]manifest.Monitor, 0, p.config.BatchSize)
-				sources := make([]MonitorSource, 0, p.config.BatchSize)
-				for i := 0; i < p.config.BatchSize && decoder.More(); i++ {
-					var monitor manifest.Monitor
-					item := batchID*p.config.BatchSize + i + 1
-					raw, err := decodeJSONResource(decoder, &monitor, p.config.StrictUnknownFields)
-					end := decoder.InputOffset()
-					if err != nil {
-						return jsonSourceError(ctx, p.filename, item, raw, end, err)
-					}
-					if err := manifest.ValidateMonitor(&monitor); err != nil {
-						return jsonSourceError(ctx, p.filename, item, raw, end, err)
-					}
-					if err := manifest.ValidateMonitorReferences(&monitor, endpoints, groups); err != nil {
-						return jsonSourceError(ctx, p.filename, item, raw, end, err)
-					}
-					sources = append(sources, MonitorSource{Item: item, Offset: end - int64(len(raw))})
-					batch = append(batch, monitor)
-				}
-				if len(batch) > 0 {
-					select {
-					case batchChan <- MonitorBatch{
-						Monitors:           batch,
-						Sources:            sources,
-						BatchID:            batchID,
-						Endpoints:          endpoints,
-						NotificationGroups: groups,
-					}:
-					case <-ctx.Done():
-						return ctx.Err()
-					}
-					batchID++
+			}
+		}
+		for decoder.More() {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			var monitor manifest.Monitor
+			item++
+			raw, err := decodeJSONResource(decoder, &monitor, p.config.StrictUnknownFields)
+			end := decoder.InputOffset()
+			if err != nil {
+				return jsonSourceError(ctx, p.filename, item, raw, end, err)
+			}
+			if err := manifest.ValidateMonitor(&monitor); err != nil {
+				return jsonSourceError(ctx, p.filename, item, raw, end, err)
+			}
+			if err := manifest.ValidateMonitorReferences(&monitor, endpoints, groups); err != nil {
+				return jsonSourceError(ctx, p.filename, item, raw, end, err)
+			}
+			size, err := decodedMonitorBytes(monitor, p.config.MaxBatchBytes)
+			if err != nil {
+				return jsonSourceError(ctx, p.filename, item, raw, end, err)
+			}
+			if len(batch) != 0 && size > p.config.MaxBatchBytes-batchBytes {
+				if err := send(); err != nil {
+					return err
 				}
 			}
+			sources = append(sources, MonitorSource{Item: item, Offset: end - int64(len(raw))})
+			batch = append(batch, monitor)
+			batchBytes += size
+			if len(batch) == p.config.BatchSize {
+				if err := send(); err != nil {
+					return err
+				}
+			}
+		}
+		if err := send(); err != nil {
+			return err
 		}
 
 		// Read the closing bracket of the array.

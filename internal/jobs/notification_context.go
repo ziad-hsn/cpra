@@ -10,16 +10,23 @@ import (
 // notificationIdentity contains committed identifiers and event time. Retries
 // retain these values; no provider secret or resolved target is included.
 type notificationIdentity struct {
-	RecoveryFailure *RecoveryFailure    `json:"recovery_failure,omitempty"`
-	Review          *ReviewNotification `json:"review,omitempty"`
-	MonitorID       string              `json:"monitor_id,omitempty"`
-	IncarnationID   string              `json:"incarnation_id,omitempty"`
-	IncidentID      string              `json:"incident_id,omitempty"`
-	EpisodeID       string              `json:"episode_id,omitempty"`
-	ActionID        string              `json:"action_id,omitempty"`
-	DeliveryID      string              `json:"delivery_id,omitempty"`
-	EndpointID      string              `json:"endpoint_id,omitempty"`
-	At              time.Time           `json:"at,omitzero"`
+	RecoveryFailure *RecoveryFailure        `json:"recovery_failure,omitempty"`
+	Review          *ReviewNotification     `json:"review,omitempty"`
+	Resolution      *ResolutionNotification `json:"resolution,omitempty"`
+	MonitorID       string                  `json:"monitor_id,omitempty"`
+	IncarnationID   string                  `json:"incarnation_id,omitempty"`
+	IncidentID      string                  `json:"incident_id,omitempty"`
+	EpisodeID       string                  `json:"episode_id,omitempty"`
+	ActionID        string                  `json:"action_id,omitempty"`
+	DeliveryID      string                  `json:"delivery_id,omitempty"`
+	EndpointID      string                  `json:"endpoint_id,omitempty"`
+	At              time.Time               `json:"at,omitzero"`
+}
+
+type ResolutionNotification struct {
+	ConditionID string    `json:"condition_id"`
+	RecoveredAt time.Time `json:"recovered_at"`
+	Health      string    `json:"health"`
 }
 
 type ReviewNotification struct {
@@ -67,6 +74,7 @@ func bindNotificationContext(job Job, dispatch *Dispatch) {
 			target.SetNotificationIdentity(notificationIdentity{
 				RecoveryFailure: dispatch.RecoveryFailure,
 				Review:          dispatch.ReviewNotification,
+				Resolution:      dispatch.ResolutionNotification,
 				MonitorID:       dispatch.MonitorID, IncarnationID: incarnation,
 				IncidentID: dispatch.IncidentID, EpisodeID: dispatch.NotificationCorrelation,
 				ActionID: dispatch.ActionID, DeliveryID: dispatch.DeliveryID,
@@ -127,6 +135,10 @@ func bindNotificationContext(job Job, dispatch *Dispatch) {
 	for range 8 {
 		switch target := job.(type) {
 		case *CodePagerDutyJob:
+			if dispatch.ProviderKey != "" {
+				target.CorrelationKey = dispatch.ProviderKey
+				return
+			}
 			url, err := pagerDutyURL(target.URL)
 			if err == nil {
 				target.CorrelationKey = correlation("pagerduty", url, target.RoutingKey)

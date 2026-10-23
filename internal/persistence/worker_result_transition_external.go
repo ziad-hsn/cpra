@@ -16,7 +16,7 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 	}
 	previous, exists := f.image.Monitors[in.MonitorID]
 	current := exists && !previous.Removed && previous.CatalogUID == in.MonitorUID && previous.Revision == in.MonitorRevision
-	inTime := l.OwnerEpoch == f.image.LocalExecutorSession && l.Phase == "started" && at.Before(in.Deadline)
+	inTime := l.OwnerEpoch == f.image.LocalExecutorSession && l.Phase == "started" && !r.executionExpired(at)
 	if in.Category == "check" {
 		noData := !current || !inTime || input.Status == "noData" || in.Generation <= previous.Generation
 		if !current || in.Generation <= previous.Generation {
@@ -65,10 +65,14 @@ func (f *machine) workerResultTransition(r WorkerExecutionRecord, input WorkerRe
 		}
 		m := previous.Clone()
 		action.State, action.Outcome, action.FinishedAt = Unknown, "worker_outcome_unknown", at
+		if m.notificationConditionsEnabled() {
+			action.TerminationReason = "outcome_unknown"
+		}
 		m.Actions[action.ID] = action
+		m.recordNotificationCondition(action)
 		event := Event{MonitorID: m.ID, CatalogUID: action.CatalogUID, Revision: action.Revision, At: at,
 			Type: "action_unknown", IncidentID: action.IncidentID, ActionID: action.ID, Kind: action.Kind,
-			Color: action.Color, Endpoint: action.Endpoint, Outcome: action.Outcome}
+			Color: action.Color, Endpoint: action.Endpoint, Outcome: action.Outcome, Resolution: action.Resolution, TerminationReason: action.TerminationReason, DeliveryID: action.DeliveryID, NotificationEpisode: action.NotificationEpisode, EndpointID: action.EndpointID}
 		events := append([]Event{event}, m.assessReviewAlertEvents(at)...)
 		return &m, events, false, false, true
 	}

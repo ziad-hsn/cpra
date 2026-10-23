@@ -6,10 +6,12 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -69,6 +71,9 @@ func Init(l installpath.Layout, account string, port int) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+	if err = prepareConfigDirectory(l, account); err != nil {
+		return err
+	}
 	for _, dir := range []string{l.ConfigDir, l.StateDir, l.LogDir} {
 		if dir != "" {
 			if err = os.MkdirAll(dir, 0700); err != nil {
@@ -97,8 +102,8 @@ func Init(l installpath.Layout, account string, port int) error {
 		} else if e != nil && !os.IsNotExist(e) {
 			return e
 		}
-		err = writeNew(filepath.Join(l.ConfigDir, name), data, 0600)
-		if err != nil && !os.IsExist(err) {
+		err = writeInitialConfig(l, account, name, data)
+		if err != nil && !errors.Is(err, os.ErrExist) {
 			return err
 		}
 	}
@@ -158,6 +163,37 @@ func serviceArgs(l installpath.Layout) ([]string, error) {
 	return args, nil
 }
 
+func serviceTokenPolicy(l installpath.Layout, account string, args []string) ([]string, error) {
+	if l.Scope != "system" || !slices.Contains(args, "-web.auth-file") {
+		return args, nil
+	}
+	args = append(args, "-web.auth-root", l.ConfigDir)
+	if runtime.GOOS == "windows" {
+		_, sid, err := managementServiceReader(l, account)
+		if err != nil {
+			return nil, err
+		}
+		return append(args, "-web.auth-reader-sid", sid), nil
+	}
+	if account == "" {
+		account = "cpra"
+		if runtime.GOOS == "darwin" {
+			account = "_cpra"
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		group, _, err := managementServiceReader(l, account)
+		if err != nil {
+			return nil, err
+		}
+		if group == nil {
+			return nil, fmt.Errorf("native service reader group is unavailable")
+		}
+		return append(args, "-web.auth-reader-group", strconv.Itoa(*group)), nil
+	}
+	return append(args, "-web.auth-reader-group", account), nil
+}
+
 // Render returns the service definition without creating files or accounts.
 func Render(l installpath.Layout, account string) (string, error) {
 	if account == "" {
@@ -170,6 +206,10 @@ func Render(l installpath.Layout, account string) (string, error) {
 		return "", fmt.Errorf("invalid service account")
 	}
 	service, err := serviceArgs(l)
+	if err != nil {
+		return "", err
+	}
+	service, err = serviceTokenPolicy(l, account, service)
 	if err != nil {
 		return "", err
 	}

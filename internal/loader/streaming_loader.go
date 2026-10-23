@@ -16,6 +16,7 @@ type MonitorBatch struct {
 	Monitors           []manifest.Monitor
 	Sources            []MonitorSource
 	BatchID            int
+	DecodedBytes       int64 // Encoded decoded-monitor payloads retained in this batch.
 	Offset             int64
 	Endpoints          map[string]manifest.Endpoint
 	NotificationGroups manifest.NotificationGroups
@@ -28,6 +29,7 @@ type ParseConfig struct {
 	BufferSize          int
 	MaxMemory           int64
 	MaxExpandedBytes    int64 // Additional private staging budget for cross-entry YAML aliases.
+	MaxBatchBytes       int64 // Decoded monitor payloads per batch; at most 4 MiB.
 	StrictUnknownFields bool
 	JSONUseNumber       bool
 }

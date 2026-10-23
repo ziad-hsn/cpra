@@ -168,6 +168,7 @@ func (s *Server) managementState(ctx context.Context, now time.Time) (api.State,
 			observation := collectionStorageObservation(*accounting)
 			result.Storage.CollectionGenerations = &observation
 		}
+		result.Storage.Actions = actionStorageObservation(status.Actions)
 		if !status.Ready {
 			result.Ready, result.ReadinessReason = false, "Durable storage is unavailable."
 		}
@@ -181,6 +182,19 @@ func (s *Server) managementState(ctx context.Context, now time.Time) (api.State,
 	// No fleet-wide scan is justified to fill an unavailable aggregate. Actions
 	// have their separate indexed, bounded ListActions endpoint.
 	return result, nil
+}
+
+func actionStorageObservation(accounting *persistence.ActionStorageAccounting) *api.ActionStorageAccounting {
+	if accounting == nil || accounting.ObservedAt.IsZero() {
+		return nil
+	}
+	return &api.ActionStorageAccounting{ObservedAt: accounting.ObservedAt.UTC(),
+		Active: accounting.Active, OrdinaryRetained: accounting.OrdinaryRetained, Protected: accounting.Protected,
+		Tombstones: accounting.Tombstones, ActiveBytes: accounting.ActiveBytes, OrdinaryBytes: accounting.OrdinaryBytes,
+		ProtectedBytes: accounting.ProtectedBytes, TombstoneBytes: accounting.TombstoneBytes,
+		Retired: accounting.Retired, RetiredBytes: accounting.RetiredBytes,
+		CleanupBlocked: accounting.CleanupBlocked, CleanupBlockedBytes: accounting.CleanupBlockedBytes,
+		CleanupCoverage: accounting.CleanupCoverage, CompactionCondition: accounting.CompactionCondition}
 }
 
 func collectionStorageObservation(accounting persistence.CollectionStorageAccounting) api.CollectionStorageAccounting {
@@ -496,7 +510,7 @@ func (s *Server) observationPage(ctx context.Context, m *managementHTTP, query u
 		}
 		var ok bool
 		entry, ok = m.snapshots[cursor.View]
-		if !ok || entry.principal != principal || entry.generation != generation || entry.kind != "Observation/"+kind {
+		if !ok || cursorExpired(entry) || entry.principal != principal || entry.generation != generation || entry.kind != "Observation/"+kind {
 			return observationList{}, managementFailure(410, "cursorExpired", "The observation cursor expired or belongs to another access context.")
 		}
 		if limit != 0 && limit != entry.limit {
@@ -510,25 +524,20 @@ func (s *Server) observationPage(ctx context.Context, m *managementHTTP, query u
 		if limit == 0 {
 			limit = 100
 		}
-		entry = managementSnapshot{observations: rows, observationsAvailable: available, principal: principal, generation: generation, kind: "Observation/" + kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
+		entry = managementSnapshot{activity: &cursorActivity{lastUsed: now}, observations: rows, observationsAvailable: available, principal: principal, generation: generation, kind: "Observation/" + kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
 		cursor.View = uuid.NewString()
 	}
 	end := min(start+entry.limit, len(entry.observations))
 	result := observationList{Items: entry.observations[start:end], Available: entry.observationsAvailable, GeneratedAt: entry.created, Snapshot: cursor.View}
 	if end < len(entry.observations) {
 		if _, exists := m.snapshots[cursor.View]; !exists {
-			owned := 0
-			for _, saved := range m.snapshots {
-				if saved.principal == principal {
-					owned++
-				}
-			}
-			if len(m.snapshots) >= managementMaxSnapshots || owned >= managementPrincipalSnapshots {
-				return observationList{}, managementFailure(429, "snapshotQuota", "Too many snapshots are retained. Reuse an existing cursor or wait for expiry.")
+			if err := m.snapshotCountQuota(principal); err != nil {
+				return observationList{}, err
 			}
 			m.snapshots[cursor.View] = entry
 		}
 		result.NextCursor = m.encodeCursor(managementCursor{View: cursor.View, After: strconv.Itoa(end)})
 	}
+	m.recordCursorPage(entry.activity, now, result.NextCursor == "")
 	return result, nil
 }

@@ -33,6 +33,9 @@ func (s *DurableSystem) NextUpdate(now time.Time, interval time.Duration) time.D
 	if s.snoozes.Len() != 0 {
 		include(s.snoozes.entries[0].at)
 	}
+	if s.observationDeadlines != nil && s.observationDeadlines.Len() != 0 {
+		include(s.observationDeadlines.entries[0].at)
+	}
 	include(s.lastSLO.Add(s.config.SLO.EvaluationInterval))
 	return max(interval, wait)
 }

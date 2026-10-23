@@ -104,7 +104,7 @@ func TestReviewFactsCannotAdmitNotificationsAcrossExplicitRestore(t *testing.T) 
 					if a.State != Cancelled || a.Outcome != "explicit_restore" || !a.StartedAt.IsZero() {
 						t.Fatal("old assessment gained execution permission", a.State, a.Outcome)
 					}
-					if !time.Now().Before(a.Deadline) {
+					if a.ExecutionBudget == 0 && !time.Now().Before(a.Deadline) {
 						t.Fatal("fixture accidentally tested expiry instead of restore fencing")
 					}
 					found = true

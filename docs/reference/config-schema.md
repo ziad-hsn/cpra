@@ -44,7 +44,12 @@ monitors:
 
 Log destinations require a process-owned root outside configuration and state.
 Save this separate runtime file, replacing the path with an absolute directory
-that the CPRa account can write:
+owned by the CPRa account with owner-only directory access. On Unix, provision
+a writable root with mode `0700`; an ordinary `mkdir` under umask `022` creates
+`0755`, which is deliberately rejected. For example, a system administrator can
+prepare `install -d -o cpra -g cpra -m 0700 /var/log/cpra/notifications` before
+starting the service. On Windows, use the protected service-account DACL created
+by local installation tooling. CPRa does not repair an existing root's access:
 
 ~~~yaml
 notifications:
@@ -233,3 +238,14 @@ in the management resource. The
 [credential and endpoint walkthrough](../cpractl-management.md#create-contacts-destinations-and-a-monitor)
 shows the conversion without putting a secret on the command line. Validation
 checks the supplied input; it does not apply that input to an existing catalog.
+
+### Input memory and expansion limits
+
+Streaming file loading splits batches at the configured monitor-count limit or
+4 MiB of encoded decoded-monitor payloads, whichever is reached first. Buffered
+batches obey the same payload limit. This is a retained-payload bound, not a total
+process heap or RSS limit; parser syntax trees, indexes and controller state have
+separate costs and limits. YAML alias expansion reserves a conservative encoded
+byte allowance before materializing aliases and also retains node, nesting,
+resource, source and staging quotas. Near a quota, an expansion can be rejected
+before exhausting every byte of the eventual compact JSON representation.

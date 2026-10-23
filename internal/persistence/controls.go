@@ -79,6 +79,8 @@ func (c ControlCommand) validate(at time.Time) error {
 // MonitorStatus is an observation projection with no action maps, provider
 // configuration, actor notes or other large per-monitor allocations.
 type MonitorStatus struct {
+	NotificationConditions                                            []NotificationConditionObservation
+	NotificationConditionsTruncated                                   bool
 	Ignored                                                           bool
 	IgnoredAt                                                         time.Time
 	IgnoredBy, IgnoreCause, IgnoreReason                              string

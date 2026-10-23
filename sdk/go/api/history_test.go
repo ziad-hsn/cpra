@@ -23,3 +23,22 @@ func TestHistoryAuditFieldsRoundTrip(t *testing.T) {
 		t.Fatal("round trip changed event", err)
 	}
 }
+
+func TestConditionCancellationIsNotAnActionOrRecovery(t *testing.T) {
+	raw := []byte(`{"id":"event","monitorID":"monitor","kind":"notification_resolution_cancelled","time":"2026-10-23T00:00:00Z","conditionID":"condition","openingActionID":"opening","incidentID":"earlier-incident","reason":"configuration_changed"}`)
+	var event Event
+	if err := StrictDecode(raw, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.ConditionID != "condition" || event.OpeningActionID != "opening" || event.ActionID != "" || event.Resolution != nil {
+		t.Fatal("condition cancellation manufactured a closing action or recovery")
+	}
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip Event
+	if err := StrictDecode(encoded, &roundTrip); err != nil || roundTrip.ConditionID != event.ConditionID || roundTrip.OpeningActionID != event.OpeningActionID {
+		t.Fatal("condition identity lost", err)
+	}
+}

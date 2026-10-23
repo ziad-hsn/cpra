@@ -288,6 +288,8 @@
     "Measurement",
     "FailureDiagnostic",
     "AutoIgnore",
-    "FieldError"
+    "FieldError",
+    "MonitorAvailability",
+    "NotificationCondition"
   ]
 }

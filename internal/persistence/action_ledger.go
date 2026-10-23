@@ -10,6 +10,7 @@ import (
 	"errors"
 	"hash"
 	"math"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -24,16 +25,21 @@ import (
 const actionLedgerMaxFrame = maxCommitBytes
 
 var (
-	errActionLedger      = errors.New("action ledger is corrupt or incompatible")
-	actionRowsBucket     = []byte("action_versions")
-	actionCurrentBucket  = []byte("action_current")
-	actionMonitorBucket  = []byte("action_monitors")
-	actionOwnerBucket    = []byte("action_owners")
-	actionEpisodeBucket  = []byte("action_episodes")
-	actionIncidentBucket = []byte("action_incidents")
-	actionReviewBucket   = []byte("action_reviews")
-	actionCooldownBucket = []byte("action_cooldowns")
-	actionMetaBucket     = []byte("action_metadata")
+	actionTerminalBucket  = []byte("action_terminal")
+	errActionLedger       = errors.New("action ledger is corrupt or incompatible")
+	actionRowsBucket      = []byte("action_versions")
+	actionCurrentBucket   = []byte("action_current")
+	actionMonitorBucket   = []byte("action_monitors")
+	actionOwnerBucket     = []byte("action_owners")
+	actionEpisodeBucket   = []byte("action_episodes")
+	actionIncidentBucket  = []byte("action_incidents")
+	actionReviewBucket    = []byte("action_reviews")
+	actionCooldownBucket  = []byte("action_cooldowns")
+	actionMetaBucket      = []byte("action_metadata")
+	actionRelevantBucket  = []byte("action_relevant")
+	actionReleasedBucket  = []byte("action_released")
+	reviewFenceBucket     = []byte("action_review_fences")
+	reviewConditionBucket = []byte("action_review_conditions")
 )
 
 // Position is a committed command, not an observation timestamp. Sequence is
@@ -45,6 +51,7 @@ type actionLedgerPosition struct {
 }
 
 type actionLedgerRow struct {
+	Deleted   bool   `json:"deleted,omitempty"`
 	Sequence  uint64 `json:"sequence"`
 	Previous  uint64 `json:"previous,omitempty"`
 	MonitorID string `json:"monitor_id"`
@@ -89,18 +96,24 @@ func (d *actionCommandDigest) sum() string {
 // The disposable memory mode mirrors disk version selection. Raft mode keeps
 // these indexes in bbolt; no all-history Go tree or payload cache is allocated.
 type actionLedgerMemory struct {
-	progress    actionLedgerProgress
-	current     map[string][]byte
-	versions    map[string][][]byte
-	order       *btree.BTreeG[string]
-	byMonitor   *btree.BTreeG[string]
-	byCooldown  *btree.BTreeG[string]
-	reviews     map[string][]byte
-	reviewOrder *btree.BTreeG[string]
+	accounting       ActionStorageAccounting
+	byTerminal       *btree.BTreeG[string]
+	progress         actionLedgerProgress
+	current          map[string][]byte
+	versions         map[string][][]byte
+	order            *btree.BTreeG[string]
+	byMonitor        *btree.BTreeG[string]
+	byCooldown       *btree.BTreeG[string]
+	byRelevant       *btree.BTreeG[string]
+	byReleased       *btree.BTreeG[string]
+	reviewFences     *btree.BTreeG[string]
+	reviewConditions *btree.BTreeG[string]
+	reviews          map[string][]byte
+	reviewOrder      *btree.BTreeG[string]
 }
 
 func newActionLedgerMemory() *actionLedgerMemory {
-	return &actionLedgerMemory{reviews: make(map[string][]byte), reviewOrder: newReviewOrder(), byCooldown: newReviewOrder(), current: make(map[string][]byte), versions: make(map[string][][]byte),
+	return &actionLedgerMemory{byTerminal: newReviewOrder(), byRelevant: newReviewOrder(), byReleased: newReviewOrder(), reviewFences: newReviewOrder(), reviewConditions: newReviewOrder(), reviews: make(map[string][]byte), reviewOrder: newReviewOrder(), byCooldown: newReviewOrder(), current: make(map[string][]byte), versions: make(map[string][][]byte),
 		order: btree.NewG(32, func(a, b string) bool { return a < b }), byMonitor: btree.NewG(32, func(a, b string) bool { return a < b })}
 }
 
@@ -140,7 +153,7 @@ func (m *actionLedgerMemory) validate() error {
 }
 
 func actionBuckets() [][]byte {
-	return [][]byte{actionRowsBucket, actionCurrentBucket, actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionMetaBucket, actionCooldownBucket, reviewRowsBucket, reviewReadyBucket}
+	return [][]byte{actionRowsBucket, actionCurrentBucket, actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionMetaBucket, actionCooldownBucket, reviewRowsBucket, reviewReadyBucket, actionRelevantBucket, actionReleasedBucket, reviewFenceBucket, reviewConditionBucket, actionTerminalBucket}
 }
 
 func actionOwnerKey(monitorID string, a Action) string {
@@ -149,6 +162,9 @@ func actionOwnerKey(monitorID string, a Action) string {
 
 func actionRowKeys(row actionLedgerRow) map[string]string {
 	a := row.Action
+	if row.Deleted {
+		return map[string]string{string(actionMonitorBucket): row.MonitorID + "\x00" + a.ID}
+	}
 	review := "complete"
 	if a.Held() {
 		review = "held"
@@ -162,7 +178,7 @@ func actionRowKeys(row actionLedgerRow) map[string]string {
 	if episode == "" {
 		episode = a.IncidentID
 	}
-	return map[string]string{
+	keys := map[string]string{
 		string(actionCooldownBucket): rejectionIndexKey(row),
 		string(actionMonitorBucket):  row.MonitorID + "\x00" + a.ID,
 		string(actionOwnerBucket):    owner + a.ID,
@@ -170,6 +186,10 @@ func actionRowKeys(row actionLedgerRow) map[string]string {
 		string(actionIncidentBucket): owner + a.IncidentID + "\x00" + a.ID,
 		string(actionReviewBucket):   owner + review + "\x00" + a.ID,
 	}
+	if key := terminalActionKey(row); key != "" {
+		keys[string(actionTerminalBucket)] = key
+	}
+	return keys
 }
 
 func encodeActionRow(row actionLedgerRow) ([]byte, error) {
@@ -177,6 +197,9 @@ func encodeActionRow(row actionLedgerRow) ([]byte, error) {
 		(row.Action.CatalogUID != "" && !catalogIdentifier(row.Action.CatalogUID, 256)) ||
 		(row.Action.FileIncarnation != "" && !catalogIdentifier(row.Action.FileIncarnation, 256)) ||
 		(row.Action.IncidentID != "" && !catalogIdentifier(row.Action.IncidentID, 256)) {
+		return nil, errActionLedger
+	}
+	if row.Deleted && !reflect.DeepEqual(row.Action, Action{ID: row.Action.ID}) {
 		return nil, errActionLedger
 	}
 	data, err := json.Marshal(row)
@@ -386,7 +409,13 @@ func (l *collectionLedger) CommitActionState(position actionLedgerPosition, rows
 			if err := tx.Bucket(actionRowsBucket).Put(key, data); err != nil {
 				return err
 			}
+			if err := updateActionAccounting(tx, decoded, exists, row); err != nil {
+				return err
+			}
 			if err := current.Put([]byte(row.Action.ID), data); err != nil {
+				return err
+			}
+			if err := putActionRelevance(tx, decoded, exists, row); err != nil {
 				return err
 			}
 			for bucket, key := range actionRowKeys(row) {
@@ -408,6 +437,9 @@ func (l *collectionLedger) CommitActionState(position actionLedgerPosition, rows
 			if err := putReviewRecord(tx, r, data); err != nil {
 				return err
 			}
+		}
+		if err := pruneActionRelevance(tx, nil, 64); err != nil {
+			return err
 		}
 		progress, err := json.Marshal(actionLedgerProgress{Position: position, Sequence: sequence, Digest: hash, Bytes: used})
 		if err != nil {
@@ -474,6 +506,7 @@ func (l *collectionLedger) commitMemoryActions(position actionLedgerPosition, ro
 		reviewData[i] = data
 	}
 	for i, r := range reviews {
+		m.updateReviewIndexes(r)
 		m.reviews[r.Key] = reviewData[i]
 		if r.Deleted {
 			m.reviewOrder.Delete(r.Key)
@@ -484,13 +517,30 @@ func (l *collectionLedger) commitMemoryActions(position actionLedgerPosition, ro
 	for i, row := range rows {
 		if old := m.current[row.Action.ID]; old != nil {
 			prior, _ := decodeActionRow(old)
+			if err := m.accounting.adjust(prior, false); err != nil {
+				return 0, err
+			}
 			m.byCooldown.Delete(rejectionIndexKey(prior))
+			m.byTerminal.Delete(terminalActionKey(prior))
+			m.byReleased.Delete(releasedActionKey(prior))
 		}
-		m.byCooldown.ReplaceOrInsert(rejectionIndexKey(row))
+		if err := m.accounting.adjust(row, true); err != nil {
+			return 0, err
+		}
+		m.putActionRelevance(row)
+		if !row.Deleted {
+			m.byCooldown.ReplaceOrInsert(rejectionIndexKey(row))
+		}
+		if key := terminalActionKey(row); key != "" {
+			m.byTerminal.ReplaceOrInsert(key)
+		}
 		m.current[row.Action.ID] = encoded[i]
 		m.versions[row.Action.ID] = append(m.versions[row.Action.ID], encoded[i])
 		m.order.ReplaceOrInsert(row.Action.ID)
 		m.byMonitor.ReplaceOrInsert(row.MonitorID + "\x00" + row.Action.ID)
+	}
+	if err := pruneActionRelevance(nil, m, 64); err != nil {
+		return 0, err
 	}
 	m.progress = actionLedgerProgress{Position: position, Sequence: sequence, Digest: digest, Bytes: used}
 	return sequence, nil
@@ -635,7 +685,7 @@ func readActionVersionDecoded(tx *bolt.Tx, memory *actionLedgerMemory, id string
 			return actionLedgerRow{}, false, err
 		}
 		if latest.Sequence <= sequence {
-			return latest, true, nil
+			return latest, !latest.Deleted, nil
 		}
 		cursor := bucket.Cursor()
 		target := actionVersionKey(id, sequence)
@@ -657,7 +707,7 @@ func readActionVersionDecoded(tx *bolt.Tx, memory *actionLedgerMemory, id string
 			if err != nil || row.Sequence != sequence || row.Action.ID != id || successor.Previous != row.Sequence {
 				return actionLedgerRow{}, false, errActionLedger
 			}
-			return row, true, nil
+			return row, !row.Deleted, nil
 		}
 		key, value = cursor.Prev()
 		prefix := []byte(id + "\x00")
@@ -671,7 +721,7 @@ func readActionVersionDecoded(tx *bolt.Tx, memory *actionLedgerMemory, id string
 		if err != nil || binary.BigEndian.Uint64(key[len(prefix):]) != row.Sequence || row.Sequence > sequence || row.Action.ID != id || successor.Previous != row.Sequence {
 			return actionLedgerRow{}, false, errActionLedger
 		}
-		return row, true, nil
+		return row, !row.Deleted, nil
 	} else if memory != nil {
 		versions := memory.versions[id]
 		if len(versions) == 0 {
@@ -715,7 +765,7 @@ func readActionVersionDecoded(tx *bolt.Tx, memory *actionLedgerMemory, id string
 	if err != nil || row.Sequence > sequence || row.Action.ID != id {
 		return actionLedgerRow{}, false, errActionLedger
 	}
-	return row, true, nil
+	return row, !row.Deleted, nil
 }
 
 func actionMemoryVersion(versions [][]byte, sequence uint64, decode func([]byte) (actionLedgerRow, error)) (int, error) {

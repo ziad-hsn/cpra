@@ -17,6 +17,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		return applyLateResultAtFormat(previous, c, version)
 	}
 	m := previous.Clone()
+	if notificationConditionStorageFormat(version) {
+		m.captureDeliveryMigration()
+	}
 	if m.ID != "" && lifecycleStorageFormat(version) {
 		m.upgradeLifecycle()
 	}
@@ -25,6 +28,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	}
 	r := Result{Monitor: &m}
 	emit := func(kind string, a *Action) {
+		if a != nil {
+			m.recordNotificationCondition(*a)
+		}
 		e := Event{MonitorID: m.ID, CatalogUID: m.CatalogUID, FileIncarnation: m.FileIncarnation, Revision: m.Revision, At: c.At, Type: kind, IncidentID: m.notificationIncident(), Failure: m.LastFailure}
 		if kind == "monitor_configuration_problem" {
 			e.Failure = m.ConfigurationProblem
@@ -38,6 +44,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if a != nil {
 			e.ReviewNotice = a.ReviewNotice
+			e.Resolution, e.TerminationReason = a.Resolution, a.TerminationReason
 			e.Control = a.Control
 			e.Failure, e.Cause = a.Failure, a.Cause
 			e.DeliveryID, e.NotificationEpisode, e.EndpointID = a.DeliveryID, a.NotificationEpisode, a.EndpointID
@@ -55,6 +62,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	}
 	if m.ID != "" && actionStorageFormat(version) {
 		m.upgradeActions(c.At, emit)
+		if notificationConditionStorageFormat(version) {
+			m.upgradeNotificationConditions()
+		}
 	}
 	if c.Kind == "configure" {
 		enabledChanged := previous.ID != "" && !previous.Removed && previous.Policy.Enabled != c.Config.Policy.Enabled
@@ -133,7 +143,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				m.Actions, m.Sequence, m.NextCheck = actions, sequence, c.At
 				m.ManualRequests = manualRequests
 				if notifications != nil {
-					m.Notifications = &NotificationState{ReviewAlerts: notifications.ReviewAlerts}
+					m.Notifications = &NotificationState{Version: notifications.Version, ReviewAlerts: notifications.ReviewAlerts, Resolutions: notifications.Resolutions, Migrations: notifications.Migrations}
 				}
 				m.Cooldowns = make(map[string]time.Time)
 			}
@@ -171,7 +181,13 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		}
 		if actionStorageFormat(version) {
 			m.upgradeActions(c.At, emit)
+			if notificationConditionStorageFormat(version) {
+				m.upgradeNotificationConditions()
+			}
 			m.pruneNotificationState()
+			if notificationConditionStorageFormat(version) {
+				m.bindDeliveryMigration(c.At)
+			}
 		}
 		if !m.Policy.Enabled {
 			for _, id := range sortedActions(m.Actions) {
@@ -186,6 +202,8 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		if lifecycleStorageFormat(version) && enabledChanged {
 			m.queueEnabledNotice(c.At, emit)
 		}
+		cancellations := m.cancelObsoleteResolutions(c.At, emit)
+		r.Events = append(r.Events, cancellations...)
 		r.Allowed = true
 		return r
 	}
@@ -206,10 +224,15 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 			if a.State == Started {
 				a.State, a.Outcome, a.FinishedAt = Unknown, "configuration_removed_while_started", c.At
+				if m.notificationConditionsEnabled() {
+					a.TerminationReason = "outcome_unknown"
+				}
 				emit("action_unknown", &a)
 			}
 			m.Actions[id] = a
 		}
+		cancellations := m.cancelObsoleteResolutions(c.At, emit)
+		r.Events = append(r.Events, cancellations...)
 		return r
 	}
 	if c.Kind == "recover" {
@@ -221,6 +244,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			if lifecycleStorageFormat(version) && a.Kind == "intervention" && a.State == Queued && m.OwnsAction(a) {
 				if a.Deadline.IsZero() || !c.At.Before(a.Deadline) {
 					a.State, a.Outcome, a.FinishedAt = Cancelled, "intervention_deadline", c.At
+					if m.notificationConditionsEnabled() {
+						a.TerminationReason = "execution_deadline"
+					}
 					m.Actions[id] = a
 					emit("action_cancelled", &a)
 					continue
@@ -229,6 +255,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 			if a.State == Started {
 				a.State, a.Outcome, a.FinishedAt = Unknown, "interrupted_after_start", c.At
+				if m.notificationConditionsEnabled() {
+					a.TerminationReason = "outcome_unknown"
+				}
 				m.Actions[id] = a
 				emit("action_unknown", &a)
 			}
@@ -254,8 +283,14 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			if lifecycleStorageFormat(version) && a.Kind == "intervention" && a.State == Queued {
 				if a.Deadline.IsZero() || !c.At.Before(a.Deadline) {
 					a.State, a.Outcome, a.FinishedAt = Cancelled, "intervention_deadline", c.At
+					if m.notificationConditionsEnabled() {
+						a.TerminationReason = "execution_deadline"
+					}
 					m.Actions[a.ID] = a
 					emit("action_cancelled", &a)
+					if a.TerminationReason == "execution_deadline" {
+						m.queueRecoveryFailure(a, c.At, emit)
+					}
 					return r
 				}
 				if c.ActionDeadline.After(a.Deadline) {
@@ -295,7 +330,11 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 				return Result{}
 			}
 			a.State, a.StartedAt = Started, c.At
+			if a.ExecutionBudget > 0 && a.Deadline.IsZero() {
+				a.Deadline = c.At.Add(a.ExecutionBudget)
+			}
 			m.recordNotificationStart(a)
+			m.captureNotificationResolution(a)
 			m.recordReviewNoticeStart(a)
 			if m.LifecycleVersion == LifecycleFormatVersion && a.Kind == "code" &&
 				(a.Color == "yellow" || a.Color == "red" || a.Color == "cyan") {
@@ -343,6 +382,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		if actionStorageFormat(version) {
 			a.Retryable = a.State == Failed && c.Retryable
 		}
+		if m.notificationConditionsEnabled() {
+			a.TerminationReason = m.notificationTermination(a, c)
+		}
 		m.Actions[a.ID] = a
 		emit("action_"+string(a.State), &a)
 		if a.Kind == "intervention" {
@@ -375,6 +417,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 			}
 			a.State, a.Outcome, a.NotBefore = Queued, "", notificationRetryAt(c, a.Attempt-1)
 			a.Failure = FailureDiagnostic{}
+			a.TerminationReason = ""
 			a.Retryable = false
 			a.StartedAt, a.FinishedAt, a.ExecutorFinishedAt = time.Time{}, time.Time{}, time.Time{}
 			a.ExecutorKind, a.ExecutorSession = "", ""
@@ -404,6 +447,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		if changed {
 			emit("monitor_configuration_problem", nil)
 		}
+		m.refreshQueuedNotificationHealth(m.notificationHealth(), emit)
 		if !paused {
 			m.scheduleNextCheck(c)
 		}
@@ -438,6 +482,7 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 	m.Warning = c.Warning
 	if c.Outcome != "success" {
 		m.beginIncident(c.At)
+		m.assessRecoveryTermination(c.At, emit)
 		if m.NotificationVersion == DeliveryFormatVersion && !previousWarning && !previousRecovering {
 			m.setNotificationCorrelation(m.IncidentID)
 		}
@@ -526,6 +571,9 @@ func transitionAtFormat(previous Monitor, c Command, version int) Result {
 		m.queueColor("red", c.At, emit)
 	}
 	m.observeIgnoreRecovery(c, emit)
+	cancellations := m.cancelObsoleteResolutions(c.At, emit)
+	r.Events = append(r.Events, cancellations...)
+	m.assessNotificationResolutions(c.At, emit)
 	m.assessReviewAlerts(c.At, emit)
 	m.scheduleNextCheck(c)
 	return r
@@ -621,12 +669,16 @@ func (m *Monitor) recovered(at time.Time, emit func(string, *Action)) {
 }
 
 func (m *Monitor) queueColor(color string, at time.Time, emit func(string, *Action)) {
+	if color == "green" && m.notificationConditionsEnabled() {
+		m.resolveNotificationConditions(at, emit)
+		return
+	}
 	if m.Policy.NotificationTriggers[color] != "" {
 		return
 	}
 	if m.Notifications != nil && color == "red" && m.Policy.RecoveryDriver != "" {
 		if a, ok := m.latestRecovery(); ok && a.State == Failed {
-			failure := RecoveryFailure{ActionID: a.ID, Driver: m.Policy.RecoveryDriver, Attempt: a.Attempt, MaxAttempts: m.Policy.recoveryLimit(), Trigger: NotifyRecoveryFailed, FailedAt: a.FinishedAt}
+			failure := RecoveryFailure{ActionID: a.ID, Driver: m.Policy.RecoveryDriver, Attempt: a.Attempt, MaxAttempts: m.Policy.recoveryLimit(), Trigger: NotifyRecoveryFailed, FailedAt: a.FinishedAt, TerminationReason: a.TerminationReason}
 			m.queueNotification(color, at, &failure, emit)
 			return
 		}
@@ -717,7 +769,9 @@ func (m *Monitor) queueActionWithFailure(kind, color string, endpoint int, at ti
 			}
 		}
 		a.QueuedAt = at
-		if m.ActionVersion == ActionFormatVersion {
+		if m.notificationConditionsEnabled() {
+			a.ExecutionBudget = m.Policy.notificationTimeout(color, endpoint)
+		} else if m.ActionVersion == ActionFormatVersion {
 			a.Deadline = at.Add(m.Policy.notificationTimeout(color, endpoint))
 		}
 		a.NotificationCorrelation = m.NotificationCorrelation

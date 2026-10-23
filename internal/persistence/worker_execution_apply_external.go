@@ -182,7 +182,7 @@ func workerExecutionRecordCost(id string, record WorkerExecutionRecord) (int64, 
 // checkWorkerExecution reuses the committed local admission rules, but it does
 // not perform their transition. The same guards must be checked again at Start.
 func (f *machine) checkWorkerExecutionPins(in WorkerExecutionIntent, at time.Time) error {
-	if !at.Before(in.Deadline) {
+	if !in.Deadline.IsZero() && !at.Before(in.Deadline) {
 		return ErrWorkerExecutionExpired
 	}
 	if at.Before(in.Scheduled) {
@@ -252,6 +252,9 @@ func (f *machine) checkWorkerActionIdentity(in WorkerExecutionIntent) error {
 	kind := "intervention"
 	if in.Category == "notification" {
 		kind = "code"
+		if in.ExecutionBudget > 0 && (action.ExecutionBudget != in.ExecutionBudget || !action.Deadline.IsZero()) {
+			return ErrWorkerExecutionConflict
+		}
 		if action.ReviewNotice != nil && in.Notification == nil {
 			return ErrWorkerExecutionConflict
 		}
@@ -436,7 +439,7 @@ func validateWorkerExecutionImage(i image) error {
 			}
 		}
 
-		if i.Version < in.minimumFormat() || id != in.ID || in.validate() != nil || !catalogIdentifier(r.OwnerEpoch, 256) || r.CreatedAt.IsZero() || r.CreatedAt.Year() < 1 || r.CreatedAt.Year() > 9998 || r.CreatedAt.Before(in.Scheduled) || !r.CreatedAt.Before(in.Deadline) || r.CommittedIndex == 0 || r.CommittedIndex > i.Index || r.Digest != workerExecutionDigest(in) {
+		if i.Version < in.minimumFormat() || id != in.ID || in.validate() != nil || !catalogIdentifier(r.OwnerEpoch, 256) || r.CreatedAt.IsZero() || r.CreatedAt.Year() < 1 || r.CreatedAt.Year() > 9998 || r.CreatedAt.Before(in.Scheduled) || !in.Deadline.IsZero() && !r.CreatedAt.Before(in.Deadline) || r.CommittedIndex == 0 || r.CommittedIndex > i.Index || r.Digest != workerExecutionDigest(in) {
 			return ErrWorkerExecutionInvalid
 		}
 		if ticket := in.Schedule; ticket != nil {

@@ -19,14 +19,17 @@ describe('private worker inventory', () => {
       for (const source of vectors.Sources) {
         await inventory.addSource(fromHex(source.BytesHex));
         for (const item of vectors.Items.filter(item => item.Position.Source.Token === source.Token)) inventory.addItem(fromHex(item.ResourceBytesHex), item.Position.ID, item.Position.Source.Document, item.Position.Source.Item,
-          { line: 3, column: 2, fields: { 'spec.check.driver.config.url': { line: 11, column: 7 }, 'metadata.labels.password': { line: 900, column: 1 }, 'metadata.labels[123]': { line: 999, column: 1 }, PRIVATE_FIELD: { line: 99, column: 1 } } });
+          { line: 3, column: 2, fields: { 'spec.check.driver.config.url': { line: 11, column: 7 }, 'metadata.labels.password': { line: 900, column: 1 }, 'metadata.labels[123]': { line: 999, column: 1 }, PRIVATE_FIELD: { line: 99, column: 1 } } },
+          [{ field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination', message: 'PRIVATE_MESSAGE', resource: 'PRIVATE_RESOURCE' }]);
       }
-      expect((await inventory.finish()).contentDigest).toBe(vectors.InventoryHex);
+      expect(await inventory.finish()).toMatchObject({ contentDigest: vectors.InventoryHex, warningCount: vectors.Items.length });
       const item = inventory.page(0, 1)[0];
+      expect(item.warnings).toEqual([{ field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' }]);
+      expect(JSON.stringify(item)).not.toMatch(/PRIVATE_MESSAGE|PRIVATE_RESOURCE/);
       expect(validationSourcePosition(item.coordinates, 'items[0].resource.spec.check.driver.config.url')).toBe(', line 11, column 7');
       expect(JSON.stringify(item.coordinates)).not.toMatch(/password|123|PRIVATE/);
       for (const bytes of [inventory.createBody(), await inventory.preflightBody(), (await inventory.uploadBody(0)).bytes]) {
-        expect(decode(bytes)).not.toMatch(/coordinates|fields|column|PRIVATE_FIELD|labels\[123\]/);
+        expect(decode(bytes)).not.toMatch(/coordinates|fields|column|PRIVATE_FIELD|labels\[123\]|warnings|unknownRecoveryDestination|PRIVATE_MESSAGE|PRIVATE_RESOURCE/);
       }
     } finally { inventory.close(); }
   });
@@ -88,6 +91,31 @@ describe('private worker inventory', () => {
       expect(first.bytes.length).toBeLessThanOrEqual(4 << 20);
       expect(first.nextOffset).toBe(5);
       expect(last.nextOffset).toBe(6);
+    } finally { inventory.close(); }
+  });
+  it('retains local warning counts and paged details above the ephemeral preflight limit', async () => {
+    const inventory = await WorkerCollectionInventory.create(1);
+    try {
+      await inventory.addSource(new Uint8Array(5 << 20));
+      for (let i = 0; i < 6; i++) inventory.addItem(raw(`large-${i}`, 800_000), `Credential/large-${i}`, 1, i + 1);
+      const warning = [{ field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' }];
+      for (let i = 0; i < 205; i++) inventory.addItem(encode(JSON.stringify({ kind: 'Monitor', metadata: { id: `warn-${i}` }, spec: {} })), `Monitor/warn-${i}`, 2, i + 1, undefined, warning);
+      expect(await inventory.finish()).toMatchObject({ warningCount: 205, preflightAvailable: false, itemCount: 211 });
+      expect(inventory.page(0).filter(item => item.warnings?.length)).toHaveLength(94);
+      expect(inventory.page(200).filter(item => item.warnings?.length)).toHaveLength(11);
+      await expect(inventory.preflightBody()).rejects.toThrow('4 MiB');
+      expect(JSON.stringify(inventory.summary)).not.toContain('spec.notifications');
+    } finally { inventory.close(); }
+  });
+  it('rejects unknown or excessive advisory metadata without reflecting input', async () => {
+    const inventory = await WorkerCollectionInventory.create(1);
+    try {
+      await inventory.addSource(encode('source'));
+      const known = { field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' };
+      for (const warnings of [{ secret: 'PRIVATE_ADVISORY' }, [{ ...known, field: 'PRIVATE_ADVISORY' }], [{ ...known, reason: 'PRIVATE_ADVISORY' }], Array(9).fill(known)]) {
+        expect(() => inventory.addItem(raw('one'), 'Credential/one', 1, 1, undefined, warnings)).toThrow('Invalid collection input');
+      }
+      expect(inventory.itemCount).toBe(0);
     } finally { inventory.close(); }
   });
   it('detects changed owned bytes before transmission and clears them on close', async () => {

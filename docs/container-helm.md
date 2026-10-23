@@ -21,7 +21,12 @@ Set `VERSION`, `COMMIT`, and `SOURCE_DATE_EPOCH` from the approved `RELEASE.json
 
 ## Compose
 
-Copy `docker/.env.example` to a private environment file and set a released image digest, existing absolute monitor and token file paths, and a stable volume name. `CPRA_RUNTIME_FILE` optionally selects an existing runtime-settings file; otherwise Compose uses `runtime.yaml` beside the bundle. Token, manifest and runtime files must be readable by container UID/GID 1001. On Linux, a suitable installation is owner root, group 1001, mode 0640 with traversable parent directories. File-backed Compose secrets use a bind mount; Compose does not remap their ownership or apply secret `uid`, `gid`, and `mode`. Configuration containing provider credentials also needs restricted host permissions. [Compose secrets reference](https://docs.docker.com/reference/compose-file/services/#secrets).
+Copy `docker/.env.example` to a private environment file and set a released image digest, existing absolute monitor and token file paths, and a stable volume name. `CPRA_RUNTIME_FILE` optionally selects an existing runtime-settings file; otherwise Compose uses `runtime.yaml` beside the bundle. Token, manifest and runtime files must be readable by container UID/GID 1001. The default token policy requires owner UID 1001 and mode `0400` or `0600`. For an administrator-owned token, use owner root, group 1001, mode `0440` or `0640` and explicitly set `CPRA_TOKEN_READER_GROUP=1001`. The Compose environment applies that reader policy to both server startup and CLI probes, with `/run/secrets` as their trusted token root. File-backed Compose secrets use a bind mount; Compose does not remap their ownership or apply secret `uid`, `gid`, and `mode`. Configuration containing provider credentials also needs restricted host permissions. [Compose secrets reference](https://docs.docker.com/reference/compose-file/services/#secrets).
+
+CPRa checks the actual opened token file and rejects broad read permissions,
+group write, unsafe ACLs and aliases outside its trusted root. It never changes
+the supplied file's ownership or permissions. Verify the actual container-visible
+metadata on Linux and Docker Desktop; host readability alone is insufficient.
 
 ```sh
 docker compose --env-file /etc/cpra/compose.env -f docker/docker-compose.yml config --quiet
@@ -29,7 +34,7 @@ docker compose --env-file /etc/cpra/compose.env -f docker/docker-compose.yml up 
 docker compose --env-file /etc/cpra/compose.env -f docker/docker-compose.yml ps
 ```
 
-The API binds to host loopback by default. Terminate TLS at an authenticated reverse proxy if remote access is required. The filesystem is read-only except the stable `cpra-data` volume and a bounded `/tmp`. Logs use Docker's bounded local driver. Stop receives 60 seconds, allowing the application's 45-second drain budget. Docker health reports readiness; Docker does not automatically restart a container solely because it becomes unhealthy. [Compose service behavior](https://docs.docker.com/reference/compose-file/services/).
+The API binds to host loopback by default. Terminate TLS at an authenticated reverse proxy if remote access is required. The filesystem is read-only except the stable `cpra-data` and `cpra-logs` volumes and a bounded `/tmp`. Set `CPRA_LOG_VOLUME` to retain a stable notification-log volume at `/var/log/cpra`; its private log directory must be owned by UID 1001 with mode `0700`. Docker's bounded local log driver rotates standard output and standard error. It does not rotate files written by log notification endpoints; operators must manage those files separately. Stop receives 60 seconds, allowing the application's 45-second drain budget. Docker health reports readiness; Docker does not automatically restart a container solely because it becomes unhealthy. [Compose service behavior](https://docs.docker.com/reference/compose-file/services/).
 
 Stop/recreate preserves the named volume. `down --volumes` deliberately deletes it and must not be used for routine upgrades. Do not change `CPRA_DATA_VOLUME` during an upgrade. The defaults of a 1 GiB container limit and 512 MiB Go memory limit are small-installation starting points, not sizing evidence. Go's soft limit covers Go-managed memory, not all mapped storage and process RSS; measure the complete working set and raise both limits before larger fleets. Leave `GOMAXPROCS` unset for Go's container-aware default. [Go memory limit](https://go.dev/doc/gc-guide#Memory_limit), [container-aware GOMAXPROCS](https://go.dev/blog/container-aware-gomaxprocs).
 
@@ -57,6 +62,14 @@ helm test cpra --namespace monitoring
 ```
 
 The namespace must already exist. These commands describe an operator installation, not permission to use an arbitrary current context. For automation, supply the intended kubeconfig/context explicitly. The chart contains no credential values, no generated token Secret, and no inline monitor content. Helm stores release metadata in cluster Secrets, so placing credentials in values would expose them to release readers. [Helm storage backends](https://helm.sh/docs/topics/advanced/#storage-backends).
+
+Direct API-token projections use mode `0440`, root ownership and the explicit
+reader group `1001` in server arguments, probes and `helm test`. The trusted mount
+is `/run/secrets/cpra`; bounded `..data` symlinks inside that mount are supported.
+Management's copied `0600` token instead uses the owner-only policy. These token
+rules do not relax the separate wrapping-key and TLS-private-key policies. Keep
+versioned immutable Secrets and the intentional rollout procedure: projected file
+changes do not reload the server's committed authentication authority.
 
 ### Management over HTTPS
 
@@ -161,6 +174,15 @@ Ingress is disabled by default. The read-only chart mode can enable it with a ho
 The StatefulSet has exactly one replica, or zero with `maintenance=true`. There is no replica count setting, HPA, automatic rollback hook, or disruption-budget claim. The default claim requests `ReadWriteOncePod`, which needs a compatible CSI provisioner. It fences the volume to one pod. `ReadWriteOnce` is supported only with `persistence.acknowledgeReadWriteOnce=true`: it allows multiple pods on the same node and is a weaker fence. An existing claim's access mode and storage behavior must be checked by the operator; Helm does not change that claim. Never force-delete a StatefulSet pod while an old node may still be executing it. [Persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/), [force-deletion hazards](https://kubernetes.io/docs/tasks/run-application/force-delete-stateful-set-pod/).
 
 StorageClass `null` selects the cluster default by omission; `""` requests no dynamic class. Provisioner permissions must make the mounted directory usable by UID/GID 1001. The pod requests `fsGroup=1001` with `OnRootMismatch`; CSI drivers may implement volume ownership themselves. Test the selected driver, including filesystem locking and durable writes, before production use. The chart does not grant root privileges to fix ownership. Memory-only mode requires both `storage.mode=memory` and `persistence.enabled=false` and loses state when the pod is replaced.
+
+Log notifications with an omitted or empty filename write to standard output.
+For file destinations, set `notificationLog.enabled=true`. The chart creates and
+checks a private UID-1001 directory with mode `0700`; it does not recursively
+change ownership on an existing volume. `notificationLog.existingClaim` selects
+a separate log claim, never the state or manifest claim. Without that setting,
+the chart uses an ephemeral `emptyDir` bounded by `notificationLog.sizeLimit`
+(64 MiB by default). File notification logs have no automatic rotation; manage
+their retention and capacity separately from container standard-output logs.
 
 Startup and liveness use `cpractl health`; readiness uses `cpractl ready`. All read a mounted token file and make authenticated read-only API requests. Read-only chart mode explicitly permits HTTP for its loopback probes and internal Helm test Service. Managed mode uses verified HTTPS and the mounted CA for both. External clients use an HTTPS endpoint. No probe executes a monitor or acquires the state-directory lock. The startup budget is ten minutes and can be increased for a measured large-fleet load time. Monitored target outages must not fail liveness. Durable-store failure or drain makes readiness unavailable. CPU starvation can also exhaust an exec probe timeout, so size resources and probe budgets together. The Helm test Job mounts only the API token and, for HTTPS, its CA; it is never a second controller. [Kubernetes probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/).
 

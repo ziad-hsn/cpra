@@ -77,6 +77,21 @@ func (p *PreparedMonitor) NotificationTimeouts(color string) []time.Duration {
 	}
 	return budgets
 }
+
+// NotificationDrivers exposes only registered type names for configuration binding.
+func (p *PreparedMonitor) NotificationDrivers(color string) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle == nil {
+		return nil
+	}
+	flows := p.bundle.jobs.CodeFlows[color]
+	drivers := make([]string, len(flows))
+	for i, flow := range flows {
+		drivers[i] = flow.Driver
+	}
+	return drivers
+}
 func (p *PreparedMonitor) String() string   { return "PreparedMonitor{private configuration}" }
 func (p *PreparedMonitor) GoString() string { return p.String() }
 func (p *PreparedMonitor) MarshalJSON() ([]byte, error) {

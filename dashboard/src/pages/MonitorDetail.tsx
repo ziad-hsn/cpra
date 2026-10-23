@@ -6,6 +6,7 @@ import { useDashboardSession } from '../auth/SessionBoundary';
 import { useMonitor } from '../hooks/queries';
 import { MonitorStatusLabels } from '../components/MonitorStatusLabels';
 import { FailureDetails } from '../components/FailureDetails';
+import { MonitorNotificationConditions } from '../components/MonitorNotificationConditions';
 import { CodeBadge } from '../components/CodeBadge';
 import { ErrorState } from '../components/ErrorState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
@@ -82,12 +83,14 @@ export default function MonitorDetail() {
 	    {m.warning && <p role='status' style={{ color: 'var(--status-degraded)' }}>{m.warning}</p>}
         <FailureDetails diagnostic={m.last_failure} />
 		<FailureDetails diagnostic={m.configuration_problem} label="Check configuration problem" />
-		{m.configuration_problem && <p>Health and last-check time show the last target observation. Preparation will be retried at the normal check interval; recovery actions are blocked meanwhile.</p>}
+		{m.configuration_problem && <p>Current health is unknown because local preparation prevents checks. Last target observation: {m.last_observed_health ?? 'unknown'} at {formatDateTime(m.last_observed_at ?? '')}. Preparation will be retried at the normal check interval; recovery actions are blocked meanwhile.</p>}
         {m.certificate_verification_disabled && <p role='status'>TLS certificate verification disabled for this monitor.</p>}
+        {m.configuration_warnings?.includes('unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
         <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Accepted (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
         <p className='muted'>Acceptance records the provider response; it does not prove a recipient received the notification.</p>
       </div>
 
+      {(!!m.notification_conditions?.length || m.notification_conditions_truncated || !!m.notification_conditions_observed_at) && <div className="card"><MonitorNotificationConditions conditions={m.notification_conditions} truncated={m.notification_conditions_truncated} observedAt={m.notification_conditions_observed_at} sequence={m.notification_conditions_sequence} headingLevel={2} /></div>}
       {m.monitor_id && <MonitorControls key={`controls/${m.monitor_id}`} monitorID={m.monitor_id} />}
       {m.monitor_id && <MonitorActions key={`actions/${m.monitor_id}`} monitorID={m.monitor_id} />}
       {m.monitor_id && <MonitorTimeline key={m.monitor_id} monitorID={m.monitor_id} />}

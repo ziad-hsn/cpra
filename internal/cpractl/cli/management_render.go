@@ -222,17 +222,26 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 	if spec.Recovery != nil {
 		recovery = managementDisplay(spec.Recovery.Driver.Type)
 	}
-	return kv(cmd.OutOrStdout(), [][2]string{
+	if err := kv(cmd.OutOrStdout(), [][2]string{
 		{"Kind", "Monitor"}, {"Stable ID", resource.Metadata.ID}, {"Name", name}, {"UID", resource.Metadata.UID},
 		{"Resource version", resource.Metadata.ResourceVersion}, {"Configuration generation", strconv.FormatInt(resource.Metadata.Generation, 10)},
 		{"Observed generation", observed}, {"Enabled", enabled},
 		{"Check driver", spec.Check.Driver.Type}, {"Check interval", spec.Check.Interval}, {"Check timeout", spec.Check.Timeout},
-		{"Recovery driver", recovery}, {"Observed health", monitorHealth(resource.Status)}, {"Last checked", checked}, {"Latency ms", latency},
+		{"Recovery driver", recovery}, {"Current health", monitorHealth(resource.Status)}, {"Last checked", checked}, {"Latency ms", latency},
+		{"Last observed health", strOrDash(status.LastObservedHealth)}, {"Last observed at", observationTimestamp(status.LastObservedAt)},
+		{"Check availability", strOrDash(string(status.Availability.State))}, {"Availability reason", strOrDash(status.Availability.Reason)}, {"Availability observed at", observationTimestamp(status.Availability.ObservedAt)},
+		{"Maintenance", observationBool(status.Maintenance)}, {"Notifications suppressed", observationBool(status.NotificationsSuppressed)},
+		{"Configuration warnings", configurationWarnings(api.ResourceWarnings(resource))},
+		{"Notification conditions sampled at", observationTimestamp(status.NotificationConditionsObservedAt)},
+		{"Notification condition sequence (not a write revision)", notificationConditionSequence(status.NotificationConditionsSequence)},
 		{"Snoozed until", snoozed}, {"Incident", strOrDash(status.IncidentID)}, {"Control version", strOrDash(status.ControlRevision)},
 		{"Unknown actions", operationCount(status.UnknownActions)}, {"Actions needing review", operationCount(status.ActionsNeedingReview)},
 		{"Last failure", diagnosticText(status.LastFailure)},
 		{"Configuration problem", diagnosticText(status.ConfigurationProblem)},
-	})
+	}); err != nil {
+		return err
+	}
+	return writeNotificationConditions(cmd, status.NotificationConditions, status.NotificationConditionsTruncated)
 }
 
 func operationCount(value *int64) string {

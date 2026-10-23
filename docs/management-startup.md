@@ -209,11 +209,52 @@ empty source.
 
 Once the catalog is active, committed dashboard/SDK changes remain authoritative.
 Restart does not reopen or reapply the original manifest, and deleting all managed
-resources does not restore its contents. A frozen interrupted import resumes its
-original encrypted stage. An incomplete input-loading stage produces an explicit
-recovery error; replacing that stage automatically with changed input is not
-permitted. Preserve the complete stopped state directory, including any required
-`management-bootstrap` stage, when performing backup or recovery.
+resources does not restore its contents. First-import input is read once into the
+private encrypted `.management-bootstrap-loading` directory on the state volume.
+Only a fully validated, frozen inventory is published as `management-bootstrap`,
+without replacing an existing stage. An ordinary invalid input is rejected before
+admission and its newly owned loading stage is removed; correct the supplied file
+and start again. Failed writes or unverifiable cleanup retain the stage and fail
+closed.
+
+A frozen interrupted import resumes its exact original encrypted inventory,
+including a frozen temporary stage whose publication was interrupted. It never
+rereads changed source input. A loading stage left by process termination, or by
+an older first-import implementation, requires stopped inspection:
+
+```sh
+cpractl local bootstrap inspect --data-dir /var/lib/cpra \
+  --runtime-config /etc/cpra/runtime.yaml --stage temporary
+```
+
+Select `--stage published` for the older `management-bootstrap` location (the
+command default). Inspect authenticates the complete encrypted inventory with the
+original key and holds exclusive storage ownership. To abandon an unadmitted
+loading stage, use the exact `identity` from that inspection:
+
+```sh
+cpractl local bootstrap discard --data-dir /var/lib/cpra \
+  --runtime-config /etc/cpra/runtime.yaml --stage temporary \
+  --identity ID_FROM_INSPECTION --actor local/admin \
+  --reason 'Correct invalid first-import input'
+```
+
+Discard refuses frozen or admitted stages, corruption, wrong keys, concurrent
+owners, links, unexpected files and changed identities. It never removes Raft.
+It writes a protected audit intent outside state before removal, then a separate
+completion record. The default audit location is `DATA-DIR-bootstrap-audit`
+(`/var/lib/cpra-bootstrap-audit` for the data directory in this example);
+`--audit-dir` selects another protected absolute directory outside state. Missing
+completion means the discard is unconfirmed. Preserve those records separately.
+The commands start no controller, scheduler or monitor provider; an explicitly
+configured remote wrapping backend may be contacted to authenticate its key.
+Native identity/removal checks currently require Linux statx mount/birth identity,
+local APFS on macOS, or local NTFS on Windows. Unverifiable filesystems fail closed;
+native platform qualification remains separate.
+
+Preserve the complete stopped state directory, including either temporary or
+published required bootstrap stage, when performing backup or recovery. Do not
+manually delete a frozen stage or reset Raft to bypass an error.
 
 Turning management off while that store retains catalog identity, including
 tombstones or an empty activated catalog, fails startup. This prevents an old
@@ -226,7 +267,10 @@ for previous local keys, OpenBao/Vault Transit and AWS KMS.
 
 `-validate` shares collection, graph and compiled-driver validation. It uses a
 temporary encrypted stage with an ephemeral local key, without opening Raft or
-contacting the selected wrapping backend or monitor providers. Successful input
+contacting the selected wrapping backend or monitor providers. It reports at most
+ten ordered static field errors with source labels and original coordinates; a
+truncation notice does not claim to count every remaining error. Syntax, quota and
+I/O failures can stop input inspection earlier. Successful input
 validation does not prove that existing state can be decrypted, that provider
 credentials work, or that a remote wrapping service is available.
 

@@ -399,6 +399,10 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 				policy.NotificationTimeouts = make(map[string][]time.Duration)
 			}
 			policy.NotificationTimeouts[color] = update.prepared.NotificationTimeouts(color)
+			if policy.NotificationDrivers == nil {
+				policy.NotificationDrivers = make(map[string][]string)
+			}
+			policy.NotificationDrivers[color] = update.prepared.NotificationDrivers(color)
 			if budgets, ok := p.NotificationTimeouts[color]; ok {
 				policy.NotificationTimeouts[color] = slices.Clone(budgets)
 			}
@@ -513,6 +517,9 @@ func (s *DurableSystem) cancelSchedules(ent ecs.Entity, id string) {
 	s.scheduler.Cancel(ent)
 	s.actions.Cancel(ent)
 	s.snoozes.Cancel(ent)
+	if s.observationDeadlines != nil {
+		s.observationDeadlines.Cancel(ent)
+	}
 	delete(s.actionDue, ent)
 	delete(s.pending, id)
 	delete(s.pendingCheckID, id)

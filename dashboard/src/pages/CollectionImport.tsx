@@ -299,6 +299,7 @@ export default function CollectionImport() {
   }, [waiting, waitKind, operation?.id, summary, session]);
 
   const results = new Map((preflight?.items ?? resultPage).map(item => [item.id, item]));
+  const localWarnings = preview.flatMap(item => (item.warnings ?? []).map(issue => ({ item, issue })));
   const canStep = (name: CollectionRequestOperation) => operator && allowed.has(name) && !busy;
   function activationReady(original?: Operation) {
     return !uncertain && !!validation?.summary.valid && validation.supported && Date.parse(validation.summary.expiresAt) > Date.now() &&
@@ -330,6 +331,7 @@ export default function CollectionImport() {
       {busy === 'Preparing files' && <button className="btn" onClick={() => lifetime.current.controller?.abort()}>Cancel preparation</button>}
       {summary && <>
         <p>{summary.itemCount} resources from {summary.sourceCount} files; {summary.sourceBytes.toLocaleString()} source bytes.</p>
+        <p>{summary.warningCount === undefined ? 'Local configuration warning count is unavailable.' : `${summary.warningCount} local configuration ${summary.warningCount === 1 ? 'warning' : 'warnings'} in the selected resources.`} Warnings are advisory and do not invalidate the collection. Details follow the resource preview pages.</p>
         <button className="btn" disabled={!!busy} onClick={discard}>{operation ? 'Close this import' : 'Discard selection'}</button>{' '}
         <button className="btn" disabled={!canStep('PreflightCollection') || !summary.preflightAvailable || !lifetime.current.collection} onClick={() => { void previewServer(); }}>Preview on server</button>
         {!summary.preflightAvailable && <p>This collection exceeds the 4 MiB ephemeral preview limit. Whole-collection validation is available after staged upload when the server supports it.</p>}
@@ -338,6 +340,7 @@ export default function CollectionImport() {
     {(feedback || problem) && <div role="alert" tabIndex={-1} ref={feedbackRef}>{feedback && <p>{feedback}</p>}<ProblemDetails error={problem} phase={failedPhase} /></div>}
     {!!summary && <section className="card" aria-label="Collection preview">
       <h2>Source-attributed preview</h2><p>Resource contents are hidden. Create, update and unchanged outcomes appear after server validation; no resources are implicitly deleted.</p>
+      {!!localWarnings.length && <section aria-label="Local configuration warnings"><h3>Local configuration warnings</h3><p>{localWarnings.length} on resources {offset + 1}–{offset + preview.length} of {summary.itemCount}; showing {Math.min(10, localWarnings.length)}.</p><ul>{localWarnings.slice(0, 10).map(({ item, issue }) => <li key={`${item.ordinal}:${issue.reason}`}><span className="mono">{item.id}</span>: {item.sourceName}, document {item.source.document}, item {item.source.item}{validationSourcePosition(item.coordinates, issue.field)}. {validationDiagnostic(issue, item.coordinates)}</li>)}</ul>{localWarnings.length > 10 && <p>{localWarnings.length - 10} additional warnings on this page are omitted. Inspect the selected source files for their monitor configurations.</p>}</section>}
       {!!preflight?.errors?.length && <ul aria-label="Preview validation errors">{preflight.errors.slice(0, 10).map((issue, index) => {
         const ordinal = /^items\[(\d+)\]/.exec(issue.field ?? '');
         const row = ordinal ? preview[Number(ordinal[1]) - offset] : undefined;
@@ -345,6 +348,7 @@ export default function CollectionImport() {
         return <li key={index}>{location}{validationDiagnostic(issue, row?.coordinates)}</li>;
       })}</ul>}
       {(preflight?.errors?.length ?? 0) > 10 && <p>Additional validation errors omitted. Correct these resources and preview again.</p>}
+      {!!preflight?.warnings?.length && <><h3>Server preview warnings</h3><ul aria-label="Preview configuration warnings">{preflight.warnings.slice(0, 10).map((issue, index) => <li key={index}>{validationDiagnostic(issue)}</li>)}</ul>{preflight.warnings.length > 10 && <p>Additional configuration warnings omitted. Inspect individual monitor configurations for their warnings.</p>}</>}
       <table><caption>Resources {preview.length ? offset + 1 : 0}–{offset + preview.length} of {summary.itemCount}</caption><thead><tr><th scope="col">Resource</th><th scope="col">Local file</th><th scope="col">Document / item</th><th scope="col">Outcome</th><th scope="col">Observed version</th></tr></thead><tbody>{preview.map(item => <tr key={item.id}><td>{item.id}</td><td>{item.sourceName}</td><td>{item.source.document} / {item.source.item}</td><td>{results.get(item.id)?.outcome ?? 'Not evaluated'}</td><td>{results.get(item.id)?.oldVersion ?? 'Unavailable'}</td></tr>)}</tbody></table>
       <div className="row" style={{ gap: 12 }}><button className="btn" disabled={!!busy || offset === 0 || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, Math.max(0, offset - 100), signal)); }}>Previous resources</button><button className="btn" disabled={!!busy || offset + preview.length >= summary.itemCount || !lifetime.current.collection} onClick={() => { void run('Reading preview page', signal => loadPage(lifetime.current.collection!, offset + 100, signal)); }}>Next resources</button></div>
     </section>}

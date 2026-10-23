@@ -28,3 +28,5 @@ func (*managementHTTP) reserveSnapshotExtension(string, string) (snapshotExtensi
 }
 func (snapshotExtensions) retain()  {}
 func (snapshotExtensions) release() {}
+
+func (*managementHTTP) reclaimSnapshotExtension(string, string, time.Time) bool { return false }

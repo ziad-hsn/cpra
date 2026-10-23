@@ -1,14 +1,9 @@
 # Release engineering
 
-The [release gates](versions.md)
-adds the integrated management, SDK/worker, provider and performance gates and the
-decision to keep candidates private until those gates pass. Publication is now
-locked while that combined gate is unfinished. Release qualification requires
-an explicitly private repository and `publish=false`; missing visibility,
-public/internal repositories and publication requests fail before checkout or
-artifact creation. The publisher also rejects direct invocation before reading
-release payloads or running external operations. This temporary lock is not a
-completed evidence gate or proof that any release requirement passed.
+Release artifacts are built from one recorded source identity and qualified
+before publication. [Versions and availability](versions.md) distinguishes
+implemented distribution routes from tested platforms and available downloads.
+Qualification inputs and unfinished candidates remain access-controlled.
 
 CPRa contains three separately versioned Go modules: the application, `sdk/go`, and
 `sdk/go/worker`. The distribution also includes two command-line programs, six
@@ -18,7 +13,10 @@ does not establish platform support. The release workflow requires the
 corresponding native execution, installation, storage and deployment evidence
 before publishing an installable version tag.
 
-Provider account verification and comparative million-monitor performance remain separate gates. On 1 October 2026 the user removed the 24-hour endurance test from the requested work and mandatory completion checks. No 24-hour endurance result is established. Packaging tests must not be described as provider certification, a capacity result, an SLA or distributed failover evidence.
+Provider-account verification, comparative capacity measurements and packaging
+qualification establish different properties. Packaging tests alone do not
+establish provider certification, a capacity result, an SLA or distributed
+failover. No 24-hour endurance result is claimed.
 
 The selected first candidate is `v0.1.0-rc.1` for the application, SDK and worker,
 with chart version `0.1.0-rc.1`. Its application and image tag retain the leading
@@ -1080,9 +1078,9 @@ Qualification must exercise both Helm 3 and 4, including a 3-to-4 upgrade. The r
 
 Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments, and the complete Store-owned generations with their catalog, recovery progress and retained-action ledger. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
-Default builds support application storage formats **1–14, 31, 33, 35, 38, 40, 42 and 44**. The
+Default builds support application storage formats **1–14, 31, 33, 35, 38, 40, 42, 44 and 46**. The
 private `externaljobs` build additionally supports worker formats **15–30, 32,
-34, 36, 37, 39, 41, 43 and 45**. [A2A driver settings](reference/jobs-reference.md) use common format
+34, 36, 37, 39, 41, 43, 45 and 47**. [A2A driver settings](reference/jobs-reference.md) use common format
 31, recovery-failure notifications use 33, and retained agent connections use
 35. Combining those features with optional worker state requires formats 32,
 34 and 36 respectively; committed-order worker assignment uses 37. State-change
@@ -1093,7 +1091,9 @@ with optional worker state requires format 41. Episode starts, Ignore state,
 control-transition notices and TLS policy use common format 42 and combined
 worker format 43. Retained actions, review assertions and blue-notification
 assessments use the indexed ledger in common format 44 and combined worker
-format 45. See [persistence and recovery](durability.md) for migration and
+format 45. Pending notification conditions, first-start budgets, explicit older
+delivery bindings and committed action retirement use format 46, or 47 with
+worker state. See [persistence and recovery](durability.md) for migration and
 complete stopped-backup requirements. Supported historical envelopes
 retain their original notification semantics. The higher
 common formats do not make worker formats readable by default builds. The
@@ -1111,7 +1111,7 @@ CI report uploads and the dedicated live-campaign workflow likewise require expl
 
 After the complete gate exists and passes, publication must additionally require reviewed `main` and the protected `release` environment. Configure required reviewers, release/tag restrictions and the narrowly scoped `RELEASE_ADMIN_READ_TOKEN` secret used to read the repository's immutable-release setting. The ordinary job token handles contents/packages/attestations; pull-request jobs have no publication credentials. [GitHub's workflow security guidance](https://docs.github.com/en/actions/how-tos/security-for-github-actions/security-guides/security-hardening-for-github-actions) covers these boundaries.
 
-Do not manually pre-create a stable tag. It becomes installable through Go independently of whether a GitHub Release is still a draft. The currently locked publisher retains its draft/readback implementation for the later ticket-16 integration; it is not an enabled shipping procedure. That integration must put the aggregate gate before image pushes, public signing or attestation, drafts, and all tags. After authorization, verify checksums, signer identity, issuer, source commit and provenance against the frozen candidate. Immutable releases must be enabled; published bytes/tags are never overwritten. Corrections use a new version. Image aliases and the chart are promoted from the exact tested payloads. The chart version is a separate immutable version: bump `charts/cpra/Chart.yaml` before releasing any changed chart or image binding, including an application prerelease-to-final transition. Authenticated registry checks reject an unrelated existing application or chart version before creating the stable Git tag. A matching version may continue only with its original source-bound journal and complete byte readback; network or authorization uncertainty fails the gate. A partially failed publication remains a failed release operation; do not hide it by overwriting artifacts.
+Do not manually pre-create a stable tag. It becomes installable through Go independently of whether a GitHub Release is still a draft. The publisher remains locked until the aggregate qualification gate precedes image pushes, public signing or attestation, drafts and all tags. After authorization, verify checksums, signer identity, issuer, source commit and provenance against the frozen source. Immutable releases must be enabled; published bytes/tags are never overwritten. Corrections use a new version. Image aliases and the chart are promoted from the exact tested payloads. The chart version is a separate immutable version: bump `charts/cpra/Chart.yaml` before releasing any changed chart or image binding, including an application prerelease-to-final transition. Authenticated registry checks reject an unrelated existing application or chart version before creating the stable Git tag. A matching version may continue only with its original source-bound journal and complete byte readback; network or authorization uncertainty fails the gate. A partially failed publication remains a failed release operation; do not hide it by overwriting artifacts.
 
 A release includes source/native/package/Compose payloads, `RELEASE.json`, checksums, target-specific dependency inventories and SPDX SBOMs, executed evidence, signature/provenance bundles and a trusted-root snapshot. These establish different properties: inventory, integrity, builder/source provenance and observed runtime behavior.
 

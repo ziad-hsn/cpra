@@ -34,6 +34,20 @@ type yamlAnchor struct {
 // fragment line to its one-based original source line. No files are opened.
 // An error contains a safe cause and original coordinates, never source values.
 func (a *YAMLAnchors) Parse(data []byte, line func(int) int) (*yaml.Node, error) {
+	return a.parse(data, line, -1)
+}
+
+// ParseBounded reserves a conservative encoded-syntax byte budget before
+// materializing aliases. A zero budget accepts no expansion. The
+// normal per-fragment node/depth limits still apply, including internal aliases.
+func (a *YAMLAnchors) ParseBounded(data []byte, line func(int) int, maxExpandedBytes int64) (*yaml.Node, error) {
+	if maxExpandedBytes < 0 {
+		return nil, yamlLimitError(0, 0)
+	}
+	return a.parse(data, line, maxExpandedBytes)
+}
+
+func (a *YAMLAnchors) parse(data []byte, line func(int) int, maxExpandedBytes int64) (*yaml.Node, error) {
 	a.external = false
 	if line == nil {
 		line = func(n int) int { return n }
@@ -132,6 +146,12 @@ func (a *YAMLAnchors) Parse(data []byte, line func(int) int) (*yaml.Node, error)
 		return nil, err
 	}
 	expanded := root
+	if maxExpandedBytes >= 0 && yamlExpansion(root, 0) {
+		remaining := maxExpandedBytes
+		if err := reserveExpandedYAML(root, &remaining, make(map[*yaml.Node]bool), 0); err != nil {
+			return nil, err
+		}
+	}
 	if yamlExpansion(root, 0) && (!a.allowUnusedOverflow || prefix > 0) {
 		budget := yamlNodeBudget{nodes: 65536, bytes: 1 << 20, active: map[*yaml.Node]bool{}}
 		expanded, err = budget.copy(root, 0)
@@ -184,6 +204,30 @@ func (a *YAMLAnchors) Parse(data []byte, line func(int) int) (*yaml.Node, error)
 	}
 	a.nodes, a.bytes = nodes, size
 	return expanded, nil
+}
+
+// JSON escapes at most six bytes per input byte. The fixed allowance covers
+// node keys, integers and delimiters. Count alias targets each time they appear;
+// do not build their copied trees merely to discover that the spool is full.
+func reserveExpandedYAML(n *yaml.Node, remaining *int64, active map[*yaml.Node]bool, depth int) error {
+	if n == nil || depth > 64 || active[n] {
+		return yamlLimitError(0, 0)
+	}
+	active[n] = true
+	defer delete(active, n)
+	if n.Kind == yaml.AliasNode {
+		return reserveExpandedYAML(n.Alias, remaining, active, depth+1)
+	}
+	*remaining -= 512 + 6*int64(len(n.Tag)+len(n.Value))
+	if *remaining < 0 {
+		return yamlLimitError(n.Line, n.Column)
+	}
+	for _, child := range n.Content {
+		if err := reserveExpandedYAML(child, remaining, active, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseYAMLFragment(data []byte) (*yaml.Node, error) {

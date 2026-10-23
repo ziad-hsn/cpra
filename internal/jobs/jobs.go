@@ -1155,6 +1155,9 @@ type CodeLogJob struct {
 func (c *CodeLogJob) Execute() (result Result) {
 	defer func() { result.Err = SanitizeError(result.Err) }()
 	status, summary, severity := c.Status, c.Summary, c.Severity
+	if c.notification.Resolution != nil {
+		status, summary, severity = "EARLIER_INCIDENT_RECOVERED", "Earlier incident recovered; current health is recorded separately.", "info"
+	}
 	if c.Color == "blue" && c.resolvesNotification(c.Color) {
 		status, summary, severity = "RECOVERY_REVIEW_CLOSED", "Review-needed alert closed; see recorded health and action outcome.", "info"
 	}
@@ -1341,6 +1344,9 @@ func (c *CodeEmailJob) Execute() (result Result) {
 	config := c.Config
 	if config.Subject == "" {
 		config.Subject = "CPRa " + codeAlertTemplateFor(c.Color).Title + ": " + c.Monitor
+		if c.notification.Resolution != nil {
+			config.Subject = "CPRa EARLIER INCIDENT RECOVERY: " + c.Monitor
+		}
 		if c.Color == "blue" && c.resolvesNotification(c.Color) {
 			config.Subject = "CPRa RECOVERY REVIEW UPDATE: " + c.Monitor
 		}

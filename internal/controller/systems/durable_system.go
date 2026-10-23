@@ -61,6 +61,9 @@ type DurableSystem struct {
 	controlView            *persistence.ControlView
 	controlAfter           string
 	snoozes                *controlDeadlines
+	observationDeadlines   *controlDeadlines
+	warningLogWindow       time.Time
+	warningLogs            int
 	interventions          *ecs.Map1[components.InterventionConfig]
 	scheduler              *PulseScheduler
 	actions                *PulseScheduler
@@ -179,6 +182,12 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 					policy.Endpoints[color] = len(js.CodeJobs[color])
 					if policy.NotificationTimeouts == nil {
 						policy.NotificationTimeouts = make(map[string][]time.Duration)
+					}
+					if policy.NotificationDrivers == nil {
+						policy.NotificationDrivers = make(map[string][]string)
+					}
+					for _, flow := range js.CodeFlows[color] {
+						policy.NotificationDrivers[color] = append(policy.NotificationDrivers[color], flow.Driver)
 					}
 					for _, job := range js.CodeJobs[color] {
 						policy.NotificationTimeouts[color] = append(policy.NotificationTimeouts[color], jobs.NotificationBudget(job))
@@ -462,6 +471,7 @@ func (s *DurableSystem) Update(*ecs.World) {
 	if s.lastError != nil || s.pendingWrite != nil {
 		return
 	}
+	s.refreshMonitorAvailability(now)
 	if s.recovering.Load() {
 		if s.resultsBuffered() {
 			return
@@ -1135,6 +1145,10 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d.DeliveryID, d.EndpointID = a.DeliveryID, a.EndpointID
 			d.NotificationCorrelation = a.NotificationCorrelation
 			d.ProviderCorrelationVersion = a.ProviderCorrelationVersion
+			d.ProviderKey = a.ProviderKey
+			if n := a.Resolution; n != nil {
+				d.ResolutionNotification = &jobs.ResolutionNotification{ConditionID: n.ConditionID, RecoveredAt: n.RecoveredAt, Health: n.Health}
+			}
 			if n := a.ReviewNotice; n != nil {
 				d.ReviewNotification = &jobs.ReviewNotification{AlertID: n.AlertID, ActionID: n.ActionID, Phase: n.Phase, Reason: n.Reason, Health: n.Health}
 			}
@@ -1147,7 +1161,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d.FileIncarnation = a.FileIncarnation
 			if a.Kind == "code" || a.Kind == "intervention" {
 				d.Deadline = a.Deadline
-				if d.Deadline.IsZero() && a.Kind == "code" {
+				if d.Deadline.IsZero() && a.Kind == "code" && a.ExecutionBudget == 0 {
 					d.Deadline = a.QueuedAt.Add(jobs.NotificationBudget(d.Job))
 				} else if !d.Deadline.IsZero() && !now.Before(d.Deadline) {
 					// Let the start guard commit cancellation of expired queued
@@ -1156,7 +1170,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				}
 			}
 			if f := a.RecoveryFailure; f != nil {
-				d.RecoveryFailure = &jobs.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: f.Trigger, FailedAt: f.FailedAt, Outcome: "failure"}
+				d.RecoveryFailure = &jobs.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: f.Trigger, FailedAt: f.FailedAt, Outcome: "failure", TerminationReason: f.TerminationReason}
 			}
 			monitorID, revision, actionID := m.ID, a.Revision, id
 			driver := d.Driver
@@ -1204,7 +1218,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				}
 				// Always retain the reserved claim, including an uncertain start.
 				// Execute invokes this only once its provider/Before path returned.
-				execution := jobs.ActionExecution{Finish: func() error { return handle.Finish(context.Background()) }}
+				execution := jobs.ActionExecution{Deadline: handle.Deadline(), Finish: func() error { return handle.Finish(context.Background()) }}
 				if err == nil && driver == "a2a" {
 					var sequence uint64
 					execution.RecordAgentReceipt = func(ctx context.Context, receipt jobs.A2AReceipt) error {
@@ -1261,6 +1275,9 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 		// inputs. History remains authoritative when diagnostic logs are sampled.
 		fields := []interface{}{"event_type", event.Type, "monitor_id", event.MonitorID,
 			"monitor_uid", event.CatalogUID, "incident_id", event.IncidentID}
+		if event.Type == "monitor_ignored" || event.Type == "monitor_unignored" {
+			fields = append(fields, "actor", event.Actor, "observed_at", event.At.UTC().Format(time.RFC3339Nano))
+		}
 		// Use the committed record, not a possibly newer ECS display name. An
 		// old action can share its execution revision with a replacement monitor.
 		if monitor != nil && monitor.ID == event.MonitorID && monitor.Revision == event.Revision &&
@@ -1379,6 +1396,10 @@ func (s *DurableSystem) project(ent ecs.Entity, m persistence.Monitor) {
 }
 
 func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview.MonitorSummary {
+	return s.summaryAt(ent, m, time.Now().UTC())
+}
+
+func (s *DurableSystem) summaryAt(ent ecs.Entity, m persistence.Monitor, at time.Time) fleetview.MonitorSummary {
 	state, cfg := s.states.Get(ent), s.configs.Get(ent)
 	status := classifyStatus(state)
 	if !m.Policy.Enabled {
@@ -1397,12 +1418,14 @@ func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview
 	summary := fleetview.MonitorSummary{Uptime: uptime, ID: ent.ID(), MonitorID: m.ID, Name: m.Name, PulseType: cfg.Type, Status: status, Incident: m.Incident, PendingCode: state.PendingCode, ConsecutiveFailures: m.ConsecutiveFailures, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: state.NextCheckTime, ActiveCodes: colors, Target: pulseTarget(cfg), IntervalMs: cfg.Interval.Milliseconds(), LatencyMs: float64(m.LastLatency) / float64(time.Millisecond), LatencyAvailable: m.LatencyAvailable, UnknownActions: unknown, Warning: state.PulseWarning}
 	summary.ActionsNeedingReview = m.HeldActionCount()
 	summary.IncarnationUID = m.IncarnationID()
+	summary.ConfigurationRevision, summary.ControlRevision, summary.StateGeneration = m.Revision, m.ControlRevision, m.Generation
+	summary.CatalogRevision = m.CatalogRevision
 	summary.Source = "file"
 	if m.CatalogUID != "" {
 		summary.Source = "management"
 	}
 	summary.Enabled, summary.Ignored, summary.SnoozedUntil = m.Policy.Enabled, m.Ignored, m.SnoozedUntil
-	summary.IncidentID = m.IncidentID
+	summary.IncidentID, summary.IncidentRevision = m.IncidentID, m.IncidentRevision
 	summary.CertificateVerificationDisabled = cfg.CertificateVerificationDisabled
 	summary.Health, summary.Phase = "unknown", "idle"
 	if !m.LastCheck.IsZero() {
@@ -1424,6 +1447,7 @@ func (s *DurableSystem) summary(ent ecs.Entity, m persistence.Monitor) fleetview
 	summary.LastFailure = fleetview.FailureDiagnostic(m.LastFailure)
 	summary.ConfigurationProblem = fleetview.FailureDiagnostic(m.ConfigurationProblem)
 	summary.ConfigurationProblemAt = m.ConfigurationProblemAt
+	s.projectAvailability(ent, m, at, &summary)
 	counts := m.RetainedNotifications()
 	summary.PendingNotifications, summary.CompletedNotifications, summary.FailedNotifications, summary.UnknownNotifications = int(counts.Pending), int(counts.Accepted), int(counts.Failed), int(counts.Unknown)
 	s.checkAdmission(ent, &summary)

@@ -32,7 +32,7 @@ func commandWriteFormat(c Command) int {
 	}
 	switch c.Kind {
 	case "configure", "pulse", "start", "result", "late_result", "recover", "remove", "control", "action_review", "local_action_review":
-		version = joinStorageFormat(version, ActionFormatVersion)
+		version = joinStorageFormat(version, NotificationConditionFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
@@ -53,6 +53,18 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.Kind == "action_project" && c.Revision == "notifications" {
+		return joinStorageFormat(NotificationConditionFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Failure.requiresConditionFormat() {
+		return joinStorageFormat(NotificationConditionFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Kind == "action_retire" || c.ActionRetirement != nil {
+		return joinStorageFormat(NotificationConditionFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Config != nil && requiresNotificationConditions(*c.Config) {
+		return joinStorageFormat(NotificationConditionFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.Kind == "action_reconcile" || c.Kind == "action_project" {
 		return ActionFormatVersion
 	}

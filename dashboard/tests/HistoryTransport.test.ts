@@ -61,3 +61,12 @@ it.each([{ code: 'invalid\ncode', message: 'safe' }, { code: 'operation_failed',
   const { session } = await timeline({ items: [{ id: 'event-1', monitorID: 'service', time: '2026-10-12T00:00:00Z', kind: 'action_unknown', failure }] });
   await expect(loadTimeline(session, 'service')).rejects.toMatchObject({ reason: 'invalid' });
 });
+
+it('preserves condition cancellation references without manufacturing an action', async () => {
+  const { session } = await timeline({ items: [{ id: 'event-condition', monitorID: 'service', time: '2026-10-23T00:00:00Z', kind: 'notification_resolution_cancelled', conditionID: 'condition-1', openingActionID: 'opening-1', terminationReason: 'configuration_changed', providerKey: 'private-provider-key' }] });
+  const { events } = await loadTimeline(session, 'service');
+  expect(events[0]).toMatchObject({ type: 'notification_resolution_cancelled', condition_id: 'condition-1', opening_action_id: 'opening-1', terminationReason: 'configuration_changed' });
+  expect(events[0].action_id).toBeUndefined();
+  expect(events[0].resolution).toBeUndefined();
+  expect(JSON.stringify(events)).not.toContain('private-provider-key');
+});

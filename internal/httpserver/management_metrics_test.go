@@ -9,8 +9,41 @@ import (
 	"unicode/utf8"
 
 	"github.com/ziad-hsn/cpra/internal/controller"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/queue"
 )
+
+func TestMonitorMetricsSeparateAvailabilityAndSuppression(t *testing.T) {
+	s := newTestServer(t)
+	index := fleetview.NewIndex([]fleetview.MonitorSummary{
+		{ID: 1, MonitorID: "private-unavailable", Health: "unknown", Status: "unknown", Availability: fleetview.MonitorAvailability{State: "unavailable"}},
+		{ID: 2, MonitorID: "private-paused", Health: "healthy", Status: "disabled", Availability: fleetview.MonitorAvailability{State: "paused"}},
+		{ID: 3, MonitorID: "private-pending", Health: "unknown", Status: "unknown", Availability: fleetview.MonitorAvailability{State: "pending"}},
+		{ID: 4, MonitorID: "private-maintenance", Health: "unhealthy", Status: "incident", Maintenance: true, NotificationsSuppressed: true, Availability: fleetview.MonitorAvailability{State: "available"}},
+		{ID: 5, MonitorID: "private-unhealthy", Health: "unhealthy", Status: "incident", Availability: fleetview.MonitorAvailability{State: "available"}},
+	})
+	s.holder.SetIndex(index)
+	response := httptest.NewRecorder()
+	s.handleMetrics(response, httptest.NewRequest("GET", "/metrics", nil))
+	body := response.Body.String()
+	for _, sample := range []string{
+		"cpra_monitors 5", "cpra_monitors_unavailable 1", "cpra_monitors_paused 1", "cpra_monitors_pending 1",
+		"cpra_monitors_in_maintenance 1", "cpra_monitors_unhealthy_suppressed 1", "cpra_monitors_unhealthy_unsuppressed 1",
+	} {
+		if !strings.Contains(body, sample+"\n") {
+			t.Errorf("missing current availability count: %s", sample)
+		}
+	}
+	if strings.Contains(body, "private-") {
+		t.Fatal("fleet gauges exposed a monitor identity")
+	}
+	index.Remove(1)
+	response = httptest.NewRecorder()
+	s.handleMetrics(response, httptest.NewRequest("GET", "/metrics", nil))
+	if !strings.Contains(response.Body.String(), "cpra_monitors_unavailable 0\n") {
+		t.Fatal("removed unavailable monitor left a stale fleet count")
+	}
+}
 
 func TestDriverMetricsExposeBoundedCapacityAndSeconds(t *testing.T) {
 	s := newTestServer(t)

@@ -3,6 +3,7 @@
 package jobs
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mlange-42/ark/ecs"
 
 	"github.com/ziad-hsn/cpra/internal/manifest"
@@ -68,7 +70,7 @@ func newPulsePostgresJob(cfg *manifest.PulsePostgresConfig, timeout time.Duratio
 }
 
 func (p *PulsePostgresJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(postgresCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -143,3 +145,16 @@ func (p *PulsePostgresJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulsePostgresJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulsePostgresJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulsePostgresJob) IsNil() bool                { return p == nil }
+
+func postgresCheckFailure(err error) error {
+	var provider *pgconn.PgError
+	if errors.As(err, &provider) {
+		switch provider.Code {
+		case "28000", "28P01":
+			return &checkAccessError{code: "authentication_failed", cause: err}
+		case "42501":
+			return &checkAccessError{code: "authorization_failed", cause: err}
+		}
+	}
+	return err
+}

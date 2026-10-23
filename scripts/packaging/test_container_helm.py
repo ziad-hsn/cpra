@@ -201,6 +201,7 @@ class ChartContract(unittest.TestCase):
             self.assertEqual(command[command.index('--server') + 1], 'https://127.0.0.1:8060')
             self.assertEqual(command[command.index('--ca-file') + 1], '/etc/cpra/management/ca.crt')
             self.assertEqual(command[command.index('--token-file') + 1], '/etc/cpra/management/read-token')
+            self.assertFalse(any(argument.startswith('--token-reader-group') for argument in command))
             self.assertNotIn('--allow-insecure-http', command)
         services = [object for object in objects if object['kind'] == 'Service']
         self.assertTrue(all(service['spec']['ports'][0]['name'] == 'https' for service in services))
@@ -211,6 +212,8 @@ class ChartContract(unittest.TestCase):
         self.assertIn('--ca-file', args)
         self.assertNotIn('--allow-insecure-http', args)
         self.assertEqual({volume['name'] for volume in job['volumes']}, {'auth', 'ca'})
+        self.assertIn('--token-root=/run/secrets/cpra', args)
+        self.assertIn('--token-reader-group=1001', args)
         ca = next(volume for volume in job['volumes'] if volume['name'] == 'ca')['secret']
         self.assertEqual(ca['items'], [{'key': 'ca.crt', 'path': 'ca.crt'}])
 
@@ -301,9 +304,13 @@ class ChartContract(unittest.TestCase):
             command = c[field]['exec']['command']
             self.assertEqual(command[:2], ['/usr/local/bin/cpractl', subcommand])
             self.assertIn('--token-file', command)
+            self.assertIn('--token-root=/run/secrets/cpra', command)
+            self.assertIn('--token-reader-group=1001', command)
             self.assertIn('--allow-insecure-http', command)
             self.assertEqual(command[command.index('--server') + 1], 'http://127.0.0.1:8060')
             self.assertNotIn('httpGet', c[field])
+        self.assertIn('-web.auth-root=/run/secrets/cpra', c['args'])
+        self.assertIn('-web.auth-reader-group=1001', c['args'])
         self.assertEqual(spec['terminationGracePeriodSeconds'], 60)
         job = kind(render(), 'Job')['spec']['template']['spec']
         self.assertEqual(job['containers'][0]['command'], ['/usr/local/bin/cpractl'])
@@ -311,6 +318,8 @@ class ChartContract(unittest.TestCase):
         self.assertIn('--allow-insecure-http', args)
         self.assertEqual(args[args.index('--server') + 1], 'http://contract-cpra:8060')
         self.assertEqual([x['name'] for x in job['volumes']], ['auth'])
+        self.assertIn('--token-root=/run/secrets/cpra', args)
+        self.assertIn('--token-reader-group=1001', args)
         self.assertFalse(job['automountServiceAccountToken'])
 
     def test_security_and_privileges_are_opt_in(self):

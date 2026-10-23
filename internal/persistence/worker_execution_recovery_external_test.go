@@ -176,7 +176,7 @@ func TestWorkerExecutionSnapshotIsolationCorruptionAndFormat(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion) {
 			t.Fatal("command format", version, err)
 		}
 	}
@@ -295,11 +295,14 @@ func TestWorkerExecutionFrozenDigestProjection(t *testing.T) {
 		t.Fatalf("frozen v1 digest changed: %s", got)
 	}
 	live, frozen := reflect.TypeFor[WorkerExecutionIntent](), reflect.TypeFor[workerExecutionIntentDigestV1]()
-	if live.NumField() != frozen.NumField()+2 || live.Field(0).Name != "Notification" || live.Field(0).Type != reflect.TypeFor[*WorkerNotification]() || live.Field(0).Tag != `json:"notification,omitempty"` || live.Field(1).Name != "Schedule" || live.Field(1).Type != reflect.TypeFor[*WorkerScheduleTicket]() || live.Field(1).Tag != `json:"schedule,omitempty"` {
+	if live.NumField() != frozen.NumField()+3 ||
+		live.Field(0).Name != "ExecutionBudget" || live.Field(0).Type != reflect.TypeFor[time.Duration]() || live.Field(0).Tag != `json:"execution_budget,omitempty"` ||
+		live.Field(1).Name != "Notification" || live.Field(1).Type != reflect.TypeFor[*WorkerNotification]() || live.Field(1).Tag != `json:"notification,omitempty"` ||
+		live.Field(2).Name != "Schedule" || live.Field(2).Type != reflect.TypeFor[*WorkerScheduleTicket]() || live.Field(2).Tag != `json:"schedule,omitempty"` {
 		t.Fatal("new intent field requires explicit identity review")
 	}
 	for n := 0; n < frozen.NumField(); n++ {
-		a, b := live.Field(n+2), frozen.Field(n)
+		a, b := live.Field(n+3), frozen.Field(n)
 		if a.Name != b.Name || a.Type != b.Type || a.Tag != b.Tag {
 			t.Fatal("intent projection not reviewed", a.Name)
 		}
@@ -327,5 +330,37 @@ func TestWorkerExecutionFrozenDigestProjection(t *testing.T) {
 	in.Schedule = nil
 	if workerExecutionDigest(in) != expected {
 		t.Fatal("v1 identity was not preserved")
+	}
+	in.Category = "notification"
+	in.JobType.Category = "notification"
+	in.Notification = &WorkerNotification{Format: 1, Color: "red", DeliveryID: "delivery", EndpointID: "endpoint", IncidentID: "incident", CorrelationID: "correlation", At: at}
+	const expectedV3 = "61e28d06395777c8443aa08af7370b8c13afb9af6d480a54ecc1b59573a9a32a"
+	if got := workerExecutionDigest(in); got != expectedV3 {
+		t.Fatal("frozen v3 notification digest changed", got)
+	}
+	before := in.Clone()
+	in.ExecutionBudget = 45 * time.Second
+	in.Deadline = time.Time{}
+	in.Notification.Format = 2
+	in.Notification.Color = "green"
+	in.Notification.Resolution = &ResolutionNotice{ConditionID: "condition", RecoveredAt: at, Health: "unhealthy"}
+	const expectedV4 = "ee009a615b791cb6ee5a7597910e3ddec2ca0479a5f4790e40b17d6dbd31d627"
+	if got := workerExecutionDigest(in); got != expectedV4 || got != workerExecutionDigest(in.Clone()) {
+		t.Fatal("frozen v4 budget/resolution digest changed", got)
+	}
+	for _, change := range []func(*WorkerExecutionIntent){
+		func(i *WorkerExecutionIntent) { i.ExecutionBudget++ },
+		func(i *WorkerExecutionIntent) { i.Notification.Resolution.ConditionID = "other-condition" },
+		func(i *WorkerExecutionIntent) { i.Notification.Resolution.RecoveredAt = at.Add(time.Second) },
+		func(i *WorkerExecutionIntent) { i.Notification.Resolution.Health = "healthy" },
+	} {
+		changed := in.Clone()
+		change(&changed)
+		if workerExecutionDigest(changed) == expectedV4 {
+			t.Fatal("new execution semantics omitted from v4 identity")
+		}
+	}
+	if workerExecutionDigest(before) != expectedV3 {
+		t.Fatal("v4 mutation changed the old notification identity")
 	}
 }

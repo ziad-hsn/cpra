@@ -158,10 +158,18 @@ For a Linux system service, use an administrator terminal:
 ```sh
 sudo cpractl local service install --scope system --binary /absolute/path/to/cpra
 sudo systemctl enable --now cpra.service
-sudo cpractl --server http://127.0.0.1:8060 --allow-insecure-http --token-file /etc/cpra/auth.token ready
+sudo cpractl --server http://127.0.0.1:8060 --allow-insecure-http --token-file /etc/cpra/auth.token --token-root /etc/cpra --token-reader-group cpra ready
 ```
 
 The local installer uses `/usr/local/lib/cpra/cpra`; DEB/RPM use `/usr/bin/cpra`.
+
+System observation services explicitly select their administrator-owned token's
+reader group on Unix and the per-service SID on Windows. Linux uses `cpra` or
+the selected account's matching group; macOS uses the selected account's actual
+numeric primary group ID. User tokens use the current-user owner-only policy.
+For manual CLI/probe access, select the same policy using `--token-reader-group`
+or `--token-reader-sid` and `--token-root`. The reader checks native permissions
+without repairing caller-owned files. See the [CLI reference](reference/cli.md).
 The system account `cpra` has no interactive login. Executables, configuration,
 and service definitions are administrator-managed; the service account can
 read configuration and write state. Local tooling records its ownership in
@@ -174,8 +182,15 @@ User services use `~/.local/lib/cpra/cpra` and the XDG systemd user unit directo
 systemctl --user enable --now cpra.service
 ```
 
-Linux initialization and stopped service installation/update repair the modes of
-managed objects while preserving their contents. User configuration, state, log,
+Linux and macOS initialization and stopped service installation/update repair the modes of
+managed non-credential objects while preserving their contents. Existing API
+token files are inspected before that repair: unsafe ownership, permissions,
+ACLs or parent directories cause refusal without changing the token. They are
+never made trusted by changing their mode or owner. Configuration must remain
+separate from writable state and log directories. Supply a separately protected
+replacement through stopped administration; initialization does not rotate a
+token already committed in Raft. Newly generated tokens receive their final
+owner and reader permissions before publication. User configuration, state, log,
 and executable directories use `0700`; starter configuration and token files use
 `0600`, the executable uses `0700`, and the user unit uses `0600`. System state
 belongs to the service account with `0700` directories and `0600` files.
@@ -226,6 +241,14 @@ from writable state. `--account` supports an existing account that does not need
 an installer-supplied password; password-bearing accounts require separate SCM
 administration. User mode supports foreground execution, not an SCM user service.
 Use `Start-Service CPRa` and `Stop-Service CPRa` for deliberate control.
+New system configuration directories and starter files receive an Administrators
+owner and protected ACLs when created. The installer derives the service SID
+before registration, so the candidate can validate its protected token before
+the service exists. Existing token ownership and ACLs are checked without
+changing them. An incompatible existing token or configuration-directory owner
+requires explicit stopped administration; initialization does not take ownership
+of supplied credentials. Native Windows service execution remains a separate
+qualification gate.
 Sigstore verification does not imply Windows Authenticode or Apple notarization.
 
 ## Readiness, shutdown and privileges
@@ -375,8 +398,8 @@ Reinstalling an older package or using Helm rollback does not reverse committed
 state or external interventions. Native crash/restart tests establish the
 tested OS/filesystem boundary; they do not claim universal power-loss durability.
 
-New monitor configuration, check and action transitions use delivery format 40;
-combining this state with optional external-worker state uses format 41. The
+Current monitor configuration, check and action transitions use storage format
+46; combining this state with optional external-worker state uses format 47. The
 recorded format determines replay behavior: supported earlier commands retain
 their original transition semantics. The reader must support both the stored
 format and any optional worker state. An older executable must reject a state
@@ -391,8 +414,8 @@ The release workflow distinguishes native execution from cross compilation and
 emulation. A platform is release-qualified only after its native artifact and
 service lifecycle gates pass. Refer to the candidate's evidence for OS versions,
 architectures, filesystems and tool versions. Production provider accounts and
-comparative performance remain separate evidence gates. The 24-hour endurance
-test is outside the requested work and is not a mandatory completion gate.
+comparative performance remain separate evidence gates. A native installation
+or service-lifecycle result does not establish endurance or fleet capacity.
 
 The separate two-version storage fixture uses different server and CLI
 executables, real committed logs, snapshots and stopped backups. It verifies

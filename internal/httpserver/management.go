@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/httpauth"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/management"
@@ -29,7 +30,17 @@ const (
 	managementPrincipalSnapshots = 16
 	managementMaxPageBytes       = 8 << 20
 	managementMaxMutations       = 8
+	managementCursorIdle         = 30 * time.Second
 )
+
+// cursorActivity is shared by detached readers and the retained view. All
+// fields are protected by managementHTTP.mu; the view itself is immutable.
+type cursorActivity struct {
+	readers   int
+	lastUsed  time.Time
+	completed bool
+	expired   bool
+}
 
 type managementResourceRoute struct{ kind, plural, path string }
 
@@ -43,6 +54,7 @@ var managementResourceRoutes = []managementResourceRoute{
 
 type managementSnapshot struct {
 	snapshotExtensions
+	activity              *cursorActivity
 	execution             collectionExecutionReadView
 	executionOperation    api.Operation
 	validation            collectionValidationReadView
@@ -80,9 +92,11 @@ type managementHTTP struct {
 	mu                    sync.Mutex
 	snapshots             map[string]managementSnapshot
 	actionCloses          []*management.ActionView // Released after the cursor mutex is unlocked.
+	extensionCloses       []snapshotExtensions
 	cursorKey             [32]byte
 	cursorReady           bool
 	now                   func() time.Time
+	logInfo               func(string, ...interface{})
 }
 
 type managementHTTPError struct {
@@ -98,6 +112,9 @@ func managementFailure(status int, code, detail string) error {
 func (s *Server) registerManagement(mux *http.ServeMux) {
 	s.managementOnce.Do(func() {
 		m := &managementHTTP{ready: s.mutationReady, admit: s.withMutationAdmission, mutations: make(chan struct{}, managementMaxMutations), validationReads: make(chan struct{}, 8), operationReads: make(chan struct{}, 8), snapshotReads: make(chan struct{}, 8), operationReservations: make(map[string]int64), catalog: s.cfg.Management, auth: s.cfg.ManagementAuth, snapshots: make(map[string]managementSnapshot), now: time.Now}
+		if controller.SystemLogger != nil {
+			m.logInfo = controller.SystemLogger.Info
+		}
 		_, err := rand.Read(m.cursorKey[:])
 		m.cursorReady = err == nil
 		m.observations = management.NewObservations(s.cfg.Store)

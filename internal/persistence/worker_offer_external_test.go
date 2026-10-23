@@ -25,10 +25,10 @@ func workerOfferFixture(t *testing.T, category string) (*Store, WorkerAuthority,
 	return s, a, request, in, p
 }
 
-func workerPollFixture(t *testing.T, category string) (*Store, WorkerAuthority, WorkerPollRequest, WorkerExecutionIntent, WorkerPrincipal) {
+func workerPollFixture(t *testing.T, category string, formats ...int) (*Store, WorkerAuthority, WorkerPollRequest, WorkerExecutionIntent, WorkerPrincipal) {
 	t.Helper()
 	s := openWorkerMemory(t)
-	in, job := workerExecutionFixture(t, s, category)
+	in, job := workerExecutionFixture(t, s, category, formats...)
 	s.administrative = true
 	p := workerPrincipal("assigned-worker")
 	p.Grants = []WorkerGrant{{JobTypeID: job.Current.Record.Key.ID, JobTypeUID: job.Current.Record.UID, Version: job.Current.Version, Category: category, ResourceKind: in.Source.Kind, ResourceIDs: []string{in.Source.ID}}}

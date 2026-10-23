@@ -6,7 +6,7 @@ export function StatusChip({ status, label: override }: { status: MonitorStatus;
   return (
     <span className={`status-chip ${status}`}>
       <span className="status-dot" aria-hidden="true" />
-      {label}
+      <span className="badge-label">{label}</span>
     </span>
   );
 }

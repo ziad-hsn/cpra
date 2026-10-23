@@ -186,6 +186,8 @@ func (s *frozenSnapshot) persistCollections(sink raft.SnapshotSink) error {
 	magic := collectionSnapshotMagic
 	if external := externalSnapshotMagic(s.image.Version); external != "" {
 		magic = external
+	} else if s.image.Version == NotificationConditionFormatVersion {
+		magic = notificationConditionSnapshotMagic
 	} else if s.image.Version == ActionFormatVersion {
 		magic = actionSnapshotMagic
 	} else if s.image.Version == LifecycleFormatVersion {
@@ -287,6 +289,8 @@ func decodeSnapshot(reader io.Reader, directory string) (_ image, ledger *collec
 	switch {
 	case version != 0:
 		magicLength = externalLength
+	case bytes.HasPrefix(prefix, []byte(notificationConditionSnapshotMagic)):
+		version, magicLength = NotificationConditionFormatVersion, len(notificationConditionSnapshotMagic)
 	case bytes.HasPrefix(prefix, []byte(actionSnapshotMagic)):
 		version, magicLength = ActionFormatVersion, len(actionSnapshotMagic)
 	case bytes.HasPrefix(prefix, []byte(lifecycleSnapshotMagic)):

@@ -249,7 +249,7 @@ func TestWorkerStatusSnapshotQuotaAndActiveReaderLifetime(t *testing.T) {
 	clock.Add(int64(2 * managementCursorTTL))
 	m.mu.Lock()
 	m.pruneSnapshots(m.now(), "", 0)
-	m.mu.Unlock()
+	m.unlockSnapshots()
 	if len(m.snapshots) != 0 || m.workerSnapshotCount.Load() != maxWorkerSnapshots {
 		t.Fatal("expiry released in-flight reader reservations")
 	}

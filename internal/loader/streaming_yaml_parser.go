@@ -92,12 +92,12 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		if metadata.Len() == metadataOffset {
 			return nil
 		}
-		root, err := anchors.Parse(metadata.Bytes()[metadataOffset:], func(n int) int {
+		root, err := anchors.ParseBounded(metadata.Bytes()[metadataOffset:], func(n int) int {
 			if n > 0 && n+metadataLineOffset <= len(metadataLines) {
 				return metadataLines[n+metadataLineOffset-1]
 			}
 			return 0
-		})
+		}, max(0, p.config.MaxExpandedBytes-spoolBytes-16))
 		if err != nil {
 			return syntaxError(err, 0)
 		}
@@ -135,7 +135,7 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 			return err
 		}
 		syntaxItem++
-		root, err := anchors.Parse(entryBuffer.Bytes(), func(n int) int { return n + entryLine - 1 })
+		root, err := anchors.ParseBounded(entryBuffer.Bytes(), func(n int) int { return n + entryLine - 1 }, max(0, p.config.MaxExpandedBytes-spoolBytes-16))
 		if err != nil {
 			return syntaxError(err, syntaxItem)
 		}
@@ -298,16 +298,18 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 	entryIndex := 0
 	batch := make([]manifest.Monitor, 0, p.config.BatchSize)
 	batchID := 0
+	var batchBytes int64
 	sources := make([]MonitorSource, 0, p.config.BatchSize)
 	send := func() error {
 		if len(batch) == 0 {
 			return nil
 		}
 		select {
-		case out <- MonitorBatch{Monitors: batch, Sources: sources, BatchID: batchID, Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}:
+		case out <- MonitorBatch{Monitors: batch, Sources: sources, BatchID: batchID, DecodedBytes: batchBytes, Endpoints: meta.Endpoints, NotificationGroups: meta.Groups}:
 			batch = make([]manifest.Monitor, 0, p.config.BatchSize)
 			sources = make([]MonitorSource, 0, p.config.BatchSize)
 			batchID++
+			batchBytes = 0
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -365,9 +367,19 @@ func (p *StreamingYamlParser) parseFile(ctx context.Context, out chan<- MonitorB
 		if err := manifest.ValidateMonitorReferences(&monitors[0], meta.Endpoints, meta.Groups); err != nil {
 			return yamlSourceError(ctx, p.filename, entryIndex, monitorNode.Content[0].Content[0], err)
 		}
+		payloadBytes, err := decodedMonitorBytes(monitors[0], p.config.MaxBatchBytes)
+		if err != nil {
+			return yamlSourceError(ctx, p.filename, entryIndex, monitorNode.Content[0].Content[0], err)
+		}
+		if len(batch) != 0 && payloadBytes > p.config.MaxBatchBytes-batchBytes {
+			if err := send(); err != nil {
+				return err
+			}
+		}
 		point := monitorNode.Content[0].Content[0]
 		sources = append(sources, MonitorSource{Item: entryIndex, Line: point.Line, Column: point.Column, Offset: -1})
 		batch = append(batch, monitors[0])
+		batchBytes += payloadBytes
 		if len(batch) >= p.config.BatchSize {
 			if err := send(); err != nil {
 				return err

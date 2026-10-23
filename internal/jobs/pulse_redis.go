@@ -4,8 +4,10 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,7 +54,7 @@ func newPulseRedisJob(cfg *manifest.PulseRedisConfig, timeout time.Duration, ent
 }
 
 func (p *PulseRedisJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(redisCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -117,3 +119,20 @@ func (p *PulseRedisJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseRedisJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseRedisJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseRedisJob) IsNil() bool                { return p == nil }
+
+func redisCheckFailure(err error) error {
+	var provider redis.Error
+	if !errors.As(err, &provider) {
+		return err
+	}
+	// RESP defines the first token as its protocol error code. Never inspect
+	// ordinary error strings or infer identity failures from message substrings.
+	code, _, _ := strings.Cut(provider.Error(), " ")
+	switch code {
+	case "NOAUTH", "WRONGPASS":
+		return &checkAccessError{code: "authentication_failed", cause: err}
+	case "NOPERM":
+		return &checkAccessError{code: "authorization_failed", cause: err}
+	}
+	return err
+}

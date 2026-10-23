@@ -36,7 +36,9 @@ func workerAssignmentIdentity(in persistence.WorkerExecutionIntent) (string, err
 		in.Category, in.ActionID, in.Generation, in.Source, in.SourceUID, in.SourceRevision,
 		in.JobType, in.Guard, in.Scheduled, in.Deadline}
 	h := sha256.New()
-	if in.Notification != nil {
+	if in.ExecutionBudget > 0 || in.Notification != nil && in.Notification.Format == 2 {
+		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v4\x00"))
+	} else if in.Notification != nil {
 		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v3\x00"))
 	} else if in.Schedule == nil {
 		_, _ = h.Write([]byte("cpra/worker/assignment-identity/v1\x00"))
@@ -48,6 +50,11 @@ func workerAssignmentIdentity(in persistence.WorkerExecutionIntent) (string, err
 	}
 	if in.Notification != nil {
 		if err := json.NewEncoder(h).Encode(in.Notification); err != nil {
+			return "", persistence.ErrWorkerExecutionInvalid
+		}
+	}
+	if in.ExecutionBudget > 0 || in.Notification != nil && in.Notification.Format == 2 {
+		if err := json.NewEncoder(h).Encode(in.ExecutionBudget); err != nil {
 			return "", persistence.ErrWorkerExecutionInvalid
 		}
 	}
@@ -80,7 +87,7 @@ func (c *Catalog) PrepareWorkerExecution(ctx context.Context, intent persistence
 	}
 	if intent.Payload.Format != 0 || intent.Payload.KeyID != "" || len(intent.Payload.WrappedKey)+len(intent.Payload.Nonce)+len(intent.Payload.Ciphertext) != 0 ||
 		intent.JobType.Validate() != nil || intent.Category != intent.JobType.Category || len(intent.Guard.Conditions) < 1 || len(intent.Guard.Conditions) > 10000 ||
-		intent.Scheduled.IsZero() || intent.Scheduled.Year() < 1 || !intent.Deadline.After(intent.Scheduled) || intent.Deadline.Sub(intent.Scheduled) > 24*time.Hour {
+		!intent.ValidTiming() {
 		return fail(persistence.ErrWorkerExecutionInvalid)
 	}
 	for _, id := range []string{intent.ID, intent.Revision, intent.MonitorID, intent.MonitorUID, intent.MonitorRevision, intent.ControlRevision, intent.Source.ID, intent.SourceUID, intent.SourceRevision} {
@@ -152,7 +159,7 @@ func (c *Catalog) PrepareWorkerExecution(ctx context.Context, intent persistence
 	if err != nil {
 		return fail(err)
 	}
-	if contract.timeout > 0 && intent.Deadline.Sub(intent.Scheduled) > contract.timeout {
+	if contract.timeout > 0 && intent.ExecutionBudgetDuration() > contract.timeout {
 		return fail(persistence.ErrWorkerExecutionInvalid)
 	}
 	identity, err := workerAssignmentIdentity(intent)

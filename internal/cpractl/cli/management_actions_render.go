@@ -40,6 +40,13 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 		rows := [][2]string{{"Action", managementDisplay(a.ID)}, {"Monitor", managementDisplay(a.MonitorID)}, {"Monitor UID", managementDisplay(a.IncarnationUID)}, {"Incident", managementDisplay(a.IncidentID)}, {"Kind", managementDisplay(a.Kind)}, {"Provider state", managementDisplay(a.State)}, {"Provider outcome", managementDisplay(a.Outcome)}, {"Held", strconv.FormatBool(a.Held)}, {"Executor fenced", strconv.FormatBool(a.ExecutorFenced)}, {"Review revision", managementDisplay(a.ReviewRevision)}, {"Execution ID", managementDisplay(a.ExecutionID)}, {"Execution revision", managementDisplay(a.ExecutionRevision)}, {"Created at", optionalManagementTime(a.CreatedAt)}, {"Updated at", optionalManagementTime(a.UpdatedAt)}}
 		rows = append(rows, [2]string{"Failure", diagnosticText(a.Failure)}, [2]string{"Notification cause", diagnosticText(a.Cause)})
 		rows = append(rows, [2]string{"Notification color", managementDisplay(a.Color)}, [2]string{"Delivery", managementDisplay(a.DeliveryID)}, [2]string{"Destination", managementDisplay(a.EndpointID)}, [2]string{"Notification episode", managementDisplay(a.NotificationEpisode)}, [2]string{"Queued at", optionalManagementTime(a.QueuedAt)}, [2]string{"Not before", optionalManagementTime(a.NotBefore)}, [2]string{"Deadline", optionalManagementTime(a.Deadline)}, [2]string{"Started at", optionalManagementTime(a.StartedAt)}, [2]string{"Finished at", optionalManagementTime(a.FinishedAt)})
+		rows = append(rows, [2]string{"Execution budget", managementDisplay(a.ExecutionBudget)}, [2]string{"Termination reason", managementDisplay(a.TerminationReason)})
+		if a.ExecutionBudget != "" && a.Deadline == nil && a.State == "queued" {
+			rows = append(rows, [2]string{"Execution timing", "waiting for first committed start; execution budget has not begun"})
+		}
+		if n := a.Resolution; n != nil {
+			rows = append(rows, [2]string{"Resolution condition", managementDisplay(n.ConditionID)}, [2]string{"Earlier recovery", managementObservedTime(n.RecoveredAt)}, [2]string{"Health at notice", managementDisplay(string(n.Health))})
+		}
 		if n := a.ReviewNotice; n != nil {
 			purpose := "Recovery outcome unknown - operator review required"
 			if n.Phase == "close" {
@@ -58,7 +65,7 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 			rows = append(rows, [2]string{"Operator assertion", "not reviewed"})
 		}
 		if f := a.RecoveryFailure; f != nil {
-			rows = append(rows, [2]string{"Failed recovery action", managementDisplay(f.ActionID)}, [2]string{"Failed recovery driver", managementDisplay(f.Driver)}, [2]string{"Recovery attempt", fmt.Sprintf("%d of %d", f.Attempt, f.MaxAttempts)}, [2]string{"Notification trigger", managementDisplay(string(f.Trigger))}, [2]string{"Recovery failed at", managementObservedTime(f.FailedAt)})
+			rows = append(rows, [2]string{"Failed recovery action", managementDisplay(f.ActionID)}, [2]string{"Failed recovery driver", managementDisplay(f.Driver)}, [2]string{"Recovery attempt", fmt.Sprintf("%d of %d", f.Attempt, f.MaxAttempts)}, [2]string{"Notification trigger", managementDisplay(string(f.Trigger))}, [2]string{"Recovery failed at", managementObservedTime(f.FailedAt)}, [2]string{"Recovery termination", managementDisplay(f.TerminationReason)})
 		}
 		if r := a.AgentReceipt; r != nil {
 			rows = append(rows, [2]string{"Agent receipt sequence", managementDisplay(r.Sequence)}, [2]string{"Agent observed at", managementObservedTime(r.ObservedAt)})
@@ -84,7 +91,7 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 	}
 	headers := []string{"ACTION", "MONITOR", "KIND", "PROVIDER STATE", "HELD", "OPERATOR ASSERTION", "REVIEW REVISION"}
 	if o.output == formatWide {
-		headers = append(headers, "PROVIDER OUTCOME", "EXECUTOR FENCED", "CREATED AT", "FAILURE")
+		headers = append(headers, "PROVIDER OUTCOME", "EXECUTOR FENCED", "CREATED AT", "FAILURE", "TERMINATION")
 	}
 	rows := make([][]string, 0, len(actions))
 	for _, a := range actions {
@@ -94,7 +101,7 @@ func writeManagementActions(cmd *cobra.Command, o *options, data []byte, describ
 		}
 		row := []string{managementDisplay(a.ID), managementDisplay(a.MonitorID), managementDisplay(a.Kind), managementDisplay(a.State), strconv.FormatBool(a.Held), managementDisplay(assertion), managementDisplay(a.ReviewRevision)}
 		if o.output == formatWide {
-			row = append(row, managementDisplay(a.Outcome), strconv.FormatBool(a.ExecutorFenced), optionalManagementTime(a.CreatedAt), diagnosticText(a.Failure))
+			row = append(row, managementDisplay(a.Outcome), strconv.FormatBool(a.ExecutorFenced), optionalManagementTime(a.CreatedAt), diagnosticText(a.Failure), managementDisplay(a.TerminationReason))
 		}
 		rows = append(rows, row)
 	}

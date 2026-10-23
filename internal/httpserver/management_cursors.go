@@ -115,7 +115,12 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 	if err := m.lockSnapshots(ctx); err != nil {
 		return nil, err
 	}
-	defer m.unlockSnapshots()
+	locked := true
+	defer func() {
+		if locked {
+			m.unlockSnapshots()
+		}
+	}()
 	if !m.cursorReady {
 		return nil, management.ErrUnavailable
 	}
@@ -128,7 +133,7 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 			return nil, err
 		}
 		entry, ok := m.snapshots[cursor.View]
-		if !ok || entry.principal != principal || entry.generation != generation || entry.kind != kind {
+		if !ok || cursorExpired(entry) || entry.principal != principal || entry.generation != generation || entry.kind != kind {
 			return nil, managementFailure(410, "cursorExpired", "The cursor expired or belongs to another access context.")
 		}
 		if (limit != 0 && limit != entry.limit) || query.Get("monitorID") != entry.monitorID {
@@ -146,24 +151,40 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 			read.entry.actions, read.entry.actionOwner = view, &view
 		}
 		read.entry.snapshotExtensions.retain()
+		read.entry.activity = m.retainCursorRead(cursor.View, entry, now)
 		return read, nil
-	}
-	if err := m.snapshotCountQuota(principal); err != nil {
-		return nil, err
 	}
 	if limit == 0 {
 		limit = 100
 	}
 	read.fresh = true
 	read.cursor.View = uuid.NewString()
-	read.entry = managementSnapshot{monitorID: query.Get("monitorID"), principal: principal, generation: generation, kind: kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
-	extension, err := m.reserveSnapshotExtension(kind, principal)
-	if err != nil {
-		return nil, err
+	read.entry = managementSnapshot{activity: &cursorActivity{readers: 1, lastUsed: now}, monitorID: query.Get("monitorID"), principal: principal, generation: generation, kind: kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
+	for attempts := 0; ; attempts++ {
+		extension, err := m.reserveSnapshotExtension(kind, principal)
+		if err == nil {
+			read.entry.snapshotExtensions = extension
+			break
+		}
+		if attempts >= managementMaxSnapshots || len(m.extensionCloses) == 0 && !m.reclaimSnapshotExtension(kind, principal, m.now().UTC()) {
+			return nil, err
+		}
+		// A retired view releases its storage/byte charge outside the mutex.
+		// Reacquire before rechecking accounting; another admitted reader may
+		// have reserved the freed capacity while the lock was released.
+		m.unlockSnapshots()
+		locked = false
+		if err := m.lockSnapshots(ctx); err != nil {
+			return nil, err
+		}
+		locked = true
+		if !m.cursorReady {
+			return nil, management.ErrUnavailable
+		}
+		m.pruneSnapshots(m.now().UTC(), principal, generation)
 	}
-	read.entry.snapshotExtensions = extension
-	// Reserve before capture so concurrent requests cannot exceed the quota.
-	m.snapshots[read.cursor.View] = read.entry
+	// Capture is bounded by the read semaphore and extension byte reservations.
+	// Retained cursor count is charged only if the response needs another page.
 	return read, nil
 }
 
@@ -179,12 +200,17 @@ func (m *managementHTTP) publishSnapshotRead(ctx context.Context, read *snapshot
 	if !now.Before(read.entry.expires) {
 		return managementFailure(410, "cursorExpired", "The cursor expired. Start a new query.")
 	}
-	entry, ok := m.snapshots[read.cursor.View]
-	if !ok || entry.principal != read.entry.principal || entry.generation != read.entry.generation {
-		return managementFailure(410, "cursorExpired", "The cursor expired. Start a new query.")
+	if !read.fresh {
+		entry, ok := m.snapshots[read.cursor.View]
+		if !ok || cursorExpired(entry) || entry.principal != read.entry.principal || entry.generation != read.entry.generation {
+			return managementFailure(410, "cursorExpired", "The cursor expired. Start a new query.")
+		}
 	}
 	if read.after != "" {
 		if read.fresh {
+			if err := m.snapshotCountQuota(read.entry.principal); err != nil {
+				return err
+			}
 			published := read.entry
 			if published.actionOwner != nil {
 				view, err := published.actionOwner.Retain()
@@ -197,7 +223,8 @@ func (m *managementHTTP) publishSnapshotRead(ctx context.Context, read *snapshot
 		}
 		read.published = true
 	}
-	// Existing terminal pages retain their immutable view for retry until TTL.
+	m.recordCursorPage(read.entry.activity, now, read.after == "")
+	// Completed views support page retry until pressure reclamation or TTL.
 	return nil
 }
 
@@ -205,6 +232,7 @@ func (m *managementHTTP) releaseSnapshotRead(read *snapshotRead) {
 	if read == nil {
 		return
 	}
+	defer m.releaseCursorRead(read.cursor.View, read.entry.activity)
 	defer read.entry.snapshotExtensions.release()
 	if read.entry.actionOwner != nil {
 		defer read.entry.actionOwner.Close()
@@ -212,13 +240,9 @@ func (m *managementHTTP) releaseSnapshotRead(read *snapshotRead) {
 	if !read.fresh || read.published {
 		return
 	}
-	m.mu.Lock()
-	if entry, ok := m.snapshots[read.cursor.View]; ok {
-		entry.snapshotExtensions.release()
-		m.queueActionClose(entry)
-	}
-	delete(m.snapshots, read.cursor.View)
-	m.unlockSnapshots()
+	// A fresh extension reserves one reference for the request and one for a
+	// possible retained cursor. No cursor was published, so release both.
+	read.entry.snapshotExtensions.release()
 }
 
 func boundSnapshotPage[T any](items []T, after string, id func(T) string) ([]T, string, error) {
@@ -263,9 +287,12 @@ func (m *managementHTTP) pruneSnapshots(now time.Time, principal string, generat
 	for key, entry := range m.snapshots {
 		// An older in-flight request must never delete a newer generation's cursor.
 		if !now.Before(entry.expires) || entry.principal == principal && entry.generation < generation {
-			entry.snapshotExtensions.release()
-			m.queueActionClose(entry)
-			delete(m.snapshots, key)
+			if entry.activity != nil {
+				entry.activity.expired = true
+			}
+			if entry.activity == nil || entry.activity.readers == 0 {
+				m.retireSnapshot(key, entry)
+			}
 		}
 	}
 }
@@ -280,8 +307,13 @@ func (m *managementHTTP) queueActionClose(entry managementSnapshot) {
 // cursor lock, including on expiry without any subsequent HTTP traffic.
 func (m *managementHTTP) unlockSnapshots() {
 	closing := m.actionCloses
+	extensions := m.extensionCloses
 	m.actionCloses = nil
+	m.extensionCloses = nil
 	m.mu.Unlock()
+	for _, extension := range extensions {
+		extension.release()
+	}
 	for _, view := range closing {
 		_ = view.Close()
 	}
@@ -299,22 +331,102 @@ func (m *managementHTTP) closeSnapshots() {
 	}
 	m.mu.Lock()
 	for key, entry := range m.snapshots {
-		entry.snapshotExtensions.release()
-		m.queueActionClose(entry)
-		delete(m.snapshots, key)
+		if entry.activity != nil {
+			entry.activity.expired = true
+		}
+		if entry.activity == nil || entry.activity.readers == 0 {
+			m.retireSnapshot(key, entry)
+		}
 	}
 	m.unlockSnapshots()
 }
 
 func (m *managementHTTP) snapshotCountQuota(principal string) error {
-	owned := 0
-	for _, entry := range m.snapshots {
-		if entry.principal == principal {
-			owned++
+	for {
+		owned := 0
+		for _, entry := range m.snapshots {
+			if entry.principal == principal {
+				owned++
+			}
+		}
+		if len(m.snapshots) < managementMaxSnapshots && owned < managementPrincipalSnapshots {
+			return nil
+		}
+		owner := ""
+		if owned >= managementPrincipalSnapshots {
+			owner = principal
+		}
+		if !m.reclaimSnapshot(owner, m.now().UTC()) {
+			return managementFailure(429, "snapshotQuota", "Cursor capacity is busy. Finish an active query or retry after inactive cursors can be reclaimed.")
 		}
 	}
-	if len(m.snapshots) >= managementMaxSnapshots || owned >= managementPrincipalSnapshots {
-		return managementFailure(429, "snapshotQuota", "Too many cursors are retained. Reuse an existing cursor or wait for expiry.")
+}
+
+func cursorExpired(entry managementSnapshot) bool {
+	return entry.activity != nil && entry.activity.expired
+}
+
+func (m *managementHTTP) retainCursorRead(id string, entry managementSnapshot, now time.Time) *cursorActivity {
+	if entry.activity == nil {
+		entry.activity = &cursorActivity{}
+		m.snapshots[id] = entry
 	}
-	return nil
+	entry.activity.readers++
+	entry.activity.lastUsed = now
+	return entry.activity
+}
+
+func (m *managementHTTP) recordCursorPage(activity *cursorActivity, now time.Time, terminal bool) {
+	if activity != nil {
+		activity.lastUsed = now
+		activity.completed = activity.completed || terminal
+	}
+}
+
+func (m *managementHTTP) releaseCursorRead(id string, activity *cursorActivity) {
+	if activity == nil {
+		return
+	}
+	m.mu.Lock()
+	activity.readers--
+	if entry, ok := m.snapshots[id]; ok && entry.activity == activity && activity.readers == 0 && activity.expired {
+		m.retireSnapshot(id, entry)
+	}
+	m.unlockSnapshots()
+}
+
+func (m *managementHTTP) retireSnapshot(id string, entry managementSnapshot) {
+	m.extensionCloses = append(m.extensionCloses, entry.snapshotExtensions)
+	m.queueActionClose(entry)
+	delete(m.snapshots, id)
+}
+
+// Capacity reclamation prefers completed views, then views idle for 30 seconds.
+// It never interrupts an admitted reader, extends the original TTL or closes a
+// storage pin while metadata is locked. Evicted cursor tokens return 410.
+func (m *managementHTTP) reclaimSnapshot(principal string, now time.Time) bool {
+	return m.reclaimSnapshotMatching(principal, now, nil)
+}
+
+func (m *managementHTTP) reclaimSnapshotMatching(principal string, now time.Time, eligible func(managementSnapshot) bool) bool {
+	var selected string
+	var oldest time.Time
+	completed := false
+	for id, entry := range m.snapshots {
+		a := entry.activity
+		if principal != "" && entry.principal != principal || a == nil || a.readers != 0 || now.Before(a.lastUsed) || eligible != nil && !eligible(entry) {
+			continue
+		}
+		if !a.completed && now.Sub(a.lastUsed) < managementCursorIdle {
+			continue
+		}
+		if selected == "" || a.completed && !completed || a.completed == completed && (a.lastUsed.Before(oldest) || a.lastUsed.Equal(oldest) && id < selected) {
+			selected, oldest, completed = id, a.lastUsed, a.completed
+		}
+	}
+	if selected == "" {
+		return false
+	}
+	m.retireSnapshot(selected, m.snapshots[selected])
+	return true
 }

@@ -52,9 +52,9 @@
     },
     {
       "asset": "reference/source/internal/httpserver/types.go.txt",
-      "bytes": 4701,
+      "bytes": 5146,
       "path": "internal/httpserver/types.go",
-      "sha256": "ef8945fe39876235b9b9b51e1708380fa945131f4324e84bd078468fc082a37f"
+      "sha256": "ccf4947549850efa594cd394a094f8a9521bbe48a4561857ef11e82d3bcfa164"
     },
     {
       "asset": "reference/source/internal/manifest/groups.go.txt",

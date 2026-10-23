@@ -63,6 +63,9 @@ type StageOptions struct {
 	MaxEncodedBytes uint64
 	Validation      CatalogOptions
 	Catalog         *Catalog
+	// inspectOnly authenticates an existing stage without changing its recorded
+	// validation profile or limits. Only stopped inspection uses this mode.
+	inspectOnly bool
 }
 
 // StageInfo contains no source paths, provider parameters or secret digests.
@@ -260,8 +263,9 @@ func openStage(ctx context.Context, o StageOptions, sealer *secureconfig.Sealer,
 			defer clear(plain)
 			var info StageInfo
 			if api.StrictDecode(plain, &info) != nil || info.Format != StageFormatVersion || info.StoreID != o.StoreID || info.StageID != o.StageID ||
-				info.ValidationProfile != profile || info.CatalogValidation != (o.Catalog != nil) ||
-				info.MaxResources != o.MaxResources || info.MaxEncodedBytes != o.MaxEncodedBytes || info.Count > info.MaxResources ||
+				(!o.inspectOnly && (info.ValidationProfile != profile || info.CatalogValidation != (o.Catalog != nil) ||
+					info.MaxResources != o.MaxResources || info.MaxEncodedBytes != o.MaxEncodedBytes)) ||
+				info.MaxResources == 0 || info.MaxResources > 10_000_000 || info.MaxEncodedBytes < stageMetadataBudget || info.MaxEncodedBytes > 1<<40 || info.Count > info.MaxResources ||
 				info.EncodedBytes < stageMetadataBudget || info.EncodedBytes > info.MaxEncodedBytes || (info.Phase != "loading" && info.Phase != "frozen") {
 				return ErrStageUnavailable
 			}
@@ -398,7 +402,10 @@ func (s *Stage) Add(ctx context.Context, input api.Resource) error {
 	}
 	defer clear(raw)
 	resource, err := api.DecodeResource(raw)
-	if err != nil || !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) || validateMetadata(resource.Metadata) != nil ||
+	if err != nil {
+		return stageValidationError(err)
+	}
+	if !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) || validateMetadata(resource.Metadata) != nil ||
 		resource.Metadata.UID != "" || resource.Metadata.ResourceVersion != "" || resource.Metadata.Generation != 0 || len(resource.Status) != 0 {
 		return ErrValidation
 	}
@@ -408,7 +415,7 @@ func (s *Stage) Add(ctx context.Context, input api.Resource) error {
 		}
 	}
 	if err := s.options.validateDesired(&resource); err != nil {
-		return ErrValidation
+		return stageValidationError(err)
 	}
 	key := persistence.CatalogKey{Kind: resource.Kind, ID: resource.Metadata.ID}
 	encodedKey := stageKey(key)
@@ -691,14 +698,20 @@ func (s *Stage) validateClosure(ctx context.Context, tx *bolt.Tx, root []byte) e
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if validateMetadata(r.Metadata) != nil || s.options.validateDesired(&r) != nil {
-			return ErrValidation
+		if err := validateMetadata(r.Metadata); err != nil {
+			return stageValidationError(err)
+		}
+		if err := s.options.validateDesired(&r); err != nil {
+			return stageValidationError(err)
 		}
 		switch r.Kind {
 		case "Monitor":
 			var spec api.MonitorSpec
-			if api.StrictDecode(r.Spec, &spec) != nil || ValidateMonitorSettings(spec) != nil {
-				return ErrValidation
+			if err := api.StrictDecode(r.Spec, &spec); err != nil {
+				return stageValidationError(err)
+			}
+			if err := ValidateMonitorSettings(spec); err != nil {
+				return stageValidationError(err)
 			}
 			monitors = append(monitors, api.Monitor{APIVersion: r.APIVersion, Kind: r.Kind, Metadata: r.Metadata, Spec: spec})
 		case "NotificationEndpoint":
@@ -729,10 +742,19 @@ func (s *Stage) validateClosure(ctx context.Context, tx *bolt.Tx, root []byte) e
 			return ErrValidation
 		}
 	}
-	if ValidateNotificationGraph(notifications, monitors) != nil {
-		return ErrValidation
+	if err := ValidateNotificationGraph(notifications, monitors); err != nil {
+		return stageValidationError(err)
 	}
 	return nil
+}
+
+// Preserve only reviewed static rules. Provider, filesystem and decoder values
+// never become bootstrap diagnostics through an arbitrary wrapped cause.
+func stageValidationError(err error) error {
+	if field, ok := api.ValidationFieldError(err); ok {
+		return errors.Join(ErrValidation, api.InvalidField(field.Field, field.Reason))
+	}
+	return ErrValidation
 }
 
 type stageCursor struct {

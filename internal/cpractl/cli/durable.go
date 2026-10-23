@@ -79,6 +79,25 @@ func writeState(p *printer, s api.State) error {
 				[2]string{"Known collection file allocation (bytes)", observedCountPointer(generations.Available, generations.KnownAllocatedBytes)},
 				[2]string{"Oldest collection file sample", optionalManagementTime(oldest)})
 		}
+		if actions := s.Storage.Actions; actions != nil {
+			rows = append(rows, [2]string{"Action accounting sample", managementObservedTime(actions.ObservedAt)},
+				[2]string{"Active actions", fmt.Sprint(actions.Active)},
+				[2]string{"Ordinary retained actions", fmt.Sprint(actions.OrdinaryRetained)},
+				[2]string{"Protected action evidence", fmt.Sprint(actions.Protected)},
+				[2]string{"Retirement markers", fmt.Sprint(actions.Tombstones)},
+				[2]string{"Active encoded bytes", fmt.Sprint(actions.ActiveBytes)},
+				[2]string{"Ordinary retained encoded bytes", fmt.Sprint(actions.OrdinaryBytes)},
+				[2]string{"Protected encoded bytes", fmt.Sprint(actions.ProtectedBytes)},
+				[2]string{"Retirement marker encoded bytes", fmt.Sprint(actions.TombstoneBytes)},
+				[2]string{"Retired actions (cumulative)", fmt.Sprint(actions.Retired)},
+				[2]string{"Retired encoded bytes (not reclaimed disk)", fmt.Sprint(actions.RetiredBytes)},
+				[2]string{"Cleanup blocked actions (last page)", fmt.Sprint(actions.CleanupBlocked)},
+				[2]string{"Cleanup blocked encoded bytes (last page)", fmt.Sprint(actions.CleanupBlockedBytes)},
+				[2]string{"Cleanup accounting coverage", managementDisplay(actions.CleanupCoverage)},
+				[2]string{"Action compaction", managementDisplay(actions.CompactionCondition)})
+		} else {
+			rows = append(rows, [2]string{"Action accounting", "unavailable"})
+		}
 		return kv(w, rows)
 	})
 }

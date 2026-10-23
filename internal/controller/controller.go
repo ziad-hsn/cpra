@@ -213,6 +213,9 @@ func NewController(config Config) *Controller {
 
 	metricsAgg := NewMetricsAggregator()
 	snapshotHolder := fleetview.NewHolder()
+	if config.Catalog != nil {
+		config.Catalog.SetObservations(snapshotHolder)
+	}
 	logger := &LoggerAdapter{logger: SystemLogger.withCallerSkip(1), metrics: metricsAgg}
 
 	alertCooldown := config.AlertCooldown

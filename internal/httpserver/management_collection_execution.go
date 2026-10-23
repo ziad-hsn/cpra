@@ -74,7 +74,7 @@ func (m *managementHTTP) readOperationDetail(ctx context.Context, id string, que
 				return err
 			}
 			entry, ok := m.snapshots[cursor.View]
-			if !ok || entry.principal != authority.principal || entry.generation != authority.generation || entry.kind != "CollectionExecution" || entry.execution == nil {
+			if !ok || cursorExpired(entry) || entry.principal != authority.principal || entry.generation != authority.generation || entry.kind != "CollectionExecution" || entry.execution == nil {
 				return managementFailure(410, "cursorExpired", "The execution-result cursor expired or belongs to another access context.")
 			}
 			if entry.executionOperation.ID != id || query.Get("limit") != "" && limit != entry.limit {
@@ -88,12 +88,10 @@ func (m *managementHTTP) readOperationDetail(ctx context.Context, id string, que
 				return managementFailure(400, "invalidCursor", "The execution-result cursor is invalid.")
 			}
 			read.entry, read.cursor, read.continued = entry, cursor, true
+			read.entry.activity = m.retainCursorRead(cursor.View, entry, read.observed)
 			return nil
 		}
-		if err := m.snapshotCountQuota(authority.principal); err != nil {
-			return err
-		}
-		if m.operationSnapshotBudget(authority.principal) < collectionExecutionSnapshotBytes {
+		if m.availableOperationSnapshotBudget(authority.principal, collectionExecutionSnapshotBytes) < collectionExecutionSnapshotBytes {
 			return persistence.ErrOperationSnapshotQuota
 		}
 		m.operationReservations[authority.principal] += collectionExecutionSnapshotBytes
@@ -113,7 +111,7 @@ func (m *managementHTTP) readOperationDetail(ctx context.Context, id string, que
 		}
 		read.result.Items, read.result.NextCursor = nil, ""
 		read.cursor.View = uuid.NewString()
-		read.entry = managementSnapshot{execution: view, executionOperation: read.result, operationBytes: collectionExecutionSnapshotBytes,
+		read.entry = managementSnapshot{activity: &cursorActivity{readers: 1, lastUsed: read.observed}, execution: view, executionOperation: read.result, operationBytes: collectionExecutionSnapshotBytes,
 			principal: authority.principal, generation: authority.generation, kind: "CollectionExecution", limit: limit,
 			created: read.observed, expires: read.observed.Add(managementCursorTTL)}
 		metadata, err := json.Marshal(struct {
@@ -192,7 +190,7 @@ func (m *managementHTTP) publishCollectionExecutionPage(ctx context.Context, rea
 	m.pruneSnapshots(now, read.entry.principal, read.entry.generation)
 	if read.continued {
 		current, ok := m.snapshots[read.cursor.View]
-		if !ok || current.principal != read.entry.principal || current.generation != read.entry.generation || current.kind != "CollectionExecution" || current.executionOperation.ID != read.entry.executionOperation.ID || current.limit != read.entry.limit {
+		if !ok || cursorExpired(current) || current.principal != read.entry.principal || current.generation != read.entry.generation || current.kind != "CollectionExecution" || current.executionOperation.ID != read.entry.executionOperation.ID || current.limit != read.entry.limit {
 			return managementFailure(410, "cursorExpired", "The execution-result cursor expired. Start a new operation query.")
 		}
 	} else {
@@ -201,7 +199,7 @@ func (m *managementHTTP) publishCollectionExecutionPage(ctx context.Context, rea
 			if err := m.snapshotCountQuota(read.entry.principal); err != nil {
 				return err
 			}
-			if read.entry.operationBytes > m.operationSnapshotBudget(read.entry.principal) {
+			if read.entry.operationBytes > m.availableOperationSnapshotBudget(read.entry.principal, read.entry.operationBytes) {
 				return persistence.ErrOperationSnapshotQuota
 			}
 		}
@@ -212,5 +210,6 @@ func (m *managementHTTP) publishCollectionExecutionPage(ctx context.Context, rea
 	if read.result.NextCursor != "" {
 		m.snapshots[read.cursor.View] = read.entry
 	}
+	m.recordCursorPage(read.entry.activity, now, read.result.NextCursor == "")
 	return nil
 }

@@ -199,6 +199,16 @@ never replace a session. A newly accepted sequence may advance session expiry;
 an exact replay does not renew it. All assignment, start, heartbeat, and receipt echoes
 must match their original identities. Poll offers do not authorize execution.
 
+The 30-second offer lifetime is separate from a notification execution budget.
+For newly admitted notifications the assignment deadline is a conservative upper
+bound. The first committed start returns the exact deadline; the runner uses that
+grant to bound the handler. Repeated starts and lost-reply reconciliation never
+renew the deadline or create another invocation. Existing actions keep their
+recorded absolute deadlines. Checks and recovery retain their own execution
+contracts. Notification context format 2 carries earlier-incident recovery
+metadata; workers must preserve its distinction from current observed health.
+
+
 An outbox result or late evidence uses the journal's original server ID and worker
 UID and does not require a current polling session or new-work grant. A rotated
 credential for the same UID can deliver it; a different UID or restored server ID

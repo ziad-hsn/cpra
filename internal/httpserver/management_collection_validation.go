@@ -147,6 +147,7 @@ func (m *managementHTTP) handleCollectionValidationResult(w http.ResponseWriter,
 		return
 	}
 	read, err := m.collectionValidationPage(ctx, r.PathValue("id"), query, owner, authorization)
+	defer m.releaseCursorRead(read.cursor.View, read.entry.activity)
 	// Recheck even a pending/error disposition before disclosing its existence.
 	permissionErr := m.auth.WithPolicyAdmission(r, "GetOperationValidation", func(access api.AccessInfo, generation uint64) error {
 		if access.PrincipalID != owner || generation != authorization {
@@ -252,7 +253,7 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 				return err
 			}
 			entry, ok := m.snapshots[cursor.View]
-			if !ok || entry.principal != principal || entry.generation != generation || entry.kind != "CollectionValidation" || entry.validation == nil {
+			if !ok || cursorExpired(entry) || entry.principal != principal || entry.generation != generation || entry.kind != "CollectionValidation" || entry.validation == nil {
 				return managementFailure(410, "cursorExpired", "The validation cursor expired or belongs to another access context.")
 			}
 			if entry.validationOperation != id || limit != 0 && limit != entry.limit {
@@ -266,9 +267,10 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 				return managementFailure(400, "invalidCursor", "The validation cursor is invalid.")
 			}
 			read.entry, read.cursor, read.continued = entry, cursor, true
+			read.entry.activity = m.retainCursorRead(cursor.View, entry, read.observed)
 			return nil
 		}
-		return m.snapshotCountQuota(principal)
+		return nil
 	}()
 	if err != nil {
 		return read, err
@@ -299,7 +301,7 @@ func (m *managementHTTP) collectionValidationPage(ctx context.Context, id string
 			return read, validationResultStatusError(status)
 		}
 		read.cursor.View = uuid.NewString()
-		read.entry = managementSnapshot{validation: view, validationOperation: id, principal: principal, generation: generation,
+		read.entry = managementSnapshot{activity: &cursorActivity{readers: 1, lastUsed: read.observed}, validation: view, validationOperation: id, principal: principal, generation: generation,
 			kind: "CollectionValidation", limit: limit, created: read.observed, expires: read.observed.Add(managementCursorTTL)}
 	}
 	page, err := read.entry.validation.Page(ctx, after, read.entry.limit, read.observed)
@@ -354,7 +356,7 @@ func (m *managementHTTP) publishCollectionValidationPage(ctx context.Context, re
 	m.pruneSnapshots(now, read.entry.principal, read.entry.generation)
 	if read.continued {
 		current, ok := m.snapshots[read.cursor.View]
-		if !ok || current.principal != read.entry.principal || current.generation != read.entry.generation || current.validationOperation != read.entry.validationOperation {
+		if !ok || cursorExpired(current) || current.principal != read.entry.principal || current.generation != read.entry.generation || current.validationOperation != read.entry.validationOperation {
 			return managementFailure(410, "cursorExpired", "The validation cursor expired. Start a new validation-result query.")
 		}
 	} else if read.result.NextCursor != "" {
@@ -368,5 +370,6 @@ func (m *managementHTTP) publishCollectionValidationPage(ctx context.Context, re
 	if read.result.NextCursor != "" {
 		m.snapshots[read.cursor.View] = read.entry
 	}
+	m.recordCursorPage(read.entry.activity, now, read.result.NextCursor == "")
 	return nil
 }

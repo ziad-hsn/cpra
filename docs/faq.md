@@ -100,7 +100,7 @@ Current source implements persistence, management and SDK/worker contracts.
 Public module tags and release artifacts require their separate qualification
 and downloaded-asset checks. Candidates remain private while gates are open.
 Local provider fixtures are contract evidence; actual account delivery/effects
-require designated resources and credentials. The 24-hour test is cancelled.
+require designated resources and credentials.
 
 ## How do I change the appearance?
 

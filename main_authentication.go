@@ -93,7 +93,12 @@ func loadAuthenticationBootstrap(ctx context.Context, settings runtimeconfig.Con
 	}
 	legacy := options.webAuth
 	if options.webAuthFile != "" {
-		data, err := readLegacyWebToken(options.webAuthFile)
+		group, err := secureconfig.TokenReaderGroup(options.webAuthReaderGroup)
+		if err != nil {
+			return persistence.AuthenticationCommand{}, err
+		}
+		data, err := secureconfig.ReadTokenFile(ctx, secureconfig.TokenFileOptions{Path: options.webAuthFile,
+			Root: options.webAuthRoot, ReaderGroupID: group, ReaderSID: options.webAuthReaderSID, MaxBytes: 4096})
 		if err != nil {
 			return persistence.AuthenticationCommand{}, err
 		}

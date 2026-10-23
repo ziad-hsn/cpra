@@ -37,7 +37,7 @@ func (c WorkerRequeueCommand) validate(at time.Time) error {
 }
 
 func workerRequeueDue(r WorkerExecutionRecord, owner string, at time.Time) bool {
-	if _, terminal := r.TerminalReceipt(); terminal || at.Before(r.CreatedAt) || !at.Before(r.Intent.Deadline) {
+	if _, terminal := r.TerminalReceipt(); terminal || at.Before(r.CreatedAt) || r.executionExpired(at) {
 		return false
 	}
 	if n := len(r.RetiredOffers); n > 0 && at.Before(r.RetiredOffers[n-1].UpdatedAt) {
@@ -127,7 +127,7 @@ func validateWorkerRetiredOffers(i image, r WorkerExecutionRecord) error {
 	for n := range r.RetiredOffers {
 		l := &r.RetiredOffers[n]
 		if l.Phase != "rejected" || l.GrantID != "" || !l.StartedAt.IsZero() || l.Heartbeat != nil ||
-			l.OfferedAt.Before(previous) || !l.UpdatedAt.Before(r.Intent.Deadline) {
+			l.OfferedAt.Before(previous) || r.executionExpired(l.UpdatedAt) {
 			return ErrWorkerExecutionInvalid
 		}
 		copy := r

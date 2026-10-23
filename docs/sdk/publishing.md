@@ -307,5 +307,5 @@ trigger pkg.go.dev indexing; indexing itself is not a compatibility test.
 [Adding packages to pkg.go.dev](https://pkg.go.dev/about#adding-a-package).
 
 No tags, releases, or public-index requests are created by the local checks above.
-Production-provider verification and the million-monitor endurance campaign
-remain separate from SDK packaging and documentation evidence.
+Production-provider verification and comparative capacity qualification remain
+separate from SDK packaging and documentation evidence.

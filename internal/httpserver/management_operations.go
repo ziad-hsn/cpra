@@ -68,6 +68,7 @@ func (m *managementHTTP) handleOperations(w http.ResponseWriter, r *http.Request
 	}
 	read, err := m.readOperations(ctx, query, authority)
 	defer m.releaseOperationReservation(read.reservation)
+	defer m.releaseCursorRead(read.cursor.View, read.entry.activity)
 	permissionErr := m.auth.WithPolicyAdmission(r, "ListOperations", func(access api.AccessInfo, generation uint64) error {
 		if operationAuthority(access, generation) != authority {
 			return managementFailure(410, "cursorExpired", "Authorization changed. Start a new operation query.")
@@ -139,6 +140,7 @@ func (m *managementHTTP) handleOperation(w http.ResponseWriter, r *http.Request)
 	}
 	read, err := m.readOperationDetail(ctx, r.PathValue("id"), query, authority)
 	defer m.releaseOperationReservation(read.reservation)
+	defer m.releaseCursorRead(read.cursor.View, read.entry.activity)
 	permissionErr := m.auth.WithPolicyAdmission(r, "GetOperation", func(access api.AccessInfo, generation uint64) error {
 		if operationAuthority(access, generation) != authority {
 			return managementFailure(410, "cursorExpired", "Authorization changed. Read the operation again.")
@@ -200,10 +202,15 @@ func operationListQuery(r *http.Request) (url.Values, error) {
 // operationSnapshotBudget accounts for retained copies and in-flight capture
 // reservations. Callers hold m.mu; reservations are charged before allocation.
 func (m *managementHTTP) operationSnapshotBudget(principal string) int64 {
+	total, owned := m.operationSnapshotBudgets(principal)
+	return min(total, owned)
+}
+
+func (m *managementHTTP) operationSnapshotBudgets(principal string) (int64, int64) {
 	var total, owned int64
 	for _, entry := range m.snapshots {
 		if entry.operationBytes < 0 || entry.operationBytes > managementOperationSnapshotBytes {
-			return 0
+			return 0, 0
 		}
 		total += entry.operationBytes
 		if entry.principal == principal {
@@ -212,14 +219,33 @@ func (m *managementHTTP) operationSnapshotBudget(principal string) int64 {
 	}
 	for actor, reserved := range m.operationReservations {
 		if reserved < 0 || reserved > managementPrincipalOperationBytes {
-			return 0
+			return 0, 0
 		}
 		total += reserved
 		if actor == principal {
 			owned += reserved
 		}
 	}
-	return max(0, min(int64(managementOperationSnapshotBytes)-total, int64(managementPrincipalOperationBytes)-owned))
+	return max(0, int64(managementOperationSnapshotBytes)-total), max(0, int64(managementPrincipalOperationBytes)-owned)
+}
+
+// Reclaim only when the requested charge cannot fit. Completed and idle views
+// can free bytes; active captures and readers keep their reservations.
+func (m *managementHTTP) availableOperationSnapshotBudget(principal string, minimum int64) int64 {
+	for {
+		total, owned := m.operationSnapshotBudgets(principal)
+		budget := min(total, owned)
+		if budget >= minimum {
+			return budget
+		}
+		owner := ""
+		if owned < minimum {
+			owner = principal
+		}
+		if !m.reclaimSnapshotMatching(owner, m.now().UTC(), func(entry managementSnapshot) bool { return entry.operationBytes > 0 }) {
+			return budget
+		}
+	}
 }
 
 type operationSnapshotReservation struct {
@@ -245,6 +271,28 @@ func (m *managementHTTP) releaseOperationReservationLocked(reservation *operatio
 		delete(m.operationReservations, reservation.principal)
 	}
 	reservation.released = true
+}
+
+// A capture reports quota pressure only after measuring the actual immutable
+// view. Retry that read after reclaiming completed/inactive views; a positive
+// but insufficient remaining byte budget must not wedge later browsing.
+func (m *managementHTTP) growOperationReservation(ctx context.Context, reservation *operationSnapshotReservation) (bool, error) {
+	if reservation == nil || reservation.bytes >= managementPrincipalOperationBytes {
+		return false, nil
+	}
+	if err := m.lockSnapshots(ctx); err != nil {
+		return false, err
+	}
+	defer m.unlockSnapshots()
+	previous := reservation.bytes
+	m.releaseOperationReservationLocked(reservation)
+	budget := m.availableOperationSnapshotBudget(reservation.principal, previous+1)
+	if budget <= previous {
+		return false, nil
+	}
+	m.operationReservations[reservation.principal] += budget
+	reservation.bytes, reservation.released = budget, false
+	return true, nil
 }
 
 type operationPageRead struct {
@@ -293,7 +341,7 @@ func (m *managementHTTP) readOperations(ctx context.Context, query url.Values, a
 				return decodeErr
 			}
 			entry, ok := m.snapshots[cursor.View]
-			if !ok || entry.operations == nil || entry.principal != authority.principal || entry.generation != authority.generation || entry.kind != "Operation" {
+			if !ok || cursorExpired(entry) || entry.operations == nil || entry.principal != authority.principal || entry.generation != authority.generation || entry.kind != "Operation" {
 				return managementFailure(410, "cursorExpired", "The operation cursor expired or belongs to another access context.")
 			}
 			if (limit != 0 && limit != entry.limit) || query.Get("monitorID") != entry.monitorID {
@@ -303,12 +351,10 @@ func (m *managementHTTP) readOperations(ctx context.Context, query url.Values, a
 				return management.ErrUnavailable
 			}
 			read.entry, read.cursor, read.continued = entry, cursor, true
+			read.entry.activity = m.retainCursorRead(cursor.View, entry, read.observed)
 			return nil
 		}
-		if err := m.snapshotCountQuota(authority.principal); err != nil {
-			return err
-		}
-		budget := m.operationSnapshotBudget(authority.principal)
+		budget := m.availableOperationSnapshotBudget(authority.principal, 1)
 		if budget <= 0 {
 			return persistence.ErrOperationSnapshotQuota
 		}
@@ -331,6 +377,16 @@ func (m *managementHTTP) readOperations(ctx context.Context, query url.Values, a
 			actor = authority.principal
 		}
 		view, captureErr := m.catalog.ManagementOperationSnapshot(ctx, actor, read.observed, read.reservation.bytes)
+		for attempt := 0; errors.Is(captureErr, persistence.ErrOperationSnapshotQuota) && attempt < managementMaxSnapshots; attempt++ {
+			grown, growErr := m.growOperationReservation(ctx, read.reservation)
+			if growErr != nil {
+				return read, growErr
+			}
+			if !grown {
+				break
+			}
+			view, captureErr = m.catalog.ManagementOperationSnapshot(ctx, actor, read.observed, read.reservation.bytes)
+		}
 		if captureErr != nil {
 			return read, captureErr
 		}
@@ -339,7 +395,7 @@ func (m *managementHTTP) readOperations(ctx context.Context, query url.Values, a
 			return read, persistence.ErrOperationSnapshotQuota
 		}
 		read.cursor.View = uuid.NewString()
-		read.entry = managementSnapshot{operations: view, operationBytes: cost, monitorID: query.Get("monitorID"),
+		read.entry = managementSnapshot{activity: &cursorActivity{readers: 1, lastUsed: read.observed}, operations: view, operationBytes: cost, monitorID: query.Get("monitorID"),
 			principal: authority.principal, generation: authority.generation, kind: "Operation", limit: limit,
 			created: read.observed, expires: read.observed.Add(managementCursorTTL)}
 	}
@@ -400,7 +456,7 @@ func (m *managementHTTP) publishOperationPage(ctx context.Context, read operatio
 	m.pruneSnapshots(now, read.entry.principal, read.entry.generation)
 	if read.continued {
 		current, ok := m.snapshots[read.cursor.View]
-		if !ok || current.principal != read.entry.principal || current.generation != read.entry.generation || current.kind != "Operation" || current.limit != read.entry.limit || current.monitorID != read.entry.monitorID {
+		if !ok || cursorExpired(current) || current.principal != read.entry.principal || current.generation != read.entry.generation || current.kind != "Operation" || current.limit != read.entry.limit || current.monitorID != read.entry.monitorID {
 			return persistence.ErrOperationCursorExpired
 		}
 	} else {
@@ -409,7 +465,7 @@ func (m *managementHTTP) publishOperationPage(ctx context.Context, read operatio
 			if err := m.snapshotCountQuota(read.entry.principal); err != nil {
 				return err
 			}
-			if read.entry.operationBytes > m.operationSnapshotBudget(read.entry.principal) {
+			if read.entry.operationBytes > m.availableOperationSnapshotBudget(read.entry.principal, read.entry.operationBytes) {
 				return persistence.ErrOperationSnapshotQuota
 			}
 		}
@@ -420,5 +476,6 @@ func (m *managementHTTP) publishOperationPage(ctx context.Context, read operatio
 	if read.result.NextCursor != "" {
 		m.snapshots[read.cursor.View] = read.entry
 	}
+	m.recordCursorPage(read.entry.activity, now, read.result.NextCursor == "")
 	return nil
 }

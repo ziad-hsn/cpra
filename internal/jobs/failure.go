@@ -109,6 +109,27 @@ func (e *HTTPStatusError) Error() string {
 	return fmt.Sprintf("received unexpected status code: %d", e.Status)
 }
 
+// checkAccessError carries a reviewed check diagnostic. The wrapped provider
+// error remains available in the executing process but never supplies public
+// text. This classification grants no retry or external-effect permission.
+type checkAccessError struct {
+	code  string
+	cause error
+}
+
+func (e *checkAccessError) Error() string {
+	switch e.code {
+	case "authentication_failed":
+		return "The target rejected the configured credentials."
+	case "authorization_failed":
+		return "The target denied the operation for the configured identity."
+	default:
+		return "The target check failed."
+	}
+}
+
+func (e *checkAccessError) Unwrap() error { return e.cause }
+
 // FailureCode classifies typed causes without inspecting arbitrary error text.
 // This is an explanation only; effect rejection and retry permission are
 // determined independently by the controller's delivery contract.
@@ -130,6 +151,13 @@ func FailureCode(err error) string {
 		return "permission_denied"
 	case errors.Is(err, ErrInterventionRejected):
 		return "rejected"
+	}
+	var access *checkAccessError
+	if errors.As(err, &access) {
+		switch access.code {
+		case "authentication_failed", "authorization_failed":
+			return access.code
+		}
 	}
 	var rejection *DeliveryError
 	var httpStatus *HTTPStatusError

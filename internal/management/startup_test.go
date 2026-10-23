@@ -362,12 +362,12 @@ func TestStartupCatalogSourceFailureNeverActivatesAndDoesNotLogInput(t *testing.
 				input = "[]"
 			}
 			var closed atomic.Int32
-			opts.Decode.SourceName = marker
+			opts.Decode.SourceName = "services.yaml"
 			opts.OpenSource = func(context.Context) (io.ReadCloser, error) {
 				return startupReader{Reader: strings.NewReader(input), closed: &closed, err: closeErr}, nil
 			}
 			result, err := StartupCatalog(ctx, store, sealer, opts)
-			if err == nil || !errors.Is(err, ErrStartupIncomplete) || strings.Contains(err.Error(), marker) || result.Catalog != nil || closed.Load() != 1 {
+			if err == nil || errors.Is(err, ErrStartupIncomplete) || errors.Is(err, ErrStartupCleanup) || strings.Contains(err.Error(), marker) || result.Catalog != nil || closed.Load() != 1 {
 				t.Fatalf("failed input was admitted, leaked or left open: %+v %v", result.Bootstrap, err)
 			}
 			if has, err := store.HasCatalog(); has || err != nil {

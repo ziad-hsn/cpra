@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -20,9 +20,10 @@ interface DataTableProps {
 
 // Shared column template — header and every row MUST use the same grid
 // so columns align perfectly across the virtualized, absolutely-positioned rows.
-const COLS = 'minmax(220px, 2.6fr) 128px 92px 96px 128px 120px minmax(150px, 1.7fr)';
+const COLS = 'minmax(220px, 2.6fr) 208px 128px 96px 144px 120px minmax(220px, 1.7fr)';
+const MIN_TABLE_WIDTH = 1152;
 
-export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) {
+export function DataTable({ data, onRowClick, rowHeight = 80 }: DataTableProps) {
   const columns: ColumnDef<MonitorSummary>[] = [
     {
       header: 'Monitor',
@@ -88,8 +89,10 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
   const parentRef = useRef<HTMLDivElement>(null);
   const { rows } = table.getRowModel();
 
+  const getItemKey = useCallback((index: number) => `${data[index].monitor_id ?? data[index].id}:${data[index].incarnation_uid ?? ''}`, [data]);
   const virtualizer = useVirtualizer({
     count: rows.length,
+    getItemKey,
     estimateSize: () => rowHeight,
     getScrollElement: () => parentRef.current,
     overscan: 16,
@@ -101,24 +104,26 @@ export function DataTable({ data, onRowClick, rowHeight = 50 }: DataTableProps) 
   return (
     <div ref={parentRef} style={{ height: '100%', overflow: 'auto', position: 'relative' }} role='table' aria-label='Monitors table' aria-rowcount={rows.length + 1} aria-colcount={columns.length} tabIndex={0}>
       {/* Sticky header — a real grid row, not a <table>, so it aligns exactly */}
-      <div className='vtable-head' role='row' aria-rowindex={1} style={{ display: 'grid', gridTemplateColumns: COLS, position: 'sticky', top: 0, zIndex: 3 }}>
+      <div className='vtable-head' role='row' aria-rowindex={1} style={{ display: 'grid', gridTemplateColumns: COLS, minWidth: MIN_TABLE_WIDTH, position: 'sticky', top: 0, zIndex: 3 }}>
         {table.getFlatHeaders().map((h) => (
           <div key={h.id} className='vtable-th' role='columnheader'>
             {flexRender(h.column.columnDef.header, h.getContext())}
           </div>
         ))}
       </div>
-      <div style={{ height: totalHeight, position: 'relative' }}>
+      <div style={{ height: totalHeight, minWidth: MIN_TABLE_WIDTH, position: 'relative' }}>
         {items.map((virtualRow) => {
           const row = rows[virtualRow.index];
           return (
             <div
-              key={row.id}
+              key={getItemKey(virtualRow.index)}
+              ref={virtualizer.measureElement}
+              data-index={virtualRow.index}
               className='vtable-row'
               style={{
                 position: 'absolute',
                 top: 0, left: 0, width: '100%',
-                height: virtualRow.size,
+                minHeight: 48,
                 transform: 'translateY(' + virtualRow.start + 'px)',
                 display: 'grid',
                 gridTemplateColumns: COLS,

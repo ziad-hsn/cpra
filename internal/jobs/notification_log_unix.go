@@ -48,6 +48,9 @@ func checkNotificationLogDirectory(file *os.File, private bool) error {
 		err = secureconfig.CheckTrustedDirectory(file)
 	}
 	if err != nil {
+		if private {
+			return errNotificationLogDirectoryAccess
+		}
 		return errNotificationLog
 	}
 	return nil

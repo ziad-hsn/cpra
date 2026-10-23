@@ -11,7 +11,7 @@ const ActionFormatVersion = 44
 const actionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-44\n"
 
 func actionStorageFormat(version int) bool {
-	return version == ActionFormatVersion || version == 45 && externalStorageFormat(version)
+	return version == ActionFormatVersion || notificationConditionStorageFormat(version) || version == 45 && externalStorageFormat(version)
 }
 
 func requiresActionFormat(m Monitor) bool {

@@ -139,8 +139,8 @@ def main():
         manifest.write_text(yaml.safe_dump({'monitors': [{'id': 'packaging-fixture', 'name': 'packaging-fixture', 'enabled': True,
             'pulse_check': {'type': 'http', 'interval': '1s', 'timeout': '1s', 'unhealthy_threshold': 1, 'healthy_threshold': 1,
                             'config': {'url': 'http://target:8080/'}},
-            'codes': {'red': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}},
-                      'green': {'dispatch': True, 'notify': 'log', 'config': {'file': '/var/lib/cpra/events.jsonl'}}}}]}))
+            'codes': {'red': {'dispatch': True, 'notify': 'log', 'config': {'file': 'events.jsonl'}},
+                      'green': {'dispatch': True, 'notify': 'log', 'config': {'file': 'events.jsonl'}}}}]}))
         manifest.chmod(0o444)
         runtime = tmp/'runtime.yaml'
         runtime.write_bytes((ROOT/'docker/runtime.yaml').read_bytes())
@@ -148,8 +148,9 @@ def main():
         token_files = [tmp/'token-v1', tmp/'token-v2']
         for path, token in zip(token_files, token_values):
             path.write_text(token)
-            # Disposable random fixture credentials; parent directory remains 0700.
-            path.chmod(0o444)
+            # Tokens begin private to the fixture owner. Before mounting each
+            # version, provision its actual container reader identity below.
+            path.chmod(0o600)
         override = tmp/'override.yaml'
         override.write_text(yaml.safe_dump({'services': {
             'cpra': {'healthcheck': {'interval': '2s', 'start_period': '60s'}},
@@ -159,11 +160,23 @@ def main():
                        'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true']}}}))
         env = {**os.environ, 'CPRA_IMAGE': a.image, 'CPRA_MANIFEST_FILE': str(manifest),
                'CPRA_RUNTIME_FILE': str(runtime),
-               'CPRA_TOKEN_FILE': str(token_files[0]), 'CPRA_DATA_VOLUME': volume, 'CPRA_PORT': '0'}
+               'CPRA_TOKEN_FILE': str(token_files[0]), 'CPRA_TOKEN_READER_GROUP': '',
+               'CPRA_DATA_VOLUME': volume, 'CPRA_LOG_VOLUME': name+'-logs', 'CPRA_PORT': '0'}
         base = ['docker', 'compose', '-p', name, '-f', str(ROOT/'docker/docker-compose.yml'), '-f', str(override)]
 
         def compose(*args, **kw):
             return run(base + list(args), env=env, **kw)
+
+        def protect_token(path):
+            # Only this task-owned, disposable token is changed. File-backed
+            # Compose secrets retain host metadata, so qualify that metadata
+            # under the actual UID rather than weakening the token reader.
+            run(['docker', 'run', '--rm', '--network', 'none', '--user', '0:0',
+                 '--read-only', '--mount', 'type=bind,source='+str(path)+',target=/fixture-token',
+                 '--entrypoint', '/bin/sh', a.image, '-c',
+                 'chown 1001:1001 /fixture-token && chmod 0400 /fixture-token'])
+
+        active_token = token_values[0]
 
         def cid():
             return compose('ps', '-q', 'cpra').stdout.strip()
@@ -182,12 +195,10 @@ def main():
             return port
 
         def history():
-            token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
-            return read_history(api_port(), token)
+            return read_history(api_port(), active_token)
 
         def healthy():
-            token = Path(env['CPRA_TOKEN_FILE']).read_text().strip()
-            page = read_observation(api_port(), token, '/api/v1/monitors?size=1')
+            page = read_observation(api_port(), active_token, '/api/v1/monitors?size=1')
             monitors = page.get('monitors') if isinstance(page, dict) else None
             if not isinstance(monitors, list) or len(monitors) != 1 or page.get('total') != 1:
                 return False
@@ -198,6 +209,7 @@ def main():
             report['compose_version'] = run(['docker', 'compose', 'version', '--short']).stdout.strip()
             image_details = json.loads(run(['docker', 'image', 'inspect', a.image]).stdout)[0]
             report['platform'] = image_details['Os'] + '/' + image_details['Architecture']
+            protect_token(token_files[0])
             compose('up', '-d', '--wait', '--wait-timeout', '120', timeout=150)
             inspect = json.loads(run(['docker', 'inspect', cid()]).stdout)[0]
             assert inspect['Config']['User'] == '1001:1001'
@@ -263,7 +275,8 @@ def main():
             token_values.append(token)
             token_files[1].chmod(0o600)
             token_files[1].write_text(token)
-            token_files[1].chmod(0o444)
+            protect_token(token_files[1])
+            active_token = token
             env['CPRA_TOKEN_FILE'] = str(token_files[1])
             compose('up', '-d', '--force-recreate', '--wait', '--wait-timeout', '120', 'cpra', timeout=150)
             ctl('ready')

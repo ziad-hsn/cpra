@@ -35,10 +35,12 @@ type diffIssue struct {
 	Message string        `json:"message" yaml:"message"`
 }
 type diffReport struct {
-	Valid   bool        `json:"valid" yaml:"valid"`
-	Changed bool        `json:"changed" yaml:"changed"`
-	Items   []diffItem  `json:"items" yaml:"items"`
-	Errors  []diffIssue `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Valid             bool        `json:"valid" yaml:"valid"`
+	Changed           bool        `json:"changed" yaml:"changed"`
+	Items             []diffItem  `json:"items" yaml:"items"`
+	Errors            []diffIssue `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Warnings          []diffIssue `json:"warnings,omitempty" yaml:"warnings,omitempty"`
+	WarningsTruncated bool        `json:"warningsTruncated,omitempty" yaml:"warningsTruncated,omitempty"`
 }
 
 func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, preflight *api.Preflight) (diffReport, error) {
@@ -52,6 +54,14 @@ func collectionDiffReport(ctx context.Context, frozen *collection.Frozen, prefli
 		item, err := frozen.Item(ctx, index)
 		if err != nil {
 			return result, managementFailure(err)
+		}
+		for _, warning := range api.ResourceWarnings(item.Resource) {
+			if len(result.Warnings) == 10 {
+				result.WarningsTruncated = true
+				break
+			}
+			location := diffSource(item.Location)
+			result.Warnings = append(result.Warnings, diffIssue{ID: item.ID, Source: &location, Field: api.SafeValidationField(warning.Field), Reason: warning.Reason, Message: api.ValidationMessage(warning.Reason)})
 		}
 		clear(item.Resource.Spec)
 		clear(item.Resource.Status)
@@ -150,6 +160,16 @@ func writeCollectionDiff(cmd *cobra.Command, o *options, result diffReport) erro
 				location += " " + issue.Field
 			}
 			if _, err := fmt.Fprintf(w, "%s: %s: %s\n", managementDisplay(location), issue.Reason, issue.Message); err != nil {
+				return err
+			}
+		}
+		for _, issue := range result.Warnings {
+			if _, err := fmt.Fprintf(w, "warning: %s %s: %s\n", managementDisplay(issue.Source.String()), issue.Field, issue.Message); err != nil {
+				return err
+			}
+		}
+		if result.WarningsTruncated {
+			if _, err := fmt.Fprintln(w, "Additional configuration warnings omitted; inspect individual monitor configurations."); err != nil {
 				return err
 			}
 		}

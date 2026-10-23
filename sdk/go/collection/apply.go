@@ -53,7 +53,10 @@ type Result struct {
 	Operation             api.Operation
 	Preflight             *api.Preflight
 	Validation            *api.ValidationResultSummary
-	Noop                  bool
+	// ValidationPage retains only the first bounded result page. Later pages are
+	// available explicitly through Operations.Validation; Apply never collects them.
+	ValidationPage *api.ValidationResultPage
+	Noop           bool
 }
 
 // Preflight performs ephemeral, bounded server validation/diff. It does not
@@ -360,11 +363,8 @@ func awaitValidationAndActivate(ctx context.Context, operations Operations, froz
 	}
 	summary := page.Data.Summary
 	result.Validation = &summary
-	if !summary.Valid {
-		return result, ErrPreflightRejected
-	}
 	for _, row := range page.Data.Items {
-		if row.Issue != "" || row.Change != "create" && row.Change != "update" && row.Change != "unchanged" {
+		if summary.Valid && (row.Issue != "" || row.Change != "create" && row.Change != "update" && row.Change != "unchanged") {
 			return result, fmt.Errorf("validation contains unsupported success observations")
 		}
 		original, readErr := frozen.Item(ctx, int(row.Ordinal-1))
@@ -372,8 +372,17 @@ func awaitValidationAndActivate(ctx context.Context, operations Operations, froz
 			return result, readErr
 		}
 		if row.Kind != original.Resource.Kind || row.ID != original.Resource.Metadata.ID || row.Source != original.Position.Source.Token || row.SourceDocument != int64(original.Position.Source.Document) || row.SourceItem != int64(original.Position.Source.Item) {
+			clear(original.Resource.Spec)
 			return result, fmt.Errorf("validation result item identity mismatch")
 		}
+		clear(original.Resource.Spec)
+	}
+	result.ValidationPage = &page.Data
+	if !summary.Valid {
+		// The sealed verdict is newer than the Validate admission response. Do
+		// not report its previous "validating" phase after rejection is known.
+		result.Operation.State = "rejected"
+		return result, ErrPreflightRejected
 	}
 	// The first page's sealed successful summary covers the complete original
 	// collection under the recognized protocol. Only returned rows are checked

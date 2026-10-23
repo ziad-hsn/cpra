@@ -26,7 +26,8 @@ it('does not invent an alert cooldown from the next pulse time',()=>{
  expect(screen.getByText('pending delivery')).toBeInTheDocument();
 });
 
-vi.mock('@tanstack/react-virtual',()=>({useVirtualizer:()=>({getTotalSize:()=>50,getVirtualItems:()=>[{index:0,start:0,size:50}]})}));
+const measured = vi.hoisted(() => ({element: vi.fn()}));
+vi.mock('@tanstack/react-virtual',()=>({useVirtualizer:()=>({getTotalSize:()=>50,getVirtualItems:()=>[{index:0,start:0,size:50}],measureElement: measured.element})}));
 
 it('does not infer healthy fleet from zero open incidents',()=>{
  render(<MemoryRouter><Alerts /></MemoryRouter>);
@@ -38,6 +39,16 @@ it('does not format an unperformed check as a real clock time',()=>{
  render(<DataTable data={[{id:1,name:'new monitor',pulse_type:'http',status:'unknown',incident:false,pending_code:'',consecutive_failures:0,last_check:zero,last_success:zero,next_check:zero,active_codes:[]}]} onRowClick={()=>{}}/>);
  const renderedZero=new Date(zero).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
  expect(screen.getByRole('row', {name: /new monitor/})).not.toHaveTextContent(renderedZero);
+});
+
+it('measures rendered rows instead of fixing height for wrapping status text', () => {
+ measured.element.mockClear();
+ render(<DataTable data={[{id: 1, name: 'monitor with controls', pulse_type: 'http', status: 'unknown', health: 'unknown', availability: {state: 'unavailable', reason: 'configurationProblem'}, maintenance: true, ignored: true, incident: false, pending_code: '', consecutive_failures: 0, last_check: '', last_success: '', next_check: '', active_codes: ['red', 'blue', 'cyan', 'green']}]} onRowClick={() => {}} />);
+ const row = screen.getByRole('row', {name: /monitor with controls/});
+ expect(row).toHaveAttribute('data-index', '0');
+ expect(row.style.height).toBe('');
+ expect(measured.element).toHaveBeenCalledWith(row);
+ expect(row).toHaveTextContent('Maintenance');
 });
 
 it('allows filtering a supported DNS check type',()=>{

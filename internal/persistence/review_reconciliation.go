@@ -23,7 +23,7 @@ func reviewStateKey(m Monitor, at time.Time) string {
 		Owner, Incident, Health, Policy string
 		Closed                          time.Time
 		Qualified, Suppressed, Removed  bool
-	}{m.incarnationIdentity(), m.IncidentID, m.observedHealth(), m.ReviewPolicyID, m.IncidentClosedAt, m.Recovering && m.outageQualified(), m.notificationsSuppressed(at), m.Removed})
+	}{m.incarnationIdentity(), m.IncidentID, m.notificationHealth(), m.ReviewPolicyID, m.IncidentClosedAt, m.Recovering && m.outageQualified(), m.notificationsSuppressed(at), m.Removed})
 	return string(data)
 }
 func (f *machine) writeReview(r reviewRecord) {
@@ -130,6 +130,9 @@ func (f *machine) recordReviewWork(previous Monitor, m *Monitor, at time.Time) {
 	context := reviewContext(*m, at)
 	key := reviewPrefix("fact", m.ID) + fmt.Sprintf("%020d-%010d", f.actionPosition.Index, f.actionPosition.Ordinal)
 	fact := reviewFact{ID: key, PolicyID: m.ReviewPolicyID, RestoreID: f.reviewRestoreID(), At: at, Fence: f.image.ActionStorage.Sequence + 1, Context: context, SourceAction: source, Phase: "actions", Revision: 1}
+	if notificationConditionStorageFormat(f.image.Version) {
+		fact.IndexVersion = 1
+	}
 	f.writeReview(reviewRecord{Key: key, MonitorID: m.ID, Fact: &fact})
 }
 
@@ -156,7 +159,10 @@ func reviewContext(m Monitor, at time.Time) Monitor {
 		c.ReviewRevisionDigest = identity(m.Revision)
 	}
 	if m.Notifications != nil {
-		c.Notifications = &NotificationState{QualifiedIncident: m.Notifications.QualifiedIncident}
+		c.Notifications = &NotificationState{Version: m.Notifications.Version, QualifiedIncident: m.Notifications.QualifiedIncident}
+	}
+	if m.notificationConditionsEnabled() {
+		c.ConfigurationProblem, c.ConfigurationProblemAt = m.ConfigurationProblem, m.ConfigurationProblemAt
 	}
 	return c.Clone()
 }
@@ -263,7 +269,7 @@ func (f *machine) assessmentInput(fact reviewFact, alert ReviewAlert) (Monitor, 
 // Each committed step visits one action/endpoint or condition. This bounds both
 // input and fan-out; a configured record may use its existing 2 MiB frame cap.
 // No external operation runs here. Current start guards remain authoritative.
-func (f *machine) applyReviewStep(c Command) Result {
+func (f *machine) applyReviewItem(c Command) Result {
 	r, ok, err := f.readReview(c.Revision)
 	if err != nil {
 		return Result{Err: err}
@@ -302,7 +308,13 @@ func (f *machine) applyReviewStep(c Command) Result {
 				return Result{Err: e}
 			}
 			pin.sequence = fact.Fence
-			rows, next, e := pin.pageBounded(context.Background(), c.MonitorID, fact.After, 1, 64, 1<<20)
+			var rows []actionLedgerRow
+			var next string
+			if fact.IndexVersion == 1 {
+				rows, next, e = pin.relevantPage(context.Background(), c.MonitorID, fact.After, 64, 1<<20)
+			} else {
+				rows, next, e = pin.pageBounded(context.Background(), c.MonitorID, fact.After, 1, 64, 1<<20)
+			}
 			pin.Close()
 			err = e
 			if len(rows) > 0 {
@@ -359,7 +371,13 @@ func (f *machine) applyReviewStep(c Command) Result {
 			}
 		}
 	} else {
-		rows, e := f.collections.reviewPage(reviewPrefix("alert", c.MonitorID), fact.After, 1)
+		var rows []reviewRecord
+		var e error
+		if fact.IndexVersion == 1 {
+			rows, e = f.collections.reviewConditions(c.MonitorID, fact.SourceAction, fact.After)
+		} else {
+			rows, e = f.collections.reviewPage(reviewPrefix("alert", c.MonitorID), fact.After, 1)
+		}
 		if e != nil {
 			return Result{Err: e}
 		}
@@ -368,7 +386,11 @@ func (f *machine) applyReviewStep(c Command) Result {
 		} else {
 			fact.After = rows[0].Key
 			if fact.SourceAction == "" || rows[0].Alert.ActionID == fact.SourceAction {
-				value := *rows[0].Alert
+				latest, exists, readErr := f.readReview(rows[0].Key)
+				if readErr != nil || !exists {
+					return Result{Err: errActionLedger}
+				}
+				value := *latest.Alert
 				alert = &value
 			}
 		}
@@ -389,6 +411,15 @@ func (f *machine) applyReviewStep(c Command) Result {
 			emit("review_alert_opened", &Action{ID: a.ID, Kind: "intervention", CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, IncidentID: alert.IncidentID, ReviewNotice: &ReviewNotice{AlertID: alert.ID, ActionID: a.ID, Phase: "open", Health: alert.Health}})
 		}
 		assessed := input.assessReviewAlert(*alert, fact.At, emit)
+		if input.notificationConditionsEnabled() && current.notificationConditionsEnabled() &&
+			input.incarnationIdentity() == current.incarnationIdentity() && input.Revision == current.Revision {
+			// Recovery/review facts use their captured observations. An older
+			// assessment must not overwrite current-health wording already
+			// refreshed by a later check/preparation result.
+			input.Notifications.ReviewAlerts[assessed.ID] = assessed
+			input.refreshQueuedNotificationHealth(current.notificationHealth(), emit)
+			assessed = input.Notifications.ReviewAlerts[assessed.ID]
+		}
 		next.Sequence = input.Sequence
 		if next.Notifications == nil {
 			next.Notifications = &NotificationState{}
@@ -455,6 +486,53 @@ func (f *machine) applyReviewStep(c Command) Result {
 		f.writeReview(r)
 	}
 	return Result{Allowed: true, Monitor: &next, Events: events}
+}
+
+// New facts advance through a bounded accepted prefix in one durable command.
+// Existing facts preserve their original one-item replay behavior.
+func (f *machine) applyReviewStep(c Command) Result {
+	r, ok, err := f.readReview(c.Revision)
+	if err != nil {
+		return Result{Err: err}
+	}
+	if !ok || r.Fact == nil || r.Fact.IndexVersion == 0 {
+		return f.applyReviewItem(c)
+	}
+	result := Result{Allowed: true}
+	for step := 0; step < 32; step++ {
+		item := f.applyReviewItem(c)
+		if item.Err != nil {
+			if step > 0 && errors.Is(item.Err, errReviewProgress) {
+				return result
+			}
+			return item
+		}
+		result.Events = append(result.Events, item.Events...)
+		if item.Monitor != nil {
+			result.Monitor = item.Monitor
+		}
+		next, exists, err := f.readReview(c.Revision)
+		if err != nil {
+			return Result{Err: err}
+		}
+		if !exists {
+			return result
+		}
+		c.Generation = next.Fact.Revision
+		bytes := 0
+		for _, row := range f.actionWrites {
+			data, _ := json.Marshal(row)
+			bytes += len(data)
+		}
+		for _, row := range f.reviewWrites {
+			data, _ := json.Marshal(row)
+			bytes += len(data)
+		}
+		if bytes >= 1<<20 {
+			return result
+		}
+	}
+	return result
 }
 
 func (s *Store) maintainReviewWork(after *string) error {

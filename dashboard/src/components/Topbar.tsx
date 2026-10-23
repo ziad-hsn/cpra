@@ -36,27 +36,33 @@ export function Topbar() {
 
   const incidentCount = overview?.by_status?.incident ?? 0;
   const downCount = overview?.by_status?.down ?? 0;
-  const critical = incidentCount + downCount;
-  const unknown = overview?.by_status?.unknown ?? 0;
+  const critical = overview?.unsuppressed_unhealthy ?? incidentCount + downCount;
+  const suppressed = overview?.suppressed_unhealthy ?? 0;
+  const unavailableChecks = overview?.unavailable ?? 0;
+  const paused = overview?.paused ?? overview?.disabled ?? 0;
+  const unknown = overview?.pending ?? overview?.by_status?.unknown ?? 0;
   const verifying = overview?.by_status?.verifying ?? 0;
   const degraded = overview?.by_status?.degraded ?? 0;
-  const active = (overview?.total ?? 0) - (overview?.disabled ?? 0);
+  const active = (overview?.total ?? 0) - paused;
   const offline = !online || fetchStatus === 'paused';
   const projectedAt = overview?.generated ? Date.parse(overview.generated) : NaN;
   const projectionUncertain = Boolean(overview && (!Number.isFinite(projectedAt) || projectedAt > now + 30000));
   const stale = Boolean(overview && (dataUpdatedAt && now - dataUpdatedAt > 30000 || Number.isFinite(projectedAt) && now - projectedAt > 30000));
   const unavailable = offline || isError || stale || projectionUncertain;
-  const ok = !isLoading && !unavailable && active > 0 && critical === 0 && degraded === 0 && unknown === 0 && verifying === 0;
+  const ok = !isLoading && !unavailable && active > 0 && paused === 0 && unavailableChecks === 0 && suppressed === 0 && critical === 0 && degraded === 0 && unknown === 0 && verifying === 0;
   const statusText = offline ? 'Offline — current health unavailable'
     : stale ? 'Observations are stale — current health unavailable'
     : projectionUncertain ? 'Projection freshness unavailable — current health unavailable'
     : isError ? 'Status unavailable'
     : isLoading ? 'Loading fleet status…'
-    : active === 0 ? 'No active monitors'
+    : active === 0 ? (paused > 0 ? `${paused} monitor${paused !== 1 ? 's' : ''} paused` : 'No active monitors')
     : critical > 0 ? `${critical} monitor${critical !== 1 ? 's' : ''} critical — investigate`
+    : unavailableChecks > 0 ? `${unavailableChecks} monitor${unavailableChecks !== 1 ? 's' : ''} unavailable — review check configuration`
+    : suppressed > 0 ? `${suppressed} unhealthy monitor${suppressed !== 1 ? 's' : ''} — notifications suppressed`
     : degraded > 0 ? `${degraded} monitor${degraded !== 1 ? 's' : ''} degraded — review warnings`
     : unknown > 0 ? 'Awaiting first check results'
     : verifying > 0 ? `${verifying} monitor${verifying !== 1 ? 's' : ''} verifying`
+    : paused > 0 ? `${active} active; ${paused} paused`
     : 'All systems operational';
 
   return (
@@ -74,6 +80,7 @@ export function Topbar() {
         <span className="dot" aria-hidden />
         <span>
           {statusText}
+          {!unavailable && !isLoading && (overview?.maintenance ?? 0) > 0 && <small className="stale-note"> {overview?.maintenance} in maintenance; checks continue.</small>}
           {unavailable && overview && <small className="stale-note"> Saved observations remain visible. Last received {dataUpdatedAt ? formatDateTime(new Date(dataUpdatedAt).toISOString()) : 'at an unavailable time'}. Controller snapshot {Number.isFinite(projectedAt) ? formatDateTime(overview.generated) : 'time unavailable'}.</small>}
         </span>
       </div>

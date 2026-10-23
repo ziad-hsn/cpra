@@ -5,6 +5,7 @@ import { formatDateTime, formatNumber } from '../lib/format';
 
 const milliseconds = (value?: number) => value === undefined ? 'Unavailable' : `${formatNumber(value)} ms`;
 const bytes = (value?: number) => value === undefined ? 'Unavailable' : `${formatNumber(value)} bytes`;
+const actionRows = (value?: number, size?: number) => `${value === undefined ? 'Unavailable' : formatNumber(value)} ${value === 1 ? 'record' : 'records'} · ${bytes(size)}`;
 const status = (value: boolean | undefined, yes: string, no: string) => value === undefined ? 'Unavailable' : value ? yes : no;
 
 export function RuntimeDiagnostics() {
@@ -34,6 +35,15 @@ export function RuntimeDiagnostics() {
         <dt>Committed controller log position</dt><dd>{current.storage.appliedIndex === undefined ? 'Unavailable' : formatNumber(current.storage.appliedIndex)}</dd>
         <dt>Last recorded commit latency</dt><dd>{milliseconds(current.storage.commitLatencyMs)}</dd>
         <dt>Last recorded snapshot duration</dt><dd>{milliseconds(current.storage.snapshotDurationMs)}</dd>
+        <dt>Action storage accounting</dt><dd>{current.storage.actions?.observedAt ? `Sampled ${formatDateTime(current.storage.actions.observedAt)}` : 'Unavailable'}</dd>
+        {current.storage.actions && <>
+          <dt>Active action records</dt><dd>{actionRows(current.storage.actions.active, current.storage.actions.activeBytes)}</dd>
+          <dt>Ordinary retained action records</dt><dd>{actionRows(current.storage.actions.ordinaryRetained, current.storage.actions.ordinaryBytes)}</dd>
+          <dt>Protected action records</dt><dd>{actionRows(current.storage.actions.protected, current.storage.actions.protectedBytes)}</dd>
+          <dt>Action retirement tombstones</dt><dd>{actionRows(current.storage.actions.tombstones, current.storage.actions.tombstoneBytes)}</dd>
+          <dt>Cumulative retired action records</dt><dd>{actionRows(current.storage.actions.retired, current.storage.actions.retiredBytes)}</dd>
+          <dt>Cleanup-blocked action records (last page)</dt><dd>{actionRows(current.storage.actions.cleanupBlocked, current.storage.actions.cleanupBlockedBytes)}</dd>
+        </>}
         {current.storage.generations && <>
           <dt>Active collection generations</dt><dd>{current.storage.generations.active === undefined ? 'Unavailable' : formatNumber(current.storage.generations.active)}</dd>
           <dt>Retained collection generations</dt><dd>{current.storage.generations.retained === undefined ? 'Unavailable' : formatNumber(current.storage.generations.retained)}</dd>
@@ -49,6 +59,9 @@ export function RuntimeDiagnostics() {
       {current.readinessReason && <p role="status">{current.readinessReason}</p>}
       {current.controllerReason && <p className="muted">{current.controllerReason}</p>}
       {current.storage.error && <p role="alert">Storage reports an error. Consult protected server diagnostics.</p>}
+      {current.storage.actions && <p className="muted">Action byte counts measure encoded records, not filesystem allocation or reclaimed disk space. Protected records include unresolved outcomes and retained review evidence. Retirement preserves records that remain referenced.</p>}
+      {current.storage.actions?.cleanupCoverage && <p className="muted">{current.storage.actions.cleanupCoverage}</p>}
+      {current.storage.actions?.compactionCondition && <p role="status">{current.storage.actions.compactionCondition}</p>}
       {current.storage.generations?.condition && <p role="status">{current.storage.generations.condition}</p>}
       {current.storage.generations?.usageCoverage && <p role="status">{current.storage.generations.usageCoverage} These byte subtotals exclude incomplete collections, Raft state, snapshots, history and other files. Filesystem allocation does not measure physical host disk usage or prove reclaimed space.</p>}
     </>}

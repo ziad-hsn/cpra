@@ -16,6 +16,10 @@ type ActionView struct {
 
 func actionView(a persistence.ActionRecord) api.Action {
 	out := api.Action{ID: a.ID, MonitorID: a.MonitorID, IncarnationUID: a.IncarnationID(), IncidentID: a.IncidentID, ExecutionID: a.ID, ExecutionRevision: a.Revision, State: string(a.State), Kind: a.Kind, Outcome: a.Outcome, ReviewRevision: a.ReviewRevision, Held: a.Held, ExecutorFenced: a.ExecutorFenced, ReceiptID: a.OperationID}
+	out.TerminationReason, out.Resolution = a.TerminationReason, resolutionView(a.Resolution)
+	if a.ExecutionBudget > 0 {
+		out.ExecutionBudget = a.ExecutionBudget.String()
+	}
 	out.Failure, out.Cause = failureView(a.Failure), failureView(a.Cause)
 	out.Color, out.DeliveryID, out.EndpointID, out.NotificationEpisode = a.Color, a.DeliveryID, a.EndpointID, a.NotificationEpisode
 	if a.ReviewNotice != nil {
@@ -156,5 +160,12 @@ func recoveryFailureView(f *persistence.RecoveryFailure) *api.RecoveryFailure {
 	if f == nil {
 		return nil
 	}
-	return &api.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, Trigger: api.RecoveryFailureTrigger(f.Trigger), Outcome: "failure", FailedAt: f.FailedAt.UTC()}
+	return &api.RecoveryFailure{ActionID: f.ActionID, Driver: f.Driver, Attempt: f.Attempt, MaxAttempts: f.MaxAttempts, TerminationReason: f.TerminationReason, Trigger: api.RecoveryFailureTrigger(f.Trigger), Outcome: "failure", FailedAt: f.FailedAt.UTC()}
+}
+
+func resolutionView(n *persistence.ResolutionNotice) *api.ResolutionNotice {
+	if n == nil {
+		return nil
+	}
+	return &api.ResolutionNotice{ConditionID: n.ConditionID, RecoveredAt: n.RecoveredAt.UTC(), Health: api.ResolutionNoticeHealth(n.Health)}
 }

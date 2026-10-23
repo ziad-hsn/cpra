@@ -39,12 +39,12 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		if !useAnchors || metadata.Len() == metadataOffset {
 			return nil
 		}
-		root, err := anchors.Parse(metadata.Bytes()[metadataOffset:], func(n int) int {
+		root, err := anchors.ParseBounded(metadata.Bytes()[metadataOffset:], func(n int) int {
 			if n > 0 && n+metadataLineOffset <= len(metadataLines) {
 				return metadataLines[n+metadataLineOffset-1]
 			}
 			return 0
-		})
+		}, min(int64(b.o.MaxDocumentBytes), max(0, b.o.MaxStagingBytes-b.bytes)))
 		if err != nil {
 			return parseSourceError(err, Location{Source: source, Document: document, Item: item + 1}, func(n int) int { return n })
 		}
@@ -101,7 +101,7 @@ func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string)
 		var root *yaml.Node
 		var err error
 		if useAnchors {
-			root, err = anchors.Parse(entry.Bytes(), line)
+			root, err = anchors.ParseBounded(entry.Bytes(), line, min(int64(b.o.MaxResourceBytes), max(0, b.o.MaxStagingBytes-b.bytes)))
 			line = func(n int) int { return n }
 			if err == nil {
 				value, err = b.decodeYAMLNode(root)
@@ -875,11 +875,16 @@ func (b *builder) document(ctx context.Context, value any, location Location, po
 }
 
 func (b *builder) emit(value any, location Location, manifest bool, positions map[string]SourcePosition) error {
+	err := b.emitResource(value, location, manifest, positions)
+	return b.retainInputError(err, Item{Location: locationAt(location, positions[""]), FieldPositions: resourceFieldPositions(positions, manifest)})
+}
+
+func (b *builder) emitResource(value any, location Location, manifest bool, positions map[string]SourcePosition) error {
 	location = locationAt(location, positions[""])
 	fields := resourceFieldPositions(positions, manifest)
 	m, ok := value.(map[string]any)
 	if !ok {
-		return fmt.Errorf("%s: resource must be an object", location)
+		return (Item{Location: location, FieldPositions: fields}).ValidationError(api.InvalidField("", "objectRequired"))
 	}
 	var resource api.Resource
 	var err error
@@ -922,24 +927,24 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 		switch key {
 		case "id", "name", "pulse_check", "codes", "intervention", "enabled", "tags", "maintenance", "auto_ignore":
 		default:
-			return api.Resource{}, fmt.Errorf("unknown manifest monitor field")
+			return api.Resource{}, api.InvalidField("", "unknownField")
 		}
 	}
 	name, _ := m["name"].(string)
 	id, _ := m["id"].(string)
 	if value, exists := m["id"]; exists {
 		if _, ok := value.(string); !ok {
-			return api.Resource{}, fmt.Errorf("manifest id must be a string")
+			return api.Resource{}, api.InvalidField("metadata.id", "invalidType")
 		}
 	}
 	if value, exists := m["name"]; exists {
 		if _, ok := value.(string); !ok {
-			return api.Resource{}, fmt.Errorf("manifest name must be a string")
+			return api.Resource{}, api.InvalidField("metadata.name", "invalidType")
 		}
 	}
 	if id == "" {
 		if name == "" {
-			return api.Resource{}, fmt.Errorf("manifest monitor name is required")
+			return api.Resource{}, api.InvalidField("metadata.name", "required")
 		}
 		sum := sha256.Sum256([]byte(name))
 		id = "name:" + hex.EncodeToString(sum[:])
@@ -955,7 +960,7 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 	}
 	pulse, ok := m["pulse_check"].(map[string]any)
 	if !ok {
-		return api.Resource{}, fmt.Errorf("manifest monitor pulse_check is required")
+		return api.Resource{}, api.InvalidField("spec.check", "required")
 	}
 	check := make(map[string]any)
 	for key, value := range pulse {
@@ -970,7 +975,7 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 		case "healthy_threshold":
 			check["healthyThreshold"] = value
 		default:
-			return api.Resource{}, fmt.Errorf("unknown manifest pulse field")
+			return api.Resource{}, api.InvalidField("spec.check", "unknownField")
 		}
 	}
 	if groups, ok := check["groups"].(string); ok {
@@ -1003,7 +1008,7 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 	if intervention, exists := m["intervention"]; exists && intervention != nil {
 		object, ok := intervention.(map[string]any)
 		if !ok {
-			return api.Resource{}, fmt.Errorf("manifest intervention must be an object")
+			return api.Resource{}, api.InvalidField("spec.recovery", "objectRequired")
 		}
 		recovery := make(map[string]any)
 		for key, value := range object {
@@ -1016,7 +1021,7 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 			case "max_failures":
 				recovery["maxFailures"] = value
 			default:
-				return api.Resource{}, fmt.Errorf("unknown manifest intervention field")
+				return api.Resource{}, api.InvalidField("spec.recovery", "unknownField")
 			}
 		}
 		driver, err := driverFromManifest("recovery", object["action"], object["target"])
@@ -1029,19 +1034,19 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 	if codes, exists := m["codes"]; exists {
 		object, ok := codes.(map[string]any)
 		if !ok {
-			return api.Resource{}, fmt.Errorf("manifest codes must be an object")
+			return api.Resource{}, api.InvalidField("spec.notifications", "objectRequired")
 		}
 		rules := make(map[string]any)
 		for color, value := range object {
 			code, ok := value.(map[string]any)
 			if !ok {
-				return api.Resource{}, fmt.Errorf("manifest code must be an object")
+				return api.Resource{}, api.InvalidField("spec.notifications", "objectRequired")
 			}
 			for key := range code {
 				switch key {
 				case "dispatch", "notify", "notify_group", "config", "trigger":
 				default:
-					return api.Resource{}, fmt.Errorf("unknown manifest code field")
+					return api.Resource{}, api.InvalidField("spec.notifications."+color, "unknownField")
 				}
 			}
 			if value, exists := code["notify_group"]; !allowDestinationConflict && exists && value != nil {

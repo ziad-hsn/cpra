@@ -82,7 +82,7 @@ func mysqlCheckConfig(dsn string) (*mysql.Config, error) {
 }
 
 func (p *PulseMySQLJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(mysqlCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -133,3 +133,16 @@ func (p *PulseMySQLJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseMySQLJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseMySQLJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseMySQLJob) IsNil() bool                { return p == nil }
+
+func mysqlCheckFailure(err error) error {
+	var provider *mysql.MySQLError
+	if errors.As(err, &provider) {
+		switch provider.Number {
+		case 1045: // ER_ACCESS_DENIED_ERROR
+			return &checkAccessError{code: "authentication_failed", cause: err}
+		case 1044, 1142, 1143, 1227: // Database, command, column or specific privilege.
+			return &checkAccessError{code: "authorization_failed", cause: err}
+		}
+	}
+	return err
+}

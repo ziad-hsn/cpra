@@ -102,6 +102,10 @@ spec:
             {{- if .Values.api.enabled }}
             - -web.addr=0.0.0.0:8060
             - {{ printf "-web.auth-file=%s" (include "cpra.readTokenPath" .) | quote }}
+            {{- if not .Values.management.enabled }}
+            - -web.auth-root=/run/secrets/cpra
+            - -web.auth-reader-group=1001
+            {{- end }}
             {{- else }}
             - -web=false
             {{- end }}
@@ -147,6 +151,10 @@ spec:
                 {{- end }}
                 - --token-file
                 - {{ include "cpra.readTokenPath" $ }}
+                {{- if not $.Values.management.enabled }}
+                - --token-root=/run/secrets/cpra
+                - --token-reader-group=1001
+                {{- end }}
                 - --request-timeout
                 - 2s
             {{- toYaml (index $.Values.probes $name) | nindent 12 }}

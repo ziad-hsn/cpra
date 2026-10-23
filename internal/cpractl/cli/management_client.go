@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection"
@@ -21,11 +22,15 @@ func (o *options) mustClient() (*cpra.Client, error) {
 	}
 	config := cpra.Config{BaseURL: o.server, Timeout: o.timeout, AllowInsecureHTTP: o.insecureHTTP, ReadAttempts: 1}
 	if o.tokenFile != "" {
+		group, err := secureconfig.TokenReaderGroup(o.tokenReaderGroup)
+		if err != nil {
+			return nil, localFileFailure("API token file", err)
+		}
 		config.TokenSource = func(ctx context.Context) (string, error) {
 			if err := ctx.Err(); err != nil {
 				return "", err
 			}
-			data, err := readManagementFile(o.tokenFile, 16<<10)
+			data, err := secureconfig.ReadTokenFile(ctx, secureconfig.TokenFileOptions{Path: o.tokenFile, Root: o.tokenRoot, ReaderGroupID: group, ReaderSID: o.tokenReaderSID, MaxBytes: 16 << 10})
 			if err != nil {
 				return "", localFileFailure("API token file", err)
 			}
@@ -128,6 +133,14 @@ func localFileFailure(subject string, err error) error {
 		message = subject + " must be a regular file"
 	case errors.Is(err, errInputTooLarge):
 		message = subject + " exceeds its byte limit"
+	case errors.Is(err, secureconfig.ErrTokenFileSize):
+		message = subject + " exceeds its byte limit"
+	case errors.Is(err, secureconfig.ErrTokenFileType):
+		message = subject + " must be a single-link regular file"
+	case errors.Is(err, secureconfig.ErrTokenFileChange):
+		message = subject + " changed during the local read; no API request was sent"
+	case errors.Is(err, secureconfig.ErrTokenFilePolicy):
+		message = subject + " has unsafe ownership, permissions or token-root policy; use an owner-only file or an explicit trusted service reader"
 	}
 	return &managementCommandError{message, err}
 }
@@ -143,6 +156,31 @@ func (e *managementCommandError) Unwrap() error { return e.cause }
 func managementFailure(err error) error {
 	if err == nil {
 		return nil
+	}
+	var input *collection.InputErrors
+	if errors.As(err, &input) {
+		// These are locally sanitized rule/location pairs, never remote error
+		// messages. Keep their original order and at most ten displayed details.
+		message := "configuration input was rejected"
+		for _, detail := range input.Details[:min(10, len(input.Details))] {
+			field, ok := api.ValidationFieldError(detail)
+			if !ok {
+				continue
+			}
+			path := field.Field
+			if detail.Field != "" {
+				path = api.SafeValidationField(detail.Field)
+			}
+			message += "\n" + managementDisplay(detail.Location.String()) + ": "
+			if path != "" {
+				message += path + ": "
+			}
+			message += field.Message
+		}
+		if input.Truncated {
+			message += "\nvalidation details truncated after ten errors"
+		}
+		return &managementCommandError{message, err}
 	}
 	var sourceAccess *collection.SourceAccessError
 	if errors.As(err, &sourceAccess) && !errors.Is(err, cpra.ErrAmbiguous) {
@@ -188,6 +226,8 @@ func managementFailure(err error) error {
 		message = local.message
 	case errors.Is(err, cpra.ErrInvalid):
 		message = "management request was rejected; inspect resource fields and version preconditions"
+	case errors.Is(err, collection.ErrPreflightRejected):
+		message = "collection validation rejected; no activation was submitted; inspect the original operation's validation result"
 	case errors.Is(err, cpra.ErrResponseTooLarge):
 		message = "management response exceeded the configured byte limit"
 	case errors.Is(err, context.Canceled):

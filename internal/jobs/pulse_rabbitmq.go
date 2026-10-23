@@ -3,6 +3,7 @@
 package jobs
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -47,7 +48,7 @@ func newPulseRabbitMQJob(cfg *manifest.PulseRabbitMQConfig, timeout time.Duratio
 }
 
 func (p *PulseRabbitMQJob) Execute() (result Result) {
-	defer func() { result.Err = SanitizeError(result.Err) }()
+	defer func() { result.Err = SanitizeError(rabbitmqCheckFailure(result.Err)) }()
 	ctx, cancel := operationContext(p.Context(), p.Timeout)
 	defer cancel()
 
@@ -91,3 +92,19 @@ func (p *PulseRabbitMQJob) SetEnqueueTime(t time.Time) { p.EnqueueTime = t }
 func (p *PulseRabbitMQJob) GetStartTime() time.Time    { return p.StartTime }
 func (p *PulseRabbitMQJob) SetStartTime(t time.Time)   { p.StartTime = t }
 func (p *PulseRabbitMQJob) IsNil() bool                { return p == nil }
+
+func rabbitmqCheckFailure(err error) error {
+	if errors.Is(err, amqp.ErrSASL) {
+		return err // Unsupported mechanism does not establish a credential rejection.
+	}
+	if errors.Is(err, amqp.ErrCredentials) {
+		return &checkAccessError{code: "authentication_failed", cause: err}
+	}
+	var provider *amqp.Error
+	if errors.As(err, &provider) && provider.Code == amqp.AccessRefused {
+		// AMQP ACCESS_REFUSED alone cannot identify a bad password. The
+		// driver's credential sentinel above identifies that handshake case.
+		return &checkAccessError{code: "authorization_failed", cause: err}
+	}
+	return err
+}

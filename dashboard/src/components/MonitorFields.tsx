@@ -7,6 +7,7 @@ import { CODE_LABELS } from '../theme/tokens';
 import { formatDateTime } from '../lib/format';
 import { DriverFields, ReferencePicker } from './ResourceForms';
 import { FailureDetails } from './FailureDetails';
+import { MonitorNotificationConditions } from './MonitorNotificationConditions';
 import { useFieldValidation } from './FieldValidation';
 
 const noop = () => undefined;
@@ -204,15 +205,19 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
   return <section aria-label="Monitor application and observations"><h3>Application and observations</h3>
     <p>Configured generation: {monitor.metadata.generation ?? 'Unavailable'} · Observed generation: {status?.observedGeneration ?? 'Unavailable'}</p>
     <p>{monitor.metadata.generation !== undefined && monitor.metadata.generation > 0 && status?.observedGeneration === monitor.metadata.generation ? 'The controller reports this configuration generation applied.' : 'Controller application of this saved configuration has not been confirmed.'}</p>
-    <p>Observed health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
+    <p>Current health: {status?.health || 'Unavailable'} · Last check: {lastChecked === '—' ? 'Unavailable' : lastChecked}</p>
+    <p>Check availability: {status?.availability?.state ?? 'Unavailable'}{status?.availability?.reason ? ` (${status.availability.reason})` : ''} · Assessed: {formatDateTime(status?.availability?.observedAt ?? '')}</p>
+    {status?.lastObservedAt && <p>Last target observation: {status.lastObservedHealth || 'unknown'} at {formatDateTime(status.lastObservedAt)}.</p>}
+    <p>Maintenance: {status?.maintenance === undefined ? 'Unavailable' : status.maintenance ? 'Active; checks continue' : 'Inactive'} · Ordinary notifications: {status?.notificationsSuppressed === undefined ? 'Suppression unavailable' : status.notificationsSuppressed ? 'Suppressed' : 'Eligible under incident policy'}</p>
     {status?.ignored && <p>Ignored by {status.ignoredBy || 'Unavailable'} since {formatDateTime(status.ignoredAt ?? '')}. {status.ignoreReason} Health observations continue.</p>}
     <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
 	<FailureDetails diagnostic={status?.configurationProblem} label="Check configuration problem" />
-	{status?.configurationProblem && <p>Health shows the last target observation. Local preparation will be retried at the check interval; recovery actions are blocked meanwhile.</p>}
+	{status?.configurationProblem && <p>Current health is unknown because local preparation prevents checks. The last target observation is retained separately. Preparation will be retried at the check interval; recovery actions are blocked meanwhile.</p>}
     {status?.warnings?.some(warning => warning.reason === 'unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>
     <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown provider outcomes: {status?.unknownActions ?? 'Unavailable'} · Actions needing review: {status?.actionsNeedingReview ?? 'Unavailable'}</p>
+    <MonitorNotificationConditions conditions={status?.notificationConditions} truncated={status?.notificationConditionsTruncated} observedAt={status?.notificationConditionsObservedAt} sequence={status?.notificationConditionsSequence} headingLevel={4} />
     <LabelFields labels={monitor.metadata.labels} onChange={noop} readOnly />
   </section>;
 }

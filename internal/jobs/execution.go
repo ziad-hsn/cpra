@@ -13,6 +13,7 @@ import (
 // ActionExecution belongs to one committed start. The owner supplies fresh
 // callbacks for every invocation, including completion after an uncertain start.
 type ActionExecution struct {
+	Deadline           time.Time
 	Finish             func() error
 	RecordAgentReceipt func(context.Context, A2AReceipt) error
 }
@@ -47,6 +48,10 @@ func (e *Execution) notificationMessage(message string) string {
 	if e.controlNotice != "" {
 		return e.controlNotice
 	}
+	if n := e.notification.Resolution; n != nil {
+		message = "Earlier incident recovered at " + n.RecoveredAt.UTC().Format(time.RFC3339) + ". Current service health: " + n.Health + "."
+		message += "\nMonitor: " + e.notification.MonitorID + "\nEarlier incident: " + e.notification.IncidentID + "\nEpisode: " + e.notification.EpisodeID
+	}
 	if n := e.notification.Review; n != nil {
 		message = "Recovery outcome unknown — operator review required."
 		if n.Phase == "close" {
@@ -62,6 +67,14 @@ func (e *Execution) notificationMessage(message string) string {
 	}
 	if failure := e.notification.RecoveryFailure; failure != nil {
 		message += fmt.Sprintf("\nRecovery attempt %d of %d failed. Recovery action: %s.", failure.Attempt, failure.MaxAttempts, failure.ActionID)
+		switch failure.TerminationReason {
+		case "execution_deadline":
+			message += " The original recovery deadline has elapsed; automatic recovery is exhausted."
+		case "permanent_rejection":
+			message += " Recovery was permanently rejected; automatic recovery requires correction."
+		case "attempt_limit":
+			message += " The configured recovery attempt limit is exhausted."
+		}
 	}
 	if e.failureCode != "" && e.failureMessage != "" {
 		return message + "\nCause: " + e.failureCode + " — " + e.failureMessage
@@ -91,6 +104,8 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
+	ProviderKey                                     string
+	ResolutionNotification                          *ResolutionNotification
 	ReviewNotification                              *ReviewNotification
 	ProviderCorrelationVersion                      int
 	NotificationLog                                 *NotificationLog
@@ -204,6 +219,12 @@ func (d *Dispatch) Execute() (r Result) {
 		if err != nil {
 			return Result{Err: err}
 		}
+		if !execution.Deadline.IsZero() {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, execution.Deadline)
+			defer cancel()
+			d.Deadline = execution.Deadline
+		}
 	}
 	if isAgent && (execution.Finish == nil || execution.RecordAgentReceipt == nil) {
 		return Result{Err: errA2AActionRequired}
@@ -253,6 +274,10 @@ func finalizeInvocation(finish func() error) (err error) {
 func (d *Dispatch) Copy() Job {
 	c := *d
 	c.Job = d.Job.Copy()
+	if d.ResolutionNotification != nil {
+		v := *d.ResolutionNotification
+		c.ResolutionNotification = &v
+	}
 	if d.RecoveryFailure != nil {
 		failure := *d.RecoveryFailure
 		c.RecoveryFailure = &failure

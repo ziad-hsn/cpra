@@ -13,11 +13,22 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 	var command Command
 	c := reflect.ValueOf(&command).Elem()
 	frozen := reflect.TypeFor[operationCommandDigestV1]()
-	if c.NumField() != frozen.NumField()+9 {
+	if c.NumField() != frozen.NumField()+10 {
 		t.Fatal("Command gained a field without a reviewed legacy projection")
 	}
 	for n := 0; n < c.NumField(); n++ {
 		field := c.Type().Field(n)
+		if field.Name == "ActionRetirement" {
+			if field.Type != reflect.TypeFor[*ActionRetirementCommand]() || field.Tag.Get("json") != "action_retirement,omitempty" {
+				t.Fatal("unreviewed action retirement shape")
+			}
+			// Retirement has its own format-46 command contract; resource-operation
+			// replay identities must reject it rather than silently omit it.
+			if _, _, err := operationDigest(Command{Kind: "action_retire", ActionRetirement: &ActionRetirementCommand{}}); err == nil {
+				t.Fatal("operation digest accepted retirement data")
+			}
+			continue
+		}
 		if field.Name == "InstallationID" || field.Name == "NoticeRevision" {
 			tag := "installation_id,omitempty"
 			if field.Name == "NoticeRevision" {

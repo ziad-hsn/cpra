@@ -19,7 +19,7 @@ type controllerHealthState struct {
 }
 
 func (f *machine) controllerHealthState() controllerHealthState {
-	return controllerHealthState{actionMigration: f.image.ActionProjectionState != nil && !f.image.ActionProjectionState.Ready, failed: f.err != nil, bootstrap: f.bootstrapPending(),
+	return controllerHealthState{actionMigration: f.image.ActionProjectionState != nil && (!f.image.ActionProjectionState.Ready || f.image.ActionProjectionState.Notifications != nil), failed: f.err != nil, bootstrap: f.bootstrapPending(),
 		restore: f.restorePending() || f.image.Authentication != nil && f.image.Authentication.ResetRequired,
 		index:   f.image.Index, format: f.image.Version}
 }

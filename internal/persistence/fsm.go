@@ -43,7 +43,7 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
-		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion || batch.Version == ActionFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion || batch.Version == ActionFormatVersion || batch.Version == NotificationConditionFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
 			return batch, errors.New("optional commands require their own storage format")
 		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
@@ -185,7 +185,7 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.At.After(at) {
 			at = c.At
 		}
-		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion || f.image.Version == ActionFormatVersion {
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion || f.image.Version == ActionFormatVersion || f.image.Version == NotificationConditionFormatVersion {
 			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
 		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
@@ -195,12 +195,13 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.Kind == "action_project" {
 			r := f.applyActionProjection(c)
 			results = append(results, r)
+			events = append(events, r.Events...)
 			if f.err != nil {
 				return f.err
 			}
 			continue
 		}
-		if state := f.image.ActionProjectionState; state != nil && !state.Ready {
+		if state := f.image.ActionProjectionState; state != nil && (!state.Ready || state.Notifications != nil) {
 			results = append(results, Result{Err: errActionProjectionPending})
 			continue
 		}
@@ -221,6 +222,16 @@ func (f *machine) Apply(log *raft.Log) any {
 		}
 		if f.restorePending() || f.image.Authentication != nil && f.image.Authentication.ResetRequired {
 			results = append(results, Result{Err: ErrAuthenticationResetRequired})
+			continue
+		}
+		if c.Kind == "action_retire" {
+			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
+			r := f.applyActionRetirement(c.ActionRetirement, c.At)
+			if f.err != nil {
+				return f.err
+			}
+			results = append(results, r)
+			events = append(events, r.Events...)
 			continue
 		}
 		if c.Kind == "action_reconcile" {

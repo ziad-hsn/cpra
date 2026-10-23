@@ -13,6 +13,7 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -23,6 +24,34 @@ import (
 type observationQueue struct {
 	queue.Queue
 	value queue.Stats
+}
+
+func TestActionAccountingObservationPreservesSampleAndScope(t *testing.T) {
+	if actionStorageObservation(nil) != nil || actionStorageObservation(&persistence.ActionStorageAccounting{}) != nil {
+		t.Fatal("missing sample became measured zero")
+	}
+	at := time.Date(2026, 10, 23, 12, 0, 0, 0, time.FixedZone("local", 3*60*60))
+	value := actionStorageObservation(&persistence.ActionStorageAccounting{ObservedAt: at, Active: 0, OrdinaryRetained: 7, Protected: 3,
+		OrdinaryBytes: 4096, ProtectedBytes: 8192, Retired: 25, RetiredBytes: 65536,
+		CleanupBlocked: 2, CleanupBlockedBytes: 512, CleanupCoverage: "last_selection_page", CompactionCondition: "state_changed"})
+	raw, err := json.Marshal(api.State{Storage: api.StorageState{Available: true, Mode: "raft", Actions: value}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded api.State
+	if err := api.DecodeResponse(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	got := decoded.Storage.Actions
+	if got == nil || got.Active != 0 || got.OrdinaryRetained != 7 || got.Protected != 3 || got.OrdinaryBytes != 4096 ||
+		got.ProtectedBytes != 8192 || got.Retired != 25 || got.RetiredBytes != 65536 || got.CleanupBlocked != 2 ||
+		got.CleanupBlockedBytes != 512 || got.CleanupCoverage != "last_selection_page" || got.CompactionCondition != "state_changed" ||
+		!got.ObservedAt.Equal(at) || decoded.Storage.BytesAvailable {
+		t.Fatal("sample became a full cleanup inventory or physical disk measurement", got)
+	}
+	if !bytes.Contains(raw, []byte(`"observedAt":"2026-10-23T09:00:00Z"`)) {
+		t.Fatal("sample did not use UTC wire time")
+	}
 }
 
 func (q *observationQueue) Stats() queue.Stats { return q.value }

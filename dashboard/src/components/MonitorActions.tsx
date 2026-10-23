@@ -9,10 +9,11 @@ import { ProblemDetails } from './ProblemDetails';
 import { mutationReceipt } from '../api/resources';
 import { useManagementMutation } from '../hooks/mutations';
 import { MutationReceipt, OperationLink } from './OperationReceipt';
-import { formatDateTime } from '../lib/format';
+import { formatDateTime, timeAgo } from '../lib/format';
 import { CODE_LABELS, type CpraCode } from '../theme/tokens';
 import { CodeBadge } from './CodeBadge';
 import { Dialog } from './Dialog';
+import { NotificationResolution, terminationLabel } from './NotificationResolution';
 
 export function MonitorActions({ monitorID }: { monitorID: string }) {
   const session = useDashboardSession();
@@ -74,7 +75,8 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
     {page.data && <>
       {page.data.items.length === 0 ? <p>No retained actions for this monitor.</p> : <ul className="stack-12">{page.data.items.map(action => <li key={action.id} style={{ overflowWrap: 'anywhere' }}>
         <strong>{action.kind === 'intervention' ? 'Recovery' : action.kind === 'code' ? 'Notification' : action.kind || 'Action'}</strong> · <span className="mono">{action.id}</span>
-        <p>Provider outcome: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
+        <p>{['queued', 'started', 'cancelled'].includes(action.state) && !action.outcome ? 'Execution state' : 'Provider outcome'}: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
+        {action.terminationReason && <p>Stopped: {terminationLabel(action.terminationReason)}. This does not authorize another attempt.</p>}
         {action.color && (Object.prototype.hasOwnProperty.call(CODE_LABELS, action.color) ? <CodeBadge code={action.color as CpraCode} /> : <span>Notification: {action.color}</span>)}
         {action.reviewNotice && <div className="stack-4">
           <p>{action.reviewNotice.phase === 'open' ? 'Recovery outcome unknown — operator review required.' : action.reviewNotice.reason === 'health_recovered' ? 'Health recovered earlier; the recovery action outcome remains unknown.' : 'Recovery outcome reviewed.'}</p>
@@ -82,12 +84,15 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
           <p>Review alert {action.reviewNotice.alertID} · Recovery action {action.reviewNotice.actionID}</p>
           {action.reviewNotice.phase === 'close' && <p className="muted">This is a closure notification. Delivery acceptance does not prove that a provider closed its alert or that the earlier recovery succeeded.</p>}
         </div>}
+        <NotificationResolution resolution={action.resolution} />
         {action.deliveryID && <p className="muted">Delivery {action.deliveryID}{action.endpointID ? ` · Destination ${action.endpointID}` : ''}</p>}
-        {(action.queuedAt || action.deadline) && <p className="muted">Queued: {formatDateTime(action.queuedAt ?? '')} · Deadline: {formatDateTime(action.deadline ?? '')}</p>}
+        {action.queuedAt && <p className="muted">Queued: {formatDateTime(action.queuedAt)}{action.state === 'queued' ? ` (${timeAgo(action.queuedAt)})` : ''}.</p>}
+        {action.executionBudget && <p className="muted">Captured execution budget: {action.executionBudget}. {!action.deadline && !action.startedAt ? action.state === 'queued' ? 'Waiting for first committed start; the execution deadline has not begun.' : 'Execution did not start.' : 'Retries and restart retain the original deadline.'}</p>}
+        {action.deadline && <p className="muted">Execution deadline: {formatDateTime(action.deadline)}.</p>}
         <FailureDetails diagnostic={action.failure} />
         <FailureDetails diagnostic={action.cause} label="Notification cause" />
         {action.updatedAt && <p className="muted">Last recorded change: {formatDateTime(action.updatedAt)}</p>}
-        {action.recoveryFailure && <p style={{ overflowWrap: 'anywhere' }}>Triggered by confirmed {action.recoveryFailure.driver} recovery failure: attempt {action.recoveryFailure.attempt} of {action.recoveryFailure.maxAttempts}, action {action.recoveryFailure.actionID}, at {formatDateTime(action.recoveryFailure.failedAt)}.</p>}
+        {action.recoveryFailure && <p style={{ overflowWrap: 'anywhere' }}>Triggered by confirmed {action.recoveryFailure.driver} recovery failure: attempt {action.recoveryFailure.attempt} of {action.recoveryFailure.maxAttempts}, action {action.recoveryFailure.actionID}, at {formatDateTime(action.recoveryFailure.failedAt)}.{action.recoveryFailure.terminationReason ? ` ${terminationLabel(action.recoveryFailure.terminationReason)}.` : ''}</p>}
         {action.agentReceipt && <p style={{ overflowWrap: 'anywhere' }}>Agent {action.agentReceipt.taskID ? `task ${action.agentReceipt.taskID}: ${action.agentReceipt.state}` : `message ${action.agentReceipt.messageID}: accepted`}. Receipt {action.agentReceipt.sequence}, observed {formatDateTime(action.agentReceipt.observedAt)}. Monitor checks establish service health.</p>}
         {action.lateEvidence && <p>Later provider evidence: {action.lateEvidence.outcome}, recorded {formatDateTime(action.lateEvidence.recordedAt)}.</p>}
         {action.conflictingEvidence && <p role="alert">Conflicting provider evidence: {action.conflictingEvidence.outcome}, recorded {formatDateTime(action.conflictingEvidence.recordedAt)}. The investigation hold remains.</p>}

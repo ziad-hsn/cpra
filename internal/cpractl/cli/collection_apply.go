@@ -61,6 +61,9 @@ func newApplyCommand(o *options) *cobra.Command {
 				}
 				return managementFailure(preflightErr)
 			}
+			if err := writeCollectionWarnings(cmd, frozen); err != nil {
+				return err
+			}
 			result, applyErr := collection.Apply(cmd.Context(), operations, frozen)
 			if safeManagementHandle(result.OperationID) {
 				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "Operation: %s\n", result.OperationID); err != nil {
@@ -81,6 +84,11 @@ func newApplyCommand(o *options) *cobra.Command {
 				}
 			}
 			if applyErr != nil {
+				if errors.Is(applyErr, collection.ErrPreflightRejected) && result.ValidationPage != nil {
+					if renderErr := writeCollectionValidationFailure(cmd, frozen, *result.ValidationPage); renderErr != nil {
+						return errors.Join(managementFailure(applyErr), renderErr)
+					}
+				}
 				return managementFailure(applyErr)
 			}
 			if wait {
@@ -211,6 +219,10 @@ func writeCollectionSummary(cmd *cobra.Command, operation api.Operation) error {
 		return err
 	}
 	if safeManagementHandle(operation.ID) {
+		if operation.State == "rejected" || operation.State == "validating" {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Inspect validation: cpractl get operation %s --validation\n", operation.ID)
+			return err
+		}
 		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Inspect phases and results: cpractl get operation %s --results\n", operation.ID)
 		return err
 	}

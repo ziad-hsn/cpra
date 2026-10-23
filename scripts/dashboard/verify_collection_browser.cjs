@@ -8,9 +8,10 @@ const origin = process.env.CPRA_BROWSER_ORIGIN;
 const files = JSON.parse(process.env.CPRA_BROWSER_FILES);
 const marker = process.env.CPRA_BROWSER_PRIVATE_MARKER;
 const names = files.map(file => path.basename(file));
+const warningFileName = 'local-only-warning-preview.json';
 const operator = 'main-operator-fixture-012345678901234567890123456789';
 const reader = 'main-reader-fixture-012345678901234567890123456789';
-const privateValues = [operator, reader, marker, ...names];
+const privateValues = [operator, reader, marker, ...names, warningFileName];
 const checks = [];
 let phase = 'browser launch';
 function check(value, message) { if (!value) throw new Error(message); }
@@ -134,7 +135,7 @@ async function bounded(promise, milliseconds, message) {
       if (url.startsWith(origin + '/api/v2/') && request.method() !== 'GET') {
         const raw = request.postData() ?? '';
         // Selected names are never part of the source identity sent to CPRa.
-        if (names.some(name => raw.includes(name))) sentFileName = true;
+        if ([...names, warningFileName].some(name => raw.includes(name))) sentFileName = true;
         writes.push({ method: request.method(), path: new URL(url).pathname });
       }
     });
@@ -184,6 +185,27 @@ async function bounded(promise, milliseconds, message) {
     }, operator);
     const operations = Object.values(discovery.resourceOperations).flat();
     check(operations.includes('PreflightCollection') && operations.includes('ValidateOperation') && operations.includes('GetOperationValidation') && operations.includes('ActivateOperation'), 'This regression requires independently advertised validation and activation');
+
+    phase = 'local configuration advisory before server preview';
+    const warningInput = Buffer.from(JSON.stringify({apiVersion: 'cpra.io/v2', kind: 'Monitor', metadata: {id: 'local-warning-preview'}, spec: {
+      enabled: false, check: {interval: '60s', timeout: '5s', driver: {type: 'http', config: {url: `https://example.invalid/${marker}`}}},
+      recovery: {driver: {type: 'webhook', config: {url: `https://example.invalid/recovery/${marker}`}}},
+    }}));
+    try { await select([{name: warningFileName, mimeType: 'application/json', buffer: warningInput}]); }
+    finally { warningInput.fill(0); }
+    await page.getByRole('heading', {name: 'Source-attributed preview', exact: true}).waitFor();
+    await workerCount(1);
+    await page.getByText('1 local configuration warning in the selected resources.', {exact: false}).waitFor();
+    const advisories = page.getByRole('region', {name: 'Local configuration warnings', exact: true});
+    check(await advisories.getByRole('listitem').count() === 1, 'Local preparation did not expose its single bounded warning');
+    check((await advisories.innerText()).includes('Uncertain recovery has no enabled blue notification destination'), 'Shared missing-blue advisory was not shown before server preflight');
+    check((await advisories.innerText()).includes(warningFileName), 'Local advisory lost source attribution');
+    check(writes.length === 0, 'Local advisory preparation sent a preflight or mutation');
+    await redactedDOM(); await safeStorage();
+    await page.getByRole('button', {name: 'Discard selection', exact: true}).click();
+    await workerCount(0);
+    check(!(await page.content()).includes(warningFileName), 'Discard retained the local warning source');
+    checks.push('shared missing-blue advisory appears during local Worker/WASM preparation before optional server preflight; source attribution is local, secrets remain hidden, and discard performs zero server writes');
 
     // Reverse selection order verifies deterministic ordering before validating a
     // Monitor whose Credential occurs in the later file.
@@ -303,7 +325,7 @@ async function bounded(promise, milliseconds, message) {
     await workerCount(0); await redactedDOM(); await safeStorage();
     checks.push('sign-out terminates worker and clears visible draft; reader cannot select files or inherit import controls');
 
-    check(createdWorkers === 3 && closedWorkers === 3, 'Worker lifecycle did not match valid, malformed, and signed-out selections');
+    check(createdWorkers === 4 && closedWorkers === 4, 'Worker lifecycle did not match advisory, valid, malformed, and signed-out selections');
     check(workerURLs.every(url => url.startsWith(origin + '/assets/') && url.includes('collection.worker-')), 'Import did not use the embedded production worker');
     check(wasmResponses.length >= 1 && wasmResponses.every(item => item.status === 200 && item.url.startsWith(origin + '/assets/collection-parser-')), 'Production Go/WASM asset was not served successfully');
     phase = 'bounded GET response accounting';

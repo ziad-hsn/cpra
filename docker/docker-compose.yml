@@ -15,6 +15,10 @@ services:
     security_opt: [no-new-privileges:true]
     environment:
       GOMEMLIMIT: ${GOMEMLIMIT:-512MiB}
+      CPRA_AUTH_TOKEN_ROOT: /run/secrets
+      # Empty selects UID-1001 owner-only files. For a root-owned 0440 file,
+      # explicitly select 1001; Compose does not change the host file's mode.
+      CPRA_AUTH_TOKEN_READER_GROUP: ${CPRA_TOKEN_READER_GROUP:-}
     ports:
       - "127.0.0.1:${CPRA_PORT:-8060}:8060"
     volumes:

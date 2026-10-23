@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -209,32 +210,30 @@ func TestManagementSnapshotReadsCancelAndBoundConcurrency(t *testing.T) {
 		})
 	}
 }
-func TestManagementSnapshotCaptureReservationsCountAndRelease(t *testing.T) {
+func TestManagementOnePageReadAtCursorQuota(t *testing.T) {
 	f := newManagementFixture(t, true)
+	for _, id := range []string{"one", "two"} {
+		configureControlMonitor(t, f, id)
+	}
 	m := f.server.managementHTTP
-	reads := make([]*snapshotRead, 0, managementPrincipalSnapshots)
-	for range managementPrincipalSnapshots {
-		read, err := m.beginSnapshotRead(t.Context(), "Monitor", url.Values{}, "operator", m.auth.Generation())
-		if err != nil {
-			t.Fatal(err)
-		}
-		reads = append(reads, read)
+	m.mu.Lock()
+	for i := range managementPrincipalSnapshots {
+		m.snapshots[fmt.Sprint(i)] = managementSnapshot{principal: "operator", generation: m.auth.Generation(),
+			created: time.Now(), expires: time.Now().Add(managementCursorTTL), activity: &cursorActivity{readers: 1, lastUsed: time.Now()}}
 	}
+	m.mu.Unlock()
 	response, _ := f.request(t, "GET", "/api/v2/monitors", managementOperatorToken, nil, nil)
-	if response.StatusCode != 429 {
-		t.Fatal("unfinished captures escaped cursor quota", response.StatusCode)
-	}
-	for _, read := range reads {
-		m.releaseSnapshotRead(read)
-	}
-	response, _ = f.request(t, "GET", "/api/v2/monitors", managementOperatorToken, nil, nil)
 	if response.StatusCode != 200 {
-		t.Fatal("released reservations kept cursor quota", response.StatusCode)
+		t.Fatal("one-page read charged retained cursor quota", response.StatusCode)
+	}
+	response, _ = f.request(t, "GET", "/api/v2/monitors?limit=1", managementOperatorToken, nil, nil)
+	if response.StatusCode != 429 {
+		t.Fatal("in-flight retained views were evicted", response.StatusCode)
 	}
 	m.mu.Lock()
-	retained := len(m.snapshots)
-	m.mu.Unlock()
-	if retained != 0 {
-		t.Fatal("terminal first page retained a reservation")
+	for _, entry := range m.snapshots {
+		entry.activity.readers = 0
 	}
+	m.mu.Unlock()
+	m.closeSnapshots()
 }

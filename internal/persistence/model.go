@@ -42,6 +42,7 @@ type Policy struct {
 	Cooldown                time.Duration              `json:"cooldown"`
 	RecoveryBypass          bool                       `json:"recovery_bypass"`
 	Endpoints               map[string]int             `json:"endpoints,omitempty"`
+	NotificationDrivers     map[string][]string        `json:"notification_drivers,omitempty"`
 	NotificationEndpointIDs map[string][]string        `json:"notification_endpoint_ids,omitempty"`
 	NotificationTimeouts    map[string][]time.Duration `json:"notification_timeouts,omitempty"`
 	NotificationTriggers    map[string]string          `json:"notification_triggers,omitempty"`
@@ -56,6 +57,10 @@ type Policy struct {
 }
 
 type Action struct {
+	ProviderKey                string              `json:"provider_key,omitempty"`
+	ExecutionBudget            time.Duration       `json:"execution_budget,omitempty"`
+	TerminationReason          string              `json:"termination_reason,omitempty"`
+	Resolution                 *ResolutionNotice   `json:"resolution,omitempty"`
 	ReviewNotice               *ReviewNotice       `json:"review_notice,omitempty"`
 	Retryable                  bool                `json:"retryable,omitempty"`
 	ProviderCorrelationVersion int                 `json:"provider_correlation_version,omitempty"`
@@ -215,6 +220,7 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	ActionRetirement     *ActionRetirementCommand  `json:"action_retirement,omitempty"`
 	InstallationID       string                    `json:"installation_id,omitempty"`
 	NoticeRevision       string                    `json:"notice_revision,omitempty"`
 	Failure              FailureDiagnostic         `json:"failure,omitzero"`
@@ -258,6 +264,10 @@ type Command struct {
 }
 
 type Event struct {
+	ConditionID                string                       `json:"condition_id,omitempty"`
+	OpeningActionID            string                       `json:"opening_action_id,omitempty"`
+	Resolution                 *ResolutionNotice            `json:"resolution,omitempty"`
+	TerminationReason          string                       `json:"termination_reason,omitempty"`
 	ReviewNotice               *ReviewNotice                `json:"review_notice,omitempty"`
 	Control                    *ControlNotice               `json:"control,omitempty"`
 	FileIncarnation            string                       `json:"file_incarnation,omitempty"`
@@ -321,6 +331,17 @@ func validateCommand(c Command) error {
 	}
 	if c.At.IsZero() {
 		return fmt.Errorf("command observation time is required")
+	}
+	if c.Kind == "action_retire" {
+		extra := c
+		extra.Kind, extra.At, extra.ActionRetirement = "", time.Time{}, nil
+		if extra != (Command{}) {
+			return errActionLedger
+		}
+		return validateActionRetirementCommand(c.ActionRetirement, c.At)
+	}
+	if c.ActionRetirement != nil {
+		return errActionLedger
 	}
 	if c.Kind == "action_project" {
 		return validateActionProjectionCommand(c)

@@ -195,6 +195,30 @@ func (e FailureDiagnosticGrpcStatus) Valid() bool {
 	}
 }
 
+// Defines values for MonitorAvailabilityState.
+const (
+	Available   MonitorAvailabilityState = "available"
+	Paused      MonitorAvailabilityState = "paused"
+	Pending     MonitorAvailabilityState = "pending"
+	Unavailable MonitorAvailabilityState = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the MonitorAvailabilityState enum.
+func (e MonitorAvailabilityState) Valid() bool {
+	switch e {
+	case Available:
+		return true
+	case Paused:
+		return true
+	case Pending:
+		return true
+	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MonitorObservationHealth.
 const (
 	Healthy   MonitorObservationHealth = "healthy"
@@ -369,6 +393,27 @@ func (e RecoveryFailureTrigger) Valid() bool {
 	}
 }
 
+// Defines values for ResolutionNoticeHealth.
+const (
+	ResolutionHealthHealthy   ResolutionNoticeHealth = "healthy"
+	ResolutionHealthUnhealthy ResolutionNoticeHealth = "unhealthy"
+	ResolutionHealthUnknown   ResolutionNoticeHealth = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the ResolutionNoticeHealth enum.
+func (e ResolutionNoticeHealth) Valid() bool {
+	switch e {
+	case ResolutionHealthHealthy:
+		return true
+	case ResolutionHealthUnhealthy:
+		return true
+	case ResolutionHealthUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessDiscovery Non-sensitive process access mode. Discovery grants no permissions and never converts an authentication failure into observation access.
 type AccessDiscovery struct {
 	AuthenticationRequired bool                `json:"authenticationRequired"`
@@ -401,12 +446,15 @@ type Action struct {
 	ConflictingEvidence *ActionEvidence `json:"conflictingEvidence,omitempty"`
 	CreatedAt           *time.Time      `json:"createdAt,omitempty"`
 
-	// Deadline Original overall execution deadline in UTC; waiting and retries do not extend it.
-	Deadline          *time.Time `json:"deadline,omitempty"`
-	DeliveryID        string     `json:"deliveryID,omitempty"`
-	EndpointID        string     `json:"endpointID,omitempty"`
-	ExecutionID       string     `json:"executionID,omitempty"`
-	ExecutionRevision string     `json:"executionRevision,omitempty"`
+	// Deadline Original absolute deadline in UTC once execution starts. New notification conditions may wait with no deadline; retries and restart never renew a started budget.
+	Deadline   *time.Time `json:"deadline,omitempty"`
+	DeliveryID string     `json:"deliveryID,omitempty"`
+	EndpointID string     `json:"endpointID,omitempty"`
+
+	// ExecutionBudget Captured execution budget as a Go duration such as 45s. For new notifications the first committed start sets deadline; absent means the original absolute-deadline contract.
+	ExecutionBudget   string `json:"executionBudget,omitempty"`
+	ExecutionID       string `json:"executionID,omitempty"`
+	ExecutionRevision string `json:"executionRevision,omitempty"`
 
 	// ExecutorFenced Whether the original executor is known finished or fenced for review.
 	ExecutorFenced bool `json:"executorFenced"`
@@ -442,7 +490,10 @@ type Action struct {
 
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
-	Review          *ActionReview    `json:"review,omitempty"`
+
+	// Resolution Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.
+	Resolution *ResolutionNotice `json:"resolution,omitempty"`
+	Review     *ActionReview     `json:"review,omitempty"`
 
 	// ReviewNotice A review-needed notification condition. Its closure does not resolve the underlying uncertain action.
 	ReviewNotice *ReviewNotice `json:"reviewNotice,omitempty"`
@@ -453,7 +504,10 @@ type Action struct {
 	// StartedAt Time the execution start was committed in UTC; absence does not grant permission to retry.
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	State     string     `json:"state"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+
+	// TerminationReason Confirmed operational terminal reason, independent of provider outcome. Empty when no terminal reason is recorded.
+	TerminationReason string     `json:"terminationReason,omitempty"`
+	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
 }
 
 // ActionEvidence Retained provider observation for the original execution, separate from its held outcome and operator assertion. No provider response body is included.
@@ -488,6 +542,54 @@ type ActionReview struct {
 
 // ActionReviewResolution defines model for ActionReview.Resolution.
 type ActionReviewResolution string
+
+// ActionStorageAccounting Cached action-ledger accounting. Bytes are encoded current rows, not bbolt allocation or physical disk reclamation. Unknown/review evidence and still-required dependencies are protected. Retention selection is bounded; cleanupBlocked is not a total inventory.
+type ActionStorageAccounting struct {
+	// Active Queued or started action records.
+	Active uint64 `json:"active"`
+
+	// ActiveBytes Encoded active row bytes.
+	ActiveBytes uint64 `json:"activeBytes"`
+
+	// CleanupBlocked Blocked records in the last bounded selection page, not a fleet total.
+	CleanupBlocked uint64 `json:"cleanupBlocked"`
+
+	// CleanupBlockedBytes Encoded bytes of blocked records in that selection page.
+	CleanupBlockedBytes uint64 `json:"cleanupBlockedBytes"`
+
+	// CleanupCoverage last_selection_page: cleanup-blocked counts cover only the last bounded candidate selection.
+	CleanupCoverage string `json:"cleanupCoverage"`
+
+	// CompactionCondition Safe background compaction condition; separate from durable admission health.
+	CompactionCondition string `json:"compactionCondition,omitempty"`
+
+	// ObservedAt UTC time the cached sample was collected; a read does not rescan storage.
+	ObservedAt time.Time `json:"observedAt"`
+
+	// OrdinaryBytes Encoded ordinary retained row bytes.
+	OrdinaryBytes uint64 `json:"ordinaryBytes"`
+
+	// OrdinaryRetained Ordinary terminal records; dependencies may still prevent retirement.
+	OrdinaryRetained uint64 `json:"ordinaryRetained"`
+
+	// Protected Records excluded from ordinary retirement, including unknown or reviewed evidence.
+	Protected uint64 `json:"protected"`
+
+	// ProtectedBytes Encoded protected row bytes.
+	ProtectedBytes uint64 `json:"protectedBytes"`
+
+	// Retired Cumulative committed retirements.
+	Retired uint64 `json:"retired"`
+
+	// RetiredBytes Cumulative encoded bytes retired; not reclaimed disk space.
+	RetiredBytes uint64 `json:"retiredBytes"`
+
+	// TombstoneBytes Encoded tombstone row bytes.
+	TombstoneBytes uint64 `json:"tombstoneBytes"`
+
+	// Tombstones Current logical retirement markers.
+	Tombstones uint64 `json:"tombstones"`
+}
 
 // AgentReceipt Last committed A2A correlation receipt. Agent text, artifacts, endpoint URLs and credentials are excluded. A task status or message acceptance does not establish monitored-service health.
 type AgentReceipt struct {
@@ -939,7 +1041,7 @@ type Duration = string
 type Event struct {
 	ActionID string `json:"actionID,omitempty"`
 
-	// ActionKind Original action category, when the event belongs to an action.
+	// ActionKind Original action category, when the event belongs to an action or notification condition.
 	ActionKind string `json:"actionKind,omitempty"`
 	Actor      string `json:"actor,omitempty"`
 
@@ -951,6 +1053,9 @@ type Event struct {
 
 	// Color Original notification Code, when applicable.
 	Color string `json:"color,omitempty"`
+
+	// ConditionID Original notification condition identity, including cancellation before any closing action exists.
+	ConditionID string `json:"conditionID,omitempty"`
 
 	// ControlRevision Original control or incident attention revision, when applicable.
 	ControlRevision string `json:"controlRevision,omitempty"`
@@ -974,13 +1079,22 @@ type Event struct {
 	// Note Operator note recorded with the original audited event; never provider credentials.
 	Note string `json:"note,omitempty"`
 
+	// OpeningActionID Original opening action referenced by a notification condition; does not imply a closing action or provider resolution.
+	OpeningActionID string `json:"openingActionID,omitempty"`
+
 	// Outcome Recorded safe outcome classification; never a provider response body.
 	Outcome string `json:"outcome,omitempty"`
 	Reason  string `json:"reason,omitempty"`
 
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
-	Time            time.Time        `json:"time"`
+
+	// Resolution Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.
+	Resolution *ResolutionNotice `json:"resolution,omitempty"`
+
+	// TerminationReason Confirmed operational terminal reason, independent of provider outcome. Empty when no terminal reason is recorded.
+	TerminationReason string    `json:"terminationReason,omitempty"`
+	Time              time.Time `json:"time"`
 }
 
 // EventList defines model for EventList.
@@ -1332,6 +1446,17 @@ type Monitor struct {
 	Status     MonitorStatus `json:"status,omitempty"`
 }
 
+// MonitorAvailability Owner-published check availability. observedAt is the controller assessment time, never a substitute for a completed check timestamp. Pending means no real check result; paused means disabled or committed snooze; unavailable means local preparation or controller projection is unavailable.
+type MonitorAvailability struct {
+	// ObservedAt Absent when the owner has not published a matching configuration and incarnation.
+	ObservedAt *time.Time               `json:"observedAt,omitempty"`
+	Reason     string                   `json:"reason,omitempty"`
+	State      MonitorAvailabilityState `json:"state"`
+}
+
+// MonitorAvailabilityState defines model for MonitorAvailability.State.
+type MonitorAvailabilityState string
+
 // MonitorList defines model for MonitorList.
 type MonitorList struct {
 	GeneratedAt time.Time `json:"generatedAt,omitempty,omitzero"`
@@ -1344,6 +1469,9 @@ type MonitorList struct {
 type MonitorObservation struct {
 	ActionsNeedingReview int64 `json:"actionsNeedingReview"`
 
+	// Availability Owner-published check availability. observedAt is the controller assessment time, never a substitute for a completed check timestamp. Pending means no real check result; paused means disabled or committed snooze; unavailable means local preparation or controller projection is unavailable.
+	Availability MonitorAvailability `json:"availability,omitempty"`
+
 	// CertificateVerificationDisabled Explicit per-monitor TLS certificate verification bypass. Does not affect API authentication or recovery verification.
 	CertificateVerificationDisabled bool   `json:"certificateVerificationDisabled"`
 	CheckAdmission                  string `json:"checkAdmission,omitempty"`
@@ -1352,20 +1480,28 @@ type MonitorObservation struct {
 	// CompletedNotifications Succeeded deliveries retained for this monitor incarnation; not a lifetime total.
 	CompletedNotifications int64 `json:"completedNotifications"`
 
-	// ConfigurationProblem Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation.
+	// ConfigurationProblem Local check preparation failed before target invocation. Current health is unknown; lastObservedHealth and lastObservedAt preserve the last real observation.
 	ConfigurationProblem *FailureDiagnostic `json:"configurationProblem,omitempty"`
 
 	// ConfigurationProblemAt Last failed local preparation, in UTC. Absent when preparation is usable.
-	ConfigurationProblemAt  *time.Time               `json:"configurationProblemAt,omitempty"`
-	ConfiguredNotifications []string                 `json:"configuredNotifications"`
-	Enabled                 bool                     `json:"enabled"`
-	FailedNotifications     int64                    `json:"failedNotifications"`
-	Health                  MonitorObservationHealth `json:"health"`
-	Ignored                 bool                     `json:"ignored"`
-	IncarnationUID          string                   `json:"incarnationUID"`
-	IncidentID              string                   `json:"incidentID,omitempty"`
-	IntervalMS              int64                    `json:"intervalMs"`
-	LastCheckLatencyMS      Measurement              `json:"lastCheckLatencyMs"`
+	ConfigurationProblemAt *time.Time `json:"configurationProblemAt,omitempty"`
+
+	// ConfigurationRevision Runtime configuration identity for this observation. Not a writable catalog resourceVersion.
+	ConfigurationRevision   string   `json:"configurationRevision,omitempty"`
+	ConfiguredNotifications []string `json:"configuredNotifications"`
+
+	// ControlRevision Committed control identity captured in this observation.
+	ControlRevision     string `json:"controlRevision,omitempty"`
+	Enabled             bool   `json:"enabled"`
+	FailedNotifications int64  `json:"failedNotifications"`
+
+	// Health Current health is unknown while local preparation prevents target checks. Use lastObservedHealth and lastObservedAt for the preserved prior real observation.
+	Health             MonitorObservationHealth `json:"health"`
+	Ignored            bool                     `json:"ignored"`
+	IncarnationUID     string                   `json:"incarnationUID"`
+	IncidentID         string                   `json:"incidentID,omitempty"`
+	IntervalMS         int64                    `json:"intervalMs"`
+	LastCheckLatencyMS Measurement              `json:"lastCheckLatencyMs"`
 
 	// LastCheckedAt Absent when unavailable.
 	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
@@ -1373,30 +1509,58 @@ type MonitorObservation struct {
 	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
 	LastFailure *FailureDiagnostic `json:"lastFailure,omitempty"`
 
+	// LastObservedAt Timestamp of the last real completed target check. Absent before any check returns.
+	LastObservedAt *time.Time `json:"lastObservedAt,omitempty"`
+
+	// LastObservedHealth Last completed target-check outcome, preserved when current check availability changes.
+	LastObservedHealth string `json:"lastObservedHealth,omitempty"`
+
 	// LastSuccessfulAt Absent when unavailable.
 	LastSuccessfulAt *time.Time `json:"lastSuccessfulAt,omitempty"`
-	MissedChecks     int64      `json:"missedChecks"`
-	MonitorID        string     `json:"monitorID"`
-	Name             string     `json:"name"`
+
+	// Maintenance Controller-evaluated maintenance for this configuration and incarnation. Absent when a matching owner projection is unavailable.
+	Maintenance  *bool  `json:"maintenance,omitempty"`
+	MissedChecks int64  `json:"missedChecks"`
+	MonitorID    string `json:"monitorID"`
+	Name         string `json:"name"`
 
 	// NextCheckAt Absent when unavailable.
-	NextCheckAt          *time.Time              `json:"nextCheckAt,omitempty"`
-	NumericID            int64                   `json:"numericID"`
-	PendingNotifications int64                   `json:"pendingNotifications"`
-	Phase                MonitorObservationPhase `json:"phase"`
-	QueueRejections      int64                   `json:"queueRejections"`
+	NextCheckAt *time.Time `json:"nextCheckAt,omitempty"`
+
+	// NotificationConditions At most 100 conditions in deterministic identity order. Inspect the original action for execution facts; no condition authorizes replay.
+	NotificationConditions []NotificationCondition `json:"notificationConditions,omitempty"`
+
+	// NotificationConditionsObservedAt UTC time of the bounded detail read. Absent from list summaries and when detail coverage is unavailable. This is an observation, not a fleet-wide snapshot.
+	NotificationConditionsObservedAt *time.Time `json:"notificationConditionsObservedAt,omitempty"`
+
+	// NotificationConditionsSequence Action-ledger progress sampled by the detail read, encoded as a decimal string. Not a resourceVersion, mutation precondition or resumable cursor.
+	NotificationConditionsSequence string `json:"notificationConditionsSequence,omitempty"`
+
+	// NotificationConditionsTruncated Conditions are omitted or detail coverage is unavailable. List summaries do not load retained review conditions. This projection never collects the whole action ledger.
+	NotificationConditionsTruncated bool `json:"notificationConditionsTruncated,omitempty"`
+
+	// NotificationsSuppressed Ordinary notification suppression captured by the owner. Gray control notices retain their documented exception. Absent when a matching projection is unavailable.
+	NotificationsSuppressed *bool                   `json:"notificationsSuppressed,omitempty"`
+	NumericID               int64                   `json:"numericID"`
+	PendingNotifications    int64                   `json:"pendingNotifications"`
+	Phase                   MonitorObservationPhase `json:"phase"`
+	QueueRejections         int64                   `json:"queueRejections"`
 
 	// SnoozedUntil Absent when unavailable.
 	SnoozedUntil *time.Time               `json:"snoozedUntil,omitempty"`
 	Source       MonitorObservationSource `json:"source"`
 
+	// SuppressionObservedAt UTC time of the controller suppression assessment. Clients must not recompute maintenance from their clocks.
+	SuppressionObservedAt *time.Time `json:"suppressionObservedAt,omitempty"`
+
 	// Target Non-secret target summary captured before credential resolution.
-	Target               string `json:"target"`
-	UnknownActions       int64  `json:"unknownActions"`
-	UnknownNotifications int64  `json:"unknownNotifications"`
+	Target               string       `json:"target"`
+	UnknownActions       int64        `json:"unknownActions"`
+	UnknownNotifications int64        `json:"unknownNotifications"`
+	Warnings             []FieldError `json:"warnings,omitempty"`
 }
 
-// MonitorObservationHealth defines model for MonitorObservation.Health.
+// MonitorObservationHealth Current health is unknown while local preparation prevents target checks. Use lastObservedHealth and lastObservedAt for the preserved prior real observation.
 type MonitorObservationHealth string
 
 // MonitorObservationPhase defines model for MonitorObservation.Phase.
@@ -1433,33 +1597,84 @@ type MonitorStatus struct {
 	// ActionsNeedingReview Unresolved action holds, including historical incarnations. A conclusive non-conflicting review releases a hold without rewriting the provider outcome.
 	ActionsNeedingReview *int64 `json:"actionsNeedingReview,omitempty"`
 
-	// ConfigurationProblem Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation.
+	// Availability Owner-published check availability. observedAt is the controller assessment time, never a substitute for a completed check timestamp. Pending means no real check result; paused means disabled or committed snooze; unavailable means local preparation or controller projection is unavailable.
+	Availability MonitorAvailability `json:"availability,omitempty"`
+
+	// ConfigurationProblem Local check preparation failed before target invocation. Current health is unknown; lastObservedHealth and lastObservedAt preserve the last real observation.
 	ConfigurationProblem *FailureDiagnostic `json:"configurationProblem,omitempty"`
 
 	// ConfigurationProblemAt Last failed local preparation, in UTC. Absent when preparation is usable.
-	ConfigurationProblemAt *time.Time  `json:"configurationProblemAt,omitempty"`
-	ControlRevision        string      `json:"controlRevision,omitempty"`
-	ExecutionRevision      string      `json:"executionRevision,omitempty"`
-	Health                 string      `json:"health,omitempty"`
-	IgnoreCause            string      `json:"ignoreCause,omitempty"`
-	IgnoreIncidentCount    int64       `json:"ignoreIncidentCount,omitempty"`
-	IgnoreReason           string      `json:"ignoreReason,omitempty"`
-	Ignored                bool        `json:"ignored,omitempty"`
-	IgnoredAt              time.Time   `json:"ignoredAt,omitempty,omitzero"`
-	IgnoredBy              string      `json:"ignoredBy,omitempty"`
-	IncidentID             string      `json:"incidentID,omitempty"`
-	LastCheckLatencyMS     Measurement `json:"lastCheckLatencyMs,omitempty"`
-	LastCheckedAt          time.Time   `json:"lastCheckedAt,omitempty,omitzero"`
+	ConfigurationProblemAt *time.Time `json:"configurationProblemAt,omitempty"`
+	ControlRevision        string     `json:"controlRevision,omitempty"`
+	ExecutionRevision      string     `json:"executionRevision,omitempty"`
+
+	// Health Current health is unknown while local preparation prevents target checks. Use lastObservedHealth and lastObservedAt for the preserved prior real observation.
+	Health              string      `json:"health,omitempty"`
+	IgnoreCause         string      `json:"ignoreCause,omitempty"`
+	IgnoreIncidentCount int64       `json:"ignoreIncidentCount,omitempty"`
+	IgnoreReason        string      `json:"ignoreReason,omitempty"`
+	Ignored             bool        `json:"ignored,omitempty"`
+	IgnoredAt           time.Time   `json:"ignoredAt,omitempty,omitzero"`
+	IgnoredBy           string      `json:"ignoredBy,omitempty"`
+	IncidentID          string      `json:"incidentID,omitempty"`
+	LastCheckLatencyMS  Measurement `json:"lastCheckLatencyMs,omitempty"`
+	LastCheckedAt       time.Time   `json:"lastCheckedAt,omitempty,omitzero"`
 
 	// LastFailure Bounded safe failure explanation. No provider response body, address, path or credential is included.
-	LastFailure        *FailureDiagnostic `json:"lastFailure,omitempty"`
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	SnoozedUntil       time.Time          `json:"snoozedUntil,omitempty,omitzero"`
-	StatusRevision     string             `json:"statusRevision,omitempty"`
-	UnknownActions     *int64             `json:"unknownActions,omitempty"`
+	LastFailure *FailureDiagnostic `json:"lastFailure,omitempty"`
+
+	// LastObservedAt Timestamp of the last real completed target check. Absent before any check returns.
+	LastObservedAt *time.Time `json:"lastObservedAt,omitempty"`
+
+	// LastObservedHealth Last completed target-check outcome, preserved when current check availability changes.
+	LastObservedHealth string `json:"lastObservedHealth,omitempty"`
+
+	// Maintenance Controller-evaluated maintenance for this configuration and incarnation. Absent when a matching owner projection is unavailable.
+	Maintenance *bool `json:"maintenance,omitempty"`
+
+	// NotificationConditions At most 100 conditions in deterministic identity order. Inspect the original action for execution facts; no condition authorizes replay.
+	NotificationConditions []NotificationCondition `json:"notificationConditions,omitempty"`
+
+	// NotificationConditionsObservedAt UTC time of the bounded detail read. Absent from list summaries and when detail coverage is unavailable. This is an observation, not a fleet-wide snapshot.
+	NotificationConditionsObservedAt *time.Time `json:"notificationConditionsObservedAt,omitempty"`
+
+	// NotificationConditionsSequence Action-ledger progress sampled by the detail read, encoded as a decimal string. Not a resourceVersion, mutation precondition or resumable cursor.
+	NotificationConditionsSequence string `json:"notificationConditionsSequence,omitempty"`
+
+	// NotificationConditionsTruncated Conditions are omitted or detail coverage is unavailable. List summaries do not load retained review conditions. This projection never collects the whole action ledger.
+	NotificationConditionsTruncated bool `json:"notificationConditionsTruncated,omitempty"`
+
+	// NotificationsSuppressed Ordinary notification suppression captured by the owner. Gray control notices retain their documented exception. Absent when a matching projection is unavailable.
+	NotificationsSuppressed *bool     `json:"notificationsSuppressed,omitempty"`
+	ObservedGeneration      int64     `json:"observedGeneration,omitempty"`
+	SnoozedUntil            time.Time `json:"snoozedUntil,omitempty,omitzero"`
+	StatusRevision          string    `json:"statusRevision,omitempty"`
+
+	// SuppressionObservedAt UTC time of the controller suppression assessment. Clients must not recompute maintenance from their clocks.
+	SuppressionObservedAt *time.Time `json:"suppressionObservedAt,omitempty"`
+	UnknownActions        *int64     `json:"unknownActions,omitempty"`
 
 	// Warnings Non-fatal configuration advisories. They do not change observed service health.
 	Warnings *[]FieldError `json:"warnings,omitempty"`
+}
+
+// NotificationCondition Public condition metadata, independent of attempts. A pending resolution or held migration can have no executable action. Provider keys, target configuration and credentials are excluded.
+type NotificationCondition struct {
+	Color       string `json:"color"`
+	ConditionID string `json:"conditionID"`
+
+	// Kind Condition category, including opening, resolution, migration, review_opening and review_closure. Review closures do not establish an intervention outcome.
+	Kind             string `json:"kind"`
+	MigrationReason  string `json:"migrationReason,omitempty"`
+	OriginalActionID string `json:"originalActionID,omitempty"`
+
+	// PendingAt Original pending condition time; absent when historical evidence provides no time.
+	PendingAt *time.Time `json:"pendingAt,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+
+	// RecoveredAt Verified recovery of the earlier episode; absence is not proof of health recovery.
+	RecoveredAt *time.Time `json:"recoveredAt,omitempty"`
+	State       string     `json:"state"`
 }
 
 // NotificationEndpoint defines model for NotificationEndpoint.
@@ -1976,7 +2191,10 @@ type RecoveryFailure struct {
 	FailedAt    time.Time              `json:"failedAt"`
 	MaxAttempts int                    `json:"maxAttempts"`
 	Outcome     RecoveryFailureOutcome `json:"outcome"`
-	Trigger     RecoveryFailureTrigger `json:"trigger"`
+
+	// TerminationReason attempt_limit, execution_deadline or permanent_rejection; unknown effects remain separate review-required outcomes.
+	TerminationReason string                 `json:"terminationReason,omitempty"`
+	Trigger           RecoveryFailureTrigger `json:"trigger"`
 }
 
 // RecoveryFailureOutcome defines model for RecoveryFailure.Outcome.
@@ -1994,6 +2212,16 @@ type RecoverySpec struct {
 	MaxFailures *int64       `json:"maxFailures,omitempty"`
 	Retries     *int64       `json:"retries,omitempty"`
 }
+
+// ResolutionNotice Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.
+type ResolutionNotice struct {
+	ConditionID string                 `json:"conditionID"`
+	Health      ResolutionNoticeHealth `json:"health"`
+	RecoveredAt time.Time              `json:"recoveredAt"`
+}
+
+// ResolutionNoticeHealth defines model for ResolutionNotice.Health.
+type ResolutionNoticeHealth string
 
 // Resource defines model for Resource.
 type Resource struct {
@@ -2096,7 +2324,9 @@ type State struct {
 
 // StorageState defines model for StorageState.
 type StorageState struct {
-	AppliedIndex int64 `json:"appliedIndex"`
+	// Actions Cached action-ledger accounting. Bytes are encoded current rows, not bbolt allocation or physical disk reclamation. Unknown/review evidence and still-required dependencies are protected. Retention selection is bounded; cleanupBlocked is not a total inventory.
+	Actions      *ActionStorageAccounting `json:"actions,omitempty"`
+	AppliedIndex int64                    `json:"appliedIndex"`
 
 	// Available Current durable-store observation.
 	Available      bool  `json:"available"`

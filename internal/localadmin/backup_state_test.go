@@ -19,7 +19,7 @@ import (
 func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
 	// The fixture commits only built-in state, even when the binary can also
 	// read external-worker formats. Capability alone must not upgrade a store.
-	testStoppedBackupStateFormat(t, persistence.ActionFormatVersion, nil)
+	testStoppedBackupStateFormat(t, persistence.NotificationConditionFormatVersion, nil)
 }
 
 func testStoppedBackupStateFormat(t *testing.T, wantFormat int, commitOptional func(*testing.T, *persistence.Store)) {

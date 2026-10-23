@@ -50,7 +50,7 @@ not permit another attempt of an unknown action. See [capacity diagnostics](how-
 
 These are observed operating targets, not a contractual SLA or an unconditional
 capacity guarantee. Large-scale qualification remains separate, as described in
-[validation](validation.md). The previously proposed 24-hour run is canceled.
+[validation](validation.md).
 
 Scheduled obligations are recorded before queue admission. Checks still missing a
 committed result become overdue once their five-second bucket and five-second

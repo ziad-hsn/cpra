@@ -69,6 +69,9 @@ func writeActionLedger(w io.Writer, view *collectionLedgerView) error {
 	_, _ = hash.Write(header)
 	var count, total uint64
 	err = view.walkActions(func(data []byte, row actionLedgerRow) error {
+		if row.Deleted && row.Sequence != progress.Sequence {
+			return nil
+		}
 		if row.Sequence > progress.Sequence || uint64(len(data)) > math.MaxUint64-total || count == math.MaxUint64 {
 			return errActionLedger
 		}
@@ -113,7 +116,11 @@ func (v *collectionLedgerView) actionProgress() (actionLedgerProgress, error) {
 
 func (v *collectionLedgerView) validateActionInventory(progress actionLedgerProgress) error {
 	digest := newActionCommandDigest()
+	var accounting ActionStorageAccounting
 	err := v.walkActions(func(data []byte, row actionLedgerRow) error {
+		if err := accounting.adjust(row, true); err != nil {
+			return err
+		}
 		if row.Sequence > progress.Sequence {
 			return errActionLedger
 		}
@@ -135,6 +142,14 @@ func (v *collectionLedgerView) validateActionInventory(progress actionLedgerProg
 	if err != nil {
 		return err
 	}
+	if v.tx != nil {
+		stored, err := actionDiskAccounting(v.tx)
+		if err != nil || accounting != stored {
+			return errActionLedger
+		}
+	} else if v.actions != nil && accounting != v.actions.accounting {
+		return errActionLedger
+	}
 	if err := v.walkReviews(func(_ []byte, r reviewRecord) error {
 		if r.Sequence > progress.Sequence {
 			return errActionLedger
@@ -151,6 +166,9 @@ func (v *collectionLedgerView) validateActionInventory(progress actionLedgerProg
 	}
 	if v.tx == nil {
 		return nil
+	}
+	if err := validateRelevanceIndexes(v.tx); err != nil {
+		return err
 	}
 	if actionBucketCount(v.tx) != len(actionBuckets()) {
 		return errActionLedger
@@ -204,7 +222,7 @@ func (v *collectionLedgerView) validateActionInventory(progress actionLedgerProg
 	}
 	// Every index entry must be justified by its current row. Deletion or
 	// substitution cannot become an authoritative omission in a new snapshot.
-	for _, name := range [][]byte{actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionCooldownBucket} {
+	for _, name := range [][]byte{actionMonitorBucket, actionOwnerBucket, actionEpisodeBucket, actionIncidentBucket, actionReviewBucket, actionCooldownBucket, actionTerminalBucket} {
 		if err := v.tx.Bucket(name).ForEach(func(key, id []byte) error {
 			row, err := decodeActionRow(v.tx.Bucket(actionCurrentBucket).Get(id))
 			if err != nil || row.Action.ID != string(id) || actionRowKeys(row)[string(name)] != string(key) {
@@ -406,13 +424,27 @@ func (l *collectionLedger) importActionBatch(batch [][]byte) error {
 			}
 			if old := l.actions.current[row.Action.ID]; old != nil {
 				prior, _ := decodeActionRow(old)
+				if err := l.actions.accounting.adjust(prior, false); err != nil {
+					return err
+				}
 				l.actions.byCooldown.Delete(rejectionIndexKey(prior))
+				l.actions.byTerminal.Delete(terminalActionKey(prior))
+				l.actions.byReleased.Delete(releasedActionKey(prior))
 			}
+			if err := l.actions.accounting.adjust(row, true); err != nil {
+				return err
+			}
+			l.actions.putActionRelevance(row)
 			l.actions.current[row.Action.ID] = data
 			l.actions.versions[row.Action.ID] = append(l.actions.versions[row.Action.ID], data)
 			l.actions.order.ReplaceOrInsert(row.Action.ID)
 			l.actions.byMonitor.ReplaceOrInsert(row.MonitorID + "\x00" + row.Action.ID)
-			l.actions.byCooldown.ReplaceOrInsert(rejectionIndexKey(row))
+			if !row.Deleted {
+				l.actions.byCooldown.ReplaceOrInsert(rejectionIndexKey(row))
+			}
+			if key := terminalActionKey(row); key != "" {
+				l.actions.byTerminal.ReplaceOrInsert(key)
+			}
 		}
 		return nil
 	}
@@ -426,16 +458,25 @@ func (l *collectionLedger) importActionBatch(batch [][]byte) error {
 			if current == nil {
 				return errActionLedger
 			}
+			var previous actionLedgerRow
+			existed := false
 			if old := current.Get([]byte(row.Action.ID)); old != nil {
 				prior, e := decodeActionRow(old)
 				if e != nil || prior.Sequence >= row.Sequence || row.Previous != prior.Sequence {
 					return errActionLedger
 				}
+				previous, existed = prior, true
 				for bucket, key := range actionRowKeys(prior) {
 					if e = tx.Bucket([]byte(bucket)).Delete([]byte(key)); e != nil {
 						return e
 					}
 				}
+			}
+			if err := updateActionAccounting(tx, previous, existed, row); err != nil {
+				return err
+			}
+			if err := putActionRelevance(tx, previous, existed, row); err != nil {
+				return err
 			}
 			if err := current.Put([]byte(row.Action.ID), data); err != nil {
 				return err

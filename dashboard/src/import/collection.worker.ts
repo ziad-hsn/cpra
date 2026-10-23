@@ -11,7 +11,7 @@ interface GoRuntime { importObject: WebAssembly.Imports; run(instance: WebAssemb
 const scope = globalThis as unknown as {
   Go: new () => GoRuntime;
   cpraCollectionNormalizationProfile: string;
-  cpraDecodeCollection(bytes: Uint8Array, visit: (id: string, document: number, item: number, raw: string, coordinates: string) => boolean): ParserResult;
+  cpraDecodeCollection(bytes: Uint8Array, visit: (id: string, document: number, item: number, raw: string, coordinates: string, warnings: string) => boolean): ParserResult;
   onmessage: (event: MessageEvent<WorkerRequest>) => void;
   postMessage(value: WorkerReply, transfer?: Transferable[]): void;
   close(): void;
@@ -63,12 +63,13 @@ async function prepare(sources: SelectedCollectionSource[]): Promise<void> {
       await inventory.addSource(raw);
       let callbackError: CollectionImportError | undefined;
       send({ kind: 'progress', phase: 'parsing', sources: index, items: inventory.itemCount });
-      const parsed = scope.cpraDecodeCollection(raw, (id, document, item, text, coordinates) => {
+      const parsed = scope.cpraDecodeCollection(raw, (id, document, item, text, coordinates, warnings) => {
         let encoded: Uint8Array | undefined;
         try {
           encoded = new TextEncoder().encode(text);
           if (encoded.byteLength > workerCollectionLimits.resourceBytes) throw new CollectionImportError('quota');
-          inventory!.addItem(encoded, id, document, item, coordinates.length <= (256 << 10) ? JSON.parse(coordinates) : undefined);
+          if (typeof warnings !== 'string' || warnings.length > 4096) throw new CollectionImportError('unavailable');
+          inventory!.addItem(encoded, id, document, item, coordinates.length <= (256 << 10) ? JSON.parse(coordinates) : undefined, JSON.parse(warnings));
           encoded = undefined; // The inventory now owns these bytes.
           return true;
         } catch (error) {

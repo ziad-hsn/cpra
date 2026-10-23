@@ -106,6 +106,9 @@ func InitManagement(ctx context.Context, l installpath.Layout, options Managemen
 	if err != nil {
 		return ManagementFiles{}, err
 	}
+	if err := prepareConfigDirectory(l, account); err != nil {
+		return ManagementFiles{}, err
+	}
 	for _, dir := range []string{l.ConfigDir, l.StateDir, l.LogDir} {
 		if dir == "" {
 			continue

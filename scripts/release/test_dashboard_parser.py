@@ -21,7 +21,7 @@ SPEC.loader.exec_module(parser_build)
 class DashboardParserTests(unittest.TestCase):
     def test_normalization_gate_qualifies_base_wasm_against_base_and_tagged_native(self):
         fixture_bytes = (parser_build.ROOT / 'sdk/go/collection/testdata/file-base-v3.json').read_bytes()
-        outcome = {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': len(json.loads(fixture_bytes)['cases']), 'nativeBuilds': 2, 'wasmBuilds': 1}
+        outcome = {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': len(json.loads(fixture_bytes)['cases']), 'nativeBuilds': 2, 'wasmBuilds': 1, 'warningCases': 4}
         environment = parser_build.build_environment()
         with tempfile.TemporaryDirectory() as temporary, \
              patch.object(parser_build.subprocess, 'check_output', side_effect=[json.dumps({'GOHOSTOS': 'linux', 'GOHOSTARCH': 'amd64'}), json.dumps(outcome)]) as output, \
@@ -39,8 +39,11 @@ class DashboardParserTests(unittest.TestCase):
         self.assertIn('/base.wasm', output.call_args.args[0])
 
     def test_normalization_gate_rejects_incomplete_or_mismatched_report(self):
+        count = len(json.loads((parser_build.ROOT / 'sdk/go/collection/testdata/file-base-v3.json').read_text())['cases'])
         for result in ({'result': 'failed'}, {'result': 'passed', 'profile': 'other'},
-                       {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': 0, 'nativeBuilds': 2, 'wasmBuilds': 1}):
+                       {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': 0, 'nativeBuilds': 2, 'wasmBuilds': 1},
+                       {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': count, 'nativeBuilds': 2, 'wasmBuilds': 1},
+                       {'result': 'passed', 'profile': 'cpra.file.base.v3', 'fixedCases': count, 'nativeBuilds': 2, 'wasmBuilds': 1, 'warningCases': 0}):
             with self.subTest(result=result), tempfile.TemporaryDirectory() as temporary, \
                  patch.object(parser_build.subprocess, 'check_output', side_effect=[json.dumps({'GOHOSTOS': 'linux', 'GOHOSTARCH': 'amd64'}), json.dumps(result)]), \
                  patch.object(parser_build.subprocess, 'run'), self.assertRaisesRegex(ValueError, 'qualification did not complete'):

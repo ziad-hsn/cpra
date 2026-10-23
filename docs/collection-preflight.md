@@ -1,12 +1,20 @@
 # Bounded collection preflight
 
-The management package provides `Catalog.ValidateCollection` as a pure
-preflight building block. The authenticated `POST /api/v2/collections/preflight`
-endpoint and `cpractl diff` now use it for ephemeral validation. Uploads,
-activation, cancellation, and durable resume remain separate implementation work.
-The [encrypted persistence foundation](collection-persistence.md) documents the
-inactive staging and restart boundary already implemented beneath those future
-workflows.
+The authenticated `POST /api/v2/collections/preflight` endpoint and `cpractl diff`
+provide an ephemeral preview. They validate the supplied collection against a
+captured catalog view without creating an operation, uploading retained input or
+activating configuration. The management package's `Catalog.ValidateCollection`
+provides the shared pure validation building block.
+
+The full collection workflow is also implemented: freeze the inputs, create an
+inactive operation, upload its resources, validate the complete collection, then
+explicitly admit conditional activation. `cpractl apply` performs those steps;
+the dashboard offers them separately. Cancellation and continuation refer to the
+original operation. An ephemeral preview is neither a retained validation verdict
+nor permission to activate. See [collection persistence](collection-persistence.md)
+for staging and recovery, and [operation progress](management-operations.md) for
+the retained results.
+
 The helper uses an explicitly captured catalog view and a bounded slice of
 desired resources with opaque source/item tokens. See the
 [collection identities and continuation](cpractl-management.md) for request
@@ -26,19 +34,21 @@ Credential value preserves the original encrypted resource's value for transient
 type validation; explicit null and redaction placeholders remain invalid. No
 credential value or provider configuration is included in the returned result.
 Supplied UID, resource-version, and generation preconditions must match the
-captured original. An absent precondition uses that captured original for later
-conditional activation rather than overwriting a newer observation.
+captured original. An absent precondition is resolved against that captured
+original during validation; a successful preview does not lock the resource or
+authorize overwriting a subsequent change.
 
 Shared updates traverse the maintained reverse index and include affected
 outside consumers in validation. The result reports safe create/update/unchanged
 classifications, source attribution, direct dependencies, impacted authorized
 identities, dependency order, original UID/version conditions, reverse-edge
 versions, and create-if-absent observations. These are observations, not prepared
-executable mutations. A fresh catalog read rejects already-stale results, and a
-future executor must still enforce the guards at activation. It must adjust only
-its own confirmed earlier changes and block a consumer when an included
-dependency fails. The current helper neither allocates replacement versions nor
-creates operation handles.
+executable mutations. A fresh catalog read rejects already-stale results. The
+durable workflow captures its own validation plan and enforces its per-resource
+and dependency guards during activation. It adjusts only its own confirmed
+earlier changes and blocks a consumer when an included dependency fails. The
+ephemeral helper neither allocates replacement versions nor creates operation
+handles.
 
 A valid final union is insufficient when dependency-first application would
 break an old consumer at an intermediate step. Preflight simulates the order in
@@ -56,8 +66,12 @@ also exist. A separate 100,000 graph traversal/resource-validation visit limit b
 dense prefix work and expanded notification-group routing. Shared definitions
 are validated once per affected set; invalid-monitor attribution does not repeat
 that shared validation. Cancellation is checked within routing expansion.
-Exceeding either bound fails explicitly before any active change. These bounds are distinct from transport chunk limits and future
-incremental encrypted staging for much larger collections.
+Exceeding either bound fails explicitly before any active change. The ephemeral
+HTTP request also has a 4 MiB body limit. These limits are distinct from the
+implemented encrypted upload protocol, whose chunks contain at most 256 resources
+or 4 MiB. Uploading in chunks does not bypass whole-collection validation limits;
+the current durable validation and activation limit is 10,000 resources. See
+[collection capacity bounds](collection-persistence.md#capacity-and-verification).
 
 All work remains request-local. The helper reads existing encrypted resources
 through the configured key backend, but does not seal new data, generate keys,

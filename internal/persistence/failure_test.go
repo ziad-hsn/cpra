@@ -146,3 +146,20 @@ func TestFailureProtocolDetailsAreBoundedAndFormatGated(t *testing.T) {
 		}
 	}
 }
+
+func TestTargetIdentityDiagnosticsRequireCurrentFormat(t *testing.T) {
+	for _, code := range []string{"authentication_failed", "authorization_failed"} {
+		d := NewFailureDiagnostic(code)
+		if d.Code != code || d.validate(NotificationConditionFormatVersion) != nil || d.validate(ActionFormatVersion) == nil {
+			t.Fatalf("diagnostic format boundary missing: %+v", d)
+		}
+		c := Command{Kind: "pulse", MonitorID: "monitor", Revision: "revision", At: policyTime(), Generation: 1, Outcome: "failure", Failure: d}
+		if commandMinimumFormat(c) != NotificationConditionFormatVersion || validateCommand(c) != nil {
+			t.Fatal("diagnostic command not versioned")
+		}
+		d.Message += " remote-secret"
+		if d.validate(NotificationConditionFormatVersion) == nil {
+			t.Fatal("remote content accepted as diagnostic")
+		}
+	}
+}

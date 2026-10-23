@@ -429,12 +429,23 @@ Provider processing success does not prove a human received the notification.
   or no-effect failure permits another controller-owned attempt, up to three
   attempts. Bad local configuration and trust failures need correction. Provider
   acceptance does not confirm a human received the alert.
-- Ordinary notifications receive one 45-second budget when their intent is
-  committed. Each HTTP call is bounded by ten seconds and the remaining budget.
-  Retry, queue delay and restart never renew that budget; expired queued work
-  cannot start. Agent and external-worker notifications retain their configured
-  overall budgets. During storage upgrade, an old queued notification lacking a
-  recorded original deadline is canceled instead of acquiring a new budget.
+- New ordinary notification conditions remain pending while relevant, including
+  while their destination or worker capacity is busy. The first committed start
+  begins one 45-second execution budget across at most three attempts. Each HTTP
+  call is bounded by ten seconds and the remaining budget. Three attempts and
+  the deadline are independent limits; exhaustion does not start another cycle.
+  Restart, retry and re-offer never renew a started budget. A2A and external-worker
+  notifications retain their configured execution-budget lengths. Worker offers
+  separately expire after 30 seconds; an offer is not permission to invoke work.
+- Existing actions retain their recorded absolute deadline. Expired work cannot
+  start. Old queued work without a recorded deadline is canceled; fresh observed
+  conditions require a separate committed authorization, with proof that the old
+  work never started. Unknown outcomes never qualify for this replacement.
+- If an attempted opening recovers during maintenance, its resolution remains
+  pending for assessment after suppression ends, using the original destination
+  and provider correlation. A pending opening that never started is canceled
+  after recovery. A delayed closure describes the earlier recovery and current
+  health separately, including when a later outage has begun.
 - `intervention.max_attempts` caps confirmed attempts within the original
   recovery budget. It cannot authorize replay of an unknown external effect.
   A separately authorized manual recovery has a new budget and still requires
@@ -452,7 +463,11 @@ Build: default. [Schema](source/internal/manifest/manifest.go.txt)
 
 `file` is relative to the process runtime setting `notifications.log_directory`.
 That root must be provisioned for the service account and must not overlap CPRa
-configuration or durable state. Absolute paths and path traversal are rejected.
+configuration or durable state. The existing root requires owner-only Unix
+permissions (normally `0700`) or the corresponding private Windows service DACL;
+writability alone is insufficient. Absolute paths and path traversal are rejected.
+An omitted or empty `file` deliberately writes the notification to process stdout,
+so it follows the service/container output destination and its log-retention policy.
 See the [minimal manifest and runtime example](config-schema.md).
 
 ### slack
@@ -612,3 +627,38 @@ Build: default. Delivers bounded incident context for investigation. A received 
 | `allow_insecure_http` | Explicitly permit HTTP to this trusted endpoint; default false. |
 
 For both A2A roles, manifests use the snake_case names above. SDK/API fields use `requestTimeout`, `taskTimeout`, `pollInterval`, and `allowInsecureHttp`. The API's driver `credentialRefs.url` and `credentialRefs.token` select separately stored encrypted secrets. URL userinfo, queries, fragments, redirects, and ambient proxies are unsupported.
+
+## Database and broker access diagnostics
+
+A check can report `authentication_failed` when the target rejects its configured
+credentials, or `authorization_failed` when it denies the operation for that
+identity. These are fixed diagnostic messages. They do not expose server messages,
+usernames, database names or credentials, and do not authorize a retry of an
+external action. Cancellation, deadlines and transport failures retain their
+separate classifications.
+
+| Driver | Recognized authentication response | Recognized authorization response |
+| --- | --- | --- |
+| PostgreSQL | SQLSTATE `28000`, `28P01` | SQLSTATE `42501` |
+| MySQL | Error `1045` | Errors `1044`, `1142`, `1143`, `1227` |
+| Redis | RESP error `NOAUTH`, `WRONGPASS` | RESP error `NOPERM` |
+| MongoDB | Command code `18` | Command code `13` |
+| RabbitMQ | Driver credential-rejection sentinel | AMQP `ACCESS_REFUSED`, including virtual-host denial |
+| Kafka | `SASL_AUTHENTICATION_FAILED` | Topic, group, cluster, transactional-ID or delegation-token authorization failure |
+
+Only typed driver errors and defined protocol codes are classified. An arbitrary
+error message containing an authentication phrase remains generic. Unsupported
+mechanisms and failures without a recognized code do not become invented
+credential diagnoses. Each adapter is compiled with its existing driver tag.
+
+These mappings follow the [PostgreSQL SQLSTATE catalog](https://www.postgresql.org/docs/current/errcodes-appendix.html),
+[MySQL server error catalog](https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html),
+[Redis RESP error contract](https://redis.io/docs/latest/develop/reference/protocol-spec/),
+[MongoDB command codes](https://www.mongodb.com/docs/manual/reference/error-codes/),
+[RabbitMQ authentication and authorization distinction](https://www.rabbitmq.com/docs/access-control),
+and [Kafka protocol error codes](https://kafka.apache.org/protocol.html#protocol_error_codes).
+
+Local verification uses typed errors for all six adapters and real loopback
+protocol error responses through the production PostgreSQL, MySQL and Redis
+check paths. Those fixtures verify diagnostic handling; they do not qualify
+production accounts or certify a database/broker deployment.

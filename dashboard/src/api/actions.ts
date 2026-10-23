@@ -1,4 +1,4 @@
-import type { Action, ActionReview, AgentReceipt, RecoveryFailure, ReviewNotice } from './generated';
+import type { Action, ActionReview, AgentReceipt, RecoveryFailure, ResolutionNotice, ReviewNotice } from './generated';
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
 import { failureView } from './failure';
@@ -23,8 +23,14 @@ export function agentReceiptView(value: unknown): AgentReceipt {
 export function recoveryFailureView(value: unknown): RecoveryFailure {
   if (!object(value) || typeof value.actionID !== 'string' || !value.actionID || new TextEncoder().encode(value.actionID).byteLength > 256 || /\p{Cc}/u.test(value.actionID) || typeof value.driver !== 'string' || !value.driver || new TextEncoder().encode(value.driver).byteLength > 128 || /\p{Cc}/u.test(value.driver) ||
     !Number.isSafeInteger(value.attempt) || (value.attempt as number) < 1 || (value.attempt as number) > 2147483647 || !Number.isSafeInteger(value.maxAttempts) || (value.maxAttempts as number) < 1 || (value.maxAttempts as number) > 2147483647 ||
-    (value.trigger !== 'recovery_failed' && value.trigger !== 'recovery_exhausted') || (value.trigger === 'recovery_exhausted' && (value.attempt as number) < (value.maxAttempts as number)) || value.outcome !== 'failure' || typeof value.failedAt !== 'string' || value.failedAt.length > 64 || !Number.isFinite(Date.parse(value.failedAt))) return invalid();
-  return { actionID: value.actionID, driver: value.driver, attempt: value.attempt as number, maxAttempts: value.maxAttempts as number, trigger: value.trigger, outcome: 'failure', failedAt: value.failedAt };
+    (value.trigger !== 'recovery_failed' && value.trigger !== 'recovery_exhausted') || (value.trigger === 'recovery_exhausted' && (value.attempt as number) < (value.maxAttempts as number) && value.terminationReason !== 'execution_deadline' && value.terminationReason !== 'permanent_rejection') || value.outcome !== 'failure' || typeof value.failedAt !== 'string' || value.failedAt.length > 64 || !Number.isFinite(Date.parse(value.failedAt))) return invalid();
+  if (value.terminationReason !== undefined && value.terminationReason !== '' && !['attempt_limit', 'execution_deadline', 'permanent_rejection'].includes(String(value.terminationReason))) return invalid();
+  return { actionID: value.actionID, driver: value.driver, attempt: value.attempt as number, maxAttempts: value.maxAttempts as number, trigger: value.trigger, outcome: 'failure', failedAt: value.failedAt, ...(value.terminationReason ? {terminationReason: value.terminationReason as string} : {}) };
+}
+
+export function resolutionNoticeView(value: unknown): ResolutionNotice {
+  if (!object(value) || typeof value.conditionID !== 'string' || !value.conditionID || new TextEncoder().encode(value.conditionID).byteLength > 256 || /\p{Cc}/u.test(value.conditionID) || typeof value.recoveredAt !== 'string' || value.recoveredAt.length > 64 || value.recoveredAt.startsWith('0001-') || !Number.isFinite(Date.parse(value.recoveredAt)) || !['healthy', 'unhealthy', 'unknown'].includes(String(value.health))) return invalid();
+  return { conditionID: value.conditionID, recoveredAt: value.recoveredAt, health: value.health as ResolutionNotice['health'] };
 }
 
 export function reviewNoticeView(value: unknown): ReviewNotice {
@@ -42,6 +48,15 @@ export function actionView(value: unknown, monitorID: string, expectedID?: strin
   if (value.agentReceipt !== undefined) action.agentReceipt = agentReceiptView(value.agentReceipt);
   if (value.reviewNotice !== undefined) action.reviewNotice = reviewNoticeView(value.reviewNotice);
   if (value.recoveryFailure !== undefined) action.recoveryFailure = recoveryFailureView(value.recoveryFailure);
+  if (value.resolution !== undefined) action.resolution = resolutionNoticeView(value.resolution);
+  if (value.executionBudget !== undefined && value.executionBudget !== '') {
+    if (typeof value.executionBudget !== 'string' || value.executionBudget.length > 128 || !/^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h)(?:(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h))*$/.test(value.executionBudget) || !/[1-9]/.test(value.executionBudget)) return invalid();
+    action.executionBudget = value.executionBudget;
+  }
+  if (value.terminationReason !== undefined && value.terminationReason !== '') {
+    if (typeof value.terminationReason !== 'string' || value.terminationReason.length > 128 || !/^[a-z][a-z0-9_]*$/.test(value.terminationReason)) return invalid();
+    action.terminationReason = value.terminationReason;
+  }
   for (const key of ['incarnationUID', 'incidentID', 'kind', 'executionID', 'executionRevision', 'reason', 'receiptID', 'reviewRevision', 'outcome', 'color', 'deliveryID', 'endpointID', 'notificationEpisode'] as const) {
     if (typeof value[key] === 'string') action[key] = value[key];
   }

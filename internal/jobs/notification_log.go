@@ -10,6 +10,7 @@ import (
 )
 
 var errNotificationLog = errors.New("notification log requires a regular private file inside notifications.log_directory")
+var errNotificationLogDirectoryAccess = errors.New("notifications.log_directory requires service-account ownership and private directory access; on Unix use owner-only permissions such as 0700, and on Windows use the protected service DACL")
 
 // NotificationLog owns the process-configured output root. Monitor inputs can
 // select relative files inside it, but cannot select another filesystem root.
@@ -79,6 +80,12 @@ func OpenNotificationLog(directory string, protected ...string) (*NotificationLo
 	}
 	root, ancestors, err := acquireNotificationLogRoot(filepath.Clean(directory), protectedDirectories...)
 	if err != nil {
+		if errors.Is(err, errNotificationLogDirectoryAccess) {
+			return nil, errNotificationLogDirectoryAccess
+		}
+		if errors.Is(err, os.ErrPermission) {
+			return nil, errors.New("notifications.log_directory cannot be read or created by the service account; provision its ownership and private access before startup")
+		}
 		return nil, errNotificationLog
 	}
 	if err := checkProtectedLogIdentities(ancestors, protectedPaths); err != nil {
@@ -206,7 +213,7 @@ func acquireNotificationLogRoot(directory string, protected ...os.FileInfo) (*os
 		next, info, err := acquireNotificationLogChild(root, name, i == len(components)-1, false)
 		_ = root.Close()
 		if err != nil {
-			return nil, nil, errNotificationLog
+			return nil, nil, err
 		}
 		root = next
 		// Reject an alias of a protected directory before descending into it or

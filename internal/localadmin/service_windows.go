@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/ziad-hsn/cpra/internal/installpath"
+	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -50,17 +51,29 @@ func nativePrepare(l installpath.Layout, account string) (string, error) {
 	return account, nil
 }
 
-// Before registration, configuration is restricted to administrators and SYSTEM.
-// Once registered, only the service SID receives access, not all LocalService processes.
-func nativeSecure(l installpath.Layout, _ string) error {
+// The deterministic per-service SID is available before SCM registration.
+// Existing bearer sources are validated before any managed permission update;
+// neither their ownership nor their DACL is repaired implicitly.
+func nativeSecure(l installpath.Layout, account string) error {
 	var principal string
 	if l.Scope == "system" {
-		sid, _, _, err := windows.LookupSID("", `NT SERVICE\`+windowsServiceName)
-		if err != nil && !errors.Is(err, windows.ERROR_NONE_MAPPED) {
-			return fmt.Errorf("resolve service SID: %w", err)
+		_, sid, err := managementServiceReader(l, account)
+		if err != nil {
+			return err
 		}
-		if err == nil {
-			principal = sid.String()
+		principal = sid
+		if err := checkSystemConfigOwner(l.ConfigDir); err != nil {
+			return err
+		}
+		path := filepath.Join(l.ConfigDir, "auth.token")
+		if _, err := os.Lstat(path); err == nil {
+			data, err := secureconfig.ReadTokenFile(context.Background(), secureconfig.TokenFileOptions{Path: path, Root: l.ConfigDir, ReaderSID: principal, MaxBytes: 4096})
+			clear(data)
+			if err != nil {
+				return fmt.Errorf("existing service token protection is incompatible; use stopped administration: %w", err)
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return errors.New("existing service token cannot be inspected")
 		}
 	} else {
 		token := windows.GetCurrentProcessToken()
@@ -96,6 +109,9 @@ func nativeSecure(l installpath.Layout, _ string) error {
 			}
 			if d.Type()&os.ModeSymlink != 0 {
 				return fmt.Errorf("refusing ACL update through link %s", path)
+			}
+			if l.Scope == "system" && path == filepath.Join(l.ConfigDir, "auth.token") {
+				return nil // The existing protected source was checked, never modified.
 			}
 			return windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil)
 		})
@@ -187,6 +203,10 @@ func nativeRegister(ctx context.Context, l installpath.Layout, account string) e
 		return errors.New("Windows user mode runs in the foreground; no user service is registered")
 	}
 	args, err := serviceArgs(l)
+	if err != nil {
+		return err
+	}
+	args, err = serviceTokenPolicy(l, account, args)
 	if err != nil {
 		return err
 	}

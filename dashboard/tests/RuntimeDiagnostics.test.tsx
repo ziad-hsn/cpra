@@ -170,3 +170,32 @@ it('hides stale success after a denied refresh and does not downgrade to legacy'
   await waitFor(() => expect(requests.filter(request => request.path === '/api/v2/state')).toHaveLength(2));
   expect(requests.some(request => request.path.startsWith('/api/v1/'))).toBe(false);
 });
+
+it('shows bounded action storage accounting separately from physical allocation and admission', async () => {
+  const wire = stateWire();
+  const actions = { observedAt: '2026-10-23T00:00:00Z', active: 3, ordinaryRetained: 12, protected: 2, tombstones: 0,
+    activeBytes: 1024, ordinaryBytes: 4096, protectedBytes: 512, tombstoneBytes: 0, retired: 7, retiredBytes: 2048,
+    cleanupBlocked: 1, cleanupBlockedBytes: 256, cleanupCoverage: 'last_selection_page', compactionCondition: 'copying' };
+  await fixture({ stateBody: { ...wire, storage: { ...wire.storage, actions } } });
+  await screen.findByText('Ready for new work');
+  expect(valueFor('Action storage accounting')).toHaveTextContent(/^Sampled /);
+  expect(valueFor('Protected action records')).toHaveTextContent(/^2 records · 512 bytes$/);
+  expect(valueFor('Action retirement tombstones')).toHaveTextContent(/^0 records · 0 bytes$/);
+  expect(valueFor('Cleanup-blocked action records (last page)')).toHaveTextContent(/^1 record · 256 bytes$/);
+  expect(screen.getByText(/Cleanup-blocked counts cover only the last retirement selection page/)).toBeInTheDocument();
+  expect(screen.getByText(/Action byte counts measure encoded records/)).toHaveTextContent('not filesystem allocation or reclaimed disk space');
+  expect(screen.getByText('Action storage compaction is copying retained records.')).toBeInTheDocument();
+  const safe = runtimeView({ ...wire, storage: { ...wire.storage, actions: { ...actions, protectedBytes: -1,
+    active: Number.MAX_SAFE_INTEGER + 1, compactionCondition: '/private/action/path', cleanupCoverage: 'private-token', privateRows: ['private-action'] } } });
+  expect(safe.storage.actions?.protectedBytes).toBeUndefined();
+  expect(safe.storage.actions?.active).toBeUndefined();
+  expect(JSON.stringify(safe)).not.toContain('private');
+  expect(safe.ready).toBe(true);
+});
+
+it('keeps absent action accounting unavailable instead of showing empty retained storage', async () => {
+  await fixture();
+  await screen.findByText('Ready for new work');
+  expect(valueFor('Action storage accounting')).toHaveTextContent(/^Unavailable$/);
+  expect(screen.queryByText('Protected action records')).not.toBeInTheDocument();
+});

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -160,4 +161,28 @@ func (r *jobTypeSnapshotReservation) shrink(size int64) error {
 	r.budget.Add(size - previous)
 	r.principalBudget.Add(size - previous)
 	return nil
+}
+
+// Choose only views charged to the exhausted extension quota. Principal limits
+// reclaim that principal's completed/inactive views, not another user's data.
+func (m *managementHTTP) reclaimSnapshotExtension(kind, principal string, now time.Time) bool {
+	owner := ""
+	switch kind {
+	case "JobType":
+		if charged := m.jobTypePrincipalBytes[principal]; charged != nil && charged.Load() > maxPrincipalJobTypeSnapshotBytes-jobTypeSnapshotReservationBytes {
+			owner = principal
+		}
+		return m.reclaimSnapshotMatching(owner, now, func(entry managementSnapshot) bool {
+			return entry.jobTypeReservation != nil
+		})
+	case "ExternalWorker":
+		if charged := m.workerPrincipalSnapshots[principal]; charged != nil && charged.Load() >= maxPrincipalWorkerSnapshots {
+			owner = principal
+		}
+		return m.reclaimSnapshotMatching(owner, now, func(entry managementSnapshot) bool {
+			return entry.workers != nil
+		})
+	default:
+		return false
+	}
 }

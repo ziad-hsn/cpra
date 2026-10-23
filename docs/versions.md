@@ -6,11 +6,9 @@ cpra_scope: development
 
 # Versions and availability
 
-This source is under private release-repair qualification as of 20 October 2026.
-The intended first release is application/SDK/worker `v0.1.0-rc.1` and Helm chart
-`0.1.0-rc.1`. These are planned versions, not proof that installable public tags,
-assets or registry entries exist. Candidates remain access-controlled until the
-agreed gates pass.
+CPRa is in development. The first qualified release is not published. The
+planned application, SDK and worker version is `v0.1.0-rc.1`, with Helm chart
+`0.1.0-rc.1`. These version names do not establish available downloads or tags.
 
 Published documentation, Git branches, SDK tags and release artifacts advance
 separately. Use matching source and documentation; qualified artifacts carry
@@ -23,7 +21,7 @@ to their actual source inventories. They are not a final frozen-release pass.
 | --- | --- | --- |
 | Process ownership | One controller and one single-node Raft owner per data directory; explicit memory mode | No multi-node failover or cross-instance monitor coordination |
 | State after restart | Committed configuration, incidents, controls and action identities recover | Interrupted started actions are unknown and held, never automatically replayed |
-| History | Incident/intervention/notification events retained for 30 days | No retained raw check stream or per-monitor percentile history |
+| History and actions | Timeline events retained for 30 days; ordinary dependency-free completed actions retained for 90 days | Unknown actions, reviewed evidence and required dependencies are protected; no retained raw check stream |
 | Management | Named authenticated monitor, endpoint, receiver, group and encrypted-secret CRUD; conditional controls and collection apply | Operator controls destinations; this is not multi-tenant destination isolation |
 | Dashboard and CLI | Management forms and read-only observations; explicit original-operation continuation | Configuration admission and controller application are reported separately |
 | SDK and workers | Separate Go modules; external workers require build tag, runtime enablement and scoped credentials | Public downloaded-module qualification and publication remain open |
@@ -53,16 +51,14 @@ binaries need native execution and service-lifecycle checks on each claimed
 OS and architecture. Container and Helm qualification includes storage ownership,
 backup/restore, upgrades and credential rotation on the tested storage stack.
 
-No native runner fleet, private Kubernetes environment or designated
-provider/agent accounts are configured yet. Actual provider effects and the
-matched comparative capacity campaign remain unqualified. Missing configuration
-is not a passing verification result. Short local isolation experiments do not
-establish five-minute SLO attainment or million-monitor capacity.
+Native platform and Kubernetes storage qualification, actual provider effects
+and matched comparative capacity measurements remain outstanding. Missing
+provider configuration is not a passing verification result. Short local
+isolation experiments do not establish five-minute SLO attainment or
+million-monitor capacity.
 
-The 24-hour endurance test is cancelled. GitHub's reporting-status API returned
-`enabled: false` on 20 October 2026. Repository administration must enable private
-vulnerability reporting and verify the reporting form before announcement; the
-available connector does not expose that setting. Historical
-engineering plans and evidence are preserved in the repository, outside the
-public site and search index. Release documentation must use the final release
-metadata; an earlier successful check does not qualify later source changes.
+Private vulnerability reporting and a working default-branch security policy
+must be verified before announcement; that gate remains open. Historical
+engineering plans and evidence remain in the repository, outside the public
+site and search index. Release documentation identifies the source whose
+artifacts and behavior were verified.

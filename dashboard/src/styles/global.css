@@ -361,7 +361,7 @@ a:hover { color: var(--accent-bright); }
 .vtable-row:nth-child(even):hover { background: var(--surface-2); }
 .vtable-row:focus-visible { outline: none; box-shadow: inset 3px 0 0 var(--accent); }
 .vtable-td {
-  padding: 0 16px;
+  padding: 8px 16px;
   font-size: 13px;
   border-right: 1px solid var(--border-subtle);
   overflow: hidden;
@@ -370,7 +370,10 @@ a:hover { color: var(--accent-bright); }
   min-width: 0;
 }
 .vtable-td.last { border-right: none; }
-.vtable-td > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vtable-td > span { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.vtable-td .status-chip, .vtable-td .code-badge { max-width: 100%; }
+.vtable-td .badge-label { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.vtable-td .code-badge svg { flex-shrink: 0; }
 
 /* ---------- States ---------- */
 .table-header {

@@ -35,6 +35,7 @@ var (
 // only a sealed, validated assignment; no provider secrets or executable object
 // may be supplied in identity fields. Admission does not grant invocation.
 type WorkerExecutionIntent struct {
+	ExecutionBudget time.Duration         `json:"execution_budget,omitempty"`
 	Notification    *WorkerNotification   `json:"notification,omitempty"`
 	Schedule        *WorkerScheduleTicket `json:"schedule,omitempty"`
 	ID              string                `json:"id"`
@@ -85,7 +86,7 @@ func (i WorkerExecutionIntent) validate() error {
 			return ErrWorkerExecutionInvalid
 		}
 	}
-	if i.Category != "check" && i.Category != "recovery" && i.Category != "notification" || i.JobType.Validate() != nil || i.JobType.Category != i.Category || i.Guard.validate(i.MonitorID) != nil || i.Guard.Removed || i.Guard.monitorUID(i.MonitorID) != i.MonitorUID || i.Source.validate() != nil || i.Payload.Validate() != nil || len(i.Payload.Ciphertext) > MaxWorkerExecutionPayload+16 || i.Scheduled.IsZero() || i.Scheduled.Year() < 1 || i.Scheduled.Year() > 9998 || !i.Deadline.After(i.Scheduled) || i.Deadline.Year() > 9999 {
+	if i.Category != "check" && i.Category != "recovery" && i.Category != "notification" || i.JobType.Validate() != nil || i.JobType.Category != i.Category || i.Guard.validate(i.MonitorID) != nil || i.Guard.Removed || i.Guard.monitorUID(i.MonitorID) != i.MonitorUID || i.Source.validate() != nil || i.Payload.Validate() != nil || len(i.Payload.Ciphertext) > MaxWorkerExecutionPayload+16 || !i.ValidTiming() {
 		return ErrWorkerExecutionInvalid
 	}
 	if i.Category == "check" {
@@ -111,6 +112,9 @@ func (i WorkerExecutionIntent) validate() error {
 }
 
 func (i WorkerExecutionIntent) minimumFormat() int {
+	if i.ExecutionBudget > 0 || i.Notification != nil && i.Notification.Format == 2 {
+		return WorkerNotificationConditionFormatVersion
+	}
 	if i.Notification != nil {
 		return 45
 	}
@@ -227,6 +231,14 @@ func workerExecutionDigest(i WorkerExecutionIntent) string {
 		Scheduled: i.Scheduled, Deadline: i.Deadline, Payload: i.Payload,
 	}
 	raw, _ := json.Marshal(projection)
+	if i.ExecutionBudget > 0 || i.Notification != nil && i.Notification.Format == 2 {
+		value, _ := json.Marshal(struct {
+			Intent       workerExecutionIntentDigestV1 `json:"intent"`
+			Notification *WorkerNotification           `json:"notification"`
+			Budget       time.Duration                 `json:"execution_budget"`
+		}{projection, i.Notification, i.ExecutionBudget})
+		return identity("cpra/worker/execution-intent/v4\x00" + string(value))
+	}
 	if i.Notification != nil {
 		value, _ := json.Marshal(struct {
 			Intent       workerExecutionIntentDigestV1 `json:"intent"`

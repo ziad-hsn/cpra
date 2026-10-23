@@ -56,7 +56,20 @@ func main() {
 				if err != nil {
 					return errors.New("source coordinates unavailable")
 				}
-				if !args[1].Invoke(item.ID, item.Location.Document, item.Location.Item, string(item.JSON), string(coordinates)).Bool() {
+				var resource api.Resource
+				defer func() { clear(resource.Spec); clear(resource.Status) }()
+				if err := api.StrictDecode(item.JSON, &resource); err != nil {
+					return errors.New("normalized resource unavailable")
+				}
+				warnings := api.ResourceWarnings(resource)
+				if warnings == nil {
+					warnings = []api.FieldError{}
+				}
+				advisories, err := json.Marshal(warnings)
+				if err != nil || len(advisories) > 4096 {
+					return errors.New("configuration advisories unavailable")
+				}
+				if !args[1].Invoke(item.ID, item.Location.Document, item.Location.Item, string(item.JSON), string(coordinates), string(advisories)).Bool() {
 					return errors.New("browser capacity exceeded")
 				}
 				return nil

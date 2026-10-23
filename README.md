@@ -37,7 +37,9 @@ use documentation from the same checkout as your executable.
 ## What CPRa does
 
 - Runs health checks at a configured cadence with unhealthy and healthy thresholds.
-  It retains incident and action events for 30 days, rather than every raw check.
+  Incident and action timeline events are retained for 30 days; ordinary completed
+  action records remain for 90 days when nothing depends on them. Unknown outcomes
+  and review evidence are protected. Raw checks are not retained.
 - Commits incident state and action intent to single-node Raft before dispatch.
   Restarts retain confirmed outcomes and hold ambiguous interventions for review.
   Health observations continue while a conflicting intervention is held.
@@ -161,6 +163,19 @@ Recovery attempts are limited per incident by `intervention.max_attempts`
 Only the configured healthy threshold confirms recovery. An unknown delivery
 holds that delivery, without suppressing unrelated later incidents or destinations.
 Transport acceptance alone does not prove delivery to a person.
+
+New notification conditions remain pending while relevant. Their captured execution
+budget starts with the first committed start after capacity becomes available.
+Ordinary built-in notifications have 45 seconds across at most three attempts;
+only proven transient failures with no external effect can retry. Neither a
+restart nor exhausted retries starts another budget. A pending recovery notice
+can report the original outage's recovery after maintenance, using its original
+destination. Delivery acceptance does not prove provider resolution.
+
+If local preparation fails, such as an unreadable CA file, current health is
+`unknown` and monitoring is unavailable. The last real health observation and its
+timestamp remain visible separately. CPRa retries preparation at the normal
+cadence without treating a local configuration failure as a target outage.
 
 Configuration authors can choose destinations and actions using the process
 account's permissions. Treat them as trusted operators. Management is not a

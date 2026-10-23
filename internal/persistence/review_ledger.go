@@ -30,6 +30,7 @@ type reviewDestination struct {
 }
 
 type reviewFact struct {
+	IndexVersion int       `json:"index_version,omitempty"`
 	PolicyID     string    `json:"policy_id"`
 	ID           string    `json:"id"`
 	RestoreID    string    `json:"restore_id,omitempty"`
@@ -99,7 +100,7 @@ func encodeReviewRecord(r reviewRecord) ([]byte, error) {
 		}
 	}
 	if f := r.Fact; f != nil {
-		if !bootstrapHash(f.PolicyID) || validateReviewContext(f.Context, f.At) != nil {
+		if f.IndexVersion < 0 || f.IndexVersion > 1 || !bootstrapHash(f.PolicyID) || validateReviewContext(f.Context, f.At) != nil {
 			return nil, errActionLedger
 		}
 		if f.RestoreID != "" {
@@ -150,7 +151,20 @@ func validateReviewContext(m Monitor, at time.Time) error {
 	if m.VerifyRemaining < 0 || m.Incident && (m.IncidentID == "" || m.IncidentOpenedAt.IsZero() || !m.IncidentClosedAt.IsZero()) || !m.IncidentOpenedAt.IsZero() && m.IncidentID == "" || !m.IncidentClosedAt.IsZero() && m.IncidentID == "" {
 		return errActionLedger
 	}
-	if m.Notifications != nil && m.Notifications.QualifiedIncident != "" && m.Notifications.QualifiedIncident != m.IncidentID {
+	if m.Notifications != nil {
+		if m.Notifications.Version != 0 && m.Notifications.Version != NotificationConditionFormatVersion {
+			return errActionLedger
+		}
+		if m.Notifications.QualifiedIncident != "" && m.Notifications.QualifiedIncident != m.IncidentID {
+			return errActionLedger
+		}
+	}
+	if m.ConfigurationProblem != (FailureDiagnostic{}) {
+		if !m.notificationConditionsEnabled() || !m.ConfigurationProblem.configurationProblem() ||
+			m.ConfigurationProblem.validate(NotificationConditionFormatVersion) != nil || m.ConfigurationProblemAt.IsZero() {
+			return errActionLedger
+		}
+	} else if !m.ConfigurationProblemAt.IsZero() {
 		return errActionLedger
 	}
 	return nil
@@ -201,6 +215,9 @@ func (d *actionCommandDigest) addReview(r reviewRecord) error {
 	return nil
 }
 func putReviewRecord(tx *bolt.Tx, r reviewRecord, data []byte) error {
+	if err := updateReviewIndexes(tx, r); err != nil {
+		return err
+	}
 	if err := tx.Bucket(reviewRowsBucket).Put([]byte(r.Key), data); err != nil {
 		return err
 	}

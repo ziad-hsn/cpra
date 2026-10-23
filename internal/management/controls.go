@@ -32,6 +32,9 @@ type ControlResult struct {
 	Incident       api.Incident
 	Operation      api.Operation
 	CommittedIndex uint64
+	// Events are the committed transition facts for process diagnostics. They
+	// are not part of the public control response or a replay subscription.
+	Events []persistence.Event
 }
 
 // PrepareControl validates an operator request without changing durable state.
@@ -157,5 +160,5 @@ func (c *Catalog) CommitControlAs(ctx context.Context, p *PreparedControl, actor
 	if !result.Allowed || result.Monitor == nil || result.Operation == nil {
 		return ControlResult{}, ErrOutcomeUnconfirmed
 	}
-	return ControlResult{Incident: incidentFromMonitor(*result.Monitor), Operation: operationView(*result.Operation), CommittedIndex: result.Operation.CommittedIndex}, nil
+	return ControlResult{Incident: incidentFromMonitor(*result.Monitor), Operation: operationView(*result.Operation), CommittedIndex: result.Operation.CommittedIndex, Events: result.Events}, nil
 }

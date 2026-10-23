@@ -528,7 +528,7 @@ func (l *collectionLedger) freezeLocked() (*collectionLedgerView, error) {
 		if err := l.actions.validate(); err != nil {
 			return nil, err
 		}
-		v.actions = &actionLedgerMemory{progress: l.actions.progress, current: make(map[string][]byte, len(l.actions.current))}
+		v.actions = &actionLedgerMemory{accounting: l.actions.accounting, progress: l.actions.progress, current: make(map[string][]byte, len(l.actions.current))}
 		v.actions.reviews = maps.Clone(l.actions.reviews)
 		v.actions.versions = maps.Clone(l.actions.versions)
 		for id, versions := range v.actions.versions {

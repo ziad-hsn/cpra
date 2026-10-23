@@ -1,6 +1,6 @@
 # Management API observations
 
-The private dashboard candidate implements the v2 read operations below. These
+CPRa provides the v2 read operations below. These
 are observations of the running CPRa process and its durable store. Reading them
 never queues a health check, performs recovery, opens a second store, or invokes
 a notification provider. Discovery and the authenticated access response list
@@ -11,7 +11,7 @@ these operations using the same names as the public Go SDK.
 | Readiness, controller progress, projection age, storage | `GET /api/v2/state` | `Client.State(ctx)` |
 | Shared queue saturation and measured wait | `GET /api/v2/queues` | `Client.Queues.List(ctx, options)` |
 | Worker bounds, capacity, throughput totals, sizing condition | `GET /api/v2/pools` | `Client.Pools.List(ctx, options)` |
-| ECS system progress and aggregate update durations | `GET /api/v2/systems` | `Client.Systems.List(ctx, options)` |
+| Controller system progress and aggregate update durations | `GET /api/v2/systems` | `Client.Systems.List(ctx, options)` |
 | Rolling health-check latency and target attainment | `GET /api/v2/slo` | `Client.SLO.Get(ctx)` |
 | Safe active runtime settings | `GET /api/v2/config` | `Client.RuntimeConfig(ctx)` |
 | Admission readiness | `GET /api/v2/readyz` | `Client.Ready(ctx)` |
@@ -20,8 +20,8 @@ these operations using the same names as the public Go SDK.
 | Prometheus exposition text | `GET /metrics` | `Client.Prometheus(ctx, writer)` |
 
 Named readers and operators can inspect these observations over the configured
-management TLS and origin policy. Legacy read access retains its existing
-compatibility policy. A token that cannot inspect a mutation cannot acquire
+management TLS and origin policy. Observation mode retains its configured
+authentication policy. A token that cannot inspect a mutation cannot acquire
 write permission by using an observation endpoint. The v1 API remains available
 for existing clients, including existing CLI read commands.
 
@@ -60,6 +60,17 @@ node identity or authentication format. Last commit/snapshot duration is
 available only after the source records a positive elapsed duration. Filesystem
 bytes and a fleet-wide unknown-action count are currently marked unavailable;
 use indexed action observations for investigation rather than inferring a zero.
+
+`storage.actions` is a cached action-ledger sample. `observedAt` identifies the
+sample time; absence of the object means no sample is available. Active,
+ordinary retained, protected and tombstone counts describe current ledger rows.
+Their byte fields measure encoded records, not allocated database pages or
+reclaimed disk space. Ordinary retained records can still have dependencies that
+prevent retirement. `retired` and `retiredBytes` are cumulative logical retirement
+totals. `cleanupBlocked` and `cleanupBlockedBytes` cover only the last bounded
+selection page, as stated by `cleanupCoverage: last_selection_page`; they are not
+a scan of every blocked record. API, CLI and dashboard reads use this cached
+sample without scanning the ledger or filesystem.
 
 ### Collection file accounting
 
@@ -103,14 +114,18 @@ capacity, drops, and saturation come directly from each queue. Saturation means
 depth reached capacity. Enqueue and dequeue rates describe the recorded sampling
 window. A dequeue is not an execution completion, so `completedRateAvailable`
 remains false. Average and maximum queue wait are available only after a dequeue
-was measured. CPRa does not currently record the age of the oldest pending item.
+was measured. Oldest pending age is explicit when the queue supplies it. Per-driver
+observations include pending and active work, reservations, requested capacity,
+oldest pending/execution ages and timeout counts with their availability.
 
 Pools expose actual capacity, target, minimum/maximum, running worker goroutines,
 waiting tasks, pending results, submitted/completed totals, scaling-event total,
-and the active sizing model and SLO condition. A running worker goroutine can
-be idle. An exact busy count, numeric model recommendation, and explanatory
-last-adjustment reason are not currently recorded. These are not invented from
-capacity or queue depth. Service time requires measured samples, and a last
+and the active sizing model and SLO condition. Active executions are counted
+separately from running worker goroutines, which can be idle. Requested and
+reserved capacity, draining workers and the oldest execution/submission age
+remain distinct from queue depth. A numeric model recommendation and explanatory
+last-adjustment reason are unavailable where the source does not record them.
+Service time requires measured samples, and a last
 scale timestamp is emitted only after an observed scaling event.
 
 System observations expose cumulative updates/entities, the latest recorded
@@ -123,8 +138,13 @@ of monitor count and does not query the mutable ECS world.
 
 Queue, pool, and system pages default to 100 items and permit at most 500. Their
 continuation cursors retain a frozen bounded observation, tied to the principal,
-authority generation, page size, and observation kind. They share the five-minute,
-64-global/16-per-principal snapshot limits with other management reads. A cursor
+authority generation, page size, and observation kind. They share the maximum
+five-minute retention and 64-global/16-per-principal limits with other management
+reads. Under allocation pressure, expired views are reclaimed first, then
+completed views, then the least recently used views that have been idle for at
+least 30 seconds. In-flight reads are protected. An evicted continuation returns
+`410 cursorExpired`; start a new query explicitly instead of combining pages from
+different observations. One-page results do not retain a view. A cursor
 cannot switch pipelines, principals, or page size. These aggregate observations
 do not accept nonempty per-monitor or label filters. Single-object aggregate
 routes reject query parameters.
@@ -160,6 +180,40 @@ literal UTF-8 label values and only the permitted backslash, quote, and line-fee
 escapes. Missing percentile/attainment measurements are omitted, while the
 availability and coverage series explain the missing values.
 
+Fleet gauges distinguish `cpra_monitors_unavailable`, `cpra_monitors_paused`,
+and `cpra_monitors_pending`. Unavailable means local check preparation failed;
+paused means a committed control prevents checks; pending means there is no
+target observation yet. A previous successful observation does not make an
+unavailable monitor healthy. Monitor responses retain that observation as
+`lastObservedHealth` and `lastObservedAt`, separately from current `health` and
+`availability` (the v1 observation names use underscores).
+
+`cpra_monitors_in_maintenance` uses the controller's current maintenance
+assessment. `cpra_monitors_unhealthy_suppressed` and
+`cpra_monitors_unhealthy_unsuppressed` distinguish observed outages with and
+without ordinary notification suppression. These are current counts, not
+cumulative counters; maintenance can overlap an availability category. They
+have no monitor, destination or secret labels and do not reconstruct control
+state from the scraping client's clock.
+
+## Notification condition details
+
+Monitor details include a bounded `notificationConditions` view. It can show an
+ordinary pending notice, an earlier outage's resolution, or a blue review notice
+whose closure has no execution attempt yet. A locally closed blue condition does
+not prove provider resolution or release the original intervention hold.
+
+Detail reads return `notificationConditionsObservedAt` and
+`notificationConditionsSequence` when a matching retained-condition sample is
+available. The sequence is a decimal string, not a write revision or pagination
+cursor. These reads include at most 100 conditions and 1 MiB of ledger input;
+they do not scan lifetime action history. List pages keep their controller
+summaries and omit these sample fields. `notificationConditionsTruncated` means
+conditions may be omitted or detail coverage is unavailable, including when a
+monitor changes during the bounded read. Inspect action records and history for
+retained delivery outcomes; do not interpret incomplete coverage as no pending
+work.
+
 ## Go consumer example
 
 ```go
@@ -180,6 +234,6 @@ for _, report := range view.Data.Reports {
 Use the caller's context and inspect availability before comparing thresholds.
 Keep credentials out of logged requests and output. The complete SDK method and
 wire-field definitions are generated in [the operation reference](sdk/api-reference.md)
-and [wire types](sdk/wire-types.md). Provider-account verification and the
-million-monitor endurance campaign are separate release gates; this interface
-implementation does not claim those campaigns passed.
+and [wire types](sdk/wire-types.md). Provider-account verification and comparative
+capacity qualification remain separate release gates. These observation
+interfaces do not establish that either gate has passed.

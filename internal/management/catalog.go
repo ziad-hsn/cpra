@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
@@ -31,12 +32,13 @@ const maxValidationGraph = persistence.CollectionValidationMaxItems
 // touches Ark or performs provider I/O. A successful commit reports durable state;
 // owner-loop reconciliation separately establishes observedGeneration.
 type Catalog struct {
-	store    *persistence.Store
-	sealer   *secureconfig.Sealer
-	storeID  string
-	options  CatalogOptions
-	failed   atomic.Bool
-	verified atomic.Bool
+	store        *persistence.Store
+	sealer       *secureconfig.Sealer
+	storeID      string
+	options      CatalogOptions
+	failed       atomic.Bool
+	verified     atomic.Bool
+	observations atomic.Pointer[fleetview.Holder]
 	// Only inactive cancellation is serialized here, before policy admission.
 	// No key wrapping, provider execution or upload work holds this semaphore.
 	collectionCancel chan struct{}
@@ -45,6 +47,10 @@ type Catalog struct {
 	validationWake     chan struct{}
 	validationStopping atomic.Bool
 }
+
+// SetObservations binds the controller's immutable read projection. Reads never
+// infer maintenance from an HTTP handler's clock or access mutable ECS state.
+func (c *Catalog) SetObservations(holder *fleetview.Holder) { c.observations.Store(holder) }
 
 // CatalogOptions is captured at construction and cannot change during admission.
 // Optional execution settings are present only in their tagged builds.
@@ -241,7 +247,7 @@ func (c *Catalog) Get(ctx context.Context, kind, id string) (api.Resource, error
 	if err != nil {
 		return api.Resource{}, err
 	}
-	return c.observedResource(ctx, resource)
+	return c.observedResourceDetail(ctx, resource)
 }
 
 // ReadView retains an immutable encrypted catalog generation. The HTTP cursor

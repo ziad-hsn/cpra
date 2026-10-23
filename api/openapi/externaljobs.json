@@ -248,7 +248,8 @@
         },
         "deadline": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Conservative upper bound for execution. The first committed start supplies the exact deadline; repeated starts never extend it. An offer itself lasts at most 30 seconds."
         },
         "workerUID": {
           "type": "string",
@@ -815,7 +816,7 @@
     },
     "WorkerNotification": {
       "type": "object",
-      "description": "Committed notification context, separate from operator parameters. No provider credential is supplied.",
+      "description": "Committed notification context, separate from operator parameters. No provider credential is supplied. Format 2 adds an earlier-episode resolution with its recovery timestamp and current observed health.",
       "properties": {
         "format": {
           "type": "integer",
@@ -847,6 +848,9 @@
         },
         "review": {
           "$ref": "#/components/schemas/ReviewNotice"
+        },
+        "resolution": {
+          "$ref": "#/components/schemas/ResolutionNotice"
         }
       },
       "required": [

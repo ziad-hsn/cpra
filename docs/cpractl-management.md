@@ -305,6 +305,14 @@ is documented in [management controls](management-controls.md).
 
 ## Preview a complete collection
 
+The dashboard's file import reports local configuration warnings as it prepares
+the selected resources, before the optional server preview or any upload. This
+also works for collections larger than the 4 MiB server-preview limit. The
+preview shows the total warning count and up to ten source-attributed details
+per resource page. Warnings, including missing blue notification destinations,
+are advisory; they do not invalidate an otherwise valid collection or replace
+whole-collection validation.
+
 Teams can keep shared contacts, endpoints and credentials in separate files from
 each service's monitors. Select every relevant file for one validation:
 
@@ -586,3 +594,26 @@ wait never cancels that execution. `resume-upload` remains limited to missing
 uploads and never validates or activates. SDK callers use `collection.ResumeFiles`
 for file-based continuation, or retain the original open `Frozen` for
 `collection.Resume`.
+
+## First-import recovery and validation details
+
+`cpractl local bootstrap inspect` authenticates a stopped loading stage; `discard`
+requires its exact identity, an actor and a reason, and proof that no bootstrap or
+catalog was admitted. Both require `--data-dir` and `--runtime-config`. Use
+`--stage temporary` for interrupted new input loading and `--stage published` for
+an older loading stage. Frozen stages resume and cannot be discarded. See
+[management startup](management-startup.md) for the protected audit and failure
+procedure.
+
+A rejected `apply` keeps its original operation ID and reports `rejected` after a
+sealed invalid verdict. It prints at most ten safe field details from the first
+returned validation page, using original local source coordinates. Additional
+results are explicitly paginated:
+
+```sh
+cpractl get operation OPERATION_ID --validation --limit 100
+```
+
+The CLI does not fetch the entire collection to display an error and never
+activates a rejected collection. Fixing input creates a different content
+identity; explicit continuation must retain the original operation and sources.

@@ -28,6 +28,10 @@ func (p Policy) Clone() Policy {
 	for color, ids := range p.NotificationEndpointIDs {
 		p.NotificationEndpointIDs[color] = slices.Clone(ids)
 	}
+	p.NotificationDrivers = maps.Clone(p.NotificationDrivers)
+	for color, drivers := range p.NotificationDrivers {
+		p.NotificationDrivers[color] = slices.Clone(drivers)
+	}
 	p.NotificationTriggers = maps.Clone(p.NotificationTriggers)
 	p.NotificationTimeouts = maps.Clone(p.NotificationTimeouts)
 	for color, values := range p.NotificationTimeouts {
@@ -64,6 +68,16 @@ func (p Policy) Validate() error {
 		}
 		for _, id := range ids {
 			if !catalogIdentifier(id, 256) {
+				return ErrNotificationIdentity
+			}
+		}
+	}
+	for color, values := range p.NotificationDrivers {
+		if len(values) != p.Endpoints[color] {
+			return ErrNotificationIdentity
+		}
+		for _, driver := range values {
+			if !catalogIdentifier(driver, 128) {
 				return ErrNotificationIdentity
 			}
 		}

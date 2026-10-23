@@ -19,6 +19,10 @@ func cloneAssignment(a api.Assignment) api.Assignment {
 	a.Parameters = append([]byte(nil), a.Parameters...)
 	if a.Notification != nil {
 		n := *a.Notification
+		if n.Resolution != nil {
+			v := *n.Resolution
+			n.Resolution = &v
+		}
 		if n.Review != nil {
 			review := *n.Review
 			n.Review = &review
@@ -57,8 +61,13 @@ func validateAssignment(a api.Assignment, server, worker, session string) error 
 		return ErrIdentity
 	}
 	if n := a.Notification; n != nil {
-		if a.Kind != "notification" || n.Format != 1 || !validID(n.DeliveryID) || !validID(n.EndpointID) || !validID(n.CorrelationID) || n.IncidentID != "" && !validID(n.IncidentID) || !validDeadline(n.At) {
+		if a.Kind != "notification" || n.Format != 1 && n.Format != 2 || !validID(n.DeliveryID) || !validID(n.EndpointID) || !validID(n.CorrelationID) || n.IncidentID != "" && !validID(n.IncidentID) || !validDeadline(n.At) {
 			return ErrIdentity
+		}
+		if r := n.Resolution; r != nil {
+			if n.Format != 2 || n.Color != "green" || n.Review != nil || !validID(r.ConditionID) || !validDeadline(r.RecoveredAt) || (r.Health != "healthy" && r.Health != "unhealthy" && r.Health != "unknown") {
+				return ErrIdentity
+			}
 		}
 		switch n.Color {
 		case "red", "yellow", "green", "cyan", "gray", "blue":

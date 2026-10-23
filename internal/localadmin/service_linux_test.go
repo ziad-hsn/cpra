@@ -155,7 +155,9 @@ func TestLinuxUserInitRepairsPermissionsWithoutReplacingFiles(t *testing.T) {
 	if err := Init(l, "", 0); err != nil {
 		t.Fatal(err)
 	}
-	directories := []string{l.ConfigDir, l.StateDir, l.LogDir, l.BinDir, filepath.Join(l.StateDir, "history")}
+	// The token's configuration directory must already be trusted; initializer
+	// repair cannot retroactively establish trust in a supplied credential.
+	directories := []string{l.StateDir, l.LogDir, l.BinDir, filepath.Join(l.StateDir, "history")}
 	for _, path := range directories {
 		if err := os.MkdirAll(path, 0700); err != nil {
 			t.Fatal(err)
@@ -167,7 +169,6 @@ func TestLinuxUserInitRepairsPermissionsWithoutReplacingFiles(t *testing.T) {
 	files := map[string][]byte{
 		filepath.Join(l.ConfigDir, "monitors.yaml"):        []byte("monitors: [] # operator edited\n"),
 		filepath.Join(l.ConfigDir, "runtime.yaml"):         []byte("storage: {mode: raft, directory: " + l.StateDir + "}\n"),
-		filepath.Join(l.ConfigDir, "auth.token"):           []byte("existing-operator-token\n"),
 		filepath.Join(l.StateDir, "history", "segment.db"): []byte("retained event fixture"),
 		filepath.Join(l.LogDir, "cpra.log"):                []byte("retained diagnostic fixture"),
 		binaryPath(l):                                      []byte("managed executable fixture"),

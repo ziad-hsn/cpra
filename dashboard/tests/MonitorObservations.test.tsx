@@ -57,3 +57,24 @@ it('preserves the server diagnostic through the production resource projection',
   rerender(<MonitorStatusDetails monitor={healthy} />);
   expect(screen.queryByText('dns_failed')).toBeNull();
 });
+
+it('preserves current unavailability, real observation, maintenance and independent closure conditions', () => {
+  const checked = '2026-10-22T12:00:00Z';
+  const response = monitor({health: 'unknown', lastCheckedAt: checked, lastObservedHealth: 'healthy', lastObservedAt: checked,
+    availability: {state: 'unavailable', reason: 'configurationProblem', observedAt: '2026-10-22T12:01:00Z'}, maintenance: true, notificationsSuppressed: true,
+    configurationProblem: {code: 'ca_file_missing', message: 'Configured CA file is unavailable.'}, warnings: [{field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination', message: 'Uncertain recovery has no enabled blue notification destination.'}],
+    notificationConditions: [{conditionID: 'closure-1', kind: 'resolution', color: 'green', state: 'pending', reason: 'maintenance', pendingAt: checked, recoveredAt: checked}], notificationConditionsTruncated: true, notificationConditionsObservedAt: checked, notificationConditionsSequence: '18446744073709551615'});
+  response.spec.check.driver.config = {url: 'https://example.test/health'};
+  const projected = resourceView(response, 'monitors').resource as Monitor;
+  expect(projected.status?.notificationConditions).toEqual(response.status?.notificationConditions);
+  expect(projected.status?.notificationConditionsSequence).toBe('18446744073709551615');
+  expect(projected.status?.availability).toEqual(response.status?.availability);
+  render(<MonitorStatusDetails monitor={projected} />);
+  expect(screen.getByText(/Current health:/)).toHaveTextContent('Current health: unknown');
+  expect(screen.getByText(/Last target observation:/)).toHaveTextContent('healthy');
+  expect(screen.getByText(/Maintenance:/)).toHaveTextContent('Active; checks continue');
+  expect(screen.getByText(/Uncertain recovery has no enabled blue/)).toBeInTheDocument();
+  expect(screen.getByRole('region', {name: 'Notification conditions'})).toHaveTextContent('Earlier outage closure');
+  expect(screen.getByText(/Storage sequence 18446744073709551615/)).toBeInTheDocument();
+  expect(screen.getByText(/Additional retained conditions/)).toBeInTheDocument();
+});

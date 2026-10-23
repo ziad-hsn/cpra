@@ -6,7 +6,7 @@ export function CodeBadge({ code, label }: { code: CpraCode; label?: string }) {
   return (
     <span className={'code-badge ' + code}>
       {code === 'blue' ? <Icon name="person" size={13} /> : code === 'cyan' ? <Icon name="clock" size={13} /> : <span className="status-dot" aria-hidden="true" />}
-      {text}
+      <span className="badge-label">{text}</span>
     </span>
   );
 }

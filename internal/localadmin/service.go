@@ -144,6 +144,10 @@ func Install(ctx context.Context, l installpath.Layout, source, account string, 
 	if err != nil {
 		return err
 	}
+	args, err = serviceTokenPolicy(l, account, args)
+	if err != nil {
+		return err
+	}
 	args = append(args, "-validate")
 	if err = runCommand(ctx, candidate, args...); err != nil {
 		return fmt.Errorf("candidate configuration validation: %w", err)

@@ -9,8 +9,9 @@ make build-ctl BUILD_TAGS=externaljobs
 ```
 
 This interface provisions worker identities and scopes in committed local state.
-It does not start a worker, load Go handlers, issue execution grants, or expose
-assignment/start/result routes. Those execution features have separate gates.
+Provisioning does not start a worker, load Go handlers or issue an execution
+grant. The server's assignment/start/result protocol requires its own runtime
+enablement and scoped authorization.
 The runtime setting `external_jobs.enabled` is a separate opt-in; compiling or
 provisioning a worker does not turn it on.
 
@@ -36,9 +37,11 @@ it does not authenticate a remote caller or require an operator bearer token.
 No command contacts `--server`, starts providers, or reads a runtime worker
 policy file. Committed worker policy is authoritative.
 
-Worker policy uses tagged storage format 17 and is bounded to 1,024 retained
-worker identities and 16 MiB of canonical state. Revoked identities remain
-retained. Default builds continue to support format 14 and refuse external state.
+Worker policy is bounded to 1,024 retained worker identities and 16 MiB of
+canonical state. Revoked identities remain retained. Current writes use storage
+format 46 for the base application and 47 when tagged state is present; supported
+older state retains its replay semantics. Untagged builds refuse external-worker
+state. See [upgrade and backup rules](durability.md) before replacing a binary.
 
 ## Explicit grant files
 

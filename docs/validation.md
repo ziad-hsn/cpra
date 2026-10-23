@@ -1,8 +1,7 @@
 # Release evidence and live verification
 
-Implementation tests, local provider operations, account-backed verification,
-comparative performance are separate evidence gates. A 24-hour endurance run is
-outside the requested work and mandatory completion checks as of 1 October 2026.
+Implementation tests, local provider operations, account-backed verification and
+comparative performance are separate evidence gates.
 An HTTP acceptance response is not proof of delivered notification or completed
 recovery. Local fixtures do not certify a cloud production account. See
 [provider test environments](provider-testing.md) for supported socket fixtures,
@@ -91,7 +90,7 @@ the compiler and tags actually used by their helper binaries in every applicatio
 variant. Missing contracts or skipped coverage produce an incomplete result;
 changed inputs and contradictory identities are invalid.
 
-The current inventory contains 71 base operations and 11 additional operations
+The current inventory contains 76 base operations and 11 additional operations
 under `externaljobs`. Its transport fixtures do not prove deployed server
 interoperability. The named server and controller integration tests cover their
 individual real scenarios, while browser behavior, accessibility, external
@@ -469,11 +468,12 @@ GOWORK="$CPRA_SDK_WORKSPACE" GOTOOLCHAIN=local CPRA_RUN_CLI_INTEGRATION=1 \
 ```
 
 Ordinary application tests skip these cases unless the explicit invocation flag
-is set. CI runs all five on both compilers and both server builds. The
-[current availability](versions.md)
-passes all 20 cases, with no skips or changed captured inputs. Frozen release
-qualification still requires `GOWORK=off`, the matching dependency cache and
-final installed artifacts; this development workspace cannot satisfy that gate.
+is set. CI is configured to run all five on both compilers and both server
+builds. Qualification requires passing records for all 20 combinations, with no
+skips or changed captured inputs, against the source being assessed. Frozen
+release qualification also requires `GOWORK=off`, the matching dependency cache
+and final installed artifacts; this development workspace cannot satisfy that
+gate. See [current availability](versions.md) for the remaining boundaries.
 
 ## Configured providers
 
@@ -486,7 +486,9 @@ go build -tags 'redis postgres mysql mongo rabbitmq kafka kubernetes aws systemd
 
 Copy `examples/verification/live.yaml` into a private location. It contains the
 existing monitor/endpoint schema and one case for each of 14 checks, five
-recoveries and 14 notifications. Enable a case only after configuring its
+recoveries and 14 notifications. The two additional A2A roles use the separate
+[configured agent scenarios](provider-testing.md#a2a-candidate-evidence), for a
+total inventory of 35 built-in roles. Enable a case only after configuring its
 designated resource and independent observer. Credentials belong in this user
 configuration or the provider's existing credential files/environment, never
 in the published evidence. AWS uses the SDK credential chain, including
@@ -514,7 +516,7 @@ the retained source hashes allow comparison with those originals.
 | ICMP | Echo request/reply capture or designated target packet accounting |
 | DNS | Actual resolver query and expected answer for the test record |
 | UDP | Echo server receipt and reply of the configured datagram |
-| gRPC | TCP listener acceptance; this driver verifies port reachability |
+| gRPC | TCP listener acceptance for the default reachability mode; for explicit health mode, an independently observed unary health request and `SERVING` response for the configured service |
 | Docker check | Real daemon inspection of the isolated running container |
 | TLS | Real handshake and expected certificate/expiry at the designated endpoint |
 | Redis | Real Redis PING and isolated command-statistics increment |
@@ -553,12 +555,14 @@ using the production jobs. It cannot verify the other provider accounts.
 
 ## Scale campaign
 
-The agreed host is the current Ubuntu WSL installation. Its virtual disk is on
-C:. The campaign checks physical host free space and requires at least 30 GiB
-plus the selected fixture allowance (default 5 GiB), independently of apparent
-free space inside the guest. Disk cleanup and additional infrastructure are
-external prerequisites. The harness does not substitute a smaller monitor count
-or another machine when the prerequisite fails.
+Select and record the host, filesystem, resource limits and fixture allowance
+before running a capacity comparison. For WSL hosts, check physical free space
+on the drive backing the virtual disk, independently of apparent guest capacity.
+The harness requires at least 30 GiB plus the selected fixture allowance
+(default 5 GiB). A missing prerequisite produces an incomplete result; it does
+not authorize a smaller monitor count or a different machine under the same
+measurement claim. Repair regression scenarios use their own bounded workload
+and stop time, and do not constitute the comparative capacity qualification.
 
 Build the baseline commit `a370969b041b399c0778318d8915ce059fd74294` and the candidate
 with identical Go version, build tags and optimized build flags. Preparation uses
@@ -599,7 +603,6 @@ proof that a performance campaign passed.
 python3 scripts/benchmark/campaign.py --mode preflight --out evidence/local/preflight
 python3 scripts/benchmark/campaign.py --mode compare --builds /path/to/prepared-builds/builds.json --candidate /path/to/prepared-builds/candidate --baseline /path/to/prepared-builds/baseline --target /path/to/prepared-builds/target --out evidence/local/comparison
 python3 scripts/benchmark/campaign.py --mode faults --builds /path/to/prepared-builds/builds.json --candidate /path/to/prepared-builds/candidate --target /path/to/prepared-builds/target --out evidence/local/faults
-python3 scripts/benchmark/campaign.py --mode soak --builds /path/to/prepared-builds/builds.json --candidate /path/to/prepared-builds/candidate --target /path/to/prepared-builds/target --out evidence/local/soak
 ```
 
 Each run creates a private, random API token file for the baseline or candidate.
@@ -618,9 +621,9 @@ trials and failed run instead of starting more work. No automatic pass is issued
 Comparison uses 10,000, 100,000 and 1,000,000 distinct monitor configurations,
 60-second cadence, five-minute warmup, fifteen-minute measurement and three
 repetitions of each build. Baseline internal percentiles remain unavailable.
-An optional operator-invoked soak mode remains available in the harness, but the
-24-hour run is outside this task and is not required. No endurance claim follows
-from comparison or short-run evidence. The target performs real network I/O with per-monitor bounded counters
+An optional operator-invoked soak mode remains available in the harness as a
+separate campaign. It is not part of the comparison commands above. No endurance
+claim follows from comparison or short-run evidence. The target performs real network I/O with per-monitor bounded counters
 and digests. Samples record rate, CPU, RSS, descriptors, worker/queue statistics,
 SLOs, persistence timing and bounded dashboard reads. Logs rotate; individual
 check histories are not retained. Sleep, process interruption and missing fleet
@@ -678,10 +681,10 @@ artifacts. The aggregate publication gate remains separate and locked. These
 reader tests use synthetic report fixtures and do not establish actual scale or
 endurance results.
 
-The current [comparative verification procedure](validation.md)
-uses local HTTP, Git and controlled compiler/process fixtures. Actual preparation
-of the frozen candidate and comparative runs remain unqualified. No 24-hour
-run is required or authorized by this guide.
+Harness contract tests use local HTTP, Git and controlled compiler/process
+fixtures. They do not qualify preparation of a frozen candidate or an actual
+comparative run. See [current availability](versions.md) for the outstanding
+capacity gates.
 
 ## Additional local and account scenarios
 

@@ -1,6 +1,6 @@
 ---
 title: Current development changes
-description: Implemented CPRa repair checkpoints and the qualification still required before its first release candidate.
+description: CPRa configuration, monitoring, notification, storage and operator-interface behavior.
 cpra_scope: development
 ---
 
@@ -20,7 +20,10 @@ and are excluded from the public website.
   cross-instance coordination or failover.
 - Incident and action events are retained for 30 days, including notification
   endpoint outcomes. Successful raw checks and historical per-monitor latency
-  distributions are not retained.
+  distributions are not retained. Ordinary dependency-free completed action records
+  are retained for 90 days; unknown actions, review evidence and their required
+  dependencies are protected. Logical retirement and physical reclamation are
+  reported separately.
 - Authenticated management supports configuration collections, monitor editing,
   recipients, groups and protected credentials. The API, Go SDK, CLI and
   dashboard expose the same resource/version contracts. Acknowledge records
@@ -33,11 +36,16 @@ and are excluded from the public website.
   explicit apply. Interrupted collection application retains its original
   operation and requires explicit continuation with the original inputs.
 - Notification intent has stable episode, endpoint and delivery identities.
-  Recovery and maintenance cancel obsolete unsent work. Intervention completion
+  New conditions remain pending while relevant; their execution budget begins
+  with the first committed start. Ordinary built-in notifications have 45 seconds
+  across at most three attempts. Recovery and maintenance cancel obsolete unsent
+  openings, while relevant closures retain their original destinations. Intervention completion
   reports health verification pending; restored health requires the configured
   successful-check threshold. Ambiguous delivery does not authorize replay.
 - Current observations expose bounded safe failure causes, queue saturation and
-  measured five-minute latency distributions. Erlang C/Allen–Cunneen remains
+  measured five-minute latency distributions. Local preparation failures make
+  current health unknown and monitoring unavailable, with the previous observation
+  and time shown separately. Erlang C/Allen–Cunneen remains
   the initial sizing model; observed percentile control is separate from a
   contractual SLA or an unconditional capacity claim.
 - The gRPC check supports explicit unary health mode with verified TLS by
@@ -53,12 +61,10 @@ See the [quickstart](tutorials/quickstart.md), [durability guide](durability.md)
 
 ## Development evidence and remaining gates {#current-boundaries}
 
-Focused Go, real-process recovery, local network, frontend and required browser
-checks have passing repair evidence, with independent review of finite
-checkpoints. An earlier broader application run failed report/fixture checks
-and exhausted its locally shortened persistence timeout. Corrected focused
-checks and a documented-budget persistence rerun remain separate evidence.
-These results do not establish a final frozen-source release matrix.
+Development tests cover individual behavior and failure boundaries. Only evidence
+bound to the final frozen source can qualify a release. Independent review,
+required browser campaigns and the complete compiler/tag matrix remain required;
+a focused pass does not replace these gates.
 
 The release recipe uses Go 1.27.3, gRPC 1.83.2 and `x/net v0.60.0`. All repository
 Go modules share a Go 1.26.10 minimum. The compiler pins include the certificate
@@ -76,8 +82,7 @@ upgrade tests, actual provider/agent effects, and comparative capacity evidence.
 Native runner, Kubernetes and provider-account infrastructure is not configured.
 Local fixtures and sandbox acceptance do not establish observed production
 delivery or provider certification. The comparative million-monitor campaign
-has not completed; its disk prerequisite still applies. The 24-hour endurance
-run remains cancelled.
+has not completed; its disk prerequisite still applies.
 
 The repository retains individual pass/fail records and open work. No public tag, module, artifact,
 image, chart or documentation promotion is implied by this page.

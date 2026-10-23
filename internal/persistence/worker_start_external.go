@@ -77,7 +77,7 @@ func workerStartResponse(r WorkerExecutionRecord, disposition string) WorkerStar
 	out := WorkerStartResponse{ServerID: l.ServerID, SessionID: l.SessionID, ExecutionID: r.Intent.ID, ExecutionRevision: r.Intent.Revision, LeaseID: l.LeaseID, WorkerUID: l.WorkerUID, Disposition: disposition}
 	if disposition == "granted" || disposition == "started" || disposition == "unknown" {
 		out.GrantID = l.GrantID
-		out.Deadline = r.Intent.Deadline
+		out.Deadline = r.ExecutionDeadline()
 	}
 	if receipt, terminal := r.TerminalReceipt(); terminal {
 		out.ReceiptID = receipt.ReceiptID
@@ -185,6 +185,9 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 					return Result{Err: ErrWorkerExecutionConflict}
 				}
 				action := result.Monitor.Actions[r.Intent.ActionID]
+				if r.Intent.ExecutionBudget > 0 && (!action.Deadline.Equal(r.ExecutionDeadline()) || action.ExecutionBudget != r.Intent.ExecutionBudget) {
+					return Result{Err: ErrWorkerExecutionConflict}
+				}
 				action.ExecutorKind = "worker"
 				action.ExecutorSession = l.GrantID
 				result.Monitor.Actions[action.ID] = action
@@ -196,7 +199,7 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 		// Concurrent callers timestamp requests before Raft orders them. An
 		// earlier duplicate may read the committed grant but cannot backdate a
 		// state transition or receive another executable grant.
-		if !at.Before(l.UpdatedAt) && (l.OwnerEpoch != f.image.LocalExecutorSession || !at.Before(r.Intent.Deadline)) {
+		if !at.Before(l.UpdatedAt) && (l.OwnerEpoch != f.image.LocalExecutorSession || r.executionExpired(at)) {
 			l.Phase = "unknown"
 			disposition = "unknown"
 		} else {
@@ -218,10 +221,14 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 				next := previous.Clone()
 				action.State = Unknown
 				action.Outcome = "worker_outcome_unknown"
+				if next.notificationConditionsEnabled() {
+					action.TerminationReason = "outcome_unknown"
+				}
 				action.FinishedAt = at
 				next.Actions[action.ID] = action
+				next.recordNotificationCondition(action)
 				monitor = &next
-				events = append(events, Event{MonitorID: previous.ID, CatalogUID: action.CatalogUID, Revision: action.Revision, At: at, Type: "action_unknown", IncidentID: action.IncidentID, ActionID: action.ID, Kind: action.Kind, Color: action.Color, Endpoint: action.Endpoint, Outcome: action.Outcome})
+				events = append(events, Event{MonitorID: previous.ID, CatalogUID: action.CatalogUID, Revision: action.Revision, At: at, Type: "action_unknown", IncidentID: action.IncidentID, ActionID: action.ID, Kind: action.Kind, Color: action.Color, Endpoint: action.Endpoint, Outcome: action.Outcome, Resolution: action.Resolution, TerminationReason: action.TerminationReason, DeliveryID: action.DeliveryID, NotificationEpisode: action.NotificationEpisode, EndpointID: action.EndpointID})
 			}
 		}
 		oldCost, err := workerExecutionRecordCost(r.Intent.ID, old)

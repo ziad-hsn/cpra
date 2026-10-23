@@ -19,6 +19,7 @@ type LocalExecution struct {
 	monitorID, actionID, revision, session string
 	serial                                 chan struct{}
 	startedAt                              time.Time
+	deadline                               time.Time
 	returnedAt                             atomic.Pointer[time.Time]
 	completed                              bool
 }
@@ -70,8 +71,20 @@ func (s *Store) BeginLocalAction(ctx context.Context, start Command) (*LocalExec
 	if !results[0].Allowed {
 		return handle, ErrRecoveryIneligible
 	}
+	if results[0].Monitor == nil {
+		return handle, ErrCommitUnconfirmed
+	}
+	a, ok := results[0].Monitor.Actions[start.ActionID]
+	if !ok || a.State != Started || a.ExecutorSession != handle.session {
+		return handle, ErrCommitUnconfirmed
+	}
+	handle.deadline = a.Deadline
 	return handle, nil
 }
+
+// Deadline is the authoritative deadline returned by the committed start. It
+// is usable only after BeginLocalAction succeeds; a lost reply grants no work.
+func (h *LocalExecution) Deadline() time.Time { return h.deadline }
 
 // Finish durably records only executor completion, never provider acceptance.
 // It is safe to retry the same handle. An unconfirmed marker retains the claim

@@ -59,14 +59,20 @@ type PublicConfig struct {
 
 // overviewResp is the /api/v1/overview payload.
 type overviewResp struct {
-	Generated   time.Time      `json:"generated,omitzero"`
-	Total       int            `json:"total"`
-	Disabled    int            `json:"disabled"`
-	ByStatus    map[string]int `json:"by_status"`
-	ByPulseType map[string]int `json:"by_pulse_type"`
-	ByCode      map[string]int `json:"by_code"`
-	UpPercent   float64        `json:"up_percent"`
-	IndexCapped bool           `json:"index_capped"`
+	Generated             time.Time      `json:"generated,omitzero"`
+	Total                 int            `json:"total"`
+	Disabled              int            `json:"disabled"`
+	Unavailable           int            `json:"unavailable"`
+	Paused                int            `json:"paused"`
+	Pending               int            `json:"pending"`
+	Maintenance           int            `json:"maintenance"`
+	SuppressedUnhealthy   int            `json:"suppressed_unhealthy"`
+	UnsuppressedUnhealthy int            `json:"unsuppressed_unhealthy"`
+	ByStatus              map[string]int `json:"by_status"`
+	ByPulseType           map[string]int `json:"by_pulse_type"`
+	ByCode                map[string]int `json:"by_code"`
+	UpPercent             float64        `json:"up_percent"`
+	IndexCapped           bool           `json:"index_capped"`
 }
 
 // monitorsResp is the /api/v1/monitors payload.

@@ -51,7 +51,7 @@ func (v *collectionLedgerView) readActionHead(id string) (actionLedgerRow, bool,
 		return actionLedgerRow{}, false, nil
 	}
 	row, err := decodeActionRow(data)
-	return row, err == nil, err
+	return row, !row.Deleted && err == nil, err
 }
 func (v *collectionLedgerView) readReviewHead(key string) (reviewRecord, bool, error) {
 	var data []byte
@@ -98,7 +98,7 @@ func (v *collectionLedgerView) reviewValidationMonitor(m Monitor, alert ReviewAl
 				return m, err
 			}
 			if ok {
-				if row.MonitorID != m.ID {
+				if row.Deleted || row.MonitorID != m.ID {
 					return m, errActionLedger
 				}
 				m.Actions[key] = row.Action
@@ -110,6 +110,9 @@ func (v *collectionLedgerView) reviewValidationMonitor(m Monitor, alert ReviewAl
 func validateProjectionInventory(i image, v *collectionLedgerView, worker workerActionValidation) error {
 	counts := make(map[string]ActionProjection)
 	if err := v.walkActions(func(_ []byte, row actionLedgerRow) error {
+		if row.Deleted {
+			return nil
+		}
 		m := i.Monitors[row.MonitorID]
 		if m.ActionProjection == nil {
 			return nil

@@ -524,6 +524,8 @@ func (s *Server) handleOverview(w http.ResponseWriter, _ *http.Request) {
 		Generated:   snap.Generated,
 		Total:       snap.Total,
 		Disabled:    snap.Disabled,
+		Unavailable: snap.Unavailable, Paused: snap.Paused, Pending: snap.Pending,
+		Maintenance: snap.Maintenance, SuppressedUnhealthy: snap.SuppressedUnhealthy, UnsuppressedUnhealthy: snap.UnsuppressedUnhealthy,
 		ByStatus:    snap.ByStatus,
 		ByPulseType: snap.ByPulseType,
 		ByCode:      snap.ByCode,
@@ -638,7 +640,7 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 404, "monitor not found")
 			return
 		}
-		writeJSON(w, 200, m)
+		s.writeMonitorDetail(w, r, m)
 		return
 	}
 	snap := s.holder.Get()
@@ -655,7 +657,37 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "monitor index out of range")
 		return
 	}
-	writeJSON(w, http.StatusOK, snap.Monitors[idx])
+	s.writeMonitorDetail(w, r, snap.Monitors[idx])
+}
+
+func (s *Server) writeMonitorDetail(w http.ResponseWriter, r *http.Request, row fleetview.MonitorSummary) {
+	if s.cfg.Store == nil || s.managementHTTP == nil {
+		row.NotificationConditionsTruncated = true
+		row.NotificationConditionsObservedAt = time.Time{}
+		row.NotificationConditionsSequence = ""
+		writeJSON(w, http.StatusOK, row)
+		return
+	}
+	var result fleetview.MonitorSummary
+	operation := "GetMonitorObservation"
+	if s.managementHTTP.auth != nil {
+		// The outer middleware already authenticated this exact numeric GET.
+		// Repeat its AuthorizeObservation mapping for the pre/post-I/O policy
+		// guard; preserve Host, TLS, origin, headers and cancellation unchanged.
+		r = r.Clone(r.Context())
+		r.URL.Path, r.URL.RawPath = "/api/v2/monitors/"+strconv.FormatUint(uint64(row.ID), 10), ""
+		operation = "GetMonitor"
+	}
+	err := s.managementHTTP.withObservationRead(r, operation, func(ctx context.Context) error {
+		var err error
+		result, err = s.monitorNotificationConditions(ctx, row)
+		return err
+	})
+	if err != nil {
+		writeManagementError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
@@ -820,6 +852,12 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	snap := s.holder.Get()
 	if snap != nil {
 		writeGauge(&b, "cpra_monitors", "Total number of monitors.", nil, float64(snap.Total))
+		writeGauge(&b, "cpra_monitors_unavailable", "Monitors whose checks are unavailable because local configuration could not be prepared.", nil, float64(snap.Unavailable))
+		writeGauge(&b, "cpra_monitors_paused", "Monitors with checks paused by a committed control.", nil, float64(snap.Paused))
+		writeGauge(&b, "cpra_monitors_pending", "Monitors waiting for their first target observation.", nil, float64(snap.Pending))
+		writeGauge(&b, "cpra_monitors_in_maintenance", "Monitors currently in maintenance according to the controller projection.", nil, float64(snap.Maintenance))
+		writeGauge(&b, "cpra_monitors_unhealthy_suppressed", "Currently unhealthy monitors with ordinary notifications suppressed.", nil, float64(snap.SuppressedUnhealthy))
+		writeGauge(&b, "cpra_monitors_unhealthy_unsuppressed", "Currently unhealthy monitors whose ordinary notifications are not suppressed by controls.", nil, float64(snap.UnsuppressedUnhealthy))
 		for status, n := range snap.ByStatus {
 			writeGauge(&b, "cpra_monitors_by_status", "Monitors by status.", []kv{{"status", status}}, float64(n))
 		}

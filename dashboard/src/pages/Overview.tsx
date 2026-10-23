@@ -69,14 +69,20 @@ export default function Overview() {
 
   const upPct = overview?.up_percent ?? 0;
   const total = overview?.total ?? 0;
-  const critical = (byStatus.incident ?? 0) + (byStatus.down ?? 0);
+  const critical = overview?.unsuppressed_unhealthy ?? (byStatus.incident ?? 0) + (byStatus.down ?? 0);
+  const suppressed = overview?.suppressed_unhealthy ?? 0;
+  const unavailable = overview?.unavailable ?? 0;
+  const paused = overview?.paused ?? overview?.disabled ?? 0;
   const degraded = byStatus.degraded ?? 0;
   const availFrac = total > 0 ? upPct / 100 : 0;
-  const pending = (byStatus.unknown ?? 0) + (byStatus.verifying ?? 0);
-  const fleetNote = total === 0 || total === (overview?.disabled ?? 0) ? 'no active monitors'
+  const pending = (overview?.pending ?? byStatus.unknown ?? 0) + (byStatus.verifying ?? 0);
+  const fleetNote = total === 0 || total === paused ? 'no active monitors'
     : critical > 0 ? formatNumber(critical) + ' need attention'
+    : unavailable > 0 ? formatNumber(unavailable) + ' checks unavailable'
+    : suppressed > 0 ? formatNumber(suppressed) + ' unhealthy with notifications suppressed'
     : degraded > 0 ? formatNumber(degraded) + ' have health warnings'
     : pending > 0 ? formatNumber(pending) + ' awaiting health confirmation'
+    : paused > 0 ? formatNumber(paused) + ' paused; remaining monitors healthy'
     : 'all active monitors operational';
 
   return (
@@ -110,9 +116,10 @@ export default function Overview() {
             </div>
           </ProgressRing>
           <div className='row muted' style={{ fontSize: 12, gap: 6 }}>
-            <span className='status-dot' style={{ background: critical > 0 ? 'var(--status-critical)' : degraded > 0 ? 'var(--status-degraded)' : pending > 0 ? 'var(--status-info)' : total === 0 || total === (overview?.disabled ?? 0) ? 'var(--status-disabled)' : 'var(--status-operational)' }} />
+            <span className='status-dot' style={{ background: critical > 0 ? 'var(--status-critical)' : degraded > 0 || unavailable > 0 ? 'var(--status-degraded)' : pending > 0 || suppressed > 0 ? 'var(--status-info)' : total === 0 || paused > 0 ? 'var(--status-disabled)' : 'var(--status-operational)' }} />
             {fleetNote}
           </div>
+          {(overview?.maintenance ?? 0) > 0 && <p className="muted">{formatNumber(overview?.maintenance ?? 0)} in maintenance; health checks continue.</p>}
         </div>
 
         <div className='card span-4'>

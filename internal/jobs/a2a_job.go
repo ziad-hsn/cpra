@@ -118,7 +118,7 @@ func (d *Dispatch) agentAction() agentAction {
 	}
 	if d.Kind == "code" {
 		action.Notification = &notificationIdentity{MonitorID: d.MonitorID, IncarnationID: d.CatalogUID, IncidentID: d.IncidentID, EpisodeID: d.NotificationCorrelation,
-			ActionID: d.ActionID, DeliveryID: d.DeliveryID, EndpointID: d.EndpointID, At: d.NotificationAt.UTC(), Review: d.ReviewNotification}
+			ActionID: d.ActionID, DeliveryID: d.DeliveryID, EndpointID: d.EndpointID, At: d.NotificationAt.UTC(), Review: d.ReviewNotification, Resolution: d.ResolutionNotification}
 		if action.Notification.IncarnationID == "" {
 			action.Notification.IncarnationID = d.FileIncarnation
 		}
@@ -238,11 +238,12 @@ func (j *A2AJob) IsNil() bool                 { return j == nil }
 // RecoveryFailure carries the original committed rejection into an agent notification.
 // Targets, credentials and provider response text are never included.
 type RecoveryFailure struct {
-	ActionID    string    `json:"actionId"`
-	Driver      string    `json:"driver"`
-	Attempt     int       `json:"attempt"`
-	MaxAttempts int       `json:"maxAttempts"`
-	Trigger     string    `json:"trigger"`
-	Outcome     string    `json:"outcome"`
-	FailedAt    time.Time `json:"failedAt"`
+	TerminationReason string    `json:"termination_reason,omitempty"`
+	ActionID          string    `json:"actionId"`
+	Driver            string    `json:"driver"`
+	Attempt           int       `json:"attempt"`
+	MaxAttempts       int       `json:"maxAttempts"`
+	Trigger           string    `json:"trigger"`
+	Outcome           string    `json:"outcome"`
+	FailedAt          time.Time `json:"failedAt"`
 }

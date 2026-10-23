@@ -117,7 +117,7 @@ func newLocalCommand() *cobra.Command {
 	restore.Flags().StringVar(&restoreDir, "data-dir", "", "new destination state directory")
 	restore.Flags().StringVar(&backupDir, "backup", "", "complete backup directory")
 	restore.Flags().StringVar(&restoreKey, "backup-auth-key", "", "protected external key used to authenticate this backup")
-	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand(), newLocalEncryptionCommand(), newLocalActionsCommand(), newLocalReviewCommand())
+	root.AddCommand(paths, init, service, backup, restore, newLocalAuthCommand(), newLocalEncryptionCommand(), newLocalActionsCommand(), newLocalReviewCommand(), newLocalBootstrapCommand())
 	registerLocalExtensions(root)
 	return root
 }

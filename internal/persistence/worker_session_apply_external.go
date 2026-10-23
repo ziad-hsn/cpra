@@ -219,7 +219,7 @@ func validateWorkerSessionImage(i image) error {
 			seenOffers[offer.ExecutionID] = true
 			execution, ok := i.WorkerExecutions.Records[offer.ExecutionID]
 			lease, _ := workerLease(execution, offer.LeaseID)
-			if !ok || lease == nil || execution.Intent.Revision != offer.ExecutionRevision || !execution.Intent.Deadline.Equal(offer.Deadline) || lease.WorkerUID != key || lease.SessionID != response.SessionID || lease.OwnerEpoch != r.OwnerEpoch || lease.ServerID != response.ServerID {
+			if !ok || lease == nil || execution.Intent.Revision != offer.ExecutionRevision || !workerAssignmentDeadline(execution.Intent, lease).Equal(offer.Deadline) || lease.WorkerUID != key || lease.SessionID != response.SessionID || lease.OwnerEpoch != r.OwnerEpoch || lease.ServerID != response.ServerID {
 				return ErrWorkerSessionInvalid
 			}
 		}

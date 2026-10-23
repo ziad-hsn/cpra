@@ -52,9 +52,11 @@ func NewIndex(monitors []MonitorSummary) *Index {
 }
 
 func (i *Index) Put(m MonitorSummary) {
-	m.ActiveCodes = slices.Clone(m.ActiveCodes)
+	m = cloneSummary(m)
 	m.LastCheck, m.LastSuccess, m.NextCheck = m.LastCheck.UTC(), m.LastSuccess.UTC(), m.NextCheck.UTC()
 	m.SnoozedUntil, m.ConfigurationProblemAt = m.SnoozedUntil.UTC(), m.ConfigurationProblemAt.UTC()
+	m.LastObservedAt, m.SuppressionObservedAt = m.LastObservedAt.UTC(), m.SuppressionObservedAt.UTC()
+	m.Availability.ObservedAt = m.Availability.ObservedAt.UTC()
 	m.LastFailure.CertificateNotAfter = m.LastFailure.CertificateNotAfter.UTC()
 	m.ConfigurationProblem.CertificateNotAfter = m.ConfigurationProblem.CertificateNotAfter.UTC()
 	i.mu.Lock()
@@ -136,7 +138,7 @@ func (i *Index) GetStable(id string) (MonitorSummary, bool) {
 		return MonitorSummary{}, false
 	}
 	m := *item.row.Load()
-	m.ActiveCodes = slices.Clone(m.ActiveCodes)
+	m = cloneSummary(m)
 	return m, true
 }
 
@@ -170,7 +172,7 @@ func (v View) Page(ctx context.Context, selection, after string, limit int) ([]M
 			return false
 		}
 		m := *item.row.Load()
-		m.ActiveCodes = slices.Clone(m.ActiveCodes)
+		m = cloneSummary(m)
 		rows = append(rows, m)
 		return selection == ""
 	})
@@ -184,6 +186,24 @@ func (i *Index) count(m MonitorSummary, delta int) {
 	}
 	if m.Status == "disabled" {
 		i.aggregate.Disabled += delta
+	}
+	switch m.Availability.State {
+	case "unavailable":
+		i.aggregate.Unavailable += delta
+	case "paused":
+		i.aggregate.Paused += delta
+	case "pending":
+		i.aggregate.Pending += delta
+	}
+	if m.Maintenance {
+		i.aggregate.Maintenance += delta
+	}
+	if m.Health == "unhealthy" {
+		if m.NotificationsSuppressed {
+			i.aggregate.SuppressedUnhealthy += delta
+		} else {
+			i.aggregate.UnsuppressedUnhealthy += delta
+		}
 	}
 }
 func (i *Index) Touch(at time.Time) { i.mu.Lock(); i.aggregate.Generated = at.UTC(); i.mu.Unlock() }
@@ -199,7 +219,7 @@ func (i *Index) Get(id uint32) (MonitorSummary, bool) {
 		return MonitorSummary{}, false
 	}
 	copy := *m
-	copy.ActiveCodes = slices.Clone(copy.ActiveCodes)
+	copy = cloneSummary(copy)
 	return copy, true
 }
 func (i *Index) Overview() *StatsSnapshot {
@@ -223,7 +243,7 @@ func (i *Index) Page(offset, limit int, match func(MonitorSummary) bool) ([]Moni
 	total := 0
 	view.Ascend(func(item indexItem) bool {
 		m := *item.row.Load()
-		m.ActiveCodes = slices.Clone(m.ActiveCodes)
+		m = cloneSummary(m)
 		if match != nil && !match(m) {
 			return true
 		}
@@ -237,4 +257,12 @@ func (i *Index) Page(offset, limit int, match func(MonitorSummary) bool) ([]Moni
 		total = view.Len()
 	}
 	return rows, total
+}
+
+// Each response owns its bounded slices; callers never mutate published rows.
+func cloneSummary(m MonitorSummary) MonitorSummary {
+	m.ActiveCodes = slices.Clone(m.ActiveCodes)
+	m.ConfigurationWarnings = slices.Clone(m.ConfigurationWarnings)
+	m.NotificationConditions = slices.Clone(m.NotificationConditions)
+	return m
 }

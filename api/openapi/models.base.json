@@ -1280,7 +1280,8 @@
           },
           "health": {
             "type": "string",
-            "x-go-type-skip-optional-pointer": true
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Current health is unknown while local preparation prevents target checks. Use lastObservedHealth and lastObservedAt for the preserved prior real observation."
           },
           "lastCheckedAt": {
             "type": "string",
@@ -1353,12 +1354,65 @@
           },
           "configurationProblem": {
             "$ref": "#/components/schemas/FailureDiagnostic",
-            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+            "description": "Local check preparation failed before target invocation. Current health is unknown; lastObservedHealth and lastObservedAt preserve the last real observation."
           },
           "configurationProblemAt": {
             "type": "string",
             "format": "date-time",
             "description": "Last failed local preparation, in UTC. Absent when preparation is usable."
+          },
+          "lastObservedHealth": {
+            "type": "string",
+            "description": "Last completed target-check outcome, preserved when current check availability changes.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "lastObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the last real completed target check. Absent before any check returns."
+          },
+          "availability": {
+            "$ref": "#/components/schemas/MonitorAvailability",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "maintenance": {
+            "type": "boolean",
+            "description": "Controller-evaluated maintenance for this configuration and incarnation. Absent when a matching owner projection is unavailable."
+          },
+          "notificationsSuppressed": {
+            "type": "boolean",
+            "description": "Ordinary notification suppression captured by the owner. Gray control notices retain their documented exception. Absent when a matching projection is unavailable."
+          },
+          "suppressionObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time of the controller suppression assessment. Clients must not recompute maintenance from their clocks."
+          },
+          "notificationConditions": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/NotificationCondition"
+            },
+            "x-go-type-skip-optional-pointer": true,
+            "description": "At most 100 conditions in deterministic identity order. Inspect the original action for execution facts; no condition authorizes replay."
+          },
+          "notificationConditionsTruncated": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Conditions are omitted or detail coverage is unavailable. List summaries do not load retained review conditions. This projection never collects the whole action ledger."
+          },
+          "notificationConditionsObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time of the bounded detail read. Absent from list summaries and when detail coverage is unavailable. This is an observation, not a fleet-wide snapshot."
+          },
+          "notificationConditionsSequence": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "maxLength": 20,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Action-ledger progress sampled by the detail read, encoded as a decimal string. Not a resourceVersion, mutation precondition or resumable cursor."
           }
         },
         "required": [],
@@ -1768,7 +1822,7 @@
           "deadline": {
             "type": "string",
             "format": "date-time",
-            "description": "Original overall execution deadline in UTC; waiting and retries do not extend it."
+            "description": "Original absolute deadline in UTC once execution starts. New notification conditions may wait with no deadline; retries and restart never renew a started budget."
           },
           "startedAt": {
             "type": "string",
@@ -1779,6 +1833,19 @@
             "type": "string",
             "format": "date-time",
             "description": "Time the outcome was committed in UTC; an unknown outcome remains uncertain."
+          },
+          "terminationReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Confirmed operational terminal reason, independent of provider outcome. Empty when no terminal reason is recorded."
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/ResolutionNotice"
+          },
+          "executionBudget": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Captured execution budget as a Go duration such as 45s. For new notifications the first committed start sets deadline; absent means the original absolute-deadline contract."
           }
         },
         "required": [
@@ -1897,7 +1964,7 @@
           "actionKind": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true,
-            "description": "Original action category, when the event belongs to an action."
+            "description": "Original action category, when the event belongs to an action or notification condition."
           },
           "color": {
             "type": "string",
@@ -1943,6 +2010,26 @@
           },
           "cause": {
             "$ref": "#/components/schemas/FailureDiagnostic"
+          },
+          "terminationReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Confirmed operational terminal reason, independent of provider outcome. Empty when no terminal reason is recorded."
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/ResolutionNotice"
+          },
+          "conditionID": {
+            "type": "string",
+            "x-go-name": "ConditionID",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original notification condition identity, including cancellation before any closing action exists."
+          },
+          "openingActionID": {
+            "type": "string",
+            "x-go-name": "OpeningActionID",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Original opening action referenced by a notification condition; does not imply a closing action or provider resolution."
           }
         },
         "required": [
@@ -2466,6 +2553,9 @@
           },
           "collectionGenerations": {
             "$ref": "#/components/schemas/CollectionStorageAccounting"
+          },
+          "actions": {
+            "$ref": "#/components/schemas/ActionStorageAccounting"
           }
         },
         "required": [
@@ -4750,6 +4840,11 @@
           "failedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "terminationReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "attempt_limit, execution_deadline or permanent_rejection; unknown effects remain separate review-required outcomes."
           }
         },
         "required": [
@@ -5099,7 +5194,8 @@
               "unhealthy",
               "warning",
               "unknown"
-            ]
+            ],
+            "description": "Current health is unknown while local preparation prevents target checks. Use lastObservedHealth and lastObservedAt for the preserved prior real observation."
           },
           "phase": {
             "type": "string",
@@ -5204,12 +5300,83 @@
           },
           "configurationProblem": {
             "$ref": "#/components/schemas/FailureDiagnostic",
-            "description": "Local check preparation failed before target invocation. Health and last-check timestamps retain the previous actual observation."
+            "description": "Local check preparation failed before target invocation. Current health is unknown; lastObservedHealth and lastObservedAt preserve the last real observation."
           },
           "configurationProblemAt": {
             "type": "string",
             "format": "date-time",
             "description": "Last failed local preparation, in UTC. Absent when preparation is usable."
+          },
+          "lastObservedHealth": {
+            "type": "string",
+            "description": "Last completed target-check outcome, preserved when current check availability changes.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "lastObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the last real completed target check. Absent before any check returns."
+          },
+          "availability": {
+            "$ref": "#/components/schemas/MonitorAvailability",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "maintenance": {
+            "type": "boolean",
+            "description": "Controller-evaluated maintenance for this configuration and incarnation. Absent when a matching owner projection is unavailable."
+          },
+          "notificationsSuppressed": {
+            "type": "boolean",
+            "description": "Ordinary notification suppression captured by the owner. Gray control notices retain their documented exception. Absent when a matching projection is unavailable."
+          },
+          "suppressionObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time of the controller suppression assessment. Clients must not recompute maintenance from their clocks."
+          },
+          "configurationRevision": {
+            "type": "string",
+            "description": "Runtime configuration identity for this observation. Not a writable catalog resourceVersion.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "controlRevision": {
+            "type": "string",
+            "description": "Committed control identity captured in this observation.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "notificationConditions": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/NotificationCondition"
+            },
+            "x-go-type-skip-optional-pointer": true,
+            "description": "At most 100 conditions in deterministic identity order. Inspect the original action for execution facts; no condition authorizes replay."
+          },
+          "notificationConditionsTruncated": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Conditions are omitted or detail coverage is unavailable. List summaries do not load retained review conditions. This projection never collects the whole action ledger."
+          },
+          "notificationConditionsObservedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time of the bounded detail read. Absent from list summaries and when detail coverage is unavailable. This is an observation, not a fleet-wide snapshot."
+          },
+          "notificationConditionsSequence": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "maxLength": 20,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Action-ledger progress sampled by the detail read, encoded as a decimal string. Not a resourceVersion, mutation precondition or resumable cursor."
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "x-go-type-skip-optional-pointer": true
           }
         },
         "required": [
@@ -5336,6 +5503,230 @@
             "minimum": 0
           }
         }
+      },
+      "ResolutionNotice": {
+        "type": "object",
+        "description": "Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.",
+        "properties": {
+          "conditionID": {
+            "type": "string",
+            "x-go-name": "ConditionID"
+          },
+          "recoveredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "health": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "unhealthy",
+              "unknown"
+            ],
+            "x-enum-varnames": [
+              "ResolutionHealthHealthy",
+              "ResolutionHealthUnhealthy",
+              "ResolutionHealthUnknown"
+            ]
+          }
+        },
+        "required": [
+          "conditionID",
+          "recoveredAt",
+          "health"
+        ],
+        "additionalProperties": false
+      },
+      "MonitorAvailability": {
+        "type": "object",
+        "description": "Owner-published check availability. observedAt is the controller assessment time, never a substitute for a completed check timestamp. Pending means no real check result; paused means disabled or committed snooze; unavailable means local preparation or controller projection is unavailable.",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "paused",
+              "pending"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Absent when the owner has not published a matching configuration and incarnation."
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationCondition": {
+        "type": "object",
+        "description": "Public condition metadata, independent of attempts. A pending resolution or held migration can have no executable action. Provider keys, target configuration and credentials are excluded.",
+        "properties": {
+          "conditionID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "ConditionID"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Condition category, including opening, resolution, migration, review_opening and review_closure. Review closures do not establish an intervention outcome.",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "color": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "state": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "originalActionID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "OriginalActionID"
+          },
+          "migrationReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "pendingAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original pending condition time; absent when historical evidence provides no time."
+          },
+          "recoveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Verified recovery of the earlier episode; absence is not proof of health recovery."
+          }
+        },
+        "required": [
+          "conditionID",
+          "kind",
+          "color",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "ActionStorageAccounting": {
+        "type": "object",
+        "description": "Cached action-ledger accounting. Bytes are encoded current rows, not bbolt allocation or physical disk reclamation. Unknown/review evidence and still-required dependencies are protected. Retention selection is bounded; cleanupBlocked is not a total inventory.",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Queued or started action records."
+          },
+          "ordinaryRetained": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Ordinary terminal records; dependencies may still prevent retirement."
+          },
+          "protected": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Records excluded from ordinary retirement, including unknown or reviewed evidence."
+          },
+          "tombstones": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Current logical retirement markers."
+          },
+          "activeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Encoded active row bytes."
+          },
+          "ordinaryBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Encoded ordinary retained row bytes."
+          },
+          "protectedBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Encoded protected row bytes."
+          },
+          "tombstoneBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Encoded tombstone row bytes."
+          },
+          "retired": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Cumulative committed retirements."
+          },
+          "retiredBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Cumulative encoded bytes retired; not reclaimed disk space."
+          },
+          "cleanupBlocked": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Blocked records in the last bounded selection page, not a fleet total."
+          },
+          "cleanupBlockedBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "x-go-type": "uint64",
+            "description": "Encoded bytes of blocked records in that selection page."
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time the cached sample was collected; a read does not rescan storage."
+          },
+          "cleanupCoverage": {
+            "type": "string",
+            "description": "last_selection_page: cleanup-blocked counts cover only the last bounded candidate selection."
+          },
+          "compactionCondition": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Safe background compaction condition; separate from durable admission health."
+          }
+        },
+        "required": [
+          "active",
+          "ordinaryRetained",
+          "protected",
+          "tombstones",
+          "activeBytes",
+          "ordinaryBytes",
+          "protectedBytes",
+          "tombstoneBytes",
+          "retired",
+          "retiredBytes",
+          "cleanupBlocked",
+          "cleanupBlockedBytes",
+          "observedAt",
+          "cleanupCoverage"
+        ],
+        "additionalProperties": false
       }
     }
   }

@@ -2,20 +2,20 @@
   "generator": "github.com/oapi-codegen/oapi-codegen/v2@v2.8.0",
   "inputs": {
     "api/openapi/contract.base.json": "d86e7265808dbd7d4836f81a9b973c73908bdeb3b8e7aa0a2a8d8bf29a5d567b",
-    "api/openapi/externaljobs.json": "e8717bbd0337222905e52b7baf783d7a87b5dbd925edabd34c69a0c3f616dc3b",
-    "api/openapi/models.base.json": "9ce979277d811fed75a48594703a63eee4edd37f7472949837d9030f8ebac95f",
+    "api/openapi/externaljobs.json": "9e1fd3f0745c705342a43aedad5a591ff54193f67564d2848c9d70b4e7d22b19",
+    "api/openapi/models.base.json": "9691e6114e020baa3babf03876a11b6ac39e6a1a7237c967f0a2db40bfb5e752",
     "api/openapi/operations.json": "fc74b3a25e1d33f72793c54dab5d677e080b4b2f2e207b554c482b343bfa5833",
     "tools/sdkgen/generate.py": "8f3f93f9ece0617fd4ffa36ce9c873677605e9d215c6530512669caf0fe3cf03",
     "tools/sdkgen/go.mod": "6494c843e170d95c1fa34818bcd079b083268d51753d9baabf724d44b36e3be8",
     "tools/sdkgen/go.sum": "380f4e9569dcabced6790bc6fac01135aa01476451341d456ed984b8455338ba"
   },
   "outputs": {
-    "sdk/go/api/generated_base.go": "cb64f989057839705ad30b5d1fb282c471de1524f3a56dde99d435a0599d85ee",
-    "sdk/go/api/generated_external.go": "458dfd096e34a20a32b9803aaad916d93ae20a8a86df009a4a524c7b7eada0da",
+    "sdk/go/api/generated_base.go": "b2a94125779d81437f581d117cab7ff6bb5208381a31fcafb1f12b6f471e54e8",
+    "sdk/go/api/generated_external.go": "18da3c431a4ff729d57ddb423810acf2df3b4f32c232bb5d49a3cf14267e686a",
     "sdk/go/api/schema_base.go": "a8fa11e296bd5be5ca9a65ed8bf5affb1a0a8506189e17addf9e3c6abf0f2cd1",
-    "sdk/go/api/schema_base.json": "bcd7b29d0f70a19054c51827c49c4da2b340911efebcd0aedf48321830fa87a1",
+    "sdk/go/api/schema_base.json": "ea1a1fc7dc38a6a5a31b35ad8fb85c84273fe8c1e186c069b87f885791666f85",
     "sdk/go/api/schema_external.go": "a03633f38a167e653e280620000934156a4482a7abe3c8136c77d2ae6d715e08",
-    "sdk/go/api/schema_external.json": "2477409c1262cf6ee5db32be9f3e4609b0cdef2cd123f9bcafd6f9c264693221",
+    "sdk/go/api/schema_external.json": "beb0117021911ea21d895df0a21cb3691caedff47500b818ece4ed4c8940327f",
     "sdk/go/internal/transport/generated_base.go": "d981af254c1838fd966ad05047186e9fc9d4baec05cee0e1ba6dd961d5ea6a56",
     "sdk/go/internal/transport/generated_external.go": "f6acef5ebb6ee09b5fbce6150adfea307fe0384d4d50051b404525cad5847dc8",
     "sdk/go/testdata/operations.json": "fc74b3a25e1d33f72793c54dab5d677e080b4b2f2e207b554c482b343bfa5833"

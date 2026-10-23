@@ -60,6 +60,9 @@ func nativePrepare(l installpath.Layout, account string) (string, error) {
 }
 
 func nativeSecure(l installpath.Layout, account string) error {
+	if err := checkExistingToken(l, account); err != nil {
+		return err
+	}
 	uid, gid := os.Geteuid(), os.Getegid()
 	configUID, executableUID, executableGID := uid, uid, gid
 	configDirMode, configFileMode := fs.FileMode(0700), fs.FileMode(0600)
@@ -122,7 +125,6 @@ func nativeSecure(l installpath.Layout, account string) error {
 		{l.ConfigDir, configUID, gid, configDirMode, true},
 		{filepath.Join(l.ConfigDir, "monitors.yaml"), configUID, gid, configFileMode, false},
 		{filepath.Join(l.ConfigDir, "runtime.yaml"), configUID, gid, configFileMode, false},
-		{filepath.Join(l.ConfigDir, "auth.token"), configUID, gid, configFileMode, false},
 		{l.BinDir, executableUID, executableGID, executableDirMode, true},
 		{binaryPath(l), executableUID, executableGID, executableFileMode, false},
 		{l.ServiceFile, executableUID, executableGID, serviceFileMode, false},

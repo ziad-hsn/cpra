@@ -1,5 +1,11 @@
 # Product-review finalization status
 
+**23 October 2026:** The [22 October repair addendum](product-review-repairs-2026-10-22.md)
+and its [R01–R29 dispositions](product-review-dispositions-2026-10-22.md) now track
+the active repairs from `60cf271036e681f5cb3b771d2599315066a8f946`. The dated
+checkpoints below retain their original scope and do not qualify the new working
+changes. The shared minimum is Go 1.26.10 and the release compiler is Go 1.27.3.
+
 Started 20 October 2026 at clean `0a22680c48e59e054fbf298d6f99c5ac62342e5a`.
 This is an execution inventory, not release qualification. See the
 [approved addendum](product-review-finalization-plan.md). The ticket tables and latest checkpoint below distinguish completed development

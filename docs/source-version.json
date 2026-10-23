@@ -1,10 +1,10 @@
 {
-  "updated": "2026-10-17",
+  "updated": "2026-10-23",
   "repository": "https://github.com/ziad-hsn/cpra",
-  "source_commit": "34ef88aa3dd5ff840285d9f59ac8a95ce7ea6865",
+  "source_commit": "60cf271036e681f5cb3b771d2599315066a8f946",
   "source_branch": "codex/release-repairs",
-  "source_commit_role": "Product-repair baseline; final candidate identity is supplied from recorded release metadata when rendering a frozen source",
-  "release_status": "Private v0.1.0-rc.1 repair candidate; final qualification and publication pending; 24-hour endurance cancelled",
+  "source_commit_role": "22 October repair baseline; uncommitted changes are not qualified by this identity. Frozen rendering supplies exact candidate metadata.",
+  "release_status": "Unpublished development source; repair review and qualification pending",
   "main_runtime_commit": "51a835a29f2fb7af2e0301910042a52e308cbb24",
   "release_candidate_commit": "410fbfb0092d01277b3884cd04151c27443a4226",
   "sdk": {
@@ -15,7 +15,7 @@
   },
   "documentation_scope": "Current development guides; dated engineering and candidate records remain in the repository and are excluded from public site output",
   "historical_review_date": "2026-09-13",
-  "development_commit": "34ef88aa3dd5ff840285d9f59ac8a95ce7ea6865",
+  "development_commit": "60cf271036e681f5cb3b771d2599315066a8f946",
   "integrated_main_commit": "b293f34dd57ee61c78371643de6d0ebaa75c626e",
   "referenced_source_inventory": "reference/source-data.json",
   "referenced_source_inventory_scope": "selected linked source files only; not the full working candidate or a release attestation",

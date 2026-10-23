@@ -11,7 +11,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"github.com/ziad-hsn/cpra/sdk/go/collection/commitment"
@@ -28,7 +31,11 @@ type Location struct {
 
 // String formats a source location without including its resource payload.
 func (l Location) String() string {
-	result := fmt.Sprintf("%s document %d item %d", l.Source, l.Document, l.Item)
+	label := l.Source
+	if strings.ContainsFunc(label, func(c rune) bool { return !unicode.IsPrint(c) }) {
+		label = strconv.QuoteToASCII(label)
+	}
+	result := fmt.Sprintf("%s document %d item %d", label, l.Document, l.Item)
 	if l.Line > 0 {
 		result += fmt.Sprintf(" line %d", l.Line)
 		if l.Column > 0 {
@@ -200,6 +207,7 @@ type builder struct {
 	emitted                  int
 	normalizationProfile     string
 	allowDestinationConflict bool
+	inputErrors              InputErrors
 }
 
 func newBuilder(o Options, sourceCount uint64) (*builder, error) {
@@ -277,6 +285,9 @@ func (f *Frozen) retainAdmission(admission api.CollectionAdmission) error {
 }
 
 func (b *builder) finish(ctx context.Context) error {
+	if len(b.inputErrors.Details) != 0 {
+		return &b.inputErrors
+	}
 	fingerprint, err := b.sources.Finish()
 	if err != nil {
 		return err
@@ -533,11 +544,15 @@ func (b *builder) add(resource api.Resource, location Location, positions map[st
 	}
 	item := Item{ID: key, Location: location, Resource: resource, FieldPositions: positions}
 	if b.stream != nil {
+		if int64(len(raw)) > b.o.MaxStagingBytes-b.bytes {
+			return fmt.Errorf("%s: normalized resource byte quota exceeded", location)
+		}
 		digest := sha256.Sum256(raw)
 		item.ContentDigest = hex.EncodeToString(digest[:])
 		if err := b.stream(item); err != nil {
 			return err
 		}
+		b.bytes += int64(len(raw))
 		b.seen[key] = location
 		b.emitted++
 		return nil

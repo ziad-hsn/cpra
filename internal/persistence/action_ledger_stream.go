@@ -54,9 +54,11 @@ func (v *collectionLedgerView) walkActionVersions(all bool, visit func([]byte, a
 // Called with the frozen view lock held. No mutable FSM state is consulted.
 func writeActionLedgerV2(w io.Writer, v *collectionLedgerView, p actionLedgerProgress) error {
 	retain := false
+	fences := make(map[string]bool)
 	if err := v.walkReviews(func(_ []byte, r reviewRecord) error {
 		if r.Fact != nil && !r.Deleted {
 			retain = true
+			fences[r.MonitorID] = true
 		}
 		return nil
 	}); err != nil {
@@ -106,7 +108,23 @@ func writeActionLedgerV2(w io.Writer, v *collectionLedgerView, p actionLedgerPro
 		total += uint64(len(data))
 		return nil
 	}
-	if err = v.walkActionVersions(retain, func(d []byte, _ actionLedgerRow) error { return frame(1, d) }); err != nil {
+	if err = v.walkActionVersions(retain, func(d []byte, row actionLedgerRow) error {
+		if !fences[row.MonitorID] {
+			if retain {
+				head, _, err := v.readActionHead(row.Action.ID)
+				if err != nil {
+					return err
+				}
+				if row.Sequence != head.Sequence {
+					return nil
+				}
+			}
+			if row.Deleted && row.Sequence != p.Sequence {
+				return nil
+			}
+		}
+		return frame(1, d)
+	}); err != nil {
 		return err
 	}
 	if err = v.walkReviews(func(d []byte, _ reviewRecord) error { return frame(2, d) }); err != nil {
@@ -272,6 +290,7 @@ func (l *collectionLedger) importReviewBatch(batch [][]byte) error {
 		if l.actions.reviews[r.Key] != nil {
 			return errActionLedger
 		}
+		l.actions.updateReviewIndexes(r)
 		l.actions.reviews[r.Key] = data
 		if !r.Deleted {
 			l.actions.reviewOrder.ReplaceOrInsert(r.Key)

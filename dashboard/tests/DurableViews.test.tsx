@@ -38,3 +38,14 @@ it('shows the audited operator and attention note as text in the retained timeli
   expect(screen.getByRole('region', { name: 'Event timeline table' })).toHaveAttribute('tabindex', '0');
   expect(document.querySelector('script')).toBeNull();
 });
+
+it('describes a cancelled pending closure without inventing delivery or recovery facts', async () => {
+  vi.spyOn(dashboardSession, 'get').mockResolvedValue({ status: 200, requestID: '', operationID: '', resourceVersion: '', retryAfterMs: 0, data: { items: [{ id: 'condition-cancelled', monitorID: 'monitor', time: '2026-10-23T00:00:00Z', kind: 'notification_resolution_cancelled', conditionID: 'condition-original', openingActionID: 'action-opening', terminationReason: 'configuration_changed' }] } });
+  render(wrap(<MonitorTimeline monitorID='monitor' />));
+  expect(await screen.findByText('Condition condition-original')).toBeInTheDocument();
+  expect(screen.getByText('Opening action action-opening')).toBeInTheDocument();
+  expect(screen.getByText('Condition update; no delivery action was created for this event.')).toBeInTheDocument();
+  expect(screen.getByText('Configuration changed')).toBeInTheDocument();
+  expect(screen.queryByText(/Earlier outage recovered/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/provider resolved/i)).not.toBeInTheDocument();
+});

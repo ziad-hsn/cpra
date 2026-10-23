@@ -62,10 +62,13 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 		if item.LastFailure != nil {
 			failure = item.LastFailure.Code + ": " + item.LastFailure.Message
 		}
-		return kv(cmd.OutOrStdout(), [][2]string{
+		if err := kv(cmd.OutOrStdout(), [][2]string{
 			{"View", "Monitor observation (read-only)"}, {"Stable ID", managementDisplay(item.MonitorID)},
 			{"Name", managementDisplay(item.Name)}, {"Incarnation", managementDisplay(item.IncarnationUID)},
-			{"Configuration source", managementDisplay(string(item.Source))}, {"Observed health", healthDisplay(string(item.Health))},
+			{"Configuration source", managementDisplay(string(item.Source))}, {"Current health", healthDisplay(string(item.Health))},
+			{"Check availability", managementDisplay(string(item.Availability.State))}, {"Availability reason", managementDisplay(item.Availability.Reason)}, {"Availability observed at", observationTimestamp(item.Availability.ObservedAt)},
+			{"Last observed health", managementDisplay(item.LastObservedHealth)}, {"Last observed at", observationTimestamp(item.LastObservedAt)},
+			{"Maintenance", observationBool(item.Maintenance)}, {"Notifications suppressed", observationBool(item.NotificationsSuppressed)},
 			{"Incident phase", managementDisplay(string(item.Phase))}, {"Enabled", strconv.FormatBool(item.Enabled)},
 			{"Ignored", strconv.FormatBool(item.Ignored)}, {"Snoozed until", observationTimestamp(item.SnoozedUntil)},
 			{"Check type", managementDisplay(item.CheckType)}, {"Target", managementDisplay(item.Target)},
@@ -75,24 +78,30 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 			{"Last check latency", latency}, {"Last failure", managementDisplay(failure)},
 			{"Configuration problem", diagnosticText(item.ConfigurationProblem)},
 			{"Preparation failed at", observationTimestamp(item.ConfigurationProblemAt)},
+			{"Configuration warnings", configurationWarnings(item.Warnings)},
 			{"Configured notifications", managementDisplay(strings.Join(item.ConfiguredNotifications, ", "))},
 			{"Pending notifications", strconv.FormatInt(item.PendingNotifications, 10)},
 			{"Accepted notifications (retained)", strconv.FormatInt(item.CompletedNotifications, 10)},
 			{"Failed notifications (retained)", strconv.FormatInt(item.FailedNotifications, 10)},
 			{"Unknown notifications", strconv.FormatInt(item.UnknownNotifications, 10)},
+			{"Notification conditions sampled at", observationTimestamp(item.NotificationConditionsObservedAt)},
+			{"Notification condition sequence (not a write revision)", notificationConditionSequence(item.NotificationConditionsSequence)},
 			{"Unknown provider outcomes", strconv.FormatInt(item.UnknownActions, 10)},
 			{"Actions needing review", strconv.FormatInt(item.ActionsNeedingReview, 10)},
-		})
+		}); err != nil {
+			return err
+		}
+		return writeNotificationConditions(cmd, item.NotificationConditions, item.NotificationConditionsTruncated)
 	}
-	headers := []string{"ID", "NAME", "OBSERVED HEALTH", "ENABLED", "IGNORED", "PENDING NOTIFICATIONS"}
+	headers := []string{"ID", "NAME", "CURRENT HEALTH", "AVAILABILITY", "MAINTENANCE", "ENABLED", "IGNORED", "PENDING NOTIFICATIONS"}
 	if o.output == formatWide {
-		headers = append(headers, "CHECK", "TARGET", "LAST CHECK")
+		headers = append(headers, "CHECK", "TARGET", "LAST CHECK", "WARNINGS")
 	}
 	rows := make([][]string, 0, len(page.Items))
 	for _, item := range page.Items {
-		row := []string{managementDisplay(item.MonitorID), managementDisplay(item.Name), healthDisplay(string(item.Health)), strconv.FormatBool(item.Enabled), strconv.FormatBool(item.Ignored), strconv.FormatInt(item.PendingNotifications, 10)}
+		row := []string{managementDisplay(item.MonitorID), managementDisplay(item.Name), healthDisplay(string(item.Health)), managementDisplay(string(item.Availability.State)), observationBool(item.Maintenance), strconv.FormatBool(item.Enabled), strconv.FormatBool(item.Ignored), strconv.FormatInt(item.PendingNotifications, 10)}
 		if o.output == formatWide {
-			row = append(row, managementDisplay(item.CheckType), managementDisplay(item.Target), observationTimestamp(item.LastCheckedAt))
+			row = append(row, managementDisplay(item.CheckType), managementDisplay(item.Target), observationTimestamp(item.LastCheckedAt), configurationWarnings(item.Warnings))
 		}
 		rows = append(rows, row)
 	}

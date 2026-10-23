@@ -16,19 +16,25 @@ import (
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 )
 
-func workerExecutionFixture(t *testing.T, s *Store, category string) (WorkerExecutionIntent, JobTypeState) {
+func workerExecutionFixture(t *testing.T, s *Store, category string, formats ...int) (WorkerExecutionIntent, JobTypeState) {
 	t.Helper()
 	cmd := jobTypeFixture(t, s, "execution-"+category+uuid.NewString())
 	cmd.Value.Category = category
 	job := commitJobType(t, s, cmd)
-	return workerExecutionFixtureType(t, s, job), job
+	return workerExecutionFixtureType(t, s, job, formats...), job
 }
-func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState) WorkerExecutionIntent {
-	return workerExecutionSourceFixture(t, s, job, false)
+func workerExecutionFixtureType(t *testing.T, s *Store, job JobTypeState, formats ...int) WorkerExecutionIntent {
+	return workerExecutionSourceFixture(t, s, job, false, formats...)
 }
 
-func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inline bool) WorkerExecutionIntent {
+func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inline bool, formats ...int) WorkerExecutionIntent {
 	t.Helper()
+	// Existing protocol fixtures retain historical absolute deadlines. New timing
+	// scenarios explicitly select format 47 rather than rewriting old evidence.
+	format := ActionWorkerFormatVersion
+	if len(formats) > 0 {
+		format = formats[0]
+	}
 	category := job.Current.Category
 	monitor := testMonitor()
 	monitor.ID = uuid.NewString()
@@ -63,12 +69,12 @@ func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inli
 		}
 	}
 	now := time.Now().UTC()
-	result := submit(t, s, Command{Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision, Config: &monitor, Guard: &guard, At: now})[0]
+	result := applyCatalogFormat(t, s, format, Command{Kind: "configure", MonitorID: monitor.ID, Revision: monitor.Revision, Config: &monitor, Guard: &guard, At: now})[0]
 	if result.Err != nil || !result.Allowed {
 		t.Fatal("configure", result.Err)
 	}
 	if category != "check" {
-		result = submit(t, s, Command{Kind: "pulse", MonitorID: monitor.ID, Revision: monitor.Revision, Generation: 1, Guard: &guard, At: now, Outcome: "failure"})[0]
+		result = applyCatalogFormat(t, s, format, Command{Kind: "pulse", MonitorID: monitor.ID, Revision: monitor.Revision, Generation: 1, Guard: &guard, At: now, Outcome: "failure"})[0]
 		if result.Err != nil {
 			t.Fatal(result.Err)
 		}
@@ -83,6 +89,10 @@ func workerExecutionSourceFixture(t *testing.T, s *Store, job JobTypeState, inli
 				in.ActionID = a.ID
 				in.Scheduled = a.NotBefore
 				in.Deadline = a.Deadline
+				in.ExecutionBudget = a.ExecutionBudget
+				if a.ExecutionBudget > 0 {
+					in.Notification = NotificationForWorker(a)
+				}
 				break
 			}
 		}

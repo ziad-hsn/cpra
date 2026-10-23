@@ -26,10 +26,11 @@ const (
 // options holds the global flags shared by all subcommands, plus the lazily
 // constructed API client.
 type options struct {
-	server    string
-	tokenFile string
-	timeout   time.Duration
-	output    string
+	server                                      string
+	tokenFile                                   string
+	tokenRoot, tokenReaderGroup, tokenReaderSID string
+	timeout                                     time.Duration
+	output                                      string
 
 	apiClient    *cpra.Client
 	caFile       string
@@ -54,6 +55,9 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&o.server, "server", envOr("CPRA_SERVER", "http://localhost:8060"),
 		"CPRA server address (env CPRA_SERVER)")
 	root.PersistentFlags().StringVar(&o.tokenFile, "token-file", os.Getenv("CPRA_AUTH_TOKEN_FILE"), "file containing the API token (env CPRA_AUTH_TOKEN_FILE; or CPRA_AUTH_TOKEN)")
+	root.PersistentFlags().StringVar(&o.tokenRoot, "token-root", os.Getenv("CPRA_AUTH_TOKEN_ROOT"), "trusted token directory or projected Secret mount (defaults to token file directory)")
+	root.PersistentFlags().StringVar(&o.tokenReaderGroup, "token-reader-group", os.Getenv("CPRA_AUTH_TOKEN_READER_GROUP"), "explicit group name or GID for a root-owned Unix token file")
+	root.PersistentFlags().StringVar(&o.tokenReaderSID, "token-reader-sid", os.Getenv("CPRA_AUTH_TOKEN_READER_SID"), "explicit Windows service SID permitted to read the token file")
 	root.PersistentFlags().StringVar(&o.caFile, "ca-file", os.Getenv("CPRA_CA_FILE"), "PEM trust roots for API HTTPS requests (env CPRA_CA_FILE)")
 	root.PersistentFlags().BoolVar(&o.insecureHTTP, "allow-insecure-http", false, "explicitly allow API authentication over HTTP for the configured origin")
 	root.PersistentFlags().DurationVar(&o.timeout, "request-timeout", 10*time.Second,

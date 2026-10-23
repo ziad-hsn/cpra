@@ -18,7 +18,10 @@ vi.mock('../src/hooks/queries',()=>({
  useQueues:()=>({}),
  useMonitors:()=>({data:undefined,isLoading:false,isError:true,error:new Error('HTTP 503')}),
 }));
-afterEach(() => { cleanup(); onlineManager.setOnline(true); data.updatedAt = Date.now(); data.overview.generated = new Date().toISOString(); });
+afterEach(() => {
+ cleanup(); onlineManager.setOnline(true); data.updatedAt = Date.now();
+ data.overview = {generated: new Date().toISOString(), total: 1, disabled: 0, by_status: {degraded: 1}, by_pulse_type: {tls: 1}, by_code: {yellow: 1}, up_percent: 0, index_capped: false};
+});
 
 it('labels cached healthy observations unavailable while offline', () => {
  data.overview = {...data.overview, total: 1, disabled: 0, by_status: {up: 1}};
@@ -75,4 +78,23 @@ it('does not claim zero monitors when the index is unavailable',()=>{
  data.overview={...data.overview,total:1000001,by_status:{up:999994,incident:7},index_capped:true};
  render(<MemoryRouter><Monitors /></MemoryRouter>);
  expect(screen.queryByText('Showing 0–0 of 0')).not.toBeInTheDocument();
+});
+
+it('does not call a maintenance-suppressed outage critical', () => {
+ data.overview = {...data.overview, total: 1, disabled: 0, paused: 0, pending: 0, unavailable: 0, maintenance: 1, suppressed_unhealthy: 1, unsuppressed_unhealthy: 0, by_status: {incident: 1}};
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ const status = screen.getByRole('status', {name: 'Global fleet status'});
+ expect(status).toHaveTextContent('1 unhealthy monitor — notifications suppressed');
+ expect(status).toHaveTextContent('1 in maintenance; checks continue');
+ expect(status).not.toHaveTextContent('critical');
+ expect(status).not.toHaveTextContent('All systems operational');
+});
+
+it('does not report preparation failures as healthy or as first-check pending', () => {
+ data.overview = {...data.overview, total: 1, disabled: 0, paused: 0, pending: 0, unavailable: 1, maintenance: 0, suppressed_unhealthy: 0, unsuppressed_unhealthy: 0, by_status: {unknown: 1}};
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ const status = screen.getByRole('status', {name: 'Global fleet status'});
+ expect(status).toHaveTextContent('1 monitor unavailable');
+ expect(status).not.toHaveTextContent('Awaiting first');
+ expect(status).not.toHaveTextContent('All systems operational');
 });

@@ -110,6 +110,7 @@ func (m *managementHTTP) handleControl(w http.ResponseWriter, r *http.Request, a
 		writeManagementError(w, err)
 		return
 	}
+	m.logControlTransitions(result)
 	w.Header().Set("X-CPRa-Admission", "committed")
 	w.Header().Set("X-Commit-Index", strconv.FormatUint(result.CommittedIndex, 10))
 	if action == "snooze" || action == "unsnooze" || action == "ignore" || action == "unignore" {
@@ -118,6 +119,29 @@ func (m *managementHTTP) handleControl(w http.ResponseWriter, r *http.Request, a
 	}
 	incidentHeaders(w, result.Incident)
 	writeManagementJSON(w, http.StatusOK, result.Incident)
+}
+
+func (m *managementHTTP) logControlTransitions(result management.ControlResult) {
+	if m.logInfo == nil {
+		return
+	}
+	for _, event := range result.Events {
+		message := ""
+		switch event.Type {
+		case "monitor_ignored":
+			message = "Monitor entered Ignore"
+		case "monitor_unignored":
+			message = "Monitor left Ignore"
+		default:
+			continue
+		}
+		// General logs contain validated identities and a fixed cause. The
+		// operator's free-form reason remains in authenticated audit history.
+		m.logInfo(message, "event_type", event.Type, "monitor_id", event.MonitorID,
+			"monitor_uid", event.CatalogUID, "incident_id", event.IncidentID,
+			"control_revision", event.ControlRevision, "operation_id", result.Operation.ID,
+			"actor", event.Actor, "ignore_cause", "operator", "observed_at", event.At.UTC().Format(time.RFC3339Nano))
+	}
 }
 
 func (m *managementHTTP) handleIncidents(w http.ResponseWriter, r *http.Request) {

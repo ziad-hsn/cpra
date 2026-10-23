@@ -23,7 +23,7 @@ The state is copied before background serialization, so subsequent applications
 cannot mutate a snapshot being written. The versioned representation contains
 plain durable records, independent of Ark's live entity numbering; Ark remains
 at v0.4.3. Jobs, clients, channels and contexts are rebuilt for execution and are
-excluded from the Raft state. Legacy manifest fingerprints contain hashes, not
+excluded from the Raft state. File-manifest fingerprints contain hashes, not
 copies of provider configuration. The management catalog separately stores
 provider configuration and write-only credential values in authenticated
 encrypted envelopes before submitting them to Raft. Its encryption keys remain
@@ -75,7 +75,8 @@ survive restart.
 
 Absolute maintenance windows include their start and exclude their end.
 Health observations continue during maintenance, while new recovery admission
-and external action starts are held. A queued action is checked again when its
+and ordinary notification starts are held. Configured gray enabled/disabled
+notices retain their explicit exception. A queued action is checked again when its
 started marker is committed, including if the window began while it waited.
 Known outcomes of actions already started are still recorded. This preserves
 the existing periodic-maintenance behavior; it differs from snoozing checks.
@@ -88,6 +89,79 @@ Ignore or admits an outage notification. Each qualifying outage counts once.
 Ignore entered while healthy stays in effect until a subsequent qualifying
 outage passes the healthy threshold, or an operator selects Unignore. Successful
 checks alone do not manufacture a recovery or a green notification.
+
+## Pending notifications and execution limits
+
+A current notification condition is distinct from an execution attempt. Pending
+conditions retain their destination, episode and configuration identity. Capacity
+or destination contention leaves a relevant condition pending. A fresh start
+checks those bindings and suppression controls before granting execution.
+For newly admitted ordinary notifications, the first committed start begins a
+45-second budget shared by at most three attempts. Each HTTP request uses the
+smaller of ten seconds and the remaining budget. A2A and external notifications
+retain their configured budget lengths. An external-worker offer has a separate
+30-second lifetime; only its committed start grants execution and returns the
+exact deadline. Repeated starts retain the original disposition and deadline.
+
+Retry requires affirmative evidence of a transient rejection or no external
+effect. Permanent failure, three-attempt exhaustion and execution-deadline expiry
+are terminal reasons. There is no automatic new retry cycle. Existing actions
+retain their absolute deadline through upgrade and restart, even if queue time
+consumed it. Unknown effects remain held.
+
+Ordinary green requires a prior committed opening start. Ignore retains its
+explicitly configured recovery-green exception. Recovery while suppressed keeps
+an eligible resolution attached to the original incident and destination. After
+suppression, CPRa assesses that resolution without releasing stale openings. If
+another outage has since begun, a delayed closure reports both the earlier
+recovery and current health. Local closure, provider acceptance and confirmed
+provider processing are separate facts.
+
+A configuration replacement or monitor removal cancels an unsent resolution
+whose original binding is no longer eligible. Later healthy checks cannot
+recreate that old condition using replacement destinations. Its cancellation
+event retains the original condition and opening-action identifiers; it has no
+closing action identifier unless a closing attempt actually existed. Started
+and uncertain outcomes remain retained. Removing obsolete condition bookkeeping
+does not erase the opening action or shorten its evidence-retention policy.
+
+`incident_id` is installation-local. Use `episode_id` and `delivery_id` for
+cross-installation notification correlation. Disaster recovery preserves these
+identities. Upgrade bindings retain actual historical provider keys; for
+example, older PagerDuty events used `cpra:<monitor name>`. If original ownership,
+destination or correlation cannot be proved, the affected delivery remains held
+with migration uncertainty. No replacement trigger is inferred from missing data.
+
+## Monitoring availability
+
+Missing or invalid local CA material prevents a check from running. Current
+public health is then `unknown`; the previous observation and its timestamp
+remain separately available. This is monitoring unavailable, not evidence that
+the target failed. CPRa retries preparation at the normal cadence, retains its
+incident facts and admits no configuration-induced recovery. Availability clears
+only after successful preparation and an actual check result. Configuration
+problems are reported through status, warnings, logs and metrics; they have no
+external notification color.
+
+## Retained action evidence
+
+Timeline events expire after 30 days. Ordinary succeeded, proven-no-effect failed
+and canceled actions can retire after 90 days only when no execution, retry,
+notification condition, correlation, review, worker receipt or pending assessment
+still depends on them. Unknown actions and review, late or conflicting evidence
+remain protected. Missing terminal timestamps never authorize deletion.
+
+Retirement is committed with an explicit UTC cutoff and expected record versions.
+Logical retirement does not immediately shrink a bbolt file. Replacement
+generations preserve current, previous and pinned readers; physical reclamation
+follows safe publication and pin release. Storage status distinguishes active,
+ordinary retained, protected and cleanup-blocked records from physical allocation.
+
+Formats 46 (base) and 47 (`externaljobs`) record these changes. Take a complete
+stopped authenticated backup before upgrade, including generation metadata,
+Raft state, snapshots and retained history. Older executables refuse newer state.
+Rollback requires a backup compatible with the older binary; replacing the
+executable alone does not reverse storage changes or external effects.
 
 ## Recovery review notifications
 
@@ -299,8 +373,10 @@ Normal startup migrates supported older state through committed transitions and
 resumes an interrupted migration before admitting work. Migration does not invoke
 providers, invent evidence that an old notification started, or release an
 unknown intervention. Back up the complete stopped store before upgrading.
-An older executable that cannot read formats 44/45 cannot be used to roll back
-the upgraded directory. Restore a compatible pre-upgrade backup to a separate
+The latest formats are **46/47**, which add pending notification conditions,
+first-start budgets, delivery migration bindings and action retirement progress.
+An older executable that cannot read the committed format cannot be used to roll
+back the upgraded directory. Restore a compatible pre-upgrade backup to a separate
 directory only after considering external effects that occurred since it was
 taken; restoring state cannot reverse those effects.
 
@@ -363,9 +439,10 @@ Every such cancellation/invalidation is audited as `explicit_restore`.
 The reset is resumable under the original marker identity. Action pages contain
 at most 85 identities, leaving room for their recovery/review receipts; receipt
 pages contain at most 256 records. Each page retains at most 256 audit events.
-This bounds per-commit work and output; the total pass is proportional to retained
-actions, and cloning a changed monitor still scales with that monitor's retained
-actions. No fleet-capacity or restore-duration claim follows from these tests.
+This bounds per-commit work and output; the total restore pass is proportional to
+retained actions. Terminal action records live in the indexed ledger rather than
+the monitor's frequently copied execution state. No fleet-capacity or
+restore-duration claim follows from these bounds.
 
 Partial reset is not a complete backup. Normal startup refuses admission until
 all reset pages finish and stopped local administration explicitly reprovisions

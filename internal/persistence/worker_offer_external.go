@@ -51,7 +51,7 @@ func workerExecutionScope(in WorkerExecutionIntent) WorkerScope {
 }
 func (r WorkerPollResponse) clone() WorkerPollResponse { r.Offers = slices.Clone(r.Offers); return r }
 func workerRecordOffer(r WorkerExecutionRecord) WorkerOffer {
-	return WorkerOffer{ExecutionID: r.Intent.ID, ExecutionRevision: r.Intent.Revision, LeaseID: r.Lifecycle.LeaseID, Deadline: r.Intent.Deadline}
+	return WorkerOffer{ExecutionID: r.Intent.ID, ExecutionRevision: r.Intent.Revision, LeaseID: r.Lifecycle.LeaseID, Deadline: r.AssignmentDeadline()}
 }
 
 // workerAssignmentEligible does not reserve work. Both the waiting read and the
@@ -165,7 +165,7 @@ func (f *machine) prepareWorkerOffers(c WorkerSessionCommand, response WorkerPol
 		usedLeases[lease] = true
 		r := old.Clone()
 		deadline := at.Add(WorkerOfferLifetime)
-		if r.Intent.Deadline.Before(deadline) {
+		if !r.Intent.Deadline.IsZero() && r.Intent.Deadline.Before(deadline) {
 			deadline = r.Intent.Deadline
 		}
 		if c.SelectionVersion == 2 && r.Intent.Category != "check" && !f.image.Monitors[r.Intent.MonitorID].ControlNotification(f.image.Monitors[r.Intent.MonitorID].Actions[r.Intent.ActionID]) {
@@ -255,7 +255,7 @@ func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
 	if l == nil {
 		return nil
 	}
-	if i.Version < WorkerOfferFormatVersion || l.OwnerEpoch != r.OwnerEpoch || !catalogIdentifier(l.ServerID, 256) || !validAuthenticationID(l.WorkerID) || !validAuthenticationID(l.WorkerUID) || !catalogIdentifier(l.SessionID, 256) || !catalogIdentifier(l.LeaseID, 256) || l.OfferedAt.Before(r.CreatedAt) || !l.OfferDeadline.After(l.OfferedAt) || l.OfferDeadline.After(r.Intent.Deadline) || l.OfferDeadline.After(l.OfferedAt.Add(WorkerOfferLifetime)) || l.UpdatedAt.Before(l.OfferedAt) || l.UpdatedAt.Year() > 9998 {
+	if i.Version < WorkerOfferFormatVersion || l.OwnerEpoch != r.OwnerEpoch || !catalogIdentifier(l.ServerID, 256) || !validAuthenticationID(l.WorkerID) || !validAuthenticationID(l.WorkerUID) || !catalogIdentifier(l.SessionID, 256) || !catalogIdentifier(l.LeaseID, 256) || l.OfferedAt.Before(r.CreatedAt) || !l.OfferDeadline.After(l.OfferedAt) || !r.Intent.Deadline.IsZero() && l.OfferDeadline.After(r.Intent.Deadline) || l.OfferDeadline.After(l.OfferedAt.Add(WorkerOfferLifetime)) || l.UpdatedAt.Before(l.OfferedAt) || l.UpdatedAt.Year() > 9998 {
 		return ErrWorkerExecutionInvalid
 	}
 	if i.WorkerPolicy == nil {
@@ -266,7 +266,7 @@ func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
 		return ErrWorkerExecutionInvalid
 	}
 	if h := l.Heartbeat; h != nil {
-		if i.Version < WorkerLifecycleFormatVersion || l.GrantID == "" || h.At.IsZero() || h.At.Before(l.StartedAt) || h.At.After(l.UpdatedAt) || h.Accepted && !h.At.Before(r.Intent.Deadline) {
+		if i.Version < WorkerLifecycleFormatVersion || l.GrantID == "" || h.At.IsZero() || h.At.Before(l.StartedAt) || h.At.After(l.UpdatedAt) || h.Accepted && r.executionExpired(h.At) {
 			return ErrWorkerExecutionInvalid
 		}
 	}
@@ -292,6 +292,9 @@ func validateWorkerExecutionLifecycle(i image, r WorkerExecutionRecord) error {
 			// dependency against the frozen ledger before accepting restoration.
 			if !ok && i.ActionStorage != nil && m.ActionProjection != nil {
 				return nil
+			}
+			if r.Intent.ExecutionBudget > 0 && (!a.Deadline.Equal(r.ExecutionDeadline()) || a.ExecutionBudget != r.Intent.ExecutionBudget) {
+				return ErrWorkerExecutionInvalid
 			}
 			if !ok || a.CatalogUID != r.Intent.MonitorUID || a.Revision != r.Intent.MonitorRevision || a.ExecutorKind != "worker" || a.ExecutorSession != l.GrantID || !a.StartedAt.Equal(l.StartedAt) || a.State != Started && a.State != Unknown {
 				return ErrWorkerExecutionInvalid

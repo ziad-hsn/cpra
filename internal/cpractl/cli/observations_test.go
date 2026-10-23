@@ -123,6 +123,36 @@ func TestStateAndConfigHonorAvailability(t *testing.T) {
 	}
 }
 
+func TestStateShowsSampledActionRetentionWithoutClaimingDiskReclamation(t *testing.T) {
+	state := api.State{GeneratedAt: time.Now().UTC(), Live: true, Storage: api.StorageState{Available: true, Mode: "raft",
+		Actions: &api.ActionStorageAccounting{ObservedAt: time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC), Active: 0, OrdinaryRetained: 7, Protected: 3,
+			Retired: 4, RetiredBytes: 8192, CleanupBlocked: 2, CleanupBlockedBytes: 1024, CleanupCoverage: "last_selection_page"}}}
+	fixture := newCLIManagementFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v2/state" {
+			t.Error("wrong runtime endpoint")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(state)
+	})
+	out, _, err := fixture.run(t, nil, "get", "state")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"Action accounting sample", "2026-10-23T12:00:00Z", "Ordinary retained actions", "Protected action evidence",
+		"Retired encoded bytes (not reclaimed disk)", "Cleanup blocked actions (last page)", "last_selection_page"} {
+		if !strings.Contains(out, expected) {
+			t.Fatal("sample scope lost:", expected, out)
+		}
+	}
+	for _, format := range []string{"json", "yaml"} {
+		out, _, err := fixture.run(t, nil, "get", "state", "-o", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertObservationEncoding(t, out, format, state)
+	}
+}
+
 func TestStateShowsCollectionUsageCoverageAndAvailability(t *testing.T) {
 	value := api.State{Storage: api.StorageState{CollectionGenerations: &api.CollectionStorageAccounting{
 		Available: true, UsageCoverage: api.Pointer(api.CollectionUsagePartial), UsageGenerations: api.Pointer(int64(1)), UsageExpected: api.Pointer(int64(2)), KnownApparentBytes: api.Pointer(int64(0)),

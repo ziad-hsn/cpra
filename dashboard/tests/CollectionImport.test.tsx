@@ -22,9 +22,10 @@ const steps = ['PrepareCollection', 'CreateOperation', 'UploadOperation', 'Valid
 // Keep its clock inside that interval; explicit expiry cases supply older dates.
 beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-21T00:00:00Z')));
 
-function frozen(count = 1, coordinates?: { line: number; column: number }) {
-  const all = Array.from({ length: count }, (_, index) => ({ ordinal: index + 1, id: `Monitor/monitor-${index + 1}`, source: { token: collectionSourceToken(1), document: index + 1, item: 1 }, bytes: 64, coordinates }));
-  const value = { summary: { ...summary, itemCount: count }, close: vi.fn(), sourceName: vi.fn(() => 'service.yaml'),
+function frozen(count = 1, coordinates?: { line: number; column: number }, warnings = false) {
+  const all = Array.from({ length: count }, (_, index) => ({ ordinal: index + 1, id: `Monitor/monitor-${index + 1}`, source: { token: collectionSourceToken(1), document: index + 1, item: 1 }, bytes: 64, coordinates,
+    ...(warnings ? { warnings: [{ field: 'spec.notifications.blue' as const, reason: 'unknownRecoveryDestination' as const }] } : {}) }));
+  const value = { summary: { ...summary, itemCount: count, warningCount: warnings ? count : 0 }, close: vi.fn(), sourceName: vi.fn(() => 'service.yaml'),
     page: vi.fn(async (offset = 0) => all.slice(offset, offset + 100)),
     createBody: vi.fn(async () => makeBody({ ...identity, itemCount: count, identityKey: 'private-key', sourceFingerprint: 'private-fingerprint' })),
     preflightBody: vi.fn(async () => makeBody({ ...identity, itemCount: count, identityKey: 'private-key', sourceFingerprint: 'private-fingerprint', items: [] })),
@@ -140,6 +141,41 @@ it('offers real preflight on current capabilities and honestly disables durable 
   expect(screen.getByRole('table')).toHaveTextContent('service.yaml'); expect(screen.getByRole('table')).toHaveTextContent('rv-1');
   for (const secret of ['private-key', 'private-file', 'private-bearer', 'private-server-message']) expect(document.body.textContent).not.toContain(secret);
   expect(storage).not.toHaveBeenCalled();
+});
+
+it('shows shared local warnings before any optional server preview or mutation', async () => {
+  const collection = frozen(1, { line: 7, column: 3 }, true);
+  const { writes } = await fixture();
+  await select();
+  expect(screen.getByText(/1 local configuration warning in the selected resources/)).toBeInTheDocument();
+  const warnings = screen.getByRole('region', { name: 'Local configuration warnings' });
+  expect(within(warnings).getAllByRole('listitem')).toHaveLength(1);
+  expect(warnings).toHaveTextContent('service.yaml, document 1, item 1, line 7, column 3');
+  expect(warnings).toHaveTextContent('Uncertain recovery has no enabled blue notification destination');
+  expect(screen.getByRole('button', { name: 'Create inactive operation' })).toBeEnabled();
+  expect(collection.preflightBody).not.toHaveBeenCalled();
+  expect(writes).toHaveLength(0);
+});
+
+it('keeps exact warning counts with ten visible details per page when a large import has no server preflight', async () => {
+  const collection = frozen(205, { line: 7, column: 3 }, true);
+  collection.summary.preflightAvailable = false; collection.summary.sourceBytes = 5 << 20;
+  const { writes } = await fixture({ count: 205, supported: steps.filter(step => step !== 'PreflightCollection') });
+  await select();
+  expect(screen.getByRole('button', { name: 'Preview on server' })).toBeDisabled();
+  expect(screen.getByText(/205 local configuration warnings in the selected resources/)).toBeInTheDocument();
+  let warnings = screen.getByRole('region', { name: 'Local configuration warnings' });
+  expect(warnings).toHaveTextContent('100 on resources 1–100 of 205; showing 10');
+  expect(within(warnings).getAllByRole('listitem')).toHaveLength(10);
+  expect(warnings).toHaveTextContent('90 additional warnings on this page are omitted');
+  await click('Next resources'); await click('Next resources');
+  warnings = screen.getByRole('region', { name: 'Local configuration warnings' });
+  expect(warnings).toHaveTextContent('5 on resources 201–205 of 205; showing 5');
+  expect(within(warnings).getAllByRole('listitem')).toHaveLength(5);
+  expect(warnings).toHaveTextContent('service.yaml, document 201, item 1');
+  expect(screen.getByText(/205 local configuration warnings in the selected resources/)).toBeInTheDocument();
+  expect(collection.preflightBody).not.toHaveBeenCalled();
+  expect(writes).toHaveLength(0);
 });
 
 it('does not parse files or mutate for reader identities even if a server incorrectly grants write permission names', async () => {

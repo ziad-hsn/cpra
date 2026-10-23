@@ -4,6 +4,22 @@ description: Plan and status · CPRa implementation status for the reviewed CPRa
 cpra_scope: plan
 ---
 
+## Current repair scope, 23 October 2026
+
+The [22 October addendum](product-review-repairs-2026-10-22.md) is being
+implemented from `60cf271036e681f5cb3b771d2599315066a8f946` on
+`codex/release-repairs`. Its [finding dispositions](product-review-dispositions-2026-10-22.md)
+track R01–R29 and distinguish focused development checks from final candidate
+qualification. All current modules require Go 1.26.10; the release compiler is
+Go 1.27.3. The storage changes use formats 46/47 and require a complete stopped,
+authenticated backup before upgrade.
+
+The deliverable is a reviewed repair candidate and merge handoff. Notification
+and migration checks, required browser campaigns, and the affected compiler/tag
+matrix remain subject to the current disposition record. No publication,
+million-monitor campaign or 24-hour run is included. Older entries below retain
+their original dates, source versions and verification limits.
+
 **Scope correction, 1 October 2026:** The user removed the 24-hour endurance run from the task and mandatory completion checks. No such run has been started or completed. Historical entries below record earlier requirements; they do not reinstate this test. Comparative performance remains separate from endurance, and documentation must not claim an unperformed endurance result.
 
 **Compatibility correction, 14 October 2026:** All repository Go modules share

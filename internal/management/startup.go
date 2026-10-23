@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -17,14 +18,15 @@ import (
 )
 
 const (
-	startupStageDirectory = "management-bootstrap"
-	startupStageIdentity  = "startup-v1"
+	startupStageDirectory   = "management-bootstrap"
+	startupStageIdentity    = "startup-v1"
+	startupLoadingDirectory = ".management-bootstrap-loading"
 )
 
 var (
 	ErrStartupInput      = errors.New("startup input could not be read or validated; inspect the selected configuration without logging protected values")
 	ErrStartupEmpty      = errors.New("startup input has no monitors; explicitly allow an empty initial configuration")
-	ErrStartupIncomplete = errors.New("startup input loading is incomplete; stop CPRa, correct the input and remove only management-bootstrap before starting a new import; do not remove Raft state")
+	ErrStartupIncomplete = errors.New("startup input loading is incomplete; stop CPRa and inspect it with cpractl local bootstrap inspect; discard requires the exact authenticated loading-stage identity and proof that nothing was admitted; never remove Raft state")
 	ErrStartupStage      = errors.New("the original encrypted startup stage is unavailable; restore management-bootstrap from the matching stopped backup; do not replace it with changed input")
 	ErrStartupDriver     = errors.New("startup input selects a driver not compiled into this server; inspect capabilities and select the required build")
 	ErrStartupCleanup    = errors.New("temporary encrypted startup staging could not be closed or removed")
@@ -65,6 +67,8 @@ type StartupValidation struct {
 	Resources                    uint64
 	Monitors                     uint64
 	UnverifiedContractReferences uint64
+	Warnings                     []api.FieldError
+	WarningsTruncated            bool
 }
 
 // StartupCatalog restores an authoritative catalog or completes exactly one
@@ -106,18 +110,28 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 	}
 	mode := store.Status().Mode
 	var directory string
-	var created bool
+	var created, temporary bool
 	switch mode {
 	case "raft":
 		if !filepath.IsAbs(options.DataDirectory) {
 			return result, ErrValidation
 		}
 		directory = filepath.Join(filepath.Clean(options.DataDirectory), startupStageDirectory)
-		if hasBootstrap {
+		if _, statErr := os.Lstat(directory); statErr == nil {
 			if err := checkStartupDirectory(directory); err != nil {
-				return result, errors.Join(ErrStartupStage, err)
+				if hasBootstrap {
+					return result, errors.Join(ErrStartupStage, err)
+				}
+				return result, errors.Join(ErrStartupIncomplete, err)
 			}
+			if _, loadingErr := os.Lstat(filepath.Join(options.DataDirectory, startupLoadingDirectory)); !errors.Is(loadingErr, os.ErrNotExist) {
+				return result, ErrStartupIncomplete
+			}
+		} else if !errors.Is(statErr, os.ErrNotExist) || hasBootstrap {
+			return result, ErrStartupStage
 		} else {
+			temporary = true
+			directory = filepath.Join(filepath.Clean(options.DataDirectory), startupLoadingDirectory)
 			created, err = createStartupDirectory(directory)
 			if err != nil {
 				return result, errors.Join(ErrStartupIncomplete, err)
@@ -163,28 +177,67 @@ func StartupCatalog(ctx context.Context, store *persistence.Store, sealer *secur
 		return result, errors.Join(ErrStartupIncomplete, safeStartupError(ctx, err))
 	}
 	defer func() {
-		if closeErr := stage.Close(); closeErr != nil {
-			err = errors.Join(err, ErrStageUnavailable)
+		if stage != nil {
+			if closeErr := stage.Close(); closeErr != nil {
+				err = errors.Join(err, ErrStageUnavailable)
+			}
 		}
 	}()
-	if created {
-		result.Bootstrap.Phase = "loading"
-		if _, err := fillStartupStage(ctx, stage, options); err != nil {
-			if mode == "memory" {
-				return result, errors.Join(ErrStartupMemory, err)
-			}
+	var files *startupFiles
+	if temporary {
+		files, err = openStartupFiles(options.DataDirectory, startupLoadingDirectory)
+		if err != nil {
 			return result, errors.Join(ErrStartupIncomplete, err)
 		}
+		defer files.Close()
+	}
+	if created {
+		result.Bootstrap.Phase = "loading"
+		if _, inputErr := fillStartupStage(ctx, stage, options); inputErr != nil {
+			if mode == "memory" {
+				return result, errors.Join(ErrStartupMemory, inputErr)
+			}
+			// Only an authenticated, still-loading stage created by this invocation is
+			// disposable. Failed writes, uncertain state and failed cleanup are retained.
+			info, inspectErr := stage.Info()
+			if inspectErr != nil || info.Phase != "loading" || errors.Is(inputErr, ErrStageUnavailable) {
+				return result, errors.Join(ErrStartupIncomplete, inputErr)
+			}
+			if closeErr := stage.Close(); closeErr != nil {
+				return result, errors.Join(ErrStartupCleanup, inputErr)
+			}
+			stage = nil
+			if removeErr := files.remove(); removeErr != nil {
+				return result, errors.Join(ErrStartupCleanup, inputErr)
+			}
+			return result, inputErr
+		}
 	} else {
-		info, err := stage.Info()
-		if err != nil {
-			return result, errors.Join(ErrStartupStage, safeStartupError(ctx, err))
+		info, infoErr := stage.Info()
+		if infoErr != nil {
+			return result, errors.Join(ErrStartupStage, safeStartupError(ctx, infoErr))
 		}
 		if info.Phase != "frozen" {
 			if hasBootstrap {
 				return result, errors.Join(ErrStartupStage, ErrStageNotFrozen)
 			}
 			return result, ErrStartupIncomplete
+		}
+	}
+	if temporary {
+		// The source is never reopened. A crash after Freeze resumes this exact
+		// authenticated inventory; publication never replaces an existing stage.
+		if err := stage.Close(); err != nil {
+			return result, ErrStartupStage
+		}
+		stage = nil
+		if err := files.publish(); err != nil {
+			return result, errors.Join(ErrStartupStage, err)
+		}
+		stageOptions.Directory = filepath.Join(options.DataDirectory, startupStageDirectory)
+		stage, err = ResumeStage(ctx, stageOptions, sealer)
+		if err != nil {
+			return result, errors.Join(ErrStartupStage, safeStartupError(ctx, err))
 		}
 	}
 	result.Bootstrap, err = ApplyBootstrap(ctx, store, stage)
@@ -285,9 +338,11 @@ func normalizeStartupOptions(options StartupOptions) (StartupOptions, error) {
 	if options.Decode.MaxResources == 0 || uint64(options.Decode.MaxResources) > options.MaxResources {
 		options.Decode.MaxResources = int(options.MaxResources)
 	}
-	// The input label is fixed and non-secret; never include caller file names,
-	// URLs or parser-supplied text in a startup error or source attribution.
-	options.Decode.SourceName = "startup input"
+	// Decode's source label is caller-selected non-secret metadata. Preserve the
+	// filename without ever deriving a diagnostic from provider configuration.
+	if options.Decode.SourceName == "" {
+		options.Decode.SourceName = "startup input"
+	}
 	return options, nil
 }
 
@@ -309,11 +364,14 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 		if reader == nil {
 			return result, ErrStartupInput
 		}
+		ordinal := 0
 		err = collection.Decode(ctx, reader, options.Decode, func(item collection.Item) error {
+			index := ordinal
+			ordinal++
 			defer clear(item.Resource.Spec)
 			resource, credentials, err := ExtractInlineCredentials(item.Resource)
 			if err != nil {
-				return err
+				return item.ValidationError(err)
 			}
 			defer clear(resource.Spec)
 			defer func() {
@@ -322,7 +380,7 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 				}
 			}()
 			if err := options.Catalog.startupCapabilities(resource); err != nil {
-				return err
+				return item.ValidationError(err)
 			}
 			for _, credential := range credentials {
 				if err := stage.Add(ctx, credential); err != nil {
@@ -330,13 +388,21 @@ func fillStartupStage(ctx context.Context, stage *Stage, options StartupOptions)
 				}
 			}
 			if err := stage.Add(ctx, resource); err != nil {
-				return err
+				return item.ValidationError(err)
 			}
 			if stage.catalog == nil {
 				result.UnverifiedContractReferences += options.Catalog.contractReferenceCount(resource)
 			}
 			if resource.Kind == "Monitor" {
 				result.Monitors++
+				for _, warning := range api.ResourceWarnings(resource) {
+					warning.Field = fmt.Sprintf("items[%d].resource.%s", index, warning.Field)
+					if len(result.Warnings) < 10 {
+						result.Warnings = append(result.Warnings, warning)
+					} else {
+						result.WarningsTruncated = true
+					}
+				}
 			}
 			return nil
 		})
@@ -412,6 +478,18 @@ func (o CatalogOptions) startupCapabilities(resource api.Resource) error {
 func safeStartupError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	var details *collection.InputErrors
+	if errors.As(err, &details) {
+		return errors.Join(ErrStartupInput, details)
+	}
+	if field, ok := api.ValidationFieldError(err); ok {
+		cause := api.InvalidField(field.Field, field.Reason)
+		var source *collection.SourceError
+		if errors.As(err, &source) {
+			return errors.Join(ErrStartupInput, &collection.SourceError{Location: source.Location, Field: api.SafeValidationField(source.Field), Cause: cause})
+		}
+		return errors.Join(ErrStartupInput, cause)
 	}
 	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, ErrValidation, ErrStageUnavailable, ErrStageExists, ErrStageMissing, ErrStageLocked, ErrStageQuota, ErrStageDuplicate, ErrStartupDriver, persistence.ErrCatalogDependency} {
 		if errors.Is(err, safe) {

@@ -75,10 +75,15 @@ func (m *Monitor) changeNotificationEpisode(episode string, at time.Time, emit f
 	m.Cooldowns = nil
 	if m.Notifications != nil {
 		m.Notifications.Deliveries = nil
+		for id, binding := range m.Notifications.Migrations {
+			if binding.IncidentID != m.IncidentID {
+				delete(m.Notifications.Migrations, id)
+			}
+		}
 	}
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) && a.ReviewNotice == nil && a.NotificationEpisode != episode {
+		if m.OwnsAction(a) && a.Kind == "code" && a.State == Queued && !m.ControlNotification(a) && a.ReviewNotice == nil && a.Resolution == nil && a.NotificationEpisode != episode {
 			m.cancelNotification(a, "notification_superseded", at, emit)
 		}
 	}
@@ -105,6 +110,9 @@ func (m *Monitor) suppressMaintenanceNotifications(at time.Time, emit func(strin
 }
 
 func (m Monitor) notificationEligible(a Action) bool {
+	if a.Resolution != nil {
+		return m.resolutionEligible(a)
+	}
 	if a.ReviewNotice != nil {
 		return m.reviewNoticeEligible(a)
 	}
@@ -132,6 +140,9 @@ func (m Monitor) notificationEligible(a Action) bool {
 }
 
 func validateNotificationIdentity(m Monitor, version int) error {
+	if len(m.Policy.NotificationDrivers) != 0 && !notificationConditionStorageFormat(version) {
+		return ErrNotificationIdentity
+	}
 	if err := validateLifecycle(m, version); err != nil {
 		return err
 	}
@@ -187,6 +198,9 @@ func notificationEndpointIdentity(m Monitor, color string, endpoint int) string 
 }
 
 func validateNotificationAction(a Action, version, notificationVersion int) error {
+	if err := validateNotificationBudget(a, version); err != nil {
+		return err
+	}
 	if err := a.Cause.validate(version); err != nil {
 		return err
 	}

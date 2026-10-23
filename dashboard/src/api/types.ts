@@ -3,12 +3,24 @@
  * Durations are Go time.Duration nanoseconds; time fields are RFC3339 strings.
  */
 
-import type { FailureDiagnostic } from './generated';
+import type { FailureDiagnostic, NotificationCondition } from './generated';
 
 export type MonitorStatus = 'up' | 'down' | 'degraded' | 'verifying' | 'incident' | 'disabled' | 'unknown';
 
 export interface MonitorSummary {
   health?: 'healthy' | 'unhealthy' | 'warning' | 'unknown';
+  last_observed_health?: 'healthy' | 'unhealthy' | 'warning' | 'unknown';
+  last_observed_at?: string;
+  availability?: { state: 'available' | 'unavailable' | 'paused' | 'pending'; reason?: string; observed_at?: string };
+  maintenance?: boolean;
+  notifications_suppressed?: boolean;
+  suppression_observed_at?: string;
+  configuration_warnings?: string[];
+  notification_conditions?: NotificationCondition[];
+  notification_conditions_truncated?: boolean;
+  notification_conditions_observed_at?: string;
+  /** Decimal string: never coerce ledger progress to a JavaScript number. */
+  notification_conditions_sequence?: string;
   phase?: 'idle' | 'incident' | 'verifying';
   enabled?: boolean;
   ignored?: boolean;
@@ -54,6 +66,12 @@ export interface OverviewResponse {
   generated?: string;
   total: number;
   disabled: number;
+  unavailable?: number;
+  paused?: number;
+  pending?: number;
+  maintenance?: number;
+  suppressed_unhealthy?: number;
+  unsuppressed_unhealthy?: number;
   by_status: Record<string, number>;
   by_pulse_type: Record<string, number>;
   by_code: Record<string, number>;
@@ -224,6 +242,8 @@ export interface DurableStateResponse {
   revision?: string;
 }
 export interface MonitorEvent {
+  resolution?: import('./generated').ResolutionNotice;
+  terminationReason?: string;
   failure?: import('./generated').FailureDiagnostic;
   cause?: import('./generated').FailureDiagnostic;
   agentReceipt?: import('./generated').AgentReceipt;
@@ -234,6 +254,8 @@ export interface MonitorEvent {
   at: string;
   type: string;
   action_id?: string;
+  condition_id?: string;
+  opening_action_id?: string;
   kind?: string;
   color?: string;
   endpoint?: number;

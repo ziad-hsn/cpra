@@ -36,6 +36,7 @@ TESTS = {
 SCREENSHOTS = {
     'dashboard-populated-demo.png', 'review-blue-opening.png', 'review-blue-health-closure.png',
     'review-blue-unknown-closure.png', 'offline-route.png', 'review-blue-mobile.png',
+    'monitor-check-unavailable.png', 'monitor-table-desktop.png', 'monitor-table-large-text.png', 'monitor-table-zoom-reflow.png', 'monitor-table-mobile.png',
     'dashboard-overview.png',
     'guarded-recovery-dialog.png', 'unknown-review-inconclusive-dialog.png',
     'unknown-review-accepted-dialog.png', 'mobile-reader-incidents-scrolled.png',

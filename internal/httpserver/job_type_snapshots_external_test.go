@@ -26,7 +26,7 @@ func jobTypeSnapshotHTTP(t *testing.T) (*managementHTTP, *atomic.Int64) {
 	t.Cleanup(func() {
 		m.mu.Lock()
 		m.pruneSnapshots(m.now().Add(2*managementCursorTTL), "", 0)
-		m.mu.Unlock()
+		m.unlockSnapshots()
 	})
 	return m, clock
 }
@@ -60,7 +60,7 @@ func TestJobTypeSnapshotReservationQuotas(t *testing.T) {
 	for _, principal := range []string{"one", "three"} {
 		_, err := m.beginSnapshotRead(t.Context(), "JobType", url.Values{}, principal, 1)
 		assertJobTypeSnapshotFailure(t, err, 429, "snapshotByteQuota")
-		if len(m.snapshots) != 4 || m.jobTypeSnapshotBytes.Load() != maxJobTypeSnapshotBytes {
+		if len(m.snapshots) != 0 || m.jobTypeSnapshotBytes.Load() != maxJobTypeSnapshotBytes {
 			t.Fatal("rejected capture changed retained accounting")
 		}
 	}
@@ -95,8 +95,8 @@ func TestJobTypeSnapshotReservationQuotas(t *testing.T) {
 	}
 }
 
-// A cursor map and every active request have separate ownership. Expiry may
-// remove the map entry while an admitted request still holds encrypted state.
+// A cursor map and every active request have separate ownership. An expired
+// view stops accepting reads, but its owner remains until admitted readers exit.
 func TestJobTypeSnapshotActiveReaderRetainsPrunedCharge(t *testing.T) {
 	for _, prune := range []string{"cursor", "observation"} {
 		t.Run(prune, func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestJobTypeSnapshotActiveReaderRetainsPrunedCharge(t *testing.T) {
 			if prune == "cursor" {
 				m.mu.Lock()
 				m.pruneSnapshots(m.now(), "reader", 1)
-				m.mu.Unlock()
+				m.unlockSnapshots()
 			} else {
 				// System has no observations without configured systems; this still
 				// exercises the production observation cursor's shared prune path.
@@ -132,7 +132,7 @@ func TestJobTypeSnapshotActiveReaderRetainsPrunedCharge(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if len(m.snapshots) != 0 || m.jobTypeSnapshotBytes.Load() != captured || active.entry.jobTypeReservation.refs.Load() != 1 {
+			if len(m.snapshots) != 1 || !cursorExpired(m.snapshots[initial.cursor.View]) || m.jobTypeSnapshotBytes.Load() != captured || active.entry.jobTypeReservation.refs.Load() != 2 {
 				t.Fatal("cursor pruning released an active request's charge")
 			}
 			assertJobTypeSnapshotFailure(t, m.publishSnapshotRead(t.Context(), active), 410, "cursorExpired")
@@ -256,7 +256,7 @@ func TestJobTypeSnapshotBlockedPageAuthorityAndLifetime(t *testing.T) {
 				clock.Add(int64(managementCursorTTL))
 				m.mu.Lock()
 				m.pruneSnapshots(m.now(), "operator", m.auth.Generation())
-				m.mu.Unlock()
+				m.unlockSnapshots()
 				if m.jobTypeSnapshotBytes.Load() != captured {
 					t.Fatal("expiry released a blocked page's charge")
 				}
@@ -282,7 +282,7 @@ func TestJobTypeSnapshotBlockedPageAuthorityAndLifetime(t *testing.T) {
 			}
 			m.mu.Lock()
 			m.pruneSnapshots(m.now().Add(2*managementCursorTTL), "", 0)
-			m.mu.Unlock()
+			m.unlockSnapshots()
 			if m.jobTypeSnapshotBytes.Load() != 0 || len(m.snapshotReads) != 0 {
 				t.Fatal("read completion retained reservation or admission slot")
 			}
@@ -365,5 +365,71 @@ func TestJobTypeSnapshotCursorBoundsAndOwnership(t *testing.T) {
 			}
 			assertJobTypeSnapshotFailure(t, err, status, code)
 		})
+	}
+}
+
+func TestExtensionCompletedViewsReclaimCaptureQuota(t *testing.T) {
+	for _, kind := range []string{"JobType", "ExternalWorker"} {
+		t.Run(kind, func(t *testing.T) {
+			m, _ := jobTypeSnapshotHTTP(t)
+			defer m.closeSnapshots()
+			first := ""
+			for range 8 {
+				read, err := m.beginSnapshotRead(t.Context(), kind, url.Values{"limit": {"1"}}, "reader", 1)
+				if err != nil {
+					t.Fatal("completed view exhausted quota", err)
+				}
+				read.after = "one"
+				if err := m.publishSnapshotRead(t.Context(), read); err != nil {
+					t.Fatal(err)
+				}
+				token := m.encodeCursor(managementCursor{View: read.cursor.View, After: "one"})
+				if first == "" {
+					first = token
+				}
+				m.releaseSnapshotRead(read)
+				for range 2 { // A retained terminal page remains replayable.
+					last, err := m.beginSnapshotRead(t.Context(), kind, url.Values{"cursor": {token}}, "reader", 1)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := m.publishSnapshotRead(t.Context(), last); err != nil {
+						t.Fatal(err)
+					}
+					m.releaseSnapshotRead(last)
+				}
+			}
+			_, err := m.beginSnapshotRead(t.Context(), kind, url.Values{"cursor": {first}}, "reader", 1)
+			assertJobTypeSnapshotFailure(t, err, 410, "cursorExpired")
+			m.closeSnapshots()
+			if m.jobTypeSnapshotBytes.Load() != 0 || m.workerSnapshotCount.Load() != 0 {
+				t.Fatal("reclaimed views leaked capture quota")
+			}
+		})
+	}
+}
+
+func TestExtensionExpiredViewsReleaseQuotaBeforeCapture(t *testing.T) {
+	m, clock := jobTypeSnapshotHTTP(t)
+	defer m.closeSnapshots()
+	for range maxPrincipalWorkerSnapshots {
+		read, err := m.beginSnapshotRead(t.Context(), "ExternalWorker", url.Values{}, "reader", 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read.after = "one"
+		if err := m.publishSnapshotRead(t.Context(), read); err != nil {
+			t.Fatal(err)
+		}
+		m.releaseSnapshotRead(read)
+	}
+	clock.Add(int64(managementCursorTTL))
+	read, err := m.beginSnapshotRead(t.Context(), "ExternalWorker", url.Values{}, "reader", 1)
+	if err != nil {
+		t.Fatal("expired view still charged", err)
+	}
+	m.releaseSnapshotRead(read)
+	if m.workerSnapshotCount.Load() != 0 {
+		t.Fatal("capture quota leaked")
 	}
 }

@@ -33,5 +33,24 @@ const check = (condition, description) => { if (!condition) throw new Error(desc
       }
     }
   }
-  process.stdout.write(JSON.stringify({ result: 'passed', profile: fixtures.profile, fixedCases: fixtures.cases.length, nativeBuilds: natives.length, wasmBuilds: 1 }) + '\n', () => process.exit(0));
+  const warningCases = [
+    { name: 'absent-blue', rules: {}, warn: true },
+    { name: 'red-only', rules: { red: { endpointRefs: ['operations'] } }, warn: true },
+    { name: 'disabled-blue', rules: { blue: { dispatch: false, endpointRefs: ['review'] } }, warn: true },
+    { name: 'explicit-blue', rules: { blue: { endpointRefs: ['review'] } }, warn: false },
+  ];
+  for (const fixture of warningCases) {
+    const raw = Buffer.from(JSON.stringify({ apiVersion: 'cpra.io/v2', kind: 'Monitor', metadata: { id: 'local-warning-fixture' },
+      spec: { check: { interval: '60s', timeout: '5s', driver: { type: 'http', config: { url: 'https://example.invalid/PRIVATE_TARGET' } } },
+        recovery: { driver: { type: 'webhook', config: { url: 'https://example.invalid/PRIVATE_RECOVERY' } } }, notifications: fixture.rules } }));
+    let advisories;
+    const result = globalThis.cpraDecodeCollection(new Uint8Array(raw), (_id, _document, _item, _json, _coordinates, warnings) => {
+      check(typeof warnings === 'string' && warnings.length <= 4096, 'Wasm advisory boundary is unbounded');
+      advisories = JSON.parse(warnings); return true;
+    });
+    check(result.valid && Array.isArray(advisories) && advisories.length === Number(fixture.warn), `Wasm shared configuration warning differs: ${fixture.name}; valid=${result.valid}; field=${result.field ?? 'none'}; reason=${result.reason ?? 'none'}; warningCount=${Array.isArray(advisories) ? advisories.length : 'unavailable'}`);
+    check(!JSON.stringify(advisories).includes('PRIVATE_'), 'Wasm advisory exposed configuration values');
+    if (fixture.warn) check(advisories[0].field === 'spec.notifications.blue' && advisories[0].reason === 'unknownRecoveryDestination', 'Wasm advisory lost its reviewed field/reason');
+  }
+  process.stdout.write(JSON.stringify({ result: 'passed', profile: fixtures.profile, fixedCases: fixtures.cases.length, warningCases: warningCases.length, nativeBuilds: natives.length, wasmBuilds: 1 }) + '\n', () => process.exit(0));
 })().catch(error => { process.stderr.write(error.message + '\n', () => process.exit(1)); });

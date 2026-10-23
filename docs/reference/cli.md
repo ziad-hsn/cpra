@@ -4,7 +4,7 @@ description: Use cpra server flags and cpractl commands to inspect monitors, inc
 cpra_scope: main
 ---
 
-> **Current development checkout:** this reference follows the merged runtime source. See [version and availability](../versions.md) for the distinction between current development and historical candidate guides.
+This reference describes the current CLI. See [versions and availability](../versions.md) for support and testing status.
 
 
 # Command-line reference
@@ -25,6 +25,9 @@ cpra_scope: main
 | `-web` | true | Enable dashboard, API, and metrics; management writes require runtime configuration. |
 | `-web.addr` | runtime `web.address`, otherwise `localhost:8060` | Explicit listener override; a remote bind requires authentication. |
 | `-web.auth-file` | `CPRA_AUTH_TOKEN_FILE` | Read the authentication token from a file. |
+| `-web.auth-root` | `CPRA_AUTH_TOKEN_ROOT`, otherwise token directory | Trusted boundary for token-file aliases/projected mounts. |
+| `-web.auth-reader-group` | `CPRA_AUTH_TOKEN_READER_GROUP` | Explicit Unix group name or GID for a root-owned group-readable token. |
+| `-web.auth-reader-sid` | `CPRA_AUTH_TOKEN_READER_SID` | Explicit Windows service SID authorized by the token's protected DACL. |
 | `-web.auth` | `CPRA_AUTH_TOKEN` | Set a token directly; prefer a file to command-line exposure. |
 | `-web.cors` | empty | Comma-separated allowed origins; intended for development. |
 | `-debug` | false | Enable debug logging. |
@@ -64,12 +67,32 @@ permitted named identity; a failed write never falls back to observation mode. S
 | --- | --- |
 | `--server` | `CPRA_SERVER` or `http://localhost:8060` |
 | `--token-file` | `CPRA_AUTH_TOKEN_FILE` |
+| `--token-root` | `CPRA_AUTH_TOKEN_ROOT`, otherwise token directory |
+| `--token-reader-group` | `CPRA_AUTH_TOKEN_READER_GROUP`; explicit Unix group name or GID |
+| `--token-reader-sid` | `CPRA_AUTH_TOKEN_READER_SID`; explicit Windows service SID |
 | `--ca-file` | `CPRA_CA_FILE` |
 | `--allow-insecure-http` | false; explicitly permits authenticated HTTP for the configured origin |
 | `--request-timeout` | `10s` |
 | `--output` / `-o` | `table`; also accepts `wide`, `json`, and `yaml` |
 
 The client also reads `CPRA_AUTH_TOKEN`. `health` checks liveness; it is not a readiness or fleet-health command. Failed API requests produce an error and an unsuccessful exit status. An HTTP 503 listing response must not be interpreted as zero incidents.
+
+Token files are checked on their opened native handle before and after a bounded
+read. Unix defaults require current-user ownership and `0400` or `0600`; shared
+service tokens require an explicit reader group, root ownership and `0440` or
+`0640`, with no group write or additional ACL readers. A configured reader must
+be available to the process. Windows uses protected DACLs for the owner,
+SYSTEM/Administrators and, when selected, the specific service reader SID.
+The reader never changes supplied credentials or their permissions. Symlinks
+require an explicit `--token-root` and must stay inside it; this supports Kubernetes `..data`
+projections. The CLI rereads between requests without retrying a mutation.
+See [container and Secret setup](../container-helm.md) for service examples.
+
+Cursor views retain at most 16 queries per principal and 64 globally, with a
+five-minute maximum lifetime. Under pressure, completed views are reclaimed
+first, then views idle for at least 30 seconds. In-flight reads are not evicted;
+final pages remain retryable while their view is retained. A reclaimed cursor
+returns `410`; start a new query. One-page responses need no retained cursor.
 
 [API semantics](api-reference.md)
 

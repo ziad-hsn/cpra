@@ -57,8 +57,10 @@ func (f *machine) actionForMonitor(m Monitor, id string) (Action, bool, error) {
 // from the action-policy format. A snapshot can discard old Raft entries only
 // when its frozen ledger has reached this exact materialization boundary.
 type actionStorageState struct {
-	Sequence uint64               `json:"sequence"`
-	Position actionLedgerPosition `json:"position"`
+	Retired      uint64               `json:"retired,omitempty"`
+	RetiredBytes uint64               `json:"retired_bytes,omitempty"`
+	Sequence     uint64               `json:"sequence"`
+	Position     actionLedgerPosition `json:"position"`
 }
 
 func (f *machine) needsActionStorage(commands []Command) bool {
@@ -176,7 +178,11 @@ func (f *machine) flushActionWrites() error {
 		f.err = errors.Join(errors.New("durable action commit failed"), err)
 		return f.err
 	}
-	f.image.ActionStorage = &actionStorageState{Sequence: sequence, Position: f.actionPosition}
+	retired, retiredBytes := uint64(0), uint64(0)
+	if f.image.ActionStorage != nil {
+		retired, retiredBytes = f.image.ActionStorage.Retired, f.image.ActionStorage.RetiredBytes
+	}
+	f.image.ActionStorage = &actionStorageState{Sequence: sequence, Position: f.actionPosition, Retired: retired, RetiredBytes: retiredBytes}
 	clear(f.actionWrites)
 	clear(f.reviewWrites)
 	return nil
@@ -189,6 +195,12 @@ func validateActionStorageHeader(i image) error {
 	s := i.ActionStorage
 	if s == nil {
 		return nil
+	}
+	if (s.Retired != 0 || s.RetiredBytes != 0) && !notificationConditionStorageFormat(i.Version) {
+		return errActionLedger
+	}
+	if (s.Retired == 0) != (s.RetiredBytes == 0) || s.Retired != 0 && s.Sequence == 0 {
+		return errActionLedger
 	}
 	if !actionStorageFormat(i.Version) || s.Position.Index > i.Index || s.Sequence == 0 && s.Position != (actionLedgerPosition{}) || s.Sequence != 0 && s.Position.Index == 0 {
 		return errActionLedger
@@ -253,7 +265,7 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 			data = view.actions.current[id]
 		}
 		row, err := decodeActionRow(data)
-		return row.Action, err == nil && row.MonitorID == m.ID
+		return row.Action, err == nil && !row.Deleted && row.MonitorID == m.ID
 	}
 	for _, receipt := range i.Operations {
 		if deferredActionReceipt(i, receipt) && !operationCurrentWithAction(i, receipt, read) {
@@ -271,6 +283,15 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 	}
 	return view.walkActions(func(_ []byte, row actionLedgerRow) error {
 		monitor, exists := i.Monitors[row.MonitorID]
+		if row.Deleted {
+			if !notificationConditionStorageFormat(i.Version) || !exists {
+				return errActionLedger
+			}
+			if _, live := monitor.Actions[row.Action.ID]; live {
+				return errActionLedger
+			}
+			return nil
+		}
 		if !exists || row.Sequence > progress.Sequence {
 			return errActionLedger
 		}

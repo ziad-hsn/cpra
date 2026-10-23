@@ -1,7 +1,7 @@
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
 import { failureView } from './failure';
-import { agentReceiptView, recoveryFailureView } from './actions';
+import { agentReceiptView, recoveryFailureView, resolutionNoticeView } from './actions';
 import type { HistoryResponse, MonitorEvent } from './types';
 
 /** Read the same bounded event contract in both access modes. */
@@ -22,7 +22,12 @@ export async function loadTimeline(session: DashboardSession, monitorID: string,
     if (value.cause !== undefined) event.cause = failureView(value.cause);
     if (value.agentReceipt !== undefined) event.agentReceipt = agentReceiptView(value.agentReceipt);
     if (value.recoveryFailure !== undefined) event.recoveryFailure = recoveryFailureView(value.recoveryFailure);
-    for (const [source, target] of [['actor', 'actor'], ['reason', 'reason'], ['note', 'note'], ['actionID', 'action_id'], ['incidentID', 'incident_id'], ['controlRevision', 'control_revision'], ['actionKind', 'kind'], ['color', 'color'], ['outcome', 'outcome']] as const) {
+    if (value.resolution !== undefined) event.resolution = resolutionNoticeView(value.resolution);
+    if (value.terminationReason !== undefined && value.terminationReason !== '') {
+      if (typeof value.terminationReason !== 'string' || value.terminationReason.length > 128 || !/^[a-z][a-z0-9_]*$/.test(value.terminationReason)) throw new ManagementError('invalid', 'An event has an unsupported terminal reason.');
+      event.terminationReason = value.terminationReason;
+    }
+    for (const [source, target] of [['actor', 'actor'], ['reason', 'reason'], ['note', 'note'], ['actionID', 'action_id'], ['conditionID', 'condition_id'], ['openingActionID', 'opening_action_id'], ['incidentID', 'incident_id'], ['controlRevision', 'control_revision'], ['actionKind', 'kind'], ['color', 'color'], ['outcome', 'outcome']] as const) {
       if (typeof value[source] === 'string') event[target] = value[source];
     }
     if (Number.isSafeInteger(value.endpoint) && (value.endpoint as number) >= 0) event.endpoint = value.endpoint as number;

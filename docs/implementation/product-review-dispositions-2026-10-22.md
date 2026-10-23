@@ -204,6 +204,20 @@ command, logs and scope. These are development checks, not frozen qualification.
   records from generated paths and all 1,184 search entries. The separate
   documentation checkout is unchanged. Later token guidance will be checked in
   the frozen rendering.
+- The first freeze, `4349df9`, passes eight static phases, including clean
+  dashboard/SDK generation, strict documentation, 718 release-script tests and
+  supporting harness checks. Its SDK consumer phase fails because dependent
+  `go.sum` files still reference the previous private SDK archive. The failure
+  and independent evidence review are retained; those eight passes are not
+  attributed to a later candidate.
+- `oct23-sdk-dependency-preparation-4` uses Go to propose four checksum changes
+  across the application, worker and SDK-example `go.sum` files. No versions,
+  dependencies or `go.mod` files change. `oct23-sdk-prepared-consumers-4` passes
+  archive identity, isolated dependency graphs, default/tagged consumers,
+  negative compilation and executable package documentation with `GOWORK=off`
+  and no local replacement. This is private prepared-archive evidence; a new
+  freeze and committed-source verification are still required. No public tag or
+  checksum-verification bypass is used.
 
 Independent reviewers inspected ticket 4 and ticket 5. Ticket 5 review identified
 and repaired partial-byte cursor reclamation; macOS reader-group rendering now

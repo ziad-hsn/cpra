@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -120,8 +121,13 @@ func TestLaunchdArgumentsAreXMLData(t *testing.T) {
 		t.Fatal("LaunchAgent changed identity")
 	}
 	l.Scope = "system"
-	value, err = Render(l, "_cpra")
-	if err != nil || !strings.Contains(value, "<key>UserName</key><string>_cpra</string>") {
+	accountOutput, err := exec.Command("/usr/bin/id", "-un").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := strings.TrimSpace(string(accountOutput))
+	value, err = Render(l, account)
+	if err != nil || !strings.Contains(value, "<key>UserName</key><string>"+account+"</string>") {
 		t.Fatalf("missing explicit daemon identity: %s %v", value, err)
 	}
 }

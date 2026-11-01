@@ -277,7 +277,15 @@ func TestCollectionExecutionSourceQualificationStorageFailure(t *testing.T) {
 			}
 			if fault == "history-catalog-save" {
 				var linkErr *os.LinkError
-				if !errors.As(applyErr, &linkErr) || linkErr.New != filepath.Join(historyDir, "catalog.json") || f.history.retainedCutoff.Load() != nil {
+				catalogPath := filepath.Join(historyDir, "catalog.json")
+				replacementFailed := errors.As(applyErr, &linkErr) && linkErr.New == catalogPath
+				if runtime.GOOS == "windows" {
+					// MoveFileEx reports access denied when the replacement is a
+					// directory; it does not return Unix os.Rename's LinkError.
+					info, statErr := os.Lstat(catalogPath)
+					replacementFailed = errors.Is(applyErr, os.ErrPermission) && statErr == nil && info.IsDir()
+				}
+				if !replacementFailed || f.history.retainedCutoff.Load() != nil {
 					t.Fatal("fixture missed durable history save failure or published its cutoff", applyErr)
 				}
 			} else {

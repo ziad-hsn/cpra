@@ -182,17 +182,30 @@ func TestCollectionGCCompletesCheckpointAfterUnlinkCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	nativeCheckpoint := r.checkpoint
+	prepared := false
 	finalCheckpoint := false
 	r.checkpoint = func(directory *os.File) error {
-		if _, err := os.Lstat(filepath.Join(f.dir, f.old)); errors.Is(err, os.ErrNotExist) {
+		// Windows deletion becomes visible after Step closes its directory
+		// handles. Identify the post-unlink parent flush by checkpoint order.
+		final := prepared && directory == r.dir
+		if directory != r.dir {
+			prepared = true
+		}
+		if final {
 			cancel()
+		}
+		err := nativeCheckpoint(directory)
+		if final && err == nil {
 			finalCheckpoint = true
 		}
-		return nativeCheckpoint(directory)
+		return err
 	}
 	step, err := r.Step(ctx, f.old)
 	if err != nil || step.Phase != "removed-directory" || !finalCheckpoint || !errors.Is(ctx.Err(), context.Canceled) {
 		t.Fatal("unlink did not finish its mandatory checkpoint", step, finalCheckpoint, err)
+	}
+	if _, err := os.Lstat(filepath.Join(f.dir, f.old)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("checkpointed directory remains after handles close", err)
 	}
 	f.assertProtected(t)
 }

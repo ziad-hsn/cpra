@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -297,10 +295,7 @@ func TestCollectionValidationResultViewMissingSegment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(s.History().dir, head.Validation.FinalizedAt.UTC().Format("2006-01-02")+".db")
-	if err := os.Rename(path, path+".missing"); err != nil {
-		t.Fatal(err)
-	}
+	moveHistorySegmentFixture(t, s.History(), head.Validation.FinalizedAt)
 	if _, err := view.Page(context.Background(), 1, 1, head.ActivityAt); !errors.Is(err, ErrHistoryUnavailable) {
 		t.Fatal("missing segment presented empty/successful result", err)
 	}

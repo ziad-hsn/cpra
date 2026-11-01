@@ -31,6 +31,16 @@ class PrivateReleasePolicyTests(unittest.TestCase):
                 self.assertEqual(re.findall(r'^go (\S+)$', definition, re.MULTILINE),
                                  [minimum.removeprefix('go')])
 
+    def test_container_contracts_install_the_compiler_before_go_event_tests(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
+        steps = workflow['jobs']['container-chart-contracts']['steps']
+        compiler = next(i for i, step in enumerate(steps)
+                        if 'scripts/release/install_go.py' in step.get('run', ''))
+        contracts = next(i for i, step in enumerate(steps)
+                         if 'discover -s scripts/release' in step.get('run', ''))
+        self.assertLess(compiler, contracts)
+        self.assertNotIn('GITHUB_PATH=', steps[compiler]['run'])
+
     def test_provider_verifier_uses_frozen_inputs_and_retains_exact_build(self):
         steps = self.workflow['jobs']['build']['steps']
         build = next(step for step in steps if step.get('name') == 'Build provider verifier from frozen release inputs')

@@ -6,7 +6,34 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
+
+// moveHistorySegmentFixture keeps the DB readable while removing the path that
+// the catalog promises. Close it before moving because Windows locks mappings.
+func moveHistorySegmentFixture(t *testing.T, h *HistoryStore, at time.Time) {
+	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	day := at.UTC().Format("2006-01-02")
+	db := h.databases[day]
+	if db == nil {
+		t.Fatal("history fixture has no open segment")
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(h.dir, day+".db")
+	if err := os.Rename(path, path+".missing"); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := bolt.Open(path+".missing", 0600, &bolt.Options{Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.databases[day] = reopened
+}
 
 func TestHistoryPaginationInsertionRetentionAndReopen(t *testing.T) {
 	dir := t.TempDir()

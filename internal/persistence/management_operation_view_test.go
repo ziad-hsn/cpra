@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -284,10 +282,7 @@ func TestManagementOperationViewCorruptHistory(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "segment":
-				path := filepath.Join(h.dir, at.UTC().Format("2006-01-02")+".db")
-				if err := os.Rename(path, path+".missing"); err != nil {
-					t.Fatal(err)
-				}
+				moveHistorySegmentFixture(t, h, at)
 			case "memory-index":
 				h.mu.Lock()
 				delete(h.memoryCollectionReceipts, head.ID)

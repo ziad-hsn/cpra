@@ -37,10 +37,9 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 		t.Run(tc.source+"/"+tc.name, func(t *testing.T) {
 			fixture := newMainManagementFixture(t)
 			ctx := context.Background()
-			// A permanent Docker rejection cannot consume unused retry capacity.
-			// Exhaustion requires reaching the configured attempt limit; the
-			// recovery_failed trigger can notify on the first definite failure.
-			expectNotification := tc.dockerStatus == 404 && (tc.maxAttempts == 1 || tc.trigger == "recovery_failed")
+			// A permanent rejection ends recovery even with unused attempts.
+			// Both failure triggers may notify, but an uncertain effect cannot.
+			expectNotification := tc.dockerStatus == 404
 			var restarts, messages, checks atomic.Int32
 			var healthy atomic.Bool
 			investigationStarted := make(chan struct{})
@@ -203,9 +202,6 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 					if expectNotification && event.ActionKind == "code" && ((!tc.agentLost && event.Kind == "action_succeeded") || (tc.agentLost && event.Kind == "action_unknown")) {
 						terminal = event
 					}
-					if tc.dockerStatus == 404 && !expectNotification && event.ActionKind == "intervention" && event.Kind == "action_failed" {
-						terminal = event
-					}
 				}
 				if terminal.ActionID != "" {
 					break
@@ -227,25 +223,31 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 					t.Fatal("no independently received notification")
 				}
 				failure, ok := sent["recoveryFailure"].(map[string]any)
-				wantAttempt := tc.maxAttempts
 				if tc.heal {
-					wantAttempt = 1
 					if restarts.Load() != 1 {
 						t.Fatal("early escalation waited for or repeated a second recovery")
 					}
 				}
-				if !ok || len(failure) != 7 || failure["driver"] != "docker" || failure["outcome"] != "failure" || failure["trigger"] != tc.trigger || failure["attempt"] != float64(wantAttempt) || failure["maxAttempts"] != float64(tc.maxAttempts) || failure["actionId"] == "" {
+				if !ok || len(failure) != 8 || failure["driver"] != "docker" || failure["outcome"] != "failure" || failure["trigger"] != tc.trigger || failure["attempt"] != float64(1) || failure["maxAttempts"] != float64(tc.maxAttempts) || failure["actionId"] == "" || failure["termination_reason"] != "permanent_rejection" {
 					t.Fatal("incorrect or unsafe agent failure context", failure)
+				}
+				failedAt, ok := failure["failedAt"].(string)
+				parsed, err := time.Parse(time.RFC3339Nano, failedAt)
+				if !ok || err != nil || parsed.IsZero() {
+					t.Fatal("agent failure context lacks its original completion time")
 				}
 				if terminal.RecoveryFailure == nil || action.Data.RecoveryFailure == nil || terminal.RecoveryFailure.ActionID != failure["actionId"] || action.Data.RecoveryFailure.ActionID != failure["actionId"] || terminal.IncidentID != sent["incidentId"] || messages.Load() != 1 {
 					t.Fatal("API, history and agent disagree about the original failure")
 				}
+				recovery, err := client.Actions.Get(ctx, terminal.RecoveryFailure.ActionID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !parsed.Equal(terminal.RecoveryFailure.FailedAt) || !parsed.Equal(action.Data.RecoveryFailure.FailedAt) || recovery.Data.FinishedAt == nil || !parsed.Equal(*recovery.Data.FinishedAt) {
+					t.Fatal("API, history and agent changed the original recovery completion time")
+				}
 				if tc.agentLost && (!action.Data.Held || action.Data.State != "unknown") {
 					t.Fatal("lost notification reply was not held")
-				}
-			} else if tc.dockerStatus == 404 {
-				if messages.Load() != 0 || restarts.Load() != 1 || action.Data.Held || action.Data.State != "failed" || action.Data.RecoveryFailure != nil {
-					t.Fatal("permanent rejection retried, escalated as exhausted, or became unknown")
 				}
 			} else if messages.Load() != 0 || restarts.Load() != 1 || !action.Data.Held || action.Data.RecoveryFailure != nil {
 				t.Fatal("unknown recovery triggered or repeated an external action")
@@ -273,9 +275,6 @@ func TestMainA2ARecoveryEscalation(t *testing.T) {
 			}
 			if restarts.Load() != 1 || messages.Load() != wantMessages {
 				t.Fatal("shutdown or restart repeated an external operation", restarts.Load(), messages.Load())
-			}
-			if tc.dockerStatus == 404 && !expectNotification && (recovered.Data.State != "failed" || recovered.Data.Held) {
-				t.Fatal("restart changed the permanent rejection outcome")
 			}
 		})
 	}

@@ -10,7 +10,8 @@ export default [
     plugins: { '@typescript-eslint': tsPlugin, 'react-hooks': hooks },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      ...hooks.configs.recommended.rules,
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },

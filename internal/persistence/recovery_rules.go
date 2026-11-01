@@ -52,8 +52,8 @@ type recoveryRuleData struct {
 // compiled predicates; decoding replaces the receiver, never shared data.
 type RecoveryRules struct{ data *recoveryRuleData }
 
-func (p RecoveryRules) IsZero() bool { return p.data == nil }
-func (p RecoveryRules) HasIntervention() bool {return p.data!=nil && len(p.data.inputs.Targets)>0}
+func (p RecoveryRules) IsZero() bool          { return p.data == nil }
+func (p RecoveryRules) HasIntervention() bool { return p.data != nil && len(p.data.inputs.Targets) > 0 }
 func (p RecoveryRules) Digest() string {
 	if p.data == nil {
 		return ""

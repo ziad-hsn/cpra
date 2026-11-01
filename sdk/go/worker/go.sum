@@ -144,7 +144,7 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/yosssi/ace v0.0.5 h1:tUkIP/BLdKqrlrPwcmH0shwEEhTRHoGnc1wFIWmaBUA=
 github.com/yosssi/ace v0.0.5/go.mod h1:ALfIzm2vT7t5ZE7uoIZqF3TQ7SAOyupFZnkrF5id+K0=
-github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1 h1:vtcvGQh3HnsPeCcfkC77Qc/YfK8sL1QD7mBAIaEn3mo=
+github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1 h1:xo45/LwEj2TZM5VNryYesP3bAzosO0MFk80XOqskevI=
 github.com/ziad-hsn/cpra/sdk/go v0.1.0-rc.1/go.mod h1:8zjD6+usJ56FH6nou7BLxr9BlHq8zdyfomc1PzI7Vj4=
 go.etcd.io/bbolt v1.4.3 h1:dEadXpI6G79deX5prL3QRNP6JB8UxVkqo4UPnHaNXJo=
 go.etcd.io/bbolt v1.4.3/go.mod h1:tKQlpPaYCVFctUIgFKFnAlvbmB3tpy1vkTnDWohtc0E=
